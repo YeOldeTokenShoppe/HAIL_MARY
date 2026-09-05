@@ -3408,6 +3408,54 @@ export default function OilPage() {
     return max;
   }, [communityGrid3D, gridSize]);
 
+  // ?mockfield=1 — a plausible, deterministic field for eyeballing the survey
+  // map and cross-section before real strikes exist (dev only; overrides what
+  // the two views are handed, nothing else).
+  const mockField = useMemo(() => {
+    if (typeof window === "undefined" || !/[?&]mockfield=1\b/.test(window.location.search)) return null;
+    let a = 0x9e3779b9; const rnd = () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const plots = {}; const grid = Array.from({ length: gridSize }, () => Array.from({ length: gridSize }, () => new Array(DEPTH_Z).fill(0)));
+    const hellM = {}; const gushers = []; const msgs = {}; const claims = []; let maxOil = 0, maxClaim = 0;
+    const now = Date.now();
+    // same order the real claimTotals use (north row first) so the row margin bars line up
+    for (let y = gridSize - 1; y >= 0; y--) for (let x = 0; x < gridSize; x++) {
+      const key = `${x}_${y}`; const r = rnd();
+      const claimed = r < 0.38; let total = 0;
+      if (claimed) {
+        const depth = 1 + Math.floor(rnd() * 14); const revealed = {}; const hellLayers = {}; const hellCapped = {};
+        const deposit = rnd() < 0.45; const peak = 2 + Math.floor(rnd() * 12);
+        for (let z = 0; z < depth; z++) {
+          let v = 0;
+          if (deposit) { const d = Math.abs(z - peak); v = d <= 2 ? Math.round((260 - d * 80) * (0.6 + rnd() * 0.8)) : 0; }
+          revealed[z] = v; grid[x][y][z] = v; total += v; if (v > maxOil) maxOil = v;
+        }
+        // hell no more often than the seeded pocket count allows (the real field can't exceed it)
+        if (rnd() < 0.16 && (numberOfHellPockets == null || Object.keys(hellM).length < numberOfHellPockets)) { const hz = Math.max(0, depth - 1 - Math.floor(rnd() * 2)); hellLayers[hz] = true; hellM[`${x}_${y}_${hz}`] = true; if (rnd() < 0.35) hellCapped[hz] = true; }
+        const plot = { col: x, row: y, currentOwnerId: `mock_${x}_${y}`, drillDay: depth, revealed, hellLayers, hellCapped, lastStrikeAt: rnd() < 0.22 ? { toMillis: () => now - Math.floor(rnd() * 20) * 3600000 } : { toMillis: () => now - (2 + Math.floor(rnd() * 8)) * 86400000 } };
+        if (rnd() < 0.15) plot.revealedArtifacts = { [Math.floor(rnd() * depth)]: { kind: "concretion" } };
+        if (total > 600 && rnd() < 0.5) gushers.push({ col: x, row: y, tier: total > 900 ? "gusher" : "strike", status: "active" });
+        if (rnd() < 0.12) msgs[key] = true;
+        plots[key] = plot;
+      }
+      if (total > maxClaim) maxClaim = total;
+      claims.push({ x, y, index: y * gridSize + x, claim: y * gridSize + x + 1, oil: total, total });
+    }
+    // put the signed-in player (or a stand-in) on one plot so YOU renders
+    const meKey = "3_2"; if (plots[meKey]) plots[meKey].currentOwnerId = user?.id || "me";
+    return { allPlotsMap: plots, claimTotals: claims, grid3D: grid, hellMap: hellM, gusherEvents: gushers, plotsWithMessages: msgs, maxOil: Math.max(1, maxOil), maxClaimTotal: Math.max(1, maxClaim) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gridSize, user?.id, numberOfHellPockets]);
+  // What the survey map and cross-section are handed: the mock, else the real thing.
+  const fieldView = useMemo(() => mockField || {
+    allPlotsMap,
+    claimTotals: showOilData ? stats.claimTotals : communityClaimTotals,
+    grid3D: showOilData ? stats.grid3D : displayGrid3D,
+    hellMap: seedVisible ? stats.hellMap : revealedHellMap,
+    gusherEvents, plotsWithMessages,
+    maxOil: showOilData ? stats.maxOil : communityMaxOil,
+    maxClaimTotal: communityMaxClaimTotal,
+  }, [mockField, allPlotsMap, showOilData, stats, communityClaimTotals, displayGrid3D, seedVisible, revealedHellMap, gusherEvents, plotsWithMessages, communityMaxOil, communityMaxClaimTotal]);
+  const fieldVerified = !!blockHash && blockHash !== DEFAULT_BLOCK_HASH;
   // Max cell value + hell pockets for the player-facing display (revealed) vs
   // admin/report (full seed truth).
   const displayMaxOil = seedVisible ? stats.maxOil : communityMaxOil;
@@ -8166,7 +8214,7 @@ export default function OilPage() {
         <div style={m.tabBar}>
           {[
             { key: "3d", label: "RIG" },
-            { key: "boardwalk", label: "BOARDWALK" },
+            { key: "boardwalk", label: "MIDWAY" },
             { key: "surface", label: "SURFACE" },
             { key: "xsec", label: "X-SECTION" },
           ].map((tab) => (
@@ -8455,8 +8503,8 @@ export default function OilPage() {
             <div style={m.section}>
               <OilSurfaceMap
                 blockade={hellActive && hellCol != null ? { col: hellCol, row: hellRow } : null}
-                claimTotals={showOilData ? stats.claimTotals : communityClaimTotals}
-                maxClaimTotal={communityMaxClaimTotal}
+                claimTotals={fieldView.claimTotals}
+                maxClaimTotal={fieldView.maxClaimTotal}
                 selectedClaimIndex={selectedClaimIndex}
                 onSelectClaim={handleSelectClaim}
                 sliceY={sliceY}
@@ -8464,10 +8512,16 @@ export default function OilPage() {
                 parabolum={parabolum}
                 gridX={gridSize}
                 gridY={gridSize}
-                allPlotsMap={allPlotsMap}
+                allPlotsMap={fieldView.allPlotsMap}
                 claimJumpMode={claimJumpMode}
                 onClaimJump={handleClaimJump}
                 currentUserId={user?.id}
+                hellMap={fieldView.hellMap}
+                numberOfDeposits={numberOfDeposits}
+                numberOfHellPockets={numberOfHellPockets}
+                gusherEvents={fieldView.gusherEvents}
+                plotsWithMessages={fieldView.plotsWithMessages}
+                verified={fieldVerified}
               />
             </div>
           )}
@@ -8476,16 +8530,24 @@ export default function OilPage() {
           {mobileTab === "xsec" && (
             <div style={m.section}>
               <OilCrossSection
-                grid3D={showOilData ? stats.grid3D : communityGrid3D}
-                maxCellValue={showOilData ? stats.maxOil : communityMaxOil}
+                grid3D={fieldView.grid3D}
+                maxCellValue={fieldView.maxOil}
                 sliceY={sliceY}
                 selectedX={xsecCol}
                 drillDepth={showOilData ? drillDepth : effectiveDrillDay}
                 onSelectX={handleSelectX}
+                onSelectRow={setSliceY}
                 theme={theme}
                 parabolum={parabolum}
                 gridX={gridSize}
                 gridY={gridSize}
+                allPlotsMap={fieldView.allPlotsMap}
+                hellMap={fieldView.hellMap}
+                gusherEvents={fieldView.gusherEvents}
+                capDepth={PASSIVE_DRILLS}
+                ownCapDepth={PASSIVE_DRILLS + (userDrill?.bonusDrills || 0)}
+                currentUserId={user?.id}
+                verified={fieldVerified}
               />
             </div>
           )}
@@ -9037,8 +9099,8 @@ export default function OilPage() {
             <div id="survey-map" style={styles.midPanel}>
               <OilSurfaceMap
                 blockade={hellActive && hellCol != null ? { col: hellCol, row: hellRow } : null}
-                claimTotals={showOilData ? stats.claimTotals : communityClaimTotals}
-                maxClaimTotal={communityMaxClaimTotal}
+                claimTotals={fieldView.claimTotals}
+                maxClaimTotal={fieldView.maxClaimTotal}
                 selectedClaimIndex={selectedClaimIndex}
                 onSelectClaim={handleSelectClaim}
                 sliceY={sliceY}
@@ -9046,24 +9108,38 @@ export default function OilPage() {
                 parabolum={parabolum}
                 gridX={gridSize}
                 gridY={gridSize}
-                allPlotsMap={allPlotsMap}
+                allPlotsMap={fieldView.allPlotsMap}
                 claimJumpMode={claimJumpMode}
                 onClaimJump={handleClaimJump}
                 currentUserId={user?.id}
+                hellMap={fieldView.hellMap}
+                numberOfDeposits={numberOfDeposits}
+                numberOfHellPockets={numberOfHellPockets}
+                gusherEvents={fieldView.gusherEvents}
+                plotsWithMessages={fieldView.plotsWithMessages}
+                verified={fieldVerified}
               />
             </div>
             <div style={{ ...styles.midPanel, flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
               <OilCrossSection
-                grid3D={showOilData ? stats.grid3D : communityGrid3D}
-                maxCellValue={showOilData ? stats.maxOil : communityMaxOil}
+                grid3D={fieldView.grid3D}
+                maxCellValue={fieldView.maxOil}
                 sliceY={sliceY}
                 selectedX={xsecCol}
                 drillDepth={showOilData ? drillDepth : effectiveDrillDay}
                 onSelectX={handleSelectX}
+                onSelectRow={setSliceY}
                 theme={theme}
                 parabolum={parabolum}
                 gridX={gridSize}
                 gridY={gridSize}
+                allPlotsMap={fieldView.allPlotsMap}
+                hellMap={fieldView.hellMap}
+                gusherEvents={fieldView.gusherEvents}
+                capDepth={PASSIVE_DRILLS}
+                ownCapDepth={PASSIVE_DRILLS + (userDrill?.bonusDrills || 0)}
+                currentUserId={user?.id}
+                verified={fieldVerified}
                 fillHeight
               />
             </div>

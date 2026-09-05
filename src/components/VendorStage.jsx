@@ -1,5 +1,6 @@
 "use client";
-// ── Phone boardwalk: one live stall inside a portal card ─────────────────────
+// ── Phone MIDWAY (the boomtown strip at the field's edge; "boardwalk" stays as the
+// internal key and the deck object): one live stall inside a portal card ────
 // The phone never loads the whole strip GLB. Browsing is a row of POSTCARDS
 // (stills rendered from the desktop strip by scripts/render-postcards.mjs);
 // picking one mounts that STALL alone — its props extracted from the strip by
@@ -114,7 +115,7 @@ const STAGE_TUNE = {
   // the rug seller sits behind his card table: the flipped card keeps the whole
   // stall (chair, folding tables, card decks, boxes, laptops, the sign) — he's
   // seen from behind with the merch laid out in front of him
-  rugs: { keepPropsOnBack: true },
+  rugs: { keepPropsOnBack: true, backShiftY: 0.04 },   // a hair higher; more would pull the awning into the frame
 };
 // Tuning overrides (dev): ?stallfront=<z> and ?stallyaw=<deg> — the front limit and an absolute stall yaw.
 const TUNE = (() => { if (typeof window === "undefined") return {}; const q = new URLSearchParams(window.location.search); const f = parseFloat(q.get("stallfront")), y = parseFloat(q.get("stallyaw")), bz = parseFloat(q.get("stallback")), by = parseFloat(q.get("stallbacky")), bp = parseFloat(q.get("stallpitch")); return { front: Number.isFinite(f) ? f : null, yaw: Number.isFinite(y) ? (y * Math.PI) / 180 : null, back: Number.isFinite(bz) ? bz : null, backY: Number.isFinite(by) ? by : null, backPitch: Number.isFinite(bp) ? (bp * Math.PI) / 180 : null }; })();
@@ -417,7 +418,7 @@ export function BoardwalkStrip({ vendorId, onSelect, open, onToggleOpen, childre
       {open && (
         <div style={{ position: "absolute", top: "calc(8px + env(safe-area-inset-top, 0px))", left: "calc(8px + env(safe-area-inset-left, 0px))", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
           <div style={{ ...panel, ...mono, padding: "7px 10px", fontSize: 10 }}>
-            <div style={{ color: "#ff8c5a", fontSize: 9 }}>BOARDWALK</div>
+            <div style={{ color: "#ff8c5a", fontSize: 9 }}>THE MIDWAY</div>
             <div>{name}</div>
           </div>
           <button type="button" onClick={onToggleOpen}

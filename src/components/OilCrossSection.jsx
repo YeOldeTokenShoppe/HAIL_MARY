@@ -38,19 +38,41 @@ export default function OilCrossSection({
   // available height instead of a fixed 280px — so it never gets clipped by a
   // short column. Mobile (tabbed) keeps the fixed height.
   fillHeight = false,
+  // ── the row as a race (2026-09-04) ──
+  allPlotsMap = {},          // every rig's depth + owner in the row
+  hellMap = {},              // "x_y_z": true — revealed hell layers
+  gusherEvents = [],         // { col, row, tier }
+  onSelectRow,               // row picker (◀ ▶)
+  capDepth = null,           // the base depth cap (a dashed line)
+  ownCapDepth = null,        // this player's own cap (bonus drills) — drawn on their column
+  currentUserId = null,
+  verified = false,
 }) {
   // Dark-theme bgs: dark (#12161c), parabolumDark (#0c0717), hud (#0f141c).
   const dark = theme?.bg === "#12161c" || theme?.bg === "#0c0717" || theme?.bg === "#0f141c";
   const sliceHasData = Array.from({ length: gridX }, (_, x) => grid3D[x]?.[sliceY] || []).some((col) => col.some((v) => v > 0));
+  const hellRed = dark ? "#8c2419" : "#d9463a";
+  const rowPlots = Array.from({ length: gridX }, (_, x) => allPlotsMap[`${x}_${sliceY}`] || null);
+  const rigsInRow = rowPlots.filter((p) => p?.currentOwnerId != null).length;
+  const gusherAt = {}; for (const g of gusherEvents || []) if (g && g.row === sliceY) gusherAt[g.col] = g;
+  const stepRow = (d) => onSelectRow?.(((sliceY + d) % gridY + gridY) % gridY);
   const t = theme || { text: "#5a4e3e", muted: "#9e8e78", inputBg: "#f0e8dc", borderLight: "#c8bfb0", accent: "#7a5a1a", gold: "#d4a854", goldBorder: "#b8922e", textStrong: "#3e2e10", inspectorKey: "#8b7d6b", seedLabel: "#8b7355" };
 
   return (
     <div style={{ fontFamily: "'Share Tech Mono', 'Courier New', monospace", color: t.text, ...(fillHeight ? { height: "100%", display: "flex", flexDirection: "column", minHeight: 0 } : {}) }}>
-      <div style={{
-        fontSize: 10, color: t.inspectorKey || t.muted, marginBottom: 6,
-        textAlign: "center", letterSpacing: "0.08em",
-      }}>
-        CROSS-SECTION &mdash; {selectedX !== null ? `Plot (${selectedX + 1}, ${sliceY + 1}) · ` : ""}Row {sliceY + 1} (X across, depth down)
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 6, fontSize: 10, color: t.inspectorKey || t.muted, letterSpacing: "0.08em" }}>
+        {onSelectRow && <button type="button" aria-label="Previous row" onClick={() => stepRow(-1)} style={{ background: "transparent", border: `1px solid ${t.borderLight}`, color: t.muted, borderRadius: 2, padding: "1px 6px", cursor: "pointer", fontSize: 9 }}>◀</button>}
+        <span>CROSS-SECTION &mdash; {selectedX !== null ? `Plot (${selectedX + 1}, ${sliceY + 1}) · ` : ""}Row {sliceY + 1}</span>
+        {onSelectRow && <button type="button" aria-label="Next row" onClick={() => stepRow(1)} style={{ background: "transparent", border: `1px solid ${t.borderLight}`, color: t.muted, borderRadius: 2, padding: "1px 6px", cursor: "pointer", fontSize: 9 }}>▶</button>}
+        <span title={verified ? "Seed revealed — every layer is verifiable" : "Map sealed until the season ends"} style={{ fontSize: 7, letterSpacing: "0.12em", padding: "2px 5px", borderRadius: 2, border: `1px solid ${verified ? t.green : t.borderLight}`, color: verified ? t.green : t.muted }}>{verified ? "VERIFIED" : "SEALED"}</span>
+      </div>
+      {/* who is in this row: owner tags and gusher marks over each column */}
+      <div style={{ marginLeft: 28, display: "grid", gridTemplateColumns: `repeat(${gridX}, 1fr)`, height: 12, marginBottom: 1 }}>
+        {rowPlots.map((p, x) => { const owned = p?.currentOwnerId != null; const mine = !!currentUserId && p?.currentOwnerId === currentUserId; return (
+          <div key={x} style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 2, fontSize: 7, lineHeight: 1, color: mine ? t.green : t.muted }}>
+            {gusherAt[x] && <span title={`gusher · ${gusherAt[x].tier || ""}`} style={{ color: t.green }}>▲</span>}
+            {owned && <span title={mine ? "your rig" : "claimed"} style={{ fontWeight: mine ? 700 : 400 }}>{mine ? "YOU" : "■"}</span>}
+          </div>); })}
       </div>
 
       <div style={{
@@ -85,12 +107,18 @@ export default function OilCrossSection({
             Array.from({ length: gridX }, (_, x) => {
               const value = grid3D[x][sliceY][z];
               const isSelected = x === selectedX;
-              const isDrilledCell = isSelected && z < drillDepth;
+              const plot = rowPlots[x]; const owned = plot?.currentOwnerId != null; const mine = !!currentUserId && plot?.currentOwnerId === currentUserId;
+              const rigDepth = isSelected ? drillDepth : (plot?.drillDay || 0);
+              const isDrilledCell = owned || isSelected ? z < rigDepth : false;
+              const isHell = !!hellMap[`${x}_${sliceY}_${z}`];
+              const isCapped = isHell && !!plot?.hellCapped?.[z];
+              const capHere = capDepth != null && z === capDepth;
+              const ownCapHere = ownCapDepth != null && mine && z === ownCapDepth && ownCapDepth !== capDepth;
               // Match the surface-view selection highlight (green) so the two
               // views read as the same selection.
               const selectBorder = t.green || "#2f8f8f";
               // Tint selected column so it's visible even when all values are 0
-              const baseBg = (value === 0 && t.mapEmpty)
+              const baseBg = isHell ? hellRed : (value === 0 && t.mapEmpty)
                 ? t.mapEmpty
                 : getOilColor(value, maxCellValue, dark, parabolum);
               const selectedTint = isSelected && value === 0
@@ -104,7 +132,7 @@ export default function OilCrossSection({
                     background: value === 0 && isSelected ? selectedTint : baseBg,
                     borderLeft: isSelected ? `2px solid ${selectBorder}` : "none",
                     borderRight: isSelected ? `2px solid ${selectBorder}` : "none",
-                    borderTop: isSelected && z === 0 ? `2px solid ${selectBorder}` : "none",
+                    borderTop: isSelected && z === 0 ? `2px solid ${selectBorder}` : isCapped ? "2px solid #fff" : capHere ? `1px dashed ${t.gold || t.accent}` : ownCapHere ? `1px dashed ${selectBorder}` : "none",
                     borderBottom: isSelected && z === DEPTH_Z - 1 ? `2px solid ${selectBorder}` : "none",
                     position: "relative",
                     boxSizing: "border-box",
@@ -118,12 +146,20 @@ export default function OilCrossSection({
                       pointerEvents: "none",
                     }} />
                   )}
-                  {isDrilledCell && (
+                  {isDrilledCell && (() => { const h = isSelected ? (t.selectHatch || (dark ? "rgba(122,170,90,0.35)" : "rgba(90,138,58,0.3)")) : (dark ? "rgba(200,200,200,0.16)" : "rgba(60,60,60,0.14)"); return (
                     <div style={{
                       position: "absolute",
                       inset: 0,
-                      background: `repeating-linear-gradient(45deg, transparent, transparent 2px, ${t.selectHatch || (dark ? "rgba(122,170,90,0.35)" : "rgba(90,138,58,0.3)")} 2px, ${t.selectHatch || (dark ? "rgba(122,170,90,0.35)" : "rgba(90,138,58,0.3)")} 4px)`,
+                      background: `repeating-linear-gradient(45deg, transparent, transparent 2px, ${h} 2px, ${h} 4px)`,
+                      pointerEvents: "none",
                     }} />
+                  ); })()}
+                  {/* every rig's bit: a marker at its depth */}
+                  {!isSelected && owned && z === rigDepth && rigDepth > 0 && rigDepth < DEPTH_Z && (
+                    <div style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)", color: mine ? selectBorder : t.muted, fontSize: 7, lineHeight: 1 }}>▾</div>
+                  )}
+                  {capHere && x === gridX - 1 && (
+                    <div style={{ position: "absolute", right: 1, top: 0, fontSize: 6, lineHeight: 1, color: t.gold || t.accent, letterSpacing: "0.06em" }}>CAP</div>
                   )}
                   {isSelected && z === drillDepth && drillDepth > 0 && drillDepth < DEPTH_Z && (
                     <div style={{
@@ -149,7 +185,7 @@ export default function OilCrossSection({
             pointerEvents: "none", padding: "0 28px", textAlign: "center",
             fontSize: 10, lineHeight: 1.5, letterSpacing: "0.06em", color: t.muted,
           }}>
-            No strikes on row {sliceY + 1} yet — layers appear here as rigs hit.
+            No strikes on row {sliceY + 1} yet{rigsInRow ? ` — ${rigsInRow} rig${rigsInRow > 1 ? "s" : ""} drilling` : ""}. Layers appear here as rigs hit.
           </div>
         )}
       </div>
@@ -179,7 +215,7 @@ export default function OilCrossSection({
         gap: 6, marginTop: 6, fontSize: 8, color: t.inspectorKey || t.muted,
         letterSpacing: "0.1em",
       }}>
-        <span>DRY</span>
+        <span>0</span>
         <div style={{ display: "flex", height: 6, width: 120, borderRadius: 1, overflow: "hidden" }}>
           {Array.from({ length: 30 }, (_, i) => (
             <div key={i} style={{
@@ -188,7 +224,10 @@ export default function OilCrossSection({
             }} />
           ))}
         </div>
-        <span>GUSHER</span>
+        <span>{Math.round(maxCellValue || 0).toLocaleString()} BTR</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 3, marginLeft: 6 }}><span style={{ width: 8, height: 8, background: hellRed, borderRadius: 1 }} />HELL</span>
+        {capDepth != null && <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><span style={{ width: 10, borderTop: `1px dashed ${t.gold || t.accent}` }} />CAP D{capDepth}</span>}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><span>▾</span>RIG DEPTH</span>
       </div>
     </div>
   );
