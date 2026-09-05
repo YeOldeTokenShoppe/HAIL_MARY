@@ -20,6 +20,17 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
 function buildSkyEnv({ sky = "#54aee8", skyBottom = "#c9e7f7", ground = "#d8c9a8", sunHour = 12, preset = "day" }) {
   const zen = lin(sky), hor = lin(skyBottom, sky), gnd = lin(ground, "#d8c9a8");
   const isHell = preset === "hell";
+  // Chrome reflects this map's colour EXACTLY (white base, metalness 1), so a
+  // tinted palette — dusk's pink horizon — turned the whole rig pink. Pull the
+  // sky and ground toward their own luminance: the map keeps its light/dark
+  // structure (that is what sells metal) but only a hint of the hue.
+  const neutral = (c, k) => { const l = c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722; c.r += (l - c.r) * k; c.g += (l - c.g) * k; c.b += (l - c.b) * k; return c; };
+  if (!isHell) { neutral(zen, 0.45); neutral(hor, 0.6); neutral(gnd, 0.35); }
+  // Mirror, not satin: what reads as chrome is CONTRAST — a bright horizon line
+  // over a dark ground, a zenith darker than the horizon, and a hot sun. The
+  // ground drops to ~45% and the sky's horizon band is lifted.
+  const MIRROR = { ground: 0.01, horizonLift: 1.25, zenith: 0.85 };
+  if (!isHell) { gnd.multiplyScalar(MIRROR.ground); hor.multiplyScalar(MIRROR.horizonLift); zen.multiplyScalar(MIRROR.zenith); }
   const isNight = preset === "night" || (!isHell && sunHour != null && (sunHour < 5.5 || sunHour > 19.5));
   // Night: the hemisphere ground colour is far darker than the violet mesa the
   // player actually sees, and a black map turns chrome matte. Lift the ground
@@ -32,7 +43,7 @@ function buildSkyEnv({ sky = "#54aee8", skyBottom = "#c9e7f7", ground = "#d8c9a8
   const sunAz = ((h - 12) / 12) * Math.PI;                 // 0 = south (toward +Z in equirect terms)
   const body = isHell ? null : isNight
     ? { el: 48 * Math.PI / 180, az: -0.8, r: 2.2 * Math.PI / 180, glow: 14 * Math.PI / 180, color: lin("#e8d0ff"), core: 4.0, halo: 0.45 }
-    : { el: Math.max(sunEl, -2 * Math.PI / 180), az: sunAz, r: 2.4 * Math.PI / 180, glow: 11 * Math.PI / 180, color: lin(h < 8 || h > 16.5 ? "#ffb070" : "#fff1c8"), core: 6.5, halo: 0.7 };
+    : { el: Math.max(sunEl, -2 * Math.PI / 180), az: sunAz, r: 1.7 * Math.PI / 180, glow: 9 * Math.PI / 180, color: lin(h < 8 || h > 16.5 ? "#ffc088" : "#fff6dc"), core: 14, halo: 1.1 };
   const bx = body ? Math.cos(body.el) * Math.sin(body.az) : 0, by = body ? Math.sin(body.el) : 0, bz = body ? Math.cos(body.el) * Math.cos(body.az) : 0;
 
   const data = new Uint16Array(W * H * 4);
@@ -43,15 +54,16 @@ function buildSkyEnv({ sky = "#54aee8", skyBottom = "#c9e7f7", ground = "#d8c9a8
     for (let x = 0; x < W; x++) {
       const az = ((x + 0.5) / W - 0.5) * 2 * Math.PI;
       if (el >= 0) {
-        // sky: horizon colour at 0°, zenith at 90°, eased so the band near the horizon stays pale
-        const t = Math.pow(clamp01(s), 0.65);
+        // sky: horizon colour at 0°, zenith at 90°; a quick ease keeps a bright band on the horizon line
+        const t = Math.pow(clamp01(s), 0.5);
         px.copy(hor).lerp(zen, t);
         if (isHell) { const g = Math.exp(-Math.pow(el / (9 * Math.PI / 180), 2)); px.r += 1.2 * g; px.g += 0.25 * g; }
       } else {
         // ground: the mesa tone, darkening toward the nadir; a thin haze at the horizon
         const d = clamp01(-el / (Math.PI / 2));
-        px.copy(gnd).multiplyScalar(0.92 - 0.5 * Math.pow(d, 0.8));
-        const haze = Math.exp(-Math.pow(el / (2.5 * Math.PI / 180), 2)) * 0.6;
+        px.copy(gnd).multiplyScalar(1.0 - 0.6 * Math.pow(d, 0.7));
+        // a crisp horizon: only a hair of haze, so the ground edge stays a line in the reflection
+        const haze = Math.exp(-Math.pow(el / (1.2 * Math.PI / 180), 2)) * 0.5;
         px.lerp(hor, haze);
       }
       if (body) {

@@ -355,6 +355,16 @@ export const VENDOR_CATALOG = [
 // coin flip per reload. Matches the model URL case-insensitively, so
 // ?pose=tattooing and ?pose=idle each name one of her two files.
 const CHOSEN_POSE_MODEL = {};
+// Pin a vendor's resting pose to one of its poseModels (URL substring, case-
+// insensitive) — the phone's boardwalk card wants the tattoo artist seated and
+// working every time, not the per-load coin flip. Call before VendorModel mounts.
+export function getChosenPoseModel(vendorId) { return CHOSEN_POSE_MODEL[vendorId] || null; }
+export function pinVendorPoseModel(vendorId, match) {
+  const v = VENDOR_CATALOG.find((x) => x.id === vendorId);
+  const url = v?.poseModels?.find((u) => u.toLowerCase().includes(String(match).toLowerCase()));
+  if (url) CHOSEN_POSE_MODEL[vendorId] = url;
+  return url || null;
+}
 const POSE_PIN =
   typeof window !== "undefined"
     ? new URLSearchParams(window.location.search).get("pose")?.toLowerCase()

@@ -8196,7 +8196,7 @@ export default function OilPage() {
               layer over the header, tabs and report — the visit is the whole screen
               until STEP BACK. No remount, so the vendor keeps talking. */}
           {(
-            <div id="oil-canvas" style={{ ...m.canvasWrap, ...(editorOpen ? { ...m.canvasCompact, height: editorSceneH, minHeight: editorSceneH, maxHeight: editorSceneH } : {}), ...(sceneTab ? null : { display: "none" }), ...(mobileTab === "boardwalk" && boardwalkOpen && !arenaOpen ? { position: "fixed", inset: 0, zIndex: 10003, height: "100dvh", minHeight: 0, maxHeight: "none", background: "#0b0709" } : {}) }}>
+            <div id="oil-canvas" style={{ ...m.canvasWrap, ...(editorOpen ? { ...m.canvasCompact, height: editorSceneH, minHeight: editorSceneH, maxHeight: editorSceneH } : {}), ...(sceneTab ? null : { display: "none" }), ...(mobileTab === "boardwalk" && !boardwalkOpen && !arenaOpen ? { height: `calc(100dvh - ${MOBILE_CHROME_H}px - env(safe-area-inset-bottom, 0px))`, minHeight: 0, maxHeight: "none" } : {}), ...(mobileTab === "boardwalk" && boardwalkOpen && !arenaOpen ? { position: "fixed", inset: 0, zIndex: 10003, height: "100dvh", minHeight: 0, maxHeight: "none", background: "#0b0709" } : {}) }}>
               <CleanCanvas
                 key={canvasEpoch}
                 onContextLost={handleContextLost}
@@ -8240,7 +8240,7 @@ export default function OilPage() {
                     onSteady={handleDemonSteady}
                   />
                 ) : mobileTab === "boardwalk" ? (
-                  <VendorStage vendorId={boardwalkVendor} open={boardwalkOpen} onToggle={() => setBoardwalkOpen((o) => !o)} lowTier={!!quality.lowGfx} />
+                  <VendorStage vendorId={boardwalkVendor} open={boardwalkOpen} onToggle={() => setBoardwalkOpen((o) => !o)} lowTier={!!quality.lowGfx} sky={{ top: env.sky, bottom: env.skyBottom }} />
                 ) : (() => {
                   const own = activeUserDrill?.col != null ? { col: activeUserDrill.col, row: activeUserDrill.row } : null;
                   const ownKey = own ? `${own.col}_${own.row}` : null;
@@ -8419,7 +8419,10 @@ export default function OilPage() {
             </div>
           )}
 
-          <div style={{ zoom: MOBILE_PANEL_ZOOM }}>
+          {/* The report (scroll handle, 2D views, the rig card and everything under
+              it) has nothing for the boardwalk: hidden on that tab, so the stage
+              is the whole page below the tabs. */}
+          <div style={{ zoom: MOBILE_PANEL_ZOOM, ...(mobileTab === "boardwalk" ? { display: "none" } : {}) }}>
           {/* Scroll handle — only on the 3D tab, where the canvas captures touch.
               Gives a non-canvas grab area so the page can be scrolled, and taps
               nudge the panels below the scene into view. */}
