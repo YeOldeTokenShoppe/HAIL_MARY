@@ -17,21 +17,23 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
-import { MeshPortalMaterial, RoundedBox, Text, useTexture, useGLTF } from "@react-three/drei";
-import { VendorModel, VENDOR_CATALOG, pinVendorPoseModel, getChosenPoseModel } from "@/components/CommercialStrip";
+import { MeshPortalMaterial, RoundedBox, Text, useTexture, useGLTF, useAnimations } from "@react-three/drei";
+import { VendorModel, VENDOR_CATALOG, pinVendorPoseModel, getChosenPoseModel, applyStallEmissiveBoost } from "@/components/CommercialStrip";
 import { activateVendorSitePal, deactivateVendorSitePal, warmVendorSitePal, onVendorTalk } from "@/lib/vendorSitePal";
 import { goodsForVendor } from "@/lib/oilVendor";
 
 export const BOARDWALK_NAMES = {
   tonics: "REMEDIES", fortunes: "FORTUNES", hotdogs: "HOT DOGS", tacos: "TACOS", promos: "PROMOS",
-  rugs: "RUGS", tattoos: "TATTOOS", carny: "THRILL RIDE", souvenirs: "SOUVENIRS",
+  rugs: "RUGS", tattoos: "TATTOOS", carny: "THRILL RIDE", souvenirs: "SOUVENIRS", chapel: "CHAPEL",
 };
 // Row order on the phone: the salesman first (he sells the holy water). The
 // souvenir tent is off the row: its prop is not in the current strip export.
-export const BOARDWALK_ORDER = ["tonics", "fortunes", "hotdogs", "tacos", "promos", "rugs", "tattoos", "carny"];
+// tacos retired 2026-09-04 — the chapel took its stretch of deck (docs/midway-chapel.md)
+export const BOARDWALK_ORDER = ["tonics", "fortunes", "hotdogs", "chapel", "promos", "rugs", "tattoos", "carny"];
 export const postcardUrl = (id) => `/boardwalk/${id}.webp`;
 export const plateUrl = (id) => `/boardwalk/${id}-plate.webp`;
-export const stallUrl = (id) => `/models/stalls/stall_${id}.glb`;
+// a vendor with its own `stallModel` (the chapel) loads that exact, versioned URL
+export const stallUrl = (id) => VENDOR_CATALOG.find((v) => v.id === id)?.stallModel || `/models/stalls/stall_${id}.glb`;
 
 // Step up to a stall: MUST run inside the user's tap. activateVendorSitePal
 // unlocks browser audio and (on touch) boots the lazily embedded player from
@@ -116,6 +118,10 @@ const STAGE_TUNE = {
   // stall (chair, folding tables, card decks, boxes, laptops, the sign) — he's
   // seen from behind with the merch laid out in front of him
   rugs: { keepPropsOnBack: true, backShiftY: 0.04 },   // a hair higher; more would pull the awning into the frame
+  // the chapel (Tent_Revival.glb): the flipped card drops the big tent and its
+  // four wall panels (all SM_Bld_Tent_01*) and looks over the preacher's
+  // shoulder at the podium, the chairs and the candle rack
+  chapel: { keepPropsOnBack: true, hideOnBack: ["SM_Bld_Tent_01"], backShiftZ: 0.12, backShiftY: 0.02 },
 };
 // Tuning overrides (dev): ?stallfront=<z> and ?stallyaw=<deg> — the front limit and an absolute stall yaw.
 const TUNE = (() => { if (typeof window === "undefined") return {}; const q = new URLSearchParams(window.location.search); const f = parseFloat(q.get("stallfront")), y = parseFloat(q.get("stallyaw")), bz = parseFloat(q.get("stallback")), by = parseFloat(q.get("stallbacky")), bp = parseFloat(q.get("stallpitch")); return { front: Number.isFinite(f) ? f : null, yaw: Number.isFinite(y) ? (y * Math.PI) / 180 : null, back: Number.isFinite(bz) ? bz : null, backY: Number.isFinite(by) ? by : null, backPitch: Number.isFinite(bp) ? (bp * Math.PI) / 180 : null }; })();
@@ -180,8 +186,14 @@ function Backdrop({ id }) {
 // step aside (the wagon would otherwise fill the window with its rear wall)
 // and only the deck stays under the vendor, seen from behind against the sky.
 function StallProps({ id, frontRef, keepOnBack = false, hideOnBack = null, showOnBack = null, onScene }) {
-  const { scene } = useGLTF(stallUrl(id));
-  useEffect(() => { scene.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; } }); }, [scene]);
+  const { scene, animations } = useGLTF(stallUrl(id));
+  useEffect(() => { scene.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; } }); applyStallEmissiveBoost(scene, id); }, [scene, id]);
+  // A stall may carry its own extras — the chapel's seated congregation (a
+  // robot and a biker, each with a looping *_Sit clip). Every clip the stall
+  // GLB holds plays, looping, from mount; a prop-only stall has none.
+  const holder = useRef(null);
+  const { actions } = useAnimations(animations, holder);
+  useEffect(() => { const list = Object.values(actions || {}).filter(Boolean); list.forEach((a) => a.reset().setLoop(THREE.LoopRepeat, Infinity).play()); return () => list.forEach((a) => a.stop()); }, [actions]);
   const base = (n) => (n || "").replace(/\.\d{3}$/, "");
   // Hand the stall scene up: VendorModel's glow effect looks for the vendor's
   // glowMesh (the fortune teller's crystal ball) in the "strip" scene — here
@@ -195,9 +207,10 @@ function StallProps({ id, frontRef, keepOnBack = false, hideOnBack = null, showO
     // on the back, props step aside except the deck and any `showOnBack` nodes (a seated vendor's chair)
     for (const child of scene.children) { const keep = child.name === "Boardwalk" || front || (showingBack && !!showOnBack?.includes(base(child.name))); if (child.visible !== keep) child.visible = keep; }
     for (const o of hideList) { const keep = !showingBack; if (o.visible !== keep) o.visible = keep; }
+    if (typeof window !== "undefined") window.__hmStallHide = (re, on = false) => { const rx = new RegExp(re, "i"); let n = 0; scene.traverse((o) => { if (o.isMesh && rx.test(`${o.parent?.name}/${o.name}`)) { o.visible = on; n++; } }); return n; };
     if (typeof window !== "undefined") window.__hmStallBox = (deep = false) => { const out = {}; scene.updateMatrixWorld(true); const list = []; if (deep) scene.traverse((o) => { if (o.isMesh) list.push(o); }); else list.push(...scene.children); for (const child of list) { const b = new THREE.Box3().setFromObject(child); if (!b.isEmpty()) out[child.name || (child.parent?.name + "/mesh")] = [b.min.toArray().map((v) => +v.toFixed(2)), b.max.toArray().map((v) => +v.toFixed(2))]; } return out; };
   });
-  return <primitive object={scene} />;
+  return <group ref={holder}><primitive object={scene} /></group>;
 }
 function StageStall({ vendor, focusedRef, frontRef, cardYawRef, open = false }) {
   // Two levels: the OUTER group turns and slides in world space, the INNER group
@@ -393,6 +406,12 @@ export default function VendorStage({ vendorId = "tonics", open = false, onToggl
           <ambientLight intensity={0.9} />
           <directionalLight position={[0.6, 1.2, 1.4]} intensity={1.6} />
           <directionalLight position={[-0.8, 0.6, 0.4]} intensity={0.5} color="#ffd9b0" />
+          {/* The lights ride inside the portal, so they turn with the card: on the
+              flipped card the key sits BEHIND whatever faces the camera — the
+              chapel's congregation looked unlit while the preacher's back shone.
+              A fill from the card's back side lights that view (and rims the
+              front view a little). */}
+          <directionalLight position={[-0.3, 0.9, -1.4]} intensity={1.5} />
           <PortalSky top={sky?.top} bottom={sky?.bottom} />
           <Suspense fallback={null}>
             <Backdrop id={vendor.id} />

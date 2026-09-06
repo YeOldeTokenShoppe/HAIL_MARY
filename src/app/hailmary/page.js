@@ -101,7 +101,7 @@ const ENV_PRESETS = {
   // dusty-rose #e0a6b4 read far too strong once the bottom gradient filled the
   // sky at zoomed-out camera angles). skyBottom, fog, and the hemi ground-
   // bounce move together so the haze and lighting agree with the sky.
-  dusk:  { sky: "#8b7faa", skyBottom: "#dab0ac", ambient: 0.7, dirA: 4.0,  dirB: 2.0,  point: "#cc9966", cloudOpacity: 0.25, fog: "#c8a49e", hemi: { sky: "#9088aa", ground: "#d2aca6", intensity: 0.5 } },
+  dusk:  { sky: "#8b7faa", skyBottom: "#dab0ac", ambient: 0.7, dirA: 4.0,  dirB: 2.0,  point: "#cc9966", cloudOpacity: 0.25, fog: "#c8a49e", hemi: { sky: "#9088aa", ground: "#d2aca6", intensity: 0.5 }, camFill: 0.3, camFillColor: "#ffd9c8" },
   // Night IS the Lyquid80 look (consolidated 2026-08-29 — there is exactly one
   // night theme). These are the former parabolumEnv values: an arcane violet
   // twilight, brighter ambient than the old navy night (which left the ground
@@ -109,8 +109,8 @@ const ENV_PRESETS = {
   // the Parabolum console. Everything gated on envPreset === "night" (stars,
   // constellation, string lights, warehouse env-map, ParabolumMoon, violet
   // fluid, parabolumDark UI) now rides this preset.
-  night: { sky: "#1a0f2e", skyBottom: "#3a1f5c", ambient: 0.55, dirA: 2.4, dirB: 1.2, dirAColor: "#e8d0ff", dirBColor: "#9a7ad6", point: "#a45cff", cloudOpacity: 0.2, fog: "#1f1438", hemi: { sky: "#4a2d7a", ground: "#2a1f3a", intensity: 0.55 } },
-  hell:  { sky: "#1a0808", skyBottom: "#6b1a05", ambient: 0.2, dirA: 0.8, dirB: 0.4, point: "#ff2200", cloudOpacity: 0.4, fog: "#1a0505", hemi: { sky: "#3a0800", ground: "#150000", intensity: 0.35 } },
+  night: { sky: "#1a0f2e", skyBottom: "#3a1f5c", ambient: 0.55, dirA: 2.4, dirB: 1.2, dirAColor: "#e8d0ff", dirBColor: "#9a7ad6", point: "#a45cff", cloudOpacity: 0.2, fog: "#1f1438", hemi: { sky: "#4a2d7a", ground: "#2a1f3a", intensity: 0.55 } , camFill: 0.85, camFillColor: "#cbb8ff" },
+  hell:  { sky: "#1a0808", skyBottom: "#6b1a05", ambient: 0.2, dirA: 0.8, dirB: 0.4, point: "#ff2200", cloudOpacity: 0.4, fog: "#1a0505", hemi: { sky: "#3a0800", ground: "#150000", intensity: 0.35 } , camFill: 0.3, camFillColor: "#ff7a4a" },
 };
 
 // ── Continuous time-of-day (auto mode) ───────────────────────────────────────
@@ -145,6 +145,11 @@ function todFrame(p, over = {}) {
     hemiSky: p.hemi?.sky ?? ENV_PRESETS.dusk.hemi.sky,
     hemiGround: p.hemi?.ground ?? ENV_PRESETS.dusk.hemi.ground,
     hemiI: p.hemi?.intensity ?? 0,
+    // camera-side fill (2026-09-05): the moon key rides its own arc and sits
+    // behind the rig for half the night, which left camera-facing surfaces
+    // black. A soft fill that follows the camera keeps every rig readable
+    // without lifting the violet mood; 0 by day.
+    camFill: p.camFill ?? 0, camFillColor: p.camFillColor ?? "#ffffff",
     ...over,
   };
 }
@@ -204,6 +209,7 @@ function sampleEnvAt(hour) {
     point: col("point"), cloudOpacity: num("cloudOpacity"),
     fog: col("fog"), fogNear: num("fogNear"), fogFar: num("fogFar"),
     hemi: { sky: col("hemiSky"), ground: col("hemiGround"), intensity: num("hemiI") },
+    camFill: num("camFill"), camFillColor: col("camFillColor"),
   };
 }
 
@@ -211,6 +217,16 @@ function sampleEnvAt(hour) {
 // the lights it always did; a sampled auto-mode env additionally puts the key
 // light on the sun arc, adds the moon key on its arc, and widens/narrows the
 // fog range through the cycle.
+// A directional light that rides the camera (a headlamp, slightly above the
+// eye), so the side of the scene you look at is never unlit. Always mounted so
+// the light count stays constant (no shader recompiles); intensity does the work.
+function CameraFill({ intensity, color }) {
+  const ref = useRef(null);
+  const { camera } = useThree();
+  useFrame(() => { const l = ref.current; if (!l) return; l.position.copy(camera.position); l.position.y += 2; });
+  return <directionalLight ref={ref} intensity={intensity} color={color} />;
+}
+
 function EnvLights({ env, moodScale }) {
   return (
     <>
@@ -221,6 +237,7 @@ function EnvLights({ env, moodScale }) {
       {env.moon != null && <directionalLight position={env.moonPos} intensity={env.moon * moodScale} color={env.moonColor} />}
       <directionalLight position={[-5, 10, -5]} intensity={env.dirB * moodScale} color={env.dirBColor || "#ffffff"} />
       <pointLight position={[-8, 5, -8]} intensity={1.5 * moodScale} color={env.point} />
+      <CameraFill intensity={(env.camFill ?? 0) * moodScale} color={env.camFillColor || "#ffffff"} />
     </>
   );
 }
@@ -2526,6 +2543,10 @@ export default function OilPage() {
 
   // Mobile tab view
   const [mobileTab, setMobileTab] = useState("3d"); // "3d" | "boardwalk" | "surface" | "xsec"
+  // The phone rig camera's view: the report's MACHINE PANEL chip toggles "panel"
+  // (a head-on glide to the control box); leaving the RIG tab puts it back.
+  const [rigView, setRigView] = useState("rig");
+  useEffect(() => { if (mobileTab !== "3d") setRigView("rig"); }, [mobileTab]);
   // Phone boardwalk (2026-09-03): which postcard is up, and whether the portal is stepped into.
   const [boardwalkVendor, setBoardwalkVendor] = useState("tonics");
   const [boardwalkOpen, setBoardwalkOpen] = useState(false);
@@ -8058,12 +8079,38 @@ export default function OilPage() {
       <PanelTitle
         theme={theme} isMobile={isMobile} icon={PANEL_ICONS.rig}
         right={(
-          <span style={{
-            fontSize: 9, letterSpacing: "0.14em", padding: "2px 7px", borderRadius: 2,
-            border: `1px solid ${rigStatus.color}`, color: rigStatus.color,
-            fontFamily: "'Share Tech Mono', monospace", lineHeight: 1.5, whiteSpace: "nowrap", textTransform: "uppercase",
-          }}>
-            {rigStatus.label}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            {/* MACHINE PANEL chip (phone): the control box sits at the frame edge
+                on every rig model, so the chip does the reaching — it switches to
+                the RIG tab, scrolls the scene up and glides the camera to the
+                knobs; tapping again returns to the rig shot. */}
+            {isMobile && (
+              <button
+                type="button"
+                aria-pressed={rigView === "panel"}
+                onClick={() => {
+                  const next = rigView === "panel" ? "rig" : "panel";
+                  setMobileTab("3d");
+                  setRigView(next);
+                  if (next === "panel") setTimeout(() => document.getElementById("oil-scroll")?.scrollTo({ top: 0, behavior: "smooth" }), 60);
+                }}
+                style={{
+                  fontSize: 9, letterSpacing: "0.14em", padding: "2px 7px", borderRadius: 2, cursor: "pointer",
+                  border: `1px solid ${rigView === "panel" ? theme.text || theme.accent : theme.accent}`,
+                  color: rigView === "panel" ? theme.bg : theme.accent, background: rigView === "panel" ? theme.accent : "transparent",
+                  fontFamily: "'Share Tech Mono', monospace", lineHeight: 1.5, whiteSpace: "nowrap", textTransform: "uppercase",
+                }}
+              >
+                {rigView === "panel" ? "◂ RIG" : "MACHINE PANEL"}
+              </button>
+            )}
+            <span style={{
+              fontSize: 9, letterSpacing: "0.14em", padding: "2px 7px", borderRadius: 2,
+              border: `1px solid ${rigStatus.color}`, color: rigStatus.color,
+              fontFamily: "'Share Tech Mono', monospace", lineHeight: 1.5, whiteSpace: "nowrap", textTransform: "uppercase",
+            }}>
+              {rigStatus.label}
+            </span>
           </span>
         )}
       >
@@ -8324,6 +8371,7 @@ export default function OilPage() {
                       hasMessages={!!(ownKey && plotsWithMessages[ownKey])}
                       onEnvelopeClick={own ? () => setChatModalPlotKey(ownKey) : undefined}
                       hellActive={!!(own && hellActive && hellCol === own.col && hellRow === own.row)}
+                      view={rigView}
                       demon={demonTargetsOwn ? {
                         active: true,
                         seed: demonBounty?.id || `local_${own.col}_${own.row}`,

@@ -1,4 +1,5 @@
 "use client";
+import { INFERNAL } from "@/lib/oilVocab";
 
 // Paraboleum — neutral when empty, iridescent opal cyan as density climbs
 // (matches the cyan gusher beam + tank liquid).
@@ -105,7 +106,7 @@ export default function OilSurfaceMap({
       {/* the tally strip — what the field has given up so far, against the seeded totals */}
       <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "2px 10px", fontSize: 8, letterSpacing: "0.1em", color: t.muted, marginBottom: 6, paddingLeft: 14 }}>
         <span><b style={{ color: t.green }}>{tally.found}</b>{numberOfDeposits != null ? `/${numberOfDeposits}` : ""} DEPOSITS</span>
-        <span><b style={{ color: hellRed }}>{tally.hell}</b>{numberOfHellPockets != null ? `/${numberOfHellPockets}` : ""} HELL</span>
+        <span><b style={{ color: hellRed }}>{tally.hell}</b>{numberOfHellPockets != null ? `/${numberOfHellPockets}` : ""} {INFERNAL.short}</span>
         <span><b style={{ color: t.text || t.muted }}>{tally.claimed}</b>/{tally.plots} CLAIMED</span>
         <span><b>{tally.dry}</b> DRY</span>
         <span><b>{tally.unexplored}</b> UNEXPLORED</span>
@@ -225,7 +226,7 @@ export default function OilSurfaceMap({
               >
                 {/* corner marks: hell (top-right, lidded when a tonic capped it), gusher (top-left), messages (bottom-left) */}
                 {plotHell(plotData) && (
-                  <span aria-label={plotCapped(plotData) ? "hell, capped" : "hell"} style={{ position: "absolute", top: 0, right: 0, width: 0, height: 0, borderTop: `9px solid ${hellRed}`, borderLeft: "9px solid transparent", opacity: plotCapped(plotData) ? 0.55 : 1 }} />
+                  <span aria-label={plotCapped(plotData) ? `${INFERNAL.singular}, capped` : INFERNAL.singular} style={{ position: "absolute", top: 0, right: 0, width: 0, height: 0, borderTop: `9px solid ${hellRed}`, borderLeft: "9px solid transparent", opacity: plotCapped(plotData) ? 0.55 : 1 }} />
                 )}
                 {plotCapped(plotData) && <span style={{ position: "absolute", top: 1, right: 1, width: 6, height: 1.5, background: "#fff" }} />}
                 {gusherByPlot[plotKey] && <span aria-label="gusher" style={{ position: "absolute", top: 0, left: 1, fontSize: 7, lineHeight: 1, color: t.green }}>▲</span>}
@@ -283,7 +284,7 @@ export default function OilSurfaceMap({
           ["UNEXPLORED", { background: emptyFill, border: `1px solid ${t.borderLight}` }],
           ["YOU", { background: emptyFill, border: `2px solid ${t.green}88` }],
           ["CLAIMED", { background: emptyFill, border: `1px solid ${ownedBorder}` }],
-          ["HELL", { background: emptyFill, border: `1px solid ${t.borderLight}`, position: "relative" }],
+          [INFERNAL.plural, { background: emptyFill, border: `1px solid ${t.borderLight}`, position: "relative" }],
           ["GUSHER", { background: emptyFill, border: `1px solid ${t.borderLight}` }],
           ["24H", { background: emptyFill, boxShadow: "0 0 0 2px rgba(255,190,90,0.8)" }],
         ].map(([label, swatch]) => (
@@ -293,7 +294,7 @@ export default function OilSurfaceMap({
               display: "inline-flex", alignItems: "center", justifyContent: "center", ...swatch,
             }}>
               {label === "CLAIMED" && <span style={{ width: 4, height: 4, background: dark ? "#888" : "#999" }} />}
-              {label === "HELL" && <span style={{ position: "absolute", top: 0, right: 0, borderTop: `6px solid ${hellRed}`, borderLeft: "6px solid transparent" }} />}
+              {label === INFERNAL.plural && <span style={{ position: "absolute", top: 0, right: 0, borderTop: `6px solid ${hellRed}`, borderLeft: "6px solid transparent" }} />}
               {label === "GUSHER" && <span style={{ fontSize: 6, color: t.green, lineHeight: 1 }}>▲</span>}
             </span>
             {label}
@@ -315,7 +316,7 @@ export default function OilSurfaceMap({
           pd?.drillDay > 0 ? `D${pd.drillDay}` : "UNDRILLED",
           selected.total > 0 ? `${Math.round(selected.total).toLocaleString()} BTR` : null,
           last != null ? `struck ${ago(last)}` : null,
-          hellZ.length ? `🔥 hell at D${hellZ.join(",")}${plotCapped(pd) ? " (capped)" : ""}` : null,
+          hellZ.length ? `🔥 ${hellZ.length > 1 ? INFERNAL.pluralLower : INFERNAL.singular} at D${hellZ.join(",")}${plotCapped(pd) ? " (capped)" : ""}` : null,
           g ? `▲ ${String(g.tier || "gusher").toUpperCase()}` : null,
           arts ? `◆ ${arts} artifact${arts > 1 ? "s" : ""}` : null,
           msgs ? "✉ messages" : null,

@@ -1010,7 +1010,7 @@ void main() {
 
 // ── Tank liquid fill (animated, flat-topped) ────────────────────────────────
 
-const PUMPJACK_SCALE = 0.1;
+export const PUMPJACK_SCALE = 0.1;   // exported: RigScene seats the phone's work light in the same frame
 
 // Yaw correction (degrees about world-up) applied to the auto-derived MachinePanel
 // front direction. The front is inferred from the gauge children, then this rotates
@@ -1172,17 +1172,21 @@ function TankLiquid({ tankBounds, tankFill, envPreset, parabolum = false }) {
     clearcoatRoughness: 0.18,
   }), [isNight, isSolstice, parabolum]);
 
-  // Tank geometry params — the tank is a horizontal cylinder
-  // sizeX is the tank's cross-section width (diameter), sizeZ is the length
+  // Tank geometry params. Two tank shapes are understood (2026-09-05, ahead of
+  // Michelle's silo remodel): a HORIZONTAL cylinder lying along Z (the original —
+  // sizeX is the diameter, sizeZ the length, the liquid is a chord-segment
+  // extrusion) and a VERTICAL silo (tallest along Y — the liquid is an upright
+  // cylinder whose height is the fill, radius from the X/Z cross-section).
   const config = useMemo(() => {
     const tb = tankBounds;
     const S = PUMPJACK_SCALE;
-    // Radius = half the smaller of sizeX and sizeY (the circular cross-section)
-    const radius = Math.min(tb.sizeX, tb.sizeY) / 2 * 0.85;
+    const vertical = tb.longAxis === "y";
+    // Radius = half the smaller cross-section dimension (the circular section)
+    const radius = (vertical ? Math.min(tb.sizeX, tb.sizeZ) : Math.min(tb.sizeX, tb.sizeY)) / 2 * 0.85;
     // Length along the tank's long axis
     const tankLength = tb.sizeZ * 1.4;
     return {
-      radius, tankLength,
+      vertical, radius, tankLength, height: tb.sizeY * 0.96,
       cx: tb.cx, cy: tb.cy, cz: tb.cz,
       minY: tb.minY, sizeY: tb.sizeY,
       S,
@@ -1215,18 +1219,26 @@ function TankLiquid({ tankBounds, tankFill, envPreset, parabolum = false }) {
     const quantized = Math.round(fill * 50) / 50;
     if (quantized !== lastQuantizedFill.current && quantized > 0) {
       lastQuantizedFill.current = quantized;
-      const { radius, tankLength } = config;
-      const newGeo = buildFillGeometry(quantized, radius, tankLength);
+      const { vertical, radius, tankLength, height } = config;
+      const newGeo = vertical
+        ? new THREE.CylinderGeometry(radius, radius, Math.max(0.001, height * quantized), 40, 1, false).translate(0, height * quantized / 2, 0)
+        : buildFillGeometry(quantized, radius, tankLength);
       if (newGeo) {
         if (mesh.geometry) mesh.geometry.dispose();
         mesh.geometry = newGeo;
       }
     }
 
-    // Position: center of tank, rotated so extrusion runs along tank's Z axis
-    const { cx, cy, cz, S } = config;
-    mesh.position.set(cx * S, cy * S, cz * S);
-    mesh.rotation.y = Math.PI / 2;
+    const { vertical, cx, cy, cz, minY, sizeY, S } = config;
+    if (vertical) {
+      // Upright silo: the column stands on the tank floor and grows with the fill
+      mesh.position.set(cx * S, (minY + sizeY * 0.02) * S, cz * S);
+      mesh.rotation.y = 0;
+    } else {
+      // Position: center of tank, rotated so extrusion runs along tank's Z axis
+      mesh.position.set(cx * S, cy * S, cz * S);
+      mesh.rotation.y = Math.PI / 2;
+    }
     mesh.scale.setScalar(S);
   });
 
@@ -1775,7 +1787,10 @@ function PlotPoop() {
   );
 }
 
-function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, depositLayer = -1, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, gusherTier = "gusher", hasMessages = false, onEnvelopeClick, hellActive = false, worldW = 10, worldD = 10, cameraViewable = true, onFocusObject }) {
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, depositLayer = -1, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, gusherTier = "gusher", hasMessages = false, onEnvelopeClick, hellActive = false, worldW = 10, worldD = 10, cameraViewable = true, onFocusObject, panelZoomed = null }) {
+  // `panelZoomed` (phone, RigScene): the report's MACHINE PANEL chip has already
+  // glided the camera to the control box, so the panel buttons work without the
+  // desktop's select-then-zoom dance — true = buttons live, false = inert, null = desktop rules.
   const panelZoomedRef = useRef(false); // true once the panel has been zoomed in on
   const machinePanelRef = useRef();     // MachinePanel container node (for click-to-zoom)
   const lastClickTime = useRef(0);
@@ -3627,9 +3642,9 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       if (b.name.startsWith("RedButton")) { clickedButton = "red"; break; }
       if (b.name.startsWith("AlarmButton")) { clickedButton = "alarm"; break; }
     }
-    if (clickedButton && highlighted) {
+    if (clickedButton && (panelZoomed != null ? panelZoomed : highlighted)) {
       // First click on either button zooms in so the user can see/aim at the button.
-      if (!panelZoomedRef.current) {
+      if (!(panelZoomed ?? panelZoomedRef.current)) {
         if (onFocusObject && machinePanelRef.current) focusMachinePanel(machinePanelRef.current);
         return;
       }
@@ -3704,7 +3719,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       onClick?.();
     }
     lastClickTime.current = now;
-  }, [onClick, onDoubleClick, highlighted, initSteam, onEnvelopeClick, onFocusObject, focusMachinePanel]);
+  }, [onClick, onDoubleClick, highlighted, initSteam, onEnvelopeClick, onFocusObject, focusMachinePanel, panelZoomed]);
 
   // Reset the panel-zoom flag when this rig is deselected, so re-selecting it starts
   // the zoom-then-drain sequence fresh.

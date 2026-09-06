@@ -1,4 +1,5 @@
 "use client";
+import { INFERNAL } from "@/lib/oilVocab";
 
 const DEPTH_Z = 20;
 
@@ -225,7 +226,7 @@ export default function OilCrossSection({
           ))}
         </div>
         <span>{Math.round(maxCellValue || 0).toLocaleString()} BTR</span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 3, marginLeft: 6 }}><span style={{ width: 8, height: 8, background: hellRed, borderRadius: 1 }} />HELL</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 3, marginLeft: 6 }}><span style={{ width: 8, height: 8, background: hellRed, borderRadius: 1 }} />{INFERNAL.plural}</span>
         {capDepth != null && <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><span style={{ width: 10, borderTop: `1px dashed ${t.gold || t.accent}` }} />CAP D{capDepth}</span>}
         <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><span>▾</span>RIG DEPTH</span>
       </div>

@@ -29,17 +29,23 @@ await page.route((u) => !u.href.startsWith(BASE) && /sitepal|oddcast/i.test(u.hr
 await page.goto(`${BASE}/hailmary?tod=${TOD}&sitepal=lazy`, { waitUntil: "domcontentloaded" });
 await page.waitForFunction(() => document.querySelector("canvas") != null, null, { timeout: 90000 });
 // Wait for every stall to register (the strip GLB + vendor GLBs loaded).
-const ids = await page.evaluate(async () => {
+// POSTCARD_ONLY=chapel,tonics renders just those stalls (the rest keep their
+// files); POSTCARD_MIN is how many stalls must register before shooting (8 since
+// the taco stall retired, 2026-09-04).
+const ONLY = (process.env.POSTCARD_ONLY || "").split(",").map((s) => s.trim()).filter(Boolean);
+const MIN = Number(process.env.POSTCARD_MIN || 8);
+const allIds = await page.evaluate(async (MIN) => {
   const t0 = Date.now();
   while (Date.now() - t0 < 120000) {
     const reg = window.__hmVendorSpots || {};
     const keys = Object.keys(reg);
-    if (keys.length >= 9 && keys.every((k) => reg[k].approach)) return keys;
+    if (keys.length >= MIN && keys.every((k) => reg[k].approach)) return keys;
     await new Promise((r) => setTimeout(r, 250));
   }
   return Object.keys(window.__hmVendorSpots || {});
-});
-console.log("stalls:", ids.join(", "));
+}, MIN);
+const ids = ONLY.length ? allIds.filter((id) => ONLY.includes(id)) : allIds;
+console.log("stalls:", ids.join(", "), ONLY.length ? `(of ${allIds.join(", ")})` : "");
 // Clear the panels so the canvas is the whole viewport.
 const hide = page.getByRole("button", { name: /HIDE PANELS/i });
 if (await hide.count()) { await hide.first().click(); await page.waitForTimeout(600); }

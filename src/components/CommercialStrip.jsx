@@ -47,6 +47,8 @@ import {
 // fresh file always won locally, while the CDN kept serving whatever it had
 // cached under the unchanged `?v=ktx2` key. BUMP THIS on every rebuild.
 const STRIP_MODEL_V = "9";
+// The chapel's split GLBs (stall + preacher) — bump after re-running scripts/split-tent-revival.mjs.
+export const CHAPEL_ASSET_V = 2;
 const STRIP_MODEL_WEBP = `/models/CommercialStrip3_opt2k.glb?v=${STRIP_MODEL_V}`;
 const STRIP_MODEL_KTX2 = `/models/CommercialStrip3_opt2k_ktx2.glb?v=${STRIP_MODEL_V}`;
 const STRIP_MODEL =
@@ -262,6 +264,9 @@ export const VENDOR_CATALOG = [
     // weight to delete.
     sitepal: "promos" },
   { id: "tacos",     label: "",    awning: "#2f6b4a", accent: "#8fe6b0",
+    // RETIRED 2026-09-04: the taco slot is the CHAPEL now (docs/midway-chapel.md).
+    // The trailer is still in the strip GLB — the chapel's hideWindow covers it.
+    retired: true,
     // Extraterrestrial taco-and-beverage trailer. His GLB was re-exported with
     // idle/talking clips and Face1-3 — an earlier build had neither, so if he
     // ever reverts to a T-pose or the projection stops landing, check the export
@@ -343,7 +348,27 @@ export const VENDOR_CATALOG = [
     gazeLift: 0.12, gazeTurn: -0.2,
     talkClip: "hard_sell",
     sitepal: "tonics" },
+  // THE CHAPEL (docs/midway-chapel.md, 2026-09-04) — a tent revival in the
+  // taco truck's stretch of deck. Michelle's Tent_Revival.glb (2026-09-05) is
+  // the source: scripts/split-tent-revival.mjs re-seats it into the strip frame
+  // and splits it into the stall GLB (`stallModel`, mounted on the desktop
+  // strip until she places the props in the strip .blend) and the preacher's
+  // GLB (`model`). `hideWindow` hides the strip's own taco dressing under it.
+  // No face plates or `sitepal` yet — he preaches silently.
+  { id: "chapel",    label: "",    awning: "#5a3a6e", accent: "#e7d4a8",
+    // ?v= busts the browser/CDN cache — bump CHAPEL_ASSET_V after every
+    // `node scripts/split-tent-revival.mjs` (the file names never change, so a
+    // stale stall kept showing the robot without his emissive, 2026-09-05).
+    model: `/models/Vendor_Chaplain_Character.glb?v=${CHAPEL_ASSET_V}`, idleClip: "preaching", talkClip: "preaching",
+    offset: [0, 0, 0],
+    prop: "SM_Bld_Tent_01",
+    stallModel: `/models/stalls/stall_chapel.glb?v=${CHAPEL_ASSET_V}`,
+    hideWindow: [0.6, 8],
+    faceDist: 0.18, faceLift: -0.03, camDrop: -0.35 },
 ];
+// The line-up the strip and the Midway actually show (retired stalls stay in
+// the catalog so their SitePal/pose tables keep resolving).
+export const ACTIVE_VENDORS = VENDOR_CATALOG.filter((v) => !v.retired);
 
 // A vendor with `poseModels` ships one GLB per resting pose, each exported with
 // the character already placed (standing outside the booth vs seated inside).
@@ -3607,9 +3632,61 @@ function VendorSpotlight({ focus, stripScene, envPreset }) {
   );
 }
 
-export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPreset, vendors = VENDOR_CATALOG, onVendorClick, onFocusObject, onZoomOut, onBoothPhoto }) {
+// A stall authored as its OWN GLB in the strip's frame (the chapel placeholder,
+// public/models/stalls/stall_<id>.glb): mounted inside the strip group so it
+// shares the fit, its deck slab dropped (the strip already has one), and the
+// strip's own dressing in its Z window hidden — same rule as __hmStripHide /
+// scripts/extract-stalls.mjs (top-level children whose centre falls in the
+// window, strip-wide dressing excluded). Reports its scene up so the vendor's
+// anchor prop can resolve for framing and clicks.
+// Emissive boosts for a stall's own extras, by vendor id → mesh name → intensity.
+// There is no bloom pass (kept off for the phone), so an emissive texture at
+// strength 1 reads as flat colour; pushing intensity past white is how the
+// strip fakes glow (the festoon bulbs do the same). Applied by both mounts.
+export const STALL_EMISSIVE_BOOST = {
+  chapel: { SK_Character_Robot_01: 2.6 },   // the robot's visor and chest lights
+};
+export function applyStallEmissiveBoost(scene, vendorId) {
+  const table = STALL_EMISSIVE_BOOST[vendorId]; if (!table) return;
+  scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const k = table[o.name] ?? table[o.parent?.name]; if (k == null) return;
+    (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m && "emissiveIntensity" in m) m.emissiveIntensity = k; });
+  });
+}
+const STALL_WINDOW_EXCLUDE = /^(Boardwalk$|SM_Prop_Bunting_Pole|SM_Prop_Light_0|Spotlight|SC_CincoDeMayo|Photo_booth|Booth_|Text|Point|Wire|StringLight|SM_Prop_Mechanical_Bull|Bull_Tent|Claw_Machine|Vending_Machine|ATM$)/;
+function StallModelMount({ vendor, stripScene, onScene }) {
+  const { scene, animations } = useGLTF(vendor.stallModel, true, true, extendKTX2);
+  // the stall's own extras (the chapel's seated congregation) loop their clips
+  const holder = useRef(null);
+  const { actions } = useAnimations(animations, holder);
+  useEffect(() => { const list = Object.values(actions || {}).filter(Boolean); list.forEach((a) => a.reset().setLoop(THREE.LoopRepeat, Infinity).play()); return () => list.forEach((a) => a.stop()); }, [actions]);
+  useEffect(() => {
+    scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    applyStallEmissiveBoost(scene, vendor.id);
+    const deck = scene.getObjectByName("Boardwalk"); if (deck) deck.visible = false;
+    onScene?.(scene);
+  }, [scene, onScene]);
+  useEffect(() => {
+    const win = vendor.hideWindow; if (!win || !stripScene) return undefined;
+    const [z0, z1] = win; const maxX = 4.7;
+    const box = new THREE.Box3(); const c = new THREE.Vector3(); const hidden = [];
+    stripScene.updateMatrixWorld(true);
+    stripScene.children.forEach((child) => {
+      if (child.name === "Boardwalk" || STALL_WINDOW_EXCLUDE.test(child.name)) return;
+      box.setFromObject(child); if (box.isEmpty()) return;
+      box.getCenter(c); stripScene.worldToLocal(c);
+      if (c.z >= z0 && c.z <= z1 && c.x <= maxX && child.visible) { child.visible = false; hidden.push(child); }
+    });
+    return () => { hidden.forEach((o) => { o.visible = true; }); };
+  }, [stripScene, vendor.hideWindow]);
+  return <group ref={holder}><primitive object={scene} /></group>;
+}
+
+export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPreset, vendors = ACTIVE_VENDORS, onVendorClick, onFocusObject, onZoomOut, onBoothPhoto }) {
   useEffect(() => { preloadVendorModels(); }, []);
   const { scene: stripScene } = useGLTF(STRIP_MODEL, true, true, extendKTX2);
+  const [extraScenes, setExtraScenes] = useState({});
   // Tooling hook for scripts/render-postcards.mjs --plates: hide every top-level
   // strip prop whose strip-local centre falls in a Z window (the stall's own
   // dressing, same windows scripts/extract-stalls.mjs uses), so the phone's
@@ -3882,6 +3959,11 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
         >
           <primitive object={stripScene} />
         </group>
+        {/* Stalls that live in their own GLB (the chapel placeholder) ride the
+            same strip-local frame; their anchor props resolve once loaded. */}
+        {vendors.filter((v) => v.stallModel).map((v) => (
+          <StallModelMount key={v.id} vendor={v} stripScene={stripScene} onScene={(scene) => setExtraScenes((m) => (m[v.id] === scene ? m : { ...m, [v.id]: scene }))} />
+        ))}
         {/* Inside the group: halo positions are strip-local, and the constant
             pixel size is immune to the scale. */}
         <BulbRig stripScene={stripScene} envPreset={envPreset} clipPlanes={clipPlanes} />
@@ -3892,7 +3974,7 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
             stripScene={stripScene}
             stripRotY={STRIP_ROT_Y}
             framingUnit={fit.scale / LEGACY_MODEL_SCALE}
-            propObj={v.prop ? findByBaseName(stripScene, v.prop) : null}
+            propObj={v.prop ? (v.stallModel ? (extraScenes[v.id] ? findByBaseName(extraScenes[v.id], v.prop) : null) : findByBaseName(stripScene, v.prop)) : null}
             onVendorClick={onVendorClick}
             onFocusObject={onFocusObject}
             onZoomOut={onZoomOut}
