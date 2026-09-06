@@ -1891,6 +1891,14 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         }
       }
       // Wheel
+      // The liquids rig's pad ("ground") is a zero-thickness plane exactly on the
+      // mesa top, so it z-fights the terrain (2026-09-06). Bias its depth toward
+      // the camera; the theme pass clones this material later and keeps the bias.
+      if (child.name === "ground" && child.isMesh && child.material && !child.userData._padBias) {
+        child.material = child.material.clone();
+        child.material.polygonOffset = true; child.material.polygonOffsetFactor = -2; child.material.polygonOffsetUnits = -2;
+        child.userData._padBias = true;
+      }
       if (child.name === "Wheel") {
         wheelRef.current = child;
       }
@@ -1910,8 +1918,14 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         }
       }
       // Dedicated LED screen mesh (preferred anchor for the live readout)
-      if (child.name === "PressurePanel2") {
-        panel2Ref.current = child;
+      // The liquids rig (2026-09-06) has no PressurePanel2 — the spectrometer's
+      // holo tab (Spectro_Readout) is the mesh-driven screen instead.
+      if (child.name === "PressurePanel2" || (child.name === "Spectro_Readout" && !panel2Ref.current)) {
+        // a node with several primitives arrives as a Group of <name>_N meshes —
+        // the readout needs geometry, so take its first mesh
+        // prefer the primitive that IS the screen (the kitbash "UI_holo"/"UI" material)
+        let m = child; if (!m.isMesh) { let first = null; m = null; child.traverse((o) => { if (!o.isMesh) return; if (!first) first = o; if (!m && /^UI/i.test(o.material?.name || "")) m = o; }); m = m || first; }
+        panel2Ref.current = m || child;
         // Darken the screen so the amber LED reads. Clone first — the base material
         // is shared across the rig atlas, so editing it in place would tint the
         // whole pumpjack. applyPumpConfig skips this mesh (no zone), so it persists.
@@ -1928,8 +1942,12 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       }
       // Pressure panel text meshes — find children of PressurePanel
       // Log names in dev to identify the correct mapping
-      if (child.name === "PressurePanel") {
-        controlBoxRef.current = child; // housing anchor for the live LED readout
+      // …and no PressurePanel housing: the kiosk body (the MachinePanel mesh) anchors the readout.
+      if (child.name === "PressurePanel" || (child.name === "MachinePanel" && !controlBoxRef.current)) {
+        // the kiosk body is a Group of three primitives; the readout anchors on — and
+        // darkens — only its screen primitive (material "UI"), never the whole body
+        let m = child; if (!m.isMesh) { let first = null; m = null; child.traverse((o) => { if (!o.isMesh) return; if (!first) first = o; if (!m && /^UI/i.test(o.material?.name || "")) m = o; }); m = m || first; }
+        controlBoxRef.current = m || child; // housing anchor for the live LED readout
         child.traverse((sub) => {
           if (sub === child) return;
           if (process.env.NODE_ENV === "development") {
@@ -1951,6 +1969,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     // position + orientation + size, so a drei <Text> lies exactly on it.
     const screenXform = (mesh) => {
       if (!mesh || !group) return null;
+      if (!mesh.isMesh) { let m = null; mesh.traverse((o) => { if (!m && o.isMesh) m = o; }); mesh = m; if (!mesh) return null; }
       group.updateWorldMatrix(true, false);
       mesh.updateWorldMatrix(true, false);
       const pos = new THREE.Vector3();

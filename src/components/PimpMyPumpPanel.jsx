@@ -71,11 +71,26 @@ export const PUMP_ZONES = [
   { id: "counterweight", label: "COUNTERWEIGHTS", meshes: ["Cylinder_Pump", "Cylinder_Pump001"] },
   { id: "horseHead",     label: "HORSE HEAD",     meshes: ["Head_Pump"] },
   { id: "drillPipe",     label: "DRILL PIPE",     meshes: ["Straw", "Cylinder"] },
-  { id: "machinePanel",  label: "MACHINE PANEL",  meshes: ["MachinePanel"] },
-  { id: "tankScaffold",  label: "TANK SCAFFOLD",  meshes: ["Fuel_Tank_Scaffold"] },
+  // The liquids rig (2026-09-06): the kiosk is the machine panel, with its base and the
+  // three-monitor console; the silo's ladder is the scaffold; the ground pipe run is
+  // Synty pipe parts (three.js drops the ".00N" dots from node names).
+  { id: "machinePanel",  label: "MACHINE PANEL",  meshes: ["MachinePanel", "Kiosk_Base", "Console"] },
+  { id: "tankScaffold",  label: "TANK SCAFFOLD",  meshes: ["Fuel_Tank_Scaffold", "Fuel_Tank_Ladder"] },
   { id: "signFrame",     label: "SIGN FRAME",     meshes: ["SignFrame", "SignFrame001"] },
-  { id: "pipes",          label: "PIPES",           meshes: ["Pipe_01", "Pipe_02", "Pipe_03", "Pipe_Refinery"] },
+  { id: "pipes",          label: "PIPES",           meshes: ["Pipe_01", "Pipe_02", "Pipe_03", "Pipe_Refinery",
+    "SM_Prop_Pipe_Part_Straight_01", "SM_Prop_Pipe_Part_Straight_01001", "SM_Prop_Pipe_Part_Straight_01002",
+    "SM_Prop_Pipe_Part_Corner_01", "SM_Prop_Pipe_Part_Corner_01001", "SM_Prop_Pipe_Part_Corner_01002", "SM_Prop_Pipe_Part_Corner_01003", "SM_Prop_Pipe_Part_Corner_01004",
+    "SM_Prop_Pipe_Part_Connect_01", "SM_Prop_Pipe_Part_Connect_01001", "SM_Prop_Pipe_Part_Connect_01002", "SM_Prop_Pipe_Part_Connect_01003", "SM_Prop_Pipe_Part_Connect_01004", "SM_Prop_Pipe_Part_Connect_01005", "SM_Prop_Pipe_Part_Connect_01006", "SM_Prop_Pipe_Part_Connect_01007"] },
   { id: "valve",          label: "VALVE WHEEL",     meshes: ["Wheel"] },
+  // the three liquid lines: risers and their wheels, and the front outlet wheels.
+  // Outlets and elbows stay UNTHEMED — their colour is the liquid legend.
+  { id: "lines",          label: "LIQUID LINES",    meshes: ["Riser_Betroleum", "Riser_Paraboleum", "Riser_Vitriol",
+    "Valve_Betroleum", "Valve_Paraboleum", "Valve_Vitriol", "Valve_Out_Betroleum", "Valve_Out_Paraboleum", "Valve_Out_Vitriol",
+    "Valve_Out_Betroleum_Stem", "Valve_Out_Paraboleum_Stem", "Valve_Out_Vitriol_Stem",
+    "Outlet_Betroleum", "Outlet_Paraboleum", "Outlet_Vitriol", "Outlet_Elbow_Betroleum", "Outlet_Elbow_Paraboleum", "Outlet_Elbow_Vitriol", "Outlet_Manifold"] },
+  // the silo shell (translucent glass in code — the theme tints the glass; keep tints light or the oil inside hides).
+  // Tank_* are the three compartments once the shell is split.
+  { id: "tank",           label: "STORAGE TANK",    meshes: ["Fuel_Tank", "Tank_Betroleum", "Tank_Paraboleum", "Tank_Vitriol"] },
 ];
 
 export const MATERIAL_PRESETS = {
@@ -186,6 +201,8 @@ export const THEME_PRESETS = {
       c.tankScaffold  = { color: "#B8860B", preset: "brushed" };
       c.signFrame     = { color: "#DAA520", preset: "gold" };
       c.pipes         = { color: "#CD853F", preset: "gold" };
+      c.lines         = { color: "#CD853F", preset: "gold" }; // the three liquid lines follow the pipes
+      c.tank          = { color: "#e8c8a9", preset: "matte" }; // glass tint: a light cut of the pipes colour
       return c;
     },
   },
@@ -219,6 +236,8 @@ export const THEME_PRESETS = {
       c.drillPipe     = { color: "#7a1fcc", preset: "neonDeep" };// purple glow
       c.signFrame     = { color: "#1a1028", preset: "neonDeep" };// cyan
       c.pipes         = { color: "#1a1028", preset: "brushed" }; // dark violet steel
+      c.lines         = { color: "#1a1028", preset: "brushed" };
+      c.tank          = { color: "#98939e", preset: "matte" };
       c.tankScaffold  = { color: "#1a1028", preset: "brushed" }; // dark violet steel
       c.valve         = { color: "#c4154f", preset: "neonDeep" };// hot magenta
       return c;
@@ -243,6 +262,8 @@ export const THEME_PRESETS = {
       c.drillPipe     = { color: "#7A4A2A", preset: "rust" };
       c.signFrame     = { color: "#6a6a60", preset: "brushed" }; // bare metal
       c.pipes         = { color: "#8B4513", preset: "rust" };    // corroded pipes
+      c.lines         = { color: "#8B4513", preset: "rust" };
+      c.tank          = { color: "#cbab95", preset: "matte" };
       c.tankScaffold  = { color: "#6a6a60", preset: "brushed" }; // weathered
       c.valve         = { color: "#5C3317", preset: "rust" };
       return c;
@@ -269,6 +290,8 @@ export const THEME_PRESETS = {
     c.drillPipe     = { color: "#6b8c00", preset: "neonDeep" }; // toxic sludge green
     c.signFrame     = { color: "#c4b800", preset: "neonDeep" }; // caution yellow
     c.pipes         = { color: "#2a2a10", preset: "brushed" };  // grimy dark
+    c.lines         = { color: "#2a2a10", preset: "brushed" };
+    c.tank          = { color: "#9f9f93", preset: "matte" };
     c.tankScaffold  = { color: "#2a2a10", preset: "brushed" };
     c.valve         = { color: "#c4b800", preset: "neonDeep" }; // caution yellow
 
@@ -292,6 +315,8 @@ hellforged: {
     c.tankScaffold  = { color: "#2B0000", preset: "brushed" };
     c.signFrame     = { color: "#B22222", preset: "brushed" };
     c.pipes         = { color: "#FF4500", preset: "neon" };
+    c.lines         = { color: "#FF4500", preset: "neon" };
+    c.tank          = { color: "#ffab8c", preset: "matte" };
 
     return c;
   },
@@ -317,6 +342,8 @@ sanctified: {
     c.drillPipe     = { color: "#b8960c", preset: "gold" };    // gold
     c.signFrame     = { color: "#b8960c", preset: "gold" };    // gold
     c.pipes         = { color: "#3b2210", preset: "brushed" }; // dark wood
+    c.lines         = { color: "#3b2210", preset: "brushed" };
+    c.tank          = { color: "#a79c93", preset: "matte" };
     c.tankScaffold  = { color: "#3b2210", preset: "brushed" }; // dark wood
     c.valve         = { color: "#6b1030", preset: "brushed" };   // burgundy
 
@@ -340,6 +367,8 @@ arctic: {
     c.tankScaffold  = { color: "#5E6E7E", preset: "brushed" };
     c.signFrame     = { color: "#A8D8FF", preset: "brushed" };
     c.pipes         = { color: "#DCE9F7", preset: "chrome" };
+    c.lines         = { color: "#DCE9F7", preset: "chrome" };
+    c.tank          = { color: "#eff5fb", preset: "matte" };
 
     return c;
   },
@@ -364,6 +393,8 @@ desert: {
     c.drillPipe     = { color: "#c4a96a", preset: "matte" };    // sand
     c.signFrame     = { color: "#b83a0a", preset: "neonDeep" }; // war-paint
     c.pipes         = { color: "#3a3530", preset: "brushed" };  // dark scrap
+    c.lines         = { color: "#3a3530", preset: "brushed" };
+    c.tank          = { color: "#a6a4a2", preset: "matte" };
     c.tankScaffold  = { color: "#3a3530", preset: "brushed" };  // dark scrap
     c.valve         = { color: "#b83a0a", preset: "neonDeep" }; // war-paint
 
@@ -390,6 +421,8 @@ crimsonCharge: {
     c.drillPipe     = { color: "#050920", preset: "neonDeep" }; // deep blue
     c.signFrame     = { color: "#050920", preset: "neonDeep" };  // red
     c.pipes         = { color: "#898e97", preset: "brushed" };  // aluminum
+    c.lines         = { color: "#898e97", preset: "brushed" };
+    c.tank          = { color: "#caccd0", preset: "matte" };
     c.valve         = { color: "#c1121f", preset: "brushed" };  // red
 
     return c;
@@ -416,6 +449,8 @@ atomicSurge: {
     c.drillPipe     = { color: "#0d9e00", preset: "brushed" };
     c.signFrame     = { color: "#0d9e00", preset: "brushed" };
     c.pipes         = { color: "#2a2a2a", preset: "brushed" };  // dark charcoal
+    c.lines         = { color: "#2a2a2a", preset: "brushed" };
+    c.tank          = { color: "#9f9f9f", preset: "matte" };
     c.valve         = { color: "#0d9e00", preset: "brushed" };
 
     return c;
@@ -444,6 +479,8 @@ tokyoNoir: {
     c.drillPipe     = { color: "#cc6600", preset: "neonDeep" }; // orange pulse
     c.signFrame     = { color: "#cc8a10", preset: "neonDeep" }; // amber
     c.pipes         = { color: "#1b2433", preset: "brushed" };
+    c.lines         = { color: "#1b2433", preset: "brushed" };
+    c.tank          = { color: "#989ca3", preset: "matte" };
     c.tankScaffold  = { color: "#1b2433", preset: "brushed" };
     c.valve         = { color: "#8a1515", preset: "neonDeep" }; // red lantern
 
@@ -472,6 +509,8 @@ texas: {
     c.drillPipe     = { color: "#c49a3a", preset: "brushed" }; // brass
     c.signFrame     = { color: "#c49a3a", preset: "brushed" };
     c.pipes         = { color: "#6b6b6b", preset: "brushed" };
+    c.lines         = { color: "#6b6b6b", preset: "brushed" };
+    c.tank          = { color: "#bcbcbc", preset: "matte" };
     c.valve         = { color: "#b22234", preset: "brushed" }; // Texas red
 
     return c;
@@ -502,6 +541,8 @@ myLittlePony: {
     c.drillPipe     = { color: "#d4906a", preset: "brushed" };  // peach
     c.signFrame     = { color: "#d4906a", preset: "brushed" };  // peach
     c.pipes         = { color: "#c04878", preset: "brushed" };  // pink grid
+    c.lines         = { color: "#c04878", preset: "brushed" };
+    c.tank          = { color: "#e3adc2", preset: "matte" };
     c.tankScaffold  = { color: "#8868a0", preset: "brushed" };  // soft purple
     c.valve         = { color: "#d4906a", preset: "brushed" };  // peach sunset
 
@@ -533,6 +574,8 @@ solarFlare: {
     c.drillPipe     = { color: "#a82a00", preset: "neonDeep" }; // deep red-orange
     c.signFrame     = { color: "#cc8800", preset: "neonDeep" }; // amber
     c.pipes         = { color: "#a82a00", preset: "neonDeep" }; // lava
+    c.lines         = { color: "#a82a00", preset: "neonDeep" };
+    c.tank          = { color: "#d89f8c", preset: "matte" };
     c.tankScaffold  = { color: "#1a1a1a", preset: "brushed" };
     c.valve         = { color: "#b83500", preset: "neonDeep" }; // molten
 
@@ -578,6 +621,8 @@ dragonforge: {
     c.drillPipe     = { color: "#6b0a0a", preset: "neonDeep" }; // crimson
     c.signFrame     = { color: "#7a6840", preset: "brushed" };  // bronze
     c.pipes         = { color: "#2a1b1b", preset: "brushed" };  // forge iron
+    c.lines         = { color: "#2a1b1b", preset: "brushed" };
+    c.tank          = { color: "#9f9898", preset: "matte" };
     c.tankScaffold  = { color: "#2a1b1b", preset: "brushed" };  // forge iron
     c.valve         = { color: "#6b0a0a", preset: "neonDeep" }; // ember
 
@@ -609,6 +654,8 @@ celestial: {
     c.drillPipe     = { color: "#0a6630", preset: "brushed" };  // emerald
     c.signFrame     = { color: "#c9a227", preset: "gold" };     // gold
     c.pipes         = { color: "#0f1a30", preset: "brushed" };  // midnight
+    c.lines         = { color: "#0f1a30", preset: "brushed" };
+    c.tank          = { color: "#9398a2", preset: "matte" };
     c.tankScaffold  = { color: "#0f1a30", preset: "brushed" };  // midnight
     c.valve         = { color: "#0a6630", preset: "brushed" };  // emerald
 
@@ -641,6 +688,8 @@ midnightSovereign: {
     c.drillPipe     = { color: "#3a1a60", preset: "brushed" };  // deep violet
     c.signFrame     = { color: "#8888a0", preset: "chrome" };   // platinum
     c.pipes         = { color: "#10101a", preset: "brushed" };
+    c.lines         = { color: "#10101a", preset: "brushed" };
+    c.tank          = { color: "#939398", preset: "matte" };
     c.tankScaffold  = { color: "#10101a", preset: "brushed" };
     c.valve         = { color: "#3a1a60", preset: "brushed" };  // deep violet
 
@@ -673,6 +722,8 @@ metalAF: {
     c.drillPipe     = { color: "#b8960c", preset: "gold" };
     c.signFrame     = { color: "#b8960c", preset: "gold" };
     c.pipes         = { color: "#606068", preset: "chrome" };   // polished steel
+    c.lines         = { color: "#606068", preset: "chrome" };
+    c.tank          = { color: "#b7b7bb", preset: "matte" };
     c.tankScaffold  = { color: "#606068", preset: "chrome" };
     c.valve         = { color: "#b8960c", preset: "gold" };
 

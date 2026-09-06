@@ -25,7 +25,8 @@ import { Pumpjack, PlotSign, HellDemon, useGroundLook, buildPeakDepthMap, PUMPJA
 // Dev switch while she decides (2026-09-05): ?rig=2 loads the previous rig, ?rig=3 (default) the compact one.
 const RIG_GLB = (() => {
   const v = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("rig") : null;
-  return v === "2" ? "/models/oilJack_fancy_allProps2.glb" : "/models/oilJack_fancy_allProps3.glb";
+  // ?v= busts caches: bump after `node scripts/optimize-rig.mjs …` writes a new allProps3
+  return v === "2" ? "/models/oilJack_fancy_allProps2.glb" : "/models/oilJack_fancy_allProps3.glb?v=3";
 })();
 // The work light (2026-09-05): a floodlight on a tripod, authored in the RIG's
 // frame so it seats at the same scale and origin as the pump jack. Phone scene
@@ -72,15 +73,22 @@ function RigLight({ skyEnv, envPreset }) {
   }, [scene]);
   // The export's emissive map is black (a Synty atlas with almost no lit texels),
   // so the lenses glow from code: drop the map, warm colour, intensity by the hour.
+  // The whole tripod rides the lamp factor (Michelle, 2026-09-06: hide it when
+  // not in use): fully there at night, dissolved by day, fading over the dusk
+  // and dawn ramps so it never pops. Materials are cloned once so the fade
+  // doesn't leak into any shared atlas material.
   useEffect(() => {
     scene.traverse((o) => {
       if (!o.isMesh) return;
       o.frustumCulled = false;
-      if (!LENS_RE.test(o.name)) return;
+      if (!o.userData._lampMat) { o.material = o.material.clone(); o.userData._lampMat = true; }
       const m = o.material; if (!m) return;
+      m.transparent = true; m.opacity = on; m.depthWrite = on > 0.5;
+      if (!LENS_RE.test(o.name)) return;
       if (m.emissiveMap) { m.emissiveMap = null; m.needsUpdate = true; }
       m.emissive.set(LENS_COLOR); m.emissiveIntensity = on * LENS_EMISSIVE;
     });
+    scene.visible = on > 0.01;
   }, [scene, on]);
   const target = useMemo(() => { const t = new THREE.Object3D(); t.position.set(0, 0.12, 0); return t; }, []);
   const spot = useRef(null);
@@ -161,20 +169,29 @@ function findMachinePanel(root) {
   root.traverse((o) => { if (!found && typeof o.name === "string" && o.name.startsWith("MachinePanel")) found = o; });
   return found;
 }
-function RigCamera({ view = "rig" }) {
+function RigCamera({ view = "rig", controlsRef }) {
   const { camera, scene } = useThree();
   const goalPos = useRef(new THREE.Vector3(...RIG_CAMERA.position));
   const goalTgt = useRef(new THREE.Vector3(...RIG_CAMERA.target));
   const curTgt = useRef(new THREE.Vector3(...RIG_CAMERA.target));
   const panelRef = useRef(null);
+  // The glide DRIVES the camera only while a view change is in flight; once it
+  // has arrived it hands the camera back to the orbit controls (Michelle,
+  // 2026-09-06: "the model won't let me rotate it" — the first version drove
+  // it every frame and ate every drag).
+  const driving = useRef(true);
   useEffect(() => {
     camera.position.set(...RIG_CAMERA.position);
     camera.lookAt(...RIG_CAMERA.target);
     curTgt.current.set(...RIG_CAMERA.target);
     camera.updateProjectionMatrix();
-    if (typeof window !== "undefined") window.__hmRigCam = () => ({ pos: camera.position.toArray().map((v) => +v.toFixed(3)), rot: camera.rotation.toArray().slice(0, 3).map((v) => +v.toFixed(3)), view });
+    if (typeof window !== "undefined") window.__hmRigCam = () => ({ pos: camera.position.toArray().map((v) => +v.toFixed(3)), rot: camera.rotation.toArray().slice(0, 3).map((v) => +v.toFixed(3)), view, driving: driving.current });
   }, [camera, view]);
+  useEffect(() => { driving.current = true; }, [view]);
   useFrame((_, dt) => {
+    const controls = controlsRef?.current;
+    if (!driving.current) { if (controls && !controls.enabled) controls.enabled = true; return; }
+    if (controls && controls.enabled) controls.enabled = false;   // no tug-of-war mid-glide
     if (view === "panel") {
       // the pump mounts after the camera and the panel node is inside its clone — resolve lazily
       if (!panelRef.current || !panelRef.current.parent) panelRef.current = findMachinePanel(scene);
@@ -201,6 +218,13 @@ function RigCamera({ view = "rig" }) {
     camera.position.lerp(goalPos.current, k);
     curTgt.current.lerp(goalTgt.current, k);
     camera.lookAt(curTgt.current);
+    // arrived: hand the camera (and its look-at) to the orbit controls, which
+    // then spin about whatever we glided to — the rig or the panel
+    if (camera.position.distanceTo(goalPos.current) < 0.004 && curTgt.current.distanceTo(goalTgt.current) < 0.004) {
+      camera.position.copy(goalPos.current); curTgt.current.copy(goalTgt.current); camera.lookAt(curTgt.current);
+      if (controls) { controls.target.copy(curTgt.current); controls.update?.(); controls.enabled = true; }
+      driving.current = false;
+    }
   });
   return null;
 }
@@ -235,6 +259,7 @@ export default function RigScene({
   view = "rig",                  // "rig" | "panel" — the report's MACHINE PANEL chip glides the camera
 }) {
   const { scene, animations } = useGLTF(RIG_GLB);
+  const controlsRef = useRef(null);
   const skyMap = useSkyEnvMap(skyEnv);
   const hdrMap = useEnvMapSafe(skyEnv ? null : envMapPreset);
   const envMap = skyMap || hdrMap;
@@ -262,7 +287,7 @@ export default function RigScene({
 
   return (
     <>
-      <RigCamera view={view} />
+      <RigCamera view={view} controlsRef={controlsRef} />
       {/* Same +1 lift as the field's group, so the camera numbers match. */}
       <group position={[0, 1, 0]}>
         <MesaTile cellSize={cellSize} depthZ={depthZ} envPreset={envPreset} parabolum={parabolum} />
@@ -332,6 +357,7 @@ export default function RigScene({
       </group>
       {/* Spin around the rig; no pan, no flying off into the void. */}
       <OrbitControls
+        ref={controlsRef}
         target={RIG_CAMERA.target}
         enablePan={false}
         enableDamping

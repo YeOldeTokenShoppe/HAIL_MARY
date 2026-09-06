@@ -69,3 +69,43 @@ whole scene at `PUMPJACK_SCALE` 0.1.
 3. Panel gauges/buttons on the front face; `MachinePanel` still the parent.
 4. Export → `node scripts/…` not needed; drop the GLB in `public/models/` and
    bump `?v=` if the file name is unchanged (see the strip's `STRIP_MODEL_V`).
+
+## The liquids rig (renamed in her .blend 2026-09-06 via the Blender bridge)
+
+Names now in the scene, so the export drops in. Suffix order everywhere is
+Betroleum (largest x, nearest the pump) → Paraboleum → Vitriol.
+
+| Part | Names | Code |
+|---|---|---|
+| Silo shell | `Fuel_Tank` (still 39 loose parts — shell, bands, hatch frame, ladder; she separates the shell, later `Tank_Betroleum/Paraboleum/Vitriol`) | fill shader (vertical path) |
+| Kiosk | `MachinePanel` (container; 3 UI faces inside it must become their own quad `Screen`), `Kiosk_Base`, `Console` | panel front derivation, chip glide, readout |
+| Buttons / beacon | `RedButton`, `Alert_Light_RED` | drain, alarm pulse |
+| Per-liquid monitors | `Screen_Betroleum`, `Screen_Paraboleum`, `Screen_Vitriol` (one UI face each) | per-liquid readouts (to build) |
+| Spectrometer | `Spectro_Chamber` (5 Glass_2 faces to separate), `Spectro_Readout` | swirl shader per fluid (to build) |
+| Risers + wheels | `Riser_*`, `Valve_*`, front `Valve_Out_*` (+ `_Stem`) | VALVES zone (to add) |
+| Outlets | `Outlet_*`, `Outlet_Elbow_*`, `Outlet_Manifold` | unthemed: their colour is the liquid legend |
+| Extras | `EmergencyAxe` (arena door later), `DronePad` (drone later), `ground` (PAD zone) | |
+| Ground pipe run | `SM_Prop_Pipe_Part_*` left as is | add to PIPES zone in code |
+
+Leftovers off the pad (Pipe_001…009 at y≈8.5; a capsule with doors and ten
+valve pieces at x≈−8) must not export — delete or export selection only.
+
+## Export pipeline (2026-09-06)
+
+Her Blender export lands in `models-src/` (raw, animations ON — the first
+export had them off and 15 MB of kitbash UI PNGs); `node scripts/optimize-rig.mjs
+models-src/<raw>.glb public/models/oilJack_fancy_allProps3.glb` prunes, dedups and
+re-encodes textures to ≤1k WebP (16 MB → 1.3 MB). Bump `?v=` on `RIG_GLB` in
+RigScene after each run. The bridge can export for her: select the rig's
+objects, `export_animations=True`, `use_selection=True`.
+
+Code notes for this rig: nodes with several primitives (`MachinePanel`,
+`Spectro_Chamber`, `Spectro_Readout`) arrive as Groups of `<name>_N` meshes —
+the readout resolves the primitive whose material is `UI`/`UI_holo`;
+`Spectro_Readout` is the mesh-driven screen (was `PressurePanel2`); the kiosk's
+`UI` primitive is the readout anchor (was `PressurePanel`). `ground` is a
+zero-thickness plane on the mesa top → polygon-offset bias in Pumpjack (better:
+give the pad thickness in Blender). Theme zones added: LIQUID LINES (risers,
+valves, stems), pipe-run parts under PIPES, `Console`/`Kiosk_Base` under MACHINE
+PANEL, `Fuel_Tank_Ladder` under TANK SCAFFOLD; every preset colours `lines`
+like `pipes`. Outlets/elbows/manifold stay unthemed.
