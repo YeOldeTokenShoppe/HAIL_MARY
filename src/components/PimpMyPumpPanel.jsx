@@ -65,19 +65,31 @@ const priceChipStyle = {
 export const PUMP_ZONES = [
   { id: "pad",           label: "PAD",            meshes: ["ground", "ground001"] },
   { id: "foundation",    label: "BASE PLATE",     meshes: ["Bottom_Box"] },
-  { id: "motorBox",      label: "MOTOR BOX",      meshes: ["Cube", "Wheel_Box", "Under_Pump"] },
+  // The Synty pumpjack (2026-09-07, ?rig=4): its A-frame, platform and ladder are one
+  // mesh. New zone so themes can paint it; presets that don't name it leave it stock.
+  { id: "post",          label: "SAMSON POST",    meshes: ["Samson_Post"] },
+  { id: "motorBox",      label: "MOTOR BOX",      meshes: ["Cube", "Wheel_Box", "Under_Pump", "Motor_Pulley"] },
+  // Synty plot, 2026-09-07: Michelle split the motor box so its pipe run paints with the
+  // pipes and its small control panel with the machine panel; the well curb gets its own
+  // zone (stock = concrete) so a theme can choose to paint it.
+  { id: "wellCurb",      label: "WELL CURB",      meshes: ["WellFrame"] },
   { id: "crankWheel",    label: "CRANK WHEEL",    meshes: ["Wheel_Back"] },
   { id: "beam",          label: "WALKING BEAM",   meshes: ["Body_Pump"] },
-  { id: "counterweight", label: "COUNTERWEIGHTS", meshes: ["Cylinder_Pump", "Cylinder_Pump001"] },
+  { id: "counterweight", label: "COUNTERWEIGHTS", meshes: ["Cylinder_Pump", "Cylinder_Pump001", "Counterweight"] },
   { id: "horseHead",     label: "HORSE HEAD",     meshes: ["Head_Pump"] },
   { id: "drillPipe",     label: "DRILL PIPE",     meshes: ["Straw", "Cylinder"] },
+  // Synty pumpjack (?rig=4) reuses Body_Pump / Head_Pump / Wheel_Back / Straw / Bottom_Box /
+  // Under_Pump / Pipe_01 / Wheel, so those zones need no new names. Belt, Belt_Clip_0N stay unzoned (atlas).
   // The liquids rig (2026-09-06): the kiosk is the machine panel, with its base and the
   // three-monitor console; the silo's ladder is the scaffold; the ground pipe run is
   // Synty pipe parts (three.js drops the ".00N" dots from node names).
-  { id: "machinePanel",  label: "MACHINE PANEL",  meshes: ["MachinePanel", "Kiosk_Base", "Console"] },
+  // The Synty plot's box body is `MachinePanel_Body`; its DANGER decal became a separate
+  // `DANGER_LABEL` plane (2026-09-07), so the body takes paint and the decal never does. The
+  // instruments (screen, gauge, buttons, toggles, lamps, key) stay stock. Zoom hooks match the prefix.
+  { id: "machinePanel",  label: "MACHINE PANEL",  meshes: ["MachinePanel", "MachinePanel_Body", "Under_Pump_Pipe_Panel", "Kiosk_Base", "Console"] },
   { id: "tankScaffold",  label: "TANK SCAFFOLD",  meshes: ["Fuel_Tank_Scaffold", "Fuel_Tank_Ladder"] },
   { id: "signFrame",     label: "SIGN FRAME",     meshes: ["SignFrame", "SignFrame001"] },
-  { id: "pipes",          label: "PIPES",           meshes: ["Pipe_01", "Pipe_02", "Pipe_03", "Pipe_Refinery",
+  { id: "pipes",          label: "PIPES",           meshes: ["Pipe_01", "Pipe_02", "Pipe_03", "Under_Pump_Pipes", "Pipe_Refinery",
     "SM_Prop_Pipe_Part_Straight_01", "SM_Prop_Pipe_Part_Straight_01001", "SM_Prop_Pipe_Part_Straight_01002",
     "SM_Prop_Pipe_Part_Corner_01", "SM_Prop_Pipe_Part_Corner_01001", "SM_Prop_Pipe_Part_Corner_01002", "SM_Prop_Pipe_Part_Corner_01003", "SM_Prop_Pipe_Part_Corner_01004",
     "SM_Prop_Pipe_Part_Connect_01", "SM_Prop_Pipe_Part_Connect_01001", "SM_Prop_Pipe_Part_Connect_01002", "SM_Prop_Pipe_Part_Connect_01003", "SM_Prop_Pipe_Part_Connect_01004", "SM_Prop_Pipe_Part_Connect_01005", "SM_Prop_Pipe_Part_Connect_01006", "SM_Prop_Pipe_Part_Connect_01007"] },

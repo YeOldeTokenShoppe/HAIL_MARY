@@ -19,7 +19,7 @@ import OilAnchorEvent from "@/components/OilAnchorEvent";
 import OilAwayRecap from "@/components/OilAwayRecap";
 import usePushAlerts from "@/hooks/usePushAlerts";
 import PimpMyPumpPanel, { getDefaultPumpConfig, THEME_PRESETS } from "@/components/PimpMyPumpPanel";
-import RigScene, { RIG_CAMERA } from "@/components/RigScene";
+import RigScene, { RIG_CAMERA, RIG_FOV } from "@/components/RigScene";
 import DemonArena, { WEAPONS } from "@/components/DemonArena";
 import VendorStage, { BoardwalkStrip, VendorCart, stepUpVendor, stepBackVendor, warmBoardwalk } from "@/components/VendorStage";
 import { playSfx } from "@/lib/uiSfx";
@@ -2615,7 +2615,8 @@ export default function OilPage() {
   }, [remountCanvas]);
 
   const showcaseKeys = useMemo(() => Object.keys(THEME_PRESETS), []);
-  const [showcaseIdx, setShowcaseIdx] = useState(() => Math.max(0, Object.keys(THEME_PRESETS).indexOf("goldRush")));
+  // Start on FACTORY DEFAULT so the showcase opens on the rig's own colours (Michelle, 2026-09-07).
+  const [showcaseIdx, setShowcaseIdx] = useState(() => Math.max(0, Object.keys(THEME_PRESETS).indexOf("stock")));
   const showcaseConfig = useMemo(() => THEME_PRESETS[showcaseKeys[showcaseIdx]].build(), [showcaseKeys, showcaseIdx]);
 
   // ── Demon arena (2026-09-03) — the hell-hit fight, canonical everywhere ──
@@ -8080,6 +8081,37 @@ export default function OilPage() {
         theme={theme} isMobile={isMobile} icon={PANEL_ICONS.rig}
         right={(
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            {/* MACHINE PANEL chip (desktop, 2026-09-07): the panel is the decision surface
+                (EXTRACT / PASS, gauge, screen), so the card reaches it without the
+                select-then-click dance. The highlighted rig listens for `hm:focus-panel`
+                and zooms exactly as a click on the box does; with nothing selected the
+                chip first flies to the player's own plot, then asks for the panel once
+                that rig has mounted. */}
+            {!isMobile && (() => {
+              const ownCol = userDrill?.col ?? myPlot?.col;
+              const ownRow = userDrill?.row ?? myPlot?.row;
+              const can = selectedX !== null || ownCol != null;
+              const fire = () => window.dispatchEvent(new CustomEvent("hm:focus-panel"));
+              return (
+                <button
+                  type="button"
+                  disabled={!can}
+                  title={can ? "Zoom to the rig's machine panel" : "Select a plot first"}
+                  onClick={() => {
+                    if (selectedX !== null) { fire(); return; }
+                    handleFlyTo(ownCol, ownRow);
+                    setTimeout(fire, 450);
+                  }}
+                  style={{
+                    fontSize: 9, letterSpacing: "0.14em", padding: "2px 7px", borderRadius: 2, cursor: can ? "pointer" : "default",
+                    border: `1px solid ${theme.accent}`, color: theme.accent, background: "transparent", opacity: can ? 1 : 0.45,
+                    fontFamily: "'Share Tech Mono', monospace", lineHeight: 1.5, whiteSpace: "nowrap", textTransform: "uppercase",
+                  }}
+                >
+                  MACHINE PANEL
+                </button>
+              );
+            })()}
             {/* MACHINE PANEL chip (phone): the control box sits at the frame edge
                 on every rig model, so the chip does the reaching — it switches to
                 the RIG tab, scrolls the scene up and glides the camera to the
@@ -8296,7 +8328,7 @@ export default function OilPage() {
                 key={canvasEpoch}
                 onContextLost={handleContextLost}
                 onContextRestored={handleContextRestored}
-                camera={{ position: RIG_CAMERA.position, fov: 50 }}
+                camera={{ position: RIG_CAMERA.position, fov: RIG_FOV }}
                 dpr={quality.dpr}
                 frameloop={sceneTab ? "always" : "never"}
                 style={{ width: "100%", height: "100%" }}
@@ -8372,6 +8404,7 @@ export default function OilPage() {
                       onEnvelopeClick={own ? () => setChatModalPlotKey(ownKey) : undefined}
                       hellActive={!!(own && hellActive && hellCol === own.col && hellRow === own.row)}
                       view={rigView}
+                      onPanelTap={() => setRigView("panel")}
                       demon={demonTargetsOwn ? {
                         active: true,
                         seed: demonBounty?.id || `local_${own.col}_${own.row}`,
