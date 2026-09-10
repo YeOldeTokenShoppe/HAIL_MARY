@@ -997,7 +997,7 @@ New "Assets" tab in the account modal showing all premium items the player owns,
 
 | Category | Price | Examples |
 |----------|-------|---------|
-| Theme | 5 USDC | Full Chrome, Dragonforge, Celestial Execution, Metal AF |
+| Theme | 5 USDC |  Dragonforge, Metal AF |
 | Fence | 3 USDC | Iron, White Picket, Stone |
 | Add-on | 3 USDC | T-Rex, Pet Zombie, Tubeman |
 | Accessory | 5 USDC | Security Camera |

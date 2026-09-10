@@ -65,15 +65,18 @@ const priceChipStyle = {
 export const PUMP_ZONES = [
   { id: "pad",           label: "PAD",            meshes: ["ground", "ground001"] },
   { id: "foundation",    label: "BASE PLATE",     meshes: ["Bottom_Box"] },
-  // The Synty pumpjack (2026-09-07, ?rig=4): its A-frame, platform and ladder are one
-  // mesh. New zone so themes can paint it; presets that don't name it leave it stock.
+  // Rail faces from both Bottom_Box and Samson_Post are consolidated into one
+  // object; the upper service deck is separate too (2026-09-08).
+  { id: "safetyRails",   label: "SAFETY RAILS",    meshes: ["Safety_Rails"] },
+  { id: "platform",      label: "SERVICE PLATFORM", meshes: ["Service_Platform"] },
+  // The post retains its A-frame and ladder, with its own structural paint.
   { id: "post",          label: "SAMSON POST",    meshes: ["Samson_Post"] },
   { id: "motorBox",      label: "MOTOR BOX",      meshes: ["Cube", "Wheel_Box", "Under_Pump", "Motor_Pulley"] },
   // Synty plot, 2026-09-07: Michelle split the motor box so its pipe run paints with the
   // pipes and its small control panel with the machine panel; the well curb gets its own
   // zone (stock = concrete) so a theme can choose to paint it.
   { id: "wellCurb",      label: "WELL CURB",      meshes: ["WellFrame"] },
-  { id: "crankWheel",    label: "CRANK WHEEL",    meshes: ["Wheel_Back"] },
+  { id: "crankWheel",    label: "CRANK & LINKAGE",    meshes: ["Wheel_Back", "Pitman"] },
   { id: "beam",          label: "WALKING BEAM",   meshes: ["Body_Pump"] },
   { id: "counterweight", label: "COUNTERWEIGHTS", meshes: ["Cylinder_Pump", "Cylinder_Pump001", "Counterweight"] },
   { id: "horseHead",     label: "HORSE HEAD",     meshes: ["Head_Pump"] },
@@ -93,7 +96,7 @@ export const PUMP_ZONES = [
     "SM_Prop_Pipe_Part_Straight_01", "SM_Prop_Pipe_Part_Straight_01001", "SM_Prop_Pipe_Part_Straight_01002",
     "SM_Prop_Pipe_Part_Corner_01", "SM_Prop_Pipe_Part_Corner_01001", "SM_Prop_Pipe_Part_Corner_01002", "SM_Prop_Pipe_Part_Corner_01003", "SM_Prop_Pipe_Part_Corner_01004",
     "SM_Prop_Pipe_Part_Connect_01", "SM_Prop_Pipe_Part_Connect_01001", "SM_Prop_Pipe_Part_Connect_01002", "SM_Prop_Pipe_Part_Connect_01003", "SM_Prop_Pipe_Part_Connect_01004", "SM_Prop_Pipe_Part_Connect_01005", "SM_Prop_Pipe_Part_Connect_01006", "SM_Prop_Pipe_Part_Connect_01007"] },
-  { id: "valve",          label: "VALVE WHEEL",     meshes: ["Wheel"] },
+  { id: "valve",          label: "VALVE WHEEL",     meshes: ["Wheel", "Wheel_BOP"] },
   // the three liquid lines: risers and their wheels, and the front outlet wheels.
   // Outlets and elbows stay UNTHEMED — their colour is the liquid legend.
   { id: "lines",          label: "LIQUID LINES",    meshes: ["Riser_Betroleum", "Riser_Paraboleum", "Riser_Vitriol",
@@ -108,7 +111,9 @@ export const PUMP_ZONES = [
 export const MATERIAL_PRESETS = {
   stock:    { label: "STOCK",         roughness: null,  metalness: null, emissive: null,     emissiveIntensity: 0, envMapIntensity: 0 },
   matte:    { label: "MATTE",         roughness: 0.92,  metalness: 0.05, emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 0.1 },
+  satin:    { label: "SATIN PAINT",   roughness: 0.48,  metalness: 0.15, emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 0.7 },
   chrome:   { label: "CHROME",        roughness: 0.0,   metalness: 1.0,  emissive: "#8b8787", emissiveIntensity: 0, envMapIntensity: 3.0, useStandard: true },
+  polished: { label: "POLISHED METAL", roughness: 0.2, metalness: 0.9, emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 1.5, useStandard: true },
   brushed:  { label: "BRUSHED STEEL", roughness: 0.3,   metalness: 0.8,  emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 2.0 },
   rust:     { label: "RUST",          roughness: 0.95,  metalness: 0.2,  emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 0.3 },
   gold:     { label: "GOLD",          roughness: 0.15,  metalness: 0.9,  emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 2.5 },
@@ -170,7 +175,9 @@ export const FENCE_CATALOG = [
 // model: `Sign` (front image), `Sign2` (back), `SignFrame`. `cameraModel` is an
 // optional matching camera GLB pre-positioned on that sign (shown when showCamera).
 export const SIGN_CATALOG = [
-  { id: "sign1", label: "TALL SIGN", model: "/models/addons/Sign1.glb", cameraModel: "/models/addons/SecurityCamera_Sign1.glb" },
+  // ?v= busts the browser cache after a re-export (the sign is authored in the rig's frame, so
+  // moving it in Blender is the way to move it on the page — but only once the new file loads).
+  { id: "sign1", label: "TALL SIGN", model: "/models/addons/Sign1.glb?v=2", cameraModel: "/models/addons/SecurityCamera_Sign1.glb" },
   { id: "sign2", label: "BILLBOARD", model: "/models/addons/Sign2.glb", cameraModel: "/models/addons/SecurityCamera_Sign2.glb" },
 ];
 
@@ -192,373 +199,521 @@ export function getDefaultPumpConfig() {
   return config;
 }
 
+// Complete newer zones when building a preset, so the editor shows the actual
+// paint and a player can subsequently choose STOCK on any individual zone.
+function completeTheme(config) {
+  const inherit = (zone, source, preset) => {
+    if (!config[zone]?.color && config[zone]?.preset === "stock") {
+      config[zone] = { ...config[source], ...(preset ? { preset } : {}) };
+    }
+  };
+  inherit("post", "foundation");
+  inherit("safetyRails", "beam");
+  inherit("platform", "motorBox", "brushed");
+  inherit("wellCurb", "foundation", "matte");
+  inherit("valve", "counterweight");
+  return config;
+}
+
 // ── Fun preset themes (full rig presets) ─────────────────────────────────────
 // Exported for the phone's showcase rig (RigScene pager) — same list the editor offers.
 export const THEME_PRESETS = {
   stock: { label: "FACTORY DEFAULT", build: () => getDefaultPumpConfig() },
+  vegasVice: {
+    label: "VEGAS VICE",
+    build: () => {
+      const c = getDefaultPumpConfig();
+      c.pad            = { color: "#211D1B", preset: "matte" };
+      c.foundation     = { color: "#2D2523", preset: "satin" };
+      c.post           = { color: "#45352E", preset: "satin" };
+      c.safetyRails    = { color: "#BCA57D", preset: "gold" };
+      c.platform       = { color: "#93877B", preset: "brushed" };
+      c.beam           = { color: "#D6CCB7", preset: "satin" };
+      c.horseHead      = { color: "#C3A570", preset: "gold" };
+      c.counterweight  = { color: "#AF292C", preset: "satin" };
+      c.crankWheel     = { color: "#68544A", preset: "brushed" };
+      c.motorBox       = { color: "#322927", preset: "satin" };
+      c.drillPipe      = { color: "#C8C0B5", preset: "polished" };
+      c.machinePanel   = { color: "#A72A2D", preset: "satin" };
+      c.tankScaffold   = { color: "#726052", preset: "brushed" };
+      c.signFrame      = { color: "#C24270", preset: "neonDeep" };
+      c.pipes          = { color: "#8B7A69", preset: "brushed" };
+      c.lines          = { color: "#8B7A69", preset: "brushed" };
+      c.tank           = { color: "#E3D7C2", preset: "matte" };
+      c.valve          = { color: "#C24270", preset: "neonDeep" };
+      c.wellCurb       = { color: "#55483E", preset: "matte" };
+      return completeTheme(c);
+    },
+  },
+  peacockRoyale: {
+    label: "PEACOCK ROYALE",
+    build: () => {
+      const c = getDefaultPumpConfig();
+      c.pad            = { color: "#19252C", preset: "matte" };
+      c.foundation     = { color: "#1D3940", preset: "matte" };
+      c.post           = { color: "#285658", preset: "satin" };
+      c.safetyRails    = { color: "#B29759", preset: "gold" };
+      c.platform       = { color: "#697F8B", preset: "brushed" };
+      c.beam           = { color: "#175D83", preset: "brushed" };
+      c.horseHead      = { color: "#208567", preset: "polished" };
+      c.counterweight  = { color: "#733F97", preset: "brushed" };
+      c.crankWheel     = { color: "#46556B", preset: "brushed" };
+      c.motorBox       = { color: "#253947", preset: "satin" };
+      c.drillPipe      = { color: "#B1C3CA", preset: "polished" };
+      c.machinePanel   = { color: "#653B83", preset: "satin" };
+      c.tankScaffold   = { color: "#476B72", preset: "brushed" };
+      c.signFrame      = { color: "#B29759", preset: "gold" };
+      c.pipes          = { color: "#597B80", preset: "brushed" };
+      c.lines          = { color: "#597B80", preset: "brushed" };
+      c.tank           = { color: "#C5D9D4", preset: "matte" };
+      c.valve          = { color: "#B29759", preset: "gold" };
+      c.wellCurb       = { color: "#364F59", preset: "matte" };
+      return completeTheme(c);
+    },
+  },
+  deepSpaceSalvage: {
+    label: "DEEP SPACE SALVAGE",
+    build: () => {
+      const c = getDefaultPumpConfig();
+      c.pad            = { color: "#27282D", preset: "matte" };
+      c.foundation     = { color: "#35383E", preset: "matte" };
+      c.post           = { color: "#747D89", preset: "brushed" };
+      c.safetyRails    = { color: "#D76628", preset: "satin" };
+      c.platform       = { color: "#949CA6", preset: "brushed" };
+      c.beam           = { color: "#C8C5BA", preset: "satin" };
+      c.horseHead      = { color: "#383E49", preset: "brushed" };
+      c.counterweight  = { color: "#969A9F", preset: "brushed" };
+      c.crankWheel     = { color: "#5C6470", preset: "brushed" };
+      c.motorBox       = { color: "#3E4550", preset: "satin" };
+      c.drillPipe      = { color: "#C2CAD3", preset: "polished" };
+      c.machinePanel   = { color: "#C8C5BA", preset: "satin" };
+      c.tankScaffold   = { color: "#727B87", preset: "brushed" };
+      c.signFrame      = { color: "#D76628", preset: "satin" };
+      c.pipes          = { color: "#86919F", preset: "brushed" };
+      c.lines          = { color: "#86919F", preset: "brushed" };
+      c.tank           = { color: "#DAD6CA", preset: "matte" };
+      c.valve          = { color: "#C95119", preset: "neonDeep" };
+      c.wellCurb       = { color: "#555C66", preset: "matte" };
+      return completeTheme(c);
+    },
+  },
+  copperhead: {
+    label: "COPPERHEAD",
+    build: () => {
+      const c = getDefaultPumpConfig();
+      c.pad            = { color: "#242120", preset: "matte" };
+      c.foundation     = { color: "#322B27", preset: "matte" };
+      c.post           = { color: "#554237", preset: "brushed" };
+      c.safetyRails    = { color: "#438F87", preset: "satin" };
+      c.platform       = { color: "#84766B", preset: "brushed" };
+      c.beam           = { color: "#242427", preset: "satin" };
+      c.horseHead      = { color: "#B97448", preset: "polished" };
+      c.counterweight  = { color: "#9D5835", preset: "brushed" };
+      c.crankWheel     = { color: "#655045", preset: "brushed" };
+      c.motorBox       = { color: "#34302F", preset: "satin" };
+      c.drillPipe      = { color: "#BDB3A7", preset: "polished" };
+      c.machinePanel   = { color: "#427B73", preset: "satin" };
+      c.tankScaffold   = { color: "#6B5647", preset: "brushed" };
+      c.signFrame      = { color: "#438F87", preset: "satin" };
+      c.pipes          = { color: "#8D6B54", preset: "brushed" };
+      c.lines          = { color: "#8D6B54", preset: "brushed" };
+      c.tank           = { color: "#D4C8B8", preset: "matte" };
+      c.valve          = { color: "#4FABA0", preset: "brushed" };
+      c.wellCurb       = { color: "#53463C", preset: "matte" };
+      return completeTheme(c);
+    },
+  },
+  midnightOctane: {
+    label: "MIDNIGHT OCTANE",
+    build: () => {
+      const c = getDefaultPumpConfig();
+      c.pad            = { color: "#111820", preset: "matte" };
+      c.foundation     = { color: "#101C2C", preset: "matte" };
+      c.post           = { color: "#24394A", preset: "matte" };
+      c.safetyRails    = { color: "#D99159", preset: "gold" };
+      c.platform       = { color: "#9AAAB3", preset: "brushed" };
+      c.beam           = { color: "#167D8D", preset: "brushed" };
+      c.horseHead      = { color: "#2396A0", preset: "brushed" };
+      c.counterweight  = { color: "#986541", preset: "brushed" };
+      c.crankWheel     = { color: "#344858", preset: "brushed" };
+      c.motorBox       = { color: "#101C2C", preset: "matte" };
+      c.drillPipe      = { color: "#B8C6CE", preset: "chrome" };
+      c.machinePanel   = { color: "#245564", preset: "matte" };
+      c.tankScaffold   = { color: "#344858", preset: "brushed" };
+      c.signFrame      = { color: "#D99159", preset: "gold" };
+      c.pipes          = { color: "#667E8B", preset: "brushed" };
+      c.lines          = { color: "#667E8B", preset: "brushed" };
+      c.tank           = { color: "#C6E0DE", preset: "matte" };
+      c.valve          = { color: "#D99159", preset: "brushed" };
+      c.wellCurb       = { color: "#303D47", preset: "matte" };
+      return completeTheme(c);
+    },
+  },
+  blackCherryChrome: {
+    label: "BLACK CHERRY CHROME",
+    build: () => {
+      const c = getDefaultPumpConfig();
+      c.pad            = { color: "#190F16", preset: "matte" };
+      c.foundation     = { color: "#200E18", preset: "matte" };
+      c.post           = { color: "#422132", preset: "brushed" };
+      c.safetyRails    = { color: "#D8D8E0", preset: "chrome" };
+      c.platform       = { color: "#777481", preset: "brushed" };
+      c.beam           = { color: "#9E2348", preset: "brushed" };
+      c.horseHead      = { color: "#C33C67", preset: "brushed" };
+      c.counterweight  = { color: "#70243F", preset: "brushed" };
+      c.crankWheel     = { color: "#3E2736", preset: "brushed" };
+      c.motorBox       = { color: "#200E18", preset: "matte" };
+      c.drillPipe      = { color: "#D8D8E0", preset: "chrome" };
+      c.machinePanel   = { color: "#9E2348", preset: "brushed" };
+      c.tankScaffold   = { color: "#777481", preset: "brushed" };
+      c.signFrame      = { color: "#D8D8E0", preset: "chrome" };
+      c.pipes          = { color: "#817687", preset: "brushed" };
+      c.lines          = { color: "#817687", preset: "brushed" };
+      c.tank           = { color: "#E6CDD8", preset: "matte" };
+      c.valve          = { color: "#E8A6BC", preset: "brushed" };
+      c.wellCurb       = { color: "#3D2C37", preset: "matte" };
+      return completeTheme(c);
+    },
+  },
+  miamiAfterHours: {
+    label: "MIAMI AFTER HOURS",
+    build: () => {
+      const c = getDefaultPumpConfig();
+      c.pad            = { color: "#111825", preset: "matte" };
+      c.foundation     = { color: "#101827", preset: "matte" };
+      c.post           = { color: "#26354D", preset: "matte" };
+      c.safetyRails    = { color: "#FF786B", preset: "matte" };
+      c.platform       = { color: "#84989E", preset: "brushed" };
+      c.beam           = { color: "#36B5AB", preset: "brushed" };
+      c.horseHead      = { color: "#BFE4DD", preset: "matte" };
+      c.counterweight  = { color: "#CD5E61", preset: "brushed" };
+      c.crankWheel     = { color: "#34475C", preset: "brushed" };
+      c.motorBox       = { color: "#101827", preset: "matte" };
+      c.drillPipe      = { color: "#BACAD4", preset: "chrome" };
+      c.machinePanel   = { color: "#36B5AB", preset: "matte" };
+      c.tankScaffold   = { color: "#34475C", preset: "brushed" };
+      c.signFrame      = { color: "#B83E86", preset: "neonDeep" };
+      c.pipes          = { color: "#577E8E", preset: "brushed" };
+      c.lines          = { color: "#577E8E", preset: "brushed" };
+      c.tank           = { color: "#CCE4E2", preset: "matte" };
+      c.valve          = { color: "#B83E86", preset: "neonDeep" };
+      c.wellCurb       = { color: "#344252", preset: "matte" };
+      return completeTheme(c);
+    },
+  },
   goldRush: {
     label: "GOLD RUSH",
     build: () => {
       const c = getDefaultPumpConfig();
-      c.pad           = { color: "#3d2b1a", preset: "matte" };   // dark earth
-      c.foundation    = { color: "#8B6914", preset: "brushed" }; // bronze
-
-      c.beam          = { color: "#FFD700", preset: "gold" };
-      c.horseHead     = { color: "#FFD700", preset: "gold" };
-      c.counterweight = { color: "#DAA520", preset: "gold" };
-      c.crankWheel    = { color: "#B8860B", preset: "brushed" };
-      c.motorBox      = { color: "#8B7355", preset: "matte" };
-      c.drillPipe     = { color: "#CD853F", preset: "brushed" };
-      c.machinePanel  = { color: "#8B7355", preset: "gold" };
-      c.tankScaffold  = { color: "#B8860B", preset: "brushed" };
-      c.signFrame     = { color: "#DAA520", preset: "gold" };
-      c.pipes         = { color: "#CD853F", preset: "gold" };
-      c.lines         = { color: "#CD853F", preset: "gold" }; // the three liquid lines follow the pipes
-      c.tank          = { color: "#e8c8a9", preset: "matte" }; // glass tint: a light cut of the pipes colour
-      return c;
+      c.pad            = { color: "#211D18", preset: "matte" };
+      c.foundation     = { color: "#30312F", preset: "matte" };
+      c.post           = { color: "#474540", preset: "brushed" };
+      c.safetyRails    = { color: "#D6BD82", preset: "gold" };
+      c.platform       = { color: "#8D8980", preset: "brushed" };
+      c.beam           = { color: "#D6BD82", preset: "gold" };
+      c.horseHead      = { color: "#E5D2A0", preset: "gold" };
+      c.counterweight  = { color: "#967040", preset: "brushed" };
+      c.crankWheel     = { color: "#5E503C", preset: "brushed" };
+      c.motorBox       = { color: "#252B2C", preset: "matte" };
+      c.drillPipe      = { color: "#B1A99A", preset: "brushed" };
+      c.machinePanel   = { color: "#5E503C", preset: "brushed" };
+      c.tankScaffold   = { color: "#5C5E56", preset: "brushed" };
+      c.signFrame      = { color: "#D6BD82", preset: "gold" };
+      c.pipes          = { color: "#786A52", preset: "brushed" };
+      c.lines          = { color: "#786A52", preset: "brushed" };
+      c.tank           = { color: "#E2D8BE", preset: "matte" };
+      c.valve          = { color: "#C5A461", preset: "gold" };
+      c.wellCurb       = { color: "#494740", preset: "matte" };
+      return completeTheme(c);
     },
   },
   murdered: {
     label: "MURDERED OUT",
     build: () => {
       const c = getDefaultPumpConfig();
-      PUMP_ZONES.forEach((z) => {
-        c[z.id] = { color: "#1a1a1a", preset: "chrome" };
-      });
-      c.pad = { color: "#0a0a0a", preset: "matte" };
-      return c;
+      c.pad            = { color: "#131619", preset: "matte" };
+      c.foundation     = { color: "#1B2025", preset: "matte" };
+      c.post           = { color: "#30353B", preset: "satin" };
+      c.safetyRails    = { color: "#454C53", preset: "satin" };
+      c.platform       = { color: "#343A40", preset: "satin" };
+      c.beam           = { color: "#30363D", preset: "satin" };
+      c.horseHead      = { color: "#252B31", preset: "satin" };
+      c.counterweight  = { color: "#252A30", preset: "satin" };
+      c.crankWheel     = { color: "#414850", preset: "brushed" };
+      c.motorBox       = { color: "#20252B", preset: "matte" };
+      c.drillPipe      = { color: "#4A525A", preset: "brushed" };
+      c.machinePanel   = { color: "#30353B", preset: "satin" };
+      c.tankScaffold   = { color: "#343A40", preset: "satin" };
+      c.signFrame      = { color: "#454C53", preset: "satin" };
+      c.pipes          = { color: "#353D44", preset: "satin" };
+      c.lines          = { color: "#353D44", preset: "satin" };
+      c.tank           = { color: "#A9AFB6", preset: "matte" };
+      c.valve          = { color: "#414850", preset: "brushed" };
+      c.wellCurb       = { color: "#24292E", preset: "matte" };
+      return completeTheme(c);
     },
   },
   cyberpunk: {
     label: "CYBERPUNK",
     build: () => {
       const c = getDefaultPumpConfig();
-      c.pad           = { color: "#0c0814", preset: "matte" };   // near-black violet
-      c.foundation    = { color: "#1a1028", preset: "brushed" }; // dark violet steel
-
-      c.beam          = { color: "#008fa8", preset: "neonDeep" };// electric cyan — hero
-      c.horseHead     = { color: "#1a1028", preset: "brushed" }; // dark violet
-
-      c.counterweight = { color: "#c4154f", preset: "neonDeep" };// hot magenta
-      c.machinePanel  = { color: "#c4154f", preset: "neonDeep" };// hot magenta
-
-      c.crankWheel    = { color: "#1a1028", preset: "brushed" }; // dark violet steel
-      c.motorBox      = { color: "#1a1028", preset: "brushed" }; // dark violet steel
-
-      c.drillPipe     = { color: "#7a1fcc", preset: "neonDeep" };// purple glow
-      c.signFrame     = { color: "#1a1028", preset: "neonDeep" };// cyan
-      c.pipes         = { color: "#1a1028", preset: "brushed" }; // dark violet steel
-      c.lines         = { color: "#1a1028", preset: "brushed" };
-      c.tank          = { color: "#98939e", preset: "matte" };
-      c.tankScaffold  = { color: "#1a1028", preset: "brushed" }; // dark violet steel
-      c.valve         = { color: "#c4154f", preset: "neonDeep" };// hot magenta
-      return c;
+      c.pad            = { color: "#100D19", preset: "matte" };
+      c.foundation     = { color: "#1A1728", preset: "matte" };
+      c.post           = { color: "#302B43", preset: "matte" };
+      c.safetyRails    = { color: "#A9236A", preset: "neonDeep" };
+      c.platform       = { color: "#68748A", preset: "brushed" };
+      c.beam           = { color: "#168DA3", preset: "brushed" };
+      c.horseHead      = { color: "#304559", preset: "brushed" };
+      c.counterweight  = { color: "#7C284E", preset: "brushed" };
+      c.crankWheel     = { color: "#393547", preset: "brushed" };
+      c.motorBox       = { color: "#1A1728", preset: "matte" };
+      c.drillPipe      = { color: "#899EB3", preset: "brushed" };
+      c.machinePanel   = { color: "#24596D", preset: "brushed" };
+      c.tankScaffold   = { color: "#393547", preset: "brushed" };
+      c.signFrame      = { color: "#168DA3", preset: "brushed" };
+      c.pipes          = { color: "#4C4965", preset: "brushed" };
+      c.lines          = { color: "#4C4965", preset: "brushed" };
+      c.tank           = { color: "#CBD5E4", preset: "matte" };
+      c.valve          = { color: "#A9236A", preset: "neonDeep" };
+      c.wellCurb       = { color: "#35313F", preset: "matte" };
+      return completeTheme(c);
     },
   },
-  rusty: {
-    label: "ABANDONED FIELD",
+  toxic: {
+    label: "BIOHAZARD",
     build: () => {
       const c = getDefaultPumpConfig();
-      c.pad           = { color: "#3E2723", preset: "matte" };   // dirt
-      c.foundation    = { color: "#6a6a60", preset: "brushed" }; // weathered steel
-
-      c.beam          = { color: "#8B4513", preset: "rust" };    // heavy rust
-      c.horseHead     = { color: "#6a6a60", preset: "brushed" }; // worn bare metal
-
-      c.counterweight = { color: "#8B4513", preset: "rust" };    // rusted through
-      c.machinePanel  = { color: "#704214", preset: "rust" };
-
-      c.crankWheel    = { color: "#5C3317", preset: "rust" };
-      c.motorBox      = { color: "#6a6a60", preset: "brushed" }; // faded steel
-
-      c.drillPipe     = { color: "#7A4A2A", preset: "rust" };
-      c.signFrame     = { color: "#6a6a60", preset: "brushed" }; // bare metal
-      c.pipes         = { color: "#8B4513", preset: "rust" };    // corroded pipes
-      c.lines         = { color: "#8B4513", preset: "rust" };
-      c.tank          = { color: "#cbab95", preset: "matte" };
-      c.tankScaffold  = { color: "#6a6a60", preset: "brushed" }; // weathered
-      c.valve         = { color: "#5C3317", preset: "rust" };
-      return c;
+      // Acid chartreuse over cold charcoal; glow stays on thin safety details.
+      c.pad            = { color: "#151519", preset: "matte" };
+      c.foundation     = { color: "#22232A", preset: "matte" };
+      c.post           = { color: "#33333E", preset: "satin" };
+      c.safetyRails    = { color: "#83AC08", preset: "neonDeep" };
+      c.platform       = { color: "#717482", preset: "brushed" };
+      c.beam           = { color: "#A5C817", preset: "satin" };
+      c.horseHead      = { color: "#2C2C37", preset: "satin" };
+      c.counterweight  = { color: "#7A940D", preset: "satin" };
+      c.crankWheel     = { color: "#41414D", preset: "brushed" };
+      c.motorBox       = { color: "#262630", preset: "matte" };
+      c.drillPipe      = { color: "#9295A2", preset: "brushed" };
+      c.machinePanel   = { color: "#A5C817", preset: "satin" };
+      c.tankScaffold   = { color: "#454552", preset: "brushed" };
+      c.signFrame      = { color: "#83AC08", preset: "neonDeep" };
+      c.pipes          = { color: "#51515F", preset: "brushed" };
+      c.lines          = { color: "#51515F", preset: "brushed" };
+      c.tank           = { color: "#E1E8BF", preset: "matte" };
+      c.valve          = { color: "#83AC08", preset: "neonDeep" };
+      c.wellCurb       = { color: "#464650", preset: "matte" };
+      return completeTheme(c);
     },
   },
- 
-  toxic: {
-  label: "BIOHAZARD",
-  build: () => {
-    const c = getDefaultPumpConfig();
-
-    c.pad           = { color: "#1a1a0a", preset: "matte" };   // dark grime
-    c.foundation    = { color: "#2a2a10", preset: "matte" };  // dirty dark olive
-
-    c.beam          = { color: "#c4b800", preset: "neonDeep" }; // caution yellow
-    c.horseHead     = { color: "#1a1a0a", preset: "brushed" };  // dark industrial
-
-    c.counterweight = { color: "#6b8c00", preset: "neonDeep" }; // toxic sludge green
-    c.machinePanel  = { color: "#c4b800", preset: "neonDeep" }; // caution yellow
-
-    c.crankWheel    = { color: "#1a1a0a", preset: "brushed" };  // dark industrial
-    c.motorBox      = { color: "#1a1a0a", preset: "brushed" };
-
-    c.drillPipe     = { color: "#6b8c00", preset: "neonDeep" }; // toxic sludge green
-    c.signFrame     = { color: "#c4b800", preset: "neonDeep" }; // caution yellow
-    c.pipes         = { color: "#2a2a10", preset: "brushed" };  // grimy dark
-    c.lines         = { color: "#2a2a10", preset: "brushed" };
-    c.tank          = { color: "#9f9f93", preset: "matte" };
-    c.tankScaffold  = { color: "#2a2a10", preset: "brushed" };
-    c.valve         = { color: "#c4b800", preset: "neonDeep" }; // caution yellow
-
-    return c;
-  },
-},
 hellforged: {
   label: "HELLFORGED",
   build: () => {
     const c = getDefaultPumpConfig();
-
-    c.beam          = { color: "#8B0000", preset: "brushed" };
-    c.horseHead     = { color: "#B22222", preset: "brushed" };
-    c.counterweight = { color: "#FF2400", preset: "neon" };
-    c.crankWheel    = { color: "#5A0A0A", preset: "matte" };
-    c.motorBox      = { color: "#2B0000", preset: "matte" };
-    c.foundation    = { color: "#1A0000", preset: "matte" };
-    c.drillPipe     = { color: "#FF4500", preset: "neon" };
-    c.pad           = { color: "#0D0000", preset: "matte" };
-    c.machinePanel  = { color: "#FF2400", preset: "neon" };
-    c.tankScaffold  = { color: "#2B0000", preset: "brushed" };
-    c.signFrame     = { color: "#B22222", preset: "brushed" };
-    c.pipes         = { color: "#FF4500", preset: "neon" };
-    c.lines         = { color: "#FF4500", preset: "neon" };
-    c.tank          = { color: "#ffab8c", preset: "matte" };
-
-    return c;
-  },
-},
-
-sanctified: {
-  label: "SANCTIFIED EXTRACTION",
-  build: () => {
-    const c = getDefaultPumpConfig();
-
-    c.pad           = { color: "#1a1008", preset: "matte" };   // dark church floor
-    c.foundation    = { color: "#3b2210", preset: "matte" };  // dark wood pew
-
-    c.beam          = { color: "#b8960c", preset: "gold" };   // altar gold
-    c.horseHead     = { color: "#f0e8d0", preset: "chrome" }; // ivory
-
-    c.counterweight = { color: "#6b1030", preset: "brushed" };   // burgundy altar cloth
-    c.machinePanel  = { color: "#6b1030", preset: "brushed" };   // burgundy
-
-    c.crankWheel    = { color: "#3b2210", preset: "brushed" }; // dark wood
-    c.motorBox      = { color: "#f0e8d0", preset: "chrome" };  // ivory
-
-    c.drillPipe     = { color: "#b8960c", preset: "gold" };    // gold
-    c.signFrame     = { color: "#b8960c", preset: "gold" };    // gold
-    c.pipes         = { color: "#3b2210", preset: "brushed" }; // dark wood
-    c.lines         = { color: "#3b2210", preset: "brushed" };
-    c.tank          = { color: "#a79c93", preset: "matte" };
-    c.tankScaffold  = { color: "#3b2210", preset: "brushed" }; // dark wood
-    c.valve         = { color: "#6b1030", preset: "brushed" };   // burgundy
-
-    return c;
+    c.pad            = { color: "#211B1C", preset: "matte" };
+    c.foundation     = { color: "#2C292D", preset: "matte" };
+    c.post           = { color: "#42363B", preset: "satin" };
+    c.safetyRails    = { color: "#C6531D", preset: "neonDeep" };
+    c.platform       = { color: "#666169", preset: "brushed" };
+    c.beam           = { color: "#852F2B", preset: "satin" };
+    c.horseHead      = { color: "#3D3D46", preset: "brushed" };
+    c.counterweight  = { color: "#A13222", preset: "satin" };
+    c.crankWheel     = { color: "#544046", preset: "brushed" };
+    c.motorBox       = { color: "#302A31", preset: "matte" };
+    c.drillPipe      = { color: "#8B7770", preset: "brushed" };
+    c.machinePanel   = { color: "#653536", preset: "satin" };
+    c.tankScaffold   = { color: "#51454C", preset: "brushed" };
+    c.signFrame      = { color: "#8B7770", preset: "brushed" };
+    c.pipes          = { color: "#65535A", preset: "brushed" };
+    c.lines          = { color: "#65535A", preset: "brushed" };
+    c.tank           = { color: "#E5C8B8", preset: "matte" };
+    c.valve          = { color: "#C6531D", preset: "neonDeep" };
+    c.wellCurb       = { color: "#514548", preset: "matte" };
+    return completeTheme(c);
   },
 },
 arctic: {
   label: "ARCTIC INDUSTRIAL",
   build: () => {
     const c = getDefaultPumpConfig();
-
-    c.beam          = { color: "#E6F2FF", preset: "chrome" };
-    c.horseHead     = { color: "#DCE9F7", preset: "chrome" };
-    c.counterweight = { color: "#A8D8FF", preset: "brushed" };
-    c.crankWheel    = { color: "#C8D6E5", preset: "brushed" };
-    c.motorBox      = { color: "#5E6E7E", preset: "matte" };
-    c.foundation    = { color: "#4B5A6A", preset: "matte" };
-    c.drillPipe     = { color: "#A8D8FF", preset: "brushed" };
-    c.pad           = { color: "#2E3A46", preset: "matte" };
-    c.machinePanel  = { color: "#E6F2FF", preset: "chrome" };
-    c.tankScaffold  = { color: "#5E6E7E", preset: "brushed" };
-    c.signFrame     = { color: "#A8D8FF", preset: "brushed" };
-    c.pipes         = { color: "#DCE9F7", preset: "chrome" };
-    c.lines         = { color: "#DCE9F7", preset: "chrome" };
-    c.tank          = { color: "#eff5fb", preset: "matte" };
-
-    return c;
+    c.pad            = { color: "#303E4B", preset: "matte" };
+    c.foundation     = { color: "#2C3C4B", preset: "matte" };
+    c.post           = { color: "#3E586F", preset: "satin" };
+    c.safetyRails    = { color: "#4095AA", preset: "brushed" };
+    c.platform       = { color: "#8296A8", preset: "brushed" };
+    c.beam           = { color: "#9FB7CA", preset: "brushed" };
+    c.horseHead      = { color: "#CBD7DF", preset: "satin" };
+    c.counterweight  = { color: "#467D9B", preset: "brushed" };
+    c.crankWheel     = { color: "#566B80", preset: "brushed" };
+    c.motorBox       = { color: "#2E4359", preset: "satin" };
+    c.drillPipe      = { color: "#C0D3DD", preset: "polished" };
+    c.machinePanel   = { color: "#738FA6", preset: "brushed" };
+    c.tankScaffold   = { color: "#566D80", preset: "brushed" };
+    c.signFrame      = { color: "#4095AA", preset: "brushed" };
+    c.pipes          = { color: "#8099AD", preset: "brushed" };
+    c.lines          = { color: "#8099AD", preset: "brushed" };
+    c.tank           = { color: "#EDF4F3", preset: "matte" };
+    c.valve          = { color: "#42B4CA", preset: "neonDeep" };
+    c.wellCurb       = { color: "#4F677A", preset: "matte" };
+    return completeTheme(c);
   },
 },
 desert: {
   label: "MAD MAX",
   build: () => {
     const c = getDefaultPumpConfig();
-
-    c.pad           = { color: "#2a2018", preset: "matte" };    // scorched earth
-    c.foundation    = { color: "#3a3530", preset: "brushed" };  // dark scrap metal
-
-    c.beam          = { color: "#c4a96a", preset: "matte" };    // sun-bleached sand
-    c.horseHead     = { color: "#3a3530", preset: "brushed" };  // dark gunmetal
-
-    c.counterweight = { color: "#b83a0a", preset: "neonDeep" }; // war-paint burnt orange
-    c.machinePanel  = { color: "#b83a0a", preset: "neonDeep" }; // war-paint
-
-    c.crankWheel    = { color: "#3a3530", preset: "brushed" };  // scrap metal
-    c.motorBox      = { color: "#3a3530", preset: "brushed" };  // scrap metal
-
-    c.drillPipe     = { color: "#c4a96a", preset: "matte" };    // sand
-    c.signFrame     = { color: "#b83a0a", preset: "neonDeep" }; // war-paint
-    c.pipes         = { color: "#3a3530", preset: "brushed" };  // dark scrap
-    c.lines         = { color: "#3a3530", preset: "brushed" };
-    c.tank          = { color: "#a6a4a2", preset: "matte" };
-    c.tankScaffold  = { color: "#3a3530", preset: "brushed" };  // dark scrap
-    c.valve         = { color: "#b83a0a", preset: "neonDeep" }; // war-paint
-
-    return c;
+    c.pad            = { color: "#3C322A", preset: "matte" };
+    c.foundation     = { color: "#393936", preset: "matte" };
+    c.post           = { color: "#777060", preset: "matte" };
+    c.safetyRails    = { color: "#A5533C", preset: "rust" };
+    c.platform       = { color: "#77766C", preset: "rust" };
+    c.beam           = { color: "#C2B397", preset: "matte" };
+    c.horseHead      = { color: "#464642", preset: "matte" };
+    c.counterweight  = { color: "#81523A", preset: "rust" };
+    c.crankWheel     = { color: "#5E5146", preset: "rust" };
+    c.motorBox       = { color: "#3D413C", preset: "matte" };
+    c.drillPipe      = { color: "#9C9785", preset: "rust" };
+    c.machinePanel   = { color: "#8E7860", preset: "matte" };
+    c.tankScaffold   = { color: "#696357", preset: "rust" };
+    c.signFrame      = { color: "#A5533C", preset: "rust" };
+    c.pipes          = { color: "#76604B", preset: "rust" };
+    c.lines          = { color: "#76604B", preset: "rust" };
+    c.tank           = { color: "#D5CABA", preset: "matte" };
+    c.valve          = { color: "#A5533C", preset: "rust" };
+    c.wellCurb       = { color: "#72695A", preset: "matte" };
+    return completeTheme(c);
   },
 },
 crimsonCharge: {
   label: "RED BULL",
   build: () => {
     const c = getDefaultPumpConfig();
-
-    c.foundation    = { color: "#050920", preset: "neonDeep" };  // aluminum can body
-    c.pad           = { color: "#a0a8b4", preset: "brushed" };
-
-    c.beam          = { color: "#050920", preset: "neonDeep" }; // deep blue band
-    c.horseHead     = { color: "#c1121f", preset: "brushed" };  // red bull head
-
-    c.counterweight = { color: "#c1121f", preset: "brushed" };  // racing red
-    c.machinePanel  = { color: "#d4a017", preset: "brushed" };  // gold sun accent
-
-    c.crankWheel    = { color: "#050920", preset: "neonDeep" };  
-    c.motorBox      = { color: "#c1121f", preset: "brushed"};
-
-    c.drillPipe     = { color: "#050920", preset: "neonDeep" }; // deep blue
-    c.signFrame     = { color: "#050920", preset: "neonDeep" };  // red
-    c.pipes         = { color: "#898e97", preset: "brushed" };  // aluminum
-    c.lines         = { color: "#898e97", preset: "brushed" };
-    c.tank          = { color: "#caccd0", preset: "matte" };
-    c.valve         = { color: "#c1121f", preset: "brushed" };  // red
-
-    return c;
+    c.pad            = { color: "#424852", preset: "matte" };
+    c.foundation     = { color: "#292E38", preset: "matte" };
+    c.post           = { color: "#A1ABB8", preset: "brushed" };
+    c.safetyRails    = { color: "#C2CAD2", preset: "brushed" };
+    c.platform       = { color: "#8D98A6", preset: "brushed" };
+    c.beam           = { color: "#234D9A", preset: "satin" };
+    c.horseHead      = { color: "#BC2331", preset: "satin" };
+    c.counterweight  = { color: "#98232E", preset: "satin" };
+    c.crankWheel     = { color: "#5D6B80", preset: "brushed" };
+    c.motorBox       = { color: "#263A60", preset: "satin" };
+    c.drillPipe      = { color: "#C2CAD2", preset: "polished" };
+    c.machinePanel   = { color: "#234D9A", preset: "satin" };
+    c.tankScaffold   = { color: "#748295", preset: "brushed" };
+    c.signFrame      = { color: "#C2CAD2", preset: "brushed" };
+    c.pipes          = { color: "#8D98A6", preset: "brushed" };
+    c.lines          = { color: "#8D98A6", preset: "brushed" };
+    c.tank           = { color: "#D8E1ED", preset: "matte" };
+    c.valve          = { color: "#C0A25D", preset: "gold" };
+    c.wellCurb       = { color: "#5B626C", preset: "matte" };
+    return completeTheme(c);
   },
-  
 },
 atomicSurge: {
   label: "MONSTER ENERGY",
   build: () => {
     const c = getDefaultPumpConfig();
-
-    c.foundation    = { color: "#1a1a1a", preset: "matte" };  // charcoal, preserves detail
-    c.pad           = { color: "#141414", preset: "matte" };
-
-    c.beam          = { color: "#0d9e00", preset: "brushed" };  // hero green
-    c.horseHead     = { color: "#0d9e00", preset: "brushed" };  // green head
-
-    c.counterweight = { color: "#0d9e00", preset: "brushed" };
-    c.machinePanel  = { color: "#0d9e00", preset: "brushed" };
-
-    c.crankWheel    = { color: "#2a2a2a", preset: "brushed" };  // dark charcoal
-    c.motorBox      = { color: "#2a2a2a", preset: "brushed" };
-
-    c.drillPipe     = { color: "#0d9e00", preset: "brushed" };
-    c.signFrame     = { color: "#0d9e00", preset: "brushed" };
-    c.pipes         = { color: "#2a2a2a", preset: "brushed" };  // dark charcoal
-    c.lines         = { color: "#2a2a2a", preset: "brushed" };
-    c.tank          = { color: "#9f9f9f", preset: "matte" };
-    c.valve         = { color: "#0d9e00", preset: "brushed" };
-
-    return c;
+    // Neutral black enamel keeps the electric green crisp under warm scene lighting.
+    c.pad            = { color: "#171719", preset: "matte" };
+    c.foundation     = { color: "#202023", preset: "matte" };
+    c.post           = { color: "#29292D", preset: "satin" };
+    c.safetyRails    = { color: "#343439", preset: "satin" };
+    c.platform       = { color: "#55555C", preset: "brushed" };
+    c.beam           = { color: "#19191C", preset: "satin" };
+    c.horseHead      = { color: "#45D500", preset: "satin" };
+    c.counterweight  = { color: "#45D500", preset: "satin" };
+    c.crankWheel     = { color: "#38383E", preset: "brushed" };
+    c.motorBox       = { color: "#202024", preset: "satin" };
+    c.drillPipe      = { color: "#BABAC2", preset: "polished" };
+    c.machinePanel   = { color: "#222226", preset: "satin" };
+    c.tankScaffold   = { color: "#424248", preset: "brushed" };
+    c.signFrame      = { color: "#3FB800", preset: "neonDeep" };
+    c.pipes          = { color: "#44444A", preset: "brushed" };
+    c.lines          = { color: "#44444A", preset: "brushed" };
+    c.tank           = { color: "#D9D9DF", preset: "matte" };
+    c.valve          = { color: "#3FB800", preset: "neonDeep" };
+    c.wellCurb       = { color: "#303034", preset: "matte" };
+    return completeTheme(c);
   },
 },
 tokyoNoir: {
   label: "TOKYO NOIR",
   build: () => {
     const c = getDefaultPumpConfig();
-
-    // Base night steel
-    c.pad           = { color: "#0a0f17", preset: "matte" };
-    c.foundation    = { color: "#1b2433", preset: "brushed" };
-
-    // Sodium vapor hero (amber)
-    c.beam          = { color: "#cc8a10", preset: "neonDeep" }; // warm streetlight
-    c.counterweight = { color: "#cc8a10", preset: "neonDeep" };
-
-    // Deep lacquer red accent
-    c.horseHead     = { color: "#7a1e1e", preset: "brushed" };
-    c.machinePanel  = { color: "#8a1515", preset: "neonDeep" }; // red lantern
-
-    // Mechanical depth
-    c.crankWheel    = { color: "#1b2433", preset: "brushed" };
-    c.motorBox      = { color: "#1b2433", preset: "brushed" };
-    c.drillPipe     = { color: "#cc6600", preset: "neonDeep" }; // orange pulse
-    c.signFrame     = { color: "#cc8a10", preset: "neonDeep" }; // amber
-    c.pipes         = { color: "#1b2433", preset: "brushed" };
-    c.lines         = { color: "#1b2433", preset: "brushed" };
-    c.tank          = { color: "#989ca3", preset: "matte" };
-    c.tankScaffold  = { color: "#1b2433", preset: "brushed" };
-    c.valve         = { color: "#8a1515", preset: "neonDeep" }; // red lantern
-
-    return c;
+    // Ink satin, smoky ivory and vermilion; red lantern glow only on the valves.
+    c.pad            = { color: "#18171B", preset: "matte" };
+    c.foundation     = { color: "#202127", preset: "matte" };
+    c.post           = { color: "#303137", preset: "satin" };
+    c.safetyRails    = { color: "#62636A", preset: "brushed" };
+    c.platform       = { color: "#74747A", preset: "brushed" };
+    c.beam           = { color: "#C8C2B3", preset: "satin" };
+    c.horseHead      = { color: "#A63324", preset: "satin" };
+    c.counterweight  = { color: "#822B23", preset: "satin" };
+    c.crankWheel     = { color: "#48474C", preset: "brushed" };
+    c.motorBox       = { color: "#24252B", preset: "satin" };
+    c.drillPipe      = { color: "#92908B", preset: "brushed" };
+    c.machinePanel   = { color: "#38373D", preset: "satin" };
+    c.tankScaffold   = { color: "#505057", preset: "brushed" };
+    c.signFrame      = { color: "#62636A", preset: "brushed" };
+    c.pipes          = { color: "#56565E", preset: "brushed" };
+    c.lines          = { color: "#56565E", preset: "brushed" };
+    c.tank           = { color: "#D9D3CB", preset: "matte" };
+    c.valve          = { color: "#A62D1B", preset: "neonDeep" };
+    c.wellCurb       = { color: "#46454B", preset: "matte" };
+    return completeTheme(c);
   },
 },
 texas: {
   label: "LONE STAR",
   build: () => {
     const c = getDefaultPumpConfig();
-
-    // === DAY STRUCTURE ===
-    c.beam          = { color: "#1c2a44", preset: "brushed" };  // navy blue
-    c.horseHead     = { color: "#c49a3a", preset: "brushed" }; // brass
-
-    c.counterweight = { color: "#b22234", preset: "brushed" }; // Texas red
-    c.machinePanel  = { color: "#1c2a44", preset: "matte" };   // navy badge base
-
-    c.foundation    = { color: "#1c2a44", preset: "matte" };
-    c.pad           = { color: "#142033", preset: "matte" };
-    c.tankScaffold  = { color: "#1c2a44", preset: "brushed" };
-
-    c.crankWheel    = { color: "#6b6b6b", preset: "brushed" };
-    c.motorBox      = { color: "#5a5a5a", preset: "brushed" };
-
-    c.drillPipe     = { color: "#c49a3a", preset: "brushed" }; // brass
-    c.signFrame     = { color: "#c49a3a", preset: "brushed" };
-    c.pipes         = { color: "#6b6b6b", preset: "brushed" };
-    c.lines         = { color: "#6b6b6b", preset: "brushed" };
-    c.tank          = { color: "#bcbcbc", preset: "matte" };
-    c.valve         = { color: "#b22234", preset: "brushed" }; // Texas red
-
-    return c;
+    c.pad            = { color: "#252A33", preset: "matte" };
+    c.foundation     = { color: "#293649", preset: "matte" };
+    c.post           = { color: "#4A6382", preset: "satin" };
+    c.safetyRails    = { color: "#AAB4C2", preset: "brushed" };
+    c.platform       = { color: "#7E8B9D", preset: "brushed" };
+    c.beam           = { color: "#223957", preset: "satin" };
+    c.horseHead      = { color: "#BAC2CF", preset: "brushed" };
+    c.counterweight  = { color: "#872E3B", preset: "satin" };
+    c.crankWheel     = { color: "#617087", preset: "brushed" };
+    c.motorBox       = { color: "#303E53", preset: "satin" };
+    c.drillPipe      = { color: "#BCC5D0", preset: "polished" };
+    c.machinePanel   = { color: "#872E3B", preset: "satin" };
+    c.tankScaffold   = { color: "#67768A", preset: "brushed" };
+    c.signFrame      = { color: "#A78B58", preset: "gold" };
+    c.pipes          = { color: "#8997AA", preset: "brushed" };
+    c.lines          = { color: "#8997AA", preset: "brushed" };
+    c.tank           = { color: "#D9DCE0", preset: "matte" };
+    c.valve          = { color: "#A78B58", preset: "gold" };
+    c.wellCurb       = { color: "#4B576B", preset: "matte" };
+    return completeTheme(c);
   },
 },
 myLittlePony: {
   label: "MY LITTLE PONY",
   build: () => {
     const c = getDefaultPumpConfig();
-
-    // Dark horizon base — just the ground
-    c.pad           = { color: "#1a1028", preset: "brushed" };    // dark purple-blue
-    c.foundation    = { color: "#1a1028", preset: "brushed"  };  // dark purple-blue
-
-    // Hot pink grid structure
-    c.beam          = { color: "#c04878", preset: "brushed" };  // synthwave pink
-    c.horseHead     = { color: "#c04878", preset: "brushed" };
-
-    // Sunset peach accents
-    c.counterweight = { color: "#d4906a", preset: "brushed" };  // peach sunset
-    c.machinePanel  = { color: "#d4906a", preset: "brushed" };
-
-    // Purple mechanicals
-    c.crankWheel    = { color: "#d4906a", preset: "brushed" };  // soft purple
-    c.motorBox      = { color: "#8868a0", preset: "brushed" };
-
-    // Sunset seams
-    c.drillPipe     = { color: "#d4906a", preset: "brushed" };  // peach
-    c.signFrame     = { color: "#d4906a", preset: "brushed" };  // peach
-    c.pipes         = { color: "#c04878", preset: "brushed" };  // pink grid
-    c.lines         = { color: "#c04878", preset: "brushed" };
-    c.tank          = { color: "#e3adc2", preset: "matte" };
-    c.tankScaffold  = { color: "#8868a0", preset: "brushed" };  // soft purple
-    c.valve         = { color: "#d4906a", preset: "brushed" };  // peach sunset
-
-    return c;
+    c.pad            = { color: "#352842", preset: "matte" };
+    c.foundation     = { color: "#49305F", preset: "satin" };
+    c.post           = { color: "#76519D", preset: "satin" };
+    c.safetyRails    = { color: "#38BBAE", preset: "satin" };
+    c.platform       = { color: "#939BB7", preset: "brushed" };
+    c.beam           = { color: "#DE459D", preset: "satin" };
+    c.horseHead      = { color: "#B74ABF", preset: "brushed" };
+    c.counterweight  = { color: "#C75CBC", preset: "brushed" };
+    c.crankWheel     = { color: "#7D7099", preset: "brushed" };
+    c.motorBox       = { color: "#59416F", preset: "satin" };
+    c.drillPipe      = { color: "#D2D5E2", preset: "polished" };
+    c.machinePanel   = { color: "#CB73C5", preset: "satin" };
+    c.tankScaffold   = { color: "#877BA2", preset: "brushed" };
+    c.signFrame      = { color: "#25B7AC", preset: "neonDeep" };
+    c.pipes          = { color: "#ACB7D0", preset: "brushed" };
+    c.lines          = { color: "#ACB7D0", preset: "brushed" };
+    c.tank           = { color: "#E5D9ED", preset: "matte" };
+    c.valve          = { color: "#25B7AC", preset: "neonDeep" };
+    c.wellCurb       = { color: "#625074", preset: "matte" };
+    return completeTheme(c);
   },
 },
 solarFlare: {
@@ -591,23 +746,35 @@ solarFlare: {
     c.tankScaffold  = { color: "#1a1a1a", preset: "brushed" };
     c.valve         = { color: "#b83500", preset: "neonDeep" }; // molten
 
-    return c;
+    return completeTheme(c);
   },
 },
- chrome: {
-    label: "FULL CHROME",
-    build: () => {
-      const c = getDefaultPumpConfig();
-      PUMP_ZONES.forEach((z) => {
-        c[z.id] = { color: "#d8d8d8", preset: "chrome" };
-      });
-      c.pad = { color: "#b0b0b0", preset: "brushed" };
-      c.counterweight = { color: "#e8e8e8", preset: "chrome" };
-      c.horseHead = { color: "#e8e8e8", preset: "chrome" };
-      c.crankWheel = { color: "#c8c8c8", preset: "chrome" };
-      return c;
-    },
-  },
+// chrome: {
+//   label: "FULL CHROME",
+//   build: () => {
+//     const c = getDefaultPumpConfig();
+//     c.pad            = { color: "#737B84", preset: "matte" };
+//     c.foundation     = { color: "#9EA6AF", preset: "brushed" };
+//     c.post           = { color: "#B2BCC6", preset: "brushed" };
+//     c.safetyRails    = { color: "#E2E5E8", preset: "chrome" };
+//     c.platform       = { color: "#969FA9", preset: "brushed" };
+//     c.beam           = { color: "#D1D7DE", preset: "polished" };
+//     c.horseHead      = { color: "#E8EAED", preset: "polished" };
+//     c.counterweight  = { color: "#B7C0CB", preset: "polished" };
+//     c.crankWheel     = { color: "#A8B1BA", preset: "brushed" };
+//     c.motorBox       = { color: "#939DA8", preset: "brushed" };
+//     c.drillPipe      = { color: "#DDE2E7", preset: "chrome" };
+//     c.machinePanel   = { color: "#BBC3CC", preset: "polished" };
+//     c.tankScaffold   = { color: "#A8B1BA", preset: "brushed" };
+//     c.signFrame      = { color: "#E2E5E8", preset: "chrome" };
+//     c.pipes          = { color: "#BCC5CE", preset: "polished" };
+//     c.lines          = { color: "#BCC5CE", preset: "polished" };
+//     c.tank           = { color: "#E4E9EE", preset: "matte" };
+//     c.valve          = { color: "#DDE2E7", preset: "chrome" };
+//     c.wellCurb       = { color: "#7E8791", preset: "matte" };
+//     return completeTheme(c);
+//   },
+// },
 dragonforge: {
   label: "DRAGONFORGE",
   build: () => {
@@ -638,108 +805,85 @@ dragonforge: {
     c.tankScaffold  = { color: "#2a1b1b", preset: "brushed" };  // forge iron
     c.valve         = { color: "#6b0a0a", preset: "neonDeep" }; // ember
 
-    return c;
+    return completeTheme(c);
   },
 },
-celestial: {
-  label: "CELESTIAL EXECUTION",
-  build: () => {
-    const c = getDefaultPumpConfig();
-
-    // Midnight blue base
-    c.pad           = { color: "#0a0f1a", preset: "matte" };
-    c.foundation    = { color: "#0c1220", preset: "matte" };
-
-    // Midnight blue structure
-    c.beam          = { color: "#0f1a30", preset: "brushed" };  // deep midnight
-    c.horseHead     = { color: "#c9a227", preset: "gold" };     // gold crown
-
-    // Emerald seams
-    c.counterweight = { color: "#0a6630", preset: "brushed" };  // deep emerald
-    c.machinePanel  = { color: "#0a6630", preset: "brushed" };
-
-    // Gold trim
-    c.crankWheel    = { color: "#c9a227", preset: "gold" };
-    c.motorBox      = { color: "#0f1a30", preset: "brushed" };  // midnight
-
-    // Holy seams
-    c.drillPipe     = { color: "#0a6630", preset: "brushed" };  // emerald
-    c.signFrame     = { color: "#c9a227", preset: "gold" };     // gold
-    c.pipes         = { color: "#0f1a30", preset: "brushed" };  // midnight
-    c.lines         = { color: "#0f1a30", preset: "brushed" };
-    c.tank          = { color: "#9398a2", preset: "matte" };
-    c.tankScaffold  = { color: "#0f1a30", preset: "brushed" };  // midnight
-    c.valve         = { color: "#0a6630", preset: "brushed" };  // emerald
-
-    return c;
-  },
-},
-
-
+// celestial: {
+//   label: "CELESTIAL EXECUTION",
+//   build: () => {
+//     const c = getDefaultPumpConfig();
+//     c.pad            = { color: "#161B2B", preset: "matte" };
+//     c.foundation     = { color: "#20263C", preset: "matte" };
+//     c.post           = { color: "#394463", preset: "satin" };
+//     c.safetyRails    = { color: "#419BAF", preset: "neonDeep" };
+//     c.platform       = { color: "#8995AF", preset: "brushed" };
+//     c.beam           = { color: "#C3CCDF", preset: "polished" };
+//     c.horseHead      = { color: "#99C6DC", preset: "satin" };
+//     c.counterweight  = { color: "#52658F", preset: "brushed" };
+//     c.crankWheel     = { color: "#46516F", preset: "brushed" };
+//     c.motorBox       = { color: "#252E48", preset: "satin" };
+//     c.drillPipe      = { color: "#AEBFD4", preset: "polished" };
+//     c.machinePanel   = { color: "#52658F", preset: "satin" };
+//     c.tankScaffold   = { color: "#596681", preset: "brushed" };
+//     c.signFrame      = { color: "#AEBFD4", preset: "polished" };
+//     c.pipes          = { color: "#6D7D9A", preset: "brushed" };
+//     c.lines          = { color: "#6D7D9A", preset: "brushed" };
+//     c.tank           = { color: "#D6E8F1", preset: "matte" };
+//     c.valve          = { color: "#419BAF", preset: "neonDeep" };
+//     c.wellCurb       = { color: "#485169", preset: "matte" };
+//     return completeTheme(c);
+//   },
+// },
 midnightSovereign: {
   label: "DARK CROWN",
   build: () => {
     const c = getDefaultPumpConfig();
-
-    // Dark throne
-    c.pad           = { color: "#080810", preset: "matte" };
-    c.foundation    = { color: "#10101a", preset: "matte" };
-
-    // Royal violet body
-    c.beam          = { color: "#1a1030", preset: "brushed" };  // dark purple steel
-    c.horseHead     = { color: "#1a1030", preset: "brushed" };
-
-    // Crown silver
-    c.counterweight = { color: "#8888a0", preset: "chrome" };   // platinum
-    c.crankWheel    = { color: "#8888a0", preset: "chrome" };
-
-    c.motorBox      = { color: "#10101a", preset: "brushed" };
-    c.machinePanel  = { color: "#3a1a60", preset: "brushed" };  // deep violet
-
-    // Violet seams
-    c.drillPipe     = { color: "#3a1a60", preset: "brushed" };  // deep violet
-    c.signFrame     = { color: "#8888a0", preset: "chrome" };   // platinum
-    c.pipes         = { color: "#10101a", preset: "brushed" };
-    c.lines         = { color: "#10101a", preset: "brushed" };
-    c.tank          = { color: "#939398", preset: "matte" };
-    c.tankScaffold  = { color: "#10101a", preset: "brushed" };
-    c.valve         = { color: "#3a1a60", preset: "brushed" };  // deep violet
-
-    return c;
+    c.pad            = { color: "#1B1721", preset: "matte" };
+    c.foundation     = { color: "#25202E", preset: "matte" };
+    c.post           = { color: "#513552", preset: "satin" };
+    c.safetyRails    = { color: "#B0A9BA", preset: "polished" };
+    c.platform       = { color: "#6F6B7B", preset: "brushed" };
+    c.beam           = { color: "#663F70", preset: "satin" };
+    c.horseHead      = { color: "#D2CAD9", preset: "polished" };
+    c.counterweight  = { color: "#432D4E", preset: "satin" };
+    c.crankWheel     = { color: "#756A83", preset: "brushed" };
+    c.motorBox       = { color: "#302737", preset: "satin" };
+    c.drillPipe      = { color: "#A397B1", preset: "brushed" };
+    c.machinePanel   = { color: "#6E437E", preset: "satin" };
+    c.tankScaffold   = { color: "#65596F", preset: "brushed" };
+    c.signFrame      = { color: "#B0A9BA", preset: "polished" };
+    c.pipes          = { color: "#63546F", preset: "brushed" };
+    c.lines          = { color: "#63546F", preset: "brushed" };
+    c.tank           = { color: "#E0D3E7", preset: "matte" };
+    c.valve          = { color: "#80489F", preset: "neonDeep" };
+    c.wellCurb       = { color: "#4E4258", preset: "matte" };
+    return completeTheme(c);
   },
 },
-
 metalAF: {
   label: "METAL AF",
   build: () => {
     const c = getDefaultPumpConfig();
-
-    // Gunmetal base
-    c.pad           = { color: "#2a2a2e", preset: "matte" };
-    c.foundation    = { color: "#606068", preset: "chrome" };   // polished steel
-
-    // Chrome body
-    c.beam          = { color: "#8a8a90", preset: "chrome" };   // bright chrome
-    c.horseHead     = { color: "#8a8a90", preset: "chrome" };
-
-    // Gold accents
-    c.counterweight = { color: "#b8960c", preset: "gold" };
-    c.machinePanel  = { color: "#b8960c", preset: "gold" };
-
-    // Brushed steel mechanicals
-    c.crankWheel    = { color: "#606068", preset: "brushed" };  // brushed steel
-    c.motorBox      = { color: "#606068", preset: "brushed" };
-
-    // Gold + steel seams
-    c.drillPipe     = { color: "#b8960c", preset: "gold" };
-    c.signFrame     = { color: "#b8960c", preset: "gold" };
-    c.pipes         = { color: "#606068", preset: "chrome" };   // polished steel
-    c.lines         = { color: "#606068", preset: "chrome" };
-    c.tank          = { color: "#b7b7bb", preset: "matte" };
-    c.tankScaffold  = { color: "#606068", preset: "chrome" };
-    c.valve         = { color: "#b8960c", preset: "gold" };
-
-    return c;
+    c.pad            = { color: "#242528", preset: "matte" };
+    c.foundation     = { color: "#383D43", preset: "matte" };
+    c.post           = { color: "#737B83", preset: "brushed" };
+    c.safetyRails    = { color: "#9AA2AA", preset: "brushed" };
+    c.platform       = { color: "#686E76", preset: "brushed" };
+    c.beam           = { color: "#9FA8B0", preset: "brushed" };
+    c.horseHead      = { color: "#78848E", preset: "brushed" };
+    c.counterweight  = { color: "#30363D", preset: "satin" };
+    c.crankWheel     = { color: "#545D67", preset: "brushed" };
+    c.motorBox       = { color: "#383F47", preset: "satin" };
+    c.drillPipe      = { color: "#A9ADB0", preset: "brushed" };
+    c.machinePanel   = { color: "#505860", preset: "brushed" };
+    c.tankScaffold   = { color: "#59636D", preset: "brushed" };
+    c.signFrame      = { color: "#9AA2AA", preset: "brushed" };
+    c.pipes          = { color: "#606A74", preset: "brushed" };
+    c.lines          = { color: "#606A74", preset: "brushed" };
+    c.tank           = { color: "#CCD2D6", preset: "matte" };
+    c.valve          = { color: "#B5764E", preset: "brushed" };
+    c.wellCurb       = { color: "#4C5055", preset: "matte" };
+    return completeTheme(c);
   },
 },
 

@@ -22,7 +22,7 @@ import PimpMyPumpPanel, { getDefaultPumpConfig, THEME_PRESETS } from "@/componen
 import RigScene, { RIG_CAMERA, RIG_FOV } from "@/components/RigScene";
 import DemonArena, { WEAPONS } from "@/components/DemonArena";
 import VendorStage, { BoardwalkStrip, VendorCart, stepUpVendor, stepBackVendor, warmBoardwalk } from "@/components/VendorStage";
-import { playSfx } from "@/lib/uiSfx";
+import { playSfx, startSfxLoop } from "@/lib/uiSfx";
 import { panelChrome, PanelSection, PanelTitle, PANEL_ICONS } from "@/components/HailMaryPanel";
 import DailyTicketPanel from "@/components/DailyTicketPanel";
 import OilWelcomeModal from "@/components/OilWelcomeModal";
@@ -225,6 +225,14 @@ function CameraFill({ intensity, color }) {
   const { camera } = useThree();
   useFrame(() => { const l = ref.current; if (!l) return; l.position.copy(camera.position); l.position.y += 2; });
   return <directionalLight ref={ref} intensity={intensity} color={color} />;
+}
+
+// Desktop field readability fades in with night; special modes keep their own lighting.
+function desktopNightStrength(preset, hour) {
+  if (preset === "hell" || preset === "solstice") return 0;
+  if (hour == null) return preset === "night" ? 1 : 0;
+  const ramp = (a, b, h) => Math.min(1, Math.max(0, (h - a) / (b - a)));
+  return hour >= 12 ? ramp(17.75, 20, hour) : 1 - ramp(5, 6.5, hour);
 }
 
 function EnvLights({ env, moodScale }) {
@@ -837,6 +845,19 @@ const DEFAULT_BLOCK_HASH =
 
 const DEPTH_Z = 20;
 const CELL_SIZE = 1;
+// Optional rig ambience (see the rigSound state). ?v= busts the cache when the file is replaced.
+const RIG_SOUND_URL = "/audio/oilRig.mp3?v=2";
+const RIG_SOUND_RATE = 0.75;    // FREE-RUN playback rate (<1 slows and lowers it) — tune with ?rigrate=; ignored when locked to the pump
+const RIG_SOUND_VOLUME = 0.35;  // tune with ?rigvol=
+// Pump lock (2026-09-08): the pump clip is 5.04 s per cycle and the horse head is lowest at
+// 0.537 of it (measured from the clip). STROKES = how many pump cycles one loop of the file
+// covers (0 = pick the count that keeps the rate nearest 1); BEAT = where in ONE stroke the
+// file's thump sits (0 = the start of the track). ?rigstrokes= / ?rigbeat= override; set
+// FREE_RUN true (or ?rigfree=1) to hear the file untouched.
+const RIG_HEAD_LOW_PHASE = 0.537;
+const RIG_SOUND_STROKES = 0;
+const RIG_SOUND_BEAT = 0;
+const RIG_SOUND_FREE_RUN = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("rigfree") === "1";
 // "Bank soon" meter threshold, in field oil units (~0.5% of OIL_FIELD_UNITS) — the
 // tank holds oil (the score), paid out at a fixed rate. Scales with OIL_FIELD_UNITS:
 // every cell's oil is proportional to the field total, so this must track it
@@ -1313,9 +1334,11 @@ function CameraFlyTo({ target, controlsRef }) {
           endTarget.current.set(target.x, target.y - 0.13, target.z + 0.05);
           endPos.current.set(target.x + 0.44, target.y + 0.06, target.z + 0.51);
         } else {
-          // Desktop: elevated close-up (pulled back slightly for more headroom)
-          endTarget.current.set(target.x + 0.1, target.y - 0.05, target.z + 0.1);
-          endPos.current.set(target.x + 0.63, target.y + 0.01, target.z + 0.47);
+          // Desktop: elevated close-up (pulled back slightly for more headroom). Look-at nudged
+          // 5 cm along screen-right (2026-09-08): the Synty rig read ~6% left of centre in the
+          // opening three-quarter view; same bearing and distance, so the orbit is unchanged.
+          endTarget.current.set(target.x + 0.07, target.y - 0.05, target.z + 0.143);
+          endPos.current.set(target.x + 0.6, target.y + 0.01, target.z + 0.513);
         }
 
         progressRef.current = 0;
@@ -1954,6 +1977,21 @@ export default function OilPage() {
   // Reflections = the scene's own sky (useSkyEnvMap): the live palette and the
   // sun's hour, so chrome mirrors the mesa's sky instead of a stock HDR.
   const skyEnv = useMemo(() => ({ sky: env.sky, skyBottom: env.skyBottom, ground: env.hemi?.ground, sunHour: skySunHour, preset: envPreset }), [env.sky, env.skyBottom, env.hemi?.ground, skySunHour, envPreset]);
+  const desktopNight = desktopNightStrength(envPreset, skySunHour);
+  const desktopEnv = useMemo(() => {
+    if (!desktopNight) return env;
+    const tint = (color, target) => new THREE.Color(color).lerp(new THREE.Color(target), desktopNight).getStyle();
+    return {
+      ...env,
+      dirA: env.dirA + (env.moon == null ? 0.9 * desktopNight : 0),
+      dirAColor: tint(env.dirAColor || "#ffffff", "#dce7ff"),
+      ...(env.moon != null ? { moon: env.moon + 0.9 * desktopNight, moonColor: tint(env.moonColor, "#dce7ff") } : {}),
+      dirB: env.dirB + 0.45 * desktopNight,
+      camFill: (env.camFill || 0) + 1.1 * desktopNight,
+      camFillColor: tint(env.camFillColor || "#ffffff", "#e5eaff"),
+    };
+  }, [env, desktopNight]);
+  const desktopSkyEnv = useMemo(() => ({ ...skyEnv, reflectionLift: Math.round(desktopNight * 16) / 16 }), [skyEnv, desktopNight]);
   // Reflections-only env map for the rigs' metal (NOT the sky). Warm "sunset"
   // reflections flatter the warm brass/copper on the bright day/dusk scenes;
   // "warehouse" (cooler, contrasty) suits the Lyquid80 night and hell.
@@ -2018,6 +2056,11 @@ export default function OilPage() {
   }, [clerk]);
   const { walletAddress, tokenBalance, isWalletConnected } = useWalletAuth();
   const { play, pause, isPlaying: contextIsPlaying, nextTrack } = useMusic();
+  // Off-tree signal for the rig crew (RigCrew.jsx): they put their headphones on when the music plays.
+  useEffect(() => {
+    window.__hmMusicOn = !!contextIsPlaying;
+    return () => { delete window.__hmMusicOn; };
+  }, [contextIsPlaying]);
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
@@ -2662,6 +2705,44 @@ export default function OilPage() {
   const [snapshotTrigger, setSnapshotTrigger] = useState(false);
   const [fireworksOn, setFireworksOn] = useState(false);
   const [fireworksSound, setFireworksSound] = useState(true);
+  // Optional rig ambience (2026-09-08): the steady drilling rhythm, off by default, remembered
+  // per browser. Loops through the shared audio context while a rig is on screen — the
+  // selected plot on desktop, the RIG tab on the phone — and fades out otherwise.
+  const [rigSound, setRigSound] = useState(false);
+  useEffect(() => { try { setRigSound(localStorage.getItem("oil_rigSound") === "1"); } catch {} }, []);
+  useEffect(() => { try { localStorage.setItem("oil_rigSound", rigSound ? "1" : "0"); } catch {} }, [rigSound]);
+  const rigOnScreen = isMobile ? mobileTab === "3d" : selectedX !== null;
+  useEffect(() => {
+    if (!rigSound || !rigOnScreen) return undefined;
+    // Knobs for tuning the file (2026-09-08): ?rigrate=0.8 slows it (playbackRate — pitch drops
+    // with it, that is how Web Audio works), ?rigvol=0.4 sets the level. While it plays,
+    // window.__hmRigSound.setRate(r) / .setVolume(v) change it live without a reload.
+    const q = new URLSearchParams(window.location.search);
+    const rate = parseFloat(q.get("rigrate")) || RIG_SOUND_RATE;
+    const vol = parseFloat(q.get("rigvol")) || RIG_SOUND_VOLUME;
+    const strokes = parseInt(q.get("rigstrokes"), 10) || RIG_SOUND_STROKES;
+    const beat = Number.isFinite(parseFloat(q.get("rigbeat"))) ? parseFloat(q.get("rigbeat")) : RIG_SOUND_BEAT;
+    // Lock to the pump when the on-screen rig publishes its clock (Pumpjack → window.__hmPump):
+    // the file is stretched so N strokes fill N pump cycles, and it starts at the offset that
+    // puts its beat (`beat`, fraction of one stroke) on the moment the horse head is lowest.
+    const pump = window.__hmPump;
+    const sync = !!pump && !RIG_SOUND_FREE_RUN;
+    const strokesFor = (dur) => strokes || Math.max(1, Math.round(dur / pump.period));
+    const loop = startSfxLoop(RIG_SOUND_URL, {
+      volume: vol,
+      rate,
+      rateFor: sync ? (dur) => dur / (strokesFor(dur) * pump.period) : null,
+      startAt: sync ? (dur) => {
+        const stroke = dur / strokesFor(dur);
+        const frac = (((pump.phase() - RIG_HEAD_LOW_PHASE + beat) % 1) + 1) % 1;
+        return frac * stroke;
+      } : null,
+    });
+    // the pump stops during a gusher: duck the loop with it
+    const duck = sync ? setInterval(() => loop.setVolume(pump.paused?.() ? 0 : vol), 250) : null;
+    window.__hmRigSound = loop;
+    return () => { if (duck) clearInterval(duck); loop.stop(0.5); if (window.__hmRigSound === loop) delete window.__hmRigSound; };
+  }, [rigSound, rigOnScreen]);
   // Remember the env preset active before fireworks switched the scene to night,
   // so toggling fireworks off restores the user's original lighting.
   const fireworksPrevPresetRef = useRef(null);
@@ -3749,6 +3830,27 @@ export default function OilPage() {
   // Tank fill: fraction of oil in tank relative to capacity (100K tokens)
   // Can exceed 1.0 — gusher fires when it first crosses 1.0
   const tankFill = useMemo(() => oilInTank / TANK_CAPACITY, [oilInTank]);
+  // Briefing lines for the rig crew (RigCrew.jsx): tap a worker and the operator reads
+  // these out. Real numbers only — the same sources as the status pill and the recap.
+  useEffect(() => {
+    const status = hellActive ? "breach" : ({ "auto-pumping": "pumping", ready: "ready", stunned: "incapacitated", blockade: "blockade", "pre-game": "pre-season",
+      "no-claim": "no claim", "max-depth": "max depth", "depth-ceiling": "caught up", "sign-in": "signed out", "wrong-claim": "pumping" }[drillStatus] || String(drillStatus));
+    const lines = [`Rig ${status}.`];
+    const r = awayRecap;
+    if (r) {
+      const h = Math.round((r.awayMs || 0) / 36e5);
+      if (h >= 1) lines.push(`You were away ${h}h.`);
+      if (r.toDepth > r.fromDepth) lines.push(`Drilled ${r.fromDepth} to ${r.toDepth}.`);
+      if (r.strikes?.length) lines.push(`${r.strikes.length} strike${r.strikes.length === 1 ? "" : "s"}, +${Math.round(r.oilGained || 0)} BTR.`);
+      if (r.hellHit) lines.push("We hit a hell pocket.");
+      (r.fieldEvents || []).slice(0, 2).forEach((e) => { if (e?.username && e?.type) lines.push(`${e.username}: ${e.type}.`); });
+      if (r.unreadCount) lines.push(`${r.unreadCount} unread message${r.unreadCount === 1 ? "" : "s"}.`);
+    }
+    lines.push(`Tank ${Math.round((tankFill || 0) * 100)}% full.`);
+    if (lines.length === 2) lines.splice(1, 0, "Nothing new since your last visit.");
+    window.__hmBriefing = { lines };
+    return () => { delete window.__hmBriefing; };
+  }, [drillStatus, hellActive, awayRecap, tankFill]);
 
 
   // Is the owner's own rig currently erupting? A live gusher event keeps the rig
@@ -4713,6 +4815,8 @@ export default function OilPage() {
   // declared after those early returns are conditional and break hook order
   // the moment settings finish loading.
   const handleLayerDecide = useCallback(async (action) => {
+    // The rig crew listens: the operator walks to that button and pushes it (RigCrew.jsx).
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("hm:decide", { detail: { action } }));
     const res = await oilApiFetch("/api/oil-layer-decide", { method: "POST", body: JSON.stringify({ action }) });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || "decide failed");
@@ -6555,7 +6659,7 @@ export default function OilPage() {
           width: "90%",
           textAlign: "center",
         }}>
-          <div style={{ fontSize: 11, letterSpacing: "0.2em", color: theme.muted, marginBottom: 8 }}>LYQUID80 QUEST</div>
+          <div style={{ fontSize: 11, letterSpacing: "0.2em", color: theme.muted, marginBottom: 8 }}>TROLLEUM TERRITORY</div>
           <h2 style={{
             fontFamily: "'Orbitron', monospace",
             fontSize: 16,
@@ -8228,7 +8332,7 @@ export default function OilPage() {
                 <span>HAIL MARY</span>
                 <span>PROSPECTING CO.{modeBadge}</span>
               </h1>
-              <p style={{ ...styles.subtitle, fontSize: 11 }}>LYQUID80 QUEST</p>
+              <p style={{ ...styles.subtitle, fontSize: 11 }}>TROLLEUM TERRITORY</p>
             </div>
           </div>
           <div style={styles.headerRight}>
@@ -8518,6 +8622,15 @@ export default function OilPage() {
               <div style={{ position: "absolute", bottom: 10, right: 10, zIndex: 10, ...TOOLBAR_TRAY }}>
                 {/* No fireworks toggle on the phone: the rig scene is a small
                     frame and the launcher sat on top of the style pager. */}
+                <button
+                  onClick={() => setRigSound((s) => !s)}
+                  title={rigSound ? "Rig sound: on (tap to mute)" : "Rig sound: off (tap to hear the rig)"}
+                  style={toolbarBtn(rigSound, 32)}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="2 12 5 12 8 5 11 19 14 8 17 15 20 12 22 12" />
+                  </svg>
+                </button>
                 <button
                   title="Snapshot"
                   onClick={handleManualSnapshot}
@@ -8841,7 +8954,7 @@ export default function OilPage() {
             <h1 style={{ ...styles.title, display: "flex", alignItems: "center", gap: 8 }}>
               <span>HAIL MARY PROSPECTING CO.{modeBadge}</span>
             </h1>
-            <p style={{ ...styles.subtitle, fontSize: 18 }}>LYQUID80 QUEST</p>
+            <p style={{ ...styles.subtitle, fontSize: 18 }}>THE TROLLEUM TRAIL</p>
           </div>
         </div>
         <div style={styles.headerRight}>
@@ -8936,7 +9049,7 @@ export default function OilPage() {
             {envPreset === "night" && <StarField radius={150} count1={500} count2={300} />}
             {envPreset === "night" && <Suspense fallback={null}><ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} /></Suspense>}
             {fireworksOn && <Fireworks quality={2} shellSize={2} finale sound={fireworksSound} />}
-            <EnvLights env={env} moodScale={moodScale} />
+            <EnvLights env={desktopEnv} moodScale={moodScale} />
             {arenaOpen ? (
               <DemonArena
                 seed={arenaRehearsal ? "rehearsal" : (demonBounty?.id || `local_${hellCol}_${hellRow}`)}
@@ -8989,7 +9102,7 @@ export default function OilPage() {
                 onRogueConsequence={handleRogueConsequence}
                 envPreset={envPreset}
                 envMapPreset={envMapPreset}
-                skyEnv={skyEnv}
+                skyEnv={desktopSkyEnv}
                 parabolum={parabolum}
                 plotsWithMessages={plotsWithMessages}
                 hellActive={hellActive}
@@ -9139,6 +9252,15 @@ export default function OilPage() {
                 </svg>
               </button>
             )}
+            <button
+              onClick={() => setRigSound((s) => !s)}
+              title={rigSound ? "Rig sound: on (click to mute)" : "Rig sound: off (click to hear the rig)"}
+              style={toolbarBtn(rigSound, 28)}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="2 12 5 12 8 5 11 19 14 8 17 15 20 12 22 12" />
+              </svg>
+            </button>
             <button
               title="Snapshot"
               onClick={handleManualSnapshot}

@@ -13,6 +13,7 @@ import RogueCharacter from "@/components/RogueCharacter";
 import { playSfx, preloadSfx, startSfxLoop } from "@/lib/uiSfx";
 import CommercialStrip from "@/components/CommercialStrip";
 import StrataVoxels from "@/components/StrataVoxels";
+import RigCrew from "@/components/RigCrew";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { mergeGeometries, deinterleaveGeometry } from "three/addons/utils/BufferGeometryUtils.js";
 
@@ -299,7 +300,10 @@ const DEFAULT_RIG_TINT = RIG_IS_SYNTY ? {} : {
 const WELLHEAD_OFFSET = [0, 0.006, 0.2];
 let _rigWellhead = [...WELLHEAD_OFFSET];
 // Opal-cyan glow color for the wellhead (the substance's signature bloom).
-const WELLHEAD_GLOW = ACTIVE_IRID.hex.emis; // 0x18d0c0
+const WELLHEAD_GLOW = ACTIVE_IRID.hex.emis; // 0x18d0c0 — the STRIKE colour: shown only when a layer has come in
+// Idle wells breathe a faint, colourless light (2026-09-08, Michelle: the cyan pool implied the
+// coveted liquid was already in the plot). Colour is information the player earns at a strike.
+const WELLHEAD_IDLE = "#7e7d6e";
 
 // Backlit sign — emissive strength of the player's image. Moderate so it glows
 // without blowing out / desaturating the image under tone-mapping.
@@ -307,7 +311,11 @@ const SIGN_EMISSIVE_INTENSITY = 0.7;
 // Glow is sunk just below the pad (DROP) so the pad masks any overhang to the hole
 // opening (depth-test); SIZE can exceed the hole since the rim trims it. No point
 // light — light spills onto the pad and can't be clipped by geometry.
-const WELLHEAD_GLOW_DROP = -0.018;
+// Synty plot (2026-09-08): the glow lies ON the black well quad (7 mm up) and under the curb
+// rim (11 mm), so it pulses inside the hole and the rim masks its overhang. The old rig sank
+// it into a real pit, hence the negative drop there.
+const WELLHEAD_GLOW_DROP = RIG_IS_SYNTY ? 0 : -0.018;
+const SYNTY_WELL_GLOW_Y = 0.065; // Blender units above the pad origin; × PUMPJACK_SCALE
 const WELLHEAD_GLOW_SIZE = 0.12;
 
 // ── Control-box live readout (MachinePanel) ──────────────────────────────────
@@ -324,6 +332,13 @@ const WELLHEAD_GLOW_SIZE = 0.12;
 // +X = proud of the face, −Y = down from the LOW screen, +Z = toward the open
 // side (away from the red button on −Z). W spans Z (horizontal), H spans Y.
 const PANEL_READOUT_OFFSET = [0.012, -0.02, 0.02];
+// Synty plot (2026-09-08): Michelle likes the big free-standing DEPTH board, but over the
+// buttons it hid the panel and above the beacon it floated across the beam. It now stands
+// at the platform's rear corner on the panel side, just outboard of the rail, like a rig
+// number board: Blender (0.80, 1.30, 0.45) vs the anchor (the PressurePanel quad at
+// 0.353, −0.841, 1.095), ×0.1, Blender→glTF (x, z, −y). The front corner by the well is the
+// same idea with the third number ≈ +0.05 instead of −0.214.
+const PANEL_READOUT_OFFSET_SYNTY = [0.045, -0.0645, -0.214];
 const PANEL_READOUT_ROT = [0, Math.PI / 2, 0]; // stand vertical, face world +X
 const PANEL_READOUT_SIZE = 0.038;          // LED glyph height (world units)
 const PANEL_SCREEN_W = 0.075;              // backing width  (along Z)
@@ -1068,7 +1083,7 @@ void main() {
 
 // ── Tank liquid fill (animated, flat-topped) ────────────────────────────────
 
-export const PUMPJACK_SCALE = 0.1;   // exported: RigScene seats the phone's work light in the same frame
+export const PUMPJACK_SCALE = 0.14;   // exported: RigScene seats the phone's work light in the same frame
 
 // Yaw correction (degrees about world-up) applied to the auto-derived MachinePanel
 // front direction. The front is inferred from the gauge children, then this rotates
@@ -1091,13 +1106,18 @@ const _needleQuat = /* @__PURE__ */ new THREE.Quaternion();
 // one rigid unit instead of swinging on its own (different local frame) and detaching.
 // Eases in with the gusher and settles as it fades.
 // Flip the sign if the rig tilts the wrong way; bump the magnitude for more drama.
-const GUSHER_BLOWBACK_BODY = -0.30; // radians of X tilt on Body_Pump (negative = pitch back)
+// Synty rig (2026-09-09): the beam's rocking axis is its local X with an identity rest pose
+// (measured from the clip), and negative raises the horse head — same sign as the old rig.
+// Michelle wants the blast to throw the beam back about 70°; the old rig's 17° stays for ?rig=2/3.
+const GUSHER_BLOWBACK_BODY = RIG_IS_SYNTY ? -1.22 : -0.30; // radians of X tilt on Body_Pump (negative = pitch back)
 const GUSHER_BLOWBACK_SPEED = 15;   // lerp rate toward the target tilt
 // Extra back-pitch on the horsehead alone, on TOP of riding the body. Applied about
 // the body's X axis (the head's parent frame during the gusher), not the head's own
 // tilted local axis. ~164°; positive pitches the head back away from the body — the
 // negative direction curled it under and clipped through Body_Pump.
-const GUSHER_HEAD_EXTRA = Math.PI / 1.1;
+// Synty: the head is a rigid child of the beam, and with the beam at 70° a 164° head flip
+// folds it back over the beam — a modest extra cock-back reads better. Tune here.
+const GUSHER_HEAD_EXTRA = RIG_IS_SYNTY ? 0.6 : (Math.PI / 1.1);
 const _GUSHER_X_AXIS = /* @__PURE__ */ new THREE.Vector3(1, 0, 0);
 const _gusherHeadQuat = /* @__PURE__ */ new THREE.Quaternion();
 // One-shot gusher length (seconds). A sustained gusher (tank overflow, or the demon
@@ -1445,6 +1465,14 @@ function applyPumpConfig(clonedScene, pumpConfig, originalMats, envMap) {
       mat.color.copy(orig.color);
       mat.map = orig.map;
     }
+
+    // Atlas finish/emission masks belong to the authored swatches. Leaving them
+    // attached multiplies the selected finish (and can black out neon entirely).
+    // Keep normal/AO detail; restore authored masks for color-only STOCK edits.
+    mat.roughnessMap = preset.roughness !== null ? null : orig.roughnessMap;
+    mat.metalnessMap = preset.roughness !== null ? null : orig.metalnessMap;
+    mat.emissiveMap = preset.roughness !== null ? null : orig.emissiveMap;
+    mat.envMap = envMap || null;
 
     // Apply preset material properties
     if (preset.roughness !== null) {
@@ -1845,7 +1873,7 @@ function PlotPoop() {
   );
 }
 
-function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, depositLayer = -1, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, gusherTier = "gusher", hasMessages = false, onEnvelopeClick, hellActive = false, worldW = 10, worldD = 10, cameraViewable = true, onFocusObject, panelZoomed = null, onPanelTap = null }) {
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, depositLayer = -1, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, gusherTier = "gusher", hasMessages = false, onEnvelopeClick, hellActive = false, worldW = 10, worldD = 10, cameraViewable = true, onFocusObject, panelZoomed = null, onPanelTap = null, yaw = 0, crewEnabled = null }) {
   // `panelZoomed` (phone, RigScene): the report's MACHINE PANEL chip has already
   // glided the camera to the control box, so the panel buttons work without the
   // desktop's select-then-zoom dance — true = buttons live, false = inert, null = desktop rules.
@@ -1866,32 +1894,102 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
 
   // PASS cover (see PASS_COVER_OPEN): hinge mesh, its rest pose, armed state, auto-drop timer
   const passCoverRef = useRef(null);
+  const passButtonRef = useRef(null);
   const passCoverRest = useRef(null);
+  // Rod string below ground (Synty rig, 2026-09-09): a thin steel cylinder from the wellhead
+  // down to the layer being worked, moving with the polished rod. World units, in the outer
+  // group, so it lives inside the ground block and shows in the cutaway. Radius from the
+  // Straw's own geometry; XZ and the rod's frame-1 height resolved on the first frame.
+  const rodStringRef = useRef(null);
+  const rodFacts = useRef(null);      // { radius, x, z, scaleY } once known
+  // Pitman arms ride the beam during a blowback (Synty rig, 2026-09-09): reparented under
+  // Body_Pump for the gusher like the head, so they lift with it and pull off the crank.
+  const pitmanRef = useRef(null);
+  const pitmanOrigParentRef = useRef(null);
+  // Lateral switches + lamps (see TOGGLE_FLIP). Levers spring between 0 and TOGGLE_FLIP;
+  // lamps are lit by code (neighbour has an open layer) — not by the switches.
+  const toggleRefs = useRef({});      // dir → { mesh, rest, angle, vel }
+  const toggleOnRef = useRef({ N: false, E: false, S: false, W: false });
+  const lampRefs = useRef({});        // dir → mesh
+  const setLamp = useCallback((dir, on) => {
+    const m = lampRefs.current[dir];
+    if (!m?.material) return;
+    if (!m.userData._lampClone) { m.material = m.material.clone(); m.material.map = null; m.material.emissiveMap = null; m.material.needsUpdate = true; m.userData._lampClone = true; }
+    const mat = m.material;
+    if (on) { mat.color.set("#ffe9b0"); if (mat.emissive) mat.emissive.copy(LAMP_LIT); mat.emissiveIntensity = 1.6; }
+    else { mat.color.copy(LAMP_OFF); if (mat.emissive) mat.emissive.set(0, 0, 0); mat.emissiveIntensity = 0; }
+    m.userData._lampOn = !!on;
+  }, []);
+  const keyRef = useRef(null);          // { mesh, rest, axisLocal }
+  const autopilotRef = useRef(false);
+  const needleAxisRef = useRef(null);   // dial normal in the needle's local frame (Synty)
+  const poseKey = useCallback(() => {
+    const k = keyRef.current;
+    if (!k) return;
+    k.mesh.quaternion.copy(k.rest);
+    if (autopilotRef.current) k.mesh.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(k.axisLocal, KEY_TURN));
+  }, []);
+  const turnKey = useCallback(() => {
+    autopilotRef.current = !autopilotRef.current;
+    poseKey();
+    try { localStorage.setItem(KEY_STORE_KEY, autopilotRef.current ? "1" : "0"); } catch {}
+    playSfx(TOGGLE_SFX, { volume: 0.7, rate: 0.85 });
+    window.dispatchEvent(new CustomEvent("hm:autopilot", { detail: { on: autopilotRef.current } }));
+  }, [poseKey]);
+  const poseToggle = useCallback((dir) => {
+    const t = toggleRefs.current[dir];
+    if (!t) return;
+    t.mesh.quaternion.copy(t.rest);
+    if (toggleOnRef.current[dir]) t.mesh.rotateX(TOGGLE_SIGN * TOGGLE_FLIP);
+  }, []);
+  const flipToggle = useCallback((dir) => {
+    const on = !toggleOnRef.current[dir];
+    toggleOnRef.current[dir] = on;
+    poseToggle(dir);
+    setLamp(dir, on); // the lamp shows the switch state (Michelle, 2026-09-08)
+    playSfx(TOGGLE_SFX, { volume: 0.8 });
+    try { localStorage.setItem(TOGGLE_STORE_KEY, JSON.stringify(toggleOnRef.current)); } catch {}
+    window.dispatchEvent(new CustomEvent("hm:lateral-toggle", { detail: { dir, on } }));
+  }, [poseToggle, setLamp]);
+  useEffect(() => { preloadSfx(TOGGLE_SFX); preloadSfx(BUTTON_SFX); preloadSfx(COVER_SFX); }, []);
+  useEffect(() => {
+    if (typeof window === "undefined" || !(highlighted || panelZoomed === true)) return;
+    const hook = { set: setLamp, state: () => ({ ...toggleOnRef.current }) };
+    window.__hmLamps = hook;
+    return () => { if (window.__hmLamps === hook) delete window.__hmLamps; };
+  }, [highlighted, panelZoomed, setLamp]);
   const passArmedRef = useRef(false);
   const passTimerRef = useRef(null);
+  // The creak plays from arm/disarm rather than the click site, so the 8 s timeout drop and
+  // the "any other click" drop creak too — the cover moves in all of them.
   const disarmPass = useCallback(() => {
+    if (passArmedRef.current) playSfx(COVER_SFX, { volume: 0.7, rate: 1.06 }); // closing: a touch quicker
     passArmedRef.current = false;
     if (passTimerRef.current) { clearTimeout(passTimerRef.current); passTimerRef.current = null; }
   }, []);
   const armPass = useCallback(() => {
+    if (!passArmedRef.current) playSfx(COVER_SFX, { volume: 0.7 });
     passArmedRef.current = true;
     if (passTimerRef.current) clearTimeout(passTimerRef.current);
-    passTimerRef.current = setTimeout(() => { passArmedRef.current = false; passTimerRef.current = null; }, PASS_ARM_MS);
+    passTimerRef.current = setTimeout(() => { if (passArmedRef.current) playSfx(COVER_SFX, { volume: 0.5, rate: 1.06 }); passArmedRef.current = false; passTimerRef.current = null; }, PASS_ARM_MS);
   }, []);
   useEffect(() => () => { if (passTimerRef.current) clearTimeout(passTimerRef.current); }, []);
-  // Press feedback (2026-09-08): a tapped button/cage flashes its emissive white for ~0.3 s so
-  // a tap is visibly acknowledged even when it changes nothing yet (empty tank, PASS unwired).
-  // Materials are cloned on first flash — the atlas materials are shared across the rig.
+  // Press feedback (2026-09-08): a tapped button/cage flashes white for ~0.3 s so a tap is
+  // visibly acknowledged even when it changes nothing yet (empty tank, PASS unwired). The
+  // flash SWAPS the mesh's material for a shared flash material and swaps it back — the
+  // first version edited the atlas material's emissiveMap in place, which changes the shader
+  // program; without needsUpdate the part came back with its emissive map gone and glowed
+  // solid white for good (Michelle's PASS button, 2026-09-08).
   const pressFlashRef = useRef([]);
+  const flashMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#ffffff", emissive: "#fff6e0", emissiveIntensity: 1.6, roughness: 0.6, metalness: 0 }), []);
   const flashPress = useCallback((mesh) => {
-    if (!mesh?.isMesh || !mesh.material) return;
-    if (!mesh.userData._pressClone) { mesh.material = mesh.material.clone(); mesh.userData._pressClone = true; }
-    const m = mesh.material;
-    if (!m.userData._pressBase) m.userData._pressBase = { emissive: m.emissive ? m.emissive.clone() : null, intensity: m.emissiveIntensity ?? 1, map: m.emissiveMap || null };
+    if (!mesh?.isMesh || !mesh.material || mesh.material === flashMat) return;
     const list = pressFlashRef.current;
     const hit = list.find((f) => f.mesh === mesh);
-    if (hit) hit.t = 1; else list.push({ mesh, t: 1 });
-  }, []);
+    if (hit) { hit.t = 1; return; }
+    list.push({ mesh, t: 1, orig: mesh.material });
+    mesh.material = flashMat;
+  }, [flashMat]);
   // Dev hook (the panel is hard to reach in an automated browser): window.__hmPass.arm()
   // swings the cover on the live rig, .cover() reports its lift, .armed() the state.
   useEffect(() => {
@@ -1961,6 +2059,12 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
 
   // Find the Straw mesh, GaugeNeedle, and pressure text meshes
   useEffect(() => {
+    // Lateral switches: read the saved state once so the levers and their lamps agree,
+    // whichever the traverse meets first.
+    try {
+      const saved = JSON.parse(localStorage.getItem(TOGGLE_STORE_KEY) || "null");
+      for (const d of TOGGLE_DIRS) toggleOnRef.current[d] = !!(saved && saved[d]);
+    } catch {}
     clonedScene.traverse((child) => {
       if (child.name === "Straw") {
         strawRef.current = child;
@@ -1970,6 +2074,20 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           child.geometry.computeBoundingBox();
           const bb = child.geometry.boundingBox;
           strawLengthZ.current = (bb.max.z - bb.min.z) * child.scale.z;
+        }
+        if (RIG_IS_SYNTY && !rodFacts.current) {
+          child.geometry.computeBoundingBox();
+          const bb = child.geometry.boundingBox;
+          const ps = child.parent ? child.parent.scale.x : 1; // Bottom_Box (0.438) under the PUMPJACK_SCALE primitive
+          rodFacts.current = { radius: 0.4 * (bb.max.x - bb.min.x) * child.scale.x * ps * PUMPJACK_SCALE, x: null, z: null, scaleY: ps * PUMPJACK_SCALE };
+          // The gusher erupts from the well: put its origin under the polished rod. The default
+          // (0, 0.05, 0.2) was the old rig's wellhead and sat between this rig's well and its
+          // skid (Michelle, 2026-09-09). Group-local, so it follows the plot and its yaw.
+          if (shakeGroupRef.current) {
+            child.updateWorldMatrix(true, false); shakeGroupRef.current.updateWorldMatrix(true, false);
+            const l = shakeGroupRef.current.worldToLocal(child.getWorldPosition(new THREE.Vector3()));
+            gusherOriginRef.current.set(l.x, 0.05, l.z);
+          }
         }
       }
       // Head_Pump mesh — flip during gusher
@@ -1991,9 +2109,17 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       // the camera; the theme pass clones this material later and keeps the bias.
       // The Synty plot's well pad (Well = black void, WellFrame = curb) sits a few cm above
       // the mesa top; bias it too so distant cameras don't let the terrain win (2026-09-07).
-      if ((child.name === "ground" || child.name === "Well" || child.name === "WellFrame") && child.isMesh && child.material && !child.userData._padBias) {
+      if (!DEV_NO_PAD_BIAS && (child.name === "ground" || child.name === "Well" || child.name === "WellFrame") && child.isMesh && child.material && !child.userData._padBias) {
         child.material = child.material.clone();
-        child.material.polygonOffset = true; child.material.polygonOffsetFactor = -2; child.material.polygonOffsetUnits = -2;
+        child.material.polygonOffset = true;
+        if (child.name === "ground") { child.material.polygonOffsetFactor = -2; child.material.polygonOffsetUnits = -2; }
+        else {
+          // Curb and well top sit 7–11 mm above the terrain at scale 0.14 — depth resolves that
+          // on its own. The slope FACTOR is what flickered: on the curb's near-vertical walls
+          // the depth slope is huge, so the bias dragged the wall over ground pixels at its base
+          // (the sawtooth along the curb, 2026-09-08). A one-unit constant is all it needs.
+          child.material.polygonOffsetFactor = 0; child.material.polygonOffsetUnits = -1;
+        }
         child.userData._padBias = true;
       }
       if (child.name === "Wheel") {
@@ -2004,12 +2130,34 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         passCoverRest.current = child.quaternion.clone();
         child.userData._lift = 0;
       }
+      if (child.name === "PassButton" && child.isMesh) passButtonRef.current = child;
+      if (child.name === "Pitman" && child.isMesh) pitmanRef.current = child;
+      if (child.isMesh && /^Toggle_[NESW]$/.test(child.name)) {
+        const dir = child.name[7];
+        toggleRefs.current[dir] = { mesh: child, rest: child.quaternion.clone() };
+        if (toggleOnRef.current[dir]) child.rotateX(TOGGLE_SIGN * TOGGLE_FLIP);
+      }
+      if (child.isMesh && /^Lamp_[NESW]$/.test(child.name)) { lampRefs.current[child.name[5]] = child; setLamp(child.name[5], !!toggleOnRef.current[child.name[5]]); }
+      if (child.name === "KeySwitch" && child.isMesh) {
+        try { autopilotRef.current = localStorage.getItem(KEY_STORE_KEY) === "1"; } catch {}
+        child.updateWorldMatrix(true, false);
+        const inv = child.getWorldQuaternion(new THREE.Quaternion()).invert();
+        keyRef.current = { mesh: child, rest: child.quaternion.clone(), axisLocal: new THREE.Vector3(0, 0, 1).applyQuaternion(inv).normalize() };
+        poseKey();
+      }
       // Pressure-gauge needle. GaugeNeedle is the needle physically mounted on the
       // visible BoostGauge_01 face (they're co-located); BoostGauge_Needle is a stray
       // off to the side, so it's NOT the one to drive.
       if (child.name === "GaugeNeedle") {
         gaugeNeedleRef.current = child;
         needleRestQuat.current = child.quaternion.clone();
+        if (RIG_IS_SYNTY) {
+          // the dial faces page +X; express that normal in the needle's own frame (Synty
+          // parts carry a 90/0/90 twist, so local X is not it)
+          child.updateWorldMatrix(true, false);
+          const inv = child.getWorldQuaternion(new THREE.Quaternion()).invert();
+          needleAxisRef.current = new THREE.Vector3(1, 0, 0).applyQuaternion(inv).normalize();
+        }
         // Red emissive glow. Clone the material first — the base is shared across the
         // rig atlas, so editing it in place would tint the whole pumpjack.
         if (child.material && !child.userData._needleGlow) {
@@ -2093,10 +2241,13 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       return { pos: [pos.x, pos.y, pos.z], quat: [q.x, q.y, q.z, q.w], w: f.w, h: f.h, fromMesh: true };
     };
 
-    // Depth screen: PressurePanel2 if exported, else the world-docked fallback.
+    // Depth screen: PressurePanel2 if exported, else the world-docked fallback. The Synty
+    // plot has ONE screen by design (2026-09-07) and no docked board: the layer is per rig
+    // but it is a decision, so it lives in the UI card, not on a sign (Michelle, 2026-09-08;
+    // the corner-board experiment is PANEL_READOUT_OFFSET_SYNTY if it ever comes back).
     if (panel2Ref.current) {
       setPanelXform(screenXform(panel2Ref.current));
-    } else if (controlBoxRef.current && group) {
+    } else if (controlBoxRef.current && group && !RIG_IS_SYNTY) {
       const pos = new THREE.Vector3();
       controlBoxRef.current.getWorldPosition(pos);
       group.worldToLocal(pos);
@@ -2131,10 +2282,24 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       if (clip.name === "Armature|spin.001" || clip.name === "Armature.001|spin.001") {
         pumpActions.push(action);
       }
+      if (clip.name === "pump") pumpClockRef.current = { action, duration: clip.duration };
     });
     pumpActionsRef.current = pumpActions;
-    return () => mixer.stopAllAction();
+    return () => { mixer.stopAllAction(); pumpClockRef.current = null; };
   }, [mixer, animations]);
+  // Publish the pump's clock for the rig ambience loop (page.js locks the file to it,
+  // 2026-09-08): period, current phase 0..1, and whether the pump is stopped (gusher).
+  const pumpClockRef = useRef(null);
+  useEffect(() => {
+    if (typeof window === "undefined" || !(highlighted || panelZoomed != null)) return undefined;
+    const hook = {
+      get period() { return pumpClockRef.current?.duration || 0; },
+      phase: () => { const c = pumpClockRef.current; return c ? ((c.action.time % c.duration) + c.duration) % c.duration / c.duration : 0; },
+      paused: () => !!pumpPausedRef.current,
+    };
+    window.__hmPump = hook;
+    return () => { if (window.__hmPump === hook) delete window.__hmPump; };
+  }, [highlighted, panelZoomed]);
 
   // Apply pump customization (paint colors). Runs for EVERY full rig, including
   // those that mount on-demand with no config (gusher/lingering cells never
@@ -2748,6 +2913,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         // Local pose under the body at rest — the per-frame extra pitch builds from here.
         headRestQuatRef.current = headPumpRef.current.quaternion.clone();
       }
+      if (RIG_IS_SYNTY && pitmanRef.current && bodyPumpRef.current && !pitmanOrigParentRef.current) {
+        pitmanOrigParentRef.current = pitmanRef.current.parent;
+        bodyPumpRef.current.attach(pitmanRef.current);
+      }
       blowbackRef.current = 0;
       // Save original colors for restore (head is intentionally excluded — it stays clean)
       oilStainedParts.current = [strawRef.current, ...cylPumpRefs.current].filter(Boolean);
@@ -2987,19 +3156,17 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       }
     }
 
-    // Press flashes — decay, restore the base emissive when spent
+    // Press flashes — decay, hand the part its own material back when spent
     const flashes = pressFlashRef.current;
     if (flashes.length) {
-      const _w = _PRESS_WHITE;
+      let peak = 0;
       for (let i = flashes.length - 1; i >= 0; i--) {
-        const f = flashes[i]; const m = f.mesh.material; const base = m.userData._pressBase;
+        const f = flashes[i];
         f.t -= delta * 3.5;
-        if (f.t <= 0 || !base) {
-          if (base && m.emissive) { m.emissive.copy(base.emissive || _PRESS_BLACK); m.emissiveIntensity = base.intensity; m.emissiveMap = base.map; }
-          flashes.splice(i, 1); continue;
-        }
-        if (m.emissive) { m.emissiveMap = null; m.emissive.copy(base.emissive || _PRESS_BLACK).lerp(_w, f.t); m.emissiveIntensity = base.intensity + 2.5 * f.t; }
+        if (f.t <= 0) { if (f.mesh.material === flashMat) f.mesh.material = f.orig; flashes.splice(i, 1); continue; }
+        if (f.t > peak) peak = f.t;
       }
+      flashMat.emissiveIntensity = 0.3 + 1.6 * peak;
     }
 
     // PASS cover — swing toward open while armed, closed otherwise (about its top hinge)
@@ -3031,7 +3198,28 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     const currentFill = (drainingRef.current || drainedRef.current) ? drainFillRef.current : tankFillRef.current;
 
     const straw = strawRef.current;
-    if (straw && strawBaseScaleZ.current !== null) {
+    // Rod string: top at the wellhead, bottom at the current layer, riding the polished rod's stroke.
+    const rod = rodStringRef.current;
+    if (RIG_IS_SYNTY && straw && rod && rodFacts.current && shakeGroupRef.current) {
+      const f = rodFacts.current;
+      if (f.x == null) {
+        const sw = straw.getWorldPosition(_rodTmp); const gw = shakeGroupRef.current.getWorldPosition(_rodTmp2);
+        f.x = sw.x - gw.x; f.z = sw.z - gw.z;
+      }
+      const day = drillDayRef.current;
+      const len = Math.max(0, day) * depthCellRef.current;
+      if (len > 0.001) {
+        const stroke = (straw.position.y - strawBasePos.current.y) * f.scaleY; // world delta from frame 1
+        rod.visible = true;
+        rod.scale.set(f.radius, len, f.radius);
+        rod.position.set(f.x, stroke - len / 2, f.z);
+      } else rod.visible = false;
+    }
+    // The Synty rig's Straw is the polished rod: the `pump` clip moves it up and down with
+    // the head, and there is no drill-depth stretch (the X-SECTION shows depth). The pin and
+    // scale below are the old armature rig's, and pinning every frame froze the rod on the
+    // close-up rig while the merged field kept moving (Michelle, 2026-09-09).
+    if (straw && strawBaseScaleZ.current !== null && !RIG_IS_SYNTY) {
       const day = drillDayRef.current;
       const L0 = strawLengthZ.current;
       const baseScale = strawBaseScaleZ.current;
@@ -3055,15 +3243,17 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       // Blender setup (full tank → 120° about local X). Applied as a quaternion in the
       // needle's local frame — the rest pose isn't identity in three.js (it counteracts
       // the rotated MachinePanel parent), so a plain Euler set would skew/foreshorten.
-      const targetAngle = fill * NEEDLE_FULL_SWEEP;
+      const sweep = RIG_IS_SYNTY ? SYNTY_NEEDLE.sweep : NEEDLE_FULL_SWEEP;
+      const targetAngle = fill * sweep;
       const lerpSpeed = hellOverride ? 8 : 3;
       needleAngle.current += (targetAngle - needleAngle.current) * Math.min(delta * lerpSpeed, 1);
       // Shudder: a fast jitter that grows with pressure (still at empty, trembling at
       // full). A smooth high-freq wobble plus a touch of per-frame randomness. Added
       // only to the displayed angle, not needleAngle, so the HIGH/MED/LOW label is stable.
-      const pressure = Math.max(0, needleAngle.current / NEEDLE_FULL_SWEEP);
+      const pressure = Math.max(0, needleAngle.current / sweep);
       const shudder = pressure * (0.05 * Math.sin(performance.now() * 0.05) + 0.3 * (Math.random() - 0.5));
-      _needleQuat.setFromAxisAngle(_NEEDLE_AXIS, needleAngle.current + shudder);
+      if (RIG_IS_SYNTY && needleAxisRef.current) _needleQuat.setFromAxisAngle(needleAxisRef.current, -(needleAngle.current + shudder + SYNTY_NEEDLE.offset));
+      else _needleQuat.setFromAxisAngle(_NEEDLE_AXIS, needleAngle.current + shudder);
       needle.quaternion.copy(needleRestQuat.current).multiply(_needleQuat);
       // Red glow brightens with pressure (caps at 1.4).
       if (needle.material) needle.material.emissiveIntensity = 0.4 + pressure * 1.0;
@@ -3071,8 +3261,8 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       // Pressure level — based on the needle's lerped angle (not raw fill). Drives the
       // code-rendered LED label; setState only when the level actually changes.
       const displayAngleDeg = Math.abs(needleAngle.current) * (180 / Math.PI);
-      const level = hellOverride || displayAngleDeg >= 110 ? "HIGH"
-        : displayAngleDeg >= 45 ? "MED" : "LOW";
+      const level = hellOverride || displayAngleDeg >= (RIG_IS_SYNTY ? SYNTY_NEEDLE.highDeg : 110) ? "HIGH"
+        : displayAngleDeg >= (RIG_IS_SYNTY ? SYNTY_NEEDLE.medDeg : 45) ? "MED" : "LOW";
       if (level !== pressureLevelRef.current) {
         pressureLevelRef.current = level;
         const hex = level === "HIGH" ? "#ff3a2a" : level === "MED" ? "#ffae00" : "#33dd66";
@@ -3647,6 +3837,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
             headOrigParentRef.current = null;
             headRestQuatRef.current = null;
           }
+          if (pitmanRef.current && pitmanOrigParentRef.current) {
+            pitmanOrigParentRef.current.attach(pitmanRef.current);
+            pitmanOrigParentRef.current = null;
+          }
           blowbackRef.current = 0;
           oilStainedParts.current.forEach((m) => {
             if (m.material && m.userData._origColor) {
@@ -3738,7 +3932,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     front.applyAxisAngle(_PANEL_UP, PANEL_FRONT_YAW_OFFSET_DEG * Math.PI / 180);
     front.y = 0;
     front.normalize();
-    onFocusObject(center, front);
+    // The Synty box is 0.068 tall on the page; the page's default focus distance (0.25) left
+    // it a quarter of the frame. Pull in, and drop OrbitControls' floor with it or the
+    // controls shove the camera back out on arrival (Michelle, 2026-09-08).
+    onFocusObject(center, front, RIG_IS_SYNTY ? PANEL_FOCUS_DIST : undefined, RIG_IS_SYNTY ? PANEL_FOCUS_MIN_DIST : undefined);
     panelZoomedRef.current = true; // now a RedButton click drains instead of zooming
   }, [onFocusObject]);
   // Desktop MACHINE PANEL chip (2026-09-07): the rig card dispatches `hm:focus-panel` on
@@ -3751,20 +3948,6 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     return () => window.removeEventListener("hm:focus-panel", onFocus);
   }, [highlighted, panelZoomed, focusMachinePanel]);
 
-  // Hover cursor on the parts that answer a click (extract hex, PASS cage, riser wheel).
-  // Pointer-move, not pointer-over: over/out fire once per handler object (the whole
-  // rig), so sliding from the box onto a button would never update the cursor.
-  const handlePointerMove = useCallback((e) => {
-    let hot = false;
-    for (let b = e.object; b; b = b.parent) {
-      if (typeof b.name !== "string") continue;
-      if (b.name === "Wheel" || b.name.startsWith("RedButton") || b.name.startsWith("PassButton")) { hot = true; break; }
-    }
-    const want = hot ? "pointer" : "";
-    if (document.body.style.cursor !== want) document.body.style.cursor = want;
-  }, []);
-  const handlePointerOut = useCallback(() => { document.body.style.cursor = ""; }, []);
-
   const handleClick = useCallback((e) => {
     e.stopPropagation();
 
@@ -3776,8 +3959,12 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
     const passLive = (panelZoomed != null ? panelZoomed : highlighted) && (panelZoomed ?? panelZoomedRef.current);
     if (passPart && passLive) {
-      flashPress(e.object);
+      // Flash the BUTTON, never whatever was hit: a click usually lands on the housing or
+      // cage and lighting that whole bezel read as a white square (Michelle, 2026-09-08).
+      // Arming needs no flash — the cover swinging is the feedback.
       if (passArmedRef.current && passPart === "PassButton") {
+        flashPress(passButtonRef.current);
+        playSfx(BUTTON_SFX, { volume: 0.8 });
         disarmPass();
         window.dispatchEvent(new CustomEvent("hm:pass-confirm"));
       } else if (!passArmedRef.current) {
@@ -3785,6 +3972,16 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       }
       return;
     }
+    // Lateral switches — a tap on a lever or its base flips it (same gate as PASS).
+    let toggleDir = null;
+    for (let b = e.object; b; b = b.parent) {
+      if (typeof b.name === "string" && b.name.startsWith("Toggle_") && TOGGLE_DIRS.includes(b.name[7])) { toggleDir = b.name[7]; break; }
+    }
+    if (toggleDir && passLive) { if (passArmedRef.current) disarmPass(); flipToggle(toggleDir); return; }
+    // Key switch — autopilot opt-in; a tap on the key or its housing turns it (same gate).
+    let keyHit = false;
+    for (let b = e.object; b; b = b.parent) { if (b.name === "KeySwitch" || b.name === "Key_Housing") { keyHit = true; break; } }
+    if (keyHit && passLive) { if (passArmedRef.current) disarmPass(); turnKey(); return; }
     if (passArmedRef.current) disarmPass(); // any other click stands down
 
     // Wheel click — spin 360° on y-axis
@@ -3836,7 +4033,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         if (onFocusObject && machinePanelRef.current) focusMachinePanel(machinePanelRef.current);
         return;
       }
-      flashPress(e.object);
+      if (clickedButton === "red") { flashPress(redButtonRef.current); playSfx(BUTTON_SFX, { volume: 0.8 }); }
       // Already zoomed in: only RedButton drains the tank.
       if (clickedButton === "red" && !drainingRef.current && tankFillRef.current > 0) {
         drainingRef.current = true;
@@ -3867,6 +4064,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
             headOrigParentRef.current = null;
             headRestQuatRef.current = null;
           }
+          if (pitmanRef.current && pitmanOrigParentRef.current) {
+            pitmanOrigParentRef.current.attach(pitmanRef.current);
+            pitmanOrigParentRef.current = null;
+          }
           blowbackRef.current = 0;
           oilStainedParts.current.forEach((m) => {
             if (m.material && m.userData._origColor) {
@@ -3892,7 +4093,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     for (let p = e.object; p; p = p.parent) {
       if (typeof p.name !== "string") continue;
       if (p.name.startsWith("MachinePanel")) { panelNode = p; break; }
-      if (machinePanelRef.current && PANEL_PART_PREFIXES.some((pre) => p.name.startsWith(pre))) { panelNode = machinePanelRef.current; break; }
+      if (machinePanelRef.current && (p.userData?.panelPart || PANEL_PART_PREFIXES.some((pre) => p.name.startsWith(pre)))) { panelNode = machinePanelRef.current; break; }
     }
     // Phone (RigScene): a tap on the panel in the rig view asks the page for the chip's
     // panel view — the phone's equivalent of the desktop click-to-zoom (2026-09-08).
@@ -3916,7 +4117,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       onClick?.();
     }
     lastClickTime.current = now;
-  }, [onClick, onDoubleClick, highlighted, initSteam, onEnvelopeClick, onFocusObject, focusMachinePanel, panelZoomed, armPass, disarmPass, flashPress, onPanelTap]);
+  }, [onClick, onDoubleClick, highlighted, initSteam, onEnvelopeClick, onFocusObject, focusMachinePanel, panelZoomed, armPass, disarmPass, flashPress, onPanelTap, flipToggle, turnKey]);
 
   // Reset the panel-zoom flag when this rig is deselected, so re-selecting it starts
   // the zoom-then-drain sequence fresh.
@@ -3925,16 +4126,28 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   }, [highlighted]);
 
   return (
-    <group ref={shakeGroupRef} position={position}>
+    <group ref={shakeGroupRef} position={position} rotation={[0, yaw, 0]}>
+      {RIG_IS_SYNTY && <mesh ref={rodStringRef} geometry={_rodGeo} material={_rodMat} visible={false} frustumCulled={false} />}
       <primitive
         ref={groupRef}
         object={clonedScene}
         scale={PUMPJACK_SCALE}
         onClick={handleClick}
-        onPointerMove={handlePointerMove}
-        onPointerOut={handlePointerOut}
         onPointerOver={() => { document.body.style.cursor = "pointer"; }}
         onPointerOut={() => { document.body.style.cursor = "auto"; }}
+      />
+      {/* Crew — workers found at Crew_* stations on the rig (highlighted rig only; the phone scene opts in) */}
+      <RigCrew
+        rigScene={clonedScene}
+        scale={PUMPJACK_SCALE}
+        enabled={crewEnabled ?? !!highlighted}
+        plotKey={`${position?.[0] ?? 0},${position?.[2] ?? 0}`}
+        envPreset={envPreset}
+        hellActive={hellActive}
+        gusherActive={!!gusherActive}
+        pausedRef={pumpPausedRef}
+        panelOpen={!!panelZoomed}
+        panelOpenRef={panelZoomedRef}
       />
       {/* Fuel tank liquid — animated fill inside the transparent tank */}
       {tankBounds && <TankLiquid tankBounds={tankBounds} tankFill={tankDraining ? 0 : tankFill} envPreset={envPreset} parabolum={parabolum} />}
@@ -3948,6 +4161,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           w={panelXform.w}
           h={panelXform.h}
           fromMesh={panelXform.fromMesh}
+          offset={RIG_IS_SYNTY ? PANEL_READOUT_OFFSET_SYNTY : PANEL_READOUT_OFFSET}
           label="DEPTH"
           token={hellActive ? "!!" : (drillDay >= maxDrillDay ? "MAX" : String(drillDay).padStart(2, "0"))}
           idleHex={drillDay >= maxDrillDay ? "#ff3a2a" : "#ffae00"}
@@ -4710,6 +4924,36 @@ const MERGE_SCREEN_MESHES = new Set(["PressurePanel", "PressurePanel2"]);
 // Machine-panel instruments on the Synty plot (2026-09-07). Name prefixes; a click on any
 // of these zooms to the panel like a click on the body. RedButton is handled first (drain).
 const PANEL_PART_PREFIXES = ["DANGER_LABEL", "PressurePanel", "Gauge", "Toggle_", "Lamp_", "Key", "PassButton", "Text_Extract", "Text_Pass", "Alert_Light"];
+// The code-drawn LED readouts (drei Text) carry this so a click on the digits counts as a
+// panel click too — it used to fall through to the plot click and fly the camera back out
+// of the close-up (Michelle, 2026-09-08).
+const PANEL_PART_USERDATA = { panelPart: true };
+const _rodTmp = new THREE.Vector3(), _rodTmp2 = new THREE.Vector3();
+const _rodGeo = /* @__PURE__ */ new THREE.CylinderGeometry(1, 1, 1, 8);
+const _rodMat = /* @__PURE__ */ new THREE.MeshStandardMaterial({ color: "#3b3e46", metalness: 0.6, roughness: 0.45 });
+const _NO_RAYCAST = () => null;
+// Dev switches for bisecting the well-pad flicker (2026-09-08): ?noglow=1 drops the field's
+// wellhead glow quads, ?nobias=1 the pad's depth bias, ?noborder=1 the selected-plot border.
+const DEV_FLAG = (name) => typeof window !== "undefined" && new URLSearchParams(window.location.search).get(name) === "1";
+const DEV_NO_GLOW = DEV_FLAG("noglow"), DEV_NO_PAD_BIAS = DEV_FLAG("nobias"), DEV_NO_BORDER = DEV_FLAG("noborder");
+// ?noground=1 drops the ground block, ?nofield=1 the merged idle-rig field (hidden copy included).
+const DEV_NO_GROUND = DEV_FLAG("noground"), DEV_NO_FIELD = DEV_FLAG("nofield");
+// Per-plot yaw jitter (2026-09-08, Michelle wants to see how variation reads): every rig used
+// to face exactly the same way. Deterministic from the plot position so the hero, its merged
+// field copy and the wellhead glow agree. Degrees of half-range; `?yaw=N` overrides for
+// testing, `?yaw=0` restores the parade ground. Small on purpose — the panel zoom reads the
+// front from the bbox's thinner axis and tolerates only a few degrees.
+const PLOT_YAW_JITTER_DEG = (() => {
+  if (typeof window === "undefined") return 0;
+  const v = parseFloat(new URLSearchParams(window.location.search).get("yaw"));
+  return Number.isFinite(v) ? v : 0; // default 0: tried at 4° on 2026-09-08, the uniform grid read better
+})();
+function plotYaw(pos) {
+  if (!pos || !PLOT_YAW_JITTER_DEG) return 0;
+  let h = Math.imul((pos[0] * 1000) | 0, 374761393) ^ Math.imul((pos[2] * 1000) | 0, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16;
+  return ((h & 0xffff) / 0xffff * 2 - 1) * PLOT_YAW_JITTER_DEG * Math.PI / 180;
+}
 // The caged PASS button arms in two clicks like a missile switch (2026-09-07): a click on
 // the cage lifts `PassButton_Cover` (PASS ARMED); a second click on the exposed button
 // confirms and fires `hm:pass-confirm` on window, where the v2 layer-decide route will
@@ -4717,25 +4961,54 @@ const PANEL_PART_PREFIXES = ["DANGER_LABEL", "PressurePanel", "Gauge", "Toggle_"
 // The cover's origin is its top hinge; its local X is the hinge line (Synty prop, rotated
 // 90/0/90), so the swing is a rotateX about the rest pose. Negative opens outward.
 const PASS_COVER_OPEN = 1.75;   // rad, ~100°: past vertical so it rests open
-const _PRESS_WHITE = new THREE.Color("#fff6e0");
-const _PRESS_BLACK = new THREE.Color(0, 0, 0);
+// Lateral switches (2026-09-08): the four toggles are standing orders per neighbour — up
+// means "drill the lateral into that neighbour when their layer opens and I have a charge".
+// Nothing acts on them until the v2 route exists; the state is kept in localStorage and
+// announced on window as `hm:lateral-toggle` {dir, on}. Hinge: the lever's local X is the
+// panel's width axis (checked in Blender); +X drops the tip, so up is negative. The throw is
+// the exact mirror of the authored down pose (rest −55.2° → +55.2°), with a little spring.
+const TOGGLE_FLIP = 1.927;
+const TOGGLE_SIGN = -1;
+// No animation (Michelle, 2026-09-08): a stiff switch has two positions, so the lever is set
+// straight to the new pose on the tap and the recorded clack plays with it.
+const TOGGLE_SFX = "/audio/toggleButton.mp3";
+const BUTTON_SFX = "/audio/extractOrPassButtons.mp3"; // EXTRACT press and PASS confirm (2026-09-08)
+const COVER_SFX = "/audio/creak.mp3";                   // the PASS cover opening or closing (2026-09-09)
+// Key switch = autopilot opt-in (the crew takes the rig at the endgame; docs/oil-game.md).
+// A tap turns it a quarter turn clockwise, as the viewer sees it, and back. State in
+// localStorage, announced as `hm:autopilot` {on}. The key protrudes along the panel's width
+// axis (Blender +Y → page −Z), so the turn is about page +Z: positive reads clockwise to
+// someone facing the key.
+const KEY_TURN = Math.PI / 2;
+const KEY_STORE_KEY = "hm:autopilot";
+// Synty gauge (2026-09-08): the needle is authored at 12 o'clock and the wedges run yellow
+// (~1) → orange (~2) → red (~4). LOW sits at 8 o'clock, HIGH at 4: a 240° sweep offset −120°
+// from the authored pose, clockwise positive (negative about the dial normal, page +X).
+const SYNTY_NEEDLE = { sweep: 240 * Math.PI / 180, offset: -120 * Math.PI / 180, medDeg: 80, highDeg: 160 };
+const TOGGLE_DIRS = ["N", "E", "S", "W"];
+const TOGGLE_STORE_KEY = "hm:lateral-switches";
+// Lamps ship lit in the atlas (white emissive); the game owns them. Each lamp shows its
+// switch: dark when the lateral order is off, amber when it is up (Michelle, 2026-09-08).
+// Same dark look in the field bake. A neighbour-open signal can pulse them later.
+const LAMP_LIT = new THREE.Color("#ffae00");
+const LAMP_OFF = new THREE.Color("#2b2b2e");
+// Scaled with PUMPJACK_SCALE (0.14, 2026-09-08): the box is 0.095 tall now; 0.21 keeps the same framing.
+const PANEL_FOCUS_DIST = 0.21;      // desktop panel zoom (Synty rig): distance from the box centre (near plane is 0.1)
+const PANEL_FOCUS_MIN_DIST = 0.17;  // OrbitControls floor while zoomed there
 const PASS_COVER_SIGN = -1;
 const PASS_ARM_MS = 8000;
-// Zones added after a theme was authored (Synty rig: the Samson post and the
-// counterweights) have no entry in older presets/player configs, so they stayed stock
-// while the rest of the rig took paint. Borrow the first sibling zone the theme does
-// define — the post reads as part of the beam structure, the counterweights as part of
-// the crank wheel.
-const ZONE_FALLBACK = { post: ["beam", "foundation"], counterweight: ["crankWheel", "beam"], motorBox: ["foundation"] };
+// Only missing zones in older saved configs inherit paint. An explicit STOCK
+// selection must remain stock, even when a sibling has a custom color.
+const ZONE_FALLBACK = { safetyRails: ["rails", "foundation"], platform: ["foundation"], post: ["foundation", "beam"], counterweight: ["crankWheel", "beam"], motorBox: ["foundation"] };
 function zoneConfFor(config, zoneId) {
   if (!config) return null;
   const own = config[zoneId];
-  if (own && (own.color || (own.preset && own.preset !== "stock"))) return own;
+  if (own) return own;
   for (const alt of ZONE_FALLBACK[zoneId] || []) {
     const c = config[alt];
     if (c && (c.color || (c.preset && c.preset !== "stock"))) return c;
   }
-  return own || null;
+  return null;
 }
 // Hidden on the full rig. The merged field has no live text to put in their
 // place, so a dark, unlit screen is the honest match — and at field distance a
@@ -4961,6 +5234,7 @@ function buildBaseRig(scene) {
     const isScreen = MERGE_SCREEN_MESHES.has(child.name);
     const forcedColor = isScreen ? MERGE_SCREEN_DARK
       : child.name === "GaugeNeedle" ? MERGE_NEEDLE_RED
+      : /^Lamp_[NESW]$/.test(child.name) ? LAMP_OFF
       : null;
     const hasMap = !forcedColor && !!child.material?.map;
     const td = hasMap ? getTexData(child.material.map) : null;
@@ -5119,9 +5393,10 @@ function buildBaseRig(scene) {
   }
   // Wellhead in cell-local space: Straw world XZ × render scale, just above the
   // pad. Cache module-level so the close-up WellGlow uses the same point.
+  const wellY = RIG_IS_SYNTY ? SYNTY_WELL_GLOW_Y * PUMPJACK_SCALE : WELLHEAD_OFFSET[1];
   const wellhead = strawXZ
-    ? [strawXZ[0] * PUMPJACK_SCALE, WELLHEAD_OFFSET[1], strawXZ[1] * PUMPJACK_SCALE]
-    : [...WELLHEAD_OFFSET];
+    ? [strawXZ[0] * PUMPJACK_SCALE, wellY, strawXZ[1] * PUMPJACK_SCALE]
+    : [WELLHEAD_OFFSET[0], wellY, WELLHEAD_OFFSET[2]];
   _rigWellhead = wellhead;
   return { geometry, vZone, vBase, total, signGeo, signFrameGeo, signCamGeo, wellhead, rock };
 }
@@ -5265,6 +5540,7 @@ function WellGlow({ position, strike = 0, hell = false }) {
   const prevStrike = useRef(strike);
   const boost = useRef(0);
   const _cyan = useMemo(() => new THREE.Color(WELLHEAD_GLOW), []);
+  const _idle = useMemo(() => new THREE.Color(WELLHEAD_IDLE), []);
   const _hellRed = useMemo(() => new THREE.Color("#ff2a10"), []);
   useFrame((_, delta) => {
     t.current += delta;
@@ -5279,8 +5555,9 @@ function WellGlow({ position, strike = 0, hell = false }) {
       matRef.current.color.copy(_hellRed);
       matRef.current.opacity = 0.55 + 0.4 * Math.abs(Math.sin(t.current * 6));
     } else {
-      matRef.current.color.copy(_cyan);
-      matRef.current.opacity = 0.34 + 0.12 * Math.sin(t.current * 2.2) + boost.current * 0.7;
+      // idle: dim neutral breath; a strike flares it cyan and bright, then it settles back
+      matRef.current.color.copy(_idle).lerp(_cyan, Math.min(1, boost.current * 1.5));
+      matRef.current.opacity = 0.10 + 0.04 * Math.sin(t.current * 1.6) + boost.current * 0.8;
     }
   });
   return (
@@ -5313,7 +5590,7 @@ function WellGlowField({ positions }) {
     return g;
   }, []);
   const mat = useMemo(() => new THREE.MeshBasicMaterial({
-    color: WELLHEAD_GLOW, transparent: true, opacity: 0.2,
+    color: WELLHEAD_IDLE, transparent: true, opacity: 0.08,
     blending: THREE.AdditiveBlending, depthWrite: false,
   }), []);
   useEffect(() => () => { geo.dispose(); mat.dispose(); }, [geo, mat]);
@@ -5335,7 +5612,7 @@ function WellGlowField({ positions }) {
     skip.current = (skip.current + 1) % 3; // throttle — it's a distant idle glow
     if (skip.current) return;
     t.current += delta * 3;
-    mat.opacity = 0.18 + 0.07 * Math.sin(t.current);
+    mat.opacity = 0.07 + 0.03 * Math.sin(t.current);
   });
   if (!positions.length) return null;
   return <instancedMesh ref={ref} args={[geo, mat, positions.length]} />;
@@ -5346,7 +5623,7 @@ function WellGlowField({ positions }) {
 // changes to a positive value (depth uses oilStrike; pressure passes 0). When `alarm`
 // (a hell event) it overrides to a hard red strobe matching the alert beacon (~4 Hz).
 // Anchored to a screen's transform { pos, quat, w, h } when fromMesh, else docked.
-function PanelReadout({ pos, quat, w, h, fromMesh = false, token = "", label = "", idleHex = "#ffae00", flareKey = 0, alarm = false, captionFrac = 0.19 }) {
+function PanelReadout({ pos, quat, w, h, fromMesh = false, token = "", label = "", idleHex = "#ffae00", flareKey = 0, alarm = false, captionFrac = 0.19, offset = PANEL_READOUT_OFFSET }) {
   const matRef = useRef();
   const t = useRef(0);
   const prevFlare = useRef(flareKey);
@@ -5414,7 +5691,7 @@ function PanelReadout({ pos, quat, w, h, fromMesh = false, token = "", label = "
   if (fromMesh) {
     const sh = h || 0.05;
     return (
-      <group position={pos} quaternion={quat}>
+      <group position={pos} quaternion={quat} userData={PANEL_PART_USERDATA}>
         <group rotation={PANEL_MESH_ROT}>
           {/* lift inside the rotated frame so it pushes along the face normal */}
           <group position={[0, 0, PANEL_TEXT_LIFT]}>
@@ -5427,8 +5704,8 @@ function PanelReadout({ pos, quat, w, h, fromMesh = false, token = "", label = "
   }
   // Fallback (pre-export): world-oriented docked LED with its own dark backing.
   return (
-    <group position={pos}>
-      <group rotation={PANEL_READOUT_ROT} position={PANEL_READOUT_OFFSET}>
+    <group position={pos} userData={PANEL_PART_USERDATA}>
+      <group rotation={PANEL_READOUT_ROT} position={offset}>
         <mesh position={[0, 0, -0.002]} renderOrder={998}>
           <planeGeometry args={[PANEL_SCREEN_W, PANEL_SCREEN_H]} />
           <meshBasicMaterial color="#070a08" transparent opacity={0.92} depthWrite={false} side={THREE.DoubleSide} />
@@ -5986,11 +6263,10 @@ function MergedRigField({ scene, items, allPumpConfigs, pumpConfig, envMap, cell
   // selection, so focusing a plot doesn't rebuild the instance buffer).
   const wellPositions = useMemo(() => {
     const wh = base.wellhead || WELLHEAD_OFFSET;
-    return rigs.map((r) => [
-      r.position[0] + wh[0],
-      r.position[1] + wh[1],
-      r.position[2] + wh[2],
-    ]);
+    return rigs.map((r) => {
+      const a = plotYaw(r.position), c = Math.cos(a), sn = Math.sin(a); // rotate the offset with the rig
+      return [r.position[0] + wh[0] * c + wh[2] * sn, r.position[1] + wh[1], r.position[2] - wh[0] * sn + wh[2] * c];
+    });
   }, [rigs, base]);
 
   useEffect(() => () => rigs.forEach((r) => r.geo.dispose()), [rigs]);
@@ -6025,8 +6301,13 @@ function MergedRigField({ scene, items, allPumpConfigs, pumpConfig, envMap, cell
               geometry={r.geo}
               material={mat}
               position={r.position}
+              rotation={[0, plotYaw(r.position), 0]}
               scale={PUMPJACK_SCALE}
               visible={!isFull}
+              // An invisible mesh still raycasts. With the full rig standing in the same
+              // spot, clicks on its panel were landing on this hidden copy first and its
+              // onClick flew the camera back out of the close-up (Michelle, 2026-09-08).
+              raycast={isFull ? _NO_RAYCAST : undefined}
               onClick={(e) => { e.stopPropagation(); onSelectCell?.(r.col, r.row); onFlyTo?.(r.col, r.row); }}
               onDoubleClick={(e) => { e.stopPropagation(); if (isSelected) onZoomOut?.(); else onFlyTo?.(r.col, r.row); }}
             />
@@ -6037,7 +6318,7 @@ function MergedRigField({ scene, items, allPumpConfigs, pumpConfig, envMap, cell
         );
       })}
       {/* Lyquid80 wellhead glow across every plot — one instanced draw call. */}
-      <WellGlowField positions={wellPositions} />
+      {!DEV_NO_GLOW && <WellGlowField positions={wellPositions} />}
       {PIN_MARK && <PinMarkers rigs={rigs} rock={base.rock} />}
       {/* Static decorations (signs, frames, cameras, fences, non-animated add-ons)
           instanced by type — one draw call each across the whole field. */}
@@ -6173,10 +6454,10 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
       {TOWER_VARIANT === "complex" && <RefineryComplex worldW={worldW} worldD={worldD} cellSize={cellSize} communityOil={communityOil} />}
       {TOWER_VARIANT !== "complex" && <OilTower position={towerPos} communityOil={communityOil} totalOilBudget={totalOilBudget} onFocusObject={onFocusObject} onZoomOut={onZoomOut} />}
       {/* Animated border outline on the selected grid square */}
-      {selectedPos && (
+      {selectedPos && !DEV_NO_BORDER && (
         <PlotBorderHighlight position={selectedPos} cellSize={cellSize} />
       )}
-      {MERGE_RIGS && (
+      {MERGE_RIGS && !DEV_NO_FIELD && (
         <MergedRigField
           scene={scene}
           items={items}
@@ -6191,7 +6472,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
           onFlyTo={onFlyTo}
           onZoomOut={onZoomOut}
           cameraViewable={cameraViewable}
-        />
+          />
       )}
       {items.map(({ key, position, col, row }) => {
         // Drill all if no selection, otherwise only the selected cell
@@ -6210,6 +6491,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
           <Pumpjack
             key={key}
             position={position}
+            yaw={plotYaw(position)}
             scene={scene}
             animations={animations}
             drillDay={active ? drillDay : 0}
@@ -6257,7 +6539,7 @@ const FIELD_RIG_GLB = (() => {
   const v = RIG_VARIANT;
   if (v === "2") return "/models/oilJack_fancy_allProps2.glb";
   if (v === "3") return "/models/oilJack_fancy_allProps3.glb?v=3";
-  return "/models/oilJack_fancy_allProps4.glb?v=17";
+  return "/models/oilJack_fancy_allProps4.glb?v=22";
 })();
 useGLTF.preload(FIELD_RIG_GLB);
 
@@ -7498,7 +7780,7 @@ export default function OilVoxelGrid({
   const groundMaterials = useMemo(() => {
     const revealed = revealProgress > 0;
     const op = revealed ? 0.15 : 1;
-    const shared = { transparent: true, depthWrite: !revealed, depthTest: !revealed, opacity: op };
+    const shared = { transparent: revealed, depthWrite: !revealed, depthTest: !revealed, opacity: op }; // opaque until the reveal fades it (2026-09-08)
     const topMat = new THREE.MeshStandardMaterial({ map: topoTex, color: groundPalette.top, roughness: 0.9, metalness: 0.05, ...shared });
     const bottomMat = new THREE.MeshStandardMaterial({ color: groundPalette.bottom, roughness: 0.95, metalness: 0.02, ...shared });
     const sideMat = new THREE.MeshStandardMaterial({ map: sideTex, color: groundPalette.side, roughness: 0.85, metalness: 0.05, ...shared });
@@ -7658,7 +7940,7 @@ export default function OilVoxelGrid({
       {TOWER_VARIANT === "complex" && <MesaApron worldW={worldW} worldD={worldD} worldH={worldH} cellSize={cellSize} materials={groundMaterials} />}
       {/* Opaque ground block — hidden once reveal starts (and in the strata
           spike, which draws the earth as game-state voxels instead) */}
-      {!STRATA_SPIKE && !animateReveal && revealProgress === 0 && (
+      {!STRATA_SPIKE && !animateReveal && revealProgress === 0 && !DEV_NO_GROUND && (
         <mesh position={[0, -worldH / 2, 0]} material={groundMaterials} onClick={handleGroundClick}>
           <boxGeometry args={[worldW, worldH, worldD]} />
         </mesh>

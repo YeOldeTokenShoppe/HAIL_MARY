@@ -17,7 +17,7 @@ const cache = new Map();
 const lin = (hex, fallback) => { const c = new THREE.Color(hex || fallback); return c.convertSRGBToLinear(); };
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
-function buildSkyEnv({ sky = "#54aee8", skyBottom = "#c9e7f7", ground = "#d8c9a8", sunHour = 12, preset = "day" }) {
+function buildSkyEnv({ sky = "#54aee8", skyBottom = "#c9e7f7", ground = "#d8c9a8", sunHour = 12, preset = "day", reflectionLift = 0 }) {
   const zen = lin(sky), hor = lin(skyBottom, sky), gnd = lin(ground, "#d8c9a8");
   const isHell = preset === "hell";
   // Chrome reflects this map's colour EXACTLY (white base, metalness 1), so a
@@ -37,6 +37,14 @@ function buildSkyEnv({ sky = "#54aee8", skyBottom = "#c9e7f7", ground = "#d8c9a8
   // toward the horizon violet and give the sky a faint glow band so the metal
   // still reads as metal under the Lyquid80 sky.
   if (isNight) { gnd.lerp(hor, 0.6).multiplyScalar(2.0); hor.multiplyScalar(1.35); }
+  // Optional desktop moonlit bounce: broad neutral reflection bands keep metal
+  // readable without changing the visible sky or adding emissive mesh materials.
+  const lift = clamp01(reflectionLift);
+  if (lift && !isHell) {
+    zen.add(new THREE.Color(0.035 * lift, 0.042 * lift, 0.055 * lift));
+    hor.add(new THREE.Color(0.16 * lift, 0.18 * lift, 0.22 * lift));
+    gnd.add(new THREE.Color(0.025 * lift, 0.028 * lift, 0.035 * lift));
+  }
   // Sun: rises east (azimuth +90°) at 6, peaks at noon, sets west at 18.
   const h = sunHour == null ? 12 : sunHour;
   const sunEl = Math.sin(((h - 6) / 12) * Math.PI) * (65 * Math.PI / 180);
@@ -94,7 +102,7 @@ function buildSkyEnv({ sky = "#54aee8", skyBottom = "#c9e7f7", ground = "#d8c9a8
 // texture per palette+hour (hour rounded to a quarter), never throws.
 export default function useSkyEnvMap(skyEnv) {
   const key = skyEnv
-    ? `${skyEnv.preset}|${skyEnv.sky}|${skyEnv.skyBottom}|${skyEnv.ground}|${skyEnv.sunHour == null ? "-" : Math.round(skyEnv.sunHour * 4) / 4}`
+    ? `${skyEnv.reflectionLift || 0}|${skyEnv.preset}|${skyEnv.sky}|${skyEnv.skyBottom}|${skyEnv.ground}|${skyEnv.sunHour == null ? "-" : Math.round(skyEnv.sunHour * 4) / 4}`
     : null;
   return useMemo(() => {
     if (!key) return null;

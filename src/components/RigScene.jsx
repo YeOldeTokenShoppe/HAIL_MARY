@@ -29,7 +29,7 @@ const RIG_GLB = (() => {
   // ?rig=2 the original. ?v= busts caches: bump after `node scripts/optimize-rig.mjs …`.
   if (v === "2") return "/models/oilJack_fancy_allProps2.glb";
   if (v === "3") return "/models/oilJack_fancy_allProps3.glb?v=3";
-  return "/models/oilJack_fancy_allProps4.glb?v=17";
+  return "/models/oilJack_fancy_allProps4.glb?v=22";
 })();
 // The work light (2026-09-05): a floodlight on a tripod, authored in the RIG's
 // frame so it seats at the same scale and origin as the pump jack. Phone scene
@@ -38,15 +38,15 @@ const RIG_GLB = (() => {
 const RIG_LIGHT_GLB = "/models/RigLight.glb?v=1";
 const LENS_RE = /^LightSurface/;            // her two lens meshes
 const LENS_COLOR = "#fff1c4";               // warm floodlight
-const LENS_EMISSIVE = 3.2;                  // past white under tone mapping — reads as lit
-const SPOT_INTENSITY = 2.4;                 // physically-correct spot, ~0.5 world units from the rig
+const LENS_EMISSIVE = 1.8;                  // visible warm lenses without dominating the rig
+const SPOT_INTENSITY = 1.6;                 // physically-correct spot, ~0.5 world units from the rig
 // Camera-side night fill (2026-09-08): the tripod stands behind the rig, so the face the
 // phone looks at — panel, well, horse head — went black after dusk (Michelle). A second,
 // cooler spot from the camera's bearing lifts that side without a second prop; it rides the
 // same lamp factor so the day look is untouched. Position is in the rig group's frame.
-const FILL_POS = [0.5, 0.45, 0.6];
-const FILL_INTENSITY = 1.5;
-const FILL_COLOR = "#dfe4ff";
+const FILL_POS = [0.7, 0.73, 0.84];   // ×1.4 with PUMPJACK_SCALE 0.14
+const FILL_INTENSITY = 1.35;
+const FILL_COLOR = "#e5eaff";
 // Where the tripod stands, in the RIG's frame (metres, rig origin = pad centre),
 // overriding the export's own placement: Michelle placed it for a Blender view,
 // but the phone's rig camera is a narrow portrait shot from the front-right
@@ -56,7 +56,7 @@ const FILL_COLOR = "#dfe4ff";
 // 2026-09-08: moved toward the far corner for the 35° lens (narrower horizontal field): at
 // the old spot it fell off the right edge; here it lands ~70% right of centre, behind the rig.
 // Skid shortened by 0.69 on 2026-09-08 (tail now ends at rig z −1.70): the tripod follows.
-const RIG_LIGHT_PLACE = { at: [-2.0, 0, -3.5], scale: 1.2 };
+const RIG_LIGHT_PLACE = { at: [-2.0, 0, -3.5], scale: 1.08 };
 // Lamp-on factor from the hour: comes on over dusk (17.75→18.5), off over dawn
 // (5.5→6.25). Without a live hour (pinned presets) it follows the night preset.
 export function lampFactor(skyEnv, envPreset) {
@@ -103,10 +103,13 @@ function RigLight({ skyEnv, envPreset }) {
     });
     scene.visible = on > 0.01;
   }, [scene, on]);
-  const target = useMemo(() => { const t = new THREE.Object3D(); t.position.set(0, 0.12, 0); return t; }, []);
+  // Aim the practical at the machinery and the softer fill at the upper frame.
+  const target = useMemo(() => { const t = new THREE.Object3D(); t.position.set(0, 0.25, 0); return t; }, []);
+  const fillTarget = useMemo(() => { const t = new THREE.Object3D(); t.position.set(0, 0.36, 0.04); return t; }, []);
   const spot = useRef(null);
   const fill = useRef(null);
-  useEffect(() => { if (spot.current) spot.current.target = target; if (fill.current) fill.current.target = target; }, [target]);
+  const rim = useRef(null);
+  useEffect(() => { if (spot.current) spot.current.target = target; if (fill.current) fill.current.target = fillTarget; if (rim.current) rim.current.target = fillTarget; }, [target, fillTarget]);
   // dev readout: where the lamp head lands on screen (NDC) and the lamp factor
   const { camera } = useThree();
   const { scene: world } = useThree();
@@ -119,10 +122,14 @@ function RigLight({ skyEnv, envPreset }) {
   }, [camera, head, on, world]);
   return (
     <>
-      <group scale={PUMPJACK_SCALE}><primitive object={scene} /></group>
+      {/* Retain the authored lamp position for lighting, but hide the physical tripod. */}
+      <group scale={PUMPJACK_SCALE} visible={false}><primitive object={scene} /></group>
       <primitive object={target} />
-      <spotLight ref={spot} position={head} intensity={on * SPOT_INTENSITY} color={LENS_COLOR} angle={0.62} penumbra={0.55} distance={4} decay={2} />
-      <spotLight ref={fill} position={FILL_POS} intensity={on * FILL_INTENSITY} color={FILL_COLOR} angle={0.75} penumbra={0.7} distance={4} decay={2} />
+      <primitive object={fillTarget} />
+      <spotLight ref={spot} position={head} intensity={on * SPOT_INTENSITY} color={LENS_COLOR} angle={0.55} penumbra={0.85} distance={4} decay={2} />
+      {/* A broad cross-light reveals dark metal edges without a concentrated ground pool. */}
+      <directionalLight ref={rim} position={[-0.6, 0.65, 0.5]} intensity={on * 1.15} color="#e8edff" />
+      <spotLight ref={fill} position={FILL_POS} intensity={on * FILL_INTENSITY} color={FILL_COLOR} angle={0.6} penumbra={1} distance={4} decay={2} />
     </>
   );
 }
@@ -144,9 +151,13 @@ const TILE_MID = 1;
 // ~2/3 of its size against the beam. A fuller profile was tried on paper and rejected: a
 // long rig across a portrait frame at this lens only fits from far away (33% height).
 export const RIG_FOV = 35;
+// 2026-09-08, PUMPJACK_SCALE 0.14: fitted numerically to the rig's vertices (scratch fit3.mjs) —
+// target = the rig's projected centre, distance = the whole rig at 95% of the portrait width,
+// bearing swung from 48° to 55° off the panel normal so the long axis foreshortens a little
+// and the rig sits 13% larger for the same fit. Width always binds on this rig in portrait.
 export const RIG_CAMERA = {
-  position: [0.53, 1.31, 0.64],
-  target: [0, 1.1, 0.05],
+  position: [0.83, 1.55, 1.32],
+  target: [-0.04, 1.17, 0.08],
 };
 
 // Ground tile with the field's textures and palette. Full field depth so it
@@ -198,8 +209,8 @@ export function MesaTile({ cellSize, depthZ, envPreset, parabolum }) {
 // way round (the key switch lives on the side face); with the 0.02 near plane the box no
 // longer clips, and at 0.11 the orbit clears the 0.03-deep body from every side.
 // distMul/minDist ×1.48 with the 35° lens (same on-screen size as 1.7/0.11 at 50°).
-const PANEL_VIEW = { distMul: 2.5, minDist: 0.16, lift: -0.08, ease: 6, near: 0.02, azimuth: Infinity, polar: [Math.PI * 0.3, Math.PI * 0.64] };
-const RIG_ORBIT = { near: null, azimuth: Infinity, polar: [0.15, Math.PI * 0.55], minDist: 0.45 };
+const PANEL_VIEW = { distMul: 2.5, minDist: 0.22, lift: -0.08, ease: 6, near: 0.02, azimuth: Infinity, polar: [Math.PI * 0.3, Math.PI * 0.64] }; // minDist ×1.4 for PUMPJACK_SCALE 0.14
+const RIG_ORBIT = { near: null, azimuth: Infinity, polar: [0.15, Math.PI * 0.55], minDist: 0.6, maxDist: 3.6 }; // ×1.4 for PUMPJACK_SCALE 0.14
 function findMachinePanel(root) {
   let found = null;
   root.traverse((o) => { if (!found && typeof o.name === "string" && o.name.startsWith("MachinePanel")) found = o; });
@@ -372,6 +383,7 @@ export default function RigScene({
           worldW={worldW}
           worldD={worldW}
           cameraViewable={cameraViewable}
+          crewEnabled
         />
         {config?.showSign && (
           <PlotSign
@@ -413,7 +425,7 @@ export default function RigScene({
         enableDamping
         dampingFactor={0.1}
         minDistance={view === "panel" ? PANEL_VIEW.minDist : RIG_ORBIT.minDist}
-        maxDistance={2.6}
+        maxDistance={RIG_ORBIT.maxDist}
         minPolarAngle={view === "panel" ? PANEL_VIEW.polar[0] : RIG_ORBIT.polar[0]}
         maxPolarAngle={view === "panel" ? PANEL_VIEW.polar[1] : RIG_ORBIT.polar[1]}
       />

@@ -15,7 +15,7 @@ const GT = process.env.GLTF_TRANSFORM_PATH || (() => {
 })();
 const { NodeIO, VertexLayout } = require(path.join(GT, "core"));
 const { ALL_EXTENSIONS } = require(path.join(GT, "extensions"));
-const { prune, dedup, textureCompress, draco } = require(path.join(GT, "functions"));
+const { prune, dedup, textureCompress, draco, resample } = require(path.join(GT, "functions"));
 // Draco in and out (the kitbash exports use it; the project has draco3d): decode on
 // read, and RIG_DRACO=1 re-encodes on write for the big complexes.
 const draco3d = require("draco3d");
@@ -48,6 +48,9 @@ io.setVertexLayout(VertexLayout.SEPARATE);
 await doc.transform(prune({ keepLeaves: true }), dedup(),
   textureCompress({ encoder: sharp, targetFormat: "webp", resize: [SIZE, SIZE], quality: 82, slots: /^(?!normal)/ }),
   textureCompress({ encoder: sharp, targetFormat: "webp", resize: [NSIZE, NSIZE], quality: 82, slots: /normal/ }),
+  // RIG_RESAMPLE=1: drop redundant animation keyframes (the crew character's 30 fps mocap;
+  // lossless within 1e-4). Off for the rig: its 13 object channels are already tiny.
+  ...(process.env.RIG_RESAMPLE === "1" ? [resample({ tolerance: 1e-4 })] : []),
   ...(process.env.RIG_DRACO === "1" ? [draco()] : []));
 await io.write(out, doc);
 const root = doc.getRoot();

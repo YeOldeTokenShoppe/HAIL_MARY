@@ -121,7 +121,10 @@ export function playSfx(url, { volume = 1, rate = 1, fallback = null } = {}) {
 // `loopTrim` shaves the mp3 encoder's padding off both loop points so the
 // seam doesn't click. No element fallback: a loop that can't mix through the
 // shared context (the iOS rule) is better silent than session-stealing.
-export function startSfxLoop(url, { volume = 1, rate = 1, loopTrim = 0.06 } = {}) {
+// `rateFor(bufferDuration)` / `startAt(bufferDuration)` (optional) decide the playback rate
+// and the start offset once the buffer is decoded — for loops that must match a clock
+// (the rig's pump cycle, 2026-09-08). `handle.duration` is set at the same time.
+export function startSfxLoop(url, { volume = 1, rate = 1, loopTrim = 0.06, rateFor = null, startAt = null } = {}) {
   const handle = {
     _vol: volume, _rate: rate, _src: null, _gain: null, _stopped: false,
     setVolume(v) { this._vol = v; if (this._gain) this._gain.gain.value = v; },
@@ -144,6 +147,8 @@ export function startSfxLoop(url, { volume = 1, rate = 1, loopTrim = 0.06 } = {}
   const begin = (buf) => {
     if (handle._stopped) return;
     try {
+      handle.duration = buf.duration;
+      if (rateFor) { const r = rateFor(buf.duration); if (Number.isFinite(r) && r > 0) handle._rate = r; }
       const src = ctx.createBufferSource();
       src.buffer = buf;
       src.loop = true;
@@ -153,7 +158,9 @@ export function startSfxLoop(url, { volume = 1, rate = 1, loopTrim = 0.06 } = {}
       const gain = ctx.createGain();
       gain.gain.value = handle._vol;
       src.connect(gain).connect(ctx.destination);
-      src.start(0, src.loopStart);
+      let at = src.loopStart;
+      if (startAt) { const o = startAt(buf.duration); if (Number.isFinite(o)) at = Math.min(Math.max(o, src.loopStart), src.loopEnd - 0.001); }
+      src.start(0, at);
       handle._src = src;
       handle._gain = gain;
     } catch {}
@@ -169,4 +176,36 @@ export function startSfxLoop(url, { volume = 1, rate = 1, loopTrim = 0.06 } = {}
     }, 120);
   }
   return handle;
+}
+
+// Synthesised mechanical click — no asset. Two layers through the shared context: a
+// bandpassed noise tick (the contact) and a short pitched "thock" that falls from `pitch`
+// to about half of it (the body). ~80 ms total. Used by the rig's toggle switches on
+// landing (2026-09-08); `pitch` around 160 reads as a chunky toggle, 420 as a small button.
+export function playClick({ volume = 0.5, pitch = 160 } = {}) {
+  if (typeof window === "undefined") return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  if (ctx.state !== "running") ctx.resume().catch(() => {});
+  try {
+    const t0 = ctx.currentTime;
+    const out = ctx.createGain();
+    out.gain.value = volume;
+    out.connect(ctx.destination);
+    // contact tick: 12 ms of noise through a bandpass
+    const n = Math.floor(ctx.sampleRate * 0.012);
+    const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n) ** 2;
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 2800; bp.Q.value = 1.2;
+    const g1 = ctx.createGain(); g1.gain.setValueAtTime(0.9, t0);
+    src.connect(bp).connect(g1).connect(out); src.start(t0);
+    // body thock: pitched drop with a fast exponential decay
+    const osc = ctx.createOscillator(); osc.type = "triangle";
+    osc.frequency.setValueAtTime(pitch, t0); osc.frequency.exponentialRampToValueAtTime(Math.max(30, pitch * 0.55), t0 + 0.05);
+    const g2 = ctx.createGain(); g2.gain.setValueAtTime(0.7, t0); g2.gain.exponentialRampToValueAtTime(0.001, t0 + 0.08);
+    osc.connect(g2).connect(out); osc.start(t0); osc.stop(t0 + 0.09);
+    window.__hmSfxLast = "synth:click"; (window.__hmSfxLog ||= []).push({ t: Math.round(performance.now()), url: "synth:click", volume: +volume.toFixed(2), rate: pitch }); if (window.__hmSfxLog.length > 16) window.__hmSfxLog.shift();
+  } catch {}
 }

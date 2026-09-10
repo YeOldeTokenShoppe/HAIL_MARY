@@ -148,7 +148,7 @@ function WalletConnectOptions({ connectExternal, connectingMethod, isMobile, the
 }
 
 const ITEM_LABELS = {
-  theme_chrome: "Full Chrome", theme_dragonforge: "Dragonforge", theme_celestial: "Celestial Execution",
+  theme_dragonforge: "Dragonforge",
   theme_midnightSovereign: "Midnight Sovereign", theme_metalAF: "Metal AF", theme_whiteGold: "White Gold",
   fence_iron: "Iron Fence", fence_whitePicket: "White Picket Fence", fence_stone: "Stone Fence",
   addon_dinosaur: "T-Rex", addon_zombie: "Pet Zombie", addon_tubeMan: "Tubeman",

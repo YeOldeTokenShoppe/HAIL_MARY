@@ -15,12 +15,10 @@ export const PREMIUM_PRICES = {
 export const FREE_THEME_KEYS = new Set([
   "stock",          // Factory Default
   "goldRush",       // Gold Rush
-  "rusty",          // Abandoned Field
   "murdered",       // Murdered Out
   "cyberpunk",      // Cyberpunk
   "toxic",          // Biohazard
   "hellforged",     // Hellforged
-  "sanctified",     // Sanctified Extraction
   "arctic",         // Arctic Industrial
   "desert",         // Mad Max
   "tokyoNoir",      // Tokyo Noir
