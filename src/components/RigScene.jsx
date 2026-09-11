@@ -29,7 +29,7 @@ const RIG_GLB = (() => {
   // ?rig=2 the original. ?v= busts caches: bump after `node scripts/optimize-rig.mjs …`.
   if (v === "2") return "/models/oilJack_fancy_allProps2.glb";
   if (v === "3") return "/models/oilJack_fancy_allProps3.glb?v=3";
-  return "/models/oilJack_fancy_allProps4.glb?v=24";
+  return "/models/oilJack_fancy_allProps4.glb?v=26";
 })();
 // The work light (2026-09-05): a floodlight on a tripod, authored in the RIG's
 // frame so it seats at the same scale and origin as the pump jack. Phone scene

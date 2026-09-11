@@ -3835,20 +3835,26 @@ export default function OilPage() {
   useEffect(() => {
     const status = hellActive ? "breach" : ({ "auto-pumping": "pumping", ready: "ready", stunned: "incapacitated", blockade: "blockade", "pre-game": "pre-season",
       "no-claim": "no claim", "max-depth": "max depth", "depth-ceiling": "caught up", "sign-in": "signed out", "wrong-claim": "pumping" }[drillStatus] || String(drillStatus));
-    const lines = [`Rig ${status}.`];
+    // Each line carries a tone for the crew's reply gesture: "no" (nothing to report, head
+    // shake), "yes" (news, nod), "thoughtful" (something to weigh). RigCrew falls back to reading
+    // the line when a tone is missing.
+    const lines = []; const tones = [];
+    const say = (line, tone) => { lines.push(line); tones.push(tone); };
+    say(`Rig ${status}.`, ["pumping", "ready"].includes(status) ? "yes" : ["signed out", "no claim", "pre-season", "caught up"].includes(status) ? "no" : "thoughtful");
     const r = awayRecap;
     if (r) {
       const h = Math.round((r.awayMs || 0) / 36e5);
-      if (h >= 1) lines.push(`You were away ${h}h.`);
-      if (r.toDepth > r.fromDepth) lines.push(`Drilled ${r.fromDepth} to ${r.toDepth}.`);
-      if (r.strikes?.length) lines.push(`${r.strikes.length} strike${r.strikes.length === 1 ? "" : "s"}, +${Math.round(r.oilGained || 0)} BTR.`);
-      if (r.hellHit) lines.push("We hit a hell pocket.");
-      (r.fieldEvents || []).slice(0, 2).forEach((e) => { if (e?.username && e?.type) lines.push(`${e.username}: ${e.type}.`); });
-      if (r.unreadCount) lines.push(`${r.unreadCount} unread message${r.unreadCount === 1 ? "" : "s"}.`);
+      if (h >= 1) say(`You were away ${h}h.`, "thoughtful");
+      if (r.toDepth > r.fromDepth) say(`Drilled ${r.fromDepth} to ${r.toDepth}.`, "yes");
+      if (r.strikes?.length) say(`${r.strikes.length} strike${r.strikes.length === 1 ? "" : "s"}, +${Math.round(r.oilGained || 0)} BTR.`, "yes");
+      if (r.hellHit) say("We hit a hell pocket.", "thoughtful");
+      (r.fieldEvents || []).slice(0, 2).forEach((e) => { if (e?.username && e?.type) say(`${e.username}: ${e.type}.`, "thoughtful"); });
+      if (r.unreadCount) say(`${r.unreadCount} unread message${r.unreadCount === 1 ? "" : "s"}.`, "yes");
     }
-    lines.push(`Tank ${Math.round((tankFill || 0) * 100)}% full.`);
-    if (lines.length === 2) lines.splice(1, 0, "Nothing new since your last visit.");
-    window.__hmBriefing = { lines };
+    const fillPct = Math.round((tankFill || 0) * 100);
+    say(`Tank ${fillPct}% full.`, fillPct >= 50 ? "yes" : fillPct > 0 ? "thoughtful" : "no");
+    if (lines.length === 2) { lines.splice(1, 0, "Nothing new since your last visit."); tones.splice(1, 0, "no"); }
+    window.__hmBriefing = { lines, tones };
     return () => { delete window.__hmBriefing; };
   }, [drillStatus, hellActive, awayRecap, tankFill]);
 

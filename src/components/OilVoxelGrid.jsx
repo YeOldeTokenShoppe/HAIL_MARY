@@ -2736,6 +2736,13 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       steamGeoRef.current.attributes.position.needsUpdate = true;
     }
   }, []);
+  // A turn of the riser valve vents steam from the chimney and drops the gauge pressure — the
+  // click-to-spin and the crew's crew_valve pulls (RigCrew, onValveTurn) share it.
+  const ventSteam = useCallback(() => {
+    if (steamActiveRef.current) return;
+    initSteam();
+    gaugePressureOffset.current = Math.min(gaugePressureOffset.current + 0.3, 0.8);
+  }, [initSteam]);
 
   // Pump head pause during gusher — tilt the horsehead up and out of the blast
   const pumpActionsRef = useRef([]);  // animation actions for the pump armatures
@@ -3993,11 +4000,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
     if (isWheelClick) {
       wheelTargetRotY.current += Math.PI * 2;
-      // Trigger steam vent from chimney + drop gauge pressure
-      if (!steamActiveRef.current) {
-        initSteam();
-        gaugePressureOffset.current = Math.min(gaugePressureOffset.current + 0.3, 0.8);
-      }
+      ventSteam();
       return;
     }
 
@@ -4148,6 +4151,8 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         pausedRef={pumpPausedRef}
         panelOpen={!!panelZoomed}
         panelOpenRef={panelZoomedRef}
+        wheelSpinRef={wheelTargetRotY}
+        onValveTurn={ventSteam}
       />
       {/* Fuel tank liquid — animated fill inside the transparent tank */}
       {tankBounds && <TankLiquid tankBounds={tankBounds} tankFill={tankDraining ? 0 : tankFill} envPreset={envPreset} parabolum={parabolum} />}
@@ -6539,7 +6544,7 @@ const FIELD_RIG_GLB = (() => {
   const v = RIG_VARIANT;
   if (v === "2") return "/models/oilJack_fancy_allProps2.glb";
   if (v === "3") return "/models/oilJack_fancy_allProps3.glb?v=3";
-  return "/models/oilJack_fancy_allProps4.glb?v=24";
+  return "/models/oilJack_fancy_allProps4.glb?v=26";
 })();
 useGLTF.preload(FIELD_RIG_GLB);
 

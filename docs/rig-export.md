@@ -58,9 +58,10 @@ same 4096 atlas as the rest. Any new panel part should reuse an atlas already in
 
 Every animated part carries its clip on an NLA track named `pump`, so the export yields one
 clip called `pump`. Write to `models-src/oilJack_allProps4_raw.glb`. The same export runs from
-a script: select the set above, `scene.frame_set(1)`, then `bpy.ops.export_scene.gltf(...)`
-with `export_animation_mode='NLA_TRACKS'`, `export_force_sampling=True`,
-`export_frame_range=False`, `export_apply=False`, Draco on, skins/morphs/lights/cameras off.
+a script — `scripts/export-rig.sh` (background Blender on the saved blend, then the optimizer;
+2026-09-11) does steps 1 and 2 in one go, mirroring the live panel parenting and selecting the
+node list plus every `Crew_*` empty. Save the blend first: it exports what is on disk. Then bump
+`?v=` (step 3) only after it has finished.
 
 ## 2. Optimize
 
@@ -201,7 +202,7 @@ Michelle saves the rig blend). Same frame convention; extras `hm_station`, `hm_c
 | `Crew_Rail_Doze` | 0.45, 2.157, 0.236 | -90° | Bottom_Box | SEAT MARKER at the north walkway rail: marks where the worker's BACK goes; the page seats the body 0.50 forward along the arrow (the seated pose reaches 45 cm behind its origin, ±28 cm sideways). Put doze markers at the rail. |
 | `Crew_Rail_Doze_Top` | 0.25, -0.42, 1.725 | -90° | Service_Platform | seat marker at the platform's north rail, same rule (excludes the lookout: same zone) |
 | `Crew_Lookout` | 0.363, -0.776, 1.725 | -90° | Service_Platform | idle, tablet, wave, facing the horse head (Michelle's spot; replaces Crew_Platform_Lookout) |
-| `Crew_Valve` | -1.05, -2.445, 0 | 90° | Pipe_03 | idle, wave, tablet (south of the riser wheel, facing it; a valve-turning clip is wanted) |
+| `Crew_Valve` | -1.05, -2.44, 0 | 90° | Pipe_03 | valve, idle, wave (south of the riser handwheel, facing it; the rim is 0.19 ahead of the feet, the hub 0.55 up — see "The handwheel") |
 | `Crew_Wellhead` | 0.556, -2.092, 0 | 180° | Bottom_Box | idle, tablet (east of the curb, on the ground) |
 | `Crew_Panel_Aside` | 0.655, -0.38, 0.245 | 174° | MachinePanel_Body | where the operator steps while the panel view is open |
 | `Crew_Chat_A` / `Crew_Chat_B` | 0.155, 1.821 / -0.345, 1.821, 0.236 | 180° / 0° | Bottom_Box | the chat pair on the north walkway (2026-09-11 wrap-around base), facing each other 0.5 apart |
@@ -258,7 +259,16 @@ Apply Modifiers off, Skinning on, Custom Properties on, Draco off. Then:
 RIG_TEX_SIZE=512 node scripts/optimize-rig.mjs models-src/crew_goblin_raw.glb public/models/crew_goblin.glb
 ```
 
-Nineteen clips ship (2026-09-11, 1.83 MB with `RIG_RESAMPLE=1`, which `export-crew.sh` sets):
+Twenty-five clips ship (2026-09-11, 2.17 MB with `RIG_RESAMPLE=1`, which `export-crew.sh` sets; `CREW_GLB` v11):
+`crew_walk` 1.07 s loop, in place as delivered; its take was rotated 7.9° and 3 cm off the shared
+frame, so the root keys were yawed and shifted (backup in the action's `hm_root_backup`), and the
+stance foot's slide gives the stride speed the page uses, 0.518 rig units/s (`WALK_SPEED`),
+`crew_no` 1.8 s, `crew_yes` 1.6 s, `crew_thoughtful` 2.9 s (her Mixamo dialogue gestures, already on
+tracks and on the shared frame; the briefing's replies),
+`crew_valve` 6.5 s (one-shot; see "The handwheel" below), `crew_getUp` 6.1 s (her Mixamo floor
+sit → standing, the wake-up after `crew_dozing`; its root was shifted 3 cm so the last frame's
+root sits exactly on the shared frame, and it was pushed from the active action onto an NLA
+track like the others — an active action alone does not export), and
 the six below plus `crew_topOfLadder` 4.0 s (one-shot, root-motion: hanging on the ladder →
 standing on the landing; its start root was unified onto the shared frame and the root pinned
 for the whole clip, the path it walked is sampled into `TOP_PATH` in RigCrew.jsx — re-sample if
@@ -276,6 +286,33 @@ old bytes under the new name (2026-09-10). Clips are the NLA track names: `crew_
 switch never moves the worker). The push is baked FK; the IK rig that authored it stays in the
 blend, muted, with its target `Crew2_PushTarget` in `glTF_not_exported`. A gltf-transform
 `resample()` pass would take the file to about 690 KB; the 33 s tablet clip is most of it.
+
+### The handwheel (crew_valve, 2026-09-11)
+
+Mixamo has no valve-turning clip, so `crew_valve` is authored procedurally in the crew blend:
+both hands are IK targets (`Crew2_ValveTarget_L/R` in `glTF_not_exported`, constraints
+`IK_ValveL/R` on the hands, chain 3, wrist locked, muted after the bake) driven along the rim of
+the linked rig's `Wheel`, over a static base pose (crew_idle frame 1) with scripted torso
+lean/roll and a 10° head-down, then baked to FK exactly like `crew_push`. The frame plan at
+30 fps: 1-18 reach, then three 48-frame cycles from frame 19 (6 settle, 24 pull, 18 release and
+return with a 6 cm lift off the rim), 163-196 back to the idle pose. Grips at 8:30 and 3:30
+(chest height) on a 0.20 radius (the rim tube centre), 1.5 cm in front of the rim face so the
+palms wrap it; each pull turns 35° clockwise as the worker sees it (left hand rises). Max reach
+0.256 from the shoulder, IK residual zero. Her first review (2026-09-11): the arms sat up by the
+helmet — fixed by moving the station 4.5 cm further from the wheel, dropping the grips from 8/4
+o'clock and halving the head-down, so the pull happens in front of the chest. The script is
+`scripts/author-crew-valve.py` (run it inside the crew session through the Blender MCP, or in
+background on the saved blend); its geometry block holds the hub, radius, rim face and station,
+so if the wheel or `Crew_Valve` moves, edit those numbers, re-run, re-export.
+
+Why the wheel moved: the Synty handwheel sat with its hub 1.01 up on the riser, above the
+goblin's head (0.79 tall, reach about 0.31 from a 0.48 shoulder). On 2026-09-11 the rig blend's
+`Wheel` object was lowered to z 0.55 (its stem now enters the valve body/flange at 0.45-0.75) and
+`Crew_Valve` moved to y -2.44 (rig v26; v25 had it at -2.395, too close for a forward reach). The same export also restored three empties
+that were stale on disk — `Crew_Chat_B`, `Crew_Rail_Doze`, `Crew_Rail_Doze_Top` had been moved
+through the data API in a session that closed without saving, so the disk file still had the old
+spots while v24 had the new ones (`Crew_Chat_B` at 0.55, 0.55 instead of -0.345, 1.821). Data-API
+moves never flag the file dirty: after such a session, save explicitly.
 
 **Before the next rig export, two things changed in the scene:**
 
@@ -324,10 +361,51 @@ worker, `frustumCulled=false` on the skinned meshes, mixer delta capped at 1/30.
   in the rig blend to move it) and slides back when the view closes. A decide during the
   view still gets the push, then the operator steps aside again. Without this the helmet
   filled the phone's panel camera.
+- **The handwheel turns**: while a worker plays `valve` at the valve spot, RigCrew rotates the
+  rig's `Wheel` node about its local Y (the same axis and node as the click-to-spin in
+  OilVoxelGrid) by the clip's pull profile — `VALVE_PULLS` windows 0.8-1.6, 2.4-3.2, 4.0-4.8 s,
+  35° each, smoothstep — from wherever the wheel is. Pumpjack passes its `wheelTargetRotY` ref
+  in as `wheelSpinRef`; the crew writes the same value there every frame so the click lerp agrees
+  instead of fighting, and a later click spins on from the crew's angle. `VALVE_SIGN` is − because
+  the node's local +Y points back at the worker (dev state `wheel.localYWorld` shows it) and the
+  clip turns the wheel clockwise as the worker sees it. Each pull also vents the chimney: Pumpjack
+  passes its `ventSteam` (the click-to-spin's steam burst + gauge pressure drop, guarded so a burst
+  in progress is not restarted) in as `onValveTurn`, and RigCrew calls it as each pull window
+  opens (dev state `valveVents` counts the calls). The
+  wheel node is looked up per act, not cached: the rig scene can be re-cloned under a worker.
+- **Waking up is a clip now** (2026-09-11): a caught dozer plays `crew_getUp` (floor sit →
+  standing, 6.1 s) instead of crew_cower backwards; `uncower` stays as the fallback if the clip
+  is missing and for standing up after a cower. Both clips come from Mixamo's sitting-on-ground
+  family, so they share one sit pose: `crew_dozing`'s lower body (root, pelvis, both legs) was
+  rewritten in the crew blend to crew_getUp's first frame (its own take had been a chair sit
+  re-posed by hand, 7 cm higher and 26 cm further back), keeping its nodding upper body. The
+  seat spots therefore have one origin, marker + 0.244 (`SEAT_BACK_OFFSET`): the sleeper's back
+  ends 5 cm in front of the rail marker, the stand-up lands on the origin and the awake menu
+  runs there. crew_getUp starts from the doze's END pose (the held last frame), so a wake-up that
+  arrives mid-nod — the caught timer, a tap, a mode change — is queued (`wakeQueued`) until the
+  pass finishes (≤ 1.9 s) and the switch is pose-exact; only a cower interrupts the sit at once.
+  (An interim version moved the group across the crossfade to hide a 26 cm offset; gone now — if
+  a switch must ever move the group again, move it by offset × (1 − fadeWeight) across `FADE`,
+  never in one jump.)
 - **Climb rise is data**: the rise per crew_climb cycle comes from `hm_climb_rise_m` on
   `Crew_Ladder_Base` (glTF extras → `userData`) when the rig ships it, else 0.154; the cycle
   length is the clip's own duration. Retime the climb in Blender (one cycle = one rung is
   0.214 on this ladder), set the property, re-export the rig — no page change.
+- **Walking** (2026-09-11): every move between spots that is at least 0.12 long — the panel
+  step-aside and back, a decide move between the two buttons (0.17), anything the dev hook's
+  `walk(role, spot)` asks for — is a walk: the worker turns to the travel heading, crew_walk
+  loops while the group moves in a straight line at `WALK_SPEED` (so the planted foot stays
+  planted), then turns to the spot's facing on arrival. Shorter moves (the ladder landing, 0.09)
+  stay a glide with the idle. There is no pathing: walks are straight lines, so the roster's
+  spot changes still happen between sightings, not on screen; `walk()` is for previewing.
+- **Briefing replies** (2026-09-11): a tap makes the operator wave at the boss ("Hey, boss.",
+  `BRIEF_GREET_S` 2.2 s), then each briefing line comes with a reply gesture: page.js sends a
+  `tone` per line in `window.__hmBriefing.tones` — "no" for nothing to report (rig signed out /
+  no claim / pre-season / caught up, "Nothing new", an empty tank), "yes" for news (pumping,
+  drilled, strikes, unread, tank ≥ 50%), "thoughtful" for the rest (away time, hell pocket,
+  field events, breach) — and RigCrew plays crew_no / crew_yes / crew_thoughtful, idling
+  between lines; without a tone it reads the line (`briefGesture`). crew_talking is reserved
+  for crew-to-crew chat (her rule).
 - **Modes** (RigCrew.jsx, highest first), layered over the menu at the worker's current spot:
   `cower` (an `hm-demon-attack` within CREW_ALERT_RANGE, or a hell breach: crew_cower once, held,
   then played back to stand), `defend` (`window.__hmDemonState` within 3 cells: face it,
@@ -356,7 +434,7 @@ worker, `frustumCulled=false` on the skinned meshes, mixer delta capped at 1/30.
   a timer and `timeScale` fast-forwards for testing.
 
 Open: whether crew throws count (`CREW_THROWS_COUNT`), a headphones prop for the music clip,
-her ladder retime (0.154 vs 0.214 per rung). Verified 2026-09-09 in the phone scene via the
+her ladder retime (0.154 vs 0.214 per rung). The valve turn was verified on 2026-09-11 (two acts back to back, the wheel angle carried over between them). Verified 2026-09-09 in the phone scene via the
 dev hook with fast-forward: brief bubble, celebrate, defend + fireballs, cower/stand-up, music,
 chat hand-off, panel step-aside; the ladder round trip (climb → top-out → slide → stay → step
 out → reverse top-out → descend) was watched end to end on 2026-09-11. Every worker keeps a
