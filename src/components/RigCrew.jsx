@@ -22,9 +22,10 @@
  * worker's current spot:
  *   cower     — a demon attack nearby or a hell breach: crew_cower once, held, then
  *               played back to stand up
- *   defend    — window.__hmDemonState within CREW_ALERT_RANGE: face it, crew_nervous,
- *               crew_throw every few seconds with a fireball (flavor; set
+ *   defend    — window.__hmDemonState within CREW_ALERT_RANGE: face it, crew_ninjaStance
+ *               as the guard loop, crew_throw every few seconds with a fireball (flavor; set
  *               CREW_THROWS_COUNT to make throws land as walker shots via "hm-shoot")
+ *   alert     — hellActive with no demon in range: crew_nervous
  *   celebrate — gusherActive: crew_clap loop with the odd crew_victory1/2
  *   brief     — a tap on a worker: the operator talks (crew_talking) with a text bubble
  *               of window.__hmBriefing.lines (page.js), the other listens (nod/shrug)
@@ -45,18 +46,30 @@ import { useFrame } from "@react-three/fiber";
 import { useGLTF, Html } from "@react-three/drei";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
-export const CREW_GLB = "/models/crew_goblin.glb?v=2";
+export const CREW_GLB = "/models/crew_goblin.glb?v=5";
 useGLTF.preload(CREW_GLB);
 
 const BUCKET_MS = 10 * 60 * 1000;
 const CLIMB_RISE_FALLBACK = 0.154;  // crew_climb is in place; world rise per cycle (rig-GLB units) unless the
                                     // Crew_Ladder_Base empty carries hm_climb_rise_m (glTF extras → userData)
-const STEP_S = 0.8;                 // step onto / off the platform at the ladder head
+const STEP_S = 0.8;                 // (legacy) step onto / off the platform at the ladder head
+// crew_topOfLadder (4 s, Mixamo): climbing pose → standing on the landing. Its root was pinned in
+// place in Blender; this is the root's travel (station frame: forward along the facing, up),
+// sampled every 0.05 of the clip, which the page applies to the group while the clip plays.
+const TOP_CLIP = "crew_topOfLadder";
+const TOP_PATH = [[0,0],[0.004,0.026],[0.034,0.021],[-0.039,0.08],[-0.014,0.13],[-0.053,0.182],[-0.064,0.217],[-0.074,0.247],[-0.135,0.323],[-0.121,0.363],[-0.142,0.395],[-0.115,0.465],[-0.008,0.503],[0.131,0.512],[0.223,0.481],[0.286,0.474],[0.315,0.477],[0.322,0.476],[0.33,0.474],[0.333,0.474],[0.334,0.474]];
+const TOP_FWD_END = 0.334, TOP_ROOT_RISE = 0.474, LANDING_RISE = 0.479;   // soles end 0.479 above the clip's start floor
+const topPathAt = (u) => {
+  const n = TOP_PATH.length; const x = Math.max(0, Math.min(1, u)) * (n - 1); const i = Math.min(n - 2, Math.floor(x)); const f = x - i;
+  const a = TOP_PATH[i], b = TOP_PATH[i + 1];
+  return [a[0] + (b[0] - a[0]) * f, (a[1] + (b[1] - a[1]) * f) * (LANDING_RISE / TOP_ROOT_RISE)];
+};
 const SLIDE_S = 0.35;               // sidestep between the PASS and EXTRACT stations
 const ASIDE_S = 0.5;                // step beside the cabinet when the player opens the panel view
 const FADE = 0.25;
 const HEAD_YAW = 1.0, HEAD_PITCH_UP = 0.55, HEAD_PITCH_DOWN = 0.45, HEAD_EASE = 5;
 const BODY_TURN_EASE = 4;           // easing when a worker turns to face a demon
+const SEAT_BACK_OFFSET = 0.50;      // seat markers mark the BACK of the seated worker (at the rail); the body sits this far forward
 const CREW_ALERT_RANGE = 3.0;       // world units (cells): demon this close → defend
 const CREW_THROW_RANGE = 2.5;
 const CREW_THROWS_COUNT = false;    // true → each throw also fires "hm-shoot" from the worker's position
@@ -66,6 +79,7 @@ const COWER_HOLD_MS = 4500;         // how long a cower is held after its trigge
 const HELL_COWER_MS = 6000;
 const CHAT_TURN = [8, 12];          // seconds each talker holds the floor
 const BRIEF_LINE_S = 3.2;
+const DOZE_CAUGHT = [3, 6];          // seconds the boss gets to catch a dozer before they scramble up to work
 const _UP = new THREE.Vector3(0, 1, 0);
 
 // Station fallbacks — rig-GLB units, three.js axes, yaw = rotation.y (local +X = facing).
@@ -76,12 +90,13 @@ const STATIONS = {
   ladder_base:      { node: "Crew_Ladder_Base",      pos: [-0.697, 0.236, 0.755], yaw: -0.054 },
   ladder_top:       { node: "Crew_Ladder_Top",       pos: [-0.45, 1.725, 0.76],   yaw: -0.054 },
   motor:            { node: "Crew_Motor",            pos: [0.40, 0.236, -0.70],   yaw: Math.PI },
-  rail_doze:        { node: "Crew_Rail_Doze",        pos: [0.45, 0.236, -1.10],   yaw: -Math.PI / 2 }, // seat 8 cm inside the north rail, 6 cm off the east rail
-  platform_lookout: { node: "Crew_Platform_Lookout", pos: [0.20, 1.725, 1.05],    yaw: -Math.PI / 2 },
-  valve:            { node: "Crew_Valve",            pos: [-1.05, 0, 1.85],       yaw: -Math.PI / 2 },
-  wellhead:         { node: "Crew_Wellhead",         pos: [0.25, 0.08, 1.90],     yaw: Math.PI },     // on the well curb (8 cm)
-  chat_a:           { node: "Crew_Chat_A",           pos: [0.55, 0.236, -0.05],   yaw: Math.PI / 2 },  // two workers facing each other along the east deck, 0.5 apart
-  chat_b:           { node: "Crew_Chat_B",           pos: [0.55, 0.236, -0.55],   yaw: -Math.PI / 2 },
+  rail_doze:        { node: "Crew_Rail_Doze",        pos: [0.45, 0.236, -2.14],   yaw: -Math.PI / 2, seatBack: true }, // marker at the north walkway rail
+  rail_doze_top:    { node: "Crew_Rail_Doze_Top",    pos: [0.25, 1.725, 0.42],    yaw: -Math.PI / 2, seatBack: true }, // marker at the platform's north rail
+  platform_lookout: { node: "Crew_Lookout",          pos: [0.363, 1.725, 0.776],  yaw: -Math.PI / 2 },
+  valve:            { node: "Crew_Valve",            pos: [-1.05, 0, 2.445],      yaw: Math.PI / 2 },   // south of the riser wheel, facing it
+  wellhead:         { node: "Crew_Wellhead",         pos: [0.556, 0, 2.092],      yaw: Math.PI },     // east of the well curb, on the ground
+  chat_a:           { node: "Crew_Chat_A",           pos: [0.155, 0.236, -1.821], yaw: Math.PI },      // two workers facing each other on the north walkway, 0.5 apart
+  chat_b:           { node: "Crew_Chat_B",           pos: [-0.345, 0.236, -1.821], yaw: 0 },
 };
 
 // Activities: clip, how long a worker keeps at it (s), props to show, whether the head
@@ -93,6 +108,7 @@ const ACTS = {
   doze:        { clip: "crew_dozing",         once: true, holdBetween: [2, 4], forever: true }, // nod off, hold, nod off again; only ever a sighting
   push:        { clip: "crew_push",           once: true },
   climb:       { clip: "crew_climb" },
+  topOfLadder: { clip: "crew_topOfLadder", once: true },
   ninja:       { clip: "crew_ninjaStance",    dwell: [9, 18] },
   nervous:     { clip: "crew_nervous",        dwell: [6, 12],  look: true },
   talking:     { clip: "crew_talking",        dwell: [10, 20], look: true },
@@ -114,12 +130,13 @@ const MENU = {
   panel_extract:    { acts: [["idle", 3], ["tablet", 2]],              look: "camera" },
   panel_aside:      { acts: [["idle", 3], ["tablet", 1]],              look: "camera" },
   motor:            { acts: [["idle", 2], ["tablet", 2]],              look: "head_pump" },
-  rail_doze:        { acts: [["doze", 1]] },                                        // caught sleeping on the job: nothing else happens here
+  rail_doze:        { acts: [["doze", 1]], awake: [["idle", 2], ["tablet", 2]] },   // caught sleeping on the job; after the scramble, back to work here
+  rail_doze_top:    { acts: [["doze", 1]], awake: [["idle", 2], ["tablet", 2]] },
   platform_lookout: { acts: [["idle", 2], ["tablet", 2], ["wave", 1]], look: "head_pump" },
   ladder_base:      { acts: [["idle", 1]],                             look: "camera",    climbTo: "ladder_top" },
   ladder_top:       { acts: [["idle", 2], ["tablet", 1]],              look: "head_pump", descendTo: "ladder_base" },
-  valve:            { acts: [["idle", 2], ["wave", 1], ["tablet", 1], ["ninja", 1]], look: "camera" },
-  wellhead:         { acts: [["idle", 2], ["tablet", 1], ["ninja", 1]], look: "head_pump" },
+  valve:            { acts: [["idle", 2], ["wave", 1], ["tablet", 1]], look: "camera" },
+  wellhead:         { acts: [["idle", 2], ["tablet", 1]],              look: "head_pump" },
   chat_a:           { acts: [["idle", 1]],                             look: "partner" },
   chat_b:           { acts: [["idle", 1]],                             look: "partner" },
 };
@@ -127,15 +144,16 @@ const MENU = {
 // The crew roster: which spots each role is found at ([spot, weight]). The operator briefs.
 const ROLES = [
   { id: "operator",  spots: [["panel_pass", 4], ["panel_extract", 1], ["motor", 1], ["wellhead", 1]], briefs: true, chatSpot: "chat_a" },
-  { id: "inspector", spots: [["ladder_base", 3], ["platform_lookout", 2], ["rail_doze", 2], ["valve", 1], ["motor", 1]], chatSpot: "chat_b" },
+  { id: "inspector", spots: [["ladder_base", 3], ["platform_lookout", 2], ["rail_doze", 2], ["rail_doze_top", 1], ["valve", 1], ["motor", 1]], chatSpot: "chat_b" },
 ];
 const CHAT_CHANCE = 0.25;           // share of sightings where the two are found chatting
-const zoneOf = (spot) => (spot.startsWith("panel_") ? "panel" : spot); // two workers never share the panel
+// two workers never share the panel, nor the platform's east strip (the seat and the lookout overlap)
+const zoneOf = (spot) => (spot.startsWith("panel_") ? "panel" : spot === "rail_doze_top" || spot === "platform_lookout" ? "platform_east" : spot);
 const PANEL_BUTTONS = new Set(["panel_pass", "panel_extract"]);
 
 // Gates: reweight spots/acts by the rig's state. night → dozing; hell → nobody dozes.
 function spotWeight(spot, w, g) {
-  if (spot === "rail_doze") return g.hell ? 0 : w * (g.night ? 3 : g.stalled ? 2 : 0.6);
+  if (spot === "rail_doze" || spot === "rail_doze_top") return g.hell ? 0 : w * (g.night ? 3 : g.stalled ? 2 : 0.6);
   return w;
 }
 function actWeight(act, w, g) {
@@ -172,17 +190,25 @@ const _m = new THREE.Matrix4(), _p = new THREE.Vector3(), _q = new THREE.Quatern
 function resolveStation(rigScene, id) {
   const def = STATIONS[id];
   const node = rigScene?.getObjectByName?.(def.node);
-  if (!node) return { pos: new THREE.Vector3(...def.pos), yaw: def.yaw, fromRig: false, extras: {} };
-  _m.copy(node.matrix);
-  let p = node.parent;
-  while (p && p !== rigScene) { _m.premultiply(p.matrix); p = p.parent; }
-  _m.decompose(_p, _q, _s);
-  _ax.set(1, 0, 0).applyQuaternion(_q);
-  return { pos: _p.clone(), yaw: Math.atan2(-_ax.z, _ax.x), fromRig: true, extras: node.userData || {} };
+  let out;
+  if (!node) out = { pos: new THREE.Vector3(...def.pos), yaw: def.yaw, fromRig: false, extras: {} };
+  else {
+    _m.copy(node.matrix);
+    let p = node.parent;
+    while (p && p !== rigScene) { _m.premultiply(p.matrix); p = p.parent; }
+    _m.decompose(_p, _q, _s);
+    _ax.set(1, 0, 0).applyQuaternion(_q);
+    out = { pos: _p.clone(), yaw: Math.atan2(-_ax.z, _ax.x), fromRig: true, extras: node.userData || {} };
+  }
+  // Seat markers sit where the worker's BACK goes (at the rail); the seated pose reaches 0.45 behind
+  // its origin, so the body is placed forward along the facing. yaw → local +X = (cos, 0, -sin).
+  if (def.seatBack || out.extras?.hm_seat_back) out.pos.add(new THREE.Vector3(Math.cos(out.yaw), 0, -Math.sin(out.yaw)).multiplyScalar(SEAT_BACK_OFFSET));
+  return out;
 }
 
 const devHook = () => (typeof window === "undefined" ? null : (window.__hmCrew ||= { workers: {}, spots: Object.keys(STATIONS), force: {},
   go: (r, sp) => window.__hmCrew.workers[r]?.go(sp),
+  act: (r, a) => window.__hmCrew.workers[r]?.act(a),
   state: () => Object.fromEntries(Object.entries(window.__hmCrew.workers).map(([k, w]) => [k, w.state()])) }));
 
 export default function RigCrew({ rigScene, scale = 1, enabled = true, plotKey = "rig", envPreset = null, hellActive = false, gusherActive = false, pausedRef = null, panelOpen = false, panelOpenRef = null, workers = 2 }) {
@@ -337,7 +363,10 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     const reg = devHook(); if (!reg) return;
     reg.workers[role.id] = {
       go: (sp) => { if (!STATIONS[sp]) return false; const stn = resolveStation(rigScene, sp); const s = st.current; s.spot = sp; s.pos.copy(stn.pos); s.yaw = s.yawCur = stn.yaw; s.phase = "act"; s.act = null; s.topStay = 0; return true; },
-      state: () => { const s = st.current; return { spot: s.spot, act: s.act, mode: s.mode, phase: s.phase, scene: scene || null, chat: crew.chat ? { talker: crew.chat.talker, swapAt: +crew.chat.swapAt.toFixed(2) } : null, t: +s.t.toFixed(3), pos: s.pos.toArray().map((v) => +v.toFixed(3)), frames: s.frames, now: +(s.now || 0).toFixed(2), nextThrowAt: +(s.nextThrowAt || 0).toFixed(2), throws: s.throws || 0, fired: s.fired || 0, dist: s.dbgDist == null ? null : +s.dbgDist.toFixed(2), running: !!(s.action && s.action.isRunning()), fromRig: resolveStation(rigScene, s.spot).fromRig }; },
+      act: (a) => { if (!ACTS[a]) return false; startAct(a, st.current.now || 0); return true; },   // force an activity (e.g. "tablet")
+      state: () => { const s = st.current; const g = groupRef.current; const gw = new THREE.Vector3(); if (g) g.getWorldPosition(gw); const sc = g ? g.getWorldScale(new THREE.Vector3()).y : 1;
+        return { spot: s.spot, act: s.act, mode: s.mode, phase: s.phase, scene: scene || null, yaw: +s.yawCur.toFixed(2), yawAim: s.yawAim == null ? null : +s.yawAim.toFixed(2), headUp: +((s.head.y - gw.y) / (sc || 1)).toFixed(3),
+        props: Object.fromEntries(Object.entries(props).map(([n, o]) => { const w = new THREE.Vector3(); o.getWorldPosition(w); return [n, { visible: o.visible, verts: o.geometry?.attributes?.position?.count || 0, world: w.toArray().map((v) => +v.toFixed(3)) }]; })), chat: crew.chat ? { talker: crew.chat.talker, swapAt: +crew.chat.swapAt.toFixed(2) } : null, t: +s.t.toFixed(3), pos: s.pos.toArray().map((v) => +v.toFixed(3)), frames: s.frames, now: +(s.now || 0).toFixed(2), nextThrowAt: +(s.nextThrowAt || 0).toFixed(2), throws: s.throws || 0, fired: s.fired || 0, dist: s.dbgDist == null ? null : +s.dbgDist.toFixed(2), running: !!(s.action && s.action.isRunning()), fromRig: resolveStation(rigScene, s.spot).fromRig, trace: s.trace || [] }; },
     };
     return () => { delete reg.workers[role.id]; };
   }, [role.id, rigScene, scene, crew]);
@@ -353,8 +382,12 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
   const play = (name, { once = false, timeScale = 1, fromEnd = false } = {}) => {
     const actions = actionsRef.current; const a = actions[name];
     if (!a) return null;
-    Object.values(actions).forEach((o) => { if (o !== a && o.isRunning()) o.fadeOut(FADE); });
-    const others = Object.values(actions).some((o) => o !== a && o.isRunning());
+    // Retire every other clip that still carries weight — a finished one-shot is paused at its
+    // last frame (clampWhenFinished) and is NOT "running", yet keeps full weight; left alone it
+    // blends 50/50 with the next clip (the half-crouch after the doze scramble).
+    const live = (o) => o !== a && o.enabled && (o.isRunning() || o.getEffectiveWeight() > 0);
+    Object.values(actions).forEach((o) => { if (live(o)) o.fadeOut(FADE); });
+    const others = Object.values(actions).some(live);
     a.reset(); a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity);
     a.clampWhenFinished = once; a.timeScale = timeScale; a.enabled = true;
     if (fromEnd) a.time = a.getClip().duration;
@@ -371,9 +404,14 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
   };
   const menuAct = (now) => {
     const s = st.current; const menu = MENU[s.spot];
-    const items = menu.acts.map(([a, w]) => [a, actWeight(a, w, gates) * (a === s.act && menu.acts.length > 1 ? 0.35 : 1)]);
-    startAct(pickWeighted(Math.random, items) || "idle", now);
+    const acts = s.awake && menu.awake ? menu.awake : menu.acts;                       // a caught dozer never dozes again this sighting
+    const items = acts.map(([a, w]) => [a, actWeight(a, w, gates) * (a === s.act && acts.length > 1 ? 0.35 : 1)]);
+    const pick = pickWeighted(Math.random, items) || "idle";
+    startAct(pick, now);
+    if (pick === "doze") s.dozeUntil = now + rand(...DOZE_CAUGHT);
   };
+  // The boss showed up: scramble up from the seat (crew_cower played backwards) and get to work.
+  const wakeUp = (now, then = null) => { const s = st.current; s.awake = true; s.wakeTo = then; startAct("uncower", now); };
   const nextAct = (now) => {
     const s = st.current; const menu = MENU[s.spot];
     if (menu.climbTo && s.act) { beginClimb(now); return; }           // ladder: one dwell at the base, then climb
@@ -391,10 +429,15 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     const clip = actionsRef.current["crew_climb"]?.getClip(); return rise / (clip?.duration || 0.8);
   };
   const beginClimb = () => { const s = st.current; const top = resolveStation(rigScene, MENU[s.spot].climbTo); s.phase = "climbUp"; s.target = top; s.act = "climb"; s.action = play("crew_climb"); showProps("climb"); };
+  const landingOf = (base) => new THREE.Vector3(base.pos.x + Math.cos(base.yaw) * TOP_FWD_END, base.pos.y + (resolveStation(rigScene, "ladder_top").pos.y - base.pos.y), base.pos.z - Math.sin(base.yaw) * TOP_FWD_END);
   const beginDescend = () => {
     const s = st.current; const base = resolveStation(rigScene, MENU[s.spot].descendTo);
     s.phase = "stepOut"; s.t = 0; s.from = s.pos.clone(); s.target = base;
-    s.to = new THREE.Vector3(base.pos.x, s.pos.y, base.pos.z); s.act = "idle"; s.action = play("crew_idle"); showProps("idle");
+    s.to = landingOf(base); s.act = "idle"; s.action = play("crew_idle"); showProps("idle");
+  };
+  const topMove = (u) => {                                   // group along the top-of-ladder path, u = clip progress 0..1
+    const s = st.current; const [f, up] = topPathAt(u);
+    s.pos.set(s.from.x + Math.cos(s.yaw) * f, s.from.y + up, s.from.z - Math.sin(s.yaw) * f);
   };
 
   // ── modes ────────────────────────────────────────────────────────────────────────
@@ -409,6 +452,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     const f = devHook()?.force || {};
     if (crew.cowerUntil > Date.now() || f.hell) return "cower";
     if (demonNear()) return "defend";
+    if (gates.hell) return "alert";
     if (crew.gusher || f.celebrate) return "celebrate";
     if (crew.brief) return crew.brief.talker === role.id ? "brief" : "listen";
     if (scene === "chat" && crew.chat) return crew.chat.talker === role.id ? "chat" : "chatListen";
@@ -420,8 +464,10 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     const s = st.current; const old = s.mode; s.mode = mode; s.yawAim = null;
     if (old === "brief") setBubble(null);
     if (old === "cower" && mode !== "cower") { startAct("uncower", now); return; }   // stand back up first
+    if (s.act === "doze" && mode !== "cower") { wakeUp(now, mode); return; }         // caught napping: scramble, then do the thing
     if (mode === "cower") { startAct("cower", now); s.actEnds = Infinity; }
-    else if (mode === "defend") { startAct("nervous", now, 999); s.nextThrowAt = now + rand(0.5, 2); }
+    else if (mode === "defend") { startAct("ninja", now, 999); s.nextThrowAt = now + rand(0.5, 2); }   // guard stance between throws
+    else if (mode === "alert") startAct("nervous", now, 999);
     else if (mode === "celebrate") startAct("clap", now);
     else if (mode === "brief") { startAct("talking", now, 999); crew.brief.i = 0; crew.brief.nextLineAt = now; }
     else if (mode === "listen" || mode === "chatListen") { startAct("idle", now, 999); s.nextGesture = now + rand(2, 5); }
@@ -432,18 +478,24 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
   const modeNext = (mode, now) => {                                     // an act ended inside a mode
     const s = st.current;
     if (mode === "cower") { s.actEnds = Infinity; return; }             // hold the curl
-    if (mode === "defend") startAct("nervous", now, 999);
+    if (mode === "defend") startAct("ninja", now, 999);
+    else if (mode === "alert") startAct("nervous", now, 999);
     else if (mode === "celebrate") startAct(s.act === "clap" ? (Math.random() < 0.5 ? "victory1" : "victory2") : "clap", now);
     else if (mode === "brief" || mode === "chat") startAct("talking", now, 999);
     else if (mode === "listen" || mode === "chatListen") { startAct("idle", now, 999); s.nextGesture = now + rand(2.5, 6); }
     else if (mode === "music") startAct("music", now, 999);
     else nextAct(now);
   };
+  const faceWorld = (x, y, z) => {
+    const s = st.current; const parent = groupRef.current?.parent; if (!parent) return;
+    _tmp.set(x, y, z); parent.worldToLocal(_tmp); s.yawAim = Math.atan2(-(_tmp.z - s.pos.z), _tmp.x - s.pos.x);
+  };
+  const partner = () => { const o = Object.entries(crew.workers).find(([k]) => k !== role.id); return o ? o[1] : null; };
   const modeTick = (mode, now, dt, state) => {
     const s = st.current;
     if (mode === "defend") {
       const D = demonNear(); if (!D) return;
-      const parent = groupRef.current?.parent; if (parent) { _tmp.set(D.x, D.y, D.z); parent.worldToLocal(_tmp); s.yawAim = Math.atan2(-(_tmp.z - s.pos.z), _tmp.x - s.pos.x); }
+      faceWorld(D.x, D.y, D.z);
       s.dbgDist = D.dist;
       if (s.act !== "throw" && D.dist < CREW_THROW_RANGE && now >= s.nextThrowAt) { startAct("throw", now); s.throws = (s.throws || 0) + 1; s.throwAt = now + THROW_RELEASE_S; s.nextThrowAt = now + rand(3, 5); }
       if (s.act === "throw" && s.throwAt && now >= s.throwAt) {
@@ -452,12 +504,14 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
         if (CREW_THROWS_COUNT && groupRef.current) { groupRef.current.getWorldPosition(_tmp); window.dispatchEvent(new CustomEvent("hm-shoot", { detail: { x: _tmp.x, y: _tmp.y, z: _tmp.z, source: "crew" } })); }
       }
     } else if (mode === "brief") {
+      const c = state.camera.position; faceWorld(c.x, c.y, c.z);          // turn to the player
       const b = crew.brief; if (!b) return;
       if (now >= b.nextLineAt) {
         if (b.i >= b.lines.length) { crew.brief = null; return; }
         setBubble(b.lines[b.i]); b.i += 1; b.nextLineAt = now + BRIEF_LINE_S;
       }
     } else if (mode === "listen" || mode === "chatListen") {
+      if (mode === "listen") { const t = partner(); if (t) faceWorld(t.head.x, t.head.y, t.head.z); }   // turn to the one briefing
       if (mode === "chatListen" && !crew.chat) crew.chat = { talker: role.id, swapAt: now + rand(...CHAT_TURN) };   // first to notice opens the conversation
       if (s.act === "idle" && now >= s.nextGesture) startAct(Math.random() < 0.65 ? "acknowledge" : "shrug", now);
     } else if (mode === "chat") {
@@ -473,6 +527,10 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     const dt = Math.min(delta, 1 / 30) * (devHook()?.force?.timeScale || 1);
     s.now = (s.now || 0) + dt; const now = s.now;
     s.frames += 1;
+    if (s.phase !== s.tracePhase) {                            // dev: phase transitions, read via window.__hmCrew.state().<role>.trace
+      s.tracePhase = s.phase; (s.trace ||= []).push({ now: +now.toFixed(2), phase: s.phase, act: s.act, pos: s.pos.toArray().map((v) => +v.toFixed(3)) });
+      if (s.trace.length > 40) s.trace.shift();
+    }
     mixer.update(dt);
     if (headBone) headBone.getWorldPosition(s.head);
     if (s.act === null) menuAct(now);
@@ -493,25 +551,32 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
         modeTick(s.mode, now, dt, state);
         const def = ACTS[s.act];
         if (def?.holdBetween) {                                             // one pass, hold the last frame, another pass
-          if (finished && !s.replayAt) s.replayAt = now + rand(...def.holdBetween);
+          if (s.act === "doze" && s.dozeUntil && now >= s.dozeUntil) wakeUp(now);
+          else if (finished && !s.replayAt) s.replayAt = now + rand(...def.holdBetween);
           else if (s.replayAt && now >= s.replayAt) { s.replayAt = 0; s.action.reset(); s.action.play(); }
-        } else if (finished || now >= s.actEnds) { if (s.act === "uncower") { s.mode = null; menuAct(now); } else modeNext(s.mode, now); }
+        } else if (finished || now >= s.actEnds) {
+          if (s.act === "uncower") { const to = s.wakeTo; s.wakeTo = null; if (to) { s.mode = null; enterMode(to, now); } else { s.mode = null; menuAct(now); } }
+          else modeNext(s.mode, now);
+        }
       }
     } else if (s.phase === "slide") {
       s.t += dt; const u = Math.min(1, s.t / (s.slideS || SLIDE_S)); const e = u * u * (3 - 2 * u);
       s.pos.lerpVectors(s.from, s.to, e); s.yaw = s.target.yaw;
       if (u >= 1) { s.spot = s.nextSpot; startAct(s.afterSlide || "idle", now); }
     } else if (s.phase === "climbUp") {
-      s.pos.y = Math.min(s.target.pos.y, s.pos.y + climbRate() * dt);
-      if (s.pos.y >= s.target.pos.y - 1e-4) { s.phase = "stepIn"; s.t = 0; s.from = s.pos.clone(); s.to = s.target.pos.clone(); s.action = play("crew_idle"); }
-    } else if (s.phase === "stepIn") {
-      s.t += dt; const u = Math.min(1, s.t / STEP_S); const e = u * u * (3 - 2 * u);
+      const stopY = s.target.pos.y - LANDING_RISE;             // the top clip climbs the last 0.48 itself
+      s.pos.y = Math.min(stopY, s.pos.y + climbRate() * dt);
+      if (s.pos.y >= stopY - 1e-4) { s.phase = "topIn"; s.from = s.pos.clone(); s.act = "topOfLadder"; s.action = play(TOP_CLIP, { once: true }); showProps("climb"); }
+    } else if (s.phase === "topIn") {                            // climbing pose → standing on the landing, group riding the clip's root path
+      const dur = s.action?.getClip().duration || 4; const u = Math.min(1, (s.action?.time || 0) / dur); topMove(u);
+      if (u >= 1 || !s.action?.isRunning()) { topMove(1); const top = MENU[s.spot].climbTo; s.topStay = now + rand(40, 90); slideTo(top, 0.35, "idle"); }
+    } else if (s.phase === "stepOut") {                          // top station → the landing point (a short walk-less slide)
+      s.t += dt; const u = Math.min(1, s.t / 0.35); const e = u * u * (3 - 2 * u);
       s.pos.lerpVectors(s.from, s.to, e); s.yaw = s.target.yaw;
-      if (u >= 1) { s.spot = MENU[s.spot].climbTo; s.topStay = now + rand(40, 90); s.act = null; }
-    } else if (s.phase === "stepOut") {
-      s.t += dt; const u = Math.min(1, s.t / STEP_S); const e = u * u * (3 - 2 * u);
-      s.pos.lerpVectors(s.from, s.to, e);
-      if (u >= 1) { s.phase = "climbDown"; s.act = "climb"; s.action = play("crew_climb", { timeScale: -1 }); showProps("climb"); }
+      if (u >= 1) { s.phase = "topOut"; s.from = s.to.clone().sub(new THREE.Vector3(Math.cos(s.yaw) * TOP_FWD_END, LANDING_RISE, -Math.sin(s.yaw) * TOP_FWD_END)); s.act = "topOfLadder"; s.action = play(TOP_CLIP, { once: true, timeScale: -1, fromEnd: true }); showProps("climb"); }
+    } else if (s.phase === "topOut") {                           // the same clip backwards: standing → hanging on the ladder
+      const dur = s.action?.getClip().duration || 4; const u = Math.max(0, (s.action?.time ?? 0) / dur); topMove(u);
+      if (u <= 0 || !s.action?.isRunning()) { topMove(0); s.phase = "climbDown"; s.act = "climb"; s.action = play("crew_climb", { timeScale: -1 }); showProps("climb"); }
     } else if (s.phase === "climbDown") {
       s.pos.y = Math.max(s.target.pos.y, s.pos.y - climbRate() * dt);
       if (s.pos.y <= s.target.pos.y + 1e-4) {

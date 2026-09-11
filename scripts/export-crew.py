@@ -14,8 +14,14 @@ def walk(o):
 walk(E)
 loose = [o.name for o in bpy.data.objects if not o.library and o not in family and o.type == 'MESH']
 S = E.matrix_world.copy(); E.matrix_world = Matrix.Identity(4); bpy.context.view_layer.update()
+# A hidden object (eye icon or monitor icon) silently refuses selection and drops out of the
+# export — the tablet went missing that way once. Unhide the whole family first.
+for o in family:
+    o.hide_viewport = False; o.hide_set(False)
+bpy.context.view_layer.update()
 for o in bpy.context.view_layer.objects: o.select_set(False)
 for o in family: o.select_set(True)
+unselected = [o.name for o in family if not o.select_get()]
 bpy.context.view_layer.objects.active = E
 try:
     res = bpy.ops.export_scene.gltf(filepath=path, export_format='GLB', use_selection=True, export_yup=True,
@@ -30,4 +36,4 @@ arm = next(o for o in family if o.type == 'ARMATURE')
 print("CREW_EXPORT " + json.dumps({"result": list(res), "file": path, "bytes": os.path.getsize(path),
     "exported": [f"{o.name}({o.type}{', bone ' + o.parent_bone if o.parent_bone else ''})" for o in family],
     "clips": [t.name for t in arm.animation_data.nla_tracks],
-    "meshes_not_under_crew_root": loose}))
+    "meshes_not_under_crew_root": loose, "could_not_select": unselected}))

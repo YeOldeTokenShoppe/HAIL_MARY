@@ -6539,7 +6539,7 @@ const FIELD_RIG_GLB = (() => {
   const v = RIG_VARIANT;
   if (v === "2") return "/models/oilJack_fancy_allProps2.glb";
   if (v === "3") return "/models/oilJack_fancy_allProps3.glb?v=3";
-  return "/models/oilJack_fancy_allProps4.glb?v=22";
+  return "/models/oilJack_fancy_allProps4.glb?v=24";
 })();
 useGLTF.preload(FIELD_RIG_GLB);
 
