@@ -13,6 +13,7 @@ import RogueCharacter from "@/components/RogueCharacter";
 import { playSfx, preloadSfx, startSfxLoop } from "@/lib/uiSfx";
 import CommercialStrip from "@/components/CommercialStrip";
 import StrataVoxels from "@/components/StrataVoxels";
+import RigStreetlights, { streetlightPart, streetlightStrength } from "@/components/RigStreetlights";
 import RigCrew from "@/components/RigCrew";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { mergeGeometries, deinterleaveGeometry } from "three/addons/utils/BufferGeometryUtils.js";
@@ -2008,6 +2009,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const textLowRef = useRef();
   const clonedScene = useMemo(() => {
     const s = scene.clone(true);
+    s.traverse((node) => { if (streetlightPart(node)) node.visible = false; });
     // Swap all meshes to MeshStandardMaterial for proper lighting/depth
     s.traverse((child) => {
       if (child.isMesh && child.material) {
@@ -5115,7 +5117,7 @@ function buildBaseRig(scene) {
   const beamPinMarker = markerAvg("BeamPin");      // equalizer attach point on the beam
   const crankAxleMarker = markerAvg("CrankAxle");  // crank rotation center (optional)
   scene.traverse((child) => {
-    if (!child.isMesh || !child.geometry) return;
+    if (!child.isMesh || !child.geometry || streetlightPart(child)) return;
     if (/^(CrankPin|BeamPin|CrankAxle)(_Left|_Right)?$/.test(child.name)) return; // hide only mesh markers, not "_Mesh" geometry
     if (child.name === "Envelope") return; // removed from scene
     if (MERGE_HIDDEN_MESHES.has(child.name)) return; // full rig hides these
@@ -6104,7 +6106,7 @@ function PinMarkers({ rigs, rock }) {
   );
 }
 
-function MergedRigField({ scene, items, allPumpConfigs, pumpConfig, envMap, cellSize, selectedCol, selectedRow, fullRigCells, onSelectCell, onFlyTo, onZoomOut, cameraViewable = true }) {
+function MergedRigField({ nightStrength = 0, scene, items, allPumpConfigs, pumpConfig, envMap, cellSize, selectedCol, selectedRow, fullRigCells, onSelectCell, onFlyTo, onZoomOut, cameraViewable = true }) {
   const base = useMemo(() => buildBaseRig(scene), [scene]);
   // Captured uniforms of the shared merged material's compiled shader — so the
   // per-frame loop can advance the beam-bob clock (ANIM_FIELD only).
@@ -6311,6 +6313,7 @@ function MergedRigField({ scene, items, allPumpConfigs, pumpConfig, envMap, cell
 
   const decoThreshold = (cellSize || 0.5) * 6;
 
+  useEffect(() => { mat.color.set(0xaaaaaa).lerp(new THREE.Color(0xd0c9bc), nightStrength); }, [mat, nightStrength]);
   return (
     <>
       {rigs.map((r) => {
@@ -6463,6 +6466,9 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
     return list;
   }, [gridX, gridY, cellSize, worldW, worldD]);
 
+  const streetPlacements = useMemo(() => items.map((item) => ({ ...item, yaw: plotYaw(item.position) })), [items]);
+  const streetFocus = streetPlacements.find((item) => item.col === selectedCol && item.row === selectedRow) || null;
+
   // Compute selected cell world position for the highlight plane
   const selectedPos = useMemo(() => {
     if (selectedCol === null || selectedRow === null) return null;
@@ -6474,6 +6480,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
 
   return (
     <>
+      {!DEV_NO_FIELD && <RigStreetlights scene={scene} scale={PUMPJACK_SCALE} placements={streetPlacements} focus={streetFocus} skyEnv={skyEnv} envPreset={envPreset} />}
       {/* Oil Tower in the center 4 cells */}
       {TOWER_VARIANT === "complex" && <RefineryComplex worldW={worldW} worldD={worldD} cellSize={cellSize} communityOil={communityOil} />}
       {TOWER_VARIANT !== "complex" && <OilTower position={towerPos} communityOil={communityOil} totalOilBudget={totalOilBudget} onFocusObject={onFocusObject} onZoomOut={onZoomOut} />}
@@ -6483,6 +6490,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
       )}
       {MERGE_RIGS && !DEV_NO_FIELD && (
         <MergedRigField
+          nightStrength={streetlightStrength(skyEnv, envPreset)}
           scene={scene}
           items={items}
           allPumpConfigs={allPumpConfigs}
@@ -6564,7 +6572,7 @@ const FIELD_RIG_GLB = (() => {
   const v = RIG_VARIANT;
   if (v === "2") return "/models/oilJack_fancy_allProps2.glb";
   if (v === "3") return "/models/oilJack_fancy_allProps3.glb?v=3";
-  return "/models/oilJack_fancy_allProps4.glb?v=30";
+  return "/models/oilJack_fancy_allProps4.glb?v=31";
 })();
 useGLTF.preload(FIELD_RIG_GLB);
 

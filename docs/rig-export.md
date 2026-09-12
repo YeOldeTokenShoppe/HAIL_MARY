@@ -539,6 +539,17 @@ worker, `frustumCulled=false` on the skinned meshes, mixer delta capped at 1/30.
   them +1) down to RigCrew, and `toggleBrief` compares. Anyone else — signed out, or at somebody
   else's claim — gets `CREW_BRUSHOFF`: one opener (shrug, no wave), one line, one closer, all
   spoken by the foreman through SitePal. Verified all three cases in the pane.
+- **Streetlight** (2026-09-12, rig v31): `Streetlight` + child `Streetlight_light` (Synty
+  PoliceStation atlas, one more 512² texture) are in the export list; 90 nodes, 17 materials,
+  6 textures. `RigStreetlights.jsx` now extracts these meshes into shared instances,
+  excluding them from the field merge and animated clones. Poles/bulbs hide by day;
+  warm bulbs, subtle decorative shafts and soft pad pools come on at night (TOD ramps
+  17:45–18:30 / 05:30–06:15). One shadowless spotlight follows the selected field rig;
+  the phone uses its streetlight head in place of the old tripod key, keeping its fill/rim.
+  The merged machinery also gets a night-only material lift, leaving ground unchanged.
+  A single baked atlas for the whole rig was audited
+  and declined the same day: the field never samples the textures, draw calls follow mesh count
+  not material count, and the panel instruments are driven per material by name.
 - **Briefing replies** (2026-09-11): a tap makes the operator wave at the boss ("Hey, boss.",
   `BRIEF_GREET_S` 2.2 s), then each briefing line comes with a reply gesture: page.js sends a
   `tone` per line in `window.__hmBriefing.tones` — "no" for nothing to report (rig signed out /

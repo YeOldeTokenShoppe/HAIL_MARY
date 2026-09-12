@@ -475,15 +475,13 @@ function LowPolyClouds({ hell = false, lift = LOW_POLY_CLOUDS_LIFT }) {
 const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, cloudOpacity = 0.2, hell = false, lowPoly = false, cloudMode = "drei", cloudLift = LOW_POLY_CLOUDS_LIFT }) {
   const topCol = useMemo(() => new THREE.Color(skyColor), [skyColor]);
   const bottomCol = useMemo(() => skyBottom ? new THREE.Color(skyBottom) : null, [skyBottom]);
+  // A theme changes the scene's light configuration as well as its palette.
+  // Give the gradient fresh uniforms/material together so a cached shader
+  // variant cannot keep the previous theme's color bindings.
   const uniforms = useMemo(() => ({
     topColor: { value: topCol },
     bottomColor: { value: bottomCol ?? topCol },
-  }), []); // stable ref — update values below
-
-  useEffect(() => {
-    uniforms.topColor.value = topCol;
-    uniforms.bottomColor.value = bottomCol ?? topCol;
-  }, [topCol, bottomCol, uniforms]);
+  }), [topCol, bottomCol]);
 
   const cloudColor = hell ? "#3a0000" : undefined;
 
@@ -493,6 +491,7 @@ const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, 
         <sphereGeometry args={[300, 24, 24]} />
         {bottomCol ? (
           <shaderMaterial
+            key={`${skyColor}:${skyBottom}`}
             side={THREE.BackSide}
             depthWrite={false}
             vertexShader={skyGradientShader.vertexShader}

@@ -14,6 +14,7 @@ import { useMemo, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useThree, useFrame } from "@react-three/fiber";
 import { useGLTF, OrbitControls } from "@react-three/drei";
+import RigStreetlights from "@/components/RigStreetlights";
 import useEnvMapSafe from "@/hooks/useEnvMapSafe";
 import useSkyEnvMap from "@/hooks/useSkyEnvMap";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
@@ -29,12 +30,13 @@ const RIG_GLB = (() => {
   // ?rig=2 the original. ?v= busts caches: bump after `node scripts/optimize-rig.mjs …`.
   if (v === "2") return "/models/oilJack_fancy_allProps2.glb";
   if (v === "3") return "/models/oilJack_fancy_allProps3.glb?v=3";
-  return "/models/oilJack_fancy_allProps4.glb?v=30";
+  return "/models/oilJack_fancy_allProps4.glb?v=31";
 })();
 // The work light (2026-09-05): a floodlight on a tripod, authored in the RIG's
 // frame so it seats at the same scale and origin as the pump jack. Phone scene
 // only — a hundred tripods on the desktop field would be clutter (Michelle).
 // ?v= busts caches on re-export.
+const SINGLE_STREETLIGHT = [{ position: [0, 0, 0], yaw: 0 }];
 const RIG_LIGHT_GLB = "/models/RigLight.glb?v=1";
 const LENS_RE = /^LightSurface/;            // her two lens meshes
 const LENS_COLOR = "#fff1c4";               // warm floodlight
@@ -65,7 +67,7 @@ export function lampFactor(skyEnv, envPreset) {
   const ramp = (a, b, x) => Math.min(1, Math.max(0, (x - a) / (b - a)));
   return h >= 12 ? ramp(17.75, 18.5, h) : 1 - ramp(5.5, 6.25, h);
 }
-function RigLight({ skyEnv, envPreset }) {
+function RigLight({ skyEnv, envPreset, streetlight = false }) {
   const { scene } = useGLTF(RIG_LIGHT_GLB);
   const on = lampFactor(skyEnv, envPreset);
   // Where the heads are, in the GLB's (rig) frame — read from her lens meshes so
@@ -126,7 +128,7 @@ function RigLight({ skyEnv, envPreset }) {
       <group scale={PUMPJACK_SCALE} visible={false}><primitive object={scene} /></group>
       <primitive object={target} />
       <primitive object={fillTarget} />
-      <spotLight ref={spot} position={head} intensity={on * SPOT_INTENSITY} color={LENS_COLOR} angle={0.55} penumbra={0.85} distance={4} decay={2} />
+      <spotLight ref={spot} position={head} intensity={streetlight ? 0 : on * SPOT_INTENSITY} color={LENS_COLOR} angle={0.55} penumbra={0.85} distance={4} decay={2} />
       {/* A broad cross-light reveals dark metal edges without a concentrated ground pool. */}
       <directionalLight ref={rim} position={[-0.6, 0.65, 0.5]} intensity={on * 1.15} color="#e8edff" />
       <spotLight ref={fill} position={FILL_POS} intensity={on * FILL_INTENSITY} color={FILL_COLOR} angle={0.6} penumbra={1} distance={4} decay={2} />
@@ -351,7 +353,8 @@ export default function RigScene({
       {/* Same +1 lift as the field's group, so the camera numbers match. */}
       <group position={[0, 1, 0]}>
         <MesaTile cellSize={cellSize} depthZ={depthZ} envPreset={envPreset} parabolum={parabolum} />
-        <RigLight skyEnv={skyEnv} envPreset={envPreset} />
+        <RigLight skyEnv={skyEnv} envPreset={envPreset} streetlight={!!scene.getObjectByName("Streetlight_light")} />
+        <RigStreetlights scene={scene} scale={PUMPJACK_SCALE} placements={SINGLE_STREETLIGHT} focus={SINGLE_STREETLIGHT[0]} skyEnv={skyEnv} envPreset={envPreset} />
         <Pumpjack
           position={[0, 0, 0]}
           plotId={plotKey}
