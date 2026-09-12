@@ -219,6 +219,37 @@ export const TATTOOS_SEATED_SITEPAL_FILTER = {
   sepia: 27,
 };
 
+// Rig crew (RigCrew.jsx): the goblin workers brief the player through SitePal
+// scene 2775497 in Michelle's account, projected onto their Face2. The crop is
+// seeded from the rug merchant's (also a goblin avatar) and is UNTUNED: adjust
+// live via window.__crewSitePalCrop / window.__crewSitePalFilter in the console
+// while a briefing runs, then paste the values back here. The skin match aims
+// at Face2's authored colour (the goblin's face swatch, #b5b794), so brightness
+// is moot; saturate/contrast/hue still shape the crop.
+// First pass 2026-09-11 from the live frame: her scene is a close-up goblin head in a hard hat
+// filling the 600×450 player, so the crop is the face from just under the brim to the chin,
+// cheek to cheek (Face2 is 1.3:1, wider than tall — the box keeps that aspect). Contrast is
+// pulled down because the avatar's baked shading is strong and the skin gain (≈1.5×) pushed the
+// lit side past white when the sample sat in the eye sockets; the sample box is a cheek now.
+// Michelle's second pass in the CREW tab (2026-09-11): tighter on the face, a hair of roll,
+// contrast and brightness nudged so the skin match has less to lift.
+export const CREW_SITEPAL_CROP = {
+  cropX: 142,
+  cropY: 179,
+  cropW: 247,
+  cropH: 205,
+  rotateZ: -1,
+  rotateX: 0,
+};
+export const CREW_SITEPAL_FILTER = {
+  saturate: 104,
+  contrast: 103,
+  brightness: 90,
+  hueRotate: 6,
+  sepia: 0,
+};
+if (typeof window !== "undefined") { window.__crewSitePalCrop = CREW_SITEPAL_CROP; window.__crewSitePalFilter = CREW_SITEPAL_FILTER; }
+
 // Skin match (CommercialStrip's projection compositor). The projected crop
 // is measured — per-channel median of a box on the crop canvas — and its
 // material colour set to target ÷ measured, so the skin lands on the face's
@@ -241,6 +272,18 @@ export const SKIN_SAMPLE_DEFAULT = Object.freeze({ x: 0.3, y: 0.3, w: 0.4, h: 0.
 // while the projection is active (the two models label them differently —
 // per-vendor fields, not a convention).
 export const VENDOR_SITEPAL_CONFIG = {
+  // The rig crew's briefer. No greeting pool: RigCrew speaks the briefing lines
+  // itself (speakVendorText), one per gesture, and closes with deactivate.
+  crew: {
+    sceneId: 2775497,
+    voice: { voice: "LglRX59YTEmRX2HIAN3F", lang: 1, engine: 14 },
+    projFace: "Face2",
+    regularFaces: ["Face1", "Face3"],
+    crop: CREW_SITEPAL_CROP,
+    filter: CREW_SITEPAL_FILTER,
+    skinSample: { x: 0.12, y: 0.62, w: 0.18, h: 0.18 },   // left cheek below the eye: clean skin, no socket shadow
+    greetings: null,
+  },
   fortunes: {
     sceneId: 2775386,
     voice: { voice: "3jFgoI5DB1bSRZIjmdho", lang: 1, engine: 14 },
@@ -767,6 +810,31 @@ export function activateVendorSitePal(vendorId) {
     // else: host still booting — vh_sceneLoaded will pick up the pending line.
   } catch (e) {}
 }
+
+// Speak one explicit line as `vendorId` (the crew's briefing, one line per
+// gesture) — same staging as a greeting, no delay, scene swapped if needed.
+// activateVendorSitePal(vendorId) should have run inside the tap that started
+// the conversation (audio unlock + embed); this just queues the words.
+export function speakVendorText(vendorId, text, gesture = null) {
+  const win = w();
+  const config = VENDOR_SITEPAL_CONFIG[vendorId];
+  if (!win || !config || !text) return false;
+  requestVendorSitePalEmbed("speak:" + vendorId);
+  state.desiredVolume = 7;
+  state.activeVendorId = vendorId;
+  win.__vendorSitePalDesiredVolume = 7;
+  state.speakNotBefore = 0;
+  if (state.speakTimer) { clearTimeout(state.speakTimer); state.speakTimer = null; }
+  state.pending = { vendorId, sceneId: config.sceneId, text, gesture, voice: config.voice };
+  if (vendorSitePalReady(config.sceneId)) speakPendingVendorLine();
+  else if (win.__vendorSitePalSceneLoaded === true && typeof win.loadSceneByID === "function") {
+    win.__vendorSitePalSceneLoaded = false;
+    try { win.loadSceneByID(config.sceneId); } catch (e) {}
+  }
+  return !!win.__vendorSitePalEmbedded || !!win.__vendorSitePalWanted;
+}
+export function vendorSitePalActiveId() { return state.activeVendorId; }
+if (typeof window !== "undefined") window.__crewSitePalConfig = VENDOR_SITEPAL_CONFIG.crew;   // dev: tune skinSample/skinTarget from the console
 
 // Unfocus: mute, stop anything in flight, drop staged speech. stopSpeech()
 // cannot cancel speech that hasn't STARTED, which is why pending is cleared.

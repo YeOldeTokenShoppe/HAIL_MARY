@@ -13,7 +13,7 @@
  * (night, hell, a stalled pump) that reweight them.
  *
  * "Found doing": the character has no walk clip, so a worker never travels on
- * screen. Spots are chosen per sighting — seeded by plot and a 10-minute bucket so
+ * screen. Spots are chosen per sighting — a fresh roll each time (see assignments) so
  * every viewer sees the same crew and re-renders are stable — and only change while
  * the crew is unmounted (rig not highlighted, tab hidden). Within a spot, clips chain
  * on random timers. The ladder is the one scripted move.
@@ -47,12 +47,17 @@ import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { useGLTF, Html } from "@react-three/drei";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+import { VENDOR_SITEPAL_CONFIG, activateVendorSitePal, deactivateVendorSitePal, speakVendorText, onVendorTalk, getVendorSitePalSource } from "@/lib/vendorSitePal";
+import { createProjectionState, disposeProjectionState, updateProjection } from "@/lib/sitepalFace";
 
-export const CREW_GLB = "/models/crew_goblin.glb?v=11";
+export const CREW_GLB = "/models/crew_goblin.glb?v=15";
 useGLTF.preload(CREW_GLB);
 
-const BUCKET_MS = 10 * 60 * 1000;
-const CLIMB_RISE_FALLBACK = 0.154;  // crew_climb is in place; world rise per cycle (rig-GLB units) unless the
+const CLIMB_RISE_FALLBACK = 0.219;  // crew_climb is in place; world rise per cycle (rig-GLB units) unless the
+const CLIMB_RUNG0_FALLBACK = 0.262; // first rung centre above the base walkway (rig extras hm_climb_rung0_m override)
+const CLIMB_PLANT_UP = 0.12;        // the left foot's peak above the group origin in crew_climb (frame 15 of 24), where it plants on a rung
+const CLIMB_PLANT_FRAC = 15 / 24;   // …and where in the cycle that happens
+const CLIMB_PLANT_BIAS = -0.04;     // aim the plant this far below the rung centre: the planted foot then rides up through the rung during its stance (the clip's stance drop is half the rung pitch), so it reads as ON the rung mid-stance rather than floating above it
                                     // Crew_Ladder_Base empty carries hm_climb_rise_m (glTF extras → userData)
 const STEP_S = 0.8;                 // (legacy) step onto / off the platform at the ladder head
 // crew_topOfLadder (4 s, Mixamo): climbing pose → standing on the landing. Its root was pinned in
@@ -71,10 +76,12 @@ const ASIDE_S = 0.5;                // step beside the cabinet when the player o
 const FADE = 0.25;
 const HEAD_YAW = 1.0, HEAD_PITCH_UP = 0.55, HEAD_PITCH_DOWN = 0.45, HEAD_EASE = 5;
 const BODY_TURN_EASE = 4;           // easing when a worker turns to face a demon
-const SEAT_BACK_OFFSET = 0.244;   // seat markers mark the worker's BACK (at the rail): the spot's origin sits this far forward along +X; crew_dozing and crew_getUp share one floor-sit pose on it, so the sleeper's back ends up 5 cm in front of the marker and the stand-up lands on the origin
+const SEAT_BACK_OFFSET = 0.20;    // seat markers mark the worker's BACK (put them at the rail): the spot's origin sits this far forward along +X, which puts the floor-sit's back (0.19 behind the origin) a centimetre in front of the marker; crew_getUp stands up onto the origin
+const TUNE_SPOT = "panel_pass";      // ?tune=vendor CREW tab parks the briefer here, facing the camera (the page flies in on hm:crew-face)
 const CREW_ALERT_RANGE = 3.0;       // world units (cells): demon this close → defend
 const CREW_THROW_RANGE = 2.5;
-const CREW_THROWS_COUNT = false;    // true → each throw also fires "hm-shoot" from the worker's position
+const CREW_THROWS_COUNT = true;     // a throw lands as a walker shot ("hm-shoot") — only inside the demon's open window (see modeTick), so the crew never triggers its counter
+const CREW_HIT_RANGE = 2.0;         // world units: the field demon's own walker hit range (DEMON_WALKER_HIT_RANGE in OilVoxelGrid.jsx)
 const THROW_RELEASE_S = 0.83;       // frame 25 of crew_throw: the right hand lets go
 const FIREBALL_FLIGHT_S = 0.45;
 const COWER_HOLD_MS = 4500;         // how long a cower is held after its trigger
@@ -83,7 +90,22 @@ const CHAT_TURN = [8, 12];          // seconds each talker holds the floor
 const WALK_SPEED = 0.518;           // rig units/s: crew_walk is in place; this is the stance foot's slide speed measured in Blender (32 f at 30 fps)
 const WALK_MIN = 0.12;              // moves shorter than this stay a glide (a shuffle, not a walk)
 const BRIEF_LINE_S = 3.2;
-const BRIEF_GREET_S = 2.2;          // the operator waves at the boss this long before the first line
+const BRIEF_GREET_S = 2.2;          // the operator waves at the boss this long before the first line (or until the opener is spoken)
+// What the briefer says around the report (spoken through SitePal in the goblin voice, shown in
+// the bubble either way). Short and boss-facing; SitePal caches TTS by text, so re-word rather
+// than re-voice. Openers go with the wave, closers get a nod.
+const CREW_OPENERS = ["Hey, boss.", "Boss! Didn't see you there.", "There you are, boss.", "Boss. Got the numbers right here.", "Boss, good timing.", "Morning, boss. Well — whatever it is out here."];
+const CREW_CLOSERS = ["That's the lot, boss.", "That's all I've got. Back to it.", "Nothing else to report, boss.", "Rig's yours, boss."];
+// Strangers (signed out, or at somebody else's claim) get the brush-off instead: one opener,
+// one line, one closer, no wave — the boss treatment is for the claim owner at their own rig.
+const CREW_BRUSHOFF = {
+  openers: ["Who're you?", "You lost, pal?", "This ain't your rig.", "Boss ain't here. And you ain't the boss."],
+  lines: ["Company business. Move along.", "Nothing to see here. Go on.", "Tour's over, friend.", "We don't take questions from tourists.", "Sign the book at the office if you want numbers."],
+  closers: ["Get off my platform.", "Don't touch nothin'.", "Go on, git.", "Mind the pump on your way out."],
+};
+let lastRude = [-1, -1, -1];
+let lastOpener = -1, lastCloser = -1;
+const pickLine = (pool, last) => { let i = Math.floor(Math.random() * pool.length); if (pool.length > 1 && i === last) i = (i + 1) % pool.length; return i; };
 const DOZE_CAUGHT = [3, 6];          // seconds the boss gets to catch a dozer before they scramble up to work
 const _UP = new THREE.Vector3(0, 1, 0);
 
@@ -94,15 +116,20 @@ const STATIONS = {
   panel_aside:      { node: "Crew_Panel_Aside",      pos: [0.655, 0.245, 0.38],   yaw: 3.036 }, // beside the key-switch face, clear of the panel camera
   ladder_base:      { node: "Crew_Ladder_Base",      pos: [-0.697, 0.236, 0.755], yaw: -0.054 },
   ladder_top:       { node: "Crew_Ladder_Top",       pos: [-0.45, 1.725, 0.76],   yaw: -0.054 },
-  motor:            { node: "Crew_Motor",            pos: [0.40, 0.236, -0.70],   yaw: Math.PI },
-  rail_doze:        { node: "Crew_Rail_Doze",        pos: [0.45, 0.236, -2.14],   yaw: -Math.PI / 2, seatBack: true }, // marker at the north walkway rail
-  rail_doze_top:    { node: "Crew_Rail_Doze_Top",    pos: [0.25, 1.725, 0.42],    yaw: -Math.PI / 2, seatBack: true }, // marker at the platform's north rail
-  platform_lookout: { node: "Crew_Lookout",          pos: [0.363, 1.725, 0.776],  yaw: -Math.PI / 2 },
+  motor:            { node: "Crew_Motor",            pos: [0.516, 0.236, -0.70],  yaw: Math.PI },
+  rail_doze:        { node: "Crew_Rail_Doze",        pos: [0.45, 0.236, -2.157],  yaw: -Math.PI / 2, seatBack: true }, // marker at the north walkway rail
+  rail_doze_top:    { node: "Crew_Rail_Doze_Top",    pos: [0.35, 1.725, 0.369],   yaw: -Math.PI / 2, seatBack: true }, // marker on the platform's north rail (x 0.35 keeps the helmet out of the beam when standing up)
+  rail_doze2:       { node: "Crew_Rail_Doze2",       pos: [-1.0, 0.236, -2.041],  yaw: 0.067,        seatBack: true }, // north-west corner, back to the west rail
+  rail_doze3:       { node: "Crew_Rail_Doze3",       pos: [-0.131, 0.236, 0.122], yaw: -Math.PI / 2, seatBack: true }, // under the walking beam
+  platform_lookout: { node: "Crew_Lookout",          pos: [0.363, 1.725, 0.653],  yaw: -Math.PI / 2 },
   valve:            { node: "Crew_Valve",            pos: [-1.05, 0, 2.44],       yaw: Math.PI / 2 },   // south of the riser handwheel (hub 0.55 up, rim 0.19 ahead), facing it
   wellhead:         { node: "Crew_Wellhead",         pos: [0.556, 0, 2.092],      yaw: Math.PI },     // east of the well curb, on the ground
   chat_a:           { node: "Crew_Chat_A",           pos: [0.155, 0.236, -1.821], yaw: Math.PI },      // two workers facing each other on the north walkway, 0.5 apart
   chat_b:           { node: "Crew_Chat_B",           pos: [-0.345, 0.236, -1.821], yaw: 0 },
+  chat_c:           { node: "Crew_Chat_C",           pos: [-0.751, 0.236, -1.799], yaw: -Math.PI / 2 }, // second pair on the west walkway, facing each other
+  chat_d:           { node: "Crew_Chat_D",           pos: [-0.754, 0.236, -1.299], yaw: Math.PI / 2 },
 };
+const CHAT_PAIRS = [["chat_a", "chat_b"], ["chat_c", "chat_d"]];   // [operator's spot, inspector's spot]; a chat sighting picks one pair
 
 // Activities: clip, how long a worker keeps at it (s), props to show, whether the head
 // may look around (reading, dozing and listening to music keep the head where the clip puts it).
@@ -119,6 +146,7 @@ const ACTS = {
   nervous:     { clip: "crew_nervous",        dwell: [6, 12],  look: true },
   talking:     { clip: "crew_talking",        dwell: [10, 20], look: true },
   acknowledge: { clip: "crew_acknowledge",    once: true,      look: true },
+  neutralIdle: { clip: "crew_neutralIdle",    dwell: [6, 14],  look: true },   // the briefer between lines (her 2026-09-11 clip); idle if absent
   no:          { clip: "crew_no",             once: true,      look: true },   // briefing replies: nothing to report…
   yes:         { clip: "crew_yes",            once: true,      look: true },   // …good news…
   thoughtful:  { clip: "crew_thoughtful",     once: true,      look: true },   // …something to think about
@@ -148,22 +176,34 @@ const MENU = {
   panel_pass:       { acts: [["idle", 3], ["tablet", 2], ["wave", 1]], look: "camera" },
   panel_extract:    { acts: [["idle", 3], ["tablet", 2]],              look: "camera" },
   panel_aside:      { acts: [["idle", 3], ["tablet", 1]],              look: "camera" },
-  motor:            { acts: [["idle", 2], ["tablet", 2]],              look: "head_pump" },
+  motor:            { acts: [["idle", 2], ["tablet", 2], ["thoughtful", 1]], look: "head_pump" },
   rail_doze:        { acts: [["doze", 1]], awake: [["idle", 2], ["tablet", 2]] },   // caught sleeping on the job; after the scramble, back to work here
   rail_doze_top:    { acts: [["doze", 1]], awake: [["idle", 2], ["tablet", 2]] },
-  platform_lookout: { acts: [["idle", 2], ["tablet", 2], ["wave", 1]], look: "head_pump" },
+  rail_doze2:       { acts: [["doze", 1]], awake: [["idle", 2], ["tablet", 2]] },
+  rail_doze3:       { acts: [["doze", 1]], awake: [["idle", 2], ["tablet", 1]] },
+  platform_lookout: { acts: [["idle", 2], ["tablet", 2], ["wave", 1], ["thoughtful", 1]], look: "head_pump" },
   ladder_base:      { acts: [["idle", 1]],                             look: "camera",    climbTo: "ladder_top" },
   ladder_top:       { acts: [["idle", 2], ["tablet", 1]],              look: "head_pump", descendTo: "ladder_base" },
   valve:            { acts: [["valve", 4], ["idle", 2], ["wave", 1]], look: "camera" },
-  wellhead:         { acts: [["idle", 2], ["tablet", 1]],              look: "head_pump" },
+  wellhead:         { acts: [["idle", 2], ["tablet", 1], ["thoughtful", 1]], look: "head_pump" },
   chat_a:           { acts: [["idle", 1]],                             look: "partner" },
   chat_b:           { acts: [["idle", 1]],                             look: "partner" },
+  chat_c:           { acts: [["idle", 1]],                             look: "partner" },
+  chat_d:           { acts: [["idle", 1]],                             look: "partner" },
 };
+// crew_neutralIdle (her 2026-09-11 clip): wherever a menu offers "idle" it now offers the square-
+// stance idle at the same weight — the Mixamo idles all shift their weight onto one leg.
+Object.values(MENU).forEach((m) => ["acts", "awake"].forEach((k) => {
+  const list = m[k]; if (!list) return;
+  const idle = list.find(([a]) => a === "idle");
+  if (idle && !list.some(([a]) => a === "neutralIdle")) list.push(["neutralIdle", idle[1]]);
+}));
 
 // The crew roster: which spots each role is found at ([spot, weight]). The operator briefs.
 const ROLES = [
-  { id: "operator",  spots: [["panel_pass", 4], ["panel_extract", 1], ["motor", 1], ["wellhead", 1]], briefs: true, chatSpot: "chat_a" },
-  { id: "inspector", spots: [["ladder_base", 3], ["platform_lookout", 2], ["rail_doze", 2], ["rail_doze_top", 1], ["valve", 1], ["motor", 1]], chatSpot: "chat_b" },
+  { id: "operator",  spots: [["panel_pass", 3], ["panel_extract", 1], ["motor", 1], ["wellhead", 1], ["valve", 1], ["platform_lookout", 1]], briefs: true },
+  { id: "inspector", spots: [["ladder_base", 3], ["platform_lookout", 2], ["valve", 1], ["motor", 1], ["rail_doze", 1], ["rail_doze_top", 1], ["rail_doze2", 1], ["rail_doze3", 1]] },
+  // The four doze spots together weigh 4 × 0.5 (spotWeight) against 7 of work by day: about one sighting in five finds the inspector asleep, spread over four places.
 ];
 const CHAT_CHANCE = 0.25;           // share of sightings where the two are found chatting
 // two workers never share the panel, nor the platform's east strip (the seat and the lookout overlap)
@@ -172,7 +212,7 @@ const PANEL_BUTTONS = new Set(["panel_pass", "panel_extract"]);
 
 // Gates: reweight spots/acts by the rig's state. night → dozing; hell → nobody dozes.
 function spotWeight(spot, w, g) {
-  if (spot === "rail_doze" || spot === "rail_doze_top") return g.hell ? 0 : w * (g.night ? 3 : g.stalled ? 2 : 0.6);
+  if (spot.startsWith("rail_doze")) return g.hell ? 0 : w * (g.night ? 1.0 : g.stalled ? 1.5 : 0.5);   // night used to triple this — every night sighting was the same sleeper
   return w;
 }
 function actWeight(act, w, g) {
@@ -228,6 +268,7 @@ function resolveStation(rigScene, id) {
 // Which reply a briefing line gets. page.js sends a tone per line ("no" | "yes" | "thoughtful");
 // without one, read the line: nothing-to-report shakes the head, gains nod, the rest ponders.
 const briefGesture = (tone, line = "") => {
+  if (tone === "rude") return Math.random() < 0.5 ? "no" : "shrug";
   if (tone === "no" || tone === "yes" || tone === "thoughtful") return tone;
   if (/nothing new|no claim|signed out|pre-season|0% full/i.test(line)) return "no";
   if (/strike|drilled|BTR|unread|full/i.test(line)) return "yes";
@@ -237,9 +278,10 @@ const devHook = () => (typeof window === "undefined" ? null : (window.__hmCrew |
   go: (r, sp) => window.__hmCrew.workers[r]?.go(sp),
   act: (r, a) => window.__hmCrew.workers[r]?.act(a),
   walk: (r, sp) => window.__hmCrew.workers[r]?.walk(sp),
+  climb: (r) => window.__hmCrew.workers[r]?.climb(),
   state: () => Object.fromEntries(Object.entries(window.__hmCrew.workers).map(([k, w]) => [k, w.state()])) }));
 
-export default function RigCrew({ rigScene, scale = 1, enabled = true, plotKey = "rig", envPreset = null, hellActive = false, gusherActive = false, pausedRef = null, panelOpen = false, panelOpenRef = null, workers = 2, wheelSpinRef = null, onValveTurn = null }) {
+export default function RigCrew({ rigScene, scale = 1, enabled = true, plotKey = "rig", plotId = null, envPreset = null, hellActive = false, gusherActive = false, pausedRef = null, panelOpen = false, panelOpenRef = null, workers = 2, wheelSpinRef = null, onValveTurn = null }) {
   // A new "sighting" whenever the tab comes back: the crew may have moved.
   const [sighting, setSighting] = useState(0);
   const forceScene = useRef(null);
@@ -256,13 +298,13 @@ export default function RigCrew({ rigScene, scale = 1, enabled = true, plotKey =
   if (!enabled || !rigScene) return null;
   return (
     <Suspense fallback={null}>
-      <CrewInner key={sighting} sighting={sighting} forceScene={forceScene} rigScene={rigScene} scale={scale} plotKey={plotKey} envPreset={envPreset} wheelSpinRef={wheelSpinRef} onValveTurn={onValveTurn}
+      <CrewInner key={sighting} sighting={sighting} forceScene={forceScene} rigScene={rigScene} scale={scale} plotKey={plotKey} plotId={plotId} envPreset={envPreset} wheelSpinRef={wheelSpinRef} onValveTurn={onValveTurn}
         hellActive={hellActive} gusherActive={gusherActive} pausedRef={pausedRef} panelRef={panelRef} workers={workers} />
     </Suspense>
   );
 }
 
-function CrewInner({ sighting, forceScene, rigScene, scale, plotKey, envPreset, hellActive, gusherActive, pausedRef, panelRef, workers, wheelSpinRef, onValveTurn }) {
+function CrewInner({ sighting, forceScene, rigScene, scale, plotKey, plotId, envPreset, hellActive, gusherActive, pausedRef, panelRef, workers, wheelSpinRef, onValveTurn }) {
   const { scene, animations } = useGLTF(CREW_GLB);
   const rootRef = useRef();
   const gates = useMemo(() => ({ night: envPreset === "night", hell: !!hellActive, stalled: !!pausedRef?.current }), [envPreset, hellActive, pausedRef]);
@@ -270,16 +312,18 @@ function CrewInner({ sighting, forceScene, rigScene, scale, plotKey, envPreset, 
   // briefing scenes, the cower timer, the rig's world position, and the fireball pool.
   const crew = useRef({ workers: {}, chat: null, brief: null, cowerUntil: 0, rigPos: new THREE.Vector3(), gusher: false, fire: null }).current;
   crew.gusher = !!gusherActive;
-  // Spots per worker for this sighting: same plot + same 10-minute bucket → same crew for everyone.
+  // Spots per worker for this sighting. Every sighting rolls fresh (a page load, the tab coming
+  // back, a reroll): the old plot + 10-minute bucket seed made every reload for ten minutes show
+  // the same crew, which read as "the same guy asleep again" (her note, 2026-09-11).
   const assignments = useMemo(() => {
-    const bucket = Math.floor(Date.now() / BUCKET_MS);
-    const rng = mulberry32(hash32(`${plotKey}|${bucket}|${sighting}`));
+    const rng = mulberry32(hash32(`${plotKey}|${sighting}|${Date.now()}|${Math.random()}`));
     const roles = ROLES.slice(0, workers);
     const forced = forceScene.current; forceScene.current = null;
     const chat = roles.length >= 2 && (forced === "chat" || (forced == null && rng() < CHAT_CHANCE));
+    const pair = CHAT_PAIRS[Math.floor(rng() * CHAT_PAIRS.length)];
     const taken = new Set();
-    return roles.map((role) => {
-      if (chat) return { role, spot: role.chatSpot, scene: "chat" };
+    return roles.map((role, k) => {
+      if (chat) return { role, spot: pair[Math.min(k, pair.length - 1)], scene: "chat" };
       const items = role.spots.map(([s, w]) => [s, taken.has(zoneOf(s)) ? 0 : spotWeight(s, w, gates)]);
       const spot = pickWeighted(rng, items) || role.spots[0][0];
       taken.add(zoneOf(spot));
@@ -300,13 +344,38 @@ function CrewInner({ sighting, forceScene, rigScene, scale, plotKey, envPreset, 
   useEffect(() => { if (hellActive && !hellWas.current) crew.cowerUntil = Date.now() + HELL_COWER_MS; hellWas.current = !!hellActive; }, [hellActive, crew]);
   // Briefing: a tap on any worker starts (or stops) the operator's briefing.
   const toggleBrief = useCallback(() => {
-    if (crew.brief) { crew.brief = null; return; }
-    const lines = (window.__hmBriefing?.lines || ["Rig's holding.", "Nothing new since your last visit."]).slice(0, 6);
-    const tones = (window.__hmBriefing?.tones || []).slice(0, 6);
+    if (crew.brief) { crew.brief = null; deactivateVendorSitePal(); return; }
+    const info = window.__hmBriefing;
+    // The boss treatment is for the claim owner at their own rig (page.js publishes who is
+    // signed in and where their claim is; plotId is the plot this rig stands on). Everyone
+    // else — signed out, or poking at somebody else's claim — gets the brush-off.
+    const boss = !!(info?.signedIn && info?.ownerPlot && plotId && info.ownerPlot === plotId);
     const talker = (assignments.find((a) => a.role.briefs) || assignments[0]).role.id;
-    crew.brief = { talker, lines, tones, i: 0, nextLineAt: 0, until: 0 };
+    let lines, tones, opener;
+    if (boss) {
+      lines = (info?.lines || ["Rig's holding.", "Nothing new since your last visit."]).slice(0, 6);
+      tones = (info?.tones || []).slice(0, 6);
+      lastOpener = pickLine(CREW_OPENERS, lastOpener); lastCloser = pickLine(CREW_CLOSERS, lastCloser);
+      lines.push(CREW_CLOSERS[lastCloser]); tones[lines.length - 1] = "yes";
+      opener = CREW_OPENERS[lastOpener];
+    } else {
+      const R = CREW_BRUSHOFF;
+      lastRude = [pickLine(R.openers, lastRude[0]), pickLine(R.lines, lastRude[1]), pickLine(R.closers, lastRude[2])];
+      opener = R.openers[lastRude[0]]; lines = [R.lines[lastRude[1]], R.closers[lastRude[2]]]; tones = ["rude", "rude"];
+    }
+    crew.brief = { talker, lines, tones, opener, rude: !boss, i: 0, nextLineAt: 0, until: 0, speaking: false, talkSeen: false, now: 0 };
+    // The briefer talks through SitePal (scene "crew" in the vendor registry, projected onto its
+    // Face2). This runs inside the tap — the one user gesture we get for audio unlock + embed.
+    if (VENDOR_SITEPAL_CONFIG.crew) activateVendorSitePal("crew");   // the phone counts as low-gfx yet is where the vendors already talk; the host embeds lazily there
   }, [crew, assignments]);
-  useEffect(() => { const hook = devHook(); if (hook) hook.brief = toggleBrief; return () => { if (hook) delete hook.brief; }; }, [toggleBrief]);
+  useEffect(() => { const hook = devHook(); if (hook) { hook.brief = toggleBrief; hook.plotId = plotId; } return () => { if (hook) { delete hook.brief; delete hook.plotId; } }; }, [toggleBrief, plotId]);
+  // SitePal's talk callbacks pace the briefing: a line's gesture and bubble go up when speech
+  // starts, the next line follows when it ends. Without callbacks the BRIEF_LINE_S timer runs.
+  useEffect(() => onVendorTalk((vendorId, talking) => {
+    const b = crew.brief; if (!b || vendorId !== "crew") return;
+    if (talking) { b.talkSeen = true; b.nextLineAt = b.now + 20; }                 // cap: a line that never ends still moves on
+    else if (b.talkSeen) { b.talkSeen = false; b.speaking = false; b.nextLineAt = b.now + 0.35; }
+  }), [crew]);
   useFrame(() => { if (rootRef.current) rootRef.current.getWorldPosition(crew.rigPos); });
   return (
     <group ref={rootRef} scale={scale}>
@@ -362,8 +431,24 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     return c;
   }, [sceneObj]);
   const props = useMemo(() => { const m = {}; clone.traverse((o) => { if (o.name && o.name.startsWith("Prop_")) m[o.name] = o; }); return m; }, [clone]);
+  // Hats (2026-09-11): on the rig it is hard hats only — the Helmet stays on for every act here
+  // (Michelle, after seeing a cowboy hat at the wellhead during music). CowboyHat / Ballcap
+  // (bone-parented to the head, hidden in her blend, plain nodes in the GLB) are for time off the
+  // rig — the CommercialStrip visit, when that exists: flag an act `offDuty: true` and showHat()
+  // swaps in the hat the worker drew once.
+  const hats = useMemo(() => { const m = {}; clone.traverse((o) => { if (o.name === "Helmet" || o.name === "CowboyHat" || o.name === "Ballcap") m[o.name] = o; }); return m; }, [clone]);
+  useEffect(() => { Object.entries(hats).forEach(([n, o]) => { o.visible = n === "Helmet"; }); }, [hats]);
   const headBone = useMemo(() => clone.getObjectByName("head") || null, [clone]);
   const handR = useMemo(() => clone.getObjectByName("hand_r") || null, [clone]);
+  const ballL = useMemo(() => clone.getObjectByName("ball_l") || null, [clone]);   // dev: rung contact check
+  // SitePal face projection (the briefer only): Face2 wears the cropped avatar frame while this
+  // worker is briefing and the host has the crew scene up; Face1/Face3 hide behind it.
+  const projRef = useRef(null);
+  useEffect(() => {
+    const cfg = VENDOR_SITEPAL_CONFIG.crew;
+    projRef.current = cfg ? createProjectionState(clone, cfg) : null;
+    return () => { disposeProjectionState(projRef.current); projRef.current = null; };
+  }, [clone]);
 
   // Manual mixer (same pattern as the field demon); geometry/materials are shared with
   // the cached GLB, so cleanup only detaches the mixer.
@@ -395,9 +480,13 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
       go: (sp) => { if (!STATIONS[sp]) return false; const stn = resolveStation(rigScene, sp); const s = st.current; s.spot = sp; s.pos.copy(stn.pos); s.yaw = s.yawCur = stn.yaw; s.phase = "act"; s.act = null; s.topStay = 0; return true; },
       act: (a) => { if (!ACTS[a]) return false; startAct(a, st.current.now || 0); return true; },   // force an activity (e.g. "tablet")
       walk: (sp) => { if (!STATIONS[sp]) return false; slideTo(sp, SLIDE_S, "idle"); return true; },   // walk to a spot in a straight line (preview only: no pathing round the rig)
+      climb: () => { if (!MENU[st.current.spot]?.climbTo) return false; beginClimb(st.current.now || 0); return true; },   // start the ladder from its base now
       state: () => { const s = st.current; const g = groupRef.current; const gw = new THREE.Vector3(); if (g) g.getWorldPosition(gw); const sc = g ? g.getWorldScale(new THREE.Vector3()).y : 1;
-        return { spot: s.spot, act: s.act, mode: s.mode, phase: s.phase, scene: scene || null, yaw: +s.yawCur.toFixed(2), yawAim: s.yawAim == null ? null : +s.yawAim.toFixed(2), headUp: +((s.head.y - gw.y) / (sc || 1)).toFixed(3),
-        props: Object.fromEntries(Object.entries(props).map(([n, o]) => { const w = new THREE.Vector3(); o.getWorldPosition(w); return [n, { visible: o.visible, verts: o.geometry?.attributes?.position?.count || 0, world: w.toArray().map((v) => +v.toFixed(3)) }]; })), chat: crew.chat ? { talker: crew.chat.talker, swapAt: +crew.chat.swapAt.toFixed(2) } : null, t: +s.t.toFixed(3), pos: s.pos.toArray().map((v) => +v.toFixed(3)), frames: s.frames, now: +(s.now || 0).toFixed(2), nextThrowAt: +(s.nextThrowAt || 0).toFixed(2), throws: s.throws || 0, fired: s.fired || 0, dist: s.dbgDist == null ? null : +s.dbgDist.toFixed(2), running: !!(s.action && s.action.isRunning()), fromRig: resolveStation(rigScene, s.spot).fromRig, trace: s.trace || [], head: s.head.toArray().map((v) => +v.toFixed(3)), valveVents: s.valveVents || 0,
+        return { spot: s.spot, act: s.act, hat: s.hat || null, mode: s.mode, phase: s.phase, scene: scene || null, yaw: +s.yawCur.toFixed(2), yawAim: s.yawAim == null ? null : +s.yawAim.toFixed(2), headUp: +((s.head.y - gw.y) / (sc || 1)).toFixed(3),
+        props: Object.fromEntries(Object.entries(props).map(([n, o]) => { const w = new THREE.Vector3(); o.getWorldPosition(w); return [n, { visible: o.visible, verts: o.geometry?.attributes?.position?.count || 0, world: w.toArray().map((v) => +v.toFixed(3)) }]; })), chat: crew.chat ? { talker: crew.chat.talker, swapAt: +crew.chat.swapAt.toFixed(2) } : null, t: +s.t.toFixed(3), pos: s.pos.toArray().map((v) => +v.toFixed(3)), frames: s.frames, now: +(s.now || 0).toFixed(2), nextThrowAt: +(s.nextThrowAt || 0).toFixed(2), throws: s.throws || 0, fired: s.fired || 0, counted: s.counted || 0, dist: s.dbgDist == null ? null : +s.dbgDist.toFixed(2), running: !!(s.action && s.action.isRunning()), fromRig: resolveStation(rigScene, s.spot).fromRig, trace: s.trace || [], head: s.head.toArray().map((v) => +v.toFixed(3)), valveVents: s.valveVents || 0, projFade: +(s.projFade || 0).toFixed(2), faces: projRef.current ? { proj: !!projRef.current.proj, regulars: projRef.current.regulars.length } : null,
+        projMat: (() => { const st = projRef.current; const m = st?.material; if (!m) return null; let px = null; try { const d = st.cropCtx.getImageData(256, 256, 1, 1).data; px = [d[0], d[1], d[2]]; } catch (e) {} const pm = st.regulars[0]?.material; return { color: "#" + m.color.getHexString(), mapCS: m.map?.colorSpace, mapIsTex: m.map === st.material.map, opacity: m.opacity, toneMapped: m.toneMapped, emissive: "#" + (m.emissive?.getHexString?.() || "000000"), emissiveIntensity: m.emissiveIntensity, type: m.type, paintedType: pm?.type, paintedMapCS: pm?.map?.colorSpace, paintedColor: pm ? "#" + pm.color.getHexString() : null, cropCentrePx: px, cropGrid: (() => { try { const g = []; for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) { const d = st.cropCtx.getImageData(64 + i * 192, 64 + j * 192, 1, 1).data; g.push([d[0], d[1], d[2]]); } return g; } catch (e) { return null; } })(), colorRaw: [m.color.r, m.color.g, m.color.b].map((v) => +v.toFixed(3)), uv: (() => { const a = st.proj.geometry?.attributes?.uv; if (!a) return null; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (let i = 0; i < a.count; i++) { const x = a.getX(i), y = a.getY(i); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } return { count: a.count, min: [+x0.toFixed(3), +y0.toFixed(3)], max: [+x1.toFixed(3), +y1.toFixed(3)] }; })(), projMatType: st.proj.material?.type, projVisible: st.proj.visible }; })(),
+        weightSum: +Object.values(actionsRef.current).reduce((acc, o) => acc + (o.isScheduled() && o.enabled ? o.getEffectiveWeight() : 0), 0).toFixed(3), visible: !!g?.visible,
+        ballL: ballL ? +((ballL.getWorldPosition(new THREE.Vector3()).y - gw.y) / (sc || 1) + s.pos.y).toFixed(3) : null,   // left ball joint height in rig units (group-relative + group y)
         wheel: (() => { const w = rigScene.getObjectByName("Wheel"); if (!w) return null; const q = w.getWorldQuaternion(new THREE.Quaternion()); const ax = new THREE.Vector3(0, 1, 0).applyQuaternion(q); return { rotY: +w.rotation.y.toFixed(3), localYWorld: ax.toArray().map((v) => +v.toFixed(3)), actTime: s.act === "valve" && s.action ? +s.action.time.toFixed(2) : null }; })() }; },
     };
     return () => { delete reg.workers[role.id]; };
@@ -417,22 +506,37 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     // Retire every other clip that still carries weight — a finished one-shot is paused at its
     // last frame (clampWhenFinished) and is NOT "running", yet keeps full weight; left alone it
     // blends 50/50 with the next clip (the half-crouch after the doze scramble).
-    const live = (o) => o !== a && o.enabled && (o.isRunning() || o.getEffectiveWeight() > 0);
+    // Only clips the mixer is actually running count (isScheduled): a clip that has never been
+    // played still reports enabled + weight 1, and counting those made every first clip after a
+    // mount fade in from the bind pose — a quarter second of T-pose at each new sighting.
+    const live = (o) => o !== a && o.isScheduled() && o.enabled && (o.isRunning() || o.getEffectiveWeight() > 0);
     Object.values(actions).forEach((o) => { if (live(o)) o.fadeOut(FADE); });
     const others = Object.values(actions).some(live);
+    const w0 = a.isScheduled() && a.enabled ? a.getEffectiveWeight() : 0;   // the clip may itself be mid-fade (restarted while still blending)
     a.reset(); a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity);
     a.clampWhenFinished = once; a.timeScale = timeScale; a.enabled = true;
     if (fromEnd) a.time = a.getClip().duration;
-    if (others) a.fadeIn(FADE); else a.setEffectiveWeight(1);   // nothing to blend from → no fade (a weight fade blends from the bind pose)
+    // Weights must keep summing to 1: whatever falls below that is filled with the BIND POSE, which
+    // is the T-pose flash. So blend in from the clip's current weight, never from zero, and skip
+    // the fade altogether when there is nothing to blend from.
+    if (!others) a.setEffectiveWeight(1);
+    else if (w0 > 0 && typeof a._scheduleFading === "function") a._scheduleFading(FADE, w0, 1);
+    else a.fadeIn(FADE);
     a.play();
     return a;
   };
   const showProps = (act) => { const want = ACTS[act]?.props || []; Object.entries(props).forEach(([name, node]) => { node.visible = want.includes(name); }); };
+  const showHat = (offDuty) => {
+    const s = st.current; s.offHat ||= Math.random() < 0.5 ? "CowboyHat" : "Ballcap";
+    const on = offDuty && hats[s.offHat] ? s.offHat : "Helmet";
+    Object.entries(hats).forEach(([n, o]) => { o.visible = n === on; }); s.hat = on;
+  };
   const startAct = (act, now, dwell) => {
+    if (act === "neutralIdle" && !actionsRef.current["crew_neutralIdle"]) act = "idle";   // stale GLB: never stand in the bind pose
     const s = st.current; const def = ACTS[act] || ACTS.idle;
     s.act = act; s.phase = "act"; s.replayAt = 0; s.wheelBase = null; s.action = play(def.clip, { once: !!def.once, timeScale: def.reverse ? -1 : 1, fromEnd: !!def.reverse });
     s.actEnds = def.once || def.forever ? Infinity : now + (dwell ?? rand(def.dwell[0], def.dwell[1]));
-    showProps(act);
+    showProps(act); showHat(!!def.offDuty);
   };
   const menuAct = (now) => {
     const s = st.current; const menu = MENU[s.spot];
@@ -464,15 +568,26 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     const dist = Math.hypot(s.to.x - s.from.x, s.to.z - s.from.z);
     if (dist >= WALK_MIN && actionsRef.current["crew_walk"]) {
       s.phase = "walk"; s.slideS = dist / WALK_SPEED; s.yaw = Math.atan2(-(s.to.z - s.from.z), s.to.x - s.from.x);
-      s.act = "walk"; s.action = play("crew_walk"); showProps("walk");
-    } else { s.phase = "slide"; s.slideS = seconds; s.action = play("crew_idle"); showProps("idle"); }
+      s.act = "walk"; s.action = play("crew_walk"); showProps("walk"); showHat(false);
+    } else { s.phase = "slide"; s.slideS = seconds; s.action = play("crew_idle"); showProps("idle"); showHat(false); }
   };
   const climbRate = () => {
     const base = resolveStation(rigScene, "ladder_base");
     const rise = Number(base.extras?.hm_climb_rise_m) || CLIMB_RISE_FALLBACK;
     const clip = actionsRef.current["crew_climb"]?.getClip(); return rise / (clip?.duration || 0.8);
   };
-  const beginClimb = () => { const s = st.current; const top = resolveStation(rigScene, MENU[s.spot].climbTo); s.phase = "climbUp"; s.target = top; s.act = "climb"; s.action = play("crew_climb"); showProps("climb"); };
+  // Where to start crew_climb so the left foot's plants (CLIMB_PLANT_FRAC into each cycle, CLIMB_PLANT_UP
+  // above the origin) land on rungs: the group rises one rung pitch per cycle, so it is only a phase.
+  const climbPhase = (z0, up) => {
+    const base = resolveStation(rigScene, "ladder_base"); const T = actionsRef.current["crew_climb"]?.getClip().duration || 0.8;
+    const R = Number(base.extras?.hm_climb_rise_m) || CLIMB_RISE_FALLBACK; const rung0 = base.pos.y + (Number(base.extras?.hm_climb_rung0_m) || CLIMB_RUNG0_FALLBACK);
+    const foot0 = z0 + CLIMB_PLANT_UP - CLIMB_PLANT_BIAS;
+    const k = up ? Math.ceil((foot0 - rung0) / R - 1e-6) : Math.floor((foot0 - rung0) / R + 1e-6);   // the first rung the foot meets in the travel direction
+    const t = Math.abs(rung0 + k * R - foot0) / R * T;                                               // travel time until then
+    const plant = CLIMB_PLANT_FRAC * T;
+    return (((up ? plant - t : plant + t) % T) + T) % T;                                             // descent runs the clip backwards
+  };
+  const beginClimb = () => { const s = st.current; const top = resolveStation(rigScene, MENU[s.spot].climbTo); s.phase = "climbUp"; s.target = top; s.act = "climb"; s.action = play("crew_climb"); s.action.time = climbPhase(s.pos.y, true); showProps("climb"); };
   const landingOf = (base) => new THREE.Vector3(base.pos.x + Math.cos(base.yaw) * TOP_FWD_END, base.pos.y + (resolveStation(rigScene, "ladder_top").pos.y - base.pos.y), base.pos.z - Math.sin(base.yaw) * TOP_FWD_END);
   const beginDescend = () => {
     const s = st.current; const base = resolveStation(rigScene, MENU[s.spot].descendTo);
@@ -513,7 +628,10 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     else if (mode === "defend") { startAct("ninja", now, 999); s.nextThrowAt = now + rand(0.5, 2); }   // guard stance between throws
     else if (mode === "alert") startAct("nervous", now, 999);
     else if (mode === "celebrate") startAct("clap", now);
-    else if (mode === "brief") { startAct("wave", now); setBubble("Hey, boss."); crew.brief.i = 0; crew.brief.nextLineAt = now + BRIEF_GREET_S; }   // greet, then each line brings its own gesture (modeTick)
+    else if (mode === "brief") {                                            // greet (the opener is spoken with the wave), then each line brings its own gesture (modeTick)
+      const b = crew.brief; startAct(b.rude ? "shrug" : "wave", now); setBubble(b.opener || "Hey, boss."); b.i = 0; b.nextLineAt = now + BRIEF_GREET_S;   // a stranger gets a shrug, not a wave
+      b.talkSeen = false; b.speaking = speakVendorText("crew", b.opener || "Hey, boss.");
+    }
     else if (mode === "listen" || mode === "chatListen") { startAct("idle", now, 999); s.nextGesture = now + rand(2, 5); }
     else if (mode === "chat") startAct("talking", now, 999);
     else if (mode === "music") startAct("music", now, 999);
@@ -525,7 +643,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     if (mode === "defend") startAct("ninja", now, 999);
     else if (mode === "alert") startAct("nervous", now, 999);
     else if (mode === "celebrate") startAct(s.act === "clap" ? (Math.random() < 0.5 ? "victory1" : "victory2") : "clap", now);
-    else if (mode === "brief") startAct("idle", now, 999);                 // a reply gesture ended: hold until the next line
+    else if (mode === "brief") startAct(actionsRef.current["crew_neutralIdle"] ? "neutralIdle" : "idle", now, 999);   // a reply gesture ended: hold until the next line
     else if (mode === "chat") startAct("talking", now, 999);
     else if (mode === "listen" || mode === "chatListen") { startAct("idle", now, 999); s.nextGesture = now + rand(2.5, 6); }
     else if (mode === "music") startAct("music", now, 999);
@@ -546,14 +664,25 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
       if (s.act === "throw" && s.throwAt && now >= s.throwAt) {
         s.throwAt = 0;
         if (handR && crew.fire) { handR.getWorldPosition(_tmp); crew.fire(_tmp, new THREE.Vector3(D.x, D.y + 0.08, D.z)); s.fired = (s.fired || 0) + 1; }
-        if (CREW_THROWS_COUNT && groupRef.current) { groupRef.current.getWorldPosition(_tmp); window.dispatchEvent(new CustomEvent("hm-shoot", { detail: { x: _tmp.x, y: _tmp.y, z: _tmp.z, source: "crew" } })); }
+        // Counted only while the demon is in its vulnerable window, this client may catch it, no
+        // cooldown is running, and the thrower is inside the demon's hit range — a shot outside the
+        // window would make the demon counter and lock the player's revolver out (the miss rule).
+        const S = window.__hmDemonState;
+        if (CREW_THROWS_COUNT && groupRef.current && S && S.vulnerable && S.capturable !== false && !(S.cooldown > 0)) {
+          groupRef.current.getWorldPosition(_tmp);
+          if (Math.hypot(S.x - _tmp.x, S.z - _tmp.z) <= CREW_HIT_RANGE) { s.counted = (s.counted || 0) + 1; window.dispatchEvent(new CustomEvent("hm-shoot", { detail: { x: _tmp.x, y: _tmp.y, z: _tmp.z, source: "crew" } })); }
+        }
       }
     } else if (mode === "brief") {
       const c = state.camera.position; faceWorld(c.x, c.y, c.z);          // turn to the player
       const b = crew.brief; if (!b) return;
-      if (now >= b.nextLineAt) {
-        if (b.i >= b.lines.length) { crew.brief = null; return; }
-        setBubble(b.lines[b.i]); startAct(briefGesture(b.tones?.[b.i], b.lines[b.i]), now); b.i += 1; b.nextLineAt = now + BRIEF_LINE_S;
+      b.now = now;
+      if (b.speaking && !b.talkSeen && now >= b.nextLineAt) b.speaking = false;   // speech never started (no host, no audio): the timer paces
+      if (now >= b.nextLineAt && !b.speaking) {
+        if (b.i >= b.lines.length) { crew.brief = null; deactivateVendorSitePal(); return; }
+        const line = b.lines[b.i];
+        setBubble(line); startAct(briefGesture(b.tones?.[b.i], line), now); b.i += 1; b.nextLineAt = now + BRIEF_LINE_S;
+        b.talkSeen = false; b.speaking = speakVendorText("crew", line);
       }
     } else if (mode === "listen" || mode === "chatListen") {
       if (mode === "listen") { const t = partner(); if (t) faceWorld(t.head.x, t.head.y, t.head.z); }   // turn to the one briefing
@@ -577,6 +706,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
       if (s.trace.length > 40) s.trace.shift();
     }
     mixer.update(dt);
+    if (!g.visible && s.act) g.visible = true;                   // first posed frame: only now let the worker be seen
     if (headBone) headBone.getWorldPosition(s.head);
     if (s.act === "valve" && s.action) {                       // the handwheel turns with the hands; same node + axis as the click-to-spin
       if (s.wheelBase == null) {                                 // cleared by startAct: each valve act carries on from where the wheel is
@@ -591,9 +721,38 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
       }
     }
     if (s.act === null) menuAct(now);
+    if (projRef.current?.proj) {
+      const cfg = VENDOR_SITEPAL_CONFIG.crew;
+      const tuning = role.briefs && typeof window !== "undefined" && window.__vendorSitePalTuneId === "crew";   // ?tune=vendor, CREW tab
+      const briefing = tuning || (s.mode === "brief" && !!crew.brief && crew.brief.talker === role.id);
+      if (tuning) { const c = state.camera.position; faceWorld(c.x, c.y, c.z); s.tuneFacing = true; }   // hold the face toward the camera while it is being tuned
+      else if (s.tuneFacing) { s.tuneFacing = false; s.yawAim = null; s.tuneFocused = false; s.tuneMoving = false; if (s.actEnds === Infinity && !ACTS[s.act]?.once && !ACTS[s.act]?.forever) s.actEnds = now + rand(2, 5); }   // tab left: let the schedule resume
+      const source = briefing ? getVendorSitePalSource() : null;
+      const onScene = typeof window !== "undefined" && window.__vendorSitePalSceneLoaded === true && window.__vendorSitePalCurrentSceneId === cfg.sceneId;
+      s.projFade = updateProjection(projRef.current, cfg, { source, onScene, show: briefing, delta, id: "crew" });
+    }
 
     const panelOpen = !!(panelRef?.current?.open || panelRef?.current?.ref?.current);
-    if (s.phase === "act") {
+    const tuneHold = role.briefs && typeof window !== "undefined" && window.__vendorSitePalTuneId === "crew";
+    if (s.phase === "act" && tuneHold) {
+      // ?tune=vendor CREW tab: park the briefer at TUNE_SPOT looping neutralIdle — no mode
+      // changes, no dwell expiry, no chores — so the face stays put under the sliders. Once it
+      // is standing there, report the head (world) once; the highlighted rig flies the camera
+      // in (hm:crew-face → onFocusObject), the same move as the panel zoom.
+      if (s.spot !== TUNE_SPOT) { if (s.act !== "push" && !s.tuneMoving) { s.mode = null; s.tuneMoving = true; slideTo(TUNE_SPOT, SLIDE_S, actionsRef.current["crew_neutralIdle"] ? "neutralIdle" : "idle"); } }
+      else {
+        s.tuneMoving = false;
+        if (s.mode !== null) s.mode = null;
+        const calm = actionsRef.current["crew_neutralIdle"] ? "neutralIdle" : "idle";
+        if (s.act !== calm) startAct(calm, now, 999);
+        s.actEnds = Infinity;
+        if (!s.tuneFocused && s.frames > 2 && headBone) {
+          s.tuneFocused = true;
+          const f = _tmp.copy(state.camera.position).sub(s.head); f.y = 0; if (f.lengthSq() < 1e-6) f.set(1, 0, 0); f.normalize();
+          try { window.dispatchEvent(new CustomEvent("hm:crew-face", { detail: { center: s.head.toArray(), front: f.toArray() } })); } catch (e) {}
+        }
+      }
+    } else if (s.phase === "act") {
       const finished = s.action && ACTS[s.act]?.once && !s.action.isRunning();
       // mode changes only between scripted moves; a finished stand-up (uncower) clears the way
       const want = wantMode(now);
@@ -602,7 +761,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
         const tgt = s.decide; s.decide = null;
         if (tgt === s.spot) startAct("push", now); else slideTo(tgt, SLIDE_S, "push");
       } else if (s.decide) { s.decide = null; }
-      else if (s.mode === null && panelOpen && PANEL_BUTTONS.has(s.spot) && s.act !== "push") { s.returnSpot = s.spot; slideTo("panel_aside", ASIDE_S, "idle"); }   // out of the player's way
+      else if (s.mode === null && panelOpen && PANEL_BUTTONS.has(s.spot) && s.act !== "push" && window.__vendorSitePalTuneId !== "crew") { s.returnSpot = s.spot; slideTo("panel_aside", ASIDE_S, "idle"); }   // out of the player's way (not while being tuned: the panel view is how you get close to the face)
       else if (s.mode === null && !panelOpen && s.spot === "panel_aside" && s.act !== "push") { slideTo(s.returnSpot || "panel_pass", ASIDE_S, "idle"); }
       else {
         modeTick(s.mode, now, dt, state);
@@ -638,7 +797,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
       if (u >= 1) { s.phase = "topOut"; s.from = s.to.clone().sub(new THREE.Vector3(Math.cos(s.yaw) * TOP_FWD_END, LANDING_RISE, -Math.sin(s.yaw) * TOP_FWD_END)); s.act = "topOfLadder"; s.action = play(TOP_CLIP, { once: true, timeScale: -1, fromEnd: true }); showProps("climb"); }
     } else if (s.phase === "topOut") {                           // the same clip backwards: standing → hanging on the ladder
       const dur = s.action?.getClip().duration || 4; const u = Math.max(0, (s.action?.time ?? 0) / dur); topMove(u);
-      if (u <= 0 || !s.action?.isRunning()) { topMove(0); s.phase = "climbDown"; s.act = "climb"; s.action = play("crew_climb", { timeScale: -1 }); showProps("climb"); }
+      if (u <= 0 || !s.action?.isRunning()) { topMove(0); s.phase = "climbDown"; s.act = "climb"; s.action = play("crew_climb", { timeScale: -1 }); s.action.time = climbPhase(s.pos.y, false); showProps("climb"); }
     } else if (s.phase === "climbDown") {
       s.pos.y = Math.max(s.target.pos.y, s.pos.y - climbRate() * dt);
       if (s.pos.y <= s.target.pos.y + 1e-4) {
@@ -656,7 +815,8 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     const t = s.look;
     let targetYaw = 0, targetPitch = 0;
     let lookAt = null;
-    if (s.mode === "defend") lookAt = "demon";
+    if (tuneHold) lookAt = "camera";
+    else if (s.mode === "defend") lookAt = "demon";
     else if (s.mode === "celebrate") lookAt = "head_pump";
     else if (s.mode === "brief") lookAt = "camera";
     else if (s.mode === "listen" || s.mode === "chat" || s.mode === "chatListen") lookAt = "partner";
@@ -696,7 +856,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
   });
 
   return (
-    <group ref={groupRef} onClick={(e) => { e.stopPropagation(); onTap?.(); }}>
+    <group ref={groupRef} visible={false} onClick={(e) => { e.stopPropagation(); onTap?.(); }}>   {/* shown once the mixer has posed it (useFrame) — a fresh clone renders in the bind pose */}
       <primitive object={clone} />
       {bubble && (
         <Html center position={[0, 0.98, 0]} zIndexRange={[9999, 9999]} style={{ pointerEvents: "none" }}>

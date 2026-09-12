@@ -3854,9 +3854,11 @@ export default function OilPage() {
     const fillPct = Math.round((tankFill || 0) * 100);
     say(`Tank ${fillPct}% full.`, fillPct >= 50 ? "yes" : fillPct > 0 ? "thoughtful" : "no");
     if (lines.length === 2) { lines.splice(1, 0, "Nothing new since your last visit."); tones.splice(1, 0, "no"); }
-    window.__hmBriefing = { lines, tones };
+    // Who is asking (2026-09-11): only the claim owner at their own rig gets the boss treatment;
+    // RigCrew compares ownerPlot with the plot its rig stands on and brushes off everyone else.
+    window.__hmBriefing = { lines, tones, signedIn: !!user?.id, ownerPlot: userDrill?.col != null ? `${userDrill.col}_${userDrill.row}` : null };
     return () => { delete window.__hmBriefing; };
-  }, [drillStatus, hellActive, awayRecap, tankFill]);
+  }, [drillStatus, hellActive, awayRecap, tankFill, user?.id, userDrill?.col, userDrill?.row]);
 
 
   // Is the owner's own rig currently erupting? A live gusher event keeps the rig

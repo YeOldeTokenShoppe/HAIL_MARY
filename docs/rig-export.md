@@ -63,6 +63,13 @@ a script — `scripts/export-rig.sh` (background Blender on the saved blend, the
 node list plus every `Crew_*` empty. Save the blend first: it exports what is on disk. Then bump
 `?v=` (step 3) only after it has finished.
 
+The panel's front face is a separate object, `MachinePanel_Body_Door` (origin on its hinge edge,
+the instruments parented to it in the blend). It is exported closed as its own node (since
+2026-09-11 — before that it was left out and the page showed an open box with the instruments
+floating in front). The instruments still export re-parented to their bases, so every panel
+hook keeps its frame; to make the door open on the page, `attach()` the instrument nodes to the
+door node at load (world transforms kept) and rotate the door about its own origin.
+
 ## 2. Optimize
 
 ```bash
@@ -71,6 +78,9 @@ RIG_EXCLUDE=OLD_Pipe_01 node scripts/optimize-rig.mjs models-src/oilJack_allProp
 
 `RIG_EXCLUDE` matters: the script's default excludes `Pipe_01`, which on this rig is the
 wellhead. The script keeps empty leaf nodes (the markers) and shrinks every atlas to 1024px WebP.
+It also passes `keepAttributes: true` to `prune()` (2026-09-11): the default strips `TEXCOORD_0`
+from any primitive whose material has no texture, which silently deleted the crew's `Face2` UVs
+(flat-colour mesh, textured at runtime by the SitePal compositor) — the face came out one flat texel.
 
 ## 3. Cache-bust
 
@@ -203,6 +213,10 @@ Michelle saves the rig blend). Same frame convention; extras `hm_station`, `hm_c
 | `Crew_Rail_Doze_Top` | 0.25, -0.42, 1.725 | -90° | Service_Platform | seat marker at the platform's north rail, same rule (excludes the lookout: same zone) |
 | `Crew_Lookout` | 0.363, -0.776, 1.725 | -90° | Service_Platform | idle, tablet, wave, facing the horse head (Michelle's spot; replaces Crew_Platform_Lookout) |
 | `Crew_Valve` | -1.05, -2.44, 0 | 90° | Pipe_03 | valve, idle, wave (south of the riser handwheel, facing it; the rim is 0.19 ahead of the feet, the hub 0.55 up — see "The handwheel") |
+| `Crew_Rail_Doze2` | -1.0, 2.041, 0.236 | 4° | Bottom_Box | dozing (seat marker: north-west corner, back to the west rail; 2026-09-11) |
+| `Crew_Rail_Doze3` | -0.131, -0.122, 0.236 | -90° | Bottom_Box | dozing (seat marker under the walking beam; 2026-09-11) |
+| `Crew_Chat_C` | -0.751, 1.799, 0.236 | -90° | Bottom_Box | second chat pair on the west walkway, facing each other (2026-09-11) |
+| `Crew_Chat_D` | -0.754, 1.299, 0.236 | 90° | Bottom_Box | " |
 | `Crew_Wellhead` | 0.556, -2.092, 0 | 180° | Bottom_Box | idle, tablet (east of the curb, on the ground) |
 | `Crew_Panel_Aside` | 0.655, -0.38, 0.245 | 174° | MachinePanel_Body | where the operator steps while the panel view is open |
 | `Crew_Chat_A` / `Crew_Chat_B` | 0.155, 1.821 / -0.345, 1.821, 0.236 | 180° / 0° | Bottom_Box | the chat pair on the north walkway (2026-09-11 wrap-around base), facing each other 0.5 apart |
@@ -259,7 +273,7 @@ Apply Modifiers off, Skinning on, Custom Properties on, Draco off. Then:
 RIG_TEX_SIZE=512 node scripts/optimize-rig.mjs models-src/crew_goblin_raw.glb public/models/crew_goblin.glb
 ```
 
-Twenty-five clips ship (2026-09-11, 2.17 MB with `RIG_RESAMPLE=1`, which `export-crew.sh` sets; `CREW_GLB` v11):
+Twenty-six clips ship (2026-09-11, 2.35 MB with `RIG_RESAMPLE=1`, which `export-crew.sh` sets; `CREW_GLB` v13, which also carries the split Face1/Face2/Face3): `crew_neutralIdle` (the briefer's between-lines hold),
 `crew_walk` 1.07 s loop, in place as delivered; its take was rotated 7.9° and 3 cm off the shared
 frame, so the root keys were yawed and shifted (backup in the action's `hm_root_backup`), and the
 stance foot's slide gives the stride speed the page uses, 0.518 rig units/s (`WALK_SPEED`),
@@ -380,17 +394,69 @@ worker, `frustumCulled=false` on the skinned meshes, mixer delta capped at 1/30.
   rewritten in the crew blend to crew_getUp's first frame (its own take had been a chair sit
   re-posed by hand, 7 cm higher and 26 cm further back), keeping its nodding upper body. The
   seat spots therefore have one origin, marker + 0.244 (`SEAT_BACK_OFFSET`): the sleeper's back
-  ends 5 cm in front of the rail marker, the stand-up lands on the origin and the awake menu
-  runs there. crew_getUp starts from the doze's END pose (the held last frame), so a wake-up that
+  ends a centimetre in front of the rail marker (`SEAT_BACK_OFFSET` 0.20 since rig v27, when
+  `Crew_Rail_Doze_Top` went onto the platform rail's inner face at y -0.369 so the sleeper leans on
+  it), the stand-up lands on the origin and the awake menu runs there. crew_getUp starts from the doze's END pose (the held last frame), so a wake-up that
   arrives mid-nod — the caught timer, a tap, a mode change — is queued (`wakeQueued`) until the
   pass finishes (≤ 1.9 s) and the switch is pose-exact; only a cower interrupts the sit at once.
   (An interim version moved the group across the crossfade to hide a 26 cm offset; gone now — if
   a switch must ever move the group again, move it by offset × (1 − fadeWeight) across `FADE`,
   never in one jump.)
+- **Ladder retime** (2026-09-11, rig v28): the rungs of the Samson_Post ladder are at
+  0.498, 0.712, 0.926, 1.153, 1.365, 1.592 (mean pitch 0.219 above a 0.236 walkway), while the
+  in-place crew_climb was cut for a 0.154 rise per cycle with a foot step of only 0.077 and a
+  hand reach of 0.148. No retime can put both feet on rungs with that clip: the feet alternate
+  half a cycle apart, so with one rung per cycle only one foot per cycle can land on a rung.
+  What ships: `hm_climb_rise_m` 0.219 (one rung per 0.8 s cycle, the climb takes 3.7 s instead
+  of 5.2) and a new `hm_climb_rung0_m` 0.262 (first rung centre above the base), which RigCrew's
+  `climbPhase` uses to start crew_climb at the clip time that puts the LEFT foot's plants
+  (0.12 above the origin, 15/24 into the cycle) on rungs, going up and coming down. Verified on
+  the page: four plants at 0.503, 0.719, 0.938, 1.157 against rungs 0.498, 0.712, 0.926, 1.153.
+  Because the planted foot still rides up about 11 cm during its stance (the clip's stance drop
+  is half the pitch), the plant is aimed 4 cm BELOW the rung centre (`CLIMB_PLANT_BIAS`) so the
+  foot reads as on the rung through the middle of the stance instead of hovering above it (her
+  "a bit high", 2026-09-11).
+  The right foot lands between rungs and the hands slide 7 cm up each rung during a pull; a
+  true fix is either rungs at half the pitch (0.11) in the model or a re-authored climb with IK
+  hands/feet pinned to rungs (the handwheel script's method). Dev hook `climb(role)` starts a
+  climb from the base; dev state `ballL` is the left ball joint's height in rig units.
+- **Crew hits count** (2026-09-11): `CREW_THROWS_COUNT` is on. A throw fires "hm-shoot" from
+  the thrower's world position only while `window.__hmDemonState` says the demon is in its
+  vulnerable window, this client may catch it, no cooldown is running, and the thrower is within
+  the demon's walker hit range (2.0) — a shot outside the window would make the demon counter and
+  lock the player's revolver out, so those throws stay VFX. Dev state `counted`. Verified with a
+  faked demon state: every throw counted while the window was open, none after it closed. Her
+  weapon question is open: the fireball is thematically backwards for a demon; recommended
+  swap is a holy-water flask from the Midway chapel, same throw clip, same counting.
 - **Climb rise is data**: the rise per crew_climb cycle comes from `hm_climb_rise_m` on
   `Crew_Ladder_Base` (glTF extras → `userData`) when the rig ships it, else 0.154; the cycle
   length is the clip's own duration. Retime the climb in Blender (one cycle = one rung is
   0.214 on this ladder), set the property, re-export the rig — no page change.
+- **No T-pose flashes** (2026-09-11): a skinned mesh shows the BIND pose for whatever part of
+  the animation weight is missing — three.js fills `1 − Σweights` with the rest pose. Two leaks
+  were closed. (1) A never-played `AnimationAction` reports `enabled` and `getEffectiveWeight()`
+  1 even though the mixer is not running it, so RigCrew's "is anything still blending?" check
+  counted all 24 idle clips as live and the first clip after every mount faded in from the
+  bind pose: a quarter second of T-pose at each new sighting. The check now requires
+  `isScheduled()`. (2) A clip restarted while still mid-fade restarted its weight at zero;
+  it now blends from its current weight (`_scheduleFading(FADE, w0, 1)`). Each worker's group
+  also stays invisible until the mixer has posed it once. Dev state carries `weightSum` (sum
+  over scheduled clips) and `visible`; verified ≥ 1.0 on every visible frame across rerolls
+  and rapid switches. Two switches inside one frame can still briefly overshoot above 1 (the
+  fade-out reads a stale cached weight) — not a T-pose, and it needs a same-frame double
+  switch.
+- **Variety** (2026-09-11, rig v27 / crew v12): sightings roll fresh every time (page load, tab
+  back, reroll) — the old plot + 10-minute-bucket seed replayed the same crew for ten minutes,
+  which read as the same sleeper over and over. Dozing is spread over four seat markers
+  (`rail_doze`, `rail_doze_top`, her `rail_doze2` in the north-west corner and `rail_doze3` under
+  the beam) at weight 1 each × 0.5 by day (1.0 at night, 1.5 stalled, 0 in hell — night used to
+  triple it, so every night sighting was a sleeper) against 7 of work, about one inspector
+  sighting in five. The operator now also turns up at the valve and the lookout (panel 4 of 8).
+  Chat sightings pick one of two pairs, `Crew_Chat_A/B` on the north walkway or her
+  `Crew_Chat_C/D` on the west walkway (`CHAT_PAIRS`). `crew_thoughtful` joins the idle menus at
+  the motor, the lookout and the wellhead. Her tablet-screen emissive (strength 3.4 on a dim
+  green) exports folded into an emissiveFactor of 0.21 — brighten the emission colour itself for
+  a visible glow.
 - **Walking** (2026-09-11): every move between spots that is at least 0.12 long — the panel
   step-aside and back, a decide move between the two buttons (0.17), anything the dev hook's
   `walk(role, spot)` asks for — is a walk: the worker turns to the travel heading, crew_walk
@@ -398,6 +464,81 @@ worker, `frustumCulled=false` on the skinned meshes, mixer delta capped at 1/30.
   planted), then turns to the spot's facing on arrival. Shorter moves (the ladder landing, 0.09)
   stay a glide with the idle. There is no pathing: walks are straight lines, so the roster's
   spot changes still happen between sightings, not on screen; `walk()` is for previewing.
+- **The briefer talks through SitePal** (2026-09-11): the crew goblin follows the vendors'
+  scheme. In the crew blend the face is three skinned meshes, `Face1` (painted), `Face2` (flat
+  projection face, authored colour #b5b794 = the goblin's face swatch, sampled area-weighted from
+  the Minis atlas) and `Face3` (painted detail); the vendor registry in `src/lib/vendorSitePal.js`
+  has a `crew` entry (scene 2775497, ElevenLabs voice LglRX59YTEmRX2HIAN3F through engine 14,
+  projFace Face2, regularFaces Face1/Face3, no greeting pool). The compositor is the vendor one
+  lifted into `src/lib/sitepalFace.js` (CommercialStrip keeps its own copy with the pose
+  overrides and tuner pins — keep them in step). Flow: the tap runs `activateVendorSitePal("crew")`
+  inside the gesture (audio unlock, lazy embed on touch, scene swap); the briefer waves, then each
+  line goes out with `speakVendorText` while its bubble + reply gesture show; SitePal's talk
+  callbacks (`onVendorTalk`) advance to the next line 0.35 s after speech ends, the BRIEF_LINE_S
+  timer paces if speech never starts; between lines the briefer holds `crew_neutralIdle` (her
+  clip; idle if absent); the last line's end deactivates the host and the painted face fades
+  back. Only the talker projects; the listener keeps its painted face. Dev state: `projFade`,
+  `faces`. The briefer also has its own words: an opener from `CREW_OPENERS` is spoken with the
+  wave (and shown in the bubble) and a closer from `CREW_CLOSERS` ends the report with a nod;
+  both pools live in RigCrew.jsx, never repeat the last pick, and are plain strings (SitePal
+  caches TTS by text — re-word to re-voice). Tuning: `/hailmary?tune=vendor` has a CREW tab.
+  Picking it loads the crew scene, and while it is the tune target
+  (`window.__vendorSitePalTuneId === "crew"`) the operator projects continuously, holds its face
+  toward the camera and does not step aside for the panel view — open MACHINE PANEL to get
+  close. The sliders drive CREW_SITEPAL_CROP/FILTER live (seeded from the rug merchant's, also a
+  goblin avatar; untuned), the face pins (Face1 · mesh / Face2 · SitePal, f to flip) are honoured
+  by the shared compositor, and "Log values" prints the CREW consts to paste back. Verified
+  2026-09-11 only with a faked host (a drawn canvas + stub sayText/vh_talk callbacks): opener →
+  lines → closer order, pacing, gestures, projection fade in/out, skin gain, the tuner tab and
+  pins. The real scene (registration, voice, lipsync) still needs her eyes and ears.
+- **"Blank white Face2" post-mortem** (2026-09-11, first run against the real scene): three
+  stacked causes, all fixed. (1) `scripts/optimize-rig.mjs` pruned `Face2`'s UVs (see §2 —
+  crew GLB v14 is the same raw re-optimized with `keepAttributes: true`); with no `uv` attribute
+  the whole face samples one texel, i.e. a flat fill. (2) `VendorSitePalHost` reset
+  `window.__vendorSitePalSceneLoaded = false` in its mount effect; the page mounts the host at
+  two places and a rig highlight remounts it, and no new `vh_sceneLoaded` ever follows, so the
+  compositor's `onScene` gate stayed shut. It now resets only when nothing is embedded.
+  (3) The crop was seeded from the rugs vendor and missed her close-up goblin avatar, and the
+  skin sample sat in an eye socket (dark median → gain 2–5× → blown out). Now
+  `skinSample` on the cheek (0.12,0.62,0.18,0.18). Her first pass from the CREW tab is what
+  ships: `CREW_SITEPAL_CROP = {142,179,247,205, rotateZ −1}`, filter saturate 104 / contrast
+  103 / brightness 90 / hue 6 (measured ≈ #847d6c vs target #b5b794, linear gain ≈ 2.0–2.3 —
+  brightness is cancelled by the skin match, it only moves the gain). SitePal's own
+  `[WARNING]audioStarted Callback Error … 'audioId'` is the player complaining when a line is
+  cancelled while its audio is still loading; it did not reproduce with stopSpeech mid-load
+  and the next line still goes out.
+  The dev state (`window.__hmCrew.state().operator.projMat`) now reports `uv` bounds (must be
+  0..1), a 3×3 `cropGrid` of canvas samples and `colorRaw` (the unclamped gain) — check those
+  three before blaming the shader.
+- **Tuning the crew face** (2026-09-11, after her first try: "no voice, the face is distant and
+  only turns to me for a moment"): with the CREW tab up, the briefer leaves whatever it was
+  doing, walks to `TUNE_SPOT` (panel_pass), loops `crew_neutralIdle` with no dwell expiry and
+  no mode changes, holds body and head on the camera, and — once it is standing there — fires
+  `hm:crew-face` with its head (world) and facing; the highlighted rig answers with
+  `onFocusObject` at `CREW_FOCUS_DIST` (0.16, floor 0.12), the same move as the panel zoom.
+  Leaving the tab hands the schedule back (actEnds re-armed). Sound: the crew has no greeting
+  pool (the briefing lines are RigCrew's), so the tab's `tuneLines` speak one line on select
+  and the SAY A LINE button repeats one in any tab. The voice itself was never the problem:
+  the ElevenLabs id fires `vh_talkStarted` ~1.6 s after `sayText` on scene 2775497, and an
+  in-game brief on the phone scene started talking 5.4 s after the tap (scene swap included).
+  Signed out on desktop the field has no rigs at all — pick a plot on the survey map to get one
+  (and its crew) before selecting CREW.
+- **Hats and the square idle** (2026-09-11, crew GLB v15): `CowboyHat` and `Ballcap` are
+  bone-parented to `head` like the `Helmet`, hidden in her blend (the export unhides the whole
+  family, glTF has no visibility, so the page hides them). On the rig it is hard hats only:
+  `showHat()` keeps the Helmet on for every act here; flag an act `offDuty: true` and the worker
+  swaps in the hat it drew once — meant for the CommercialStrip visit when that exists (a first
+  cut that flagged dozing and music put a cowboy hat at the wellhead; she vetoed it).
+  `crew_neutralIdle` (the square stance — every Mixamo idle leans on one leg) is offered
+  wherever a menu offers `idle`, same weight; `startAct` falls back to `idle` if a stale GLB
+  lacks the clip. Export from the live session with export-crew.py (restore the hats' eye
+  icons afterwards), optimize, bump `?v=`.
+- **Chain of command** (2026-09-11): only the claim owner at their own rig gets the boss
+  briefing. page.js publishes `signedIn` and `ownerPlot` (`col_row`) on `window.__hmBriefing`;
+  each Pumpjack passes its `plotId` (the same `col_row`, internal indices — the survey map shows
+  them +1) down to RigCrew, and `toggleBrief` compares. Anyone else — signed out, or at somebody
+  else's claim — gets `CREW_BRUSHOFF`: one opener (shrug, no wave), one line, one closer, all
+  spoken by the foreman through SitePal. Verified all three cases in the pane.
 - **Briefing replies** (2026-09-11): a tap makes the operator wave at the boss ("Hey, boss.",
   `BRIEF_GREET_S` 2.2 s), then each briefing line comes with a reply gesture: page.js sends a
   `tone` per line in `window.__hmBriefing.tones` — "no" for nothing to report (rig signed out /

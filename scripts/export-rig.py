@@ -4,6 +4,8 @@
 # extras on. The panel instruments are parented to MachinePanel_Body_Door, which is not exported,
 # so the export temporarily mirrors the live GLB's parenting (Toggle_X -> Toggle_X_Base, KeySwitch ->
 # Key_Housing, PassButton_Cover -> PassButton_Housing, Gauge_* / GaugeNeedle -> Gauge) and restores it.
+# The door itself IS exported (closed, its origin on the hinge edge) since 2026-09-11 — it is the
+# panel's front face; the page can attach the instruments to it and swing it open later.
 # Nothing is saved.
 import bpy, os, json
 from mathutils import Matrix
@@ -12,7 +14,7 @@ path = os.path.join(repo, "models-src", "oilJack_allProps4_raw.glb")
 scn = bpy.context.scene; out = {}
 live_parent = {"Toggle_N": "Toggle_N_Base", "Toggle_E": "Toggle_E_Base", "Toggle_S": "Toggle_S_Base", "Toggle_W": "Toggle_W_Base", "KeySwitch": "Key_Housing",
                "PassButton_Cover": "PassButton_Housing", "Gauge_Marks": "Gauge", "Gauge_Orange": "Gauge", "Gauge_Red": "Gauge", "Gauge_Yellow": "Gauge", "GaugeNeedle": "Gauge"}
-names = ["Alert_Light_RED","BeamPin_Left","BeamPin_Right","Belt","Belt_Clip_01","Belt_Clip_02","Belt_Clip_03","Head_Pump","Body_Pump","Counterweight","CrankAxle","CrankPin_Left","CrankPin_Right","Motor_Pulley","Pipe_01","Pitman","RodRef","Safety_Rails","Samson_Post","Service_Platform","Straw","Under_Pump","Under_Pump_Pipe_Panel","Under_Pump_Pipes","Wheel_Back","Wheel_BOP","Bottom_Box","MachinePanel_Body","FlareTip","Pipe_03","Well","WellFrame","Wheel","PressurePanel","PressurePanelFrame","Toggle_N","Toggle_N_Base","Lamp_N_Border","Lamp_N","Toggle_E","Toggle_E_Base","Lamp_E_Border","Lamp_E","Toggle_S","Toggle_S_Base","Lamp_S_Border","Lamp_S","Toggle_W","Toggle_W_Base","Lamp_W_Border","Lamp_W","KeySwitch","Key_Housing","PassButton_Cover","PassButton_Housing","PassButton","RedButton_Housing","RedButton","Gauge_Marks","Gauge_Orange","Gauge_Red","Gauge_Yellow","GaugeNeedle","Gauge","RedButtonBorder","Text_Extract","Text_Pass","RedButton_Plate","DANGER_LABEL","PassButton_Housing.001"]
+names = ["Alert_Light_RED","BeamPin_Left","BeamPin_Right","Belt","Belt_Clip_01","Belt_Clip_02","Belt_Clip_03","Head_Pump","Body_Pump","Counterweight","CrankAxle","CrankPin_Left","CrankPin_Right","Motor_Pulley","Pipe_01","Pitman","RodRef","Safety_Rails","Samson_Post","Service_Platform","Straw","Under_Pump","Under_Pump_Pipe_Panel","Under_Pump_Pipes","Wheel_Back","Wheel_BOP","Bottom_Box","MachinePanel_Body","FlareTip","Pipe_03","Well","WellFrame","Wheel","PressurePanel","PressurePanelFrame","Toggle_N","Toggle_N_Base","Lamp_N_Border","Lamp_N","Toggle_E","Toggle_E_Base","Lamp_E_Border","Lamp_E","Toggle_S","Toggle_S_Base","Lamp_S_Border","Lamp_S","Toggle_W","Toggle_W_Base","Lamp_W_Border","Lamp_W","KeySwitch","Key_Housing","PassButton_Cover","PassButton_Housing","PassButton","RedButton_Housing","RedButton","Gauge_Marks","Gauge_Orange","Gauge_Red","Gauge_Yellow","GaugeNeedle","Gauge","RedButtonBorder","Text_Extract","Text_Pass","RedButton_Plate","DANGER_LABEL","PassButton_Housing.001","MachinePanel_Body_Door"]
 crew = sorted(o.name for o in bpy.data.objects if o.name.startswith("Crew_"))
 missing = [n for n in names if n not in bpy.data.objects]
 door = bpy.data.objects.get("MachinePanel_Body_Door"); saved = {}

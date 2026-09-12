@@ -45,7 +45,11 @@ if (process.env.RIG_DROP_NORMALS === "1") for (const m of doc.getRoot().listMate
 // (mergeGeometries) refuses to combine with Draco-decoded attributes. (weld() would index
 // them, but its internal prune drops the marker empties — do not add it.)
 io.setVertexLayout(VertexLayout.SEPARATE);
-await doc.transform(prune({ keepLeaves: true }), dedup(),
+// keepAttributes: prune() otherwise strips TEXCOORD_0 from any primitive whose material has
+// no texture. The crew's Face2 is a flat-colour mesh (Mini_Chr.001) that the SitePal
+// compositor textures at RUNTIME, so without its UVs the projected face is one flat texel
+// (the "blank white Face2", 2026-09-11).
+await doc.transform(prune({ keepLeaves: true, keepAttributes: true }), dedup(),
   textureCompress({ encoder: sharp, targetFormat: "webp", resize: [SIZE, SIZE], quality: 82, slots: /^(?!normal)/ }),
   textureCompress({ encoder: sharp, targetFormat: "webp", resize: [NSIZE, NSIZE], quality: 82, slots: /normal/ }),
   // RIG_RESAMPLE=1: drop redundant animation keyframes (the crew character's 30 fps mocap;

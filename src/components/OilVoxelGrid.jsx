@@ -1873,7 +1873,7 @@ function PlotPoop() {
   );
 }
 
-function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, depositLayer = -1, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, gusherTier = "gusher", hasMessages = false, onEnvelopeClick, hellActive = false, worldW = 10, worldD = 10, cameraViewable = true, onFocusObject, panelZoomed = null, onPanelTap = null, yaw = 0, crewEnabled = null }) {
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, depositLayer = -1, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, gusherTier = "gusher", hasMessages = false, onEnvelopeClick, hellActive = false, worldW = 10, worldD = 10, cameraViewable = true, onFocusObject, panelZoomed = null, onPanelTap = null, yaw = 0, crewEnabled = null, plotId = null }) {
   // `panelZoomed` (phone, RigScene): the report's MACHINE PANEL chip has already
   // glided the camera to the control box, so the panel buttons work without the
   // desktop's select-then-zoom dance — true = buttons live, false = inert, null = desktop rules.
@@ -3954,6 +3954,22 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     window.addEventListener("hm:focus-panel", onFocus);
     return () => window.removeEventListener("hm:focus-panel", onFocus);
   }, [highlighted, panelZoomed, focusMachinePanel]);
+  // ?tune=vendor CREW tab (2026-09-11): the parked briefer reports its head (world) once it is
+  // standing at the tune station; fly in the way the panel zoom does so the face fills the
+  // frame while its crop/skin sliders are dragged. Desktop only — the phone has its own camera.
+  useEffect(() => {
+    if (!highlighted || panelZoomed != null) return;
+    const onFace = (e) => {
+      const d = e.detail; if (!d?.center) return;
+      const c = new THREE.Vector3().fromArray(d.center);
+      const f = new THREE.Vector3().fromArray(d.front || [1, 0, 0]); f.y = 0;
+      if (f.lengthSq() < 1e-6) f.set(1, 0, 0);
+      f.normalize();
+      onFocusObject(c, f, CREW_FOCUS_DIST, CREW_FOCUS_MIN_DIST);
+    };
+    window.addEventListener("hm:crew-face", onFace);
+    return () => window.removeEventListener("hm:crew-face", onFace);
+  }, [highlighted, panelZoomed, onFocusObject]);
 
   const handleClick = useCallback((e) => {
     e.stopPropagation();
@@ -4143,6 +4159,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       <RigCrew
         rigScene={clonedScene}
         scale={PUMPJACK_SCALE}
+        plotId={plotId}
         enabled={crewEnabled ?? !!highlighted}
         plotKey={`${position?.[0] ?? 0},${position?.[2] ?? 0}`}
         envPreset={envPreset}
@@ -5000,6 +5017,8 @@ const LAMP_OFF = new THREE.Color("#2b2b2e");
 // Scaled with PUMPJACK_SCALE (0.14, 2026-09-08): the box is 0.095 tall now; 0.21 keeps the same framing.
 const PANEL_FOCUS_DIST = 0.21;      // desktop panel zoom (Synty rig): distance from the box centre (near plane is 0.1)
 const PANEL_FOCUS_MIN_DIST = 0.17;  // OrbitControls floor while zoomed there
+const CREW_FOCUS_DIST = 0.16;       // ?tune=vendor CREW tab: distance from the parked briefer's head (goblin head ≈ 0.03 at PUMPJACK_SCALE)
+const CREW_FOCUS_MIN_DIST = 0.12;   // OrbitControls floor there (near plane is 0.1)
 const PASS_COVER_SIGN = -1;
 const PASS_ARM_MS = 8000;
 // Only missing zones in older saved configs inherit paint. An explicit STOCK
@@ -6495,6 +6514,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
         return (
           <Pumpjack
             key={key}
+            plotId={cellKey}
             position={position}
             yaw={plotYaw(position)}
             scene={scene}
@@ -6544,7 +6564,7 @@ const FIELD_RIG_GLB = (() => {
   const v = RIG_VARIANT;
   if (v === "2") return "/models/oilJack_fancy_allProps2.glb";
   if (v === "3") return "/models/oilJack_fancy_allProps3.glb?v=3";
-  return "/models/oilJack_fancy_allProps4.glb?v=26";
+  return "/models/oilJack_fancy_allProps4.glb?v=30";
 })();
 useGLTF.preload(FIELD_RIG_GLB);
 

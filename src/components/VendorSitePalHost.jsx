@@ -29,6 +29,10 @@ import {
   speakPendingVendorLine,
   getVendorSitePalSource,
   notifyVendorTalk,
+  CREW_SITEPAL_CROP,
+  CREW_SITEPAL_FILTER,
+  activateVendorSitePal,
+  speakVendorText,
 } from "@/lib/vendorSitePal";
 
 // Vendor tabs for the crop tuner. constName is used by the "Log values"
@@ -49,6 +53,13 @@ const TUNER_VENDORS = {
   // currently using.
   tattoos_idle: { label: "TAT STAND", crop: TATTOOS_IDLE_SITEPAL_CROP, filter: TATTOOS_IDLE_SITEPAL_FILTER, constName: "TATTOOS_IDLE", sitepalId: "tattoos" },
   tattoos_seated: { label: "TAT SIT", crop: TATTOOS_SEATED_SITEPAL_CROP, filter: TATTOOS_SEATED_SITEPAL_FILTER, constName: "TATTOOS_SEATED", sitepalId: "tattoos" },
+  // The rig crew's briefer (RigCrew.jsx, not a stall): picking this tab loads the crew scene
+  // itself, and RigCrew keeps the operator projecting and facing the camera while it is the
+  // tune target (window.__vendorSitePalTuneId) — open the MACHINE PANEL view to get close.
+  crew: { label: "CREW", crop: CREW_SITEPAL_CROP, filter: CREW_SITEPAL_FILTER, constName: "CREW", activateOnSelect: true,
+    // No greeting pool (the briefing lines are RigCrew's), so the tab speaks one of these on
+    // select and on SAY A LINE — otherwise there is nothing to hear while tuning the crop.
+    tuneLines: ["Crew reporting in, boss.", "Testing, testing. Can you hear me up there?", "Pump's turning, valve's tight, nobody's dozing. Officially."] },
 };
 
 // ── Single SitePal host embed for the /hailmary vendor strip ───────────────
@@ -160,6 +171,14 @@ function VendorCropTuner() {
     force((n) => n + 1);
   };
 
+  // Who is being tuned: characters outside the strip (the rig crew) read this to
+  // project without a focus, and a tab flagged activateOnSelect boots its scene.
+  useEffect(() => {
+    window.__vendorSitePalTuneId = sitepalId;
+    if (active.activateOnSelect) { try { activateVendorSitePal(sitepalId); } catch (e) {} }
+    if (active.tuneLines?.length) { try { speakVendorText(sitepalId, active.tuneLines[Math.floor(Math.random() * active.tuneLines.length)]); } catch (e) {} }
+    return () => { window.__vendorSitePalTuneId = null; };
+  }, [sitepalId, active]);
   useEffect(() => {
     // Carries the vendor so the pin lands on the stall whose sliders are live,
     // rather than on whichever one happens to be focused — and so it still
@@ -317,6 +336,17 @@ function VendorCropTuner() {
         >
           BLINK
         </button>
+        {/* Hear the voice without leaving the panel: a tab's tuneLines, or a stock line. */}
+        <button
+          onClick={() => { const lines = active.tuneLines || ["Testing, one two three."]; try { speakVendorText(sitepalId, lines[Math.floor(Math.random() * lines.length)]); } catch (e) {} }}
+          title="speak a test line in this character's voice"
+          style={{
+            flex: "0 0 74px", padding: "4px 6px", fontSize: 11, cursor: "pointer",
+            background: "#1a2230", color: "#cde", border: "1px solid #6a4a2a", borderRadius: 4,
+          }}
+        >
+          SAY A LINE
+        </button>
       </div>
       <div style={{ fontSize: 10, opacity: 0.6 }}>
         press f to flip · pins {active.label} — exactly one face mesh is drawn
@@ -421,8 +451,12 @@ export default function VendorSitePalHost() {
     // Lifecycle globals. vh_sceneLoaded fires on the initial load AND after
     // every loadSceneByID swap; read getSceneAttributes() rather than
     // trusting the call, because a failed swap silently keeps the old scene.
-    window.__vendorSitePalSceneLoaded = false;
-    window.__vendorSitePalDesiredVolume = 0;
+    // A REMOUNT (the page mounts a host per layout, and a rig highlight re-renders around it)
+    // must not forget a scene the player already has up: vh_sceneLoaded only fires on a swap,
+    // so a false here would stay false for anything that projects without focusing a stall
+    // (the rig crew's tune mode / briefing). Reset only before the player exists.
+    if (!window.__vendorSitePalEmbedded) window.__vendorSitePalSceneLoaded = false;
+    window.__vendorSitePalDesiredVolume = window.__vendorSitePalDesiredVolume || 0;
     window.vh_sceneLoaded = () => {
       try {
         if (typeof window.getSceneAttributes === "function") {
