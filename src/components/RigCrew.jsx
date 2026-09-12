@@ -50,7 +50,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { VENDOR_SITEPAL_CONFIG, activateVendorSitePal, deactivateVendorSitePal, speakVendorText, onVendorTalk, getVendorSitePalSource } from "@/lib/vendorSitePal";
 import { createProjectionState, disposeProjectionState, updateProjection } from "@/lib/sitepalFace";
 
-export const CREW_GLB = "/models/crew_goblin.glb?v=15";
+export const CREW_GLB = "/models/crew_goblin.glb?v=16";
 useGLTF.preload(CREW_GLB);
 
 const CLIMB_RISE_FALLBACK = 0.219;  // crew_climb is in place; world rise per cycle (rig-GLB units) unless the
@@ -91,6 +91,11 @@ const WALK_SPEED = 0.518;           // rig units/s: crew_walk is in place; this 
 const WALK_MIN = 0.12;              // moves shorter than this stay a glide (a shuffle, not a walk)
 const BRIEF_LINE_S = 3.2;
 const BRIEF_GREET_S = 2.2;          // the operator waves at the boss this long before the first line (or until the opener is spoken)
+// How long a phrase may take to START playing before the briefing gives up on the voice and
+// paces by timer alone (2026-09-12). ElevenLabs through SitePal can take 3–6 s to synthesize a
+// line it has not cached; the old rule moved on after BRIEF_LINE_S and the next sayText cancelled
+// the phrase still loading — "the first or second phrase can't be heard" (Michelle).
+const SPEECH_START_S = 8;
 // What the briefer says around the report (spoken through SitePal in the goblin voice, shown in
 // the bubble either way). Short and boss-facing; SitePal caches TTS by text, so re-word rather
 // than re-voice. Openers go with the wave, closers get a nod.
@@ -104,6 +109,7 @@ const CREW_BRUSHOFF = {
   closers: ["Get off my platform.", "Don't touch nothin'.", "Go on, git.", "Mind the pump on your way out."],
 };
 let lastRude = [-1, -1, -1];
+let lastRudeGesture = "yell";
 let lastOpener = -1, lastCloser = -1;
 const pickLine = (pool, last) => { let i = Math.floor(Math.random() * pool.length); if (pool.length > 1 && i === last) i = (i + 1) % pool.length; return i; };
 const DOZE_CAUGHT = [3, 6];          // seconds the boss gets to catch a dozer before they scramble up to work
@@ -146,11 +152,13 @@ const ACTS = {
   nervous:     { clip: "crew_nervous",        dwell: [6, 12],  look: true },
   talking:     { clip: "crew_talking",        dwell: [10, 20], look: true },
   acknowledge: { clip: "crew_acknowledge",    once: true,      look: true },
-  neutralIdle: { clip: "crew_neutralIdle",    dwell: [6, 14],  look: true },   // the briefer between lines (her 2026-09-11 clip); idle if absent
+  neutralIdle: { clip: "crew_neutralIdle",    dwell: [6, 14],  look: true, fallback: "idle" },   // the briefer between lines (her 2026-09-11 clip); idle if absent
   no:          { clip: "crew_no",             once: true,      look: true },   // briefing replies: nothing to report…
   yes:         { clip: "crew_yes",            once: true,      look: true },   // …good news…
   thoughtful:  { clip: "crew_thoughtful",     once: true,      look: true },   // …something to think about
   shrug:       { clip: "crew_shrug",          once: true,      look: true },
+  scold:       { clip: "crew_scold",          once: true,      look: true, fallback: "no" },      // 2026-09-12: the brush-off, and outbursts in crew chat
+  yell:        { clip: "crew_yell",           once: true,      look: true, fallback: "shrug" },   // 7.7 s — the next line's gesture cuts it
   clap:        { clip: "crew_clap",           dwell: [5, 9],   look: true },
   cheer:       { clip: "crew_cheer",          dwell: [4, 8],   look: true },
   victory1:    { clip: "crew_victory1",       once: true,      look: true },
@@ -243,6 +251,62 @@ function pickWeighted(rng, items) {
 const rand = (a, b) => a + Math.random() * (b - a);
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
+// Step-turns (her 2026-09-12 clips, both RIGHT turns): a body-yaw change of TURN_MIN or more while
+// standing plays crew_quarterTurn (< HALF_TURN_MIN) or crew_halfTurn instead of the feet-planted
+// ease. The clips carry the turn in the root bone (Mixamo-style, plus ~15 cm of drift); at load
+// the root's tracks are flattened to their first key (in place, no root yaw) and the ORIGINAL root
+// yaw curve is kept as a normalized profile, so the page rotates the group along the clip's own
+// timing and to whatever angle is actually needed. A left turn is the clip played backwards.
+const TURN_MIN = 1.05;        // ≥ 60° turns step; less eases as before
+const HALF_TURN_MIN = 2.1;    // ≥ 120° uses the half turn
+const TURN_CLIPS = { quarter: "crew_quarterTurn", half: "crew_halfTurn" };
+const TURN_ACTS = new Set(["idle", "neutralIdle", "talking", "music", "nervous"]);   // standing loops a turn may interrupt
+const TURN_PROFILES = {};     // clip name → { total (rad, signed), p: Float32Array (yaw/total sampled 0..1) }
+const _tq = new THREE.Quaternion(), _tq0 = new THREE.Quaternion(), _tv = new THREE.Vector3(), _tv0 = new THREE.Vector3(), _tup = new THREE.Vector3(0, 1, 0);
+function patchTurnClips(animations, scene) {
+  if (!animations || !scene) return;
+  scene.updateMatrixWorld(true);
+  const rootBone = scene.getObjectByName("root");
+  const parentQ = new THREE.Quaternion(); if (rootBone?.parent) rootBone.parent.getWorldQuaternion(parentQ);
+  Object.values(TURN_CLIPS).forEach((name) => {
+    const clip = animations.find((c) => c.name === name); if (!clip || clip.userData?.hmTurnPatched) return;
+    const qt = clip.tracks.find((t) => t.name === "root.quaternion"), pt = clip.tracks.find((t) => t.name === "root.position");
+    if (!qt) return;
+    // yaw of each key: signed angle, about world +Y, of the root's most horizontal axis vs key 0
+    const n = qt.times.length, yaw = new Float32Array(n);
+    _tq0.fromArray(qt.values, 0).premultiply(parentQ);
+    const axes = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 1, 0)];
+    const axis = axes.reduce((best, a) => { const h = a.clone().applyQuaternion(_tq0); h.y = 0; return h.length() > best.len ? { a, len: h.length() } : best; }, { a: axes[0], len: -1 }).a;
+    _tv0.copy(axis).applyQuaternion(_tq0); _tv0.y = 0; _tv0.normalize();
+    let acc = 0, prev = 0;
+    for (let k = 0; k < n; k++) {
+      _tq.fromArray(qt.values, k * 4).premultiply(parentQ);
+      _tv.copy(axis).applyQuaternion(_tq); _tv.y = 0; _tv.normalize();
+      const ang = Math.atan2(_tv0.clone().cross(_tv).dot(_tup), _tv0.dot(_tv));
+      acc += wrapAngle(ang - prev); prev = ang; yaw[k] = acc;   // unwrapped: a half turn passes ±π
+    }
+    const total = yaw[n - 1], N = 32, prof = new Float32Array(N + 1);
+    for (let i = 0; i <= N; i++) {
+      const t = (i / N) * clip.duration; let k = 0; while (k < n - 2 && qt.times[k + 1] < t) k++;
+      const t0 = qt.times[k], t1 = qt.times[k + 1] ?? t0, f = t1 > t0 ? Math.min(1, Math.max(0, (t - t0) / (t1 - t0))) : 0;
+      const y = yaw[k] + (yaw[Math.min(n - 1, k + 1)] - yaw[k]) * f;
+      prof[i] = Math.abs(total) > 0.1 ? y / total : i / N;
+    }
+    TURN_PROFILES[name] = { total, p: prof };
+    // flatten the root: hold key 0 for rotation AND position (the page owns yaw and place)
+    for (let k = 1; k < n; k++) for (let j = 0; j < 4; j++) qt.values[k * 4 + j] = qt.values[j];
+    if (pt) for (let k = 1; k < pt.times.length; k++) for (let j = 0; j < 3; j++) pt.values[k * 3 + j] = pt.values[j];
+    clip.userData = { ...(clip.userData || {}), hmTurnPatched: true, hmTurnTotalDeg: +(total * 180 / Math.PI).toFixed(1) };
+  });
+}
+// Normalized progress of the body yaw at playback progress u (0..1); a reversed clip runs the
+// curve backwards from its end.
+const turnProfile = (name, u, reverse) => {
+  const P = TURN_PROFILES[name]; if (!P) return u;
+  const f = (x) => { const i = Math.min(P.p.length - 1, Math.max(0, x * (P.p.length - 1))); const k = Math.floor(i), r = i - k; return P.p[k] + ((P.p[Math.min(P.p.length - 1, k + 1)] || P.p[k]) - P.p[k]) * r; };
+  return reverse ? 1 - f(1 - u) : f(u);
+};
+
 // A station's transform in the rig root's frame — from the Crew_* empty if the rig
 // GLB has it, else the documented fallback.
 const _m = new THREE.Matrix4(), _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _ax = new THREE.Vector3();
@@ -268,7 +332,7 @@ function resolveStation(rigScene, id) {
 // Which reply a briefing line gets. page.js sends a tone per line ("no" | "yes" | "thoughtful");
 // without one, read the line: nothing-to-report shakes the head, gains nod, the rest ponders.
 const briefGesture = (tone, line = "") => {
-  if (tone === "rude") return Math.random() < 0.5 ? "no" : "shrug";
+  if (tone === "rude") { lastRudeGesture = lastRudeGesture === "scold" ? "yell" : "scold"; return lastRudeGesture; }   // alternate her scold / yell
   if (tone === "no" || tone === "yes" || tone === "thoughtful") return tone;
   if (/nothing new|no claim|signed out|pre-season|0% full/i.test(line)) return "no";
   if (/strike|drilled|BTR|unread|full/i.test(line)) return "yes";
@@ -306,6 +370,7 @@ export default function RigCrew({ rigScene, scale = 1, enabled = true, plotKey =
 
 function CrewInner({ sighting, forceScene, rigScene, scale, plotKey, plotId, envPreset, hellActive, gusherActive, pausedRef, panelRef, workers, wheelSpinRef, onValveTurn }) {
   const { scene, animations } = useGLTF(CREW_GLB);
+  useMemo(() => { patchTurnClips(animations, scene); return animations; }, [animations, scene]);   // in-place step-turns + their yaw profiles
   const rootRef = useRef();
   const gates = useMemo(() => ({ night: envPreset === "night", hell: !!hellActive, stalled: !!pausedRef?.current }), [envPreset, hellActive, pausedRef]);
   // Shared crew state: worker registry (head positions for "partner" looks), the chat and
@@ -482,7 +547,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
       walk: (sp) => { if (!STATIONS[sp]) return false; slideTo(sp, SLIDE_S, "idle"); return true; },   // walk to a spot in a straight line (preview only: no pathing round the rig)
       climb: () => { if (!MENU[st.current.spot]?.climbTo) return false; beginClimb(st.current.now || 0); return true; },   // start the ladder from its base now
       state: () => { const s = st.current; const g = groupRef.current; const gw = new THREE.Vector3(); if (g) g.getWorldPosition(gw); const sc = g ? g.getWorldScale(new THREE.Vector3()).y : 1;
-        return { spot: s.spot, act: s.act, hat: s.hat || null, mode: s.mode, phase: s.phase, scene: scene || null, yaw: +s.yawCur.toFixed(2), yawAim: s.yawAim == null ? null : +s.yawAim.toFixed(2), headUp: +((s.head.y - gw.y) / (sc || 1)).toFixed(3),
+        return { spot: s.spot, act: s.act, hat: s.hat || null, look: s.lookAtName || null, turn: s.turn ? { clip: s.turn.clip, reverse: s.turn.reverse, deg: +(s.turn.delta * 180 / Math.PI).toFixed(0) } : null, turns: Object.fromEntries(Object.entries(TURN_PROFILES).map(([k, v]) => [k, +(v.total * 180 / Math.PI).toFixed(1)])), mode: s.mode, phase: s.phase, scene: scene || null, yaw: +s.yawCur.toFixed(2), yawAim: s.yawAim == null ? null : +s.yawAim.toFixed(2), headUp: +((s.head.y - gw.y) / (sc || 1)).toFixed(3),
         props: Object.fromEntries(Object.entries(props).map(([n, o]) => { const w = new THREE.Vector3(); o.getWorldPosition(w); return [n, { visible: o.visible, verts: o.geometry?.attributes?.position?.count || 0, world: w.toArray().map((v) => +v.toFixed(3)) }]; })), chat: crew.chat ? { talker: crew.chat.talker, swapAt: +crew.chat.swapAt.toFixed(2) } : null, t: +s.t.toFixed(3), pos: s.pos.toArray().map((v) => +v.toFixed(3)), frames: s.frames, now: +(s.now || 0).toFixed(2), nextThrowAt: +(s.nextThrowAt || 0).toFixed(2), throws: s.throws || 0, fired: s.fired || 0, counted: s.counted || 0, dist: s.dbgDist == null ? null : +s.dbgDist.toFixed(2), running: !!(s.action && s.action.isRunning()), fromRig: resolveStation(rigScene, s.spot).fromRig, trace: s.trace || [], head: s.head.toArray().map((v) => +v.toFixed(3)), valveVents: s.valveVents || 0, projFade: +(s.projFade || 0).toFixed(2), faces: projRef.current ? { proj: !!projRef.current.proj, regulars: projRef.current.regulars.length } : null,
         projMat: (() => { const st = projRef.current; const m = st?.material; if (!m) return null; let px = null; try { const d = st.cropCtx.getImageData(256, 256, 1, 1).data; px = [d[0], d[1], d[2]]; } catch (e) {} const pm = st.regulars[0]?.material; return { color: "#" + m.color.getHexString(), mapCS: m.map?.colorSpace, mapIsTex: m.map === st.material.map, opacity: m.opacity, toneMapped: m.toneMapped, emissive: "#" + (m.emissive?.getHexString?.() || "000000"), emissiveIntensity: m.emissiveIntensity, type: m.type, paintedType: pm?.type, paintedMapCS: pm?.map?.colorSpace, paintedColor: pm ? "#" + pm.color.getHexString() : null, cropCentrePx: px, cropGrid: (() => { try { const g = []; for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) { const d = st.cropCtx.getImageData(64 + i * 192, 64 + j * 192, 1, 1).data; g.push([d[0], d[1], d[2]]); } return g; } catch (e) { return null; } })(), colorRaw: [m.color.r, m.color.g, m.color.b].map((v) => +v.toFixed(3)), uv: (() => { const a = st.proj.geometry?.attributes?.uv; if (!a) return null; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (let i = 0; i < a.count; i++) { const x = a.getX(i), y = a.getY(i); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } return { count: a.count, min: [+x0.toFixed(3), +y0.toFixed(3)], max: [+x1.toFixed(3), +y1.toFixed(3)] }; })(), projMatType: st.proj.material?.type, projVisible: st.proj.visible }; })(),
         weightSum: +Object.values(actionsRef.current).reduce((acc, o) => acc + (o.isScheduled() && o.enabled ? o.getEffectiveWeight() : 0), 0).toFixed(3), visible: !!g?.visible,
@@ -532,8 +597,8 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     Object.entries(hats).forEach(([n, o]) => { o.visible = n === on; }); s.hat = on;
   };
   const startAct = (act, now, dwell) => {
-    if (act === "neutralIdle" && !actionsRef.current["crew_neutralIdle"]) act = "idle";   // stale GLB: never stand in the bind pose
-    const s = st.current; const def = ACTS[act] || ACTS.idle;
+    while (ACTS[act] && !actionsRef.current[ACTS[act].clip] && ACTS[act].fallback) act = ACTS[act].fallback;   // stale GLB: never stand in the bind pose
+    const s = st.current; const def = ACTS[act] || ACTS.idle; s.turn = null;   // a new act cancels a step-turn in progress
     s.act = act; s.phase = "act"; s.replayAt = 0; s.wheelBase = null; s.action = play(def.clip, { once: !!def.once, timeScale: def.reverse ? -1 : 1, fromEnd: !!def.reverse });
     s.actEnds = def.once || def.forever ? Infinity : now + (dwell ?? rand(def.dwell[0], def.dwell[1]));
     showProps(act); showHat(!!def.offDuty);
@@ -629,10 +694,11 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     else if (mode === "alert") startAct("nervous", now, 999);
     else if (mode === "celebrate") startAct("clap", now);
     else if (mode === "brief") {                                            // greet (the opener is spoken with the wave), then each line brings its own gesture (modeTick)
-      const b = crew.brief; startAct(b.rude ? "shrug" : "wave", now); setBubble(b.opener || "Hey, boss."); b.i = 0; b.nextLineAt = now + BRIEF_GREET_S;   // a stranger gets a shrug, not a wave
-      b.talkSeen = false; b.speaking = speakVendorText("crew", b.opener || "Hey, boss.");
+      const b = crew.brief; startAct(b.rude ? "scold" : "wave", now); setBubble(b.opener || "Hey, boss."); b.i = 0; b.nextLineAt = now + BRIEF_GREET_S;   // a stranger gets a scolding, not a wave
+      b.talkSeen = false; b.noVoice = false; b.speaking = speakVendorText("crew", b.opener || "Hey, boss."); b.speakDeadline = now + SPEECH_START_S + 1.5;   // +1.5: the opener also waits out the activation's greeting delay
     }
-    else if (mode === "listen" || mode === "chatListen") { startAct("idle", now, 999); s.nextGesture = now + rand(2, 5); }
+    else if (mode === "listen") { startAct(Math.random() < 0.5 && actionsRef.current["crew_neutralIdle"] ? "neutralIdle" : "idle", now, 999); s.nextGesture = Infinity; s.yawAim = null; s.noticeAt = now + rand(0.5, 1.4); }   // the other worker just notices the boss: no body turn, no gestures, head only (Michelle, 2026-09-12)
+    else if (mode === "chatListen") { startAct("idle", now, 999); s.nextGesture = now + rand(2, 5); }
     else if (mode === "chat") startAct("talking", now, 999);
     else if (mode === "music") startAct("music", now, 999);
     else if (mode === null) menuAct(now);
@@ -645,7 +711,8 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     else if (mode === "celebrate") startAct(s.act === "clap" ? (Math.random() < 0.5 ? "victory1" : "victory2") : "clap", now);
     else if (mode === "brief") startAct(actionsRef.current["crew_neutralIdle"] ? "neutralIdle" : "idle", now, 999);   // a reply gesture ended: hold until the next line
     else if (mode === "chat") startAct("talking", now, 999);
-    else if (mode === "listen" || mode === "chatListen") { startAct("idle", now, 999); s.nextGesture = now + rand(2.5, 6); }
+    else if (mode === "listen") { startAct("idle", now, 999); s.nextGesture = Infinity; }
+    else if (mode === "chatListen") { startAct("idle", now, 999); s.nextGesture = now + rand(2.5, 6); }
     else if (mode === "music") startAct("music", now, 999);
     else nextAct(now);
   };
@@ -677,19 +744,30 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
       const c = state.camera.position; faceWorld(c.x, c.y, c.z);          // turn to the player
       const b = crew.brief; if (!b) return;
       b.now = now;
-      if (b.speaking && !b.talkSeen && now >= b.nextLineAt) b.speaking = false;   // speech never started (no host, no audio): the timer paces
+      if (b.speaking && !b.talkSeen && now >= b.speakDeadline) { b.speaking = false; b.noVoice = true; }   // no host, no audio, or SitePal never started this phrase: the timer paces from here on
       if (now >= b.nextLineAt && !b.speaking) {
         if (b.i >= b.lines.length) { crew.brief = null; deactivateVendorSitePal(); return; }
         const line = b.lines[b.i];
         setBubble(line); startAct(briefGesture(b.tones?.[b.i], line), now); b.i += 1; b.nextLineAt = now + BRIEF_LINE_S;
-        b.talkSeen = false; b.speaking = speakVendorText("crew", line);
+        b.talkSeen = false; b.speaking = !b.noVoice && speakVendorText("crew", line); b.speakDeadline = now + SPEECH_START_S;
       }
-    } else if (mode === "listen" || mode === "chatListen") {
-      if (mode === "listen") { const t = partner(); if (t) faceWorld(t.head.x, t.head.y, t.head.z); }   // turn to the one briefing
-      if (mode === "chatListen" && !crew.chat) crew.chat = { talker: role.id, swapAt: now + rand(...CHAT_TURN) };   // first to notice opens the conversation
+    } else if (mode === "listen") {
+      // watching the briefing: body stays put, no gestures — the head turns to the camera (below)
+    } else if (mode === "chatListen") {
+      if (!crew.chat) crew.chat = { talker: role.id, swapAt: now + rand(...CHAT_TURN) };   // first to notice opens the conversation
       if (s.act === "idle" && now >= s.nextGesture) startAct(Math.random() < 0.65 ? "acknowledge" : "shrug", now);
     } else if (mode === "chat") {
       if (!crew.chat || now >= crew.chat.swapAt) { const other = Object.keys(crew.workers).find((k) => k !== role.id) || role.id; crew.chat = { talker: other, swapAt: now + rand(...CHAT_TURN) }; }
+      else {
+        // One chance per talking turn at an outburst (her 2026-09-12 clips): a scolding now and
+        // then, the odd yell; crew_talking resumes when it ends (modeNext).
+        if (s.chatTurnAt !== crew.chat.swapAt) { s.chatTurnAt = crew.chat.swapAt; s.outburstAt = now + rand(2.5, 7); }
+        if (s.act === "talking" && s.outburstAt && now >= s.outburstAt) {
+          s.outburstAt = 0; const r = Math.random();
+          if (r < 0.3 && actionsRef.current["crew_scold"]) startAct("scold", now);
+          else if (r < 0.42 && actionsRef.current["crew_yell"]) startAct("yell", now);
+        }
+      }
     }
   };
 
@@ -771,7 +849,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
           else if (s.act === "doze" && s.dozeUntil && now >= s.dozeUntil) wakeUp(now);
           else if (finished && !s.replayAt) s.replayAt = now + rand(...def.holdBetween);
           else if (s.replayAt && now >= s.replayAt) { s.replayAt = 0; s.action.reset(); s.action.play(); }
-        } else if (finished || now >= s.actEnds) {
+        } else if (!s.turn && (finished || now >= s.actEnds)) {
           if (s.act === "uncower" || s.act === "getUp") { const to = s.wakeTo; s.wakeTo = null; if (to) { s.mode = null; enterMode(to, now); } else { s.mode = null; menuAct(now); } }
           else modeNext(s.mode, now);
         }
@@ -805,9 +883,23 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
         startAct("idle", now); s.actEnds = now + rand(20, 40); // rest at the base before the next climb
       }
     }
-    // body yaw: the station's facing, or eased toward a demon while defending
+    // body yaw: the station's facing, or eased toward a demon while defending. A big change while
+    // standing steps through a turn clip; the group follows the clip's own yaw curve (see TURN_*).
     const yawT = s.yawAim ?? s.yaw;
-    s.yawCur += wrapAngle(yawT - s.yawCur) * (1 - Math.exp(-BODY_TURN_EASE * dt));
+    const dY = wrapAngle(yawT - s.yawCur);
+    if (s.turn) {
+      const T = s.turn, a = s.action, dur = a?.getClip().duration || 1;
+      const u = a ? Math.min(1, Math.max(0, (T.reverse ? dur - a.time : a.time) / dur)) : 1;
+      s.yawCur = T.start + T.delta * turnProfile(T.clip, u, T.reverse);
+      if (!a || !a.isRunning()) { s.yawCur = T.start + T.delta; const { act, actEnds } = T; s.turn = null; startAct(act, now); s.actEnds = actEnds; }
+    } else if (Math.abs(dY) >= TURN_MIN && s.phase === "act" && TURN_ACTS.has(s.act) && s.mode !== "defend" && !tuneHold && TURN_PROFILES[TURN_CLIPS.quarter]) {
+      const clip = Math.abs(dY) >= HALF_TURN_MIN && TURN_PROFILES[TURN_CLIPS.half] ? TURN_CLIPS.half : TURN_CLIPS.quarter;
+      const reverse = Math.sign(dY) !== Math.sign(TURN_PROFILES[clip].total);   // both clips turn right; a left turn plays backwards
+      const T = { clip, start: s.yawCur, delta: dY, reverse, act: s.act, actEnds: s.actEnds };
+      const a = play(clip, { once: true, timeScale: reverse ? -1 : 1, fromEnd: reverse });
+      if (a) { s.turn = T; s.action = a; s.actEnds = Infinity; }
+      else s.yawCur += dY * (1 - Math.exp(-BODY_TURN_EASE * dt));
+    } else s.yawCur += dY * (1 - Math.exp(-BODY_TURN_EASE * dt));
     g.position.copy(s.pos); g.rotation.y = s.yawCur;
 
     // head: look at the point of interest (mode first, then the spot's), eased and clamped
@@ -819,8 +911,10 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     else if (s.mode === "defend") lookAt = "demon";
     else if (s.mode === "celebrate") lookAt = "head_pump";
     else if (s.mode === "brief") lookAt = "camera";
-    else if (s.mode === "listen" || s.mode === "chat" || s.mode === "chatListen") lookAt = "partner";
+    else if (s.mode === "listen") lookAt = s.now >= (s.noticeAt || 0) ? "camera" : null;   // a beat, then it notices the boss
+    else if (s.mode === "chat" || s.mode === "chatListen") lookAt = "partner";
     else if (s.mode === null && ACTS[s.act]?.look) lookAt = MENU[s.spot]?.look || null;
+    s.lookAtName = lookAt;   // dev state
     if (lookAt) {
       headBone.getWorldPosition(_headPos);
       let ok = false;
@@ -859,17 +953,31 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     <group ref={groupRef} visible={false} onClick={(e) => { e.stopPropagation(); onTap?.(); }}>   {/* shown once the mixer has posed it (useFrame) — a fresh clone renders in the bind pose */}
       <primitive object={clone} />
       {bubble && (
-        <Html center position={[0, 0.98, 0]} zIndexRange={[9999, 9999]} style={{ pointerEvents: "none" }}>
-          <div style={bubbleStyle}>{bubble}</div>
+        // Anchored just above the hat and lifted by its own height so the box never sits on the
+        // face (Michelle's phone screenshot, 2026-09-12); a small tail points back at the talker.
+        <Html center position={[0, 1.0, 0]} zIndexRange={[9999, 9999]} style={{ pointerEvents: "none" }}>
+          <div style={bubbleWrapStyle}>
+            <div style={bubbleStyle}>{bubble}</div>
+            <div style={bubbleTailStyle} />
+          </div>
         </Html>
       )}
     </group>
   );
 }
 
+// The wrapper is centred on the anchor by drei; translating it up by its full height puts the
+// tail's tip on the anchor, so the whole bubble floats above the head whatever its size.
+const bubbleWrapStyle = { display: "flex", flexDirection: "column", alignItems: "center", transform: "translateY(calc(-50% - 4px))" };
 const bubbleStyle = {
   fontFamily: "'Share Tech Mono', monospace", fontSize: 12, letterSpacing: "0.04em", lineHeight: 1.25,
   color: "#f3e7c3", background: "rgba(20, 14, 10, 0.86)", border: "1px solid rgba(243, 231, 195, 0.35)",
-  padding: "6px 9px", borderRadius: 4, whiteSpace: "nowrap", maxWidth: 260, textAlign: "center",
+  padding: "6px 9px", borderRadius: 4, textAlign: "center",
+  // wrap long lines inside the box instead of running past it (2026-09-12)
+  whiteSpace: "normal", width: "max-content", maxWidth: 220, overflowWrap: "break-word",
   boxShadow: "0 2px 10px rgba(0,0,0,0.35)",
+};
+const bubbleTailStyle = {
+  width: 8, height: 8, marginTop: -5, transform: "rotate(45deg)",
+  background: "rgba(20, 14, 10, 0.86)", borderRight: "1px solid rgba(243, 231, 195, 0.35)", borderBottom: "1px solid rgba(243, 231, 195, 0.35)",
 };

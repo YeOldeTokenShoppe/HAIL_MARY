@@ -823,7 +823,9 @@ export function speakVendorText(vendorId, text, gesture = null) {
   state.desiredVolume = 7;
   state.activeVendorId = vendorId;
   win.__vendorSitePalDesiredVolume = 7;
-  state.speakNotBefore = 0;
+  // Keep a still-pending activation delay: the first line after activateVendorSitePal() waits
+  // out GREETING_DELAY_MS like a greeting would, so it does not land on top of the saySilent(0)
+  // primer and get swallowed (2026-09-12). Later lines find the delay in the past and go at once.
   if (state.speakTimer) { clearTimeout(state.speakTimer); state.speakTimer = null; }
   state.pending = { vendorId, sceneId: config.sceneId, text, gesture, voice: config.voice };
   if (vendorSitePalReady(config.sceneId)) speakPendingVendorLine();

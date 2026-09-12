@@ -550,6 +550,37 @@ worker, `frustumCulled=false` on the skinned meshes, mixer delta capped at 1/30.
   A single baked atlas for the whole rig was audited
   and declined the same day: the field never samples the textures, draw calls follow mesh count
   not material count, and the panel instruments are driven per material by name.
+- **Step-turns, scold, yell** (2026-09-12, crew GLB v16, 30 clips): `crew_quarterTurn` (1.0 s)
+  and `crew_halfTurn` (1.6 s) are both RIGHT turns and carry the turn in the root bone plus
+  ~15 cm of drift, Mixamo-style. RigCrew flattens the root's tracks to their first key at load
+  (`patchTurnClips`, in place) and keeps the original root yaw as a normalized profile
+  (`TURN_PROFILES`, measured −95.6° / −175.1° in three's yaw sense). A body-yaw change ≥ 60°
+  while standing in idle/neutralIdle/talking/music/nervous plays the quarter turn, ≥ 120° the
+  half, the group's yaw follows the clip's own curve scaled to the angle actually needed, and a
+  left turn is the same clip played backwards. Smaller changes still ease as before; defend,
+  the tuner hold and every once-act keep the old ease. `crew_scold` (2.4 s) opens the stranger
+  brush-off and alternates with `crew_yell` (7.7 s) for its lines; in crew chat the talker gets
+  one chance per turn at an outburst (30 % scold, 12 % yell), then crew_talking resumes.
+- **The other worker just watches** (2026-09-12): during a briefing the non-talker (mode
+  `listen`) no longer turns its body to the briefer or throws acknowledge/shrug gestures — it
+  keeps its station facing and its idle (idle or neutralIdle), and after a 0.5–1.4 s beat its
+  HEAD turns to the camera as if it just noticed the boss. Chat listeners (`chatListen`) keep
+  the old behaviour. Head tracking is skipped on low-gfx (the phone), so there the watcher
+  simply stands still.
+- **Bubble and phone framing** (2026-09-12, her iPhone screenshot): the speech bubble is
+  anchored at 1.0 above the feet and translated up by its own height, so it floats above the hat
+  with a small tail instead of sitting on the face; long lines wrap (`white-space: normal`,
+  `max-width` 220 px) instead of running past the box. The phone rig shot is pulled in along its
+  fitted bearing by `RIG_CAMERA_PULL` (0.72: distance 1.56 → 1.12, rig ≈ 95 % of the portrait
+  width; the horse head nearly touches the left edge — back it off to 0.78 if that reads tight).
+- **Silent first phrases** (2026-09-12): the briefing used its bubble timers (2.2 s greet,
+  3.2 s per line) as the deadline for a phrase to START, but ElevenLabs through SitePal needs
+  3–6 s for a line it has not cached (and ~8 s on the phone's first tap while the player embeds),
+  so the next `sayText` cancelled the phrase still loading. Now a phrase gets `SPEECH_START_S`
+  (8 s, +1.5 s for the opener) to start; only if nothing starts does the brief mark itself
+  voiceless and pace by timer. `speakVendorText` also no longer zeroes the activation's
+  greeting delay, so the opener waits out `saySilent(0)` like a vendor greeting does. Measured
+  on the phone: 3 phrases, 3 starts, both on the first tap and on a re-tap.
 - **Briefing replies** (2026-09-11): a tap makes the operator wave at the boss ("Hey, boss.",
   `BRIEF_GREET_S` 2.2 s), then each briefing line comes with a reply gesture: page.js sends a
   `tone` per line in `window.__hmBriefing.tones` — "no" for nothing to report (rig signed out /

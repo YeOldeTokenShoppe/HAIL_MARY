@@ -157,9 +157,17 @@ export const RIG_FOV = 35;
 // target = the rig's projected centre, distance = the whole rig at 95% of the portrait width,
 // bearing swung from 48° to 55° off the panel normal so the long axis foreshortens a little
 // and the rig sits 13% larger for the same fit. Width always binds on this rig in portrait.
-export const RIG_CAMERA = {
+// 2026-09-12: on her phone the rig spanned ~65% of the width and the crew read as specks, so the
+// shot is pulled in along the same bearing: RIG_CAMERA_PULL scales the camera's offset from the
+// target (0.72 → distance 1.56 → 1.12, the rig ≈ 90% of the portrait width).
+export const RIG_CAMERA_PULL = 0.72;
+const RIG_CAMERA_FIT = {
   position: [0.83, 1.55, 1.32],
   target: [-0.04, 1.17, 0.08],
+};
+export const RIG_CAMERA = {
+  target: RIG_CAMERA_FIT.target,
+  position: RIG_CAMERA_FIT.position.map((v, i) => RIG_CAMERA_FIT.target[i] + (v - RIG_CAMERA_FIT.target[i]) * RIG_CAMERA_PULL),
 };
 
 // Ground tile with the field's textures and palette. Full field depth so it
