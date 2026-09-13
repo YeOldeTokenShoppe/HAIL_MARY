@@ -21,9 +21,10 @@ import BuyModal from './BuyModal';
 import CyberNav from './CyberNav';
 import HorizontalRoadmap from './HorizontalRoadmap';
 import { createLowRider, LOW_RIDER_MODEL_URL } from '@/lib/palmTreeDriveCar.mjs';
+import { applyIllustratedStyle } from '@/lib/palmTreeDriveIllustrated.mjs';
 import { createCandyEmeraldPaint } from '@/lib/palmTreeDrivePaint.mjs';
 import { createPalmTreeDriveCameraHelper } from '@/lib/palmTreeDriveCameraHelper.mjs';
-import { DESKTOP_CAMERA_SHOTS, DESKTOP_CAMERA_SECONDS, sampleDesktopCamera } from '@/lib/palmTreeDriveCameraPath.mjs';
+import { DESKTOP_CAMERA_SHOTS, DESKTOP_CAMERA_SECONDS, sampleResponsiveCamera } from '@/lib/palmTreeDriveCameraPath.mjs';
 
 
 
@@ -601,15 +602,10 @@ const PalmsScene = ({ onLoadingChange }) => {
       return (isIPhone || isAndroid) && hasSmallScreen && hasTouch;
     })();
     
-    // Start camera at aerial view position based on device type
-    if (isMobileDevice) {
-      camera.position.set(15.5605, 12.0910, 60.1540);  // Mobile aerial view - moved back and adjusted X
-      camera.lookAt(3.0669, 6.0868, 20.1252);           // Mobile initial target
-    } else {
-      camera.position.set(DESKTOP_CAMERA_SHOTS[0].x, DESKTOP_CAMERA_SHOTS[0].y, DESKTOP_CAMERA_SHOTS[0].z);    // Desktop aerial view
-      camera.lookAt(DESKTOP_CAMERA_SHOTS[0].targetX, DESKTOP_CAMERA_SHOTS[0].targetY, DESKTOP_CAMERA_SHOTS[0].targetZ);           // Desktop initial target
-    }
-    camera.fov = 45;
+    // Every viewport starts at the same captured opening shot.
+    camera.position.set(DESKTOP_CAMERA_SHOTS[0].x, DESKTOP_CAMERA_SHOTS[0].y, DESKTOP_CAMERA_SHOTS[0].z);
+    camera.lookAt(DESKTOP_CAMERA_SHOTS[0].targetX, DESKTOP_CAMERA_SHOTS[0].targetY, DESKTOP_CAMERA_SHOTS[0].targetZ);
+    camera.fov = sampleResponsiveCamera(0, camera.aspect).fov;
     camera.updateProjectionMatrix();
     cameraRef.current = camera;
     
@@ -870,25 +866,14 @@ const PalmsScene = ({ onLoadingChange }) => {
     controls.maxDistance = 0;
     controls.maxPolarAngle = Math.PI * 0.5; // Initial limit - will be dynamic
     controls.minPolarAngle = 0; // Prevent camera from flipping
-    // Set initial target to match the camera's lookAt position based on device
-    if (isMobileDevice) {
-      controls.target.set(3.0669, 6.0868, 20.1252); // Mobile initial target
-    } else {
-      controls.target.set(DESKTOP_CAMERA_SHOTS[0].targetX, DESKTOP_CAMERA_SHOTS[0].targetY, DESKTOP_CAMERA_SHOTS[0].targetZ); // Desktop initial target
-    }
+    controls.target.set(DESKTOP_CAMERA_SHOTS[0].targetX, DESKTOP_CAMERA_SHOTS[0].targetY, DESKTOP_CAMERA_SHOTS[0].targetZ);
     controls.zoomToCursor = true;
     controls.enabled = false; // Start with controls disabled since scroll camera is active
     // Don't call controls.update() here - it repositions the camera even when disabled
     controlsRef.current = controls; // Store ref for access in event handlers
     
-    // Re-set camera position after OrbitControls creation to ensure it stays at aerial view
-    if (isMobileDevice) {
-      camera.position.set(15.5605, 12.0910, 60.1540);  // Mobile aerial view - moved back and adjusted X
-      camera.lookAt(3.0669, 6.0868, 20.1252);           // Mobile initial target
-    } else {
-      camera.position.set(DESKTOP_CAMERA_SHOTS[0].x, DESKTOP_CAMERA_SHOTS[0].y, DESKTOP_CAMERA_SHOTS[0].z);    // Desktop aerial view
-      camera.lookAt(DESKTOP_CAMERA_SHOTS[0].targetX, DESKTOP_CAMERA_SHOTS[0].targetY, DESKTOP_CAMERA_SHOTS[0].targetZ);           // Desktop initial target
-    }
+    camera.position.set(DESKTOP_CAMERA_SHOTS[0].x, DESKTOP_CAMERA_SHOTS[0].y, DESKTOP_CAMERA_SHOTS[0].z);
+    camera.lookAt(DESKTOP_CAMERA_SHOTS[0].targetX, DESKTOP_CAMERA_SHOTS[0].targetY, DESKTOP_CAMERA_SHOTS[0].targetZ);
     camera.updateProjectionMatrix();
 
     // Ground and road
@@ -1421,6 +1406,11 @@ const PalmsScene = ({ onLoadingChange }) => {
         }
       });
 
+      // Keep the previous finish accessible for direct visual comparison.
+      if (new URLSearchParams(window.location.search).get('sceneStyle') !== 'original') {
+        applyIllustratedStyle(carScene);
+      }
+
       // A small, soft-edged portrait light aimed down at the dashboard statue.
       // Its short range and narrow cone keep the surrounding paint subdued.
       const maryKey = new THREE.SpotLight(0xffe6cc, 0.3, 0.85, 0.30, 1, 2);
@@ -1565,16 +1555,11 @@ const PalmsScene = ({ onLoadingChange }) => {
       })();
       
       
-      // Set initial camera position based on device type
-      const initialPos = isMobile 
-        ? { x: 17.5605, y: 12.0910, z: 55.1540 }  // Mobile aerial view
-        : DESKTOP_CAMERA_SHOTS[0];   // Desktop aerial view
-      
-      const initialTarget = isMobile
-        ? { x: 3.0669, y: 6.0868, z: 20.1252 }     // Mobile initial target
-        : { x: DESKTOP_CAMERA_SHOTS[0].targetX, y: DESKTOP_CAMERA_SHOTS[0].targetY, z: DESKTOP_CAMERA_SHOTS[0].targetZ };    // Desktop initial target
-      
-      const initialFov = 45;
+      // Shared captures prevent mobile and desktop tours from drifting apart.
+      const initialPos = sampleResponsiveCamera(0, camera.aspect);
+      const initialTarget = { x: initialPos.targetX, y: initialPos.targetY, z: initialPos.targetZ };
+
+      const initialFov = initialPos.fov;
       
       cameraRef.current.position.set(initialPos.x, initialPos.y, initialPos.z);
       cameraRef.current.lookAt(initialTarget.x, initialTarget.y, initialTarget.z);
@@ -1583,7 +1568,6 @@ const PalmsScene = ({ onLoadingChange }) => {
       
       if (controlsRef.current) {
         controlsRef.current.target.set(initialTarget.x, initialTarget.y, initialTarget.z);
-        controlsRef.current.update();
       }
       
       // Create a simple timeline for camera movement
@@ -1596,9 +1580,7 @@ const PalmsScene = ({ onLoadingChange }) => {
       // Mary is a small dashboard assembly centered near (2.45, 1.29, 24.35).
       // Approach from above the open cabin, then look forward from behind her.
       // Share the final pose with onComplete so Skip Intro lands on the same shot.
-      const maryShot = isMobile
-        ? { x: 2.46, y: 1.40, z: 24.83, targetX: 2.45, targetY: 1.31, targetZ: 24.35, fov: 36 }
-        : DESKTOP_CAMERA_SHOTS.at(-1);
+      const maryShot = sampleResponsiveCamera(1, camera.aspect);
 
       // Define camera path from aerial to the dashboard statue
       const cameraPath = {
@@ -1614,62 +1596,12 @@ const PalmsScene = ({ onLoadingChange }) => {
       
       const desktopSweep = { progress: 0 };
 
-      // Use different camera paths for mobile vs desktop
-      if (isMobile) {
-        // Mobile camera sequence - using smoother transitions
-        // Mobile waypoint 1: Approach from above
-        tl.to(cameraPath, {
-          x: 1.0987,
-          y: 4.8203,
-          z: 36.7389,
-          targetX: 1.1492,
-          targetY: 2.2977,
-          targetZ: 23.3133,
-          fov: 44.995111,
-          duration: 0.2,
-          ease: "none"  // Linear for smoother transitions
-        })
-        // Mobile waypoint 2: Dramatic side angle
-        .to(cameraPath, {
-          x: -7.7565,
-          y: 3.4606,
-          z: 9.1109,
-          targetX: 0.3402,
-          targetY: 0.9371,
-          targetZ: 22.4996,
-          fov: 44.833105,
-          duration: 0.25,
-          ease: "none"  // Linear for consistency
-        })
-        // Mobile waypoint 3: Descend above the open cabin
-        .to(cameraPath, {
-          x: 2.5,
-          y: 2.7,
-          z: 25.3,
-          targetX: 2.45,
-          targetY: 1.3,
-          targetZ: 24.35,
-          fov: 44.832617,
-          duration: 0.2,
-          ease: "none"  // Linear throughout
-        })
-        // Mobile final: Mary with dashboard context
-        .to(cameraPath, {
-          ...maryShot,
-          duration: 0.3,
-          ease: "power2.out"  // Only ease out at the very end
-        });
-        
-        
-        ;
-      } else {
-        // One continuous sweep, with gentle acceleration only at its ends.
-        tl.to(desktopSweep, { progress: 1, duration: 1, ease: "none" });
-      }
-  
+      // Both touch scrolling and desktop autoplay follow the same smooth sweep.
+      tl.to(desktopSweep, { progress: 1, duration: 1, ease: "none" });
+
       // Single onUpdate for the entire timeline
       tl.eventCallback("onUpdate", () => {
-        if (!isMobile) sampleDesktopCamera(desktopSweep.progress, cameraPath);
+        sampleResponsiveCamera(desktopSweep.progress, camera.aspect, cameraPath);
         if (camera) {
           // Always update camera during scroll animation, regardless of controls state
           camera.position.set(cameraPath.x, cameraPath.y, cameraPath.z);

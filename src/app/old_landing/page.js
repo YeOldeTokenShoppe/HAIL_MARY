@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import PlainBlackSample from '@/components/PlainBlackSample';
 import PalmTreeDrive from '@/components/PalmTreeDrive';
 import { useMusic } from '@/components/MusicContext';
 import CyberNav from '@/components/CyberNav';
@@ -123,6 +124,7 @@ export default function Home() {
         </div>
       )}
       
+      <PlainBlackSample />
       <PalmTreeDrive 
         onLoadingChange={setIsSceneLoading}
       />
