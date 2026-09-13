@@ -3717,6 +3717,13 @@ export default function OilPage() {
       hellTimeoutRef.current = null;
     }, 90000);
   }, [hellActive, selectedX, sliceY, envPreset]);
+  // Dev: window.__hmTestHell() — the admin TEST HELL button without the admin gate (select a plot
+  // first). Used to check the crew's cower → alert reaction on the real hell path (2026-09-12).
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return undefined;
+    window.__hmTestHell = handleTestHell;
+    return () => { if (window.__hmTestHell === handleTestHell) delete window.__hmTestHell; };
+  }, [handleTestHell]);
 
   // Mobile: two-phase camera pull-back while the demon is loose. The close
   // focused-rig view leaves the erupting demon too high in frame and loses it as
@@ -6666,7 +6673,7 @@ export default function OilPage() {
           width: "90%",
           textAlign: "center",
         }}>
-          <div style={{ fontSize: 11, letterSpacing: "0.2em", color: theme.muted, marginBottom: 8 }}>TROLLEUM TERRITORY</div>
+          <div style={{ fontSize: 11, letterSpacing: "0.2em", color: theme.muted, marginBottom: 8 }}>THE PLAINS OF π80</div>
           <h2 style={{
             fontFamily: "'Orbitron', monospace",
             fontSize: 16,
@@ -8339,7 +8346,7 @@ export default function OilPage() {
                 <span>HAIL MARY</span>
                 <span>PROSPECTING CO.{modeBadge}</span>
               </h1>
-              <p style={{ ...styles.subtitle, fontSize: 11 }}>TROLLEUM TERRITORY</p>
+              <p style={{ ...styles.subtitle, fontSize: 11 }}>THE PLAINS OF π80</p>
             </div>
           </div>
           <div style={styles.headerRight}>
@@ -8961,7 +8968,7 @@ export default function OilPage() {
             <h1 style={{ ...styles.title, display: "flex", alignItems: "center", gap: 8 }}>
               <span>HAIL MARY PROSPECTING CO.{modeBadge}</span>
             </h1>
-            <p style={{ ...styles.subtitle, fontSize: 18 }}>THE TROLLEUM TRAIL</p>
+            <p style={{ ...styles.subtitle, fontSize: 18 }}>THE PLAINS OF π80</p>
           </div>
         </div>
         <div style={styles.headerRight}>

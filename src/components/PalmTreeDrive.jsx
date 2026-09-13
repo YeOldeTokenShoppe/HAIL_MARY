@@ -20,6 +20,10 @@ import WebGLStandaloneText from '@/components/WebGLStandaloneText';
 import BuyModal from './BuyModal';
 import CyberNav from './CyberNav';
 import HorizontalRoadmap from './HorizontalRoadmap';
+import { createLowRider, LOW_RIDER_MODEL_URL } from '@/lib/palmTreeDriveCar.mjs';
+import { createCandyEmeraldPaint } from '@/lib/palmTreeDrivePaint.mjs';
+import { createPalmTreeDriveCameraHelper } from '@/lib/palmTreeDriveCameraHelper.mjs';
+import { DESKTOP_CAMERA_SHOTS, DESKTOP_CAMERA_SECONDS, sampleDesktopCamera } from '@/lib/palmTreeDriveCameraPath.mjs';
 
 
 
@@ -131,7 +135,7 @@ const PalmsScene = ({ onLoadingChange }) => {
   // Add ref for new light
   const carAccentLightRef = useRef(null);
   
-  // GUI removed for production
+  // Camera authoring controls are opt-in via ?cameraHelper=1.
   
   // Add ref for controls
   const controlsRef = useRef(null);
@@ -469,18 +473,17 @@ const PalmsScene = ({ onLoadingChange }) => {
   useEffect(() => {
     if (!mountRef.current) return;
 
+    let carPaint = null;
+
     // Create a fresh clock for this mount
     clockRef.current = new THREE.Clock();
     
     // Reset material shaders array
     materialShadersRef.current = [];
     
-    // Fallback timer to ensure loading completes
-    const loadingFallback = setTimeout(() => {
-      if (isSceneLoadingInternal) {
-        setIsSceneLoading(false);
-      }
-    }, 8000); // 8 seconds fallback to match home
+    // Reveal the scene only when the model callbacks have resolved.
+    setIsSceneLoading(true);
+    setModelsLoadState({ palm: 'loading', sign: 'loading', sun: 'loading', car: 'loading' });
 
     // Noise shader function
     const noise = `
@@ -568,6 +571,14 @@ const PalmsScene = ({ onLoadingChange }) => {
     `;
 
     const materialShaders = [];
+    let lowRider = null;
+    let disposed = false;
+    let startCameraSequence = null;
+    let cameraSequenceStarted = false;
+    let cameraHelper = null;
+    const cameraHelperEnabled = new URLSearchParams(window.location.search).get('cameraHelper') === '1';
+    const retryTimers = new Set();
+    const resolvedModelNames = new Set();
     const speed = 15; // Increased from 10 to make the car appear faster
     
     // Scene setup
@@ -595,8 +606,8 @@ const PalmsScene = ({ onLoadingChange }) => {
       camera.position.set(15.5605, 12.0910, 60.1540);  // Mobile aerial view - moved back and adjusted X
       camera.lookAt(3.0669, 6.0868, 20.1252);           // Mobile initial target
     } else {
-      camera.position.set(16.2711, 5.8264, 40.5498);    // Desktop aerial view
-      camera.lookAt(4.3726, 2.1681, 20.7525);           // Desktop initial target
+      camera.position.set(DESKTOP_CAMERA_SHOTS[0].x, DESKTOP_CAMERA_SHOTS[0].y, DESKTOP_CAMERA_SHOTS[0].z);    // Desktop aerial view
+      camera.lookAt(DESKTOP_CAMERA_SHOTS[0].targetX, DESKTOP_CAMERA_SHOTS[0].targetY, DESKTOP_CAMERA_SHOTS[0].targetZ);           // Desktop initial target
     }
     camera.fov = 45;
     camera.updateProjectionMatrix();
@@ -863,7 +874,7 @@ const PalmsScene = ({ onLoadingChange }) => {
     if (isMobileDevice) {
       controls.target.set(3.0669, 6.0868, 20.1252); // Mobile initial target
     } else {
-      controls.target.set(4.3726, 2.1681, 20.7525); // Desktop initial target
+      controls.target.set(DESKTOP_CAMERA_SHOTS[0].targetX, DESKTOP_CAMERA_SHOTS[0].targetY, DESKTOP_CAMERA_SHOTS[0].targetZ); // Desktop initial target
     }
     controls.zoomToCursor = true;
     controls.enabled = false; // Start with controls disabled since scroll camera is active
@@ -875,8 +886,8 @@ const PalmsScene = ({ onLoadingChange }) => {
       camera.position.set(15.5605, 12.0910, 60.1540);  // Mobile aerial view - moved back and adjusted X
       camera.lookAt(3.0669, 6.0868, 20.1252);           // Mobile initial target
     } else {
-      camera.position.set(16.2711, 5.8264, 40.5498);    // Desktop aerial view
-      camera.lookAt(4.3726, 2.1681, 20.7525);           // Desktop initial target
+      camera.position.set(DESKTOP_CAMERA_SHOTS[0].x, DESKTOP_CAMERA_SHOTS[0].y, DESKTOP_CAMERA_SHOTS[0].z);    // Desktop aerial view
+      camera.lookAt(DESKTOP_CAMERA_SHOTS[0].targetX, DESKTOP_CAMERA_SHOTS[0].targetY, DESKTOP_CAMERA_SHOTS[0].targetZ);           // Desktop initial target
     }
     camera.updateProjectionMatrix();
 
@@ -888,6 +899,9 @@ const PalmsScene = ({ onLoadingChange }) => {
     const planeMat = new THREE.ShaderMaterial({
       uniforms: {
         time: { value: 0 },
+        contactShadowsReady: { value: 0 },
+        tireContacts: { value: Array.from({ length: 4 }, () => new THREE.Vector4()) },
+        chassisContact: { value: new THREE.Vector4() },
         fogColor: { value: scene.fog.color },
         fogNear: { value: scene.fog.near },
         fogFar: { value: scene.fog.far }
@@ -919,6 +933,9 @@ const PalmsScene = ({ onLoadingChange }) => {
         uniform vec3 fogColor;
         uniform float fogNear;
         uniform float fogFar;
+        uniform float contactShadowsReady;
+        uniform vec4 tireContacts[4];
+        uniform vec4 chassisContact;
         varying vec3 vPos;
         varying vec2 vUv;
         
@@ -958,6 +975,22 @@ const PalmsScene = ({ onLoadingChange }) => {
           float centerLine = dashLine(vPos);
           vec3 lineColor = vec3(1.0, 1.0, 1.0); // White
           vec3 c = mix(roadColor, lineColor, centerLine * 0.8);
+
+          // Analytic contact shadows stay attached to the parked car while the
+          // road markings move. No shadow map, texture download, or extra pass.
+          if (contactShadowsReady > 0.5) {
+            vec2 bodyOffset = (vPos.xz - chassisContact.xy) / chassisContact.zw;
+            // Violet chassis underglow spreads onto the procedural road;
+            // standard Three.js lights cannot illuminate this custom shader.
+            float glow = exp(-0.95 * dot(bodyOffset, bodyOffset));
+            c = mix(c, vec3(0.48, 0.025, 1.15), 0.75 * glow);
+            float shade = 0.30 * exp(-2.0 * dot(bodyOffset, bodyOffset));
+            for (int i = 0; i < 4; i++) {
+              vec2 offset = (vPos.xz - tireContacts[i].xy) / tireContacts[i].zw;
+              shade = max(shade, 0.82 * exp(-2.5 * dot(offset, offset)));
+            }
+            c *= 1.0 - shade;
+          }
           
           // Apply fog
           float depth = gl_FragCoord.z / gl_FragCoord.w;
@@ -974,6 +1007,7 @@ const PalmsScene = ({ onLoadingChange }) => {
     
     const plane = new THREE.Mesh(planeGeom, planeMat);
     scene.add(plane);
+
 
     // Create loading manager to track all assets
     const loadingManager = new THREE.LoadingManager();
@@ -992,12 +1026,9 @@ const PalmsScene = ({ onLoadingChange }) => {
     
     loadingManager.onError = (url) => {
       console.error(`[CRITICAL] Failed to load model: ${url}`);
-      // Set error state to properly track failures
-      if (url.includes('palm2')) setModelsLoadState(prev => ({ ...prev, palm: 'error' }));
-      if (url.includes('sign2')) setModelsLoadState(prev => ({ ...prev, sign: 'error' }));
-      if (url.includes('synthSunset')) setModelsLoadState(prev => ({ ...prev, sun: 'error' }));
-      if (url.includes('lambo5k3')) setModelsLoadState(prev => ({ ...prev, car: 'error' }));
-      
+      // A failed request may be retried. Only the final failure callback
+      // resolves a model's loading state.
+
       // Log additional debug info for production issues
       console.error('[Debug] Failed URL:', url);
       console.error('[Debug] Current origin:', window.location.origin);
@@ -1009,7 +1040,8 @@ const PalmsScene = ({ onLoadingChange }) => {
     // Use explicit path that works in production
     const dracoPath = '/draco/';
     dracoLoader.setDecoderPath(dracoPath);
-    dracoLoader.setDecoderConfig({ type: 'js' }); // Ensure JS decoder is used
+    dracoLoader.setWorkerLimit(2);
+    dracoLoader.preload(); // Use the bundled WASM decoder when available.
     
     const loader = new GLTFLoader(loadingManager);
     loader.setDRACOLoader(dracoLoader);
@@ -1023,20 +1055,29 @@ const PalmsScene = ({ onLoadingChange }) => {
       }
       
       const attemptLoad = () => {
-        
+        if (disposed) return;
         loader.load(
           path,
-          onSuccess,
+          (gltf) => {
+            if (disposed) return;
+            onSuccess(gltf);
+            resolvedModelNames.add(modelName);
+            startCameraSequence?.();
+          },
           onProgress,
           (error) => {
+            if (disposed) return;
             retryCount[attemptKey]++;
             // console.error(`[PalmTreeDrive] Error loading ${modelName} (attempt ${retryCount[attemptKey]}):`, error);
             
             if (retryCount[attemptKey] <= maxRetries) {
-              setTimeout(attemptLoad, retryDelay);
+              const timer = setTimeout(() => { retryTimers.delete(timer); attemptLoad(); }, retryDelay);
+              retryTimers.add(timer);
             } else {
               // console.error(`[PalmTreeDrive] Failed to load ${modelName} after ${maxRetries} retries`);
               onError(error);
+              resolvedModelNames.add(modelName);
+              startCameraSequence?.();
             }
           }
         );
@@ -1094,11 +1135,12 @@ const PalmsScene = ({ onLoadingChange }) => {
         return;
       }
       
-      // Set up instance positions
+      // Keep trunks outside the low camera orbit (x=-6.42 through x=8).
+      // Fixed wider rows also prevent moving palms from crossing the lens.
       const palmPositions = [];
       for (let i = 0; i < 5; i++) {
-        palmPositions.push(-6.5, 0, i * 20 - 10 - 50);
-        palmPositions.push(6.5, 0, i * 20 - 50);
+        palmPositions.push(-11, 0, i * 20 - 10 - 50);
+        palmPositions.push(11, 0, i * 20 - 50);
       }
       
       // Debug geometry bounds
@@ -1332,235 +1374,61 @@ const PalmsScene = ({ onLoadingChange }) => {
       setModelsLoadState(prev => ({ ...prev, sun: 'error' }));
     }, 'sun');
     
-    // Load car model (now includes UFO) with retry
-    const carPath = '/models/lambo5k5.glb';
-    loadModelWithRetry(carPath, (gltf) => {
-      const carScene = gltf.scene;
-      
-      setModelsLoadState(prev => ({ ...prev, car: 'loaded' }));
-      const carParts = [];
-      const unknownObjects = [];
-      
-      // Log all objects in the scene hierarchy
-      carScene.traverse((child) => {
-        const lowerName = child.name.toLowerCase();
-        
-        // Check if object name contains car-related keywords
-        if (lowerName.includes('wheel') || 
-            lowerName.includes('tire') || 
-            lowerName.includes('rim') ||
-            lowerName.includes('brake') ||
-            lowerName.includes('suspension') ||
-            lowerName.includes('axle')) {
-          carParts.push(child);
-          // Ensure car parts are visible
-          child.visible = true;
-        }
-        
-        // Look for Mary specifically and ensure she's visible
-        if (child.name.toLowerCase().includes('mary')) {
-          // Make sure Mary is visible
-          child.visible = true;
-          // If it's a mesh, ensure material is properly set
-          if (child.isMesh) {
-            // Store reference to Mary mesh
-            maryMeshRef.current = child;
-            
-            // Generate a marble/stone matcap texture procedurally
-            const matcapSize = 256;
-            const matcapCanvas = document.createElement('canvas');
-            matcapCanvas.width = matcapSize;
-            matcapCanvas.height = matcapSize;
-            const ctx = matcapCanvas.getContext('2d');
-
-            // Radial gradient mimicking a lit marble sphere
-            const cx = matcapSize / 2;
-            const cy = matcapSize / 2;
-            const r = matcapSize / 2;
-
-            // Base sphere gradient — highlight top-left, shadow bottom-right
-            const grad = ctx.createRadialGradient(cx * 0.7, cy * 0.6, 0, cx, cy, r);
-            grad.addColorStop(0, '#f5f0eb');   // bright highlight
-            grad.addColorStop(0.2, '#e0d8cf'); // warm ivory mid
-            grad.addColorStop(0.1, '#b8a89a'); // stone shadow
-            grad.addColorStop(1.0, '#6b5b50'); // deep shadow edge
-
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, matcapSize, matcapSize);
-
-            // Clip to circle
-            ctx.globalCompositeOperation = 'destination-in';
-            ctx.beginPath();
-            ctx.arc(cx, cy, r, 0, Math.PI * 2);
-            ctx.fill();
-
-            const matcapTexture = new THREE.CanvasTexture(matcapCanvas);
-
-            // MeshMatcapMaterial — scene-light independent with realistic shading
-            child.material = new THREE.MeshMatcapMaterial({
-              matcap: matcapTexture,
-              color: new THREE.Color(0xf0e8dc),
-            });
-          }
-
-          // Dedicated light for Mary — positioned above to cast shadows in eye sockets
-          if (maryMeshRef.current) {
-            const maryLight = new THREE.SpotLight(0xcce0ff, 1.5, 10, Math.PI / 6, 0.5);
-            maryLight.position.copy(maryMeshRef.current.position);
-            maryLight.position.y += 3.0;  // high above — creates downward light
-            maryLight.position.z += 0.3;  // barely in front
-            // Aim at mid-body, not face
-            maryLight.target.position.copy(maryMeshRef.current.position);
-            maryLight.target.position.y += 0.5;
-            carScene.add(maryLight);
-            carScene.add(maryLight.target);
-            maryLightRef.current = maryLight;
-          }
-        }
+    // Keep animation placement separate from the imported rig hierarchy.
+    loadModelWithRetry(LOW_RIDER_MODEL_URL, (gltf) => {
+      if (disposed) return;
+      lowRider = createLowRider(gltf, { roadSpeed: speed / 2 });
+      const carScene = lowRider.car;
+      carScene.updateMatrixWorld(true);
+      const tireEnvelope = new THREE.Box3();
+      lowRider.wheels.forEach((wheel, index) => {
+        const bounds = new THREE.Box3().setFromObject(wheel.pivot);
+        const center = bounds.getCenter(new THREE.Vector3());
+        const size = bounds.getSize(new THREE.Vector3());
+        tireEnvelope.union(bounds);
+        planeMat.uniforms.tireContacts.value[index].set(
+          center.x, center.z, Math.max(size.x * 0.9, 0.28), Math.max(size.z * 0.55, 0.36)
+        );
       });
-
-      if (unknownObjects.length > 0) {
-        unknownObjects.forEach(obj => {
-        });
+      if (!tireEnvelope.isEmpty()) {
+        const center = tireEnvelope.getCenter(new THREE.Vector3());
+        const size = tireEnvelope.getSize(new THREE.Vector3());
+        planeMat.uniforms.chassisContact.value.set(center.x, center.z, size.x * 0.48, size.z * 0.52);
+        planeMat.uniforms.contactShadowsReady.value = 1;
       }
-      
-      // Position the car
-      carScene.position.set(2.5, 0, 25.6);
-      // Rotate 180 degrees so car faces away from camera (same direction we're looking)
-      carScene.rotation.y = Math.PI;
-      carScene.scale.set(2.7, 2.7, 2.7);
-      
-      // Set up animations
-      const animationMixers = [];
-      
-      if (gltf.animations && gltf.animations.length > 0) {
-        gltf.animations.forEach(anim => {
-        });
-        
-        // Create mixer for the scene
-        const mixer = new THREE.AnimationMixer(carScene);
-        
-        // Play ALL animations on a loop
-        const actions = [];
-        gltf.animations.forEach((clip, index) => {
-          
-          // Handle Armature/Mixamo character animations
-          if (clip.name.toLowerCase().includes('armature') && 
-              !clip.name.toLowerCase().includes('wheel') &&
-              clip.name !== 'ArmatureAction.001') { // Don't skip UFO animation
-            const action = mixer.clipAction(clip);
-            action.play();
-            action.paused = true; // Play but immediately pause to hold the first frame
-            action.time = 0; // Ensure we're at the first frame (rest pose)
-            actions.push(action);
-            return; // Skip further processing
-          }
-          
-          const action = mixer.clipAction(clip);
-          
-          // Check if this is the halo animation
-          if (clip.name.toLowerCase().includes('halorotation.001')) {
-            action.loop = THREE.LoopRepeat;
-            action.play();
-            actions.push(action);
-            return;
-          }
-          
-          // Check if this is the wheel animation (now 200 frames)
-          if (clip.name.toLowerCase().includes('wheel') || 
-              (clip.tracks.length > 0 && Math.abs(clip.duration - 6.67) < 0.1)) { // 200 frames at 30fps = 6.67 seconds
-            action.loop = THREE.LoopRepeat;
-            action.clampWhenFinished = false;
-            // Play from the beginning
-            action.time = 0;
-            // Adjust speed as needed (1.0 = normal speed, negative = reverse)
-            action.timeScale = -9.0; // Increased from -3.0 to match the tripled speed
-            action.play();
-          } else if (clip.name === 'ArmatureAction.001') {
-            // UFO animation - handle separately for scroll-based trigger
-            action.clampWhenFinished = true;
-            action.loop = THREE.LoopOnce;
-            action.setEffectiveWeight(1);
+      materialShaders.push({ update: (_time, delta) => lowRider?.update(delta) });
 
-          } else {
-            // Play any other animations on loop
-            action.loop = THREE.LoopRepeat;
-            action.play();
-          }
-          
-          actions.push(action);
-        });
-        
-        // Add mixer to the list for updating
-        animationMixers.push(mixer);
-        
-        // Store reference to mixers for animation updates
-        if (!materialShadersRef.current) {
-          materialShadersRef.current = [];
-        }
-        materialShadersRef.current.push({
-          update: (time, delta) => {
-            mixer.update(delta);
-          }
-        });
-      }
-      
-      // Create video element and texture
-      const video = document.createElement('video');
-      video.src = '/videos/stockChart.mp4';
-      video.loop = true;
-      video.muted = true;
-      video.playsInline = true;
-      video.autoplay = true;
-      
-      const videoTexture = new THREE.VideoTexture(video);
-      videoTexture.minFilter = THREE.LinearFilter;
-      videoTexture.magFilter = THREE.LinearFilter;
-      videoTexture.format = THREE.RGBFormat;
-      videoTexture.flipY = false; // Flip the video upside down
-      
-      // Keep original car materials and add emissive to halo
+      const candyPaint = createCandyEmeraldPaint(renderer);
+      carPaint = candyPaint;
+      materialShaders.push({ update: () => candyPaint.update(camera) });
       carScene.traverse((child) => {
-        if (child.isMesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-          
-          
-          // Add emissive to Halo mesh only and put it on bloom layer
-          if (child.name === 'Halo') {
-            child.material = child.material.clone();
-            child.material.emissive = new THREE.Color(0xaaff88);
-            child.material.emissiveIntensity = 1.0;
-            child.material.transparent = true;
-            child.material.opacity = 0.9;
-            child.material.needsUpdate = true;
-            // Add to bloom layer so selective bloom picks it up
-            child.layers.enable(renderer.userData.BLOOM_LAYER);
-          }
-
-          // Add video texture to Display mesh
-          if (child.name === 'Display') { // Exact match
-            child.material = new THREE.MeshBasicMaterial({
-              map: videoTexture,
-              transparent: true,
-              opacity: 1
-            });
-            child.material.needsUpdate = true;
-          }
+        if (!child.isMesh) return;
+        child.castShadow = true;
+        child.receiveShadow = true;
+        candyPaint.apply(child);
+        // Skinned characters must remain visible throughout their animation.
+        if (child.isSkinnedMesh) child.frustumCulled = false;
+        if (/^(headlights|taillights)/i.test(child.name)) {
+          // Keep Blender's emissive color/strength and include these meshes
+          // in the scene's selective bloom pass.
+          child.layers.enable(renderer.userData.BLOOM_LAYER);
+        }
+        if (child.name === 'Halo') {
+          child.material = child.material.clone();
+          child.material.emissive = new THREE.Color(0xaaff88);
+          child.material.emissiveIntensity = 1;
+          child.layers.enable(renderer.userData.BLOOM_LAYER);
         }
       });
-      
-      // Start playing the video
-      video.play().catch(error => {
-        // console.warn('Video autoplay failed:', error);
-        // Add click handler to start video on user interaction
-        const startVideo = () => {
-          video.play();
-          document.removeEventListener('click', startVideo);
-        };
-        document.addEventListener('click', startVideo);
-      });
-      
+
+      // A small, soft-edged portrait light aimed down at the dashboard statue.
+      // Its short range and narrow cone keep the surrounding paint subdued.
+      const maryKey = new THREE.SpotLight(0xffe6cc, 0.3, 0.85, 0.30, 1, 2);
+      maryKey.name = 'MaryPortraitKey';
+      maryKey.position.set(2.30, 1.57, 24.70);
+      maryKey.target.position.set(2.45, 1.30, 24.35);
+      scene.add(maryKey, maryKey.target);
+
       // Update existing car spotlight target to point at the loaded car
       if (carSpotlightRef.current) {
         carSpotlightRef.current.target = carScene;
@@ -1579,11 +1447,11 @@ const PalmsScene = ({ onLoadingChange }) => {
         lightSettings.underglow.intensity,
         lightSettings.underglow.distance
       );
-      underglowLight.position.set(
-        lightSettings.underglow.position.x,
-        lightSettings.underglow.position.y,
-        lightSettings.underglow.position.z
-      );
+      // Place the light beneath the actual new chassis in car-local space.
+      const underglowCenter = tireEnvelope.getCenter(new THREE.Vector3());
+      underglowCenter.y = 0.16;
+      underglowLight.position.copy(carScene.worldToLocal(underglowCenter));
+      underglowLight.color.set('#9b35ff');
       underglowLightRef.current = underglowLight;
       carScene.add(underglowLight);
       
@@ -1617,7 +1485,8 @@ const PalmsScene = ({ onLoadingChange }) => {
       scene.add(carScene);
       carModelRef.current = carScene; // Save reference for potential scroll-based animations
       
-      // GUI initialization removed for production
+      setModelsLoadState(prev => ({ ...prev, car: 'loaded' }));
+      startCameraSequence?.();
 
     }, 
     // Progress callback (optional)
@@ -1699,11 +1568,11 @@ const PalmsScene = ({ onLoadingChange }) => {
       // Set initial camera position based on device type
       const initialPos = isMobile 
         ? { x: 17.5605, y: 12.0910, z: 55.1540 }  // Mobile aerial view
-        : { x: 16.2711, y: 5.8264, z: 40.5498 };   // Desktop aerial view
+        : DESKTOP_CAMERA_SHOTS[0];   // Desktop aerial view
       
       const initialTarget = isMobile
         ? { x: 3.0669, y: 6.0868, z: 20.1252 }     // Mobile initial target
-        : { x: 4.3726, y: 2.1681, z: 20.7525 };    // Desktop initial target
+        : { x: DESKTOP_CAMERA_SHOTS[0].targetX, y: DESKTOP_CAMERA_SHOTS[0].targetY, z: DESKTOP_CAMERA_SHOTS[0].targetZ };    // Desktop initial target
       
       const initialFov = 45;
       
@@ -1724,7 +1593,14 @@ const PalmsScene = ({ onLoadingChange }) => {
       });
       scrollTimelineRef.current = tl;
       
-      // Define camera path from aerial to Mary's face
+      // Mary is a small dashboard assembly centered near (2.45, 1.29, 24.35).
+      // Approach from above the open cabin, then look forward from behind her.
+      // Share the final pose with onComplete so Skip Intro lands on the same shot.
+      const maryShot = isMobile
+        ? { x: 2.46, y: 1.40, z: 24.83, targetX: 2.45, targetY: 1.31, targetZ: 24.35, fov: 36 }
+        : DESKTOP_CAMERA_SHOTS.at(-1);
+
+      // Define camera path from aerial to the dashboard statue
       const cameraPath = {
         // Starting values (aerial view) - must match initialPos/Target above
         x: initialPos.x,
@@ -1736,6 +1612,8 @@ const PalmsScene = ({ onLoadingChange }) => {
         fov: initialFov
       };
       
+      const desktopSweep = { progress: 0 };
+
       // Use different camera paths for mobile vs desktop
       if (isMobile) {
         // Mobile camera sequence - using smoother transitions
@@ -1763,22 +1641,21 @@ const PalmsScene = ({ onLoadingChange }) => {
           duration: 0.25,
           ease: "none"  // Linear for consistency
         })
-        // Mobile waypoint 3: Move closer to interior
+        // Mobile waypoint 3: Descend above the open cabin
         .to(cameraPath, {
-          x: 2.8016,
-          y: 1.3315,
-          z: 19.6750,
-          targetX: 2.3361,
-          targetY: 1.5058,
-          targetZ: 22.1126,
+          x: 2.5,
+          y: 2.7,
+          z: 25.3,
+          targetX: 2.45,
+          targetY: 1.3,
+          targetZ: 24.35,
           fov: 44.832617,
           duration: 0.2,
           ease: "none"  // Linear throughout
         })
-        // Mobile final: Direct to final position at Mary
+        // Mobile final: Mary with dashboard context
         .to(cameraPath, {
-          x: 2.4853, y: 1.1738, z: 24.3400, targetX: 2.4593, targetY: 1.1558, targetZ: 24.0773,
-          fov: 44.832617,
+          ...maryShot,
           duration: 0.3,
           ease: "power2.out"  // Only ease out at the very end
         });
@@ -1786,83 +1663,13 @@ const PalmsScene = ({ onLoadingChange }) => {
         
         ;
       } else {
-        // Desktop camera sequence - original path
-        // Waypoint 1: Behind and above (first movement from aerial)
-        tl.to(cameraPath, {
-          x: 0.8114,
-          y: 3.8097,
-          z: 36.9146,
-          targetX: 0.6379,
-          targetY: 1.7031,
-          targetZ: 23.6150,
-          fov: 42.106054,
-          duration: 0.2,
-          ease: "none"
-        })
-        // Waypoint 2: Side view at car level
-        .to(cameraPath, {
-          x: -12.6434,
-          y: 3.9412,
-          z: 20.5192,
-          targetX: 0.6205,
-          targetY: 1.7849,
-          targetZ: 23.5889,
-          fov: 42.106054,
-          duration: 0.2,
-          ease: "none"
-        })
-        // Waypoint 3: Low front angle
-        .to(cameraPath, {
-          x: -0.7692,
-          y: 3.9049,
-          z: 10.1399,
-          targetX: 0.6226,
-          targetY: 1.7644,
-          targetZ: 23.5831,
-          fov: 42.106054,
-          duration: 0.15,
-          ease: "none"
-        })
-        // Waypoint 4: Approaching car from behind
-        .to(cameraPath, {
-          x: 3.2883,
-          y: 1.7877,
-          z: 26.5226,
-          targetX: 1.4980,
-          targetY: 1.3718,
-          targetZ: 22.9299,
-          fov: 38,
-          duration: 0.15,
-          ease: "none"
-        })
-        // Waypoint 5: Close to dashboard
-        .to(cameraPath, {
-          x: 2.3730,
-          y: 1.1926,
-          z: 26.0807,
-          targetX: 1.6639,
-          targetY: 1.3046,
-          targetZ: 22.9043,
-          fov: 30,
-          duration: 0.25,
-          ease: "none"
-        })
-        // Final close-up: Face to face with Mary
-        .to(cameraPath, {
-          x: 2.5268,
-          y: 1.1644,
-          z: 24.4943,
-          targetX: 2.4119,
-          targetY: 1.1506,
-          targetZ: 22.2732,
-          fov: 31.2576,
-          duration: 0.25,  // Longer duration for final position
-          ease: "none"  // Linear easing to ensure exact final position
-        });
+        // One continuous sweep, with gentle acceleration only at its ends.
+        tl.to(desktopSweep, { progress: 1, duration: 1, ease: "none" });
       }
   
       // Single onUpdate for the entire timeline
       tl.eventCallback("onUpdate", () => {
+        if (!isMobile) sampleDesktopCamera(desktopSweep.progress, cameraPath);
         if (camera) {
           // Always update camera during scroll animation, regardless of controls state
           camera.position.set(cameraPath.x, cameraPath.y, cameraPath.z);
@@ -1892,17 +1699,10 @@ const PalmsScene = ({ onLoadingChange }) => {
       tl.eventCallback("onComplete", () => {
 
         if (camera) {
-          // Force final position - matching the last waypoint for each platform
-          const finalPos = isMobile 
-            ? { x: 2.4853, y: 1.1738, z: 24.3400 }
-            : { x: 2.5268, y: 1.1644, z: 24.4943 };
-          
-          const finalTarget = isMobile
-            ? { x: 2.4593, y: 1.1558, z: 24.0773 }
-            : { x: 2.4119, y: 1.1506, z: 22.2732 };
-          
-          const finalFov = isMobile ? 44.832617 : 31.2576;
-          
+          const finalPos = maryShot;
+          const finalTarget = { x: maryShot.targetX, y: maryShot.targetY, z: maryShot.targetZ };
+          const finalFov = maryShot.fov;
+
           camera.position.set(finalPos.x, finalPos.y, finalPos.z);
           camera.lookAt(finalTarget.x, finalTarget.y, finalTarget.z);
           camera.fov = finalFov;
@@ -1918,7 +1718,7 @@ const PalmsScene = ({ onLoadingChange }) => {
         setTimeout(() => {
 
           setShowEnterButton(true);
-        }, 1500); // 1.5 second delay after reaching Mary
+        }, 1500); // 1.5 second delay after reaching the final view
       });
       
       // Create ScrollTrigger - track the document scroll with touch support
@@ -2016,6 +1816,21 @@ const PalmsScene = ({ onLoadingChange }) => {
       st.refresh();
       ScrollTrigger.refresh();
 
+      if (cameraHelperEnabled) {
+        cameraHelper?.dispose();
+        cameraHelper = createPalmTreeDriveCameraHelper({
+          camera, controls: controlsRef.current, canvas: renderer.domElement,
+          timeline: tl, trigger: st, setStage: setCurrentCameraStage,
+          freezeTour: () => {
+            clearTimeout(autoPlayTimeoutRef.current);
+            autoPlayTimeoutRef.current = null;
+            autoPlayTweenRef.current?.kill();
+            autoPlayTweenRef.current = null;
+          },
+        });
+        return;
+      }
+
       // --- Hybrid auto-play: desktop only, if user doesn't scroll within 4s, drive timeline directly ---
       if (isMobile) return;
       const cancelAutoPlay = autoPlayCancelRef.current = () => {
@@ -2077,7 +1892,7 @@ const PalmsScene = ({ onLoadingChange }) => {
         // Drive the timeline directly — no scroll middleman, buttery smooth
         autoPlayTweenRef.current = gsap.to(tl, {
           progress: 1,
-          duration: isMobile ? 30 : 25,
+          duration: isMobile ? 30 : DESKTOP_CAMERA_SECONDS,
           ease: "none",
           onUpdate: () => {
             const p = tl.progress();
@@ -2117,8 +1932,11 @@ const PalmsScene = ({ onLoadingChange }) => {
       }, 4000); // 4 second delay before auto-play starts
     };
 
-    // Set up scroll animation after a short delay to ensure scene is ready
-    setTimeout(() => {
+    // Both initial setup and the car loader call this. Start only once the
+    // car has actually been attached, rather than racing a fixed timeout.
+    startCameraSequence = () => {
+      if (disposed || !lowRider || resolvedModelNames.size < 4 || cameraSequenceStarted) return;
+      cameraSequenceStarted = true;
       // Enable ScrollTrigger for mobile with better touch handling
       ScrollTrigger.config({
         ignoreMobileResize: true,
@@ -2155,7 +1973,8 @@ const PalmsScene = ({ onLoadingChange }) => {
       }
       
       setupScrollAnimation();
-    }, 100);
+    };
+    startCameraSequence();
     
 
     
@@ -2185,7 +2004,9 @@ const PalmsScene = ({ onLoadingChange }) => {
       // Scroll camera animation
       
       // Handle scroll-based camera movement
-      if (scrollCameraEnabledRef.current) {
+      if (cameraHelper?.isEditing) {
+        controls.update();
+      } else if (scrollCameraEnabledRef.current) {
         // Scroll camera is enabled - this handles the camera movement
         // The actual camera updates happen in the handleScroll function
       } else {
@@ -2251,6 +2072,7 @@ const PalmsScene = ({ onLoadingChange }) => {
     
     // Handle mouse move for hover effect
     const handleMouseMove = (event) => {
+      if (cameraHelperEnabled) return;
       
       const rect = mountRef.current.getBoundingClientRect();
       mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -2299,6 +2121,7 @@ const PalmsScene = ({ onLoadingChange }) => {
     
     // Handle click on Mary
     const handleClick = (event) => {
+      if (cameraHelperEnabled) return;
       // Don't handle 3D clicks when Buy modal is open
       if (showBuyModal) return;
       
@@ -2367,8 +2190,14 @@ const PalmsScene = ({ onLoadingChange }) => {
 
     // Cleanup
     return () => {
-      // Clear loading fallback timer
-      clearTimeout(loadingFallback);
+      disposed = true;
+      lowRider?.dispose();
+      lowRider = null;
+      carModelRef.current = null;
+      cameraHelper?.dispose();
+      retryTimers.forEach(clearTimeout);
+      retryTimers.clear();
+      dracoLoader.dispose();
       
       // Cancel animation frame to stop the animation loop
       if (animationFrameRef.current) {
@@ -2422,6 +2251,8 @@ const PalmsScene = ({ onLoadingChange }) => {
         composerRef.current = null;
       }
       
+      carPaint?.dispose();
+
       // Dispose of scene objects
       if (sceneRef.current) {
         sceneRef.current.traverse((object) => {

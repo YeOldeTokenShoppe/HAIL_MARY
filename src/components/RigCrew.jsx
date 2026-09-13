@@ -86,6 +86,8 @@ const THROW_RELEASE_S = 0.83;       // frame 25 of crew_throw: the right hand le
 const FIREBALL_FLIGHT_S = 0.45;
 const COWER_HOLD_MS = 4500;         // how long a cower is held after its trigger
 const HELL_COWER_MS = 6000;
+const CELEBRATE_LINGER_S = 3.5;         // the crew keeps celebrating this long after a gusher/motherlode column drops
+const CELEBRATE_LINGER_STRIKE_S = 1.5;  // …and after a small strike
 const CHAT_TURN = [8, 12];          // seconds each talker holds the floor
 const WALK_SPEED = 0.518;           // rig units/s: crew_walk is in place; this is the stance foot's slide speed measured in Blender (32 f at 30 fps)
 const WALK_MIN = 0.12;              // moves shorter than this stay a glide (a shuffle, not a walk)
@@ -160,7 +162,7 @@ const ACTS = {
   scold:       { clip: "crew_scold",          once: true,      look: true, fallback: "no" },      // 2026-09-12: the brush-off, and outbursts in crew chat
   yell:        { clip: "crew_yell",           once: true,      look: true, fallback: "shrug" },   // 7.7 s — the next line's gesture cuts it
   clap:        { clip: "crew_clap",           dwell: [5, 9],   look: true },
-  cheer:       { clip: "crew_cheer",          dwell: [4, 8],   look: true },
+  cheer:       { clip: "crew_cheer",          dwell: [4, 8],   look: true },   // unused: the take headbangs (head ±35° at ~4 nods/s)
   victory1:    { clip: "crew_victory1",       once: true,      look: true },
   victory2:    { clip: "crew_victory2",       once: true },
   cower:       { clip: "crew_cower",          once: true },
@@ -250,6 +252,7 @@ function pickWeighted(rng, items) {
 }
 const rand = (a, b) => a + Math.random() * (b - a);
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+const _wellHead = new THREE.Vector3();
 
 // Step-turns (her 2026-09-12 clips, both RIGHT turns): a body-yaw change of TURN_MIN or more while
 // standing plays crew_quarterTurn (< HALF_TURN_MIN) or crew_halfTurn instead of the feet-planted
@@ -260,7 +263,7 @@ const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const TURN_MIN = 1.05;        // ≥ 60° turns step; less eases as before
 const HALF_TURN_MIN = 2.1;    // ≥ 120° uses the half turn
 const TURN_CLIPS = { quarter: "crew_quarterTurn", half: "crew_halfTurn" };
-const TURN_ACTS = new Set(["idle", "neutralIdle", "talking", "music", "nervous"]);   // standing loops a turn may interrupt
+const TURN_ACTS = new Set(["idle", "neutralIdle", "talking", "music", "nervous", "clap"]);   // standing loops a turn may interrupt
 const TURN_PROFILES = {};     // clip name → { total (rad, signed), p: Float32Array (yaw/total sampled 0..1) }
 const _tq = new THREE.Quaternion(), _tq0 = new THREE.Quaternion(), _tv = new THREE.Vector3(), _tv0 = new THREE.Vector3(), _tup = new THREE.Vector3(0, 1, 0);
 function patchTurnClips(animations, scene) {
@@ -345,7 +348,7 @@ const devHook = () => (typeof window === "undefined" ? null : (window.__hmCrew |
   climb: (r) => window.__hmCrew.workers[r]?.climb(),
   state: () => Object.fromEntries(Object.entries(window.__hmCrew.workers).map(([k, w]) => [k, w.state()])) }));
 
-export default function RigCrew({ rigScene, scale = 1, enabled = true, plotKey = "rig", plotId = null, envPreset = null, hellActive = false, gusherActive = false, pausedRef = null, panelOpen = false, panelOpenRef = null, workers = 2, wheelSpinRef = null, onValveTurn = null }) {
+export default function RigCrew({ rigScene, scale = 1, enabled = true, plotKey = "rig", plotId = null, envPreset = null, hellActive = false, gusherActive = false, pausedRef = null, panelOpen = false, panelOpenRef = null, workers = 2, wheelSpinRef = null, onValveTurn = null, eruption = null }) {
   // A new "sighting" whenever the tab comes back: the crew may have moved.
   const [sighting, setSighting] = useState(0);
   const forceScene = useRef(null);
@@ -362,21 +365,23 @@ export default function RigCrew({ rigScene, scale = 1, enabled = true, plotKey =
   if (!enabled || !rigScene) return null;
   return (
     <Suspense fallback={null}>
-      <CrewInner key={sighting} sighting={sighting} forceScene={forceScene} rigScene={rigScene} scale={scale} plotKey={plotKey} plotId={plotId} envPreset={envPreset} wheelSpinRef={wheelSpinRef} onValveTurn={onValveTurn}
+      <CrewInner key={sighting} sighting={sighting} forceScene={forceScene} rigScene={rigScene} scale={scale} plotKey={plotKey} plotId={plotId} envPreset={envPreset} wheelSpinRef={wheelSpinRef} onValveTurn={onValveTurn} eruption={eruption}
         hellActive={hellActive} gusherActive={gusherActive} pausedRef={pausedRef} panelRef={panelRef} workers={workers} />
     </Suspense>
   );
 }
 
-function CrewInner({ sighting, forceScene, rigScene, scale, plotKey, plotId, envPreset, hellActive, gusherActive, pausedRef, panelRef, workers, wheelSpinRef, onValveTurn }) {
+function CrewInner({ sighting, forceScene, rigScene, scale, plotKey, plotId, envPreset, hellActive, gusherActive, pausedRef, panelRef, workers, wheelSpinRef, onValveTurn, eruption }) {
   const { scene, animations } = useGLTF(CREW_GLB);
   useMemo(() => { patchTurnClips(animations, scene); return animations; }, [animations, scene]);   // in-place step-turns + their yaw profiles
   const rootRef = useRef();
   const gates = useMemo(() => ({ night: envPreset === "night", hell: !!hellActive, stalled: !!pausedRef?.current }), [envPreset, hellActive, pausedRef]);
   // Shared crew state: worker registry (head positions for "partner" looks), the chat and
   // briefing scenes, the cower timer, the rig's world position, and the fireball pool.
-  const crew = useRef({ workers: {}, chat: null, brief: null, cowerUntil: 0, rigPos: new THREE.Vector3(), gusher: false, fire: null }).current;
-  crew.gusher = !!gusherActive;
+  const crew = useRef({ workers: {}, chat: null, brief: null, cowerUntil: 0, rigPos: new THREE.Vector3(), gusher: false, gusherTier: null, wellPos: new THREE.Vector3(), hasWell: false, fire: null }).current;
+  // crew.gusher / gusherTier are written every frame below from the rig's LIVE eruption, not at
+  // render: a render landing mid-gusher must not blink the flag and restart everyone's reaction.
+  const wellNodes = useMemo(() => ({ straw: rigScene?.getObjectByName("Straw") || null, head: rigScene?.getObjectByName("Head_Pump") || null }), [rigScene]);
   // Spots per worker for this sighting. Every sighting rolls fresh (a page load, the tab coming
   // back, a reroll): the old plot + 10-minute bucket seed made every reload for ten minutes show
   // the same crew, which read as "the same guy asleep again" (her note, 2026-09-11).
@@ -441,7 +446,25 @@ function CrewInner({ sighting, forceScene, rigScene, scale, plotKey, plotId, env
     if (talking) { b.talkSeen = true; b.nextLineAt = b.now + 20; }                 // cap: a line that never ends still moves on
     else if (b.talkSeen) { b.talkSeen = false; b.speaking = false; b.nextLineAt = b.now + 0.35; }
   }), [crew]);
-  useFrame(() => { if (rootRef.current) rootRef.current.getWorldPosition(crew.rigPos); });
+  useFrame(() => {
+    if (rootRef.current) rootRef.current.getWorldPosition(crew.rigPos);
+    // React to what the rig is actually doing (2026-09-12): the eruption refs cover every source —
+    // strike overflow, tank overflow, the admin test, a broadcast gusher event, a hell breach — where
+    // the old gusherActive prop only saw the broadcast event. Hell eruptions belong to alert/cower.
+    const live = !!eruption?.activeRef?.current, hellErupt = live && !!eruption?.hellRef?.current;
+    const nowS = performance.now() / 1000;
+    if (live && !hellErupt) { crew.gusherTier = eruption?.tierRef?.current || "gusher"; crew.gusherSeenAt = nowS; }
+    else if (gusherActive) { crew.gusherTier ||= "gusher"; crew.gusherSeenAt = nowS; }
+    else if (crew.gusher && Object.values(crew.workers).some((w) => w.wakeTo === "celebrate")) crew.gusherSeenAt = nowS;   // a dozer is still getting up (6 s): hold the party until it can join
+    // Keep celebrating a moment after the column drops: a local gusher lasts 3 s, which ended the
+    // party mid-clap. A seep gets a shorter afterglow. The length is pinned while the tier is known —
+    // measuring against the tier after clearing it restarted a finished strike party as a gusher one.
+    if (crew.gusherTier) crew.gusherLinger = crew.gusherTier === "strike" ? CELEBRATE_LINGER_STRIKE_S : CELEBRATE_LINGER_S;
+    crew.gusher = crew.gusherSeenAt != null && nowS - crew.gusherSeenAt < (crew.gusherLinger || CELEBRATE_LINGER_S);
+    if (!crew.gusher) { crew.gusherTier = null; crew.gusherSeenAt = null; }
+    // The eruption point for faces and looks: over the polished rod, at the horsehead's height.
+    if (wellNodes.straw && wellNodes.head) { wellNodes.straw.getWorldPosition(crew.wellPos); wellNodes.head.getWorldPosition(_wellHead); crew.wellPos.y = _wellHead.y; crew.hasWell = true; }
+  });
   return (
     <group ref={rootRef} scale={scale}>
       {assignments.map(({ role, spot, scene: sc }) => (
@@ -547,7 +570,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
       walk: (sp) => { if (!STATIONS[sp]) return false; slideTo(sp, SLIDE_S, "idle"); return true; },   // walk to a spot in a straight line (preview only: no pathing round the rig)
       climb: () => { if (!MENU[st.current.spot]?.climbTo) return false; beginClimb(st.current.now || 0); return true; },   // start the ladder from its base now
       state: () => { const s = st.current; const g = groupRef.current; const gw = new THREE.Vector3(); if (g) g.getWorldPosition(gw); const sc = g ? g.getWorldScale(new THREE.Vector3()).y : 1;
-        return { spot: s.spot, act: s.act, hat: s.hat || null, look: s.lookAtName || null, turn: s.turn ? { clip: s.turn.clip, reverse: s.turn.reverse, deg: +(s.turn.delta * 180 / Math.PI).toFixed(0) } : null, turns: Object.fromEntries(Object.entries(TURN_PROFILES).map(([k, v]) => [k, +(v.total * 180 / Math.PI).toFixed(1)])), mode: s.mode, phase: s.phase, scene: scene || null, yaw: +s.yawCur.toFixed(2), yawAim: s.yawAim == null ? null : +s.yawAim.toFixed(2), headUp: +((s.head.y - gw.y) / (sc || 1)).toFixed(3),
+        return { spot: s.spot, act: s.act, erupt: crew.gusher ? crew.gusherTier : null, lookPitch: +(s.look?.pitch || 0).toFixed(3), wellY: crew.hasWell ? +crew.wellPos.y.toFixed(4) : null, hat: s.hat || null, look: s.lookAtName || null, flinched: s.flinched || 0, headYaw: +(s.look?.yaw || 0).toFixed(2), turn: s.turn ? { clip: s.turn.clip, reverse: s.turn.reverse, deg: +(s.turn.delta * 180 / Math.PI).toFixed(0) } : null, turns: Object.fromEntries(Object.entries(TURN_PROFILES).map(([k, v]) => [k, +(v.total * 180 / Math.PI).toFixed(1)])), mode: s.mode, phase: s.phase, scene: scene || null, yaw: +s.yawCur.toFixed(2), yawAim: s.yawAim == null ? null : +s.yawAim.toFixed(2), headUp: +((s.head.y - gw.y) / (sc || 1)).toFixed(3),
         props: Object.fromEntries(Object.entries(props).map(([n, o]) => { const w = new THREE.Vector3(); o.getWorldPosition(w); return [n, { visible: o.visible, verts: o.geometry?.attributes?.position?.count || 0, world: w.toArray().map((v) => +v.toFixed(3)) }]; })), chat: crew.chat ? { talker: crew.chat.talker, swapAt: +crew.chat.swapAt.toFixed(2) } : null, t: +s.t.toFixed(3), pos: s.pos.toArray().map((v) => +v.toFixed(3)), frames: s.frames, now: +(s.now || 0).toFixed(2), nextThrowAt: +(s.nextThrowAt || 0).toFixed(2), throws: s.throws || 0, fired: s.fired || 0, counted: s.counted || 0, dist: s.dbgDist == null ? null : +s.dbgDist.toFixed(2), running: !!(s.action && s.action.isRunning()), fromRig: resolveStation(rigScene, s.spot).fromRig, trace: s.trace || [], head: s.head.toArray().map((v) => +v.toFixed(3)), valveVents: s.valveVents || 0, projFade: +(s.projFade || 0).toFixed(2), faces: projRef.current ? { proj: !!projRef.current.proj, regulars: projRef.current.regulars.length } : null,
         projMat: (() => { const st = projRef.current; const m = st?.material; if (!m) return null; let px = null; try { const d = st.cropCtx.getImageData(256, 256, 1, 1).data; px = [d[0], d[1], d[2]]; } catch (e) {} const pm = st.regulars[0]?.material; return { color: "#" + m.color.getHexString(), mapCS: m.map?.colorSpace, mapIsTex: m.map === st.material.map, opacity: m.opacity, toneMapped: m.toneMapped, emissive: "#" + (m.emissive?.getHexString?.() || "000000"), emissiveIntensity: m.emissiveIntensity, type: m.type, paintedType: pm?.type, paintedMapCS: pm?.map?.colorSpace, paintedColor: pm ? "#" + pm.color.getHexString() : null, cropCentrePx: px, cropGrid: (() => { try { const g = []; for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) { const d = st.cropCtx.getImageData(64 + i * 192, 64 + j * 192, 1, 1).data; g.push([d[0], d[1], d[2]]); } return g; } catch (e) { return null; } })(), colorRaw: [m.color.r, m.color.g, m.color.b].map((v) => +v.toFixed(3)), uv: (() => { const a = st.proj.geometry?.attributes?.uv; if (!a) return null; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (let i = 0; i < a.count; i++) { const x = a.getX(i), y = a.getY(i); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } return { count: a.count, min: [+x0.toFixed(3), +y0.toFixed(3)], max: [+x1.toFixed(3), +y1.toFixed(3)] }; })(), projMatType: st.proj.material?.type, projVisible: st.proj.visible }; })(),
         weightSum: +Object.values(actionsRef.current).reduce((acc, o) => acc + (o.isScheduled() && o.enabled ? o.getEffectiveWeight() : 0), 0).toFixed(3), visible: !!g?.visible,
@@ -692,7 +715,13 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     if (mode === "cower") { startAct("cower", now); s.actEnds = Infinity; }
     else if (mode === "defend") { startAct("ninja", now, 999); s.nextThrowAt = now + rand(0.5, 2); }   // guard stance between throws
     else if (mode === "alert") startAct("nervous", now, 999);
-    else if (mode === "celebrate") startAct("clap", now);
+    else if (mode === "celebrate") {
+      // A seep ("strike") gets a quick cheer; a real gusher or a motherlode blasts first, so the
+      // crew flinches for a beat (nervous) before the cheering starts (modeNext).
+      s.celebrateTier = crew.gusherTier || "gusher"; s.celebrateSeq = 0;
+      if (s.celebrateTier === "strike" || s.act === "getUp" || s.act === "uncower") celebrateNext(now);   // a seep, or a worker who already scrambled up: no flinch
+      else startAct("nervous", now, rand(0.6, 1.1));
+    }
     else if (mode === "brief") {                                            // greet (the opener is spoken with the wave), then each line brings its own gesture (modeTick)
       const b = crew.brief; startAct(b.rude ? "scold" : "wave", now); setBubble(b.opener || "Hey, boss."); b.i = 0; b.nextLineAt = now + BRIEF_GREET_S;   // a stranger gets a scolding, not a wave
       b.talkSeen = false; b.noVoice = false; b.speaking = speakVendorText("crew", b.opener || "Hey, boss."); b.speakDeadline = now + SPEECH_START_S + 1.5;   // +1.5: the opener also waits out the activation's greeting delay
@@ -703,12 +732,33 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     else if (mode === "music") startAct("music", now, 999);
     else if (mode === null) menuAct(now);
   };
+  // Celebration clips, chosen against what the partner is playing (Michelle, 2026-09-12: not both
+  // clapping at once). A worker never starts the clip its partner is in, so one claps while the
+  // other dances; a clapper hands over to a victory dance when its clap ends, and a dancer takes the
+  // clapping when it is free. No crew_cheer: that take nods the head ~35° four times a second.
+  // A small strike: one claps, the other acknowledges once and then just watches the well.
+  const celebrateNext = (now) => {
+    const s = st.current; const p = partner();
+    const pAct = p && p.mode === "celebrate" ? p.act : null;
+    const tier = s.celebrateTier, other = (v) => (v === "victory1" ? "victory2" : "victory1");
+    const prev = s.celebrateSeq ? s.act : null;   // only a clip from THIS party counts (a chat nod before the strike does not)
+    let prefs;
+    if (tier === "strike") prefs = pAct === "clap" ? (prev === "acknowledge" ? [] : ["acknowledge"]) : ["clap", "acknowledge"];
+    else if (prev === "clap") { const v = other(s.lastVictory); prefs = [v, other(v)]; }                  // hand the clapping over (either dance)
+    else if (prev === "victory1" || prev === "victory2") prefs = ["clap", other(prev), prev];
+    else prefs = tier === "motherlode" ? ["victory1", "victory2", "clap"] : ["clap", "victory1", "victory2"];   // after the flinch, or up from a nap
+    const act = prefs.find((a) => a && a !== pAct && actionsRef.current[ACTS[a]?.clip]) || null;
+    s.celebrateSeq = (s.celebrateSeq || 0) + 1;
+    if (!act) { startAct("neutralIdle", now, tier === "strike" ? 999 : rand(1, 2)); return; }   // nothing that differs from the partner: watch the well (a strike), or for a beat
+    if (act === "victory1" || act === "victory2") s.lastVictory = act;
+    startAct(act, now);
+  };
   const modeNext = (mode, now) => {                                     // an act ended inside a mode
     const s = st.current;
     if (mode === "cower") { s.actEnds = Infinity; return; }             // hold the curl
     if (mode === "defend") startAct("ninja", now, 999);
     else if (mode === "alert") startAct("nervous", now, 999);
-    else if (mode === "celebrate") startAct(s.act === "clap" ? (Math.random() < 0.5 ? "victory1" : "victory2") : "clap", now);
+    else if (mode === "celebrate") celebrateNext(now);   // the flinch or a clip ended: pick the next one against the partner
     else if (mode === "brief") startAct(actionsRef.current["crew_neutralIdle"] ? "neutralIdle" : "idle", now, 999);   // a reply gesture ended: hold until the next line
     else if (mode === "chat") startAct("talking", now, 999);
     else if (mode === "listen") { startAct("idle", now, 999); s.nextGesture = Infinity; }
@@ -723,6 +773,13 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
   const partner = () => { const o = Object.entries(crew.workers).find(([k]) => k !== role.id); return o ? o[1] : null; };
   const modeTick = (mode, now, dt, state) => {
     const s = st.current;
+    // A stand-up (getUp from a doze, uncower from a curl) plays out untouched: no turning to face
+    // the eruption, no throw or gesture cutting it short. The scheduler starts the mode after it.
+    if (s.act === "uncower" || s.act === "getUp" || s.act === "doze") return;
+    if ((mode === "celebrate" || mode === "alert") && crew.hasWell) {
+      // Turn to the eruption — after the flinch for a gusher, straight away for a hell breach.
+      if (!(mode === "celebrate" && s.act === "nervous")) faceWorld(crew.wellPos.x, crew.wellPos.y, crew.wellPos.z);
+    }
     if (mode === "defend") {
       const D = demonNear(); if (!D) return;
       faceWorld(D.x, D.y, D.z);
@@ -755,7 +812,18 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
       // watching the briefing: body stays put, no gestures — the head turns to the camera (below)
     } else if (mode === "chatListen") {
       if (!crew.chat) crew.chat = { talker: role.id, swapAt: now + rand(...CHAT_TURN) };   // first to notice opens the conversation
-      if (s.act === "idle" && now >= s.nextGesture) startAct(Math.random() < 0.65 ? "acknowledge" : "shrug", now);
+      // React to the talker's outbursts (2026-09-12): a yell makes the listener fidget nervously
+      // (after a short reaction beat) until it stops; a scold is taken quietly, no nods or shrugs.
+      const pAct = partner()?.act;
+      if (pAct === "yell") {
+        if (!s.flinchAt) s.flinchAt = now + rand(0.15, 0.4);
+        if (now >= s.flinchAt && s.act !== "nervous") { startAct("nervous", now, 999); s.flinched = (s.flinched || 0) + 1; }
+      } else {
+        s.flinchAt = 0;
+        if (s.act === "nervous") { startAct("idle", now, 999); s.nextGesture = now + rand(1.5, 3); }   // the yelling stopped: settle
+        else if (pAct === "scold") s.nextGesture = Math.max(s.nextGesture, now + rand(1.5, 3));
+        else if (s.act === "idle" && now >= s.nextGesture) startAct(Math.random() < 0.65 ? "acknowledge" : "shrug", now);
+      }
     } else if (mode === "chat") {
       if (!crew.chat || now >= crew.chat.swapAt) { const other = Object.keys(crew.workers).find((k) => k !== role.id) || role.id; crew.chat = { talker: other, swapAt: now + rand(...CHAT_TURN) }; }
       else {
@@ -850,7 +918,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
           else if (finished && !s.replayAt) s.replayAt = now + rand(...def.holdBetween);
           else if (s.replayAt && now >= s.replayAt) { s.replayAt = 0; s.action.reset(); s.action.play(); }
         } else if (!s.turn && (finished || now >= s.actEnds)) {
-          if (s.act === "uncower" || s.act === "getUp") { const to = s.wakeTo; s.wakeTo = null; if (to) { s.mode = null; enterMode(to, now); } else { s.mode = null; menuAct(now); } }
+          if (s.act === "uncower" || s.act === "getUp") { const to = s.wakeTo; s.wakeTo = null; if (to && wantMode(now) === to) { s.mode = null; enterMode(to, now); } else { s.mode = null; menuAct(now); } }   // the reason it woke may be over by now
           else modeNext(s.mode, now);
         }
       }
@@ -903,13 +971,15 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     g.position.copy(s.pos); g.rotation.y = s.yawCur;
 
     // head: look at the point of interest (mode first, then the spot's), eased and clamped
-    if (!headBone || window.__hmLowGfx) return;
+    // Every tier (2026-09-12): the low-graphics gate left phone heads frozen, and the briefing watcher
+    // is head-only. Two workers, a little math on one bone each: nothing next to drawing the scene.
+    if (!headBone || devHook()?.force?.noHead) return;   // dev: __hmCrew.force.noHead = true shows the clip without the look-at
     const t = s.look;
     let targetYaw = 0, targetPitch = 0;
     let lookAt = null;
     if (tuneHold) lookAt = "camera";
     else if (s.mode === "defend") lookAt = "demon";
-    else if (s.mode === "celebrate") lookAt = "head_pump";
+    else if (s.mode === "celebrate" || s.mode === "alert") lookAt = crew.hasWell ? "well" : "head_pump";   // watch the column (or the hellhole)
     else if (s.mode === "brief") lookAt = "camera";
     else if (s.mode === "listen") lookAt = s.now >= (s.noticeAt || 0) ? "camera" : null;   // a beat, then it notices the boss
     else if (s.mode === "chat" || s.mode === "chatListen") lookAt = "partner";
@@ -919,6 +989,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
       headBone.getWorldPosition(_headPos);
       let ok = false;
       if (lookAt === "camera") { _to.copy(state.camera.position).sub(_headPos); ok = true; }
+      else if (lookAt === "well") { _to.copy(crew.wellPos).sub(_headPos); ok = true; }
       else if (lookAt === "head_pump") { const hp = rigScene.getObjectByName("Head_Pump"); if (hp) { hp.getWorldPosition(_to); _to.sub(_headPos); ok = true; } }
       else if (lookAt === "demon") { const D = demonNear(); if (D) { _to.set(D.x, D.y + 0.1, D.z).sub(_headPos); ok = true; } }
       else if (lookAt === "partner") { const o = Object.entries(crew.workers).find(([k]) => k !== role.id); if (o) { _to.copy(o[1].head).sub(_headPos); ok = true; } }

@@ -581,6 +581,31 @@ worker, `frustumCulled=false` on the skinned meshes, mixer delta capped at 1/30.
   voiceless and pace by timer. `speakVendorText` also no longer zeroes the activation's
   greeting delay, so the opener waits out `saySilent(0)` like a vendor greeting does. Measured
   on the phone: 3 phrases, 3 starts, both on the first tap and on a re-tap.
+- **Heads on every device; chat reactions** (2026-09-12): the head look-at (camera in a
+  briefing, partner in chat, demon, pump head) no longer checks `__hmLowGfx`, which is true on
+  every touch device, so phone and iPad heads move too (the briefing watcher is head-only and
+  did nothing there). In crew chat the listener now reacts to the talker: a `yell` puts it into
+  `nervous` after a 0.15–0.4 s beat until the yell ends, then idle; a `scold` suppresses its
+  acknowledge/shrug gestures. Dev state reports `look`, `headYaw` and `flinched`.
+- **Gusher and hell reactions follow the live eruption** (2026-09-12): Pumpjack passes its
+  eruption refs (`gusherActiveRef`, `gusherHellRef`, `gusherTierRef`) to RigCrew as `eruption`,
+  so every source that goes through `initGusher` — strike overflow, tank overflow, the admin
+  test, a broadcast gusher event — starts `celebrate`; before, only the broadcast event did.
+  Hell eruptions are excluded (they stay cower → defend/alert on `hellActive`). By tier: a
+  `strike` goes straight to clap; `gusher` flinches (`nervous`, 0.6–1.1 s) then claps;
+  `motherlode` flinches then goes to victory1/2 more often. Celebrating and alert workers turn
+  their body (step-turns now allowed from clap) and head to the eruption point: over
+  `Straw`, at `Head_Pump`'s height. The party lingers `CELEBRATE_LINGER_S` (3.5 s; strike 1.5 s)
+  after the column drops, and holds while a woken dozer is still in its 6 s `crew_getUp`, which
+  then skips the flinch. `crew_cheer` is deliberately unused: its head swings ~35° about four times a second, which read as headbanging. The two workers never play the same celebration clip at once (`celebrateNext`, her ask the same
+  day): a worker skips whatever its partner is playing, so one claps while the other does victory1/2,
+  a clapper hands over to a dance when its clap ends, and a dancer takes the clapping when it is free.
+  On a strike one claps and the other acknowledges once, then watches. Only clips from the current
+  party count as "previous" (`celebrateSeq`). Measured: 0 same-clip frames over a 17 s gusher, a
+  motherlode and a strike; roles swapped twice in the long gusher. `modeTick` no longer runs during `getUp`/`uncower`, so a stand-up is
+  never turned or cut by a throw (the post-cower uncower was being cut 0.2 s in). Dev:
+  `window.__hmErupt("strike"|"gusher"|"motherlode")` on the highlighted rig and
+  `window.__hmTestHell()` (the admin TEST HELL toggle) in development builds.
 - **Briefing replies** (2026-09-11): a tap makes the operator wave at the boss ("Hey, boss.",
   `BRIEF_GREET_S` 2.2 s), then each briefing line comes with a reply gesture: page.js sends a
   `tone` per line in `window.__hmBriefing.tones` — "no" for nothing to report (rig signed out /

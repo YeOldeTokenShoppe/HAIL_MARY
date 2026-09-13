@@ -2826,6 +2826,9 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   // True while the active gusher is a hell eruption (demon unleash) rather than a
   // normal oil/parabolum overflow — drives the fiery shader tint + fireball burst.
   const gusherHellRef = useRef(false);
+  // The crew reads the live eruption through these (2026-09-12): every source funnels into
+  // initGusher, so the workers react to what the rig is actually doing.
+  const crewEruption = useMemo(() => ({ activeRef: gusherActiveRef, hellRef: gusherHellRef, tierRef: gusherTierRef }), []);
   const hellBurstRef = useRef();
   const hellBurstMatRef = useRef();
   const hellBurstLightRef = useRef();
@@ -3048,6 +3051,15 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
     prevGusherActive.current = gusherActive;
   }, [gusherActive, initGusher]);
+
+  // Dev: window.__hmErupt("strike" | "gusher" | "motherlode") on the highlighted rig — a local
+  // eruption of any tier, for checking the crew's reactions without a real strike.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development" || !highlighted || typeof window === "undefined") return undefined;
+    const fn = (tier = "gusher") => { initGusher(false, tier); return tier; };
+    window.__hmErupt = fn;
+    return () => { if (window.__hmErupt === fn) delete window.__hmErupt; };
+  }, [highlighted, initGusher]);
 
   // Trigger drill effects on every drill event (highlighted rig only)
   const initDust = useCallback((intensity = 1) => {
@@ -4172,6 +4184,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         panelOpenRef={panelZoomedRef}
         wheelSpinRef={wheelTargetRotY}
         onValveTurn={ventSteam}
+        eruption={crewEruption}
       />
       {/* Fuel tank liquid — animated fill inside the transparent tank */}
       {tankBounds && <TankLiquid tankBounds={tankBounds} tankFill={tankDraining ? 0 : tankFill} envPreset={envPreset} parabolum={parabolum} />}
