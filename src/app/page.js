@@ -14,7 +14,7 @@ import ChartShrine, { TIMEFRAME_OPTIONS } from "@/components/ChartShrine";
 import ChartWidget from "@/components/ChartWidget";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import useCyberConfirm from "@/components/useCyberConfirm";
-import MusicButton from "@/components/MusicButton";
+import ModernMusicPlayer from "@/components/ModernMusicPlayer";
 import BuyModal from "@/components/BuyModal";
 import { useBuyModal } from "@/lib/useBuyModal";
 import ReliquaryRail from "@/components/ReliquaryRail";
@@ -2672,22 +2672,16 @@ export default function HomePage() {
           above it are the MORE popover's, and that can't be open on load. */}
       <CoinLoader loading={isLoading} />
 
-      {/* Music control is desktop-only — removed on mobile. */}
-      {!isMobileDevice && (
-        <MusicButton
-          accent="#d4a854"
-          // Two round faces that spin while the music plays: a synthwave-sun "80s"
-          // badge, and the vinyl record for MIX.
-          icon="/synthwave-sun-80s.svg"
-          modernIcon="/virginRecords.jpg"
-          // Tap the icon = play/pause; the "80s | MIX" switch flips the music era.
-          showModeToggle
-          size={62}
-          // top clears the VigilTicker chyron strip (~24px) pinned to the
-          // viewport's top edge.
-          style={{ position: "fixed", top: "2.5rem", right: "1rem", zIndex: 1000, pointerEvents: "auto" }}
-        />
-      )}
+      {/* Music player — always mounted so the page stays on the modern
+          non80sTracks bucket; the buttons are desktop-only (removed on mobile).
+          Ring matches the social stack. */}
+      <ModernMusicPlayer
+        visible={!isMobileDevice}
+        border="1px solid rgba(212, 175, 55, 0.35)"
+        // top clears the VigilTicker chyron strip (~24px) pinned to the
+        // viewport's top edge.
+        style={{ position: "fixed", top: "2.5rem", right: "1rem", zIndex: 1000, pointerEvents: "auto" }}
+      />
       <div className="scene-background">
         <StarfieldStatueScene
           style={{

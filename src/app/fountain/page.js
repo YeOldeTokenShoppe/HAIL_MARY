@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMusic } from '@/components/MusicContext';
-import MusicButton from '@/components/MusicButton';
+import ModernMusicPlayer, { GOLD_CONTROL, goldHover } from '@/components/ModernMusicPlayer';
 import CoinLoader from '@/components/CoinLoader';
 import CyberNav from '@/components/CyberNav';
 import NavControlsHome from '@/components/NavControlsHome';
@@ -22,42 +22,12 @@ const FountainFrame = dynamic(() => import('@/components/FountainFrame'), {
   loading: () => <CoinLoader loading={true} />
 });
 
-// The fountain page restricts music to exactly these tracks (resolved by path
-// against the full catalog `allTracks`, regardless of era bucket).
-// Paths must match the entries in MusicContext; normalized for leading-slash differences.
-const FOUNTAIN_TRACK_PATHS = [
-  // "/audio/HeartOfGlass.mp3",          // Heart Of Glass - Blondie
-  // "/audio/LoveIsAStranger.m4a",               // Love Is A Stranger - Eurythmics
-  // "/audio/Wishing.m4a",           // Wishing (If I Had a Photograph of You) - A Flock of Seagulls
-  // "/audio/Eyes Without A Face.mp3",           // Eyes Without A Face - Billy Idol
-  // "/audio/Cat People (Putting Out Fire).mp3", // Cat People (Putting Out Fire) - David Bowie
-  // "audio/like-a-prayer-madonna.m4a",          // Like A Prayer - Madonna
-  // "audio/99RedBalloons.mp3",        // 99 Luftballoons - Nena
-  "audio/PersonalJesus.m4a",        // Personal Jesus - Depeche Mode
-  // "audio/TwilightZone.m4a",         // Twilight Zone - Golden Earring
-  "/audio/EveryLittleThing.mp3",
-"audio/Cities.mp3",          
-"/audio/WishingWell.m4a",          // Wishing Well - Sananda Maitraya
-  // "audio/AhLeah.m4a",              // Ah Leah! Donnie Iris
-  "audio/LoveMyWay.m4a",           // Love My Way - Psychedelic Furs
-  // "audio/Heroes.m4a",              // Heroes - Janelle Monae
-  // "audio/RocketsTail.m4a",     // Rocket's Tail - Kate Bush
-  // "audio/IfYouAllGetToHeaven.m4a",       // If You Leave - Orchestral Manoeuvres in the D
-  "audio/for-those-about-to-rock-ac-dc.m4a",
-  "/audio/GoldDustWoman.m4a",          // Gold
-  // "audio/AhLeah.m4a",
-  "/audio/like-a-prayer-madonna.m4a",          // Like A Prayer - Madonna
-  // "audio/ChurchOfThePoisonMind.mp3",          // Church of the Poison Mind - Culture Club
-// Amor Amor - Arno Elias
-"/audio/SinInMyHeart.mp3",          // Sin In My Heart - Siouxsie & The Banshees
-].map((p) => p.replace(/^\//, ""));
-
 export default function FountainPage() {
   // Get user from Clerk
   const { user, isSignedIn } = useUser();
   const router = useRouter();
   
-  const { play, pause, isPlaying: contextIsPlaying, nextTrack, setPagePlaylistOverride, allTracks, musicEra } = useMusic();
+  const { isPlaying: contextIsPlaying } = useMusic();
   const [isLoading, setIsLoading] = useState(true);
   const [fontLoaded, setFontLoaded] = useState(false);
   const [isMobileView, setIsMobileView] = useState(false);
@@ -80,24 +50,6 @@ export default function FountainPage() {
   const loadingTimeoutRef = useRef(null);
 
   
-  // Restrict the playlist to the curated fountain tracks while on this page.
-  // This governs which track is chosen next (first play, skip, auto-advance) —
-  // a song already playing on arrival keeps playing untouched until it ends.
-  // The curated set is all 80s; in MIX (modern) era we release the override so
-  // the era toggle on the music button actually changes the music here.
-  useEffect(() => {
-    if (musicEra === "modern") {
-      setPagePlaylistOverride(null);
-      return () => setPagePlaylistOverride(null);
-    }
-    const wanted = new Set(FOUNTAIN_TRACK_PATHS);
-    const override = (allTracks || []).filter((t) =>
-      wanted.has((t.path || "").replace(/^\//, ""))
-    );
-    setPagePlaylistOverride(override.length ? override : null);
-    return () => setPagePlaylistOverride(null);
-  }, [allTracks, musicEra, setPagePlaylistOverride]);
-
   // Check if mobile - run immediately on mount
   useEffect(() => {
     const checkMobile = () => {
@@ -542,16 +494,9 @@ export default function FountainPage() {
             style={{ display: "block" }}
           />
         </Link> */}
-        {/* Music control is desktop-only — removed on mobile. */}
-        {!isMobileView && (
-          <MusicButton
-            accent="#d4a854"
-            icon="/synthwave-sun-80s.svg"
-            modernIcon="/virginRecords.jpg"
-            showModeToggle
-            size={62}
-          />
-        )}
+        {/* Music player — always mounted so the page stays on the modern
+            non80sTracks bucket; the buttons are desktop-only (removed on mobile). */}
+        <ModernMusicPlayer visible={!isMobileView} />
       </div>
 
       {/* Nav Controls - Top Right (desktop only) */}
@@ -788,19 +733,19 @@ export default function FountainPage() {
         title="Take a snapshot"
         style={{
           position: "fixed",
-          // Mobile: the music button is gone, so the camera takes the now-vacated
-          // top-right corner. Desktop: still tucked under the music button
-          // (62px tall, anchored at top:1rem) with an 8px gap.
+          // Mobile: the music player is gone, so the camera takes the now-vacated
+          // top-right corner. Desktop: still tucked under the music player
+          // (48px tall, anchored at top:1rem) with an 8px gap.
           top: isMobileView
             ? "calc(1rem + env(safe-area-inset-top))"
-            : "calc(1rem + 70px)",
+            : "calc(1rem + 56px)",
           right: "1rem",
           width: isMobileView ? "44px" : "48px",
           height: isMobileView ? "44px" : "48px",
           borderRadius: "10px",
-          border: "1.5px solid rgba(212, 175, 55, 0.2)",
-          background: "rgba(212, 175, 55, 0.05)",
-          color: "#d4a854",
+          border: GOLD_CONTROL.border,
+          background: GOLD_CONTROL.background,
+          color: GOLD_CONTROL.color,
           fontSize: "22px",
           lineHeight: 1,
           cursor: snapshotPending ? "wait" : "pointer",
@@ -812,16 +757,7 @@ export default function FountainPage() {
           pointerEvents: infoPanelOpen ? "none" : "auto",
           transition: "opacity 0.25s ease, transform 0.3s ease, box-shadow 0.3s ease",
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.15)";
-          e.currentTarget.style.boxShadow = "0 0 15px rgba(212, 175, 55, 0.5)";
-          e.currentTarget.style.transform = "scale(1.1)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.05)";
-          e.currentTarget.style.boxShadow = "none";
-          e.currentTarget.style.transform = "scale(1)";
-        }}
+        {...goldHover}
       >
         <span aria-hidden="true" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
           {snapshotPending ? (

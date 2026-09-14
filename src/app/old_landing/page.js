@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import PlainBlackSample from '@/components/PlainBlackSample';
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import PalmTreeDrive from '@/components/PalmTreeDrive';
+import DriveSocialLinks from '@/components/DriveSocialLinks';
 import { useMusic } from '@/components/MusicContext';
 import CyberNav from '@/components/CyberNav';
 import CoinLoader from '@/components/CoinLoader';
@@ -14,6 +14,7 @@ import LanguageSwitcher from '@/components/LanguageSwitcher';
 export default function Home() {
   
   const [isSceneLoading, setIsSceneLoading] = useState(true);
+  const [titleMoment, setTitleMoment] = useState('opening');
   const [fontLoaded, setFontLoaded] = useState(false);
   const [isMobileView, setIsMobileView] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
@@ -25,7 +26,9 @@ export default function Home() {
     isPlaying: contextIsPlaying, 
     nextTrack, 
     currentTrack, 
-    is80sMode 
+    is80sMode,
+    isLoadingTrack,
+    loadTrackByPath
   } = useMusic();
   
   // Show music controls if music is already playing
@@ -38,13 +41,49 @@ export default function Home() {
     }
   }, [contextIsPlaying]);
 
-    const handleMusicToggle = useCallback((show) => {
-      setShowMusicControls(show);
-      if (show && !contextIsPlaying) {
-        play();
+  const musicOptOut = useRef(false);
+  const autoMusicAttempted = useRef(false);
+  const musicState = useRef({ play, contextIsPlaying, isLoadingTrack, loadTrackByPath });
+  musicState.current = { play, contextIsPlaying, isLoadingTrack, loadTrackByPath };
+
+  const handleMusicToggle = useCallback((show) => {
+    musicOptOut.current = !show;
+    setShowMusicControls(show);
+    if (show && !contextIsPlaying) play();
+    if (!show) pause();
+  }, [contextIsPlaying, play, pause]);
+
+  useEffect(() => {
+    if (isSceneLoading) return;
+    const startMusic = () => {
+      const state = musicState.current;
+      if (!musicOptOut.current && !state.contextIsPlaying && !state.isLoadingTrack) state.play();
+    };
+    if (!autoMusicAttempted.current) {
+      autoMusicAttempted.current = true;
+      if (!musicOptOut.current) {
+        musicState.current.loadTrackByPath('audio/05 Feel It Still (Flatbush Zombies Remix).m4a', 'Feel It Still (Flatbush Zombies Remix)');
       }
-    }, [contextIsPlaying, play]);
-  
+    }
+    // If audible autoplay is blocked, retry from a real user gesture.
+    const onGesture = event => {
+      if (event.target instanceof Element && event.target.closest('[data-intro-music-controls]')) return;
+      if (event.type === 'keydown' && !['Enter', ' ', 'ArrowDown'].includes(event.key)) return;
+      startMusic();
+    };
+    window.addEventListener('pointerdown', onGesture);
+    window.addEventListener('keydown', onGesture);
+    return () => {
+      window.removeEventListener('pointerdown', onGesture);
+      window.removeEventListener('keydown', onGesture);
+    };
+  }, [isSceneLoading]);
+
+  // Honor an off click even if an earlier track request finishes afterward.
+  useEffect(() => {
+    if (contextIsPlaying && musicOptOut.current) pause();
+  }, [contextIsPlaying, pause]);
+
   // Check if font is loaded
   useEffect(() => {
     const checkFont = async () => {
@@ -124,9 +163,9 @@ export default function Home() {
         </div>
       )}
       
-      <PlainBlackSample />
       <PalmTreeDrive 
         onLoadingChange={setIsSceneLoading}
+        onTitleMomentChange={setTitleMoment}
       />
       
       {/* Add inline keyframes for spin animation and font */}
@@ -155,13 +194,16 @@ export default function Home() {
       
       {/* RL80 Logo - Top Left */}
       {!isSceneLoading && (
-        <div style={{
+        <div aria-hidden={titleMoment === 'opening'} style={{
           position: "fixed",
           top: "20px", 
           left: "20px",
           borderRadius: "8px",
           padding: "10px",
-          pointerEvents: "auto",
+          opacity: titleMoment === 'opening' ? 0 : 1,
+          transition: 'opacity 0.7s ease',
+          transitionDelay: titleMoment === 'opening' ? '0s' : '0.7s',
+          pointerEvents: titleMoment === 'opening' ? 'none' : 'auto',
           zIndex: 10,
         }}>
         <div 
@@ -219,7 +261,7 @@ export default function Home() {
             position: "fixed",
             top: "20px",
             right: "20px",
-            zIndex: 9999,
+            zIndex: 100002,
           }}
         >
           {/* <CyberNav 
@@ -227,12 +269,12 @@ export default function Home() {
             position="fixed"
             
           /> */}
-          <div
+          <div data-intro-music-controls
         style={{
           position: "fixed",
           top: "1rem",
           right: "1rem",
-          zIndex: 290
+          zIndex: 100002
         }}
       >
         {
@@ -254,7 +296,8 @@ export default function Home() {
                   backdropFilter: "blur(10px)",
                   boxShadow: "0 0.125rem 0.5rem rgba(0, 0, 0, 0.3)",
                 }}
-                title="Toggle Music"
+                title="Play music"
+                aria-label="Play music"
               >
                 <svg
                   width={isMobileDevice ? "20" : "30"}
@@ -291,8 +334,10 @@ export default function Home() {
                   }}
                   onClick={() => {
                     if (contextIsPlaying) {
+                      musicOptOut.current = true;
                       pause();
                     } else {
+                      musicOptOut.current = false;
                       play();
                     }
                   }}
@@ -369,115 +414,9 @@ export default function Home() {
         </div>
       )}
 
-      {/* Social Links - Bottom Right */}
-      {!isSceneLoading && (
-        <div
-          style={{
-            position: "fixed",
-            bottom:  "5rem",
-            right:  "2rem",
-            left: "auto",
-            transform: isMobileDevice ? "translateY(-50%)" : "none",
-            display: "flex",
-            flexDirection:  "column",
-            alignItems: "center",
-            gap: "12px",
-            zIndex: 1001,
-            pointerEvents: "auto",
-          }}
-        >
-          <a
-            href="https://x.com/rl80token"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="X (Twitter)"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "44px",
-              height: "44px",
-              borderRadius: "50%",
-              border: "1px solid rgba(255, 255, 255, 0.3)",
-              background: "rgba(0, 0, 0, 0.5)",
-              transition: "all 0.3s ease",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
-              e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 255, 255, 0.3)";
-              e.currentTarget.style.transform = "scale(1.1)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
-              e.currentTarget.style.boxShadow = "none";
-              e.currentTarget.style.transform = "scale(1)";
-            }}
-          >
-            <img src="/x_logo_white.webp" alt="X (Twitter)" style={{ width: "18px", height: "18px" }} />
-          </a>
-
-          <a
-            href="https://t.me/rl80token"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Telegram"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "44px",
-              height: "44px",
-              borderRadius: "50%",
-              border: "1px solid rgba(255, 255, 255, 0.3)",
-              background: "rgba(0, 0, 0, 0.5)",
-              transition: "all 0.3s ease",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
-              e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 255, 255, 0.3)";
-              e.currentTarget.style.transform = "scale(1.1)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
-              e.currentTarget.style.boxShadow = "none";
-              e.currentTarget.style.transform = "scale(1)";
-            }}
-          >
-            <img src="/telegram_logo_white.webp" alt="Telegram" style={{ width: "20px", height: "20px" }} />
-          </a>
-
-          <a
-            href="https://farcaster.xyz/rl80"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Farcaster"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "44px",
-              height: "44px",
-              borderRadius: "50%",
-              border: "1px solid rgba(255, 255, 255, 0.3)",
-              background: "rgba(0, 0, 0, 0.5)",
-              transition: "all 0.3s ease",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
-              e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 255, 255, 0.3)";
-              e.currentTarget.style.transform = "scale(1.1)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
-              e.currentTarget.style.boxShadow = "none";
-              e.currentTarget.style.transform = "scale(1)";
-            }}
-          >
-            <img src="/farcaster_logo.webp" alt="Farcaster" style={{ width: "20px", height: "20px" }} />
-          </a>
+      {!isSceneLoading && titleMoment !== 'final' && (
+        <div style={{ position: 'fixed', bottom: '5rem', right: '2rem', zIndex: 1001 }}>
+          <DriveSocialLinks vertical />
         </div>
       )}
     </div>

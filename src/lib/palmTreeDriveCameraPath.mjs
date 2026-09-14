@@ -8,7 +8,7 @@ export const DESKTOP_CAMERA_SHOTS = [
   { x: 7.9979, y: 2.1078, z: 28.1434, targetX: 1.1779, targetY: 0.7365, targetZ: 23.728, fov: 41.9528 },
   { x: 2.5133, y: 1.5917, z: 31.3361, targetX: 2.3144, targetY: 1.5036, targetZ: 24.2607, fov: 41.9528 },
   { x: 2.4802, y: 1.4387, z: 26.9541, targetX: 2.4047, targetY: 1.4052, targetZ: 24.2663, fov: 41.9528 },
-  { x: 2.5139, y: 1.2955, z: 24.6193, targetX: 2.5193, targetY: 1.2913, targetZ: 24.2791, fov: 41.9528 }
+  { x: 2.5071, y: 1.2811, z: 24.4796, targetX: 2.5113, targetY: 1.3454, targetZ: 24.2962, fov: 5 }
 ];
 
 // Spend the first 43% circling behind and along the left side.
@@ -63,21 +63,51 @@ PORTRAIT_CAMERA_SHOTS[1] = {
   targetX: 1.7672, targetY: 0.5976, targetZ: 25.2043, fov: 63
 };
 PORTRAIT_CAMERA_SHOTS[PORTRAIT_CAMERA_SHOTS.length - 1] = {
-  x: 2.484, y: 1.3159, z: 24.5634,
-  targetX: 2.4619, targetY: 1.2761, targetZ: 24.3545, fov: 51.9528
+  x: 2.5071, y: 1.2811, z: 24.4796,
+  targetX: 2.5113, targetY: 1.3454, targetZ: 24.2962, fov: 5
 };
+const statueDesktopShots = DESKTOP_CAMERA_SHOTS.map(shot => ({ ...shot }));
+statueDesktopShots[statueDesktopShots.length - 1] = {
+  x: 2.5139, y: 1.2955, z: 24.6193,
+  targetX: 2.5193, targetY: 1.2913, targetZ: 24.2791, fov: 41.9528
+};
+const statuePortraitShots = PORTRAIT_CAMERA_SHOTS.map(shot => ({ ...shot }));
+statuePortraitShots[statuePortraitShots.length - 1] = {
+  x: 2.5425, y: 1.2956, z: 24.5955,
+  targetX: 2.5306, targetY: 1.2857, targetZ: 24.3222, fov: 51.9528
+};
+const statueDesktopTangents = buildTangents(statueDesktopShots);
+const statuePortraitTangents = buildTangents(statuePortraitShots);
 const desktopTangents = buildTangents(DESKTOP_CAMERA_SHOTS);
 const portraitTangents = buildTangents(PORTRAIT_CAMERA_SHOTS);
 
-export function sampleDesktopCamera(progress, output = {}) {
-  return sampleCameraShots(progress, DESKTOP_CAMERA_SHOTS, desktopTangents, output);
+// Re-time the dashboard approach: cover the distant portion earlier, then
+// linger as the statue fills the frame. Entry speed matches the existing tour;
+// the final glide settles to rest without changing either endpoint or route.
+export function glideCameraProgress(progress) {
+  const start = 0.78;
+  const p = Math.max(0, Math.min(1, progress));
+  if (p <= start || p === 1) return p;
+  const u = (p - start) / (1 - start);
+  const strength = 2.6;
+  const normalization = 1 - Math.exp(-strength);
+  const entrySlope = normalization / strength;
+  const eased = (-2 * u ** 3 + 3 * u ** 2)
+    + (u ** 3 - 2 * u ** 2 + u) * entrySlope;
+  return start + (1 - start) * (1 - Math.exp(-strength * eased)) / normalization;
 }
 
-export function sampleResponsiveCamera(progress, aspect, output = {}) {
-  sampleDesktopCamera(progress, output);
+export function sampleDesktopCamera(progress, output = {}) {
+  return sampleCameraShots(glideCameraProgress(progress), DESKTOP_CAMERA_SHOTS, desktopTangents, output);
+}
+
+export function sampleResponsiveCamera(progress, aspect, output = {}, ending = 'heart') {
+  const statue = ending === 'statue';
+  sampleCameraShots(glideCameraProgress(progress), statue ? statueDesktopShots : DESKTOP_CAMERA_SHOTS,
+    statue ? statueDesktopTangents : desktopTangents, output);
   const portrait = Math.max(0, Math.min(1, (1 - aspect) / 0.4));
   if (portrait === 0) return output;
-  const portraitPose = sampleCameraShots(progress, PORTRAIT_CAMERA_SHOTS, portraitTangents);
+  const portraitPose = sampleCameraShots(glideCameraProgress(progress), statue ? statuePortraitShots : PORTRAIT_CAMERA_SHOTS, statue ? statuePortraitTangents : portraitTangents);
   for (const field of fields) output[field] += (portraitPose[field] - output[field]) * portrait;
   return output;
 }

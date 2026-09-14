@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
-const BODY_PANELS = new Set(['CarBody', 'LDoor', 'RDoor']);
+const BODY_PANELS = new Set(['CarBody', 'LDoor', 'LDoor.001', 'RDoor', 'RDoor.001']);
 
 export function createCandyEmeraldPaint(renderer) {
   // Generate soft reflection cards locally; no additional downloaded textures.

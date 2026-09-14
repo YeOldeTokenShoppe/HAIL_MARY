@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { useMusic } from '@/components/MusicContext';
-import MusicButton from '@/components/MusicButton';
+import ModernMusicPlayer from '@/components/ModernMusicPlayer';
 import CoinLoader from '@/components/CoinLoader';
 import CyberNav from '@/components/CyberNav';
 import CompactCandleModal from '@/components/CompactCandleModal';
@@ -44,7 +44,7 @@ export default function ModelViewerPage() {
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const is80sMode = context80sMode;
 
-  // Music control is desktop-only — hide the MusicButton on mobile.
+  // Music player buttons are desktop-only — hidden on mobile.
   const [isMobileView, setIsMobileView] = useState(false);
   useEffect(() => {
     const check = () => setIsMobileView(window.innerWidth <= 768);
@@ -82,17 +82,14 @@ export default function ModelViewerPage() {
         onBookHoverChange={setIsBookHovered}
       />
 
-      {/* Music control is desktop-only — removed on mobile. */}
-      {!isMobileView && (
-        <MusicButton
-          accent="#d4a854"
-          icon="/synthwave-sun-80s.svg"
-          modernIcon="/virginRecords.jpg"
-          showModeToggle
-          size={62}
-          style={{ position: "fixed", top: "1rem", right: "1rem", zIndex: 9999 }}
-        />
-      )}
+      {/* Music player — always mounted so the page stays on the modern
+          non80sTracks bucket; the buttons are desktop-only (removed on mobile).
+          Ring matches the "Open the Book" tooltip (and the root page). */}
+      <ModernMusicPlayer
+        visible={!isMobileView}
+        border="1px solid rgba(212, 175, 55, 0.35)"
+        style={{ position: "fixed", top: "1rem", right: "1rem", zIndex: 9999 }}
+      />
 
       {isBookHovered && !showLittleBook && (
         <div

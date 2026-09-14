@@ -15,8 +15,9 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useLanguage } from './LanguageProvider';
 import { useRouter } from 'next/navigation';
 // import SynthwaveText from './SynthwaveText';
-import MorphingWebGLText from './MorphingWebGLText';
-import WebGLStandaloneText from '@/components/WebGLStandaloneText';
+import DriveTitles from './DriveTitles';
+import DriveActions from './DriveActions';
+import RL80SceneIntro from './RL80SceneIntro';
 import BuyModal from './BuyModal';
 import CyberNav from './CyberNav';
 import HorizontalRoadmap from './HorizontalRoadmap';
@@ -24,7 +25,7 @@ import { createLowRider, LOW_RIDER_MODEL_URL } from '@/lib/palmTreeDriveCar.mjs'
 import { applyIllustratedStyle } from '@/lib/palmTreeDriveIllustrated.mjs';
 import { createCandyEmeraldPaint } from '@/lib/palmTreeDrivePaint.mjs';
 import { createPalmTreeDriveCameraHelper } from '@/lib/palmTreeDriveCameraHelper.mjs';
-import { DESKTOP_CAMERA_SHOTS, DESKTOP_CAMERA_SECONDS, sampleResponsiveCamera } from '@/lib/palmTreeDriveCameraPath.mjs';
+import { DESKTOP_CAMERA_SHOTS, DESKTOP_CAMERA_SECONDS, sampleResponsiveCamera as sampleCameraVariant } from '@/lib/palmTreeDriveCameraPath.mjs';
 
 
 
@@ -36,7 +37,7 @@ gsap.registerPlugin(ScrollTrigger);
 
 
 
-const PalmsScene = ({ onLoadingChange }) => {
+const PalmsScene = ({ onLoadingChange, onTitleMomentChange }) => {
   const { t, locale } = useLanguage();
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
@@ -114,6 +115,12 @@ const PalmsScene = ({ onLoadingChange }) => {
   }, [modelsLoadState, setIsSceneLoading]);
   // Cinematic reverse removed
   const scrollCameraActive = true; // Scroll camera always active
+  const [introDone, setIntroDone] = useState(false);
+  const finishIntro = useCallback(() => setIntroDone(true), []);
+  const [titleMoment, setTitleMoment] = useState('opening');
+  useEffect(() => {
+    onTitleMomentChange?.(titleMoment);
+  }, [titleMoment, onTitleMomentChange]);
   const [currentCameraStage, setCurrentCameraStage] = useState(0); // Track which camera position we're at
   const [showEnterButton, setShowEnterButton] = useState(true); // Show "Take me there" button immediately
   const [hideLastText, setHideLastText] = useState(false); // Hide the last text block after delay
@@ -176,6 +183,7 @@ const PalmsScene = ({ onLoadingChange }) => {
     const resetScroll = () => {
       window.scrollTo(0, 0);
       setCurrentCameraStage(0);
+      setTitleMoment('opening');
       scrollProgressRef.current = 0;
       setHasScrolled(false);
       hasScrolledRef.current = false;
@@ -312,16 +320,13 @@ const PalmsScene = ({ onLoadingChange }) => {
     }
   }, [currentCameraStage, scrollCameraActive]);
   
-  // Effect to trigger morph animation when reaching final stage
+  // Let the final title settle before revealing the action buttons.
   useEffect(() => {
-    if (currentCameraStage === 4 && !shouldMorph) {
-      const timer = setTimeout(() => {
-        setShouldMorph(true);
-      }, 1500); // Trigger morph after 1.5 seconds at final stage
-      
-      return () => clearTimeout(timer);
-    }
-  }, [currentCameraStage, shouldMorph]);
+    setShouldMorph(false);
+    if (titleMoment !== 'final') return;
+    const timer = setTimeout(() => setShouldMorph(true), 1800);
+    return () => clearTimeout(timer);
+  }, [titleMoment]);
   
   const carModelRef = useRef(null);
   const intersectionRef = useRef(null);
@@ -352,10 +357,11 @@ const PalmsScene = ({ onLoadingChange }) => {
     document.documentElement.style.overflow = 'auto';
     document.documentElement.style.height = 'auto';
     
+    setIntroDone(true);
     // Immediately set to final stage
     setCurrentCameraStage(4);
+    setTitleMoment('final');
     scrollProgressRef.current = 1;
-    setShouldMorph(true);
     
     // Mark as scrolled to hide the button
     setHasScrolled(true);
@@ -473,6 +479,8 @@ const PalmsScene = ({ onLoadingChange }) => {
 
   useEffect(() => {
     if (!mountRef.current) return;
+    const ending = new URLSearchParams(window.location.search).get('ending') === 'statue' ? 'statue' : 'heart';
+    const sampleResponsiveCamera = (progress, aspect, output = {}) => sampleCameraVariant(progress, aspect, output, ending);
 
     let carPaint = null;
 
@@ -877,8 +885,17 @@ const PalmsScene = ({ onLoadingChange }) => {
     camera.updateProjectionMatrix();
 
     // Ground and road
-    const planeGeom = new THREE.PlaneGeometry(100, 100, 200, 200);
+    // Extend only the rear (+Z) terrain, retaining the original front edge.
+    const planeGeom = new THREE.PlaneGeometry(100, 220, 200, 440);
     planeGeom.rotateX(-Math.PI * 0.5);
+    planeGeom.translate(0, 0, 60); // z=-50 through z=170
+    // Preserve the existing hill pattern and grid density on the original land.
+    const terrainPositions = planeGeom.attributes.position;
+    const terrainUVs = planeGeom.attributes.uv;
+    for (let i = 0; i < terrainPositions.count; i++) {
+      terrainUVs.setXY(i, terrainPositions.getX(i) / 100 + 0.5, 0.5 - terrainPositions.getZ(i) / 100);
+    }
+    terrainUVs.needsUpdate = true;
     
     // Create shader material
     const planeMat = new THREE.ShaderMaterial({
@@ -1120,10 +1137,40 @@ const PalmsScene = ({ onLoadingChange }) => {
         return;
       }
       
+      // Allow one extra 20-unit pair into the horizon, fading whole instances
+      // without shrinking trees or changing the repeating intervals.
+      palmMaterial.alphaHash = true;
+      const originalPalmCompile = palmMaterial.onBeforeCompile;
+      const originalPalmKey = palmMaterial.customProgramCacheKey();
+      palmMaterial.onBeforeCompile = function(shader, renderer) {
+        originalPalmCompile.call(this, shader, renderer);
+        shader.vertexShader = 'varying float vPalmLandFade;\n' + shader.vertexShader;
+        shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
+          #include <begin_vertex>
+          vec4 palmRoot = vec4(0.0, 0.0, 0.0, 1.0);
+          #ifdef USE_INSTANCING
+            palmRoot = instanceMatrix * palmRoot;
+          #endif
+          float palmRootZ = (modelMatrix * palmRoot).z;
+          // Keep the approved forward horizon. Rear trees now extend over land
+          // and fade beyond the scene fog, instead of dissolving near the car.
+          float forwardFade = smoothstep(-62.0, -45.0, palmRootZ);
+          float rearFade = 1.0 - smoothstep(130.0, 160.0, palmRootZ);
+          vPalmLandFade = forwardFade * rearFade;
+        `);
+        shader.fragmentShader = 'varying float vPalmLandFade;\n' + shader.fragmentShader;
+        shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `
+          #include <color_fragment>
+          if (vPalmLandFade <= 0.0) discard;
+          diffuseColor.a *= vPalmLandFade;
+        `);
+      };
+      palmMaterial.customProgramCacheKey = () => `${originalPalmKey}|palm-land-fade-v5`;
+
       // Keep trunks outside the low camera orbit (x=-6.42 through x=8).
       // Fixed wider rows also prevent moving palms from crossing the lens.
       const palmPositions = [];
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 20; i++) {
         palmPositions.push(-11, 0, i * 20 - 10 - 50);
         palmPositions.push(11, 0, i * 20 - 50);
       }
@@ -1169,40 +1216,28 @@ const PalmsScene = ({ onLoadingChange }) => {
         palms.setMatrixAt(i, dummy.matrix);
       }
       
-      // Store initial positions for animation
-      const initialPositions = new Float32Array(palmPositions);
-      
-      // Animation function to update palm positions
-      const animatePalms = (time) => {
+      // A longer repeating lattice preserves the 20-unit intervals. Both ends
+      // stay well beyond the 100-unit fog range, including during the rear sweep.
+      const rowLength = 400;
+      let palmTravel = 0;
+      palms.frustumCulled = false;
+      const animatePalms = (_time, delta = 0) => {
+        palmTravel = (palmTravel + Math.min(Math.max(delta, 0), 0.1) * speed) % rowLength;
+        const rearBoundary = camera.position.z - rowLength / 2;
         for (let i = 0; i < instanceCount; i++) {
-          const baseX = initialPositions[i * 3];
-          const baseY = initialPositions[i * 3 + 1];
-          const baseZ = initialPositions[i * 3 + 2];
-          
-          // Animate position along Z axis
-          const animatedZ = ((baseZ + time * speed + 50) % 100) - 50;
-          
-          // Scale based on distance with the base scale factor
-          const distanceScale = 0.4 + smoothstep(50, 45, Math.abs(animatedZ)) * 0.6;
-          const finalScale = scaleFactor * distanceScale;
-          
-          dummy.position.set(baseX, baseY, animatedZ);
-          dummy.scale.set(finalScale, finalScale, finalScale);
-          
-          // Mirror palm trees on the left side
-          if (baseX < 0) {
-            dummy.scale.x = -finalScale;
-          }
-          
-          // Keep rotation variation
-          dummy.rotation.y = Math.PI * 2 * ((i * 0.618) % 1); // Golden ratio for varied rotation
-          
+          const baseX = palmPositions[i * 3];
+          const offset = palmPositions[i * 3 + 2] + palmTravel - rearBoundary;
+          const z = rearBoundary + ((offset % rowLength) + rowLength) % rowLength;
+          dummy.position.set(baseX, palmPositions[i * 3 + 1], z);
+          dummy.scale.set(baseX < 0 ? -scaleFactor : scaleFactor, scaleFactor, scaleFactor);
+          dummy.rotation.y = Math.PI * 2 * ((i * 0.618) % 1);
           dummy.updateMatrix();
           palms.setMatrixAt(i, dummy.matrix);
         }
         palms.instanceMatrix.needsUpdate = true;
       };
-      
+      animatePalms(0, 0);
+
       // Add animation update function to materialShaders
       materialShaders.push({ update: animatePalms });
       
@@ -1351,6 +1386,55 @@ const PalmsScene = ({ onLoadingChange }) => {
       });
       
       scene.add(sun);
+
+      // A distant skyline sits in front of the lower sun, behind the road scenery.
+      // Optional scenery loads separately so it cannot advance the required-model gate.
+      loader.load('/models/skyline.glb', ({ scene: skyline }) => {
+        if (disposed) {
+          skyline.traverse(child => {
+            child.geometry?.dispose();
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            materials.filter(Boolean).forEach(material => { material.map?.dispose(); material.dispose(); });
+          });
+          return;
+        }
+        skyline.name = 'DistantSynthSkyline';
+        const skylineMaterials = [];
+        skyline.updateMatrixWorld(true);
+        const sourceBounds = new THREE.Box3().setFromObject(skyline, true);
+        const sourceSize = sourceBounds.getSize(new THREE.Vector3());
+        skyline.scale.multiplyScalar(600 / Math.max(sourceSize.x, 0.001));
+        skyline.updateMatrixWorld(true);
+        const bounds = new THREE.Box3().setFromObject(skyline, true);
+        const center = bounds.getCenter(new THREE.Vector3());
+        skyline.position.add(new THREE.Vector3(-30 - center.x, -12 - bounds.min.y, -760 - center.z));
+        skyline.traverse(child => {
+          if (!child.isMesh) return;
+          const silhouette = source => {
+            const material = new THREE.MeshBasicMaterial({
+              map: source.map, color: 0x86778f, alphaTest: 0.08,
+              transparent: true, opacity: 0, depthWrite: false,
+              side: THREE.DoubleSide, fog: false, toneMapped: false,
+            });
+            skylineMaterials.push(material);
+            source.dispose();
+            return material;
+          };
+          child.material = Array.isArray(child.material) ? child.material.map(silhouette) : silhouette(child.material);
+          child.castShadow = false;
+          child.receiveShadow = false;
+        });
+        const updateSkyline = () => {
+          // Hide the cutout base from the high opening angle; reveal near road level.
+          const visibility = 1 - THREE.MathUtils.smoothstep(camera.position.y, 1.8, 3.5);
+          skyline.visible = visibility > 0.001;
+          skylineMaterials.forEach(material => { material.opacity = visibility; });
+        };
+        updateSkyline();
+        materialShaders.push({ update: updateSkyline });
+        scene.add(skyline);
+      }, undefined, error => console.warn('Optional skyline could not load:', error));
+
     }, 
     (progress) => {
     },
@@ -1406,18 +1490,94 @@ const PalmsScene = ({ onLoadingChange }) => {
         }
       });
 
-      // Keep the previous finish accessible for direct visual comparison.
-      if (new URLSearchParams(window.location.search).get('sceneStyle') !== 'original') {
+      // Keep the illustrated experiment opt-in so normal visits match the original preview.
+      if (new URLSearchParams(window.location.search).get('sceneStyle') === 'illustrated') {
         applyIllustratedStyle(carScene);
       }
 
-      // A small, soft-edged portrait light aimed down at the dashboard statue.
-      // Its short range and narrow cone keep the surrounding paint subdued.
-      const maryKey = new THREE.SpotLight(0xffe6cc, 0.3, 0.85, 0.30, 1, 2);
+
+      // A broad, feathered spotlight lifts the face from just above the viewer.
+      // The frontal angle avoids the harsh grazing highlights of the earlier rig.
+      const maryKey = new THREE.SpotLight(0xfff4e8, 0.32, 0.95, 0.48, 1, 2);
       maryKey.name = 'MaryPortraitKey';
-      maryKey.position.set(2.30, 1.57, 24.70);
-      maryKey.target.position.set(2.45, 1.30, 24.35);
+      maryKey.position.set(2.45, 1.42, 24.78);
+      maryKey.target.position.set(2.45, 1.31, 24.35);
       scene.add(maryKey, maryKey.target);
+
+      // A transparent aura behind Mary adds atmosphere without lighting her surface.
+      const statue = carScene.getObjectByName('statue');
+      if (statue) {
+        const bounds = new THREE.Box3().setFromObject(statue, true);
+        const center = bounds.getCenter(new THREE.Vector3());
+        const size = bounds.getSize(new THREE.Vector3());
+        const auraMaterial = new THREE.ShaderMaterial({
+          uniforms: { opacity: { value: 0 } },
+          vertexShader: `varying vec2 vUv;
+            void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+          fragmentShader: `varying vec2 vUv; uniform float opacity;
+            void main() {
+              float r = length((vUv - 0.5) * 2.0);
+              float glow = exp(-4.0 * r * r) * (1.0 - smoothstep(0.65, 1.0, r));
+              gl_FragColor = vec4(0.80, 0.85, 1.0, glow * opacity);
+            }`,
+          transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+        });
+        const aura = new THREE.Mesh(new THREE.PlaneGeometry(size.x * 2.1, size.y * 1.35), auraMaterial);
+        aura.name = 'MarySoftAura';
+        aura.layers.enable(renderer.userData.BLOOM_LAYER);
+        scene.add(aura);
+        const towardCamera = new THREE.Vector3();
+        materialShaders.push({ update: () => {
+          towardCamera.subVectors(camera.position, center).normalize();
+          aura.position.copy(center).addScaledVector(towardCamera, -size.z * 0.8 - 0.015);
+          aura.quaternion.copy(camera.quaternion);
+          auraMaterial.uniforms.opacity.value = 0.18 * (1 - THREE.MathUtils.smoothstep(camera.position.distanceTo(center), 0.3, 2.0));
+        } });
+      }
+
+      const heartCandles = carScene.getObjectByName('Heart3');
+      const chaseTime = { value: 0 };
+      if (heartCandles) {
+        carScene.updateMatrixWorld(true);
+        const candleBounds = new THREE.Box3().setFromObject(heartCandles, true);
+        const chaseBounds = { value: new THREE.Vector2(candleBounds.min.x, Math.max(candleBounds.max.x - candleBounds.min.x, 0.00001)) };
+        heartCandles.traverse(child => {
+          if (!child.isMesh) return;
+          const makeCandleGlow = source => {
+            const material = source.clone();
+            material.emissive = new THREE.Color(0x65ff87);
+            material.emissiveIntensity = 1;
+            const previousCompile = source.onBeforeCompile;
+            const previousKey = source.customProgramCacheKey();
+            material.onBeforeCompile = function(shader, renderer) {
+              previousCompile.call(this, shader, renderer);
+              shader.uniforms.heartChaseTime = chaseTime;
+              shader.uniforms.heartChaseBounds = chaseBounds;
+              shader.vertexShader = 'varying float vHeartChaseX;\n' + shader.vertexShader;
+              shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', `
+                vHeartChaseX = (modelMatrix * vec4(transformed, 1.0)).x;
+                #include <project_vertex>
+              `);
+              shader.fragmentShader = 'varying float vHeartChaseX; uniform float heartChaseTime; uniform vec2 heartChaseBounds;\n' + shader.fragmentShader;
+              shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `
+                #include <emissivemap_fragment>
+                float across = (vHeartChaseX - heartChaseBounds.x) / heartChaseBounds.y;
+                float head = fract(heartChaseTime / 3.0) * 1.5 - 0.25;
+                float distanceToHead = (across - head) / 0.12;
+                float chase = exp(-distanceToHead * distanceToHead);
+                totalEmissiveRadiance *= 0.12 + 1.05 * chase;
+              `);
+            };
+            material.customProgramCacheKey = () => `${previousKey}|heart-chase-v1`;
+            return material;
+          };
+          child.material = Array.isArray(child.material) ? child.material.map(makeCandleGlow) : makeCandleGlow(child.material);
+          child.layers.enable(renderer.userData.BLOOM_LAYER);
+        });
+        materialShaders.push({ update: (_time, delta) => {
+          chaseTime.value += Math.min(Math.max(delta || 0, 0), 0.1);
+        } });
+      }
 
       // Update existing car spotlight target to point at the loaded car
       if (carSpotlightRef.current) {
@@ -1541,6 +1701,7 @@ const PalmsScene = ({ onLoadingChange }) => {
       window.scrollTo(0, 0);
       scrollProgressRef.current = 0;
       setCurrentCameraStage(0);
+      setTitleMoment('opening');
       setHasScrolled(false);
       hasScrolledRef.current = false;
       
@@ -1601,6 +1762,7 @@ const PalmsScene = ({ onLoadingChange }) => {
 
       // Single onUpdate for the entire timeline
       tl.eventCallback("onUpdate", () => {
+        setTitleMoment(desktopSweep.progress >= 0.985 ? 'final' : desktopSweep.progress < 0.22 ? 'opening' : 'hidden');
         sampleResponsiveCamera(desktopSweep.progress, camera.aspect, cameraPath);
         if (camera) {
           // Always update camera during scroll animation, regardless of controls state
@@ -1861,7 +2023,7 @@ const PalmsScene = ({ onLoadingChange }) => {
             window.removeEventListener('keydown', cancelAutoPlayOnKey);
           }
         });
-      }, 4000); // 4 second delay before auto-play starts
+      }, 5000); // Allow the mask reveal and opening title to settle before the sweep.
     };
 
     // Both initial setup and the car loader call this. Start only once the
@@ -2314,93 +2476,12 @@ const PalmsScene = ({ onLoadingChange }) => {
 
       </div>
 
-      {!isSceneLoading && scrollCameraActive && (
-        <div 
-          ref={textSectionRef}
-          style={{
-            position: 'fixed',
-            right: isMobile ? '20px' : '15%',
-            top: isMobile ? '50%' : '50%',
-            transform: 'translateY(-50%)',
-            width: isMobile ? '85%' : '50%',
-            maxWidth: '600px',
-            pointerEvents: 'none',
-            zIndex: "1000",
-            height: 'auto',
-            minHeight: '60vh',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            gap: '20px',
-            overflow: 'visible',
-          }}
-        >
-          <div style={{
-            marginBottom: isMobile ? '0' : '0',
-            position: 'relative',
-            height: '700px',
-            minHeight: '450px',
-          }}>
-            {/* Use MorphingWebGLText for final stage, WebGLStandaloneText for others */}
-            {currentCameraStage === 4 ? (
-              <MorphingWebGLText
-                startTextArray={[t('palmTreeDrive.morphing.line1'), t('palmTreeDrive.morphing.line2')]}
-                endText="RL80"
-                shouldMorph={shouldMorph}
-                morphDelay={500}
-                fontSize={(() => {
-                  // Adjust font sizes for different scripts to prevent clipping
-                  const isArabic = locale === 'ar';
-                  const isAsian = ['ja', 'zh', 'ko'].includes(locale);
-                  const isDevanagari = locale === 'hi';
-                  const isCyrillic = ['ru', 'uk', 'bg'].includes(locale); // Russian, Ukrainian, Bulgarian
-
-                  if (isArabic || isDevanagari) {
-                    return isMobile ? (isVerySmallScreen ? 0.85 : 1.0) : 1.5;
-                  } else if (isAsian) {
-                    // Smaller font for very small screens (iPhone 13 mini, SE) to prevent clipping
-                    return isMobile ? (isVerySmallScreen ? 0.55 : 0.7) : 1.3;
-                  } else if (isCyrillic) {
-                    return isMobile ? (isVerySmallScreen ? 0.85 : 1.0) : 1.2;
-                  }
-                  return isMobile ? (isVerySmallScreen ? 1.0 : 1.2) : 1.8;
-                })()}
-                lineHeight={['ar', 'hi'].includes(locale) ? 1.1 : 0.9}
-                color="#fdcdf9"
-                className="mb-4"
-                isMobile={isMobile}
-              />
-            ) : (
-              <WebGLStandaloneText
-                textArray={textBlocks[currentCameraStage] || ["DRIFT"]}
-                fontSize={(() => {
-                  // Adjust font sizes for different scripts to prevent clipping
-                  const isArabic = locale === 'ar';
-                  const isAsian = ['ja', 'zh', 'ko'].includes(locale);
-                  const isDevanagari = locale === 'hi';
-                  const isCyrillic = ['ru', 'uk', 'bg'].includes(locale); // Russian, Ukrainian, Bulgarian
-
-                  if (isArabic || isDevanagari) {
-                    return isMobile ? (isVerySmallScreen ? 0.85 : 1.0) : 1.5;
-                  } else if (isAsian) {
-                    // Smaller font for very small screens (iPhone 13 mini, SE) to prevent clipping
-                    return isMobile ? (isVerySmallScreen ? 0.55 : 0.7) : 1.3;
-                  } else if (isCyrillic) {
-                    return isMobile ? (isVerySmallScreen ? 0.85 : 1.0) : 1.2;
-                  }
-                  return isMobile ? (isVerySmallScreen ? 1.0 : 1.2) : 1.8;
-                })()}
-                lineHeight={['ar', 'hi'].includes(locale) ? 1.1 : 0.9}
-                id={`palmtree-stage-${currentCameraStage}`}
-                className="mb-4"
-              />
-            )}
-          </div>
-        </div>
-      )}
+      {!isSceneLoading && scrollCameraActive && <DriveTitles moment={introDone ? titleMoment : 'hidden'} />}
 
       {/* Scroll Camera Indicator removed for production */}
       </div>
+
+      {!isSceneLoading && !introDone && <RL80SceneIntro onComplete={finishIntro} />}
 
       {/* Progress dots and scroll hint - fixed position, separate from text container */}
       {!isSceneLoading && scrollCameraActive && (
@@ -2521,103 +2602,9 @@ const PalmsScene = ({ onLoadingChange }) => {
         }} 
       />
       
-      {/* Enter Button - positioned under the pagination dots, appears after morph completes */}
-     {currentCameraStage === 4 && shouldMorph && (
-        <div style={{
-          position: 'fixed',
-          right: isMobile ? '20px' : '15%',
-          top: isMobile ? '78%' : '65%',
-          transform: 'translateY(-50%)', // Center vertically at new position
-          width: isMobile ? '85%' : '50%',
-          maxWidth: '600px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 100,
-          pointerEvents: 'auto',
-          animation: 'simpleFadeIn 1s ease-in',
-        }}>
-          {/* Horizontal Roadmap Timeline */}
-          {/* <HorizontalRoadmap
-            isVisible={true}
-            isMobile={isMobile}
-          /> */}
-
-          {/* Action buttons row - Buy + More */}
-          <div style={{
-            display: 'flex',
-            gap: '1.5rem',
-            justifyContent: 'center',
-            alignItems: 'center',
-            marginTop: '70%',
-          }}>
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setShowBuyModal(true);
-              }}
-              style={{
-                padding: isMobile ? '10px 25px' : '15px 40px',
-                fontSize: isMobile ? "1.3rem" : "1.8rem",
-                fontFamily: "'UnifrakturCook', serif",
-                background: 'rgba(20, 10, 35, 0.85)',
-                color: "#ff00ee",
-                border: "2px solid #ff00ee",
-                borderRadius: "8px",
-                cursor: "pointer",
-                transition: "all 0.3s ease",
-                boxShadow: "0 0 20px rgba(255, 0, 238, 0.5)",
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = "#1a001a";
-                e.target.style.transform = "scale(1.05)";
-                e.target.style.boxShadow = "0 0 30px rgba(255, 0, 238, 0.8)";
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = "#000000";
-                e.target.style.transform = "scale(1)";
-                e.target.style.boxShadow = "0 0 20px rgba(255, 0, 238, 0.5)";
-              }}
-            >
-              {t('palmTreeDrive.buyButton')}
-            </button>
-
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                router.push('/arcade');
-              }}
-              style={{
-                padding: isMobile ? '10px 25px' : '15px 40px',
-                fontSize: isMobile ? "1.3rem" : "1.8rem",
-                fontFamily: "'Permanent Marker', serif",
-                background: 'transparent',
-                color: "#000000",
-                border: "none",
-                cursor: "pointer",
-                transition: "all 0.3s ease",
-                textShadow: '0 0 20px rgba(255, 0, 238, 0.9), 0 0 40px rgba(255, 0, 238, 0.6)',
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.transform = "scale(1.1)";
-                e.target.style.textShadow = '0 0 25px rgba(255, 0, 238, 1), 0 0 50px rgba(255, 0, 238, 0.8)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.transform = "scale(1)";
-                e.target.style.textShadow = '0 0 20px rgba(255, 0, 238, 0.9), 0 0 40px rgba(255, 0, 238, 0.6)';
-              }}
-            >
-              {t('palmTreeDrive.more')}
-            </button>
-          </div>
-        </div>
+      {currentCameraStage === 4 && shouldMorph && (
+        <DriveActions onBuy={() => setShowBuyModal(true)} onExplore={() => router.push('/')} />
       )}
-
-   
-
 
       {/* CyberNav Menu */}
       <CyberNav

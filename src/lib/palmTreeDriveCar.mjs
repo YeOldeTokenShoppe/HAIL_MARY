@@ -1,10 +1,15 @@
 import * as THREE from 'three';
 
-export const LOW_RIDER_MODEL_URL = '/models/lowRider_scene_emerald_optimized.glb';
+export const LOW_RIDER_MODEL_URL = '/models/lowRider_scene_characters_optimized.glb?v=slow-tap4';
 
-// Only character clips run during the drive. Take 01 also opens doors and
-// moves the chassis, so sample its starting pose without advancing it.
-const CHARACTER_CLIPS = new Set(['mixamo.com', 'mixamo.com.001']);
+// Character and halo clips loop during the drive; the car model is static.
+const LOOPING_CLIPS = new Set([
+  'mixamo.com',
+  'Unicorn_Seated_Music_Sway',
+  'Shiba_Sitting_Baked',
+  'Hologirl_Seated_Sway_RestingForearm_SlowTap',
+  'HaloRotation',
+]);
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 
 export function createLowRider(gltf, { roadSpeed = 7.5 } = {}) {
@@ -15,11 +20,7 @@ export function createLowRider(gltf, { roadSpeed = 7.5 } = {}) {
   const mixer = new THREE.AnimationMixer(model);
 
   for (const clip of gltf.animations || []) {
-    if (clip.name === 'Take 01') {
-      const action = mixer.clipAction(clip).play();
-      action.paused = true;
-      action.time = 0;
-    } else if (CHARACTER_CLIPS.has(clip.name)) {
+    if (LOOPING_CLIPS.has(clip.name)) {
       mixer.clipAction(clip).setLoop(THREE.LoopRepeat, Infinity).play();
     }
   }

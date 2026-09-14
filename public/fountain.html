@@ -4661,16 +4661,19 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 }
                 // --- END NEW ---
 
-				const env = await rgbeLoader.loadAsync( 'venice_sunset_1k.hdr' ).then(
+				// HDRs live in /hdr/ (moved there by the TOD-cycle commit). The fountain's
+				// look was always the Blouberg sunrise — the old root venice_sunset_1k.hdr
+				// was a byte-identical copy of it — so load that first; the real Venice
+				// sunset is only the fallback. Absolute paths: this doc runs in an iframe.
+				const env = await rgbeLoader.loadAsync( '/hdr/blouberg_sunrise_2_1k.hdr' ).then(
 					(texture) => {
 						assetsToLoad.envMap = true;
 						checkAllAssetsLoaded();
 						return texture;
 					},
 					(error) => {
-						console.warn('[Fountain] Venice sunset HDR not found, falling back to sunrise:', error);
-						// Fallback to the original sunrise HDR
-						return rgbeLoader.loadAsync( 'blouberg_sunrise_2_1k.hdr' ).then(
+						console.warn('[Fountain] Blouberg sunrise HDR not found, falling back to Venice sunset:', error);
+						return rgbeLoader.loadAsync( '/hdr/venice_sunset_1k.hdr' ).then(
 							(texture) => {
 								assetsToLoad.envMap = true;
 								checkAllAssetsLoaded();
@@ -4680,13 +4683,17 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 								console.error('[Fountain] Error loading fallback environment map:', fallbackError);
 								assetsToLoad.envMap = true; // Mark as loaded anyway to not block
 								checkAllAssetsLoaded();
-								throw fallbackError;
+								// Don't throw: a rejection here aborts init() before the model and
+								// water load, blanking the whole scene. No env map just dims reflections.
+								return null;
 							}
 						);
 					}
 				);
-				env.mapping = THREE.EquirectangularReflectionMapping;
-				scene.environment = env; // Keep HDR for reflections
+				if ( env ) {
+					env.mapping = THREE.EquirectangularReflectionMapping;
+					scene.environment = env; // Keep HDR for reflections
+				}
 				// scene.environmentIntensity = 1.15; // Slightly reduced for better balance with new background
 
 				// Create sublime dawn gradient background - completely new implementation
