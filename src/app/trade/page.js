@@ -6109,7 +6109,7 @@ export default function CyborgTemple() {
                       key: 'home',
                       label: 'Home',
                       title: 'Our Lady of Perpetual Profit',
-                      onClick: () => router.push('/'),
+                      onClick: () => router.push('/home'),
                       icon: (
                         <img src="/favicon.svg" alt="" style={{ width: 24, height: 24, display: 'block' }} />
                       ),

@@ -193,8 +193,8 @@ export default function TextingExperience() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <Link className={styles.brand} href="/">Hail Mary<span>Our Lady of Perpetual Profit</span></Link>
-        <Link className={styles.back} href="/">Back to the world <span aria-hidden="true">↗</span></Link>
+        <Link className={styles.brand} href="/home">Hail Mary<span>Our Lady of Perpetual Profit</span></Link>
+        <Link className={styles.back} href="/home">Back to the world <span aria-hidden="true">↗</span></Link>
       </header>
       <section className={styles.experience} aria-labelledby="texting-title">
         <div className={styles.intro}>

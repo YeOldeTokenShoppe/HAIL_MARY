@@ -31,7 +31,7 @@ useGLTF.setDecoderPath("/draco/");
 useGLTF.preload(MODEL_PATH);
 
 // Votive mesh/material hooks — copied from CANDLE_VARIANTS.votive in
-// src/app/page.js so this component stays self-contained.
+// src/app/home/page.js so this component stays self-contained.
 const VOTIVE = {
   meltMeshName: "XBASE",
   meltAxis: "y",

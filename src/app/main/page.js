@@ -3520,7 +3520,7 @@ export default function MainPage() {
             key: "candelarium",
             label: "ex Machina",
             title: "ex Machina",
-            onClick: () => { window.location.href = "/"; },
+            onClick: () => { window.location.href = "/home"; },
             confirm: {
               title: "ex Machina",
               body: "Return to home.",

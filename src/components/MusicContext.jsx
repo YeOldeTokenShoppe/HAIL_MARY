@@ -63,15 +63,17 @@ const non80sTracks = [
   { name: "Feel It Still (Flatbush Zombies Remix)", path: "audio/05 Feel It Still (Flatbush Zombies Remix).m4a", bpm: 100 },
   { name: "Feel It Still (ZHU Remix)", path: "audio/01 Feel It Still (ZHU Remix).m4a", bpm: 100 },
   { name: "Feel It Still (Ofenbach Remix)", path: "audio/06 Feel It Still (Ofenbach Remix).m4a", bpm: 100 },
+  { name: "Feel It Still (Lido Remix)", path: "audio/04 Feel It Still (Lido Remix).m4a", bpm: 100 },
 
     { name: "Eyes Without A Face - Billy Idol", path: "/audio/Eyes Without A Face.mp3", bpm: 110 },
     // { name: "Band Of Matron Saints - RJD2", path: "audio/BandOfMatronSaints.m4a", bpm: 100 },
     { name: "Utopia - Goldfrapp", path: "audio/08 Utopia.m4a", bpm: 100 },
   // { name: "Gangsta's Paradise - Coolio", path: "/audio/gangstas_paradise.mp3", bpm: 80 },
   // { name: "Intergalactic - Beastie Boys", path: "audio/Intergalactic.mp3", bpm: 108 },
-  // { name: "Heroes - Janelle Monae", path: "audio/Heroes.m4a", bpm: 85 },
+  { name: "Gold Dust Woman - Waylon Jennings", path: "audio/09 Gold Dust Woman (Remastered).m4a", bpm: 85 },
   { name: "Lifetimes", path: "audio/07 Lifetimes.m4a", bpm: 105 },
     { name: "Amor Amor - Arno Elias", path: "audio/AmorAmor.m4a", bpm: 105 },
+    { name: "Feel It Still (Gryffin Remix)", path: "audio/02 Feel It Still (Gryffin Remix).m4a", bpm: 100 },
 ];
 
 // Every track across both eras, deduped by path. Used to resolve curated
@@ -331,7 +333,7 @@ export const MusicProvider = ({ children }) => {
   }, [getCurrentPlaylist, setCurrentTrackBPM]);
   
   // Load a track by its Firebase Storage path (for DJ listener mode)
-  const loadTrackByPath = useCallback(async (path, trackName, bpm = 100, seekSeconds = 0) => {
+  const loadTrackByPath = useCallback(async (path, trackName, bpm = 100, seekSeconds = 0, { autoplay = true } = {}) => {
     if (!path || !storage || !storage.app) return false;
 
     setIsLoadingTrack(true);
@@ -381,10 +383,14 @@ export const MusicProvider = ({ children }) => {
           globalAudioManager.setState({ currentTrack: trackObj });
         }
 
-        try {
-          await audioRef.current.play();
-          setIsPlaying(true);
-        } catch (e) {
+        if (autoplay) {
+          try {
+            await audioRef.current.play();
+            setIsPlaying(true);
+          } catch (e) {
+            setIsPlaying(false);
+          }
+        } else {
           setIsPlaying(false);
         }
         return true;

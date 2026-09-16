@@ -3833,6 +3833,41 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			const _idleColor = new THREE.Color();  // scratch colour for the candle-lit idle glow
 			let votiveFlames = []; // tinyVotiveOnly2 FLAME meshes baked into mission.glb (the 4 XCandle01 instances) — procedural noise flicker, ported from the landing page (HeroAltarObject)
 			let votiveLights = []; // the 4 Point lights baked alongside them — normalized to a warm candle glow + flicker (Blender exported them white @ ~543 candela)
+			let saintLight = null; // subtle warm downlight on patronSaint1 in her facade niche (see aimSaintLight)
+			let saintFocusEntry = null; // her close-up { node, center, radius, viewDir } (see tryTapSaint)
+			let saintHitMeshes = [];    // patronSaint1's meshes — raycast targets for the double-tap
+			let saintTapTimer = 0;      // pending single-tap toss while waiting for a second tap (0 = none)
+			const _saintTapCoords = new THREE.Vector2(); // that toss's aim (the next press overwrites aimedCoords)
+
+			// --- Patron saint niche downlight ---
+			// patronSaint1 stands in a shallow facade niche (~0.27 deep, ~0.47 wide) whose arch
+			// crown sits only ~0.25 above her head, so a light inside the niche would hot-spot the
+			// crown and leave the figure dark. Instead the spot floats ~0.7 above her head and ~0.3
+			// out from her front (the facade faces +Z) and aims down/back at her centre: the crown
+			// falls outside the cone and light fades head → feet like a niche downlight. Keep it
+			// faint — the sunset sun already gives her a warm upper-left highlight; at 2 cd she blooms out.
+			// No shadows (same cost call as the votive lights). Placement reads the statue's FINAL
+			// world bounds, so call it after the model is shifted/scaled/added to the scene.
+			// Console: window.saintLight (intensity / angle / penumbra / color) and
+			// window.aimSaintLight(node) to re-aim it at another statue.
+			function aimSaintLight(anchor) {
+				const box = new THREE.Box3().setFromObject(anchor);
+				if (box.isEmpty()) return null;
+				const center = box.getCenter(new THREE.Vector3());
+				if (!saintLight) {
+					// color, intensity (cd), distance, half-angle (rad), penumbra, decay
+					saintLight = new THREE.SpotLight(0xfff1e0, 0.4, 3.0, 0.3, 0.6, 2);
+					saintLight.castShadow = false;
+					scene.add(saintLight);
+					scene.add(saintLight.target);
+					window.saintLight = saintLight;
+				}
+				saintLight.position.set(center.x, box.max.y + 0.69, box.max.z + 0.31);
+				saintLight.target.position.copy(center);
+				saintLight.target.updateMatrixWorld();
+				return saintLight;
+			}
+			window.aimSaintLight = aimSaintLight;
 
 			// --- Click-a-candle to zoom in close ---
 			// Tap any votive candle to dolly the camera in and frame it; tap elsewhere (or the
@@ -5670,6 +5705,33 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						buildInfoHubBeam();
 						buildInfoHubHalo();
 
+						// Patron saint: niche downlight + double-tap focus — both need the model's final world
+						// bounds. Tolerant of GLTFLoader's `_N` collision suffix + case.
+						let patronSaint = null;
+						fountainModel.traverse(function (node) {
+							if (!patronSaint && node.name &&
+								node.name.toLowerCase().replace(/_\d+$/, '') === 'patronsaint1') patronSaint = node;
+						});
+						if (patronSaint) {
+							aimSaintLight(patronSaint);
+							// Double-tap focus (see tryTapSaint) rides the candle close-up tween, Back pill
+							// and Escape. viewDir pins a front-on approach: a bearing dolly from the fountain
+							// comes in low and at an angle, clipping the niche jambs and then snapping up to
+							// OrbitControls' maxPolarAngle on arrival.
+							const saintSphere = new THREE.Box3().setFromObject(patronSaint).getBoundingSphere(new THREE.Sphere());
+							saintFocusEntry = {
+								node: patronSaint,
+								center: saintSphere.center.clone(),
+								radius: saintSphere.radius,
+								viewDir: new THREE.Vector3(0, 0.15, 1).normalize(),
+							};
+							saintHitMeshes = [];
+							patronSaint.traverse(function (m) { if (m.isMesh) saintHitMeshes.push(m); });
+							console.log('[Fountain] patron saint downlight + double-tap focus:', patronSaint.name);
+						} else {
+							console.warn('[Fountain] no "patronSaint1" found — saint downlight + double-tap focus skipped');
+						}
+
 						// --- NEW: Play the character's looping NLA track ---
 						// The GLB ships its baked NLA tracks as AnimationClips on gltf.animations.
 						// Drive the 'Combined_SitStand' track on a mixer rooted at the model so its
@@ -5691,7 +5753,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 								console.log('[Fountain] playing looping NLA track:', sitStandClip.name,
 									'(' + sitStandClip.duration.toFixed(2) + 's)');
 							} else {
-								console.warn('[Fountain] no "Combined_SitStand" clip found in fountain4.glb. Available:',
+								console.warn('[Fountain] no "Combined_SitStand" clip found in fountain5.glb. Available:',
 									gltf.animations.map(c => c.name));
 							}
 
@@ -5719,7 +5781,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 									gltf.animations.map(c => c.name));
 							}
 						} else {
-							console.warn('[Fountain] fountain4.glb has no animation clips');
+							console.warn('[Fountain] fountain5.glb has no animation clips');
 						}
 
 						// The drinking mouth is a separate mesh that should only show while the monk
@@ -5744,7 +5806,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 							drinkingMouthBaseScale = drinkingMouth.scale.clone(); // animate around this
 							console.log('[Fountain] DrinkingMouth found — opens/closes over frames 95-150');
 						} else {
-							console.warn('[Fountain] no "DrinkingMouth" mesh found in fountain4.glb');
+							console.warn('[Fountain] no "DrinkingMouth" mesh found in fountain5.glb');
 						}
 						if (monkEyes.length) {
 							// Monk_Eyes is skinned, so scaling/opacity are unreliable — blink by hiding the
@@ -5755,7 +5817,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 								monkEyes.map(function (m) { return m.name; }).join(', ') +
 								') — idle blink (visibility toggle) enabled');
 						} else {
-							console.warn('[Fountain] no "Monk_Eyes" mesh found in fountain4.glb');
+							console.warn('[Fountain] no "Monk_Eyes" mesh found in fountain5.glb');
 						}
 
 						// Calculate bounding box to see actual size
@@ -7748,9 +7810,10 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
             }
 
-            // Frame `entry` (a candle) and start easing the camera toward it. Keeps the
-            // current viewing bearing (a straight dolly-in) so the move never swings around
-            // or clips the niche wall. Re-callable while focused to hop between candles.
+            // Frame `entry` (a candle, or the patron saint) and start easing the camera toward
+            // it. Keeps the current viewing bearing (a straight dolly-in) so the move never
+            // swings around or clips the niche wall, unless the entry pins its own `viewDir`.
+            // Re-callable while focused to hop between targets.
             function startCandleZoomIn(entry) {
                 if (!entry || cameraFollowActive) return;
                 if (candleFocusPhase === 'in' || candleFocusPhase === 'out') return; // mid-tween
@@ -7772,8 +7835,12 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 const fit = entry.radius / Math.sin(Math.min(fovV, fovH) / 2);
                 let dist = fit * margin;
                 dist = Math.max(controls.minDistance + 0.05, Math.min(dist, controls.maxDistance));
-                _candleTmp.subVectors(camera.position, entry.center);
-                if (_candleTmp.lengthSq() < 1e-6) _candleTmp.set(0, 0.2, 1); // degenerate guard
+                if (entry.viewDir) {
+                    _candleTmp.copy(entry.viewDir);
+                } else {
+                    _candleTmp.subVectors(camera.position, entry.center);
+                    if (_candleTmp.lengthSq() < 1e-6) _candleTmp.set(0, 0.2, 1); // degenerate guard
+                }
                 _candleTmp.normalize();
                 _candleToPos.copy(entry.center).addScaledVector(_candleTmp, dist);
                 candleFocusActive = true;
@@ -7793,6 +7860,31 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 candleFocusPhase = 'out';
                 candleFocusStartMs = performance.now();
                 controls.enabled = false;
+            }
+
+            // Double-tap the patron saint for her close-up. A single tap tosses a coin (maybe the
+            // armed donation coin), so a tap that lands on her holds its toss for
+            // window.saintDoubleTapMs: a second tap on her inside that window takes the close-up
+            // and drops the toss; otherwise the held toss runs from the original aim. Taps that
+            // miss her never wait. Returns true when it consumed the tap.
+            function tryTapSaint(ndc) {
+                if (!saintHitMeshes.length || cameraFollowActive) return false;
+                raycaster.setFromCamera(ndc, camera);
+                if (!raycaster.intersectObjects(saintHitMeshes, false).length) return false;
+                if (saintTapTimer) {
+                    clearTimeout(saintTapTimer);
+                    saintTapTimer = 0;
+                    startCandleZoomIn(saintFocusEntry);
+                    return true;
+                }
+                _saintTapCoords.copy(ndc);
+                saintTapTimer = setTimeout(function () {
+                    saintTapTimer = 0;
+                    if (candleFocusActive || cameraFollowActive) return; // taps don't toss while focused
+                    aimedCoords.copy(_saintTapCoords); // a later press may have re-aimed
+                    if (!tryInspectCoin(aimedCoords)) tossHeldCoin();
+                }, window.saintDoubleTapMs ?? 350);
+                return true;
             }
 
             // Tap test against the candle cups. Returns true on a hit (so the caller skips the
@@ -8544,7 +8636,9 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 							/* goldCoin1 opened the info hub */
 						} else if (tryClickShowerCoin(aimedCoords)) {
 							/* goldCoin2 fired the coin-stream shower */
-						} else if (tryClickCandle(aimedCoords)) {
+						} else if (tryTapSaint(aimedCoords)) {
+								/* patron saint: double-tap -> close-up (a lone tap tosses after a beat) */
+							} else if (tryClickCandle(aimedCoords)) {
 								/* tapped a votive candle -> zoom in close */
 							} else if (!tryInspectCoin(aimedCoords)) {
 							tossHeldCoin();

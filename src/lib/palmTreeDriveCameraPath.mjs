@@ -8,7 +8,7 @@ export const DESKTOP_CAMERA_SHOTS = [
   { x: 7.9979, y: 2.1078, z: 28.1434, targetX: 1.1779, targetY: 0.7365, targetZ: 23.728, fov: 41.9528 },
   { x: 2.5133, y: 1.5917, z: 31.3361, targetX: 2.3144, targetY: 1.5036, targetZ: 24.2607, fov: 41.9528 },
   { x: 2.4802, y: 1.4387, z: 26.9541, targetX: 2.4047, targetY: 1.4052, targetZ: 24.2663, fov: 41.9528 },
-  { x: 2.5071, y: 1.2811, z: 24.4796, targetX: 2.5113, targetY: 1.3454, targetZ: 24.2962, fov: 5 }
+  { x: 2.5074, y: 1.3007, z: 24.4668, targetX: 2.5111, targetY: 1.3446, targetZ: 24.296, fov: 5 }
 ];
 
 // Spend the first 43% circling behind and along the left side.
@@ -63,8 +63,8 @@ PORTRAIT_CAMERA_SHOTS[1] = {
   targetX: 1.7672, targetY: 0.5976, targetZ: 25.2043, fov: 63
 };
 PORTRAIT_CAMERA_SHOTS[PORTRAIT_CAMERA_SHOTS.length - 1] = {
-  x: 2.5071, y: 1.2811, z: 24.4796,
-  targetX: 2.5113, targetY: 1.3454, targetZ: 24.2962, fov: 5
+  x: 2.5074, y: 1.3007, z: 24.4668,
+  targetX: 2.5111, targetY: 1.3446, targetZ: 24.296, fov: 5
 };
 const statueDesktopShots = DESKTOP_CAMERA_SHOTS.map(shot => ({ ...shot }));
 statueDesktopShots[statueDesktopShots.length - 1] = {
@@ -110,4 +110,36 @@ export function sampleResponsiveCamera(progress, aspect, output = {}, ending = '
   const portraitPose = sampleCameraShots(glideCameraProgress(progress), statue ? statuePortraitShots : PORTRAIT_CAMERA_SHOTS, statue ? statuePortraitTangents : portraitTangents);
   for (const field of fields) output[field] += (portraitPose[field] - output[field]) * portrait;
   return output;
+}
+
+// Slow the last four segments, beginning at the front-to-right-side swing.
+// Ease the playback speed from normal to half speed over 5% of the route.
+const SLOW_START = 0.53;
+const SLOW_RAMP = 0.05;
+function playbackElapsed(routeProgress) {
+  if (routeProgress <= SLOW_START) return routeProgress;
+  const distance = routeProgress - SLOW_START;
+  if (distance >= SLOW_RAMP) return routeProgress + distance - SLOW_RAMP / 2;
+  const u = distance / SLOW_RAMP;
+  // Integral of smoothstep: continuous speed and acceleration at both joins.
+  return routeProgress + SLOW_RAMP * (u ** 3 - 0.5 * u ** 4);
+}
+export function cameraPlaybackDuration(baseSeconds) {
+  return baseSeconds * playbackElapsed(1);
+}
+export function cameraPlaybackProgress(progress) {
+  const p = Math.max(0, Math.min(1, progress));
+  if (p === 0 || p === 1) return p;
+  const elapsed = p * playbackElapsed(1);
+  if (elapsed <= SLOW_START) return elapsed;
+  if (elapsed >= playbackElapsed(SLOW_START + SLOW_RAMP)) {
+    return (elapsed + SLOW_START + SLOW_RAMP / 2) / 2;
+  }
+  let low = SLOW_START, high = SLOW_START + SLOW_RAMP;
+  for (let i = 0; i < 32; i++) {
+    const mid = (low + high) / 2;
+    if (playbackElapsed(mid) < elapsed) low = mid;
+    else high = mid;
+  }
+  return (low + high) / 2;
 }

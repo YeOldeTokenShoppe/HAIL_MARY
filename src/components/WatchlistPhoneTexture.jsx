@@ -210,7 +210,7 @@ function drawGear(ctx, x, y, r, color = '#e7e9ea') {
 
 // Fallback wax tints for holders who never picked one — the landing
 // page's picker presets (keep in sync with VOTIVE_TINT_PRESETS in
-// app/page.js), chosen deterministically per holder so the feed shows
+// app/home/page.js), chosen deterministically per holder so the feed shows
 // a varied vigil without misrepresenting anyone's customization: a
 // real votiveTint pref always wins over the fallback.
 const VOTIVE_FALLBACK_TINTS = [

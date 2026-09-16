@@ -17,7 +17,7 @@ import { useRouter } from 'next/navigation';
 // import SynthwaveText from './SynthwaveText';
 import DriveTitles from './DriveTitles';
 import DriveActions from './DriveActions';
-import RL80SceneIntro from './RL80SceneIntro';
+import RL80SceneIntro, { INTRO_DURATION_MS, REDUCED_INTRO_DURATION_MS } from './RL80SceneIntro';
 import BuyModal from './BuyModal';
 import CyberNav from './CyberNav';
 import HorizontalRoadmap from './HorizontalRoadmap';
@@ -25,7 +25,8 @@ import { createLowRider, LOW_RIDER_MODEL_URL } from '@/lib/palmTreeDriveCar.mjs'
 import { applyIllustratedStyle } from '@/lib/palmTreeDriveIllustrated.mjs';
 import { createCandyEmeraldPaint } from '@/lib/palmTreeDrivePaint.mjs';
 import { createPalmTreeDriveCameraHelper } from '@/lib/palmTreeDriveCameraHelper.mjs';
-import { DESKTOP_CAMERA_SHOTS, DESKTOP_CAMERA_SECONDS, sampleResponsiveCamera as sampleCameraVariant } from '@/lib/palmTreeDriveCameraPath.mjs';
+import { DESKTOP_CAMERA_SHOTS, DESKTOP_CAMERA_SECONDS, cameraPlaybackDuration, cameraPlaybackProgress, sampleResponsiveCamera as sampleCameraVariant } from '@/lib/palmTreeDriveCameraPath.mjs';
+import { createHeartSparkle } from '@/lib/palmTreeDriveHeartSparkle.mjs';
 
 
 
@@ -37,8 +38,14 @@ gsap.registerPlugin(ScrollTrigger);
 
 
 
-const PalmsScene = ({ onLoadingChange, onTitleMomentChange }) => {
+const PalmsScene = ({ onLoadingChange, onTitleMomentChange, onIntroComplete, hasEntered = true }) => {
   const { t, locale } = useLanguage();
+  const entryStartedRef = useRef(hasEntered);
+  const startSequenceRef = useRef(null);
+  useEffect(() => {
+    entryStartedRef.current = hasEntered;
+    if (hasEntered) startSequenceRef.current?.();
+  }, [hasEntered]);
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
   const rendererRef = useRef(null);
@@ -116,7 +123,10 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange }) => {
   // Cinematic reverse removed
   const scrollCameraActive = true; // Scroll camera always active
   const [introDone, setIntroDone] = useState(false);
-  const finishIntro = useCallback(() => setIntroDone(true), []);
+  const finishIntro = useCallback(() => {
+    setIntroDone(true);
+    onIntroComplete?.();
+  }, [onIntroComplete]);
   const [titleMoment, setTitleMoment] = useState('opening');
   useEffect(() => {
     onTitleMomentChange?.(titleMoment);
@@ -1504,6 +1514,13 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange }) => {
       maryKey.target.position.set(2.45, 1.31, 24.35);
       scene.add(maryKey, maryKey.target);
 
+      // Keep the cyan road rim light from outlining Mary's veil in close-ups.
+      materialShaders.push({ update: () => {
+        rimLight.intensity = 0.2 * THREE.MathUtils.smoothstep(
+          camera.position.distanceTo(maryKey.target.position), 0.6, 2.0
+        );
+      } });
+
       // A transparent aura behind Mary adds atmosphere without lighting her surface.
       const statue = carScene.getObjectByName('statue');
       if (statue) {
@@ -1535,17 +1552,26 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange }) => {
         } });
       }
 
+      // Heart3 holds the green candles and Heart3.5 the red ones (three.js drops the "." from glTF names).
+      // One chase sweeps across both; each candle glows in its own base colour, scaled to the green glow's
+      // brightness so red flares as strongly under the luminance-thresholded bloom.
       const heartCandles = carScene.getObjectByName('Heart3');
+      const candleGroups = [heartCandles, carScene.getObjectByName(THREE.PropertyBinding.sanitizeNodeName('Heart3.5'))].filter(Boolean);
       const chaseTime = { value: 0 };
-      if (heartCandles) {
+      if (candleGroups.length) {
         carScene.updateMatrixWorld(true);
-        const candleBounds = new THREE.Box3().setFromObject(heartCandles, true);
+        const candleBounds = new THREE.Box3();
+        candleGroups.forEach(group => candleBounds.union(new THREE.Box3().setFromObject(group, true)));
         const chaseBounds = { value: new THREE.Vector2(candleBounds.min.x, Math.max(candleBounds.max.x - candleBounds.min.x, 0.00001)) };
-        heartCandles.traverse(child => {
+        const luma = color => 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
+        const glowLuma = luma(new THREE.Color(0x65ff87));
+        const candleParts = [];
+        candleGroups.forEach(group => group.traverse(child => candleParts.push(child)));
+        candleParts.forEach(child => {
           if (!child.isMesh) return;
           const makeCandleGlow = source => {
             const material = source.clone();
-            material.emissive = new THREE.Color(0x65ff87);
+            material.emissive = source.color.clone().multiplyScalar(glowLuma / Math.max(luma(source.color), 0.01));
             material.emissiveIntensity = 1;
             const previousCompile = source.onBeforeCompile;
             const previousKey = source.customProgramCacheKey();
@@ -1577,6 +1603,25 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange }) => {
         materialShaders.push({ update: (_time, delta) => {
           chaseTime.value += Math.min(Math.max(delta || 0, 0), 0.1);
         } });
+      }
+
+      // Heart2 is Mary's flat heart sprite; its gem glint is an additive overlay (palmTreeDriveHeartSparkle.mjs)
+      // and only the overlay joins the bloom layer. It runs on the chase clock and fires as the chase head
+      // reaches the rally's last candle, which sits at Heart3's local +X end.
+      const heartSprite = carScene.getObjectByName('Heart2');
+      if (heartSprite?.isMesh && heartSprite.material?.map) {
+        let glintStart = 0;
+        if (heartCandles) {
+          const rallyAtMaxX = new THREE.Vector3(1, 0, 0).transformDirection(heartCandles.matrixWorld).x >= 0;
+          // Inverse of the chase head: head = fract(t / 3) * 1.5 - 0.25.
+          glintStart = ((rallyAtMaxX ? 0.95 : 0.05) + 0.25) / 1.5 * 3;
+        } else {
+          materialShaders.push({ update: (_time, delta) => {
+            chaseTime.value += Math.min(Math.max(delta || 0, 0), 0.1);
+          } });
+        }
+        const sparkle = createHeartSparkle(heartSprite, { time: chaseTime, glintStart });
+        sparkle.layers.enable(renderer.userData.BLOOM_LAYER);
       }
 
       // Update existing car spotlight target to point at the loaded car
@@ -1762,7 +1807,8 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange }) => {
 
       // Single onUpdate for the entire timeline
       tl.eventCallback("onUpdate", () => {
-        setTitleMoment(desktopSweep.progress >= 0.985 ? 'final' : desktopSweep.progress < 0.22 ? 'opening' : 'hidden');
+        // Leave time to read the delayed opening subheading after its 8.5s reveal.
+        setTitleMoment(desktopSweep.progress >= 0.985 ? 'final' : desktopSweep.progress < 0.37 ? 'opening' : 'hidden');
         sampleResponsiveCamera(desktopSweep.progress, camera.aspect, cameraPath);
         if (camera) {
           // Always update camera during scroll animation, regardless of controls state
@@ -1925,9 +1971,14 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange }) => {
         return;
       }
 
-      // --- Hybrid auto-play: desktop only, if user doesn't scroll within 4s, drive timeline directly ---
-      if (isMobile) return;
-      const cancelAutoPlay = autoPlayCancelRef.current = () => {
+      // Entry starts the tour on every device. Keep scroll restoration and
+      // viewport changes from moving the timeline during the mask hold.
+      st.disable();
+      tl.progress(0).pause();
+      hasScrolledRef.current = false;
+      setHasScrolled(false);
+      const cancelAutoPlay = autoPlayCancelRef.current = (event) => {
+        if (event?.target instanceof Element && event.target.closest('button, a, select, input, [data-intro-music-controls]')) return;
         if (autoPlayTimeoutRef.current) {
           clearTimeout(autoPlayTimeoutRef.current);
           autoPlayTimeoutRef.current = null;
@@ -1973,7 +2024,7 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange }) => {
 
       autoPlayTimeoutRef.current = setTimeout(() => {
         // Only auto-play if user hasn't scrolled yet
-        if (hasScrolledRef.current || animationSkippedRef.current) {
+        if (animationSkippedRef.current) {
           cancelAutoPlay();
           return;
         }
@@ -1986,8 +2037,8 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange }) => {
         // Drive the timeline directly — no scroll middleman, buttery smooth
         autoPlayTweenRef.current = gsap.to(tl, {
           progress: 1,
-          duration: isMobile ? 30 : DESKTOP_CAMERA_SECONDS,
-          ease: "none",
+          duration: cameraPlaybackDuration(isMobile ? 30 : DESKTOP_CAMERA_SECONDS),
+          ease: cameraPlaybackProgress,
           onUpdate: () => {
             const p = tl.progress();
             scrollProgressRef.current = p;
@@ -2023,13 +2074,14 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange }) => {
             window.removeEventListener('keydown', cancelAutoPlayOnKey);
           }
         });
-      }, 5000); // Allow the mask reveal and opening title to settle before the sweep.
+      }, window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? REDUCED_INTRO_DURATION_MS : INTRO_DURATION_MS); // Start the drive once the mask clears.
     };
 
     // Both initial setup and the car loader call this. Start only once the
     // car has actually been attached, rather than racing a fixed timeout.
     startCameraSequence = () => {
-      if (disposed || !lowRider || resolvedModelNames.size < 4 || cameraSequenceStarted) return;
+      if (disposed || !entryStartedRef.current || !lowRider || resolvedModelNames.size < 4 || cameraSequenceStarted) return;
       cameraSequenceStarted = true;
       // Enable ScrollTrigger for mobile with better touch handling
       ScrollTrigger.config({
@@ -2068,6 +2120,7 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange }) => {
       
       setupScrollAnimation();
     };
+    startSequenceRef.current = startCameraSequence;
     startCameraSequence();
     
 
@@ -2285,6 +2338,7 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange }) => {
     // Cleanup
     return () => {
       disposed = true;
+      startSequenceRef.current = null;
       lowRider?.dispose();
       lowRider = null;
       carModelRef.current = null;
@@ -2476,15 +2530,15 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange }) => {
 
       </div>
 
-      {!isSceneLoading && scrollCameraActive && <DriveTitles moment={introDone ? titleMoment : 'hidden'} />}
+      {hasEntered && introDone && !isSceneLoading && scrollCameraActive && <DriveTitles moment={introDone ? titleMoment : 'hidden'} />}
 
       {/* Scroll Camera Indicator removed for production */}
       </div>
 
-      {!isSceneLoading && !introDone && <RL80SceneIntro onComplete={finishIntro} />}
+      {!isSceneLoading && !introDone && <RL80SceneIntro onComplete={finishIntro} started={hasEntered} />}
 
       {/* Progress dots and scroll hint - fixed position, separate from text container */}
-      {!isSceneLoading && scrollCameraActive && (
+      {hasEntered && introDone && !isSceneLoading && scrollCameraActive && (
         <div
           style={{
             position: 'fixed',
@@ -2553,7 +2607,7 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange }) => {
       )}
 
       {/* Skip Animation Button - bottom right - Outside pointer-events:none container */}
-      {currentCameraStage < 4 && (
+      {hasEntered && introDone && currentCameraStage < 4 && (
         <button
           onClick={skipAnimation}
           style={{
@@ -2603,7 +2657,7 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange }) => {
       />
       
       {currentCameraStage === 4 && shouldMorph && (
-        <DriveActions onBuy={() => setShowBuyModal(true)} onExplore={() => router.push('/')} />
+        <DriveActions onBuy={() => setShowBuyModal(true)} onExplore={() => router.push('/home')} />
       )}
 
       {/* CyberNav Menu */}

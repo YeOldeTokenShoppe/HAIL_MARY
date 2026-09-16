@@ -464,7 +464,7 @@ export default function OilQualify({
       {!isMobile && (
         <div style={{ position: "fixed", top: 12, right: 12, zIndex: 100, display: "flex", alignItems: "center", gap: 6 }}>
           <Link
-            href="/"
+            href="/home"
             title="Return to shrine"
             style={{
               display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -1962,7 +1962,7 @@ export default function OilQualify({
           key: "home",
           label: "HOME",
           title: "Return to shrine",
-          onClick: () => router.push("/"),
+          onClick: () => router.push("/home"),
           icon: <img src="/brand-mark-mono.svg" alt="" width="24" height="24" style={{ display: "block" }} />,
         }]}
       />}

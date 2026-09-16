@@ -1,7 +1,7 @@
 "use client";
 
 // Shared votive-candle customization picker — used by BOTH the landing page
-// (src/app/page.js, placement="anchored") and the /main vigil panel
+// (src/app/home/page.js, placement="anchored") and the /main vigil panel
 // (MainVigilPanel.jsx, placement="modal"). Extracted so the two pages can
 // never drift. The picker BODY is identical; only the shell differs:
 //   • anchored — bare card, positioned + styled by chart-shrine.css (loaded

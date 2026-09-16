@@ -34,7 +34,7 @@ export const goldHover = {
 
 const normalizePath = (p) => (p || "").replace(/^\//, "");
 
-// /old_landing's music player — a music-note button that opens into a spinning
+// The root drive page's music player — a music-note button that opens into a spinning
 // disc (play/pause), skip, and close — in gold page-control style.
 //
 // While mounted it keeps playback on the modern `non80sTracks` bucket, so mount

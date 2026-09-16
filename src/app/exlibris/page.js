@@ -241,7 +241,7 @@ export default function ModelViewerPage() {
             key: 'home',
             label: 'Home',
             title: 'Return to home',
-            onClick: () => { router.push('/'); },
+            onClick: () => { router.push('/home'); },
             // Same brand mark this slot used before, now in the Terminal spot.
             iconSrc: '/favicon.svg',
           },

@@ -1,7 +1,7 @@
 "use client";
 
 // Shared votive-candle cosmetic presets + device-local preference storage.
-// Extracted from src/app/page.js so both the landing page and the /main
+// Extracted from src/app/home/page.js so both the landing page and the /main
 // vigil panel can drive the SAME customization picker without duplicating
 // the presets, storage keys, or the upload-compression pipeline. The
 // Firestore side of prefs lives in lib/candleRitual.js (read/writeCandlePrefs);

@@ -198,7 +198,7 @@ export default function MerchPage() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <Link href="/" className={styles.wordmark} aria-label="Return to HAIL_MARY">
+        <Link href="/home" className={styles.wordmark} aria-label="Return to HAIL_MARY">
           <span>RL80</span>
           <small>OUR LADY OF PERPETUAL PROFIT</small>
         </Link>
@@ -228,7 +228,7 @@ export default function MerchPage() {
       <nav className={styles.sideRail} aria-label="Quick merch links">
         <a href="#offerings"><span />Offerings</a>
         <a href="#coin"><span />Strike</a>
-        <Link href="/"><span />Exit</Link>
+        <Link href="/home"><span />Exit</Link>
       </nav>
 
       <section className={styles.hero}>
@@ -370,7 +370,7 @@ export default function MerchPage() {
           <span className={styles.footerMark}>RL80</span>
           <p>Physical artifacts from Our Lady of Perpetual Profit.</p>
         </div>
-        <Link href="/">Return to the cathedral ↗</Link>
+        <Link href="/home">Return to the cathedral ↗</Link>
         <p>© MMXXVI · HAIL_MARY</p>
       </footer>
 

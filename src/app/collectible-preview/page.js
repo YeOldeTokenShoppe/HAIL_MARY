@@ -102,7 +102,7 @@ export default function CollectiblePreviewPage() {
         textAlign: 'center',
         marginBottom: '40px',
       }}>
-        <Link href="/" style={{ textDecoration: 'none' }}>
+        <Link href="/home" style={{ textDecoration: 'none' }}>
           <h1 style={{
             fontFamily: "'UnifrakturMaguntia', serif",
             fontSize: '3rem',

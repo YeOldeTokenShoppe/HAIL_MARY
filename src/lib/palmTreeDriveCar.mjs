@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 
-export const LOW_RIDER_MODEL_URL = '/models/lowRider_scene_characters_optimized.glb?v=slow-tap4';
+export const LOW_RIDER_MODEL_URL = '/models/lowRider_scene_V2_optimized.glb?v=v2-20260915-1743';
 
-// Character and halo clips loop during the drive; the car model is static.
+// Character clips loop during the drive; the car model is static.
+// 'HaloRotation' was dropped when the halo was deleted from the scene — restore it here if it comes back.
 const LOOPING_CLIPS = new Set([
   'mixamo.com',
   'Unicorn_Seated_Music_Sway',
   'Shiba_Sitting_Baked',
   'Hologirl_Seated_Sway_RestingForearm_SlowTap',
-  'HaloRotation',
 ]);
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 

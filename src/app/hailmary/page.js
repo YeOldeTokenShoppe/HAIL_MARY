@@ -6673,7 +6673,7 @@ export default function OilPage() {
           width: "90%",
           textAlign: "center",
         }}>
-          <div style={{ fontSize: 11, letterSpacing: "0.2em", color: theme.muted, marginBottom: 8 }}>THE PERMIAN BASIN</div>
+          <div style={{ fontSize: 11, letterSpacing: "0.2em", color: theme.muted, marginBottom: 8 }}>THE PERMIAN PLAINS</div>
           <h2 style={{
             fontFamily: "'Orbitron', monospace",
             fontSize: 16,
@@ -8335,7 +8335,7 @@ export default function OilPage() {
         <header style={m.header}>
           <div style={styles.headerLeft}>
             <Link
-              href="/"
+              href="/home"
               title="Return to shrine"
               style={{ ...styles.logoMark, cursor: "pointer", textDecoration: "none" }}
             >
@@ -8346,7 +8346,7 @@ export default function OilPage() {
                 <span>HAIL MARY</span>
                 <span>PROSPECTING CO.{modeBadge}</span>
               </h1>
-              <p style={{ ...styles.subtitle, fontSize: 11 }}>THE PERMIAN BASIN</p>
+              <p style={{ ...styles.subtitle, fontSize: 11 }}>THE PERMIAN PLAINS</p>
             </div>
           </div>
           <div style={styles.headerRight}>
@@ -8958,7 +8958,7 @@ export default function OilPage() {
       <header style={{ ...styles.header, zoom: uiScale }}>
         <div style={styles.headerLeft}>
           <Link
-            href="/"
+            href="/home"
             title="Return to shrine"
             style={{ ...styles.logoMark, cursor: "pointer", textDecoration: "none" }}
           >
@@ -8968,7 +8968,7 @@ export default function OilPage() {
             <h1 style={{ ...styles.title, display: "flex", alignItems: "center", gap: 8 }}>
               <span>HAIL MARY PROSPECTING CO.{modeBadge}</span>
             </h1>
-            <p style={{ ...styles.subtitle, fontSize: 18 }}>THE PERMIAN BASIN</p>
+            <p style={{ ...styles.subtitle, fontSize: 18 }}>THE PERMIAN PLAINS</p>
           </div>
         </div>
         <div style={styles.headerRight}>

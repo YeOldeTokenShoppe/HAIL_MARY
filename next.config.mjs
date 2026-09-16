@@ -68,8 +68,8 @@ const nextConfig = {
         permanent: false, // 307 temporary redirect
       },
       {
-        // /home is now the root page; preserve old links by redirecting.
-        source: '/home',
+        // The drive is now the root page; /old_landing links keep working.
+        source: '/old_landing',
         destination: '/',
         permanent: true, // 308 permanent redirect
       },

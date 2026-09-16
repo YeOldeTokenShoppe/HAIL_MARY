@@ -3,7 +3,7 @@
 // PanelVotive — the user's lit "votive candle" as a small always-lit 3D
 // object for a /main side panel (DESKTOP + iPad only). Ported from the
 // landing page's HeroAltarObject minus all scroll/melt/ignition VFX.
-// Self-contained — does NOT import from src/app/page.js.
+// Self-contained — does NOT import from src/app/home/page.js.
 
 import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
@@ -17,7 +17,7 @@ const MODEL_PATH = "/models/tinyVotiveOnly2.glb";
 // gstatic CDN — otherwise useGLTF suspends forever and the canvas stays blank.
 useGLTF.setDecoderPath("/draco/");
 
-// Votive config, copied from CANDLE_VARIANTS.votive in src/app/page.js.
+// Votive config, copied from CANDLE_VARIANTS.votive in src/app/home/page.js.
 const VOTIVE = {
   meltMeshName: "XBASE", // the wax column group
   wickMaterialName: "Mat15.001", // second material slot on XBase
