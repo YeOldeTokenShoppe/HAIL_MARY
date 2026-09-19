@@ -26,6 +26,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF, SpotLight } from "@react-three/drei";
 import { clone as skeletonClone } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { SITEPAL_PROJECTION_CONFIG } from "@/components/CyborgTempleScene";
+import { useChannelScreen } from "@/components/trade/ltTvChannelScreen";
 
 // Version the URL when the Blender export changes so drei does not keep an
 // older GLTF from its in-memory cache during hot reloads.
@@ -1134,6 +1135,8 @@ function TalkShowModel({
   enableMonitorFeed,
   compactPortalHost,
   hideCameraRig,
+  castHidden,
+  channelCards,
   onPlaybackReady,
   onPlaybackStateChange,
 }) {
@@ -1150,8 +1153,8 @@ function TalkShowModel({
   // tree, and so R3F isn't handed the same cached object twice.
   const cloned = useMemo(() => {
     const c = skeletonClone(scene);
-    // Hide the blank inner screen for now (the neon Frame border stays) —
-    // reserved for a future topic screen. Flip visible = true to bring back.
+    // Hide the blank inner screen (the neon Frame border stays). LT TV's
+    // lineup view lights it up as the channel screen — see useChannelScreen.
     const screen = c.getObjectByName("Content_Screen");
     if (screen) screen.visible = false;
     // Projection targets start hidden; Face1 / FaceDemon1 are the visible
@@ -1184,6 +1187,18 @@ function TalkShowModel({
     hidden.forEach((o) => { o.visible = !hideCameraRig; });
     return () => { hidden.forEach((o) => { o.visible = true; }); };
   }, [cloned, hideCameraRig]);
+
+  // Empty chairs for LT TV's lineup. Each guest's empty parents the rig, the
+  // body and both faces, so hiding it takes the whole character.
+  useEffect(() => {
+    const guests = Object.values(EMPTY_FOR_ACTOR)
+      .map((name) => cloned.getObjectByName(name))
+      .filter(Boolean);
+    guests.forEach((o) => { o.visible = !castHidden; });
+    return () => { guests.forEach((o) => { o.visible = true; }); };
+  }, [cloned, castHidden]);
+
+  useChannelScreen(cloned, channelCards);
 
   // Camera-monitor feed. Built on the first frame (it needs the viewer camera)
   // and torn down with the model it was built against; `undefined` means "not
@@ -1881,7 +1896,8 @@ function TalkShowModel({
 
     Object.entries(TALKSHOW_PROJECTION_CONFIG).forEach(([key, cfg]) => {
       const st = projRef.current[key];
-      if (!st) return;
+      // No one in the chairs, nothing to paint.
+      if (!st || castHidden) return;
       const portal = portalsRef.current[key];
       if (portal?.ready && !portal.source) {
         try {
@@ -1955,6 +1971,10 @@ function TalkShowModel({
 // throttle the off-screen half of it, and `hideCameraRig` strikes the tripod
 // prop that the (now inert) monitor feed existed to justify. Desktop leaves all
 // four at their defaults and behaves exactly as before.
+//
+// LT TV's lineup view uses the same set off air: `castHidden` empties the chairs
+// (and skips painting the hidden faces), and `channelCards` puts the channel on
+// the frame's screen — see ltTvChannelScreen.
 export default function TalkShowScene({
   position = [0, -1.9, 0],
   scale = [1.2, 1.2, 1.2],
@@ -1965,6 +1985,8 @@ export default function TalkShowScene({
   enableMonitorFeed = true,
   compactPortalHost = false,
   hideCameraRig = false,
+  castHidden = false,
+  channelCards = null,
   onPlaybackReady,
   onPlaybackStateChange,
 }) {
@@ -1978,6 +2000,8 @@ export default function TalkShowScene({
           enableMonitorFeed={enableMonitorFeed}
           compactPortalHost={compactPortalHost}
           hideCameraRig={hideCameraRig}
+          castHidden={castHidden}
+          channelCards={channelCards}
           onPlaybackReady={onPlaybackReady}
           onPlaybackStateChange={onPlaybackStateChange}
         />

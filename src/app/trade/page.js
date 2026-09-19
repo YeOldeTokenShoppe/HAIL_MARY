@@ -26,7 +26,7 @@ import VideoScreens from "@/components/VideoScreens";
 // import VideoScreensOptimized from "@/components/VideoScreensOptimized";
 import CouncilChatScreens from "@/components/CouncilChatScreens";
 import TalkShowScene, { preloadTalkShow } from "@/components/trade/TalkShowScene";
-import LTTvBroadcastPanel from "@/components/trade/LTTvBroadcastPanel";
+import LTTvBroadcastPanel, { SHOWS as LT_TV_SHOWS } from "@/components/trade/LTTvBroadcastPanel";
 import TickerDisplay3 from "@/components/TickerDisplay3";
 import { useMusic } from '@/components/MusicContext';
 import { useUser, useClerk } from "@clerk/nextjs";
@@ -87,6 +87,17 @@ const MOBILE_SCENE = 'laptop';
 // cluster, the verdict control + MENU live in the bottom dock, so the strip is
 // redundant. Flip to true to bring it back (e.g. when multi-case switching ships).
 const SHOW_CASE_HUD_STRIP = false;
+
+// How far the viewer may dolly out on LT TV — the set shot sits at ~3.7, so
+// this leaves room to look around without zooming the stage into the void.
+const LT_TV_MAX_DISTANCE = 6;
+
+// What the LT TV lineup cycles on the set's frame screen: one card per show,
+// with its latest episode, or Coming soon until it has one.
+const LT_TV_CHANNEL_CARDS = LT_TV_SHOWS.map((show) => {
+  const latest = show.episodes[show.episodes.length - 1];
+  return { title: show.title, format: show.format, latest: latest ? `EP ${latest.number}` : null };
+});
 
 const HOST_SITEPAL_CONFIG = {
   containerId: DEMON_SITEPAL_CONTAINER_ID, // shared host container
@@ -814,10 +825,14 @@ function CameraControlsRig({
 
   // Composed static pose (TALK SHOW). When focusPose flips non-null, smoothly
   // move to it and hold — the per-frame orbit/zoom is already gated off by
-  // autoRotate=false in this mode, so nothing fights the setLookAt.
+  // autoRotate=false in this mode, so nothing fights the setLookAt. A pose can
+  // also cap how far the viewer may dolly out (`maxDistance`); leaving it
+  // restores the hub's envelope.
   useEffect(() => {
     const c = ref.current;
-    if (!c || !focusPose) return;
+    if (!c) return;
+    c.maxDistance = focusPose?.maxDistance ?? 20;
+    if (!focusPose) return;
     introCompleteRef.current = true;
     const p = focusPose.position;
     const t = focusPose.target;
@@ -1338,6 +1353,10 @@ export default function CyborgTemple() {
   // talk_show.glb set. Desktop-only — the live 3D scene is desktop-only
   // (mobile shows a baked backdrop with no model to swap).
   const [talkShowMode, setTalkShowMode] = useState(false);
+  // LT TV lands on the lineup — the set off air: empty chairs, the channel
+  // cycling on the frame's screen — and a show takes over once it's picked
+  // ('lineup' | 'set'). Same model either way, so tuning in is instant.
+  const [ltTvView, setLtTvView] = useState('lineup');
   // Which talk-show character projects the live SitePal face — for fitting the
   // crop onto Face2/FaceDemon2. 'Monk' | 'Barron' | null. Driven by the dev
   // fitting control (?tune=sitepal); one at a time (single shared portal).
@@ -1367,7 +1386,16 @@ export default function CyborgTemple() {
   const exitTalkShow = useCallback(() => {
     try { window.__talkShowStop?.(); } catch (e) {}
     setTalkShowMode(false);
+    setLtTvView('lineup');
     setTalkShowProject(null);
+    setTalkShowAudioReady(false);
+    setTalkShowPlaying(false);
+    setTalkShowVoiceStatus('loading');
+  }, []);
+  // Back from a show to the LT TV lineup, staying on the tab.
+  const leaveTalkShowSet = useCallback(() => {
+    try { window.__talkShowStop?.(); } catch (e) {}
+    setLtTvView('lineup');
     setTalkShowAudioReady(false);
     setTalkShowPlaying(false);
     setTalkShowVoiceStatus('loading');
@@ -2799,12 +2827,16 @@ export default function CyborgTemple() {
   // characters (Demon left, Monk right) with the neon frame behind them.
   // Derived from the model's world layout (see TalkShowScene). Null unless the
   // tab is active, so the rig only snaps when talk show is on.
-  const talkShowPose = useMemo(
-    () => (talkShowMode
-      ? { position: [0.15, 0.15, 3.7], target: [0.15, -0.5, 0.1] }
-      : null),
-    [talkShowMode],
-  );
+  // On the lineup (the LT TV landing) it frames the frame's channel screen and
+  // the empty chairs, offset right of the console. Either way the viewer can
+  // orbit and dolly, but not pull back past LT_TV_MAX_DISTANCE into the void.
+  const talkShowPose = useMemo(() => {
+    if (!talkShowMode) return null;
+    if (ltTvView === 'set') {
+      return { position: [0.15, 0.15, 3.7], target: [0.15, -0.5, 0.1], maxDistance: LT_TV_MAX_DISTANCE };
+    }
+    return { position: [-0.51, -0.15, 2.95], target: [-0.51, -0.65, -0.4], maxDistance: LT_TV_MAX_DISTANCE };
+  }, [talkShowMode, ltTvView]);
   // Tightened framing: dolly the resting shot ~15% closer so the workstation
   // fills more of the frame and the empty sky band above the monitors crops
   // down. Angle/target unchanged — same approved composition, just nearer.
@@ -3725,10 +3757,15 @@ export default function CyborgTemple() {
                 left: isMobileView ? "1rem" : "1rem",
                 top: isMobileView ? "0.5rem" : "-2rem",
                 color: "#f6f5f1ff",
-                fontFamily: "UnifrakturCook, serif",
+                // Grenze Gotisch over UnifrakturCook (2026-09-18): keeps the
+                // gothic mood but its L and T don't read as C. Also drops the
+                // logo out of the global fonts-loaded rule, whose
+                // `opacity: 1 !important` was overriding the fade below for
+                // visitors arriving from /.
+                fontFamily: "'Grenze Gotisch', serif",
                 textShadow: "0 0 10px rgba(212, 175, 55, 0.8), 0 0 20px rgba(212, 175, 55, 0.6), 0 0 30px rgba(212, 175, 55, 0.8), 6px 6px 16px rgba(0, 0, 0, 1), -2px -2px 8px rgba(255, 192, 203, 0.7), 0 0 100px rgba(212, 175, 55, 0.1)",
                 fontSize: isMobileView ? "2.5rem" : "3rem",
-                fontWeight: 900,
+                fontWeight: 700,
                 lineHeight: 0.85,
                 transform: "rotate(-8deg) skew(-15deg)",
                 zIndex: 1000,
@@ -4110,6 +4147,10 @@ export default function CyborgTemple() {
                 scale={[1.2, 1.2, 1.2]}
                 rotation={[0, 0, 0]}
                 projectCharacter={talkShowProject}
+                castHidden={ltTvView === 'lineup'}
+                hideCameraRig={ltTvView === 'lineup'}
+                enableMonitorFeed={ltTvView === 'set'}
+                channelCards={ltTvView === 'lineup' ? LT_TV_CHANNEL_CARDS : null}
                 onPlaybackReady={handleTalkShowPlaybackReady}
                 onPlaybackStateChange={handleTalkShowPlaybackState}
               />
@@ -4530,6 +4571,7 @@ export default function CyborgTemple() {
                 // and braces for the ?press=1 entry: never leave a live run
                 // stranded on a set that isn't its room.
                 exitPressGame();
+                setLtTvView('lineup');
                 setTalkShowMode(true);
               },
             },
@@ -4548,7 +4590,9 @@ export default function CyborgTemple() {
                 right: 0,
                 top: '50%',
                 transform: 'translateY(-50%)',
-                zIndex: 40,
+                // Above the LT TV chiron (10035), which reaches the rail's
+                // bottom tab on short windows.
+                zIndex: talkShowMode ? 10036 : 40,
                 display: 'flex',
                 flexDirection: 'column',
                 borderTop: '1px solid rgba(150, 170, 200, 0.35)',
@@ -4624,6 +4668,9 @@ export default function CyborgTemple() {
             set; all episode selection and playback controls live here. */}
         {mounted && !isMobileView && talkShowMode && (
           <LTTvBroadcastPanel
+            view={ltTvView}
+            onTuneIn={() => setLtTvView('set')}
+            onLeaveSet={leaveTalkShowSet}
             audioReady={talkShowAudioReady}
             playing={talkShowPlaying}
             voiceStatus={talkShowVoiceStatus}

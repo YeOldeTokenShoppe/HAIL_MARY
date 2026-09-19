@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import LTTvChiron from "@/components/trade/LTTvChiron";
 
 // Exported so the mobile LT TV screen (MobileTalkShow) shows the same slate
 // rather than keeping a second copy that drifts from this one.
@@ -43,7 +44,22 @@ export const EPISODES = [
   },
 ];
 
+// The LT TV lineup. A show with no episodes yet is listed in the guide as
+// Coming soon. `graphics: "news"` gives a show the full chiron (headline bar,
+// ticker, quote); every other show — and the lineup — wears only the logo cube.
+export const SHOWS = [
+  { id: "roundtable", title: "The Liminal Terminal", format: "Weekly roundtable", episodes: EPISODES },
+  { id: "news", title: "LT Weekly News Recap", format: "News", graphics: "news", episodes: [] },
+  { id: "morality", title: "Markets & Morality", format: "Moral philosophy", episodes: [] },
+];
+
+// `view` is 'lineup' (the LT TV landing — the set off air, channel on the
+// frame's screen) or 'set' (a show on). On the lineup the primary action tunes
+// in; on a show it runs the show.
 export default function LTTvBroadcastPanel({
+  view = "set",
+  onTuneIn,
+  onLeaveSet,
   audioReady,
   playing,
   voiceStatus,
@@ -51,27 +67,40 @@ export default function LTTvBroadcastPanel({
   onStop,
   onRetry,
 }) {
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [showId, setShowId] = useState(SHOWS[0].id);
+  const [episodeIndex, setEpisodeIndex] = useState(0);
   // Open on arrival: this panel only mounts once the LT TV set is up, and the
   // production controls ARE the point of switching to it — collapsing first
   // made you click twice to reach them. Still collapsible to clear the set.
-  // (The episode rack opens separately from its selector.)
+  // (The program guide opens from the show and episode titles.)
   const [collapsed, setCollapsed] = useState(false);
-  const [episodesOpen, setEpisodesOpen] = useState(false);
-  const selected = EPISODES[selectedIndex];
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState(SHOWS[0].id);
+  const show = SHOWS.find((s) => s.id === showId);
+  const selected = show.episodes[episodeIndex];
   const loading = !audioReady && voiceStatus !== "failed";
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      if (event.key === "Escape" && episodesOpen) setEpisodesOpen(false);
+      if (event.key === "Escape" && guideOpen) setGuideOpen(false);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [episodesOpen]);
+  }, [guideOpen]);
 
-  const selectEpisode = (index) => {
+  const toggleGuide = () => {
+    // Open on the show that's on now.
+    if (!guideOpen) setExpandedId(showId);
+    setGuideOpen((open) => !open);
+  };
+
+  const selectEpisode = (id, index) => {
     if (playing) onStop?.();
-    setSelectedIndex(index);
+    setShowId(id);
+    setEpisodeIndex(index);
+    setGuideOpen(false);
+    // Picking from the guide on the lineup is picking what to watch.
+    if (view === "lineup") onTuneIn?.();
   };
 
   const handlePrimaryAction = () => {
@@ -86,8 +115,17 @@ export default function LTTvBroadcastPanel({
     onPlay?.();
   };
 
+  // On-air graphics. Stays up when the console collapses — that's the clean
+  // "watching TV" view. The full lower third is a news convention, so only a
+  // news show gets it; otherwise it's just the channel's logo cube.
+  const chironMode = view === "set" && show.graphics === "news" ? "news" : "logo";
+  const chiron = <LTTvChiron episode={selected} mode={chironMode} />;
+  const chevron = <i aria-hidden="true">{guideOpen ? "⌃" : "⌄"}</i>;
+
   if (collapsed) {
     return (
+      <>
+      {chiron}
       <aside className="ltv-collapsed" aria-label="LT TV broadcast controls">
         <button type="button" onClick={() => setCollapsed(false)} aria-label="Expand LT TV controls">
           <span className={playing ? "is-live" : ""} />
@@ -97,52 +135,64 @@ export default function LTTvBroadcastPanel({
         </button>
         <style jsx>{styles}</style>
       </aside>
+      </>
     );
   }
 
   return (
+    <>
+    {chiron}
+    {/* Outside the console's stacking context so it can sit under the chiron
+        (the logo cube's perspective rises past the chiron's top edge). */}
+    <div className="ltv-vignette" aria-hidden="true" />
     <aside className="ltv-dashboard" aria-label="LT TV episode selection">
-      <div className="ltv-vignette" aria-hidden="true" />
-
-      <div
-        className="ltv-masthead"
-        style={{ top: 26, left: 46, width: "auto" }}
-      >
-        <div className="ltv-showmark" aria-label="The Liminal Terminal">
-                <span className="title-line" style={{ display: '', position: 'relative', marginLeft: "-1.0rem" }}>The</span>
-          <strong>Liminal</strong>
-          <strong>Terminal</strong>
-        </div>
-        <div className="ltv-network-lockup">
-          <div className="ltv-network-row">
-            <span>LT TV</span>
-            <button type="button" onClick={() => setCollapsed(true)} aria-label="Collapse LT TV controls">
-              ‹
+      {/* The channel is the masthead here; "The Liminal Terminal" umbrella
+          brand belongs to the /trade page, not this tab. */}
+      <div className="ltv-masthead">
+        <div className="ltv-network-row">
+          {view === "set" ? (
+            <button type="button" className="ltv-home" onClick={onLeaveSet} aria-label="Back to the LT TV lineup">
+              LT TV
             </button>
-          </div>
-          <p>{selected.title}</p>
+          ) : (
+            <span>LT TV</span>
+          )}
+          <button type="button" onClick={() => setCollapsed(true)} aria-label="Collapse LT TV controls">
+            ‹
+          </button>
         </div>
-      </div>
-
-      <section className="ltv-production">
-        <div className="ltv-eyebrow">Current production</div>
-        <h2>The Liminal Terminal</h2>
-        <div className="ltv-format">Weekly roundtable</div>
-
-        <label>Episode</label>
+        {/* The labelled way in — the title chevrons alone didn't read as
+            controls. */}
         <button
           type="button"
-          className="ltv-select"
-          onClick={() => setEpisodesOpen((open) => !open)}
-          aria-expanded={episodesOpen}
-          aria-controls="ltv-episode-rack"
+          className={`ltv-guide-toggle${guideOpen ? " is-open" : ""}`}
+          onClick={toggleGuide}
+          aria-expanded={guideOpen}
+          aria-controls="ltv-guide"
         >
-          <span>Episode {selected.number}</span>
-          <i aria-hidden="true">{episodesOpen ? "⌃" : "⌄"}</i>
+          Guide
         </button>
+      </div>
+
+      {/* One heading per level — show, then episode — and each heading is
+          also the way into the guide. */}
+      <section className="ltv-production">
+        <h2>
+          <button type="button" onClick={toggleGuide} aria-expanded={guideOpen} aria-controls="ltv-guide">
+            {show.title}
+            {chevron}
+          </button>
+        </h2>
+        <div className="ltv-format">{show.format}</div>
 
         <div className="ltv-current" aria-live="polite">
-          <h3>{selected.title}</h3>
+          <div className="ltv-eyebrow">EP {selected.number}</div>
+          <h3>
+            <button type="button" onClick={toggleGuide} aria-expanded={guideOpen} aria-controls="ltv-guide">
+              {selected.title}
+              {chevron}
+            </button>
+          </h3>
           <p>{selected.summary}</p>
           <div className="ltv-facts">
             <span><i aria-hidden="true">◷</i>{selected.runtime}</span>
@@ -151,88 +201,92 @@ export default function LTTvBroadcastPanel({
           </div>
         </div>
 
-        <button
-          type="button"
-          className={`ltv-start ${playing ? "is-live" : ""}`}
-          disabled={loading}
-          onClick={handlePrimaryAction}
-        >
-          <span aria-hidden="true">
-            {playing ? "■" : voiceStatus === "failed" ? "↻" : "▶"}
-          </span>
-          {loading
-            ? "Loading voices…"
-            : playing
-              ? "Stop show"
-              : voiceStatus === "failed"
-                ? "Retry signal"
-                : "Start show"}
-        </button>
-
-        <div className={`ltv-ready ${playing ? "is-live" : ""}`}>
-          <span aria-hidden="true">{playing ? "●" : "≋"}</span>
-          {playing
-            ? "Broadcasting now"
-            : voiceStatus === "failed"
-              ? "Signal interrupted"
-              : audioReady
-                ? "Ready to broadcast"
-                : "Preparing broadcast"}
-        </div>
+        {view === "lineup" ? (
+          <button type="button" className="ltv-start" onClick={onTuneIn}>
+            <span aria-hidden="true">▶</span>
+            Tune in
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={`ltv-start ${playing ? "is-live" : ""}`}
+            disabled={loading}
+            onClick={handlePrimaryAction}
+          >
+            <span aria-hidden="true">
+              {playing ? "■" : voiceStatus === "failed" ? "↻" : "▶"}
+            </span>
+            {loading
+              ? "Loading voices…"
+              : playing
+                ? "Stop show"
+                : voiceStatus === "failed"
+                  ? "Retry signal"
+                  : "Start show"}
+          </button>
+        )}
       </section>
 
-      {episodesOpen && (
-        <section id="ltv-episode-rack" className="ltv-episode-rack" aria-label="Episodes">
-          <h3>Episodes</h3>
-          <div role="listbox" aria-label="Episode archive">
-            {EPISODES.map((episode, index) => {
-              const active = selectedIndex === index;
+      {guideOpen && (
+        <section id="ltv-guide" className="ltv-guide" aria-label="Program guide">
+          <h3>Program guide</h3>
+          <div className="ltv-guide-list">
+          {SHOWS.map((s) => {
+            const latest = s.episodes[s.episodes.length - 1];
+            if (!latest) {
               return (
-                <button
-                  key={episode.number}
-                  type="button"
-                  role="option"
-                  aria-selected={active}
-                  className={active ? "is-selected" : ""}
-                  onClick={() => selectEpisode(index)}
-                >
-                  <span className="ltv-ep-number">{episode.number}</span>
-                  <span className="ltv-ep-copy">
-                    <b>{episode.title}</b>
-                    <small>{episode.runtime}</small>
-                  </span>
-                  {active && <span className="ltv-row-play" aria-hidden="true">▶</span>}
-                </button>
+                <div key={s.id} className="ltv-guide-show is-soon">
+                  <span className="ltv-guide-name"><b>{s.title}</b><small>{s.format}</small></span>
+                  <span className="ltv-guide-tag">Coming soon</span>
+                </div>
               );
-            })}
+            }
+            const open = expandedId === s.id;
+            return (
+              <div key={s.id}>
+                <button
+                  type="button"
+                  className={`ltv-guide-show${open ? " is-open" : ""}`}
+                  aria-expanded={open}
+                  onClick={() => setExpandedId(open ? null : s.id)}
+                >
+                  <span className="ltv-guide-name"><b>{s.title}</b><small>{s.format}</small></span>
+                  <span className="ltv-guide-tag">EP {latest.number}</span>
+                </button>
+                {open && (
+                  <div role="listbox" aria-label={`${s.title} episodes`}>
+                    {s.episodes.map((episode, index) => {
+                      const active = s.id === showId && index === episodeIndex;
+                      return (
+                        <button
+                          key={episode.number}
+                          type="button"
+                          role="option"
+                          aria-selected={active}
+                          className={active ? "is-selected" : ""}
+                          onClick={() => selectEpisode(s.id, index)}
+                        >
+                          <span className="ltv-ep-number">{episode.number}</span>
+                          <span className="ltv-ep-copy">
+                            <b>{episode.title}</b>
+                            <small>{episode.runtime}</small>
+                          </span>
+                          {active && <span className="ltv-row-play" aria-hidden="true">▶</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           </div>
-          <button type="button" className="ltv-archive" onClick={() => setEpisodesOpen(false)}>
-            <span aria-hidden="true">▣</span>
-            Browse archive
-          </button>
         </section>
       )}
 
-      <div className="ltv-live-badge" aria-label={`Live, episode ${selected.number}, season 1`}>
-        <strong><span /> Live</strong>
-        <small>EP {selected.number} / S01</small>
-      </div>
-
-      <section className="ltv-broadcast-status" aria-label="Broadcast status">
-        <header>
-          <span>Broadcast status</span>
-          <span className="ltv-rec"><i /> Rec</span>
-        </header>
-        <dl>
-          <div><dt>Studio</dt><dd>LT talk set</dd></div>
-          <div><dt>Camera</dt><dd>Cam 01</dd></div>
-          <div><dt>Audio</dt><dd>Live mix</dd></div>
-          <div><dt>Status</dt><dd className={playing ? "on-air" : ""}>{playing ? "On air" : "Ready"}</dd></div>
-        </dl>
-      </section>
-
       <style jsx>{styles}</style>
     </aside>
+    </>
   );
 }
 
@@ -255,6 +309,7 @@ const styles = `
 
   .ltv-vignette {
     position: fixed;
+    z-index: 10030;
     inset: 0 auto 64px 0;
     width: min(610px, 49vw);
     pointer-events: none;
@@ -265,51 +320,39 @@ const styles = `
 
   .ltv-masthead,
   .ltv-production,
-  .ltv-episode-rack,
-  .ltv-broadcast-status,
-  .ltv-live-badge {
+  .ltv-guide {
     pointer-events: auto;
     animation: ltv-enter 420ms cubic-bezier(.2,.72,.2,1) both;
   }
 
   .ltv-masthead {
     position: fixed;
-    top: 30px;
-    left: 52px;
+    top: 28px;
+    left: 32px;
+    width: 270px;
     display: flex;
     align-items: center;
-    gap: 34px;
+    justify-content: space-between;
   }
 
-  .ltv-showmark {
-    position: relative;
-    width: 158px;
-    color: #fff9dc;
-    filter: drop-shadow(0 0 10px rgba(255,222,123,.62));
-    font-family: "UnifrakturCook", "UnifrakturMaguntia", Georgia, serif;
-    line-height: .73;
-    transform: rotate(-4deg);
+  .ltv-guide-toggle {
+    height: 38px;
+    padding: 0 16px;
+    border: 1px solid rgba(32,215,242,.55);
+    border-radius: 7px;
+    background: rgba(4,14,22,.6);
+    box-shadow: 0 0 12px rgba(32,215,242,.18);
+    color: var(--cyan);
+    font: 700 11px "Orbitron", "IBM Plex Mono", monospace;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    cursor: pointer;
   }
 
-  .ltv-showmark span {
-    position: absolute;
-    top: -5px;
-    left: 10px;
-    font-size: 14px;
-  }
-
-  .ltv-showmark strong {
-    display: block;
-    font-size: 35px;
-    font-weight: 900;
-  }
-
-  .ltv-showmark strong:last-child {
-    margin-left: 23px;
-  }
-
-  .ltv-network-lockup {
-    padding-top: 2px;
+  .ltv-guide-toggle:hover,
+  .ltv-guide-toggle.is-open {
+    background: rgba(32,215,242,.14);
+    box-shadow: 0 0 16px rgba(32,215,242,.35);
   }
 
   .ltv-network-row {
@@ -323,7 +366,8 @@ const styles = `
     overflow: hidden;
   }
 
-  .ltv-network-row > span {
+  .ltv-network-row > span,
+  .ltv-network-row > .ltv-home {
     display: grid;
     place-items: center;
     min-width: 104px;
@@ -346,25 +390,28 @@ const styles = `
     cursor: pointer;
   }
 
-  .ltv-network-lockup p {
-    margin: 10px 0 0;
-    color: rgba(244,235,248,.58);
-    font-family: "Orbitron", "IBM Plex Mono", monospace;
-    font-size: 8px;
-    font-weight: 700;
-    letter-spacing: .15em;
-    text-transform: uppercase;
+  /* On a show, the channel name is the way back to the lineup. */
+  .ltv-network-row > .ltv-home {
+    width: auto;
+    border: 0;
+    background: none;
+    font-size: 18px;
+    cursor: pointer;
+  }
+
+  .ltv-network-row > .ltv-home:hover {
+    color: #ffd9bd;
+    text-shadow: 0 0 14px rgba(255, 119, 192, .95);
   }
 
   .ltv-production {
     position: fixed;
-    top: 144px;
+    top: 100px;
     left: 32px;
     width: 270px;
   }
 
   .ltv-eyebrow,
-  .ltv-production > label,
   .ltv-format {
     font-family: "Orbitron", "IBM Plex Mono", monospace;
     font-size: 8px;
@@ -375,7 +422,7 @@ const styles = `
 
   .ltv-eyebrow {
     color: rgba(247,244,250,.66);
-    margin-bottom: 15px;
+    margin-bottom: 7px;
   }
 
   .ltv-production h2 {
@@ -387,42 +434,42 @@ const styles = `
     text-shadow: 0 0 15px rgba(32,215,242,.56);
   }
 
+  /* The show and episode titles are the guide's triggers — headings that
+     click, with only a chevron to say so. */
+  .ltv-production h2 button,
+  .ltv-current h3 button {
+    display: inline;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    text-shadow: inherit;
+    cursor: pointer;
+  }
+
+  .ltv-production h2 i,
+  .ltv-current h3 i {
+    margin-left: .35em;
+    color: var(--cyan);
+    font-size: .7em;
+    font-style: normal;
+    opacity: .75;
+  }
+
+  .ltv-production h2 button:hover i,
+  .ltv-current h3 button:hover i {
+    opacity: 1;
+  }
+
   .ltv-format {
     margin: 10px 0 26px;
     color: var(--magenta);
   }
 
-  .ltv-production > label {
-    display: block;
-    margin-bottom: 8px;
-    color: rgba(247,244,250,.7);
-  }
-
-  .ltv-select {
-    width: 100%;
-    height: 42px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 13px;
-    border: 1px solid rgba(32,215,242,.45);
-    border-radius: 6px;
-    background: linear-gradient(90deg, rgba(6,11,20,.92), rgba(7,7,15,.8));
-    box-shadow: 0 0 13px rgba(32,215,242,.09), inset 0 0 9px rgba(32,215,242,.04);
-    color: #f9f5fb;
-    font: 700 11px "IBM Plex Mono", monospace;
-    cursor: pointer;
-  }
-
-  .ltv-select i {
-    color: var(--cyan);
-    font-style: normal;
-    font-size: 18px;
-    line-height: 1;
-  }
-
   .ltv-current h3 {
-    margin: 17px 0 8px;
+    margin: 0 0 8px;
     font-family: "Orbitron", "IBM Plex Mono", monospace;
     font-size: 18px;
     line-height: 1.15;
@@ -511,31 +558,11 @@ const styles = `
     box-shadow: 0 0 20px rgba(255,64,91,.38);
   }
 
-  .ltv-ready {
-    margin-top: 10px;
-    color: var(--green);
-    font-size: 8px;
-    font-weight: 800;
-    letter-spacing: .1em;
-    text-align: center;
-    text-transform: uppercase;
-    text-shadow: 0 0 8px rgba(51,242,138,.3);
-  }
-
-  .ltv-ready span {
-    margin-right: 6px;
-  }
-
-  .ltv-ready.is-live {
-    color: #ff6d82;
-  }
-
-  .ltv-episode-rack {
+  .ltv-guide {
     position: fixed;
-    top: 167px;
+    top: 100px;
     left: 320px;
     width: 254px;
-    min-height: 372px;
     padding: 16px 14px 13px;
     border: 1px solid rgba(123,155,186,.25);
     border-radius: 5px;
@@ -545,8 +572,8 @@ const styles = `
     -webkit-backdrop-filter: blur(12px);
   }
 
-  .ltv-episode-rack::before,
-  .ltv-episode-rack::after {
+  .ltv-guide::before,
+  .ltv-guide::after {
     content: "";
     position: absolute;
     width: 12px;
@@ -556,10 +583,10 @@ const styles = `
     background: rgba(7,7,18,.93);
   }
 
-  .ltv-episode-rack::before { top: 5px; right: -7px; }
-  .ltv-episode-rack::after { bottom: 5px; left: -7px; transform: rotate(180deg); }
+  .ltv-guide::before { top: 5px; right: -7px; }
+  .ltv-guide::after { bottom: 5px; left: -7px; transform: rotate(180deg); }
 
-  .ltv-episode-rack > h3 {
+  .ltv-guide > h3 {
     margin: 0 5px 12px;
     color: var(--cyan);
     font-family: "Orbitron", "IBM Plex Mono", monospace;
@@ -568,12 +595,84 @@ const styles = `
     text-transform: uppercase;
   }
 
-  .ltv-episode-rack [role="listbox"] {
-    display: grid;
-    gap: 2px;
+  /* Scrolls inside the frame (not the frame itself, which would clip its
+     corner tabs) once the lineup outgrows the space above the chiron. */
+  .ltv-guide-list {
+    max-height: calc(100vh - 340px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
-  .ltv-episode-rack [role="option"] {
+  .ltv-guide-show {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 8px 8px 9px;
+    border: 0;
+    border-left: 2px solid transparent;
+    border-top: 1px solid rgba(123,155,186,.14);
+    background: transparent;
+    color: #f8f5fa;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  button.ltv-guide-show:hover {
+    background: rgba(32,215,242,.06);
+  }
+
+  .ltv-guide-show.is-open {
+    border-left-color: var(--cyan);
+    background: rgba(32,215,242,.07);
+  }
+
+  .ltv-guide-show.is-soon {
+    cursor: default;
+    opacity: .55;
+  }
+
+  .ltv-guide-name {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .ltv-guide-name b {
+    font-family: "Orbitron", "IBM Plex Mono", monospace;
+    font-size: 9px;
+    font-weight: 700;
+  }
+
+  .ltv-guide-show.is-open .ltv-guide-name b {
+    color: var(--cyan);
+  }
+
+  .ltv-guide-name small {
+    color: rgba(247,244,250,.5);
+    font-size: 7px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .ltv-guide-tag {
+    flex: none;
+    color: rgba(247,244,250,.6);
+    font-family: "Orbitron", monospace;
+    font-size: 8px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .ltv-guide [role="listbox"] {
+    display: grid;
+    gap: 2px;
+    padding: 4px 0 8px 10px;
+  }
+
+  .ltv-guide [role="option"] {
     width: 100%;
     min-height: 43px;
     display: grid;
@@ -589,11 +688,11 @@ const styles = `
     cursor: pointer;
   }
 
-  .ltv-episode-rack [role="option"]:hover {
+  .ltv-guide [role="option"]:hover {
     background: rgba(32,215,242,.06);
   }
 
-  .ltv-episode-rack [role="option"].is-selected {
+  .ltv-guide [role="option"].is-selected {
     border-color: rgba(239,98,220,.72);
     background: linear-gradient(90deg, rgba(63,12,68,.72), rgba(19,7,29,.82));
     box-shadow: 0 0 12px rgba(239,98,220,.25), inset 0 0 10px rgba(239,98,220,.08);
@@ -631,138 +730,6 @@ const styles = `
     color: #fff;
     font-size: 9px;
     filter: drop-shadow(0 0 5px rgba(239,98,220,.7));
-  }
-
-  .ltv-archive {
-    width: 100%;
-    height: 36px;
-    margin-top: 10px;
-    border: 1px solid rgba(32,215,242,.28);
-    border-radius: 5px;
-    background: rgba(4,10,18,.65);
-    color: rgba(32,215,242,.78);
-    font: 800 8px "Orbitron", "IBM Plex Mono", monospace;
-    letter-spacing: .11em;
-    text-transform: uppercase;
-    cursor: pointer;
-  }
-
-  .ltv-archive span { margin-right: 7px; }
-
-  .ltv-live-badge {
-    position: fixed;
-    top: 34px;
-    right: 68px;
-    min-width: 114px;
-    padding: 8px 12px;
-    border: 1px solid rgba(239,98,220,.74);
-    border-radius: 6px;
-    background: rgba(9,6,16,.74);
-    box-shadow: 0 0 14px rgba(239,98,220,.33), inset 0 0 10px rgba(239,98,220,.06);
-    text-align: center;
-    backdrop-filter: blur(8px);
-  }
-
-  .ltv-live-badge strong,
-  .ltv-live-badge small {
-    display: block;
-    font-family: "Orbitron", monospace;
-    text-transform: uppercase;
-  }
-
-  .ltv-live-badge strong {
-    color: #ffbd9a;
-    font-size: 11px;
-    letter-spacing: .14em;
-  }
-
-  .ltv-live-badge strong span {
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    margin: 0 7px 1px 0;
-    border-radius: 50%;
-    background: var(--red);
-    box-shadow: 0 0 7px rgba(255,64,91,.8);
-    animation: ltv-pulse 1.5s ease-in-out infinite;
-  }
-
-  .ltv-live-badge small {
-    margin-top: 5px;
-    color: var(--cyan-soft);
-    font-size: 8px;
-    letter-spacing: .1em;
-  }
-
-  .ltv-broadcast-status {
-    position: fixed;
-    left: 26px;
-    bottom: 73px;
-    width: 300px;
-    padding: 11px 13px 12px;
-    border: 1px solid rgba(32,215,242,.19);
-    border-radius: 5px;
-    background: rgba(3,4,10,.85);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
-    backdrop-filter: blur(10px);
-  }
-
-  .ltv-broadcast-status header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 10px;
-    color: rgba(32,215,242,.77);
-    font: 800 8px "Orbitron", monospace;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-  }
-
-  .ltv-rec {
-    color: rgba(255,77,110,.72);
-  }
-
-  .ltv-rec i {
-    display: inline-block;
-    width: 5px;
-    height: 5px;
-    margin-right: 4px;
-    border-radius: 50%;
-    background: var(--red);
-    box-shadow: 0 0 5px var(--red);
-  }
-
-  .ltv-broadcast-status dl {
-    display: grid;
-    grid-template-columns: 1.3fr 1fr 1fr .8fr;
-    gap: 10px;
-    margin: 0;
-  }
-
-  .ltv-broadcast-status dt,
-  .ltv-broadcast-status dd {
-    margin: 0;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-
-  .ltv-broadcast-status dt {
-    color: rgba(247,244,250,.43);
-    font-size: 7px;
-    letter-spacing: .1em;
-  }
-
-  .ltv-broadcast-status dd {
-    margin-top: 3px;
-    color: rgba(247,244,250,.72);
-    font-size: 8px;
-  }
-
-  .ltv-broadcast-status dl > div:last-child dd {
-    color: var(--green);
-  }
-
-  .ltv-broadcast-status dd.on-air {
-    color: #ff6d82;
   }
 
   .ltv-collapsed {
@@ -815,40 +782,33 @@ const styles = `
     to { opacity: 1; translate: 0 0; }
   }
 
-  @keyframes ltv-pulse {
-    0%,100% { opacity:.55; }
-    50% { opacity:1; }
-  }
-
   @media (max-width: 1100px) {
     .ltv-vignette { width: 540px; }
-    .ltv-masthead { left: 40px; }
+    .ltv-masthead { left: 20px; width: 240px; }
     .ltv-production { left: 20px; width: 240px; }
-    .ltv-episode-rack { left: 276px; width: 224px; }
-    .ltv-broadcast-status { left: 20px; }
+    .ltv-guide { left: 276px; width: 224px; }
   }
 
+  /* No room beside the column — the guide opens over it instead. */
   @media (max-width: 900px) {
-    .ltv-episode-rack { display: none; }
+    .ltv-masthead { width: 270px; }
+    .ltv-guide { left: 20px; width: 270px; }
+    .ltv-guide::before,
+    .ltv-guide::after { display: none; }
     .ltv-vignette { width: 340px; }
     .ltv-production { width: 270px; }
-    .ltv-live-badge { right: 58px; }
   }
 
   @media (max-height: 690px) {
     .ltv-masthead { top: 14px; transform: scale(.9); transform-origin: top left; }
-    .ltv-production { top: 122px; transform: scale(.9); transform-origin: top left; }
-    .ltv-episode-rack { top: 142px; transform: scale(.9); transform-origin: top left; }
-    .ltv-broadcast-status { transform: scale(.9); transform-origin: bottom left; }
+    .ltv-production { top: 84px; transform: scale(.9); transform-origin: top left; }
+    .ltv-guide { top: 84px; transform: scale(.9); transform-origin: top left; }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .ltv-masthead,
     .ltv-production,
-    .ltv-episode-rack,
-    .ltv-broadcast-status,
-    .ltv-live-badge,
-    .ltv-live-badge strong span {
+    .ltv-guide {
       animation: none;
     }
   }
