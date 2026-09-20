@@ -64,6 +64,17 @@ export const ACTIONS = {
     argv: (id) => ["node", ["scripts/lt-tv-edit.mjs", id, "--rerecord"]],
     blurb: "For an episode already recorded. Returns it to Not recorded yet until you record it again.",
   },
+  "rewrite-marked": {
+    label: "Rewrite the lines I marked",
+    // One small call: the marked lines and the script around them, not a
+    // whole new episode.
+    spends: "an Anthropic call",
+    needs: ["ANTHROPIC_API_KEY"],
+    stages: ["written", "recorded", "on-air"],
+    needsScreenplay: true,
+    argv: (id) => ["node", ["scripts/lt-tv-rewrite.mjs", id]],
+    blurb: "Put a # note under a line saying what is wrong with it, Save, then press this. Only the marked lines change. Start the note #! to keep it as a rule for future episodes.",
+  },
   record: {
     label: "Record it",
     spends: "an ElevenLabs render",

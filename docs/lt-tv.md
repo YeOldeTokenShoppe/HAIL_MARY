@@ -25,9 +25,9 @@ an editor that has claimed `.command` will open it for reading instead of
 running it.
 
 Every episode of both shows, what stage each one is at, and the next step as a
-button — write it, record it, apply your edits, check the slate. The screenplay
-is editable in the page, with a Save button and a separate Apply, so a
-half-finished edit is never live.
+button — write it, record it, apply your edits, rewrite a line you marked,
+check the slate. The screenplay is editable in the page, with a Save button and
+a separate Apply, so a half-finished edit is never live.
 
 It runs **on your machine only.** What this pipeline produces is source code:
 an episode reaches /trade because its record is committed under
@@ -93,6 +93,7 @@ root — the path is relative to you, not to the repo.
 | `npm run lt:news` | write a news episode |
 | `npm run lt:roundtable` | write a roundtable episode |
 | `npm run lt:edit` | apply your edits to a screenplay |
+| `npm run lt:rewrite` | rewrite the lines you marked with a `#` note |
 | `npm run lt:audio` | record an episode |
 | `npm run lt:test` | run every check |
 
@@ -317,6 +318,49 @@ fault.** Check this before you go back and re-render anything.
 
 When `talk_show.glb` is re-exported, bump the query version in `MODEL_URL` so
 the browser does not keep the old animation library.
+
+---
+
+## A line you don't like (both shows)
+
+Three things you can do with a bad line, in rising order of effort.
+
+**Rewrite it yourself.** Open the screenplay, change the words, Save, then
+**Apply my edits**. Nothing is spent and nothing else in the episode moves.
+
+**Ask for a new one.** Put a note under the line saying what is wrong with it,
+starting with `#`, then press **Rewrite the lines I marked** — or
+`node scripts/lt-tv-rewrite.mjs roundtable-02`:
+
+```
+ 41    SAINT GR80 A rising number does not make you wealthy. It makes you willing.
+ # too on-the-nose, and he would never explain his own point twice
+```
+
+The whole episode is sent for context and only the marked lines come back
+different, so the replacement picks up the line before it and sets up the line
+after it. The note disappears with the edit. Mark several lines at once, or
+put two notes under one line. Pressing it with nothing marked costs nothing
+and says so.
+
+It writes the `.txt` only, so a rewrite you dislike is thrown away by not
+applying it — and a line the model left alone stays marked, which is how you
+see what it skipped.
+
+**Stop getting that line.** Start the note `#!` instead of `#`:
+
+```
+ #! GR80 never explains his own point twice
+```
+
+That fixes this line *and* adds the note to `docs/lt-tv-style-notes.md`, which
+is read into the writer's instructions at the top of every future episode of
+both shows. One sentence, a rule rather than a complaint — "nobody says at the
+end of the day", not "that ETF bit was flat". You can also just type rules into
+that file; only the bullets under **Rules** are sent, so the rest of the page
+explains itself without the explanation reaching the model.
+
+A script run prints `House notes: 3 in force.` when it is using them.
 
 ---
 

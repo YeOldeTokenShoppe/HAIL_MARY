@@ -38,6 +38,7 @@ import {
 import { assemble, renderScript } from "./lt-tv-episode.mjs";
 import { arg, rejectUnknownFlags } from "./lt-tv-cli.mjs";
 import { claude as callClaude } from "./lt-tv-claude.mjs";
+import { readStyleNotes, withStyleNotes } from "./lt-tv-style-notes.mjs";
 import { toSlateRecord, writeSlateRecord, SLATE_DIR, SLATE_INDEX } from "./lt-tv-slate-record.mjs";
 
 const MODEL = process.env.LT_TV_MODEL || "claude-opus-5";
@@ -249,9 +250,14 @@ async function main() {
     topic = draft.topic ?? { number: await nextNumber(), keep: null, from: null };
   } else {
     topic = await resolveTopic();
+    // Standing corrections from docs/lt-tv-style-notes.md. Read once and sent
+    // with both passes, so a rule about how these two talk shapes the argument
+    // as well as the dialogue.
+    const houseNotes = await readStyleNotes();
+    if (houseNotes.length) console.log(`House notes: ${houseNotes.length} in force.`);
     console.log(`Argument pass (${MODEL})…`);
     plan = await claude({
-      system: PLAN_SYSTEM,
+      system: withStyleNotes(PLAN_SYSTEM, houseNotes),
       user: `TONIGHT'S THEME\n${topic.theme}\n\nWrite the argument.`,
       maxTokens: MAX_TOKENS.plan,
     });
@@ -269,7 +275,7 @@ async function main() {
 
     console.log("Dialogue pass…");
     ({ segments } = await claude({
-      system: SCRIPT_SYSTEM,
+      system: withStyleNotes(SCRIPT_SYSTEM, houseNotes),
       user: scriptUserMessage(plan),
       maxTokens: MAX_TOKENS.dialogue,
     }));

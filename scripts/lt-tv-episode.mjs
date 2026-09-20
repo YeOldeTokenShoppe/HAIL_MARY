@@ -323,6 +323,12 @@ export function renderScript(episode) {
     "# delivery directions ElevenLabs performs, and they are part of the line.",
     "# An indented (Monk headshake @ +0.4s) is an animation beat on the line",
     "# above it. Lines starting with # are ignored.",
+    "#",
+    "# To have a line rewritten instead of writing it yourself, put a # note",
+    "# under it saying what is wrong, then run:",
+    `#     node scripts/lt-tv-rewrite.mjs ${episode.id}`,
+    "# Start the note #! to also keep it as a standing rule for future",
+    "# episodes, in docs/lt-tv-style-notes.md.",
     "",
   ];
   for (const segment of episode.segments) {

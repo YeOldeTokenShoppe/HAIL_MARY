@@ -113,8 +113,10 @@ ok("anything that costs names the key it needs", ACTION_NAMES.every((n) => !ACTI
 console.log("\nThe steps that read the screenplay say that they do:");
 ok("applying edits needs a screenplay", ACTIONS["apply-edits"].needsScreenplay === true);
 ok("applying edits and re-recording needs one too", ACTIONS["apply-edits-rerecord"].needsScreenplay === true);
-ok("nothing else claims to need one",
-  ACTION_NAMES.every((n) => n.startsWith("apply-edits") || !ACTIONS[n].needsScreenplay));
+ok("rewriting a marked line needs one", ACTIONS["rewrite-marked"].needsScreenplay === true);
+check("and nothing else claims to",
+  ACTION_NAMES.filter((n) => ACTIONS[n].needsScreenplay),
+  ["apply-edits", "apply-edits-rerecord", "rewrite-marked"]);
 ok("actionsFor carries the flag through to the page",
   actionsFor("on-air").find((a) => a.name === "apply-edits").needsScreenplay === true);
 
@@ -125,7 +127,10 @@ ok("a written one is offered recording", actionsFor("written").some((a) => a.nam
 ok("a recorded one is not offered recording again", !actionsFor("recorded").some((a) => a.name === "record"));
 ok("a recorded one can still be edited, with the re-record warning",
   actionsFor("recorded").some((a) => a.name === "apply-edits-rerecord"));
-ok("an on-air one is never offered a plain write", !actionsFor("on-air").some((a) => a.name.includes("write")));
+ok("an on-air one is never offered a plain write",
+  !actionsFor("on-air").some((a) => a.name.startsWith("write-") || a.name.startsWith("plan-")));
+ok("but it can still have one line rewritten",
+  actionsFor("on-air").some((a) => a.name === "rewrite-marked"));
 ok("every stage is offered something", STAGES.every((s) => actionsFor(s.id).length > 0));
 ok("no offered action leaks the argv builder", actionsFor("planned").every((a) => a.argv === undefined));
 
