@@ -8,12 +8,13 @@ the reference for the audio mechanics (ElevenLabs tags, the balanced-WAV
 cleanup, SitePal uploads); this one is the layer above it — what the show is,
 where its topics come from, and what file holds an episode.
 
-> **Status.** Steps 1, 2 and 4 are built and runnable: a week of signal becomes
-> a script, and the script lands on the LT TV guide as an episode. Step 3, the
-> audio build, is designed here but not yet written, so an episode arrives on
-> the guide listed as "Not recorded yet" until someone records it. No existing
-> route has been modified; the only component-adjacent file this touches is
-> `src/content/lt-tv/index.js`, whose episode list it appends to.
+> **Status.** All four steps are written: a week of signal becomes a script,
+> the script becomes audio, and the episode lands on the LT TV guide. Step 3
+> has never been run against a real ElevenLabs render — it was written without
+> a key and without ffmpeg — so treat the first recording as its test. Until an
+> episode is recorded it appears on the guide as "Not recorded yet". No
+> existing route has been modified; the only component-adjacent file this
+> touches is `src/content/lt-tv/index.js`, whose episode list it appends to.
 
 ---
 
@@ -297,7 +298,7 @@ not be recorded or quoted.
 
 ---
 
-## Step 3 — Build the audio *(designed, not yet built)*
+## Step 3 — Build the audio *(built; unproven against a real render)*
 
 This is the part that makes a 5–10 minute episode possible at all, and it is
 worth stating plainly because it is not obvious.
@@ -331,19 +332,46 @@ shows up as a truncated generation rather than an error.
 A block boundary is always a segment boundary, so the join lands on a beat that
 was already there.
 
-**What the builder needs to do**, in order:
+**PCM, not mp3 — this matters.** The blocks are requested as `pcm_44100`
+rather than the `mp3_44100_128` the single-block test script uses, because mp3
+frames carry encoder delay and padding. Concatenating them inserts a few
+milliseconds of silence at *every join* that the timestamps know nothing
+about, and since each block's offset is the sum of the ones before it, that
+error accumulates: the first block stays in sync and the last one drifts. The
+symptom is the picture running against the dialogue, which looks exactly like
+a mistuned lead-in and is much harder to trace. Raw PCM concatenates by
+appending bytes, so a join is exact to the sample and a block's duration is a
+byte count rather than a measurement. It also means this step needs no ffmpeg.
 
-1. For each block in the record, emit an ElevenLabs `dialogue.json` from its
-   lines and generate it. Keep the seed per episode for repeatability.
-2. Concatenate the block masters in order (`ffmpeg concat`), recording each
-   block's measured duration into `blocks[].durationSeconds` and its cumulative
-   `offsetSeconds`.
-3. Run the existing `process_dialogue.py` cleanup against the concatenated
-   master and the offset-shifted `voice_segments`, producing the two balanced
-   WAVs exactly as today.
-4. Write `timing.lineStarts` / `lineEnds` / `durationSeconds` back into the
-   record, and resolve each cue's absolute time from its line and offset.
-5. Print the upload worklist: two files, two names.
+```bash
+node scripts/lt-news-audio.mjs content/lt-tv/episodes/news-2026-W38.json
+```
+
+That generates each block, cross-checks the decoded length against the
+timestamps ElevenLabs returned for it (a wrong format assumption fails on
+block one rather than silently at minute four), lays the blocks end to end,
+writes `master-dialogue.wav` and the merged `voice-segments.json` under
+`content/lt-tv/audio/<episode>/`, and writes the real `lineStarts`,
+`lineEnds` and `durationSeconds` back into the production record. Finished
+blocks are cached, so a run that dies on block four resumes at block four
+rather than paying for the first three again.
+
+Then the existing cleanup splits that master into the two balanced tracks.
+**This half needs ffmpeg:**
+
+```bash
+python3 elevenlabs-dialogue-test/process_dialogue.py \
+    --master content/lt-tv/audio/news-01/master-dialogue.wav \
+    --segments content/lt-tv/audio/news-01/voice-segments.json \
+    content/lt-tv/audio/news-01
+```
+
+`--master`/`--segments` are new: the processor previously only accepted a
+response JSON it decoded itself, which a concatenated master is not. Its
+actual stem-splitting is untouched.
+
+Finally re-run `scripts/lt-news-script.mjs` so the slate record picks up the
+timing and the episode becomes playable rather than a slate entry.
 
 Hand-copying `line_starts` into a constant and re-stating the speaker mapping
 for the gazes are gone from `docs/talk-show-production.md` at this point — the
@@ -451,8 +479,9 @@ pointing the component at it is a one-line change nobody has made yet.
 - [ ] Check `rundown.stories[].gaps` — anything non-empty is unsourced
 - [ ] Spot-check every number in the script against `sources`
 - [ ] `node scripts/lt-tv-check.mjs` — the new record is on the slate and consistent
-- [ ] Build the audio, listen to the master end to end
-- [ ] Check each block join for a seam
+- [ ] `node scripts/lt-news-audio.mjs <record>` — then listen to the master end to end
+- [ ] Check each block join for a seam, and the last block for drift against the picture
+- [ ] `process_dialogue.py --master ... --segments ...` for the two balanced tracks
 - [ ] Upload two WAVs under the names the record prescribes
 - [ ] `node scripts/lt-tv-check.mjs` again — it should now report a runtime, not "not recorded yet"
 - [ ] Tune `leadIn` by ear — 2.5 is a placeholder, and it is a property of the
@@ -469,9 +498,14 @@ pointing the component at it is a one-line change nobody has made yet.
   blocks and sources. Making `assemble()` also emit the slate's shape is the
   single change that lets a generated news episode appear on the site. Until
   then `content/lt-tv/episodes/` at the repo root is a staging area.
-- **Step 3 is not built.** The design above is sound but unproven — the sandbox
-  this was written in had no `ffmpeg` and no ElevenLabs key, so the
-  concatenation and the offset arithmetic have not been run against real audio.
+- **Step 3 has never met real audio.** It was written without an ElevenLabs key
+  and without ffmpeg. The offset arithmetic, the PCM handling and the WAV
+  header are covered by `scripts/lt-news-audio.test.mjs` against synthetic
+  buffers of known length, and the processor's new `--master` path was
+  exercised to the point where it calls `ffprobe`. What is unverified is
+  everything past that line: that `pcm_44100` really is 44.1kHz mono 16-bit
+  (the run cross-checks this and fails loudly if not), and that the stems come
+  out clean from a concatenated master. The first real render is the test.
 - **The replacement upstreams have not been run against the real internet.**
   FRED, the four crypto RSS desks, the Google News queries and Reddit's OAuth
   handshake were all written in a sandbox with no outbound network, and

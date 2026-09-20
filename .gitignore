@@ -65,3 +65,4 @@ contracts/lib/
 
 # Raw screen-recording masters — ship the compressed .mp4 instead
 public/videos/*.mov
+content/lt-tv/audio/
