@@ -9,9 +9,10 @@ cleanup, SitePal uploads); this one is the layer above it — what the show is,
 where its topics come from, and what file holds an episode.
 
 > **Status.** Steps 1 and 2 are built and runnable. Step 3 is designed here but
-> not yet written. Step 4 changes files on the site and has not been done — it
-> needs a decision first. Nothing in this workflow has modified an existing
-> route or component.
+> not yet written. Step 4 is half done and not by this pipeline: the slate under
+> `src/content/lt-tv/` already reads one JSON record per episode, but this
+> pipeline's record is a different shape and has not been converged onto it.
+> Nothing in this workflow has modified an existing route or component.
 
 ---
 
@@ -20,12 +21,13 @@ where its topics come from, and what file holds an episode.
 An episode is **one JSON file**. Everything about it — its title, its chiron
 copy, every spoken line with its voice, its recording blocks, its animation
 cues, the SitePal clip names, the sources it is built on — lives in that one
-record. Today those things live in four hand-maintained arrays across two
-components, joined by nothing, and producing an episode overwrites the previous
-one. The record is what makes a *second* episode possible.
+record. The site now agrees: `src/content/lt-tv/episodes/` holds one record per
+episode, and the guide, the mobile screen and the set all read it. What this
+pipeline adds is the front half — turning a week of market signal into that
+record's contents rather than typing them.
 
 ```
-  a week of crypto signal
+  a week of market signal
            │
            │  scripts/lt-news-brief.mjs          ← step 1, runs anywhere
            ▼
@@ -33,7 +35,7 @@ one. The record is what makes a *second* episode possible.
            │                       ↖ content/lt-tv/rl80-spots.md (you edit this)
            │  scripts/lt-news-script.mjs         ← step 2, two Claude calls
            ▼
-  content/lt-tv/episodes/news-2026-W38.json     ← THE EPISODE RECORD
+  content/lt-tv/episodes/news-2026-W38.json     ← THE EPISODE RECORD (staging)
   content/lt-tv/episodes/news-2026-W38.txt      ← the read-through, for review
            │
            │  audio build (step 3 — not built yet)
@@ -107,19 +109,20 @@ The set has **exactly two seats**. `CHARACTER_CLIPS` in `TalkShowScene.jsx`
 registers `Demon_Empty` and `Monk_Empty` and nothing else, so a third host is
 not producible on this set without new rig work.
 
-One character has five names depending on which file you are in:
+One character answers to a different string in almost every file:
 
-| `actor` | Display | ElevenLabs voice | Python key | GLB node | Also called |
+| `actor` | Display | ElevenLabs voice | Python key | GLB node | Animation clips |
 |---|---|---|---|---|---|
-| `Connor` | Connor | `IcFWazAaBzXNwLWpySgF` | `john` | `Demon_Empty` | Connor, H80Z, JB |
-| `Monk` | Saint GR80 | `fATgBRI8wg5KkDFg8vBd` | `gr80` | `Monk_Empty` | GR |
+| `Connor` | Connor | `IcFWazAaBzXNwLWpySgF` | `john` | `Demon_Empty` | `barron_*` |
+| `Monk` | Saint GR80 | `fATgBRI8wg5KkDFg8vBd` | `gr80` | `Monk_Empty` | `monk_*` |
 
-**The character is Connor.** The pipeline uses that name throughout. Two shared
-files have not caught up: `TalkShowScene.jsx`'s `CHARACTER_CLIPS` still maps
-`Demon_Empty` to the actor string `"Connor"`, and `process_dialogue.py`'s
-`ACTOR_NAMES` still maps `john` to `"Connor"`. `CAST.Connor.sceneActorKey`
-records what the scene currently expects, so whatever joins this pipeline to the
-runtime can bridge the two spellings until the repo-wide rename lands.
+**The character is Connor**, and the runtime says so too: `CHARACTER_CLIPS` in
+`TalkShowScene.jsx` and `ACTOR_NAMES` in `process_dialogue.py` both resolve him
+to `"Connor"`. The other strings in that row are not old names — they are
+plumbing. `Demon_Empty` and the `barron_*` clips are baked into
+`talk_show3-textures.glb` and only change when the model is re-exported;
+`john` is the processor's speaker key, which names the WAV it writes
+(`john-sitepal-balanced.wav`). Leave all three alone.
 
 `scripts/lt-tv-format.mjs` is the one place this mapping is written down, and
 the pipeline uses `actor` and nothing else.
@@ -318,12 +321,11 @@ was already there.
    record, and resolve each cue's absolute time from its line and offset.
 5. Print the upload worklist: two files, two names.
 
-Steps 3 and 4 of `docs/talk-show-production.md` — copying `line_starts` into
-`TEST_LINE_STARTS` by hand, and re-stating the speaker mapping in
-`DIRECT_ADDRESS_GAZES` — disappear at this point. The record already knows who
-speaks each line, so gaze and camera derive from it instead of being
-transcribed. (`TalkShowScene.jsx:123` anticipates exactly this: *"Cues stay
-attached to line numbers so a future script generator can replace this array."*)
+Hand-copying `line_starts` into a constant and re-stating the speaker mapping
+for the gazes are gone from `docs/talk-show-production.md` at this point — the
+episode-records change removed those constants from `TalkShowScene.jsx`
+outright. The record already knows who speaks each line, so gaze and camera
+derive from it rather than being transcribed.
 
 **Uploading stays manual.** Two files per episode into SitePal's Audio Manager.
 That is the one step the spike proved cannot be automated from the site.
@@ -351,24 +353,32 @@ the number passed explicitly.
 
 ---
 
-## Step 4 — Put it on the site *(not done — needs a decision)*
+## Step 4 — Put it on the site *(the slate is wired; this pipeline is not)*
 
-Nothing in this workflow has touched a route or a component yet. Wiring the
-record into LT TV means these changes, and they should be made deliberately:
+The component half of this is **done**, by the episode-records change rather
+than by this pipeline. `src/content/lt-tv/` is now the slate: one JSON record
+per episode under `episodes/`, decorated by `index.js`, read by
+`LTTvBroadcastPanel`, the mobile screen and `TalkShowScene`. Adding an episode
+is adding a file and one import line. A record with no `audio` is listed as
+"Not recorded yet" instead of silently replaying another episode.
 
-- `LTTvBroadcastPanel.jsx` — `EPISODES` and `SHOWS` become a read of the episode
-  records instead of hardcoded arrays, so the news show stops being "Coming
-  soon" and the slate stops advertising six episodes that are one recording.
-  The hardcoded air date at `:196` comes from the record.
-- `TalkShowScene.jsx` — `TALK_SHOW_AUDIO`, `TEST_LINE_STARTS`,
-  `TALK_SHOW_CUE_DEFS` and `DIRECT_ADDRESS_GAZES` stop being module constants
-  and become props derived from the selected episode. This is what lets two
-  episodes both be playable.
-- `LTTvChiron.jsx` — `TICKER_COPY` is still lorem ipsum with a comment saying
-  the content is undecided. It becomes `graphics.ticker` from the record.
+What is left is joining the two halves, and it is one real task:
 
-The honest note: until step 4 happens, picking any episode in the guide still
-plays the same 58-second test recording, exactly as it does today.
+- **The two record schemas have not been converged.** The slate's shape is
+  flat — `showId`, `audio: { Connor, Monk }`, `lineStarts`, `speakers`,
+  `audienceLines`, `cues`, `dialogueEnd`. This pipeline's is nested —
+  `show`, `segments[].lines[]`, `cast[].sitepalAudio`, `timing.lineStarts`,
+  `blocks`. Both describe the same episode; neither reads the other. Until
+  `assemble()` emits the slate's shape (or writes it alongside), a generated
+  news record cannot be dropped into `src/content/lt-tv/episodes/`, which is
+  why this pipeline still writes to `content/lt-tv/episodes/` at the repo
+  root. That directory is a staging area, not the slate.
+- **`LTTvChiron.jsx`'s `TICKER_COPY` is still lorem ipsum**, with a comment
+  saying the content is undecided. It becomes `graphics.ticker` from the
+  record — the news record already carries the copy.
+
+The honest note: the guide can now list and play more than one episode, but no
+news episode exists to list until step 3 runs and the schemas meet.
 
 ---
 
@@ -389,6 +399,12 @@ plays the same 58-second test recording, exactly as it does today.
 
 ## Still open
 
+- **The two episode-record schemas have not been converged.** The slate under
+  `src/content/lt-tv/episodes/` is flat (`showId`, `audio`, `lineStarts`,
+  `speakers`, `cues`); this pipeline emits a nested record with segments,
+  blocks and sources. Making `assemble()` also emit the slate's shape is the
+  single change that lets a generated news episode appear on the site. Until
+  then `content/lt-tv/episodes/` at the repo root is a staging area.
 - **Step 3 is not built.** The design above is sound but unproven — the sandbox
   this was written in had no `ffmpeg` and no ElevenLabs key, so the
   concatenation and the offset arithmetic have not been run against real audio.
