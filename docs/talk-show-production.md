@@ -140,6 +140,12 @@ cd elevenlabs-dialogue-test
 The script asks for the API key without displaying or saving it. Outputs are
 written to `elevenlabs-dialogue-test/output/`.
 
+That is one ElevenLabs call per episode, no matter how many people watch it.
+Recording once and uploading is what keeps the cost flat; having SitePal speak
+the lines live through `sayText` would spend a call on every playback. It is the
+reason this pipeline exists in the shape it does, and a reason not to replace it
+with live speech later.
+
 ### Why the balanced WAV files stay clean
 
 Do not split the conversation into separately generated lines. Text to Dialogue
@@ -181,8 +187,41 @@ Upload:
 - `john-sitepal-balanced.wav` to Connor's SitePal Audio Manager.
 - `gr80-sitepal-balanced.wav` to GR80's SitePal Audio Manager.
 
-Give each upload a short, unique episode name. After SitePal finishes
-processing, copy the names exactly into the record's `audio` block (step 4).
+Give each upload a name that follows the convention below. After SitePal
+finishes processing, copy the names exactly into the record's `audio` block
+(step 4).
+
+### Naming clips
+
+The Audio Manager is the SitePal account's shared clip library: the list of
+uploaded audio files `sayAudio` looks names up in. There is one for account
+`9308752`, not one per character, so every clip for every character and every
+show sits in the same list. It has nothing to do with the ElevenLabs voice each
+SitePal character is configured with — the talk show never uses SitePal's own
+text-to-speech, only these pre-rendered uploads.
+
+One shared list means the name has to carry its own namespace. The Terminal
+Traders clips already in there look like `case001_monk_q5`, so LT TV follows the
+same shape:
+
+```
+lttv_<show>_ep<NN>_<character>
+```
+
+- `<show>` is `rt` (The Liminal Terminal), `news` (LT Weekly News Recap) or `mm`
+  (Markets & Morality)
+- `<NN>` is the episode number, zero-padded: `02`, never `2`
+- `<character>` is `connor` or `gr80`
+
+Episode 02 of the roundtable uploads as `lttv_rt_ep02_connor` and
+`lttv_rt_ep02_gr80`. An episode split into sections because it ran past the
+2,000-character limit appends the section number: `lttv_rt_ep07_connor_s2`.
+
+Lowercase and underscores throughout. SitePal accepts spaces — the clips on air
+are `talk show test for jb` and `talk show test GR80` — but these names get
+retyped by hand into a JSON record, and a space is a typo waiting to happen.
+Renaming a clip later means going back into the Audio Manager by hand, so it is
+worth getting right the first time.
 
 Do not remove the leading silence or independently shift either file. The live
 show starts both full-length tracks together; their shared timeline is what
@@ -286,7 +325,7 @@ how to announce next week's show before it exists.
 
 1. Open `/trade` and enter **LT TV**.
 2. Pick the episode in the program guide.
-3. Wait for **Play replay** rather than **Preparing studio…**.
+3. Wait for **Play episode** rather than **Preparing studio…**.
 4. Play the entire episode once without stopping.
 5. Check voice handoffs, final syllables, face sync, reaction timing, gaze,
    crossfades, and the final return to idle.
@@ -304,6 +343,7 @@ the browser does not retain the previous animation library.
 - [ ] Master performance is approved.
 - [ ] No blips or clipped syllables in either balanced WAV.
 - [ ] Both balanced WAV files have equal duration.
+- [ ] Clips named to the convention: `lttv_<show>_ep<NN>_<character>`.
 - [ ] SitePal upload names exactly match the record's `audio`.
 - [ ] `summary` reads well in the guide.
 - [ ] `audienceLines` covers every line played to the room.

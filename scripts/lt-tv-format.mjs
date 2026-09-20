@@ -45,7 +45,7 @@ export const CAST = {
 // might also reach for.
 //
 // The convention is the one agreed for LT TV as a whole (see
-// docs/lt-tv-episode-runbook.md): lttv_<show>_ep<NN>_<character>, following the
+// docs/talk-show-production.md): lttv_<show>_ep<NN>_<character>, following the
 // shape of the existing Terminal Traders clips (case001_monk_q5). A split
 // episode's later sections append _s2, _s3.
 export const SHOW_CLIP_SLUGS = {

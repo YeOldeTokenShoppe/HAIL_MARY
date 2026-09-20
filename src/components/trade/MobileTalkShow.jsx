@@ -334,7 +334,7 @@ export default function MobileTalkShow({ onExit }) {
           <button type="button" className="mts-play" onClick={voiceStatus === "failed" ? retry : playing ? stop : play}
             disabled={!canPlay || (!audioReady && voiceStatus !== "failed")}>
             <span aria-hidden="true">{playing ? "■" : voiceStatus === "failed" ? "↻" : "▶"}</span>
-            {!hasEpisode ? "Episodes coming soon" : !canPlay ? "Not recorded yet" : voiceStatus === "failed" ? "Retry audio" : !audioReady ? "Preparing studio…" : playing ? "Stop replay" : "Play replay"}
+            {!hasEpisode ? "Episodes coming soon" : !canPlay ? "Not recorded yet" : voiceStatus === "failed" ? "Retry audio" : !audioReady ? "Preparing studio…" : playing ? "Stop episode" : "Play episode"}
           </button>
           <div className="mts-rotate-hint">Rotate your phone for full-screen viewing</div>
         </div>
