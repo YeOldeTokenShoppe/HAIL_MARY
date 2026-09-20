@@ -455,6 +455,8 @@ pointing the component at it is a one-line change nobody has made yet.
 - [ ] Check each block join for a seam
 - [ ] Upload two WAVs under the names the record prescribes
 - [ ] `node scripts/lt-tv-check.mjs` again — it should now report a runtime, not "not recorded yet"
+- [ ] Tune `leadIn` by ear — 2.5 is a placeholder, and it is a property of the
+      upload, not the script (`docs/talk-show-production.md`)
 - [ ] Play it once through on `/trade`, then a second time for stale state
 
 ---
