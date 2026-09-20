@@ -555,7 +555,7 @@ export const PITCH_BOT_VARIANTS = {
      *
      * A VOICE IS A THREE-FILE CHANGE, and this rig is the one that proves why:
      *   api/counsel-voice VOICES     — or there is no id to synthesise with
-     *   api/counsel-voice allow-list — or the speaker silently becomes Barron
+     *   api/counsel-voice allow-list — or the speaker silently becomes Connor
      *   lib/adviserMouth             — or setAdviserMouth drops every write and
      *                                  the viseme mouth never opens
      * Two of those three fail SILENTLY, with the bot cheerfully talking.

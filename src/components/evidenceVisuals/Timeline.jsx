@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 // Timeline — time axis with event markers. Drives multiple case-001
 // evidence types: GR80/DEPLOYER WALLET AGE (wallet activity over time),
-// Barron/FUD SUPPRESSION (comment-deleted intervals), Eugene/ROADMAP
+// Connor/FUD SUPPRESSION (comment-deleted intervals), Eugene/ROADMAP
 // REALISM (milestone feasibility).
 //
 //   events: [{ position: 0-1, label, sublabel?, tone? ('red'|'amber'|'green'), highlight? }]

@@ -58,7 +58,7 @@ export const AGENT_CAMERA_SETTINGS = {
     // and sitting at the desk with him. lookAtPos unchanged.
     //
     // BACKED OFF 0.35 ON 2026-08-05 (author: "move the camera back a little bit
-    // for Barron/Connor - it's a little too close"), giving back about a third
+    // for Connor - it's a little too close"), giving back about a third
     // of that move: 2.80 units from the lookAt to 3.15, +12%.
     //
     // MOVED ALONG THE VIEW AXIS, not by editing one component. Backing off in z
@@ -365,13 +365,13 @@ export const DEMON_SITEPAL_CONTAINER_ID = "sitepal-container-host";
 //
 // PLACEHOLDERS — record these in the SitePal account on scene 2774900, save
 // each under the name shown, then uncomment. Names must match EXACTLY.
-// Voice: John Barron (old logs call him H80Z) — smug, market-brained, hostile
+// Voice: John Connor (old logs call him H80Z) — smug, market-brained, hostile
 // to new wallets as a bit. Short sentences, one clipped cut per line.
 export const DEMON_SITEPAL_AUDIO_NAMES = [
   '11devil1',
-  // 'barron greeting 2',  → "New wallet. No history. Of course you found me first."
-  // 'barron greeting 3',  → "Let me guess. You want a number. Everybody wants a number."
-  // 'barron greeting 4',  → "Burner. ...Fine. Sit down. I've been wrong once."
+  // 'connor greeting 2',  → "New wallet. No history. Of course you found me first."
+  // 'connor greeting 3',  → "Let me guess. You want a number. Everybody wants a number."
+  // 'connor greeting 4',  → "Burner. ...Fine. Sit down. I've been wrong once."
 ];
 
 // ── Detective SitePal config (parallel to Demon) ────────────────
@@ -2494,7 +2494,7 @@ const CyborgTempleScene = ({
       // bound greeting when projected — page.js has had stray-auto-greeting
       // suppression for exactly that. During a pitch the press floor is already
       // speaking them through ElevenLabs, so projecting SitePal put TWO streams of
-      // the same character on top of each other: Barron's lobby "Welcome to the
+      // the same character on top of each other: Connor's lobby "Welcome to the
       // Liminal Terminal…" over his in-game answer (author, 2026-07-29).
       //
       // gameStartedRef CANNOT carry this. It is held until START in GameOverlay,
@@ -3175,7 +3175,7 @@ const CyborgTempleScene = ({
      * !gameStartedRef && !pitchStartedRef). This effect is the opposite — it
      * early-returns unless pitchStarted. So the two never overlapped, the ref was
      * permanently false whenever this ran, and the exclusion below silently
-     * excluded nobody. Barron was the one seat the room kept posing WHILE HE WAS
+     * excluded nobody. Connor was the one seat the room kept posing WHILE HE WAS
      * ANSWERING: his own focus pose pinned him, this un-pinned him a beat later
      * (the 'typing' branch passes releaseAfter), and his ungated alternation and
      * the H80Z price poll were then free to cross-fade him mid-sentence. Two

@@ -152,7 +152,7 @@ function makeScreen({ header: header0, fps, getCanvas, getTexture, claim, releas
   // An ACTIVE negative: somebody was sent, searched, and came back with an
   // absence. Deliberately not the same state as `receipt === null`, which is
   // just a board nobody has put anything on. Proving a negative is the only
-  // thing an adviser can do that Barron structurally cannot, so it needs its
+  // thing an adviser can do that Connor structurally cannot, so it needs its
   // own picture.
   let empty = null;   // { title, query }
   let tick = 0;

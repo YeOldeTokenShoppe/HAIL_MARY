@@ -65,7 +65,7 @@ export const SHAPE_LIST = Object.values(SHAPES);
  * legal here" (which the UI could answer for you) and becomes "is this claim
  * worth my one specialist, or will a shallow look do" — which it can't.
  *
- * Four lanes, four seats, one each. Barron pitches and is unlimited within the
+ * Four lanes, four seats, one each. Connor pitches and is unlimited within the
  * budget; the other three answer ONE claim per session each, so three
  * interruptions and three specialists is a genuinely tight allocation.
  * ------------------------------------------------------------------------ */
@@ -73,7 +73,7 @@ export const SHAPE_LIST = Object.values(SHAPES);
 export const LANES = {
   CHAIN: "CHAIN",   // money movement, wallet ages, unlocks — Marisol
   RECORD: "RECORD", // documents: audit scope, references, post-mortems — GR80
-  CHART: "CHART",   // price, windows, the tape — Barron, who sells on it
+  CHART: "CHART",   // price, windows, the tape — Connor, who sells on it
   SOCIAL: "SOCIAL", // narrative, reputation, who vouches for whom — Eugene
   // Retained for archetypes that want a claim nobody specialises in. No slot
   // uses it today: with four lanes the surface is covered, and "nobody can
@@ -84,7 +84,7 @@ export const LANES = {
 };
 
 export const SEATS = {
-  BARRON: "barron",
+  CONNOR: "connor",
   MARISOL: "marisol",
   GR80: "gr80",
   EUGENE: "eugene",
@@ -107,16 +107,16 @@ export const SEATS = {
  * WHY IT IS NOT A SEAT. Connor used to be both pitcher and CHART seat, which
  * is why he needed a special case everywhere — and it quietly made his own lane
  * the only one that was deeply answerable for free. An outside agent pitches now,
- * so the desk is four symmetric seats and Barron is a plain specialist.
+ * so the desk is four symmetric seats and Connor is a plain specialist.
  * See VC_GAME.md §1.
  */
 export const PITCHER = "pitchbot";
 
-/** Everyone owns exactly one lane now, Barron included. His is CHART: he's a
+/** Everyone owns exactly one lane now, Connor included. His is CHART: he's a
  *  tape reader who sells on the tape, so his own specialism is the one subject
  *  he'll happily go deep on — which is a very salesman thing to be. */
 export const SEAT_LANE = {
-  [SEATS.BARRON]: LANES.CHART,
+  [SEATS.CONNOR]: LANES.CHART,
   [SEATS.MARISOL]: LANES.CHAIN,
   [SEATS.GR80]: LANES.RECORD,
   [SEATS.EUGENE]: LANES.SOCIAL,
@@ -124,15 +124,15 @@ export const SEAT_LANE = {
 
 /**
  * One use each, all session — and since 2026-07-29 that is ALL FOUR, in
- * DESK_ORDER. Barron used to be excluded because he was the one pitching; the
+ * DESK_ORDER. Connor used to be excluded because he was the one pitching; the
  * pitch bot took that job (see PITCHER above), so his CHART expertise is now
  * scarce like everyone else's and the desk has no exceptions left.
  *
- * What keeps every verdict reachable for free is no longer "Barron is unlimited"
+ * What keeps every verdict reachable for free is no longer "Connor is unlimited"
  * — it is that pressing the PITCHER costs no seat, and the loadBearing claim
  * discriminates on the `generic` block the pitcher hands you.
  */
-export const SPENDABLE_SEATS = [SEATS.BARRON, SEATS.MARISOL, SEATS.GR80, SEATS.EUGENE];
+export const SPENDABLE_SEATS = [SEATS.CONNOR, SEATS.MARISOL, SEATS.GR80, SEATS.EUGENE];
 
 /** Is this seat the specialist for this claim? Decides DEPTH, never legality. */
 export function inLane(seat, claim) {

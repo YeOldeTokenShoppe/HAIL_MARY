@@ -54,7 +54,7 @@ export default function Lobby({ docketLength, onStart, onExit, exitLabel = "◀ 
           <div className="ct-step"><span className="ct-step-n">02</span>
             <div><b>READ THE ROOM</b> — the partners call vague leans before you commit. Their exact numbers stay sealed until the Ledger.</div></div>
           <div className="ct-step"><span className="ct-step-n">03</span>
-            <div><b>LOCK THE TICKET</b> — three dials: your read, your stake (up to {MAX_STAKE}; the council benchmarks a flat {STAKE}), your timing. A max-conviction miss at full stake costs {MAX_STAKE * 3}. That's more than your book. Barron would do it anyway.</div></div>
+            <div><b>LOCK THE TICKET</b> — three dials: your read, your stake (up to {MAX_STAKE}; the council benchmarks a flat {STAKE}), your timing. A max-conviction miss at full stake costs {MAX_STAKE * 3}. That's more than your book. Connor would do it anyway.</div></div>
         </div>
         <div className="ct-eyebrow" style={{ marginTop: 6 }}>▸ CHOOSE YOUR BACKER — one partner stakes your book; their edge rides the whole deal flow</div>
         <div className="ct-cardpicks">

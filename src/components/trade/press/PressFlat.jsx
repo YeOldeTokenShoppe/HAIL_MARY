@@ -48,7 +48,7 @@ import TerminalModuleHeader from "../TerminalModuleHeader";
 // here the panel IS a terminal, and the strip under it puts all four boards a
 // tap apart.
 //
-// THE VOICE IS NO LONGER THIS SURFACE'S EXCLUSIVE. It used to be — "Barron
+// THE VOICE IS NO LONGER THIS SURFACE'S EXCLUSIVE. It used to be — "Connor
 // SPEAKS, desktop is stuck with banked SitePal clips" stood here — and it
 // stopped being true on 2026-07-29, when PressSession took the same
 // /api/counsel-voice path this surface proved (see its own note: the pitcher is
@@ -355,7 +355,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // One board per seat that can be sent. Only one is on screen at a time; the
   // strip below is how you move between them.
   //
-  // PITCHER, not Barron, holds the first tab. Barron ALIASES onto it (see the
+  // PITCHER, not Connor, holds the first tab. Connor ALIASES onto it (see the
   // same note in PressSession): the agent is an outsider whose receipt belongs
   // on the easel page once that is wired.
   //
@@ -383,8 +383,8 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       // something should not look like the three that are checking it. That is
       // a real argument and it is why pitchDeck.js existed, but it was true on
       // ONE of the two surfaces: desktop has no deck at all, and its pitcher
-      // aliases Barron's cyan evidence terminal (PressSession's board effect,
-      // "PITCHER and Barron ALIAS one screen"). Two presentations of one beat is
+      // aliases Connor's cyan evidence terminal (PressSession's board effect,
+      // "PITCHER and Connor ALIAS one screen"). Two presentations of one beat is
       // the drift both files keep logging, so the deck went rather than being
       // built a second time in 3D.
       // header comes from seatMeta for every seat now, PITCHER included — it
@@ -393,7 +393,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       made[seat] = createFlatEvidenceScreen(el, { header: seatMeta(seat).name.toUpperCase() });
     }
     screensRef.current = made;
-    made[SEATS.BARRON] = made[PITCHER];   // alias — see BOARDS note
+    made[SEATS.CONNOR] = made[PITCHER];   // alias — see BOARDS note
     screenRef.current = made[PITCHER] || null;
     return () => {
       Object.values(made).forEach((x) => x.dispose());
@@ -407,7 +407,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
      no slides and no setClaim — evidenceScreen.js's contract is
      stamp/stampNothing/stayBlack/dispose — so the board is blank until something
      is stamped onto it, exactly as the analysts' are and exactly as desktop's
-     shared pitcher/Barron screen is. Nothing else read setClaim. */
+     shared pitcher/Connor screen is. Nothing else read setClaim. */
 
   /* ---- he says it out loud ----
      Token-guarded. A press interrupts the claim he's mid-way through, so two
@@ -784,7 +784,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       seat: outcome.seat, board: outcome.board,
       nothingOnFile: outcome.nothingOnFile,
       adviserSays: outcome.adviserSays,
-      line: outcome.barronSays,
+      line: outcome.connorSays,
       stage: "reporting",
       heard: solo,
       looked: false,
@@ -827,7 +827,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
          a substitute for mounting it a claim early; see portalSeat. */
       (solo ? Promise.resolve() : warmSeatPortal(outcome.seat))
         .then(() => sayTurn([solo
-          ? { voice: VOICE, text: outcome.barronSays, seat: PITCHER }
+          ? { voice: VOICE, text: outcome.connorSays, seat: PITCHER }
           : { voice: seatMeta(outcome.seat)?.voice, text: outcome.adviserSays,
               seat: outcome.seat }])),
       new Promise((r) => setTimeout(r, MIN_BEAT)),
@@ -837,7 +837,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
         revealFor.current = null;
         // The answer lands on whoever went and got it. An adviser who found
         // nothing stamps NOTHING ON FILE — an absence somebody independently
-        // looked for, which is a different and stronger thing than Barron's
+        // looked for, which is a different and stronger thing than Connor's
         // board simply staying dark.
         const board = screensRef.current[outcome.board];
         if (outcome.receipt) board?.stamp(outcome.receipt);
@@ -1241,7 +1241,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
         <div className={`pf-floor${floorLive ? "" : " opening"}${pane !== "feed" ? " on-screen" : ""}`}>
           <div className="pf-tabs">
             {/* NAMED FROM THE DESK, not typed in — and now named after WHOEVER
-                THE FEED IS ON, which is the same fix twice over. It said BARRON,
+                THE FEED IS ON, which is the same fix twice over. It said CONNOR,
                 left over from when he did the selling, so the tab back to the
                 PITCHER carried an ANALYST's name two rows above a seat row where
                 that analyst is one of the four you can send. Hard-coding the

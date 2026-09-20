@@ -50,17 +50,17 @@ console.log("\n-- the desk ------------------------------------------------");
       const lanes = Object.values(DESK).map((d) => d.lane);
       return lanes.every(Boolean) && new Set(lanes).size === lanes.length;
     })());
-  // THE DESK HAS NO EXCEPTIONS LEFT (2026-07-29). Barron was excluded here for as
+  // THE DESK HAS NO EXCEPTIONS LEFT (2026-07-29). Connor was excluded here for as
   // long as he was the pitcher; the bot took that job, so all four seats are
   // scarce and the special case is gone. The pitcher is not a seat at all.
   ok("all four seats are spendable — the desk is symmetric",
     SPENDABLE_SEATS.length === 4
-    && [SEATS.BARRON, SEATS.MARISOL, SEATS.GR80, SEATS.EUGENE].every((s) => SPENDABLE_SEATS.includes(s)));
+    && [SEATS.CONNOR, SEATS.MARISOL, SEATS.GR80, SEATS.EUGENE].every((s) => SPENDABLE_SEATS.includes(s)));
   ok("the pitcher is not a seat and owns no lane",
     !Object.values(SEATS).includes(PITCHER) && !SEAT_LANE[PITCHER]
     && !SPENDABLE_SEATS.includes(PITCHER));
-  ok("Barron owns the chart and can still be asked off-lane",
-    SEAT_LANE[SEATS.BARRON] === LANES.CHART && canSend(SEATS.BARRON, { lane: LANES.CHAIN }));
+  ok("Connor owns the chart and can still be asked off-lane",
+    SEAT_LANE[SEATS.CONNOR] === LANES.CHART && canSend(SEATS.CONNOR, { lane: LANES.CHAIN }));
   ok("Marisol CHAIN, GR80 RECORD, Eugene SOCIAL",
     SEAT_LANE[SEATS.MARISOL] === LANES.CHAIN && SEAT_LANE[SEATS.GR80] === LANES.RECORD
     && SEAT_LANE[SEATS.EUGENE] === LANES.SOCIAL);
@@ -247,7 +247,7 @@ console.log("\n-- the desk ------------------------------------------------");
   ok("no lane produces a mangled noun phrase at any count",
     Object.values(LANES).filter((l) => l !== LANES.SHAPE).every((lane) =>
       [0, 1, 2, 3].every((remaining) =>
-        [[], [SEATS.MARISOL], [SEATS.GR80], [SEATS.EUGENE], [SEATS.BARRON]].every((spent) => {
+        [[], [SEATS.MARISOL], [SEATS.GR80], [SEATS.EUGENE], [SEATS.CONNOR]].every((spent) => {
           const line = virgilAgenda({ id: "x", lane }, { owner: laneOwner({ lane }),  spent, remaining });
           return line
             && !/storys|charts\b|questions question|more question after/.test(line)
@@ -464,7 +464,7 @@ console.log("\n-- THE ACCEPTANCE INVARIANT: the desk must beat the seller ---");
   //
   // The seller was Connor then and is the pitch bot now (2026-07-29). The
   // asymmetry this section guards against is UNCHANGED by that swap — if
-  // anything it matters more, because Barron joining the desk means all four
+  // anything it matters more, because Connor joining the desk means all four
   // specialists are costed and the free press is the only uncosted move left.
   //
   // The cause was `backing` being authored per branch. resolvePress zeroes the
@@ -539,13 +539,13 @@ console.log("\n-- lanes decide DEPTH, not legality -------------------------");
       const deep = resolvePress(record, SEATS.GR80);
       const shallow = resolvePress(record, SEATS.MARISOL);
       return deep.deep && !shallow.deep
-        && deep.barronSays === record.press.sharp.line
-        && shallow.barronSays === record.press.generic.line;
+        && deep.connorSays === record.press.sharp.line
+        && shallow.connorSays === record.press.generic.line;
     })());
   ok("an off-lane resolve returns a real answer, never null",
     [PITCHER, ...SPENDABLE_SEATS].every((seat) => {
       const o = resolvePress(record, seat);
-      return o && typeof o.barronSays === "string";
+      return o && typeof o.connorSays === "string";
     }));
 
   let run = walkTo(d, record.id);
@@ -591,7 +591,7 @@ console.log("\n-- lanes decide DEPTH, not legality -------------------------");
         return !o.nothingOnFile || (o.deep && seat !== PITCHER);
       })));
   // The pitcher owns no lane, so it is never `deep` and can never prove an
-  // absence. Barron CAN now — that is the point of him becoming a specialist.
+  // absence. Connor CAN now — that is the point of him becoming a specialist.
   ok("the pitcher never returns NOTHING ON FILE on any claim",
     d.claims.every((c) => !resolvePress(c, PITCHER).nothingOnFile));
   ok("the pitcher is never deep, on any claim, in any archetype",
@@ -629,21 +629,21 @@ console.log("\n-- what an interruption returns ----------------------------");
 
   const b = resolvePress(audit, PITCHER);
   ok("the pitcher's press lands on the pitcher's board", b.board === PITCHER);
-  ok("the pitcher speaks the authored generic line", b.barronSays === audit.press.generic.line);
+  ok("the pitcher speaks the authored generic line", b.connorSays === audit.press.generic.line);
   ok("no adviser speaks on a pitcher press", b.adviserSays === null);
 
-  // BARRON IS A SEAT NOW, so he behaves like one: his own board, his own
+  // CONNOR IS A SEAT NOW, so he behaves like one: his own board, his own
   // retrieval line, and the pitcher reacting after him.
-  const bar = resolvePress(audit, SEATS.BARRON);
-  ok("Barron lands on Barron's board and speaks a retrieval line",
-    bar.board === SEATS.BARRON && !!bar.adviserSays);
-  ok("Barron off-lane gets the shallow line, not silence",
-    bar.adviserSays === adviserLine(SEATS.BARRON, "found", false));
+  const bar = resolvePress(audit, SEATS.CONNOR);
+  ok("Connor lands on Connor's board and speaks a retrieval line",
+    bar.board === SEATS.CONNOR && !!bar.adviserSays);
+  ok("Connor off-lane gets the shallow line, not silence",
+    bar.adviserSays === adviserLine(SEATS.CONNOR, "found", false));
 
   const g = resolvePress(audit, SEATS.GR80);
   ok("an adviser's answer lands on the ADVISER's board", g.board === SEATS.GR80);
   ok("the adviser speaks a global line, not archetype prose", !!g.adviserSays);
-  ok("the pitcher reacts with the authored sharp line", g.barronSays === audit.press.sharp.line);
+  ok("the pitcher reacts with the authored sharp line", g.connorSays === audit.press.sharp.line);
   ok("the receipt is the claim's authored sharp receipt",
     JSON.stringify(g.receipt) === JSON.stringify(audit.press.sharp.receipt));
 
@@ -668,7 +668,7 @@ console.log("\n-- the budget is still frozen ------------------------------");
     let run = createRun(d), spent = 0;
     for (let i = 0; i < d.claims.length; i++) {
       const before = run.pressesLeft;
-      for (const seat of [SEATS.GR80, SEATS.MARISOL, SEATS.BARRON]) run = press(run, d, seat);
+      for (const seat of [SEATS.GR80, SEATS.MARISOL, SEATS.CONNOR]) run = press(run, d, seat);
       spent += before - run.pressesLeft;
       run = advance(run, d);
     }
@@ -694,7 +694,7 @@ console.log("\n-- TRUTH IS NEVER FOR SALE ---------------------------------");
       if (!d) { worst = `${arch}/${wantTruth}: no instance`; continue; }
       const decisive = d.claims.filter((c) => c.loadBearing);
       if (!decisive.length) { worst = `${arch}/${wantTruth}: no loadBearing claim played`; continue; }
-      // FREE-REACHABLE MEANS THE PITCHER, NOT BARRON (2026-07-29). Barron is a
+      // FREE-REACHABLE MEANS THE PITCHER, NOT CONNOR (2026-07-29). Connor is a
       // costed seat now, so asserting this against him would be asserting that
       // the decisive claim is reachable for the price of a specialist — which is
       // the opposite of invariant 1. The free press is the pitcher, and because
@@ -742,7 +742,7 @@ console.log("\n-- STRUCTURAL: is there always a real choice? --------------");
     // EXEMPT: a lane whose slots are ALL non-discriminating in the archetype as
     // authored. backdoor-fork and anon-but-real give CHART a single VIBES slot
     // on purpose — there is no discriminating slot in that lane to pin, and
-    // Barron's job there is to say price movement is not evidence (`[A§15]`).
+    // Connor's job there is to say price movement is not evidence (`[A§15]`).
     // That is an authoring choice; this assertion catches the cut destroying a
     // lane that HAD one.
     {
@@ -1102,7 +1102,7 @@ console.log("\n-- PURITY: a run is a function of (seed, inputs) -----------");
       body.length > 0 && !IMPURE.test(body));
   }
 
-  const script = [SEATS.GR80, null, SEATS.BARRON, null, null, SEATS.MARISOL];
+  const script = [SEATS.GR80, null, SEATS.CONNOR, null, null, SEATS.MARISOL];
   const play = () => {
     const d = instanceDeal(20250727);
     let r = createRun(d);

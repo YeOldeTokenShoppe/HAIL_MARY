@@ -9,7 +9,7 @@ anchor. Rewrite in place; the anchors map each line back to code.
 |---|---|---|---|---|
 | Pitch bot | (rolled shell: PB-100 / PB-220 / PB-340) | sells the deal | — | `pitchers.js:115` |
 | Virgil | Virgil | THE CAT · YOUR GUIDE | — (never sent) | `virgil.js:41` |
-| Barron | Connor | THE CHART | chart | `desk.js:112` |
+| Connor | Connor | THE CHART | chart | `desk.js:112` |
 | Marisol | Detective Marisol | THE MONEY | money | `desk.js:129` |
 | GR80 | Saint GR80 | REPUTATION | paperwork | `desk.js:141` |
 | Eugene | Eugene | THE STORY | story | `desk.js:153` |
@@ -105,7 +105,7 @@ by branch.
 ---
 
 ### CLAIM 2 · `apy` — THE HEADLINE
-`chart` lane (Barron) · shape SELECTIVE_WINDOW · backing SOFT
+`chart` lane (Connor) · shape SELECTIVE_WINDOW · backing SOFT
 
 | | |
 |---|---|
@@ -326,7 +326,7 @@ whenever the player asks for their view **outside their specialty**.
 - nothing: `There is no transaction or account trail supporting that claim. Absence is the finding here, not proof of the opposite.`
 - shallow: `This is outside my lane. From the money side I can only tell you who was paid and when; I can’t verify the larger claim from that alone.`
 
-### Barron / Connor — THE CHART (`apy`)
+### Connor / Connor — THE CHART (`apy`)
 *Connor retrieves the full **performance history**, never the price alone: the chart
 lane's whole lesson is that price movement is not evidence.*
 - consult *(existing `dispatch` code key)*: `Give me a moment. I’ll pull the full performance history.`

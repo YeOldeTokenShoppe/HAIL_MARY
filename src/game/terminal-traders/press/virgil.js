@@ -63,7 +63,7 @@ export const VIRGIL = {
    * ADDING A VOICE IS NEVER A ONE-FILE CHANGE, and two thirds of it fails
    * SILENTLY (the list is written out in full on pitchBotScene's v3 entry):
    *   api/counsel-voice VOICES      — or there is no id to synthesise with
-   *   api/counsel-voice allow-list  — or "VG" is quietly served as BARRON, and
+   *   api/counsel-voice allow-list  — or "VG" is quietly served as CONNOR, and
    *                                   the symptom is the wrong character
    *                                   speaking rather than any error at all
    *   lib/adviserMouth              — or setAdviserMouth drops every write and

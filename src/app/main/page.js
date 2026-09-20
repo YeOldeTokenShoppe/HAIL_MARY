@@ -207,7 +207,7 @@ const MOUTH_ART = {
 // MEASURED off the source art, not guessed:
 //   GR80  angel/body.png 600×829 — the dark slot spans x 290–337, y 265–272,
 //         so centre (313.5, 268), i.e. 47×8 px.
-//   Barron demon/body.png 600×901 — the smirk curve spans x 305–372, y 280–296,
+//   Connor demon/body.png 600×901 — the smirk curve spans x 305–372, y 280–296,
 //         so centre (338.5, 288), i.e. 67×16 px. His is a CURVE, so the box
 //         approximates a region rather than tracing the shape.
 // These same source-pixel figures are what the sprite art should be drawn
@@ -337,7 +337,7 @@ const RL80_RAYS = 100;
 // Written as the seeker, not as a menu — a question or a confession, which is
 // what the counsel prompt expects. Lowercase and unhedged, matching the voices'
 // register. Each is chosen to pull a DIFFERENT argument out of the triptych:
-// appetite, shame, and a real question about limits. Barron has something to
+// appetite, shame, and a real question about limits. Connor has something to
 // say about all three, which is the point.
 //
 // SECOND TEST, added with Our Lady's repertoire (/api/counsel's OL voice): each
@@ -400,7 +400,7 @@ const RL80_RAYS = 100;
 // three confessions and never taught that you may simply ask. Each register now
 // carries roughly half and half, so any draw teaches both.
 const STARTER_REGISTERS = [
-  // APPETITE — Barron's home ground; she has to rule on whether they may want it.
+  // APPETITE — Connor's home ground; she has to rule on whether they may want it.
   [
     // "everyone's buying. am i late?",
     // "why does everyone else look so sure?",
@@ -433,7 +433,7 @@ const STARTER_REGISTERS = [
   // by breaking the rule above it: a bare prayer names nothing, so by the
   // "must have a person in it" test it should fail. Tested against the live
   // endpoint instead of assumed, and it is the strongest chip here — the room
-  // treats the emptiness AS the content (Barron demands the confession, GR80
+  // treats the emptiness AS the content (Connor demands the confession, GR80
   // says a prayer deserves to be heard whole, she says "say the whole thing").
   // It is also the only chip that OPENS a conversation rather than closing one:
   // every other gets a complete answer and ends, this one asks for a second turn.
@@ -470,7 +470,7 @@ const STARTER_REGISTERS = [
 const COLD_OPENS = [
   [
     { s: "JB", t: "another one, my lady. they always come down here at this hour, and it is never because things are going well." },
-    { s: "GR", t: "or they came for company while they think. barron reads arriving as weakness; usually it is just honesty." },
+    { s: "GR", t: "or they came for company while they think. connor reads arriving as weakness; usually it is just honesty." },
     { s: "OL", t: "sit down. you don't have to have the question ready." },
   ],
   [
@@ -480,12 +480,12 @@ const COLD_OPENS = [
   ],
   [
     { s: "JB", t: "the room's been loud all week, my lady. they heard it from here. let them ask me first." },
-    { s: "GR", t: "they will ask whoever answers plainly. that has never been you, barron." },
+    { s: "GR", t: "they will ask whoever answers plainly. that has never been you, connor." },
     { s: "OL", t: "you're not late and you're not early. you're just here." },
   ],
   [
     { s: "JB", t: "my lady, i had the whole afternoon planned and then this one went and lit a candle." },
-    { s: "GR", t: "the candle is not for you, barron." },
+    { s: "GR", t: "the candle is not for you, connor." },
     { s: "OL", t: "ask me something. or don't, and just stay a minute." },
   ],
 ];
@@ -758,10 +758,10 @@ function ShoulderFigure({
       }}
     >
       <div className={`hm2-figure hm2-figure--${side}`}>
-        {/* Mirror (Barron whispers toward her) composed with a small lean-in
+        {/* Mirror (Connor whispers toward her) composed with a small lean-in
             while speaking. transformOrigin MUST stay centred: an edge origin
             makes scaleX(-1) mirror the figure across that edge, i.e. bodily
-            outside its own box — it threw Barron a full width leftward, on top
+            outside its own box — it threw Connor a full width leftward, on top
             of her face. Scale from the centre; the flip happens in place.
             Lives on its own layer so the hover keyframe above can't clobber it. */}
         <div
@@ -776,7 +776,7 @@ function ShoulderFigure({
               a STATIC hue filter, cross-faded by OPACITY alone.
               Do NOT collapse this back into a `lit ? glow : none` filter on an
               ancestor. That's what it was, and iOS never painted it: measured on
-              an iPhone (2026-07-15) mid-line with Barron audible — React had the
+              an iPhone (2026-07-15) mid-line with Connor audible — React had the
               speaker right and the element computed all 3 drop-shadows, yet
               nothing rendered. The hover keyframe promotes this subtree to a
               composited layer that iOS rasterises once and won't re-raster when
@@ -978,7 +978,7 @@ function PortraitPanel({
   // direct competition for one column; 250 leaves the argument legible.
   // CEILING if this is ever raised: the shoulder figures hang 28px off each side
   // of this box (see ShoulderFigure's [side]: -28), so it must stay under
-  // viewportWidth - 56 or the saint and Barron get clipped by the panel's
+  // viewportWidth - 56 or the saint and Connor get clipped by the panel's
   // overflowX — i.e. under ~319 on a 375px phone.
   const frameSize = compact ? 150 : isSolo ? soloSize : triptychSize;
   // The shoulder figures, scaled to whatever frame they're attending. The two
@@ -1187,7 +1187,7 @@ function PortraitPanel({
         <div style={{ position: "relative", width: frameSize, margin: "0 auto" }}>
         {figures && (
           <>
-            {/* St. GR80 at her right hand (screen left); Barron at her left,
+            {/* St. GR80 at her right hand (screen left); Connor at her left,
                 MIRRORED so his cupped hand whispers toward her rather than out
                 of frame. Each greys out until it's their turn to argue. */}
             <ShoulderFigure
@@ -1834,7 +1834,7 @@ export default function MainPage() {
 
   // ── The share card ── HER most recent line, plus the question that drew it.
   // Only OL is offered: the advisers argue TO HER (see /api/counsel's staging),
-  // so a Barron line on its own is half a scene and reads as the shrine
+  // so a Connor line on its own is half a scene and reads as the shrine
   // endorsing him. The question is carried along so the card CAN show it, but
   // OracleCard keeps it off by default — the confession belongs to the seeker.
   // ── The three petitions this visit gets ── Drawn AFTER mount, never during
@@ -1980,7 +1980,7 @@ export default function MainPage() {
            doesn't exist, so SitePalLivePortrait falls back to their cameo. This
            must stay pinned to the SEAT, never to "who's speaking": the single
            player holds HER scene, so pointing an adviser's frame at it would
-           put her face inside Barron's frame. */
+           put her face inside Connor's frame. */
         sourceContainerId={
           !isMobile
             ? portalContainerId(s.key)
@@ -2102,7 +2102,7 @@ export default function MainPage() {
   // measured against the STAGE instead of against the window.
   const isWideSolo = isSolo && isWide && !isMobile;
 
-  // ── The inner struggle ── The seeker asks; Barron argues for the appetite,
+  // ── The inner struggle ── The seeker asks; Connor argues for the appetite,
   // GR80 answers from duty, Our Lady weighs in last and lightest. Each line is
   // spoken by its OWN character's portal, awaited in turn, so the argument
   // plays across the triptych as a conversation instead of three portraits
@@ -2246,8 +2246,8 @@ export default function MainPage() {
         // ── She watches them argue ──
         // While an adviser speaks she TURNS toward them and reacts to what they
         // actually said (the counsel endpoint picks her expression per line —
-        // Disgust at something odious, a smile when Barron amuses her). GR80
-        // sits screen-left, Barron screen-right, on both layouts. Her gaze
+        // Disgust at something odious, a smile when Connor amuses her). GR80
+        // sits screen-left, Connor screen-right, on both layouts. Her gaze
         // recenters on its own the instant she's asked to speak, so her own
         // turn needs no cleanup — she simply faces front and delivers it.
         if (s !== "OL") {

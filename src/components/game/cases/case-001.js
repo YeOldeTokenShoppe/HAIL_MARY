@@ -195,7 +195,7 @@ rulesIntro: {
       tagline: "Sentiment is theater. Strip the script and read the cast.",
       // Per-station SitePal voice override for TTS fallback. The runtime
       // default (used for all other characters unless they specify) is voice
-      // "3". Barron needs a male voice — placeholder "2" is the typical
+      // "3". Connor needs a male voice — placeholder "2" is the typical
       // SitePal Neural2 US-English male slot; adjust to whichever voice ID
       // matches the male voice in your SitePal account 9308752. Audio
       // recordings (when present) bypass this entirely.
@@ -205,7 +205,7 @@ rulesIntro: {
         audio: "case001_demon_intro",
       },
       // Character-wide return pool — same files play across all cases on
-      // revisits to Barron. Each picked at random by pickReturnLine().
+      // revisits to Connor. Each picked at random by pickReturnLine().
       returnLines: [
         { text: "You're back. Smart. Very smart.", audio: "demon_return_1" },
         { text: "Good. You're back. I was getting bored.", audio: "demon_return_2" },

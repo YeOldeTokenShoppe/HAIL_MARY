@@ -12,14 +12,14 @@ src/app/main/page.js).
 
 Why the axis is measured: hand-entered centre/tilt got both characters wrong in
 ways that were obvious on screen. GR80's slot RISES to the right (-4.5px across
-its width) and a hand-guessed +5px fall made his mouth read as sideways; Barron's
+its width) and a hand-guessed +5px fall made his mouth read as sideways; Connor's
 smirk centres at y=297 with a +20px fall, and a guess of y=287/+6px sat visibly
 high on his face. Tracing the baked mouth's own per-column centroid makes both
 correct by construction, and re-derives itself if the art is ever redrawn.
 
 Erase method: replace ONLY the baked mouth's pixels (luminance-masked, dilated
 1px) with colour interpolated between two FIXED clean rows in the same column.
-Fixed rows matter — per-column detection left a streaky comb under Barron's lip.
+Fixed rows matter — per-column detection left a streaky comb under Connor's lip.
 
 Re-run after tweaking the tuning block at the bottom.
 """
@@ -138,11 +138,11 @@ build(
     h_mid=6, h_open=13,
 )
 
-# ── Barron ── 3/4-turned face; baked mouth is a smirk curve falling ~20px to
+# ── Connor ── 3/4-turned face; baked mouth is a smirk curve falling ~20px to
 # the right. mouth_box reaches y=308 because the smirk TAILS DOWN to y≈304;
 # stopping at 302 left that hook floating under the new opening.
 build(
-    "Barron", f"{SRC}/demon/body.png", f"{SRC}/demon",
+    "Connor", f"{SRC}/demon/body.png", f"{SRC}/demon",
     patch=(292, 264, 388, 320), mouth_box=(300, 274, 380, 308), thresh=120,
     clean_top=272, clean_bot=316,
     h_mid=7, h_open=15,
