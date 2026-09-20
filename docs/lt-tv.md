@@ -11,7 +11,62 @@ one of the two deeper docs, linked at each step.
 
 ---
 
-## Where is everything
+## The studio page
+
+The one to open if you would rather not remember any of this. **Double-click
+`LT TV Studio`** in the repo folder — no terminal, no typing. It starts the
+site and opens the studio for you, and it prints the address it actually used,
+which is not always port 3000. Close its window when you are done. From a
+terminal, `npm run lt:studio` does the same thing.
+
+`Open LT TV Studio.command` does the same job and is kept as a fallback. Prefer
+the app: Finder decides what to do with a `.command` by file association, and
+an editor that has claimed `.command` will open it for reading instead of
+running it.
+
+Every episode of both shows, what stage each one is at, and the next step as a
+button — write it, record it, split the master into the two tracks, apply your
+edits, rewrite a line you marked, check the slate. The screenplay is editable in the page, with a Save button and
+a separate Apply, so a half-finished edit is never live.
+
+It runs **on your machine only.** What this pipeline produces is source code:
+an episode reaches /trade because its record is committed under
+`src/content/lt-tv/episodes/` and imported by `index.js` at build time. A
+server that wrote that file into its own container would change nothing, since
+the container is rebuilt from git and the write goes with it — and half the
+working files under `content/lt-tv/` are gitignored, so they only ever exist
+where they were made.
+
+A hosted studio is therefore not this one behind a password. It is a different
+system, one that commits episodes back to GitHub or keeps them in Firestore
+instead of on disk. The page and its routes 404 outside `npm run dev`, which
+means the answer to "what if someone finds it" is that there is nothing there.
+
+## The lineup page — the half that is on the live site
+
+`/admin/lt-tv` on the deployed site, behind the admin password. It lists every
+episode of every show and whether it is on air or planned, which is useful from
+a phone. It is **read only**: it cannot write, run or spend anything, because
+the slate is all that ships with a build.
+
+Its password is checked **on the server** (`src/lib/ltTv/lineupAuth.mjs`) and
+what the browser gets is a signed, expiring, httpOnly cookie. The repo's older
+`/admin` page compares `NEXT_PUBLIC_ADMIN_PASSWORD` in the browser and trusts a
+`localStorage` flag, which is not protection — do not copy it.
+
+Two things it is careful about. A button that spends money says so and asks
+first; the free ones do not ask, because a confirm on a free action teaches you
+to click through confirms. And it prints each step's real output rather than a
+tick — the scripts say useful things, and swallowing them would send you back
+to a terminal to find out what happened.
+
+Every button runs the same command you would have typed, so the page cannot
+drift from the tools, and nothing you do in it is anything you could not have
+done by hand.
+
+---
+
+## Where is everything, from a terminal
 
 ```bash
 npm run lt                        # every episode, both shows
@@ -30,13 +85,17 @@ root — the path is relative to you, not to the repo.
 
 | | |
 |---|---|
+| double-click `LT TV Studio` | the studio page — all of the below, as buttons |
+| `npm run lt:studio` | the same, from a terminal |
 | `npm run lt` | where every episode is |
 | `npm run lt:check` | validate the slate |
 | `npm run lt:brief` | pull the week (news) |
 | `npm run lt:news` | write a news episode |
 | `npm run lt:roundtable` | write a roundtable episode |
 | `npm run lt:edit` | apply your edits to a screenplay |
+| `npm run lt:rewrite` | rewrite the lines you marked with a `#` note |
 | `npm run lt:audio` | record an episode |
+| `npm run lt:split` | split the master into the two SitePal tracks |
 | `npm run lt:slate` | put a recorded episode on the guide |
 | `npm run lt:test` | run every check |
 
@@ -126,10 +185,8 @@ npm run lt:check
 npm run lt:audio -- content/lt-tv/episodes/news-2026-W38.json
 
 # 5. Split the master into the two balanced tracks. Needs ffmpeg.
-python3 elevenlabs-dialogue-test/process_dialogue.py \
-    --master content/lt-tv/audio/news-01/master-dialogue.wav \
-    --segments content/lt-tv/audio/news-01/voice-segments.json \
-    content/lt-tv/audio/news-01
+#    The studio's "Split it into the two tracks" button runs exactly this.
+npm run lt:split -- news-2026-W38
 
 # 6. Refresh the slate record so the guide plays it rather than listing it.
 npm run lt:slate -- news-2026-W38
@@ -147,6 +204,23 @@ audio.
 Because a news episode is generated in blocks laid end to end, check **each
 block join for a seam** and the **last block for drift** against the picture.
 Drift looks exactly like a mistuned lead-in, so rule the audio out first.
+
+**If ElevenLabs refuses the format** — `Output format 'pcm_44100' is only
+available on the Pro tier` — that is the plan, not a fault. 44.1kHz PCM is the
+only part of this that needs Pro. Every lower rate is allowed on every plan and
+the pipeline works identically at one, because the joins are exact at any rate
+and a block's length is still a byte count. Put this in `.env.local` and
+restart:
+
+```
+LT_TV_PCM_RATE=24000
+```
+
+24kHz carries 12kHz of bandwidth, which is more than a speaking voice uses, and
+SitePal re-encodes the upload anyway. Blocks already recorded at another rate
+are re-recorded rather than reused, because reusing them would place every
+later line wrong — so change the rate before starting an episode, not part way
+through.
 
 Then upload and test — see the two sections below, which are the same for both
 shows.
@@ -195,13 +269,11 @@ From here it is the same tail as the news show — steps 5 and 6 above, then the
 shared sections below:
 
 ```bash
-# Split the master into the two balanced tracks. Needs ffmpeg.
-python3 elevenlabs-dialogue-test/process_dialogue.py \
-    --master content/lt-tv/audio/roundtable-02/master-dialogue.wav \
-    --segments content/lt-tv/audio/roundtable-02/voice-segments.json \
-    content/lt-tv/audio/roundtable-02
+# Split the master into the two SitePal tracks. Needs ffmpeg.
+# It ends by printing which file to upload under which clip name.
+npm run lt:split -- roundtable-02
 
-# Refresh the slate record.
+# Then, once they are uploaded, put it on the guide.
 npm run lt:slate -- roundtable-02
 npm run lt:check -- roundtable-02
 ```
@@ -221,12 +293,24 @@ that does not belong on the slate. For an episode of the show, prefer the
 generator — it numbers the lines, packs the blocks, validates the cues and puts
 the record on the guide, all of which that path leaves to you.
 
+It asks for `mp3_44100_128`, which every plan allows, and `process_dialogue.py`
+decodes it to WAV with ffmpeg. That is why it never hit the tier limit above.
+It gets away with mp3 because it makes one call — with nothing to join, there
+are no joins to be wrong.
+
 ---
 
 ## Uploading the clips (both shows)
 
 Upload the two balanced WAVs to the SitePal Audio Manager and copy the names
 into the record's `audio` block, exactly.
+
+**You do not have to work the names out.** Both the record step and
+`npm run lt:split` end by printing which file goes to which character under
+which name, and the studio lists them under **SitePal clip names** in the
+episode's panel. For roundtable 02 they are `lttv_rt_ep02_connor` and
+`lttv_rt_ep02_gr80`. Note that Connor's file is `john-sitepal-balanced.wav` —
+`john` is the processor's own key for him and is not the clip name.
 
 **There is one Audio Manager for the whole account** (`9308752`), not one per
 character. Every clip for every character and every show sits in the same list,
@@ -284,6 +368,64 @@ fault.** Check this before you go back and re-render anything.
 
 When `talk_show.glb` is re-exported, bump the query version in `MODEL_URL` so
 the browser does not keep the old animation library.
+
+---
+
+## A line you don't like (both shows)
+
+Three things you can do with a bad line, in rising order of effort.
+
+**Rewrite it yourself.** Open the screenplay, change the words, then
+**Apply my edits**. Nothing is spent and nothing else in the episode moves.
+
+**Ask for a new one.** Put a note under the line saying what is wrong with it,
+starting with `#`, then press **Rewrite the lines I marked** — or
+`node scripts/lt-tv-rewrite.mjs roundtable-02`:
+
+```
+ 41    SAINT GR80 A rising number does not make you wealthy. It makes you willing.
+ # too on-the-nose, and he would never explain his own point twice
+```
+
+The whole episode is sent for context and only the marked lines come back
+different, so the replacement picks up the line before it and sets up the line
+after it. The note disappears with the edit. Mark several lines at once, or
+put two notes under one line. Pressing it with nothing marked costs nothing
+and says so.
+
+A long line is often wrong in one sentence of several, so you can break it
+where the trouble is and put the note there. The two halves are read as the
+one line they were, both notes count, and the rewrite comes back as a single
+line again:
+
+```
+  0    CONNOR     Welcome back to the Liminal Terminal, where the lights are holy.
+ # that first bit makes no sense
+Here is tonight, and it is a Tuesday problem.
+ # and neither does this — no cheesy lines
+```
+
+**You do not have to press Save first.** A step that reads the screenplay
+saves the box for you, so what runs is what you can see.
+
+It writes the `.txt` only, so a rewrite you dislike is thrown away by not
+applying it — and a line the model left alone stays marked, which is how you
+see what it skipped.
+
+**Stop getting that line.** Start the note `#!` instead of `#`:
+
+```
+ #! GR80 never explains his own point twice
+```
+
+That fixes this line *and* adds the note to `docs/lt-tv-style-notes.md`, which
+is read into the writer's instructions at the top of every future episode of
+both shows. One sentence, a rule rather than a complaint — "nobody says at the
+end of the day", not "that ETF bit was flat". You can also just type rules into
+that file; only the bullets under **Rules** are sent, so the rest of the page
+explains itself without the explanation reaching the model.
+
+A script run prints `House notes: 3 in force.` when it is using them.
 
 ---
 

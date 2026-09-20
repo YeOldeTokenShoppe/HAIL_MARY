@@ -1,0 +1,31 @@
+#!/bin/bash
+#
+# Finder runs this when you double-click "LT TV Studio" in the repo folder.
+# It opens a Terminal window running scripts/lt-tv-studio.sh, which is where
+# everything actually happens — this file only gets you there.
+#
+# WHY AN APP BUNDLE and not just the .command file beside it: Finder decides
+# what to do with a .command by file association, and an editor can claim that
+# association. Then double-clicking shows you the script instead of running it,
+# which is exactly what happened. Nothing can claim an app bundle the same way.
+
+set -u
+
+# Contents/MacOS/this -> up three -> the repo folder.
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+SCRIPT="$ROOT/scripts/lt-tv-studio.sh"
+
+alert() {
+  osascript -e "display alert \"LT TV Studio\" message \"$1\"" >/dev/null 2>&1
+}
+
+if [ ! -f "$SCRIPT" ]; then
+  alert "Could not find scripts/lt-tv-studio.sh. Is this app still inside the HAIL_MARY folder?"
+  exit 1
+fi
+
+# Terminal will only run it if it is executable, and a checkout can lose the
+# bit. Putting it back costs nothing and saves a mystifying no-op.
+[ -x "$SCRIPT" ] || chmod +x "$SCRIPT" 2>/dev/null
+
+open -a Terminal "$SCRIPT" || alert "Could not open Terminal."

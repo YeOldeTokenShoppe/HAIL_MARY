@@ -5,7 +5,7 @@ episode: news-2026-W38
 CHIRON: FED HOLDS — AND CALLS IT PATIENCE
 
 # Edit this file, then apply it with:
-#     node scripts/lt-news-edit.mjs news-2026-W38
+#     node scripts/lt-tv-edit.mjs news-2026-W38
 #
 # Reword any line. Add lines, delete lines, reorder them — they renumber
 # themselves and the counts above are recomputed, so do not keep them
@@ -17,6 +17,13 @@ CHIRON: FED HOLDS — AND CALLS IT PATIENCE
 # delivery directions ElevenLabs performs, and they are part of the line.
 # An indented (Monk headshake @ +0.4s) is an animation beat on the line
 # above it. Lines starting with # are ignored.
+#
+# To have a line rewritten instead of writing it yourself, put a # note
+# under it saying what is wrong, then run:
+#     node scripts/lt-tv-rewrite.mjs news-2026-W38
+# Start the note #! to also keep it as a standing rule for future
+# episodes, in docs/lt-tv-style-notes.md. If only one sentence of a
+# long line is wrong, break the line there and note it there.
 
 ── COLD OPEN  [cold-open] — 78 words, ~32s
 

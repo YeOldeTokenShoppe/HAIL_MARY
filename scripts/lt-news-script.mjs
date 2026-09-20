@@ -53,11 +53,11 @@ import { toSlateRecord, writeSlateRecord, SLATE_DIR, SLATE_INDEX } from "./lt-tv
 import { assemble, renderScript } from "./lt-tv-episode.mjs";
 import { arg, rejectUnknownFlags } from "./lt-tv-cli.mjs";
 import { claude as callClaude } from "./lt-tv-claude.mjs";
+import { readStyleNotes, withStyleNotes } from "./lt-tv-style-notes.mjs";
 
 const claude = (opts) => callClaude({ ...opts, model: MODEL });
 
 const MODEL = process.env.LT_NEWS_MODEL || "claude-opus-5";
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
 // Every flag this script knows. An unrecognised one is almost always a typo,
 // and silently ignoring it is how `--check-sources.` — one stray full stop —
@@ -325,9 +325,14 @@ async function main() {
       },
     ];
 
+    // Standing corrections from docs/lt-tv-style-notes.md, sent with both
+    // passes: a rule can be about what is worth covering as much as about how
+    // a line is written.
+    const houseNotes = await readStyleNotes();
+    if (houseNotes.length) console.log(`House notes: ${houseNotes.length} in force.`);
     console.log(`Rundown pass (${MODEL})${search ? " with source verification" : " — search disabled"}…`);
     rundown = await claude({
-      system: RUNDOWN_SYSTEM,
+      system: withStyleNotes(RUNDOWN_SYSTEM, houseNotes),
       user: `Week: ${week}\n\nTHE BRIEF\n${JSON.stringify(brief.signals, null, 2)}`,
       maxTokens: maxTokensFor("rundown"),
       tools: search,
@@ -355,7 +360,7 @@ async function main() {
     const spots = await readSpots();
     console.log(`Script pass… ${spots.length ? `(${spots.length} spot(s) available)` : "(no ad break this week)"}`);
     const written = await claude({
-      system: SCRIPT_SYSTEM,
+      system: withStyleNotes(SCRIPT_SYSTEM, houseNotes),
       user: scriptUserMessage(rundown, week, spots),
       maxTokens: maxTokensFor("dialogue"),
     });

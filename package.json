@@ -13,9 +13,12 @@
     "lint": "next lint",
 
     "lt": "node scripts/lt-tv-status.mjs",
+    "lt:studio": "bash scripts/lt-tv-studio.sh",
     "lt:check": "node scripts/lt-tv-check.mjs",
     "lt:edit": "node scripts/lt-tv-edit.mjs",
+    "lt:rewrite": "node scripts/lt-tv-rewrite.mjs",
     "lt:audio": "node scripts/lt-tv-audio.mjs",
+    "lt:split": "node scripts/lt-tv-split.mjs",
     "lt:slate": "node scripts/lt-tv-slate-record.mjs",
     "lt:brief": "node scripts/lt-news-brief.mjs",
     "lt:news": "node scripts/lt-news-script.mjs",

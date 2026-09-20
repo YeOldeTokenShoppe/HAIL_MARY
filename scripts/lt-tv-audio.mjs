@@ -32,23 +32,50 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve, dirname, join, basename } from "node:path";
 
+import { uploadPlan } from "./lt-tv-split.mjs";
+
 const ENDPOINT = "https://api.elevenlabs.io/v1/text-to-dialogue/with-timestamps";
 
 // ── the PCM assumption, made self-checking ────────────────────────────────
 //
-// `pcm_44100` is documented as 16-bit signed little-endian mono. Every
-// duration below is computed from that, so if it is ever wrong every offset
-// is wrong by the same ratio and the episode desyncs silently. It is not
-// something this environment can verify, so instead of trusting it the run
-// cross-checks each block's byte length against the last timestamp ElevenLabs
-// itself reported for that block. A wrong assumption fails loudly on block
-// one rather than quietly at minute four.
-export const PCM = { sampleRate: 44100, channels: 1, bytesPerSample: 2 };
-const BYTES_PER_SECOND = PCM.sampleRate * PCM.channels * PCM.bytesPerSample;
+// ElevenLabs PCM is 16-bit signed little-endian mono at whatever rate was
+// asked for. Every duration below is computed from that, so if it is ever
+// wrong every offset is wrong by the same ratio and the episode desyncs
+// silently. It is not something this environment can verify, so instead of
+// trusting it the run cross-checks each block's byte length against the last
+// timestamp ElevenLabs itself reported for that block. A wrong assumption
+// fails loudly on block one rather than quietly at minute four.
+//
+// THE RATE IS AN ACCOUNT FACT, NOT AN EPISODE ONE. 44.1kHz PCM is a Pro-tier
+// format, and an account below that tier is refused it outright. Any other
+// PCM rate is allowed, and the design does not care which: the joins are still
+// sample-exact and a block's duration is still its byte count. So the rate is
+// settable and everything derives from it. Speech at 24kHz carries 12kHz of
+// bandwidth, which is more than a voice uses, and SitePal re-encodes the
+// upload anyway.
+export const PCM_RATES = [8000, 16000, 22050, 24000, 32000, 44100, 48000];
+export const PCM = { sampleRate: rateFromEnv(), channels: 1, bytesPerSample: 2 };
+
+/** The configured rate, or the default, refusing anything ElevenLabs has no name for. */
+function rateFromEnv() {
+  const raw = process.env.LT_TV_PCM_RATE;
+  if (!raw) return 44100;
+  const rate = Number(raw);
+  if (!PCM_RATES.includes(rate)) {
+    throw new Error(
+      `LT_TV_PCM_RATE=${raw} is not a rate ElevenLabs offers. ` +
+        `Pick one of: ${PCM_RATES.join(", ")}.`,
+    );
+  }
+  return rate;
+}
+
+/** Bytes of PCM per second at the configured rate. Read, never cached — the rate moves. */
+const bytesPerSecond = () => PCM.sampleRate * PCM.channels * PCM.bytesPerSample;
 
 /** Seconds of audio in a raw PCM buffer of this format. */
 export function pcmSeconds(byteLength) {
-  return byteLength / BYTES_PER_SECOND;
+  return byteLength / bytesPerSecond();
 }
 
 /**
@@ -110,7 +137,7 @@ const round = (n) => Number(n.toFixed(3));
 /** A canonical 44-byte WAV header for a PCM payload of this many bytes. */
 export function wavHeader(dataBytes) {
   const h = Buffer.alloc(44);
-  const byteRate = BYTES_PER_SECOND;
+  const byteRate = bytesPerSecond();
   const blockAlign = PCM.channels * PCM.bytesPerSample;
   h.write("RIFF", 0);
   h.writeUInt32LE(36 + dataBytes, 4);
@@ -161,28 +188,70 @@ export function timingFromSegments(episode, segments) {
 
 // ── generating ────────────────────────────────────────────────────────────
 
+/**
+ * What to say when the account is not allowed the format that was asked for.
+ *
+ * This is not a bug and not a key problem, and it reads like both. 44.1kHz
+ * PCM is Pro-tier only; every other rate works on any account and costs this
+ * pipeline nothing, so the answer is one line in .env.local rather than an
+ * upgrade.
+ */
+export function tierRefusal(body) {
+  if (!/output_format_not_allowed|subscription_required/.test(body)) return null;
+  return [
+    `Your ElevenLabs plan does not include pcm_${PCM.sampleRate}.`,
+    "",
+    "Only the 44.1kHz PCM formats need the Pro tier. Any lower rate is allowed",
+    "on every plan and this pipeline works exactly the same at one — the joins",
+    "stay sample-exact — so record at 24kHz instead. Add this line to .env.local",
+    "and restart:",
+    "",
+    "    LT_TV_PCM_RATE=24000",
+    "",
+    "From a terminal you can also pass it for one run:",
+    "",
+    `    LT_TV_PCM_RATE=24000 npm run lt:audio -- <the record>`,
+    "",
+    `What ElevenLabs said: ${body.slice(0, 200)}`,
+  ].join("\n");
+}
+
 async function generateBlock({ inputs, key, outDir, id }) {
   // Blocks cost money and a long episode is several of them, so a finished
   // block is kept. A run that dies on block four resumes at block four.
+  //
+  // A kept block is only reusable at the rate it was recorded at: its length
+  // in bytes is how every later line is placed, so mixing rates inside one
+  // episode would desync it from the join onwards. Blocks kept before the
+  // rate was settable are all 44100.
+  const format = `pcm_${PCM.sampleRate}`;
   const cached = join(outDir, `${id}.json`);
   if (existsSync(cached)) {
-    console.log(`  ${id}: using the copy already in ${basename(outDir)}/`);
-    return JSON.parse(await readFile(cached, "utf8"));
+    const kept = JSON.parse(await readFile(cached, "utf8"));
+    if ((kept.lt_tv_output_format ?? "pcm_44100") === format) {
+      console.log(`  ${id}: using the copy already in ${basename(outDir)}/`);
+      return kept;
+    }
+    console.log(
+      `  ${id}: the kept copy is ${kept.lt_tv_output_format ?? "pcm_44100"} and this run is ` +
+        `${format}, so it is being recorded again.`,
+    );
   }
 
-  const res = await fetch(`${ENDPOINT}?output_format=pcm_${PCM.sampleRate}`, {
+  const res = await fetch(`${ENDPOINT}?output_format=${format}`, {
     method: "POST",
     headers: { "xi-api-key": key, "content-type": "application/json" },
     body: JSON.stringify({ inputs }),
   });
   if (!res.ok) {
-    throw new Error(`${id}: ElevenLabs ${res.status} — ${(await res.text()).slice(0, 300)}`);
+    const body = await res.text();
+    throw new Error(tierRefusal(body) || `${id}: ElevenLabs ${res.status} — ${body.slice(0, 300)}`);
   }
   const payload = await res.json();
   if (!payload?.audio_base64) {
     throw new Error(`${id}: no audio came back — ${JSON.stringify(payload).slice(0, 300)}`);
   }
-  await writeFile(cached, JSON.stringify(payload));
+  await writeFile(cached, JSON.stringify({ ...payload, lt_tv_output_format: format }));
   return payload;
 }
 
@@ -209,7 +278,10 @@ async function main() {
   const outDir = resolve("content/lt-tv/audio", episode.id);
   await mkdir(outDir, { recursive: true });
 
-  console.log(`${episode.title} — ${episode.blocks.length} block(s)`);
+  console.log(
+    `${episode.title} — ${episode.blocks.length} block(s), pcm_${PCM.sampleRate}` +
+      `${PCM.sampleRate === 44100 ? "" : " (set by LT_TV_PCM_RATE)"}`,
+  );
   const built = [];
   for (const block of episode.blocks) {
     const payload = await generateBlock({
@@ -265,16 +337,23 @@ async function main() {
       `across ${built.length} block(s), ${merged.segments.length} lines timed.`,
   );
   console.log(`Updated ${recordPath} with the real timing.`);
+  // Naming the clips here rather than pointing at the record: "the names the
+  // record prescribes in `cast`" is a true sentence that leaves you opening a
+  // JSON file to find two strings, and a wrong one plays nothing.
+  const plan = uploadPlan(episode, episode.id);
   console.log(
-    "\nNext, split it into the two balanced tracks (this part needs ffmpeg):\n" +
-      `  python3 elevenlabs-dialogue-test/process_dialogue.py --master ${masterPath} \\\n` +
-      `      --segments ${join(outDir, "voice-segments.json")} ${outDir}\n` +
-      "Then upload both WAVs under the names the record prescribes in `cast`, and\n" +
-      `refresh the slate record so the guide plays it:\n` +
-      `  node scripts/lt-tv-slate-record.mjs ${episode.id}\n` +
-      "Do NOT re-run the generator for this — it rebuilds the episode from\n" +
-      "scratch and would discard both your edits and the timing above.",
+    `\nNext, split it into the two tracks SitePal plays (this part needs ffmpeg):\n` +
+      `  npm run lt:split -- ${episode.id}\n`,
   );
+  if (plan.length) {
+    console.log("That writes the two WAVs you upload, which will be:\n");
+    for (const row of plan) {
+      console.log(`  ${row.who}`);
+      console.log(`    file  ${row.file}`);
+      console.log(`    name  ${row.clip}\n`);
+    }
+  }
+  console.log("Then re-run the script step to refresh the slate record.");
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

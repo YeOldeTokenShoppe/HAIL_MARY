@@ -9,11 +9,7 @@
 // the two shows are written by different prompts and there is no reason they
 // must always share a model.
 
-// ── Anthropic ─────────────────────────────────────────────────────────────
-//
-// Raw fetch against the Messages API, matching how every other Claude call in
-// this repo is written (src/app/api/trade/director, /api/review/characters,
-// /api/council-chat). No SDK dependency is added for a script.
+const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
 export async function claude({ system, user, model, maxTokens = 8000, tools = null }) {
   const key = process.env.ANTHROPIC_API_KEY;
