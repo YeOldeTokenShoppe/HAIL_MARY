@@ -20,7 +20,7 @@ const NOISE_H = 133;
 // Above 1 on purpose: the unlit screen renders brighter than white so the
 // page's Bloom (threshold 0.3) catches the lit type the way it catches the neon
 // frame. The card's dark ground stays under the threshold, so only type glows.
-const GLOW = 1.35;
+const GLOW = 1.08;
 // Static peaks lower than the cards, or a full screen of it blooms into a flare.
 const STATIC_PEAK = 170;
 
@@ -49,8 +49,8 @@ function uvBounds(geometry) {
 }
 
 // Greedy word wrap, shrinking the type until the title fits in `maxLines`.
-function fitTitle(ctx, text, maxWidth, maxLines) {
-  for (let size = 68; size >= 30; size -= 2) {
+function fitTitle(ctx, text, maxWidth, maxLines, maxSize = 68) {
+  for (let size = maxSize; size >= 20; size -= 2) {
     ctx.font = `800 ${size}px Orbitron, "Arial Black", sans-serif`;
     const lines = [];
     let line = "";
@@ -93,11 +93,11 @@ function drawCard(ctx, card) {
   // tilted), so titles keep ~75px clear on each side.
   const { size, lines } = fitTitle(ctx, card.title.toUpperCase(), W - 150, 3);
   const lineHeight = size * 1.12;
-  const top = 380 - ((lines.length - 1) * lineHeight) / 2;
+  const top = 340 - ((lines.length - 1) * lineHeight) / 2;
   ctx.save();
   ctx.fillStyle = INK.title;
   ctx.shadowColor = INK.titleGlow;
-  ctx.shadowBlur = 22;
+  ctx.shadowBlur = 10;
   lines.forEach((l, i) => ctx.fillText(l, W / 2, top + i * lineHeight));
   ctx.restore();
 
@@ -108,11 +108,20 @@ function drawCard(ctx, card) {
   ctx.fillText(card.format.toUpperCase(), W / 2 + 3, top + (lines.length - 1) * lineHeight + size * 0.5 + 52);
   ctx.restore();
 
+  if (card.episodeTitle) {
+    const episode = fitTitle(ctx, card.episodeTitle, W - 120, 2, 28);
+    ctx.save();
+    ctx.font = `600 ${episode.size}px Orbitron, sans-serif`;
+    ctx.fillStyle = "#f7f4fa";
+    episode.lines.forEach((line, i) => ctx.fillText(line, W / 2, 563 + i * 32));
+    ctx.restore();
+  }
+
   const soon = !card.latest;
   const tag = soon ? "COMING SOON" : card.latest;
   const ink = soon ? INK.soon : INK.latest;
   ctx.save();
-  ctx.font = '700 30px Orbitron, "Arial Black", sans-serif';
+  ctx.font = '700 24px Orbitron, "Arial Black", sans-serif';
   if ("letterSpacing" in ctx) ctx.letterSpacing = "5px";
   const tagW = ctx.measureText(tag).width + 56;
   ctx.strokeStyle = ink;
@@ -216,7 +225,7 @@ export function useChannelScreen(root, cards) {
 
   useFrame(({ clock }) => {
     const s = stateRef.current;
-    if (!s) return;
+    if (!s || s.cards.length < 2) return;
     const t = clock.elapsedTime;
     if (!s.phaseStart) s.phaseStart = t;
     const age = t - s.phaseStart;

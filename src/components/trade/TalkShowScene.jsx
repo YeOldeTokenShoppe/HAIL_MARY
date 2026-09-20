@@ -30,7 +30,7 @@ import { useChannelScreen } from "@/components/trade/ltTvChannelScreen";
 
 // Version the URL when the Blender export changes so drei does not keep an
 // older GLTF from its in-memory cache during hot reloads.
-const MODEL_URL = "/models/talk_show2.glb";
+const MODEL_URL = "/models/talk_show3-textures.glb?v=news-desk-hierarchy-1";
 // World up, for the camera prop's pan.
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const SITEPAL_ACCOUNT = "9308752";
@@ -1136,11 +1136,13 @@ function TalkShowModel({
   compactPortalHost,
   hideCameraRig,
   castHidden,
+  newsMode,
   channelCards,
   onPlaybackReady,
   onPlaybackStateChange,
 }) {
   const { scene, animations } = useGLTF(MODEL_URL, DRACO_PATH);
+  const raisedSet = castHidden || newsMode;
   const portalsRef = useRef({
     Monk: { frame: null, ready: false, source: null },
     Barron: { frame: null, ready: false, source: null },
@@ -1197,6 +1199,113 @@ function TalkShowModel({
     guests.forEach((o) => { o.visible = !castHidden; });
     return () => { guests.forEach((o) => { o.visible = true; }); };
   }, [cloned, castHidden]);
+
+  // The NewsDesk parent hides its entire prop hierarchy outside pre-show/news.
+  // Desk chairs and sign supports follow the same rule. Lounge chairs
+  // (seats and legs) appear only in the regular roundtable set.
+  // Match Blender duplicates (.001) and GLTFLoader's sanitized names (001).
+  useEffect(() => {
+    const deskPropName = /^(?:NewsDesk|CoffeeCup|Microphone|Laptop|DeskChair|Cylinder|SM_Prop_(?:Cup_Coffee_Disposable_Open_01|Microphone_03|Laptop_01))(?:[._]?\d+)?$/;
+    const loungeChairName = /^Chair1?_Color_[12]_0(?:_\d+)?$/;
+    const props = [];
+    cloned.traverse((object) => {
+      if (deskPropName.test(object.name) || loungeChairName.test(object.name)) {
+        props.push({ object, visible: object.visible });
+        object.visible = loungeChairName.test(object.name)
+          ? object.visible && !raisedSet
+          : object.visible && raisedSet;
+      }
+    });
+    return () => props.forEach(({ object, visible }) => { object.visible = visible; });
+  }, [cloned, raisedSet]);
+
+  // Pre-show backdrop: lift the screen assembly above the news desk and
+  // hide only its old platform. Work in world Y because imported parents may
+  // rotate/scale their local axes. Cleanup restores the authored studio pose.
+  useEffect(() => {
+    if (!raisedSet) return;
+    const studio = cloned.getObjectByName("Studio_Set") || cloned;
+    const frame = studio.getObjectByName("Frame001") || studio.getObjectByName("Frame.001");
+    const neons = studio.getObjectByName("Neons001") || studio.getObjectByName("Neons.001");
+    const floor = studio.getObjectByName("Floor");
+    const originalFloorVisible = floor?.visible;
+    const moved = [];
+    if (frame && neons) {
+      cloned.updateWorldMatrix(true, true);
+      const height = new THREE.Box3().setFromObject(frame).getSize(new THREE.Vector3()).y;
+      if (Number.isFinite(height) && height > 0) {
+        const lift = new THREE.Vector3(0, (height / 3) * 1.25, 0);
+        for (const object of [frame, neons]) {
+          moved.push({ object, position: object.position.clone() });
+          const raised = object.getWorldPosition(new THREE.Vector3()).add(lift);
+          object.position.copy(object.parent ? object.parent.worldToLocal(raised) : raised);
+          object.updateWorldMatrix(false, true);
+        }
+      }
+    }
+    if (floor) floor.visible = false;
+    return () => {
+      for (const { object, position } of moved) {
+        object.position.copy(position);
+        object.updateWorldMatrix(false, true);
+      }
+      if (floor) floor.visible = originalFloorVisible;
+    };
+  }, [cloned, raisedSet]);
+
+  // Screenshot transforms use Blender Z-up and quaternion WXYZ. Convert to
+  // glTF Y-up: position (x,z,-y), quaternion (x,z,-y,w). Actor empties are
+  // unparented in the export; their local coordinates are the model's basis.
+  useEffect(() => {
+    if (!newsMode) return;
+    const poses = {
+      Demon_Empty: { position: [-0.44472, 0.42248, 0.018999], quaternion: [0, 0.255, 0, 0.967], scale: 1.125 },
+      Monk_Empty: { position: [0.53267, 0.39882, -0.049794], quaternion: [0, -0.030, 0, 1.000], scale: 1.081 },
+    };
+    const originals = [];
+    for (const [name, pose] of Object.entries(poses)) {
+      const actor = cloned.getObjectByName(name);
+      if (!actor) continue;
+      originals.push({ actor, position: actor.position.clone(), quaternion: actor.quaternion.clone(), scale: actor.scale.clone() });
+      actor.position.fromArray(pose.position);
+      actor.quaternion.fromArray(pose.quaternion).normalize();
+      actor.scale.setScalar(pose.scale);
+      actor.updateWorldMatrix(false, true);
+    }
+    return () => originals.forEach(({ actor, position, quaternion, scale }) => {
+      actor.position.copy(position);
+      actor.quaternion.copy(quaternion);
+      actor.scale.copy(scale);
+      actor.updateWorldMatrix(false, true);
+    });
+  }, [cloned, newsMode]);
+
+  // These props share atlas materials in the GLB. Clone per mesh so the
+  // lounge treatment never alters the actors or the cached source asset.
+  useEffect(() => {
+    const adjusted = [];
+    cloned.traverse((mesh) => {
+      if (!mesh.isMesh) return;
+      const chair = /^Chair1?_Color_1_0$/.test(mesh.name);
+      const palm = /^Palm_Leaf/.test(mesh.name);
+      const floor = /^Floor/.test(mesh.name);
+      const frame = mesh.name === "Frame_Color_1_0";
+      if (!chair && !palm && !floor && !frame) return;
+      const original = mesh.material;
+      const copies = (Array.isArray(original) ? original : [original]).map((material) => {
+        const copy = material.clone();
+        copy.color?.multiplyScalar(floor ? 0.65 : palm ? 0.72 : frame ? 0.8 : 0.9);
+        if ("roughness" in copy) copy.roughness = Math.max(copy.roughness, chair ? 0.55 : 0.8);
+        return copy;
+      });
+      mesh.material = Array.isArray(original) ? copies : copies[0];
+      adjusted.push({ mesh, original, copies });
+    });
+    return () => adjusted.forEach(({ mesh, original, copies }) => {
+      mesh.material = original;
+      copies.forEach((material) => material.dispose());
+    });
+  }, [cloned]);
 
   useChannelScreen(cloned, channelCards);
 
@@ -1391,6 +1500,12 @@ function TalkShowModel({
     [headBones],
   );
 
+  // Keep animation output separate from procedural gaze. PropertyMixer skips
+  // unchanged values, so leaving the previous gaze on the bone can accumulate it.
+  const animatedHeadQuaternions = useMemo(
+    () => Object.fromEntries(Object.entries(headBones).map(([actor, head]) => [actor, head.quaternion.clone()])),
+    [headBones],
+  );
   const listenerGazeRef = useRef({ Barron: 0, Monk: 0 });
   const listenerGazeQuatRef = useRef(new THREE.Quaternion());
   const listenerGazeAxisRef = useRef(new THREE.Vector3(0, 1, 0));
@@ -1781,7 +1896,13 @@ function TalkShowModel({
       }
     }
 
+    Object.entries(headBones).forEach(([actor, head]) => {
+      head.quaternion.copy(animatedHeadQuaternions[actor]);
+    });
     Object.values(mixers).forEach((m) => m.update(delta));
+    Object.entries(headBones).forEach(([actor, head]) => {
+      animatedHeadQuaternions[actor].copy(head.quaternion);
+    });
 
     const introCameraFocus = playback.running
       ? 1 -
@@ -1986,6 +2107,7 @@ export default function TalkShowScene({
   compactPortalHost = false,
   hideCameraRig = false,
   castHidden = false,
+  newsMode = false,
   channelCards = null,
   onPlaybackReady,
   onPlaybackStateChange,
@@ -2001,6 +2123,7 @@ export default function TalkShowScene({
           compactPortalHost={compactPortalHost}
           hideCameraRig={hideCameraRig}
           castHidden={castHidden}
+          newsMode={newsMode}
           channelCards={channelCards}
           onPlaybackReady={onPlaybackReady}
           onPlaybackStateChange={onPlaybackStateChange}

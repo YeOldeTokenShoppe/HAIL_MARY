@@ -48,7 +48,7 @@ const VOICES = {
     // Kept in lockstep with COUNSEL_VOICES.GR in lib/counselSpeech.js — that
     // map voices the `?triptych=1` layout, this route voices every other one,
     // and a mismatch means GR80 changes voice when the layout changes.
-    id: process.env.ELEVENLABS_VOICE_GR80 || "JBFqnCBsd6RMkjVDRZzb",
+    id: process.env.ELEVENLABS_VOICE_GR80 || "fATgBRI8wg5KkDFg8vBd",
     // High stability, near-zero style = flat, procedural, unbothered. The
     // saint reports what the maxim yields; he doesn't perform it.
     settings: { stability: 0.85, similarity_boost: 0.6, style: 0.1 },

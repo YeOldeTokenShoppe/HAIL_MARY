@@ -89,7 +89,7 @@ const LOGO_FACE = (
   </div>
 );
 
-export default function LTTvChiron({ episode, mode = "news" }) {
+export default function LTTvChiron({ episode, mode = "news", status = "Replay" }) {
   const news = mode === "news";
   const trackRef = useRef(null);
   const [navHeight, setNavHeight] = useState(64);
@@ -159,7 +159,7 @@ export default function LTTvChiron({ episode, mode = "news" }) {
           <div className="ltc-box-bttm">
             <div className="ltc-cube">
               <div className="ltc-face ltc-f-front"><span>EP {episode.number}</span></div>
-              <div className="ltc-face ltc-f-right"><span>Live</span></div>
+              <div className="ltc-face ltc-f-right"><span>{status}</span></div>
               <div className="ltc-face ltc-f-back"><span>EP {episode.number}</span></div>
               <div className="ltc-face ltc-f-left">
                 <span>

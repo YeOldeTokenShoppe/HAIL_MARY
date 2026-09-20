@@ -146,7 +146,7 @@ export const DESK = {
       label: "Saint GR80", account: SITEPAL_ACCOUNT,
       sceneId: 2775053, hash: "I0s05E8rXxvHYHdJIPmcIU5msqkW6t0A",
       embedContext: 1,
-      voice: { voice: "JBFqnCBsd6RMkjVDRZzb", lang: 1, engine: 14 },
+      voice: { voice: "fATgBRI8wg5KkDFg8vBd", lang: 1, engine: 14 },
     },
     blurb: "What the documents actually say.",
   },

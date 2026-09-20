@@ -36,7 +36,7 @@ Edit `elevenlabs-dialogue-test/dialogue.json`. Each item is one spoken turn:
     },
     {
       "text": "[dryly] Your opening monologue is already overleveraged.",
-      "voice_id": "JBFqnCBsd6RMkjVDRZzb"
+      "voice_id": "fATgBRI8wg5KkDFg8vBd"
     }
   ],
   "model_id": "eleven_v3",
@@ -48,7 +48,7 @@ Edit `elevenlabs-dialogue-test/dialogue.json`. Each item is one spoken turn:
 Current voices:
 
 - Connor: `IcFWazAaBzXNwLWpySgF`
-- Saint GR80: `JBFqnCBsd6RMkjVDRZzb`
+- Saint GR80: `fATgBRI8wg5KkDFg8vBd`
 
 Keep the total request under roughly 2,000 characters for reliable Text to
 Dialogue generation. For longer episodes, generate contiguous sections and
@@ -98,7 +98,7 @@ You can instead write a reaction as dialogue when you want precise syllables:
 ```json
 {
   "text": "Heh. Your confidence remains impressively unfunded.",
-  "voice_id": "JBFqnCBsd6RMkjVDRZzb"
+  "voice_id": "fATgBRI8wg5KkDFg8vBd"
 }
 ```
 

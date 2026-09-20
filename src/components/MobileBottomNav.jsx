@@ -9,6 +9,7 @@ import useCyberConfirm from './useCyberConfirm';
 // Bottom mobile app-style navigation bar — drop-in replacement for NavControlsHome
 export default function MobileBottomNav({
   isPlaying,
+  subdued = false,
   onPlayMusic,
   onStopMusic,
   onSkipTrack,
@@ -309,6 +310,9 @@ export default function MobileBottomNav({
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
 
+        .btm-nav-dock[data-subdued="true"] { opacity: .4; }
+        .btm-nav-dock[data-subdued="true"]:hover,
+        .btm-nav-dock[data-subdued="true"]:focus-within { opacity: 1; }
         .btm-nav-dock {
           position: fixed;
           bottom: 0;
@@ -979,7 +983,7 @@ export default function MobileBottomNav({
         ` : ''}
       `}</style>
 
-      <div className="btm-nav-dock">
+      <div className="btm-nav-dock" data-subdued={subdued || undefined}>
         <div className="btm-nav-bar">
 
           {/* 1 — CyberNav (80s toggle) — only if enabled */}

@@ -11,7 +11,7 @@ const BOOT_LINES = [
   { t: "Welcome to the Liminal Terminal.", c: "hi" },
   { t: "VERIFYING CREDENTIALS", c: "cmd", ok: true },
   { t: "ACCESS GRANTED — guest clearance.", c: "ok" },
-  { t: "SELECT A CHANNEL", c: "gold" },
+  { t: "Browse channels", c: "gold" },
 ];
 
 // How long the static burst covers a channel change.
@@ -151,10 +151,10 @@ export default function TerminalBoot({ options = [], onSelect, onExit, instant =
   const pfx = (l) => (l.c === "hi" || l.c === "gold" ? "" : "> ");
 
   return (
-    <div className="tb-root" onClick={skip}>
+    <div className="tb-root tb-streaming" onClick={skip}>
       <div className="tb-header">
         <div className="tb-brand">
-          <span className="tb-title">LIMINAL // RL80</span>
+          <span className="tb-title">Liminal</span>
           <span className="tb-version">TERMINAL v1.0</span>
         </div>
         <div className="tb-header-actions">
@@ -164,7 +164,7 @@ export default function TerminalBoot({ options = [], onSelect, onExit, instant =
             onClick={(e) => { e.stopPropagation(); onExit?.(); }}
             aria-label="Exit Liminal Terminal"
           >
-            <span aria-hidden="true">×</span> EXIT
+            <span aria-hidden="true">×</span> Close
           </button>
         </div>
       </div>
@@ -203,7 +203,7 @@ export default function TerminalBoot({ options = [], onSelect, onExit, instant =
             </div>
 
             <div className="tb-section-head">
-              <span>SELECT A CHANNEL</span>
+              <span>Browse channels</span>
               <span className="tb-counter">{String(channel + 1).padStart(2, "0")} / {String(count).padStart(2, "0")}</span>
             </div>
 
@@ -222,7 +222,7 @@ export default function TerminalBoot({ options = [], onSelect, onExit, instant =
                   <div className="tb-crt-head">
                     <span className="tb-ch">CH {String(channel + 1).padStart(2, "0")} // {tuned.key.toUpperCase()}</span>
                     <span className="tb-sig">
-                      {tuned.disabled ? "○ OFF AIR" : "● SIGNAL LOCKED"}
+                      {tuned.disabled ? "Coming soon" : "Available now"}
                     </span>
                   </div>
 
@@ -266,7 +266,7 @@ export default function TerminalBoot({ options = [], onSelect, onExit, instant =
                     {/* <div className="tb-card-overline">{channelMeta.overline}</div> */}
                     <div className="tb-card-title">{tuned.label}</div>
                     {tuned.sub && <div className="tb-card-sub">{tuned.sub}</div>}
-                    {tuned.disabled && <div className="tb-card-soon">TRANSMISSION PENDING</div>}
+                    {tuned.disabled && <div className="tb-card-soon">Coming soon</div>}
                   </div>
 
                   <div className="tb-scan" aria-hidden="true" />
@@ -298,14 +298,14 @@ export default function TerminalBoot({ options = [], onSelect, onExit, instant =
                       onClick={() => tune(-1)}
                       aria-label="Previous channel"
                     >
-                      <span>F1</span><b>‹ PREV</b>
+                      <b>‹ Previous</b>
                     </button>
                     <button
                       className="tb-softkey"
                       onClick={() => tune(1)}
                       aria-label="Next channel"
                     >
-                      <span>F2</span><b>NEXT ›</b>
+                      <b>Next ›</b>
                     </button>
                   </div>
                 )}
@@ -327,18 +327,18 @@ export default function TerminalBoot({ options = [], onSelect, onExit, instant =
                 disabled={tuned.disabled}
               >
                 {tuned.disabled ? (
-                  "○ OFF AIR"
+                  "Coming soon"
                 ) : (
                   <>
-                    <span className="tb-enter-command">▸ TUNE IN</span>
-                    <span className="tb-enter-label">CH {String(channel + 1).padStart(2, "0")} // {tuned.label}</span>
+                    <span className="tb-enter-command">▶ Tune in</span>
+                    <span className="tb-enter-label">{tuned.label}</span>
                   </>
                 )}
               </button>
 
               <div className="tb-presets-label">
-                <span>CHANNEL MATRIX</span>
-                <span>SWIPE DISPLAY OR USE F-KEYS</span>
+                <span>All channels</span>
+                <span>Swipe to explore</span>
               </div>
 
               {/* The whole slate at a glance. Flipping alone reads as sparse at
@@ -762,7 +762,7 @@ export default function TerminalBoot({ options = [], onSelect, onExit, instant =
 
            WHY GOLD AND NOT var(--tb-channel), which is the tuner's whole colour
            system. Gold is ALREADY this terminal's action colour independent of
-           channel — SELECT A CHANNEL, the CH 01 readout and every preset number
+           channel — Browse channels, the CH 01 readout and every preset number
            are --tb-gold on all three channels — so a gold CTA joins a family that
            exists rather than fighting the tuner. A channel-tinted bar would also
            make the button change identity three times on a screen whose entire
@@ -902,6 +902,52 @@ export default function TerminalBoot({ options = [], onSelect, onExit, instant =
           .tb-enter { gap: 6px; }
           .tb-presets-label span:last-child { display: none; }
         }
+
+        /* Streaming channel browser; shared typography and actions with LT TV. */
+        .tb-streaming { background: #050408; color: #f7f4fa; font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+        .tb-streaming *, .tb-streaming *::before { box-sizing: border-box; }
+        .tb-streaming::after, .tb-streaming .tb-version, .tb-streaming .tb-live,
+        .tb-streaming .tb-auth, .tb-streaming .tb-crt-head, .tb-streaming .tb-lattice,
+        .tb-streaming .tb-terminal-mark, .tb-streaming .tb-feed-live,
+        .tb-streaming .tb-scan, .tb-streaming .tb-track, .tb-streaming .tb-glass,
+        .tb-streaming .tb-static, .tb-streaming .tb-console::after,
+        .tb-streaming .tb-bezel::before, .tb-streaming .tb-bezel::after,
+        .tb-streaming .tb-crt::after, .tb-streaming .tb-enter::after { display: none; }
+        .tb-streaming .tb-header { flex-shrink: 0; padding: calc(env(safe-area-inset-top, 0px) + 8px) 20px 8px; background: transparent; border: 0; }
+        .tb-streaming .tb-title { color: #ffc096; font: 500 18px "Orbitron", sans-serif; letter-spacing: .06em; }
+        .tb-streaming .tb-header-exit { min-height: 44px; color: #c9c6d0; background: transparent; border: 0; clip-path: none; font: 500 13px "Inter", sans-serif; letter-spacing: 0; }
+        .tb-streaming .tb-body.is-ready { display: block; padding: 16px 20px calc(env(safe-area-inset-bottom, 0px) + 24px); }
+        .tb-streaming .tb-tuner { min-height: 0; max-width: 520px; gap: 18px; animation: none; }
+        .tb-streaming .tb-section-head { padding: 0; color: #f7f4fa; font-size: 22px; font-weight: 650; letter-spacing: -.025em; }
+        .tb-streaming .tb-counter { color: #96919f; font-size: 12px; letter-spacing: 0; font-weight: 400; }
+        .tb-streaming .tb-console { flex: none; padding: 0; gap: 14px; background: transparent; border: 0; box-shadow: none; clip-path: none; overflow: visible; }
+        .tb-streaming .tb-bezel { padding: 0; background: transparent; border: 0; box-shadow: none; clip-path: none; }
+        .tb-streaming .tb-crt { height: auto; min-height: 0; aspect-ratio: 1 / 1; border: 1px solid #292330; border-radius: 10px; background: #100c17; box-shadow: none; overflow: hidden; }
+        .tb-streaming .tb-preview-media { filter: none; opacity: 1; }
+        .tb-streaming .tb-card { animation: none; padding: 24px; }
+        .tb-streaming .tb-card.has-preview { padding: 60px 20px 20px; background: linear-gradient(transparent 35%, rgba(5,4,8,.45) 65%, #050408 100%); }
+        .tb-streaming .tb-card-title, .tb-streaming .tb-card.has-preview .tb-card-title { color: #20d7f2; font: 700 28px/1.2 "Orbitron", sans-serif; letter-spacing: -.02em; text-shadow: none; }
+        .tb-streaming .tb-card-sub, .tb-streaming .tb-card.has-preview .tb-card-sub { display: block; max-width: 300px; font-size: 13px; line-height: 1.5; letter-spacing: 0; color: #d1ccd8; margin-top: 9px; }
+        .tb-streaming .tb-card-soon { color: #ef62dc; font-size: 12px; letter-spacing: 0; }
+        .tb-streaming .tb-market-rail { min-height: 0; padding: 0; border: 0; background: transparent; display: flex; justify-content: flex-end; }
+        .tb-streaming .tb-function-keys { display: flex; gap: 8px; }
+        .tb-streaming .tb-softkey { height: 44px; min-width: 86px; padding: 10px 14px; border: 1px solid #302a38; border-radius: 5px; background: #15121b; box-shadow: none; clip-path: none; color: #d1ccd8; font: 500 12px "Inter", sans-serif; }
+        .tb-streaming .tb-softkey b { font: inherit; color: inherit; letter-spacing: 0; }
+        .tb-streaming .tb-enter { min-height: 48px; align-items: center; padding: 13px 16px; background: #f7f4fa; border: 0; border-radius: 5px; box-shadow: none; clip-path: none; text-shadow: none; gap: 10px; }
+        .tb-streaming .tb-enter-command { color: #131019; font: 650 15px "Inter", sans-serif; letter-spacing: 0; }
+        .tb-streaming .tb-enter-label { color: #57505e; font: 400 12px "Inter", sans-serif; letter-spacing: 0; }
+        .tb-streaming .tb-enter:not(:disabled):hover { background: #dfdce5; box-shadow: none; }
+        .tb-streaming .tb-enter:disabled { background: #232027; color: #a9a5b2; font: 500 14px "Inter", sans-serif; }
+        .tb-streaming .tb-presets-label { padding: 12px 0 0; color: #f7f4fa; font-size: 16px; font-weight: 600; letter-spacing: 0; }
+        .tb-streaming .tb-presets-label span:last-child { color: #96919f; font-size: 11px; font-weight: 400; }
+        .tb-streaming .tb-strip { display: flex; gap: 10px; overflow-x: auto; padding: 3px 3px 10px; margin: 0 -3px; scroll-snap-type: x proximity; scrollbar-width: thin; }
+        .tb-streaming .tb-strip-item { flex: 1 0 105px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 9px; min-height: 88px; padding: 12px; border: 1px solid #302a38; border-radius: 7px; background: #15121b; box-shadow: none; clip-path: none; color: #f7f4fa; scroll-snap-align: start; }
+        .tb-streaming .tb-strip-item.is-on { border-color: var(--tb-item-accent); background: #28172c; box-shadow: none; }
+        .tb-streaming .tb-strip-item:not(.is-on):hover { background: #232027; }
+        .tb-streaming .tb-strip-no { color: #a9a5b2; font-size: 11px; letter-spacing: 0; }
+        .tb-streaming .tb-strip-label { font-size: 12px; line-height: 1.4; text-align: left; }
+        .tb-streaming button:focus-visible { outline: 2px solid #8feeff; outline-offset: 2px; }
+        @container terminal (max-height: 500px) { .tb-streaming .tb-crt { aspect-ratio: 16 / 9; } }
       `}</style>
     </div>
   );

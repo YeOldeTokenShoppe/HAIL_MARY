@@ -92,13 +92,6 @@ const SHOW_CASE_HUD_STRIP = false;
 // this leaves room to look around without zooming the stage into the void.
 const LT_TV_MAX_DISTANCE = 6;
 
-// What the LT TV lineup cycles on the set's frame screen: one card per show,
-// with its latest episode, or Coming soon until it has one.
-const LT_TV_CHANNEL_CARDS = LT_TV_SHOWS.map((show) => {
-  const latest = show.episodes[show.episodes.length - 1];
-  return { title: show.title, format: show.format, latest: latest ? `EP ${latest.number}` : null };
-});
-
 const HOST_SITEPAL_CONFIG = {
   containerId: DEMON_SITEPAL_CONTAINER_ID, // shared host container
   account: "9308752",
@@ -1354,9 +1347,15 @@ export default function CyborgTemple() {
   // (mobile shows a baked backdrop with no model to swap).
   const [talkShowMode, setTalkShowMode] = useState(false);
   // LT TV lands on the lineup — the set off air: empty chairs, the channel
-  // cycling on the frame's screen — and a show takes over once it's picked
+  // previewing the selected show on the frame's screen — and a show takes over once it's picked
   // ('lineup' | 'set'). Same model either way, so tuning in is instant.
   const [ltTvView, setLtTvView] = useState('lineup');
+  const [ltTvSelection, setLtTvSelection] = useState({ showId: LT_TV_SHOWS[0].id, episodeIndex: 0 });
+  const ltTvChannelCards = useMemo(() => {
+    const show = LT_TV_SHOWS.find((item) => item.id === ltTvSelection.showId) || LT_TV_SHOWS[0];
+    const episode = show.episodes[ltTvSelection.episodeIndex] || show.episodes[0];
+    return [{ title: show.title, format: show.format, episodeTitle: episode?.title, latest: episode ? `EP ${episode.number} · REPLAY` : null }];
+  }, [ltTvSelection]);
   // Which talk-show character projects the live SitePal face — for fitting the
   // crop onto Face2/FaceDemon2. 'Monk' | 'Barron' | null. Driven by the dev
   // fitting control (?tune=sitepal); one at a time (single shared portal).
@@ -2827,16 +2826,24 @@ export default function CyborgTemple() {
   // characters (Demon left, Monk right) with the neon frame behind them.
   // Derived from the model's world layout (see TalkShowScene). Null unless the
   // tab is active, so the rig only snaps when talk show is on.
-  // On the lineup (the LT TV landing) it frames the frame's channel screen and
-  // the empty chairs, offset right of the console. Either way the viewer can
+  // The landing uses an elevated three-quarter establishing shot of the
+  // news desk, program screen, and diagonal studio lights, right of the console. Either way the viewer can
   // orbit and dolly, but not pull back past LT_TV_MAX_DISTANCE into the void.
   const talkShowPose = useMemo(() => {
     if (!talkShowMode) return null;
-    if (ltTvView === 'set') {
-      return { position: [0.15, 0.15, 3.7], target: [0.15, -0.5, 0.1], maxDistance: LT_TV_MAX_DISTANCE };
+    if (ltTvView === 'set' && ltTvSelection.showId === 'news') {
+      return { position: [-0.8, 0.6, 4.8], target: [-0.8, -0.1, -0.2], maxDistance: LT_TV_MAX_DISTANCE };
     }
-    return { position: [-0.51, -0.15, 2.95], target: [-0.51, -0.65, -0.4], maxDistance: LT_TV_MAX_DISTANCE };
-  }, [talkShowMode, ltTvView]);
+    if (ltTvView === 'set') {
+      // Playback collapses the console: center the guests and dolly in ~15%.
+      // The wider, offset framing returns when playback stops or finishes.
+      if (talkShowPlaying) {
+        return { position: [0.1, 0.25, 4.95], target: [0.1, -0.5, 0.1], maxDistance: LT_TV_MAX_DISTANCE };
+      }
+      return { position: [-0.65, 0.4, 5.8], target: [-0.65, -0.5, 0.1], maxDistance: LT_TV_MAX_DISTANCE };
+    }
+    return { position: [-4.7744, 2.004, 1.9736], target: [-0.8, -0.65, -0.4], maxDistance: LT_TV_MAX_DISTANCE };
+  }, [talkShowMode, ltTvView, ltTvSelection.showId, talkShowPlaying]);
   // Tightened framing: dolly the resting shot ~15% closer so the workstation
   // fills more of the frame and the empty sky band above the monitors crops
   // down. Angle/target unchanged — same approved composition, just nearer.
@@ -4148,9 +4155,10 @@ export default function CyborgTemple() {
                 rotation={[0, 0, 0]}
                 projectCharacter={talkShowProject}
                 castHidden={ltTvView === 'lineup'}
-                hideCameraRig={ltTvView === 'lineup'}
-                enableMonitorFeed={ltTvView === 'set'}
-                channelCards={ltTvView === 'lineup' ? LT_TV_CHANNEL_CARDS : null}
+                newsMode={ltTvView === 'set' && ltTvSelection.showId === 'news'}
+                hideCameraRig={ltTvView === 'lineup' || ltTvSelection.showId === 'news'}
+                enableMonitorFeed={ltTvView === 'set' && ltTvSelection.showId !== 'news'}
+                channelCards={ltTvView === 'lineup' || ltTvSelection.showId === 'news' ? ltTvChannelCards : null}
                 onPlaybackReady={handleTalkShowPlaybackReady}
                 onPlaybackStateChange={handleTalkShowPlaybackState}
               />
@@ -4604,7 +4612,7 @@ export default function CyborgTemple() {
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
                 overflow: 'hidden',
-                opacity: railHidden ? 0 : 1,
+                opacity: railHidden ? 0 : talkShowPlaying ? 0.4 : 1,
                 pointerEvents: railHidden ? 'none' : 'auto',
                 transition: 'opacity 0.3s ease',
               }}
@@ -4669,6 +4677,9 @@ export default function CyborgTemple() {
         {mounted && !isMobileView && talkShowMode && (
           <LTTvBroadcastPanel
             view={ltTvView}
+            showId={ltTvSelection.showId}
+            episodeIndex={ltTvSelection.episodeIndex}
+            onSelectEpisode={(showId, episodeIndex) => setLtTvSelection({ showId, episodeIndex })}
             onTuneIn={() => setLtTvView('set')}
             onLeaveSet={leaveTalkShowSet}
             audioReady={talkShowAudioReady}
@@ -6021,6 +6032,7 @@ export default function CyborgTemple() {
                   document.body
                 )}
               <MobileBottomNav
+                subdued={talkShowMode && talkShowPlaying}
                   hideWallet
                   accountOnLeft
                 /* No center FAB in the lobby on any width (2026-08-01): the

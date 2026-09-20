@@ -1,5 +1,5 @@
 "use client";
-// LT TV on mobile — the talk_show2.glb set running inside the Liminal Terminal.
+// LT TV on mobile — the talk_show3.glb set running inside the Liminal Terminal.
 //
 // WHY THIS EXISTS SEPARATELY FROM THE DESKTOP TAB. The desktop set is swapped
 // into the page's big CleanCanvas (app/trade/page.js), which is gated
@@ -20,13 +20,12 @@
 // Three further mobile budget switches are passed to TalkShowScene: solo face
 // projection, no in-scene camera monitor, and a viewport-fitted portal host.
 // See the prop comments on TalkShowScene's default export.
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import TalkShowScene from "./TalkShowScene";
-import { EPISODES } from "./LTTvBroadcastPanel";
+import { SHOWS } from "./LTTvBroadcastPanel";
 import usePerfHud from "./PerfHud";
-import TerminalModuleHeader from "./TerminalModuleHeader";
 
 // Camera + aim carried over from the desktop talk-show pose (`talkShowPose` in
 // app/trade/page.js), pushed in for phone-sized real estate: the desktop shot is
@@ -87,7 +86,7 @@ const isHeadBone = (node) =>
 // texture/geometry it can reach and clears THREE.Cache on unmount, which would
 // gut the drei useGLTF entry the set is cloned from — the next open (or the
 // desktop tab) would come up with dead materials. R3F disposes its own renderer.
-function StageCamera() {
+function StageCamera({ newsMode }) {
   const { scene } = useThree();
   // The MEASUREMENT only — { separation, mid }. Deliberately not the solved
   // shot: baking `spread` in here at measure time is what made the advertised
@@ -128,7 +127,7 @@ function StageCamera() {
       }
     }
 
-    const subject = subjectRef.current;
+    const subject = newsMode ? null : subjectRef.current;
     const target = targetRef.current;
     let frameWidth;
     if (subject) {
@@ -136,8 +135,8 @@ function StageCamera() {
       target.copy(subject.mid);
       target.y -= subject.separation * cfg.dropBelowHeads;
     } else {
-      frameWidth = cfg.fallbackWidth;
-      target.set(...cfg.fallbackTarget);
+      frameWidth = newsMode ? 3.8 : cfg.fallbackWidth;
+      target.set(...(newsMode ? [0, -0.65, 0] : cfg.fallbackTarget));
     }
 
     camera.position.set(...cfg.position);
@@ -202,7 +201,16 @@ export default function MobileTalkShow({ onExit }) {
   // today. Mirrored here rather than "fixed" on mobile only, so the two
   // surfaces don't disagree about what picking an episode means.
   const [episodeIndex, setEpisodeIndex] = useState(0);
-  const episode = EPISODES[episodeIndex];
+  const [showId, setShowId] = useState(SHOWS[0].id);
+  const show = SHOWS.find((item) => item.id === showId) || SHOWS[0];
+  const newsMode = show.id === "news";
+  const hasEpisode = show.episodes.length > 0;
+  const episode = show.episodes[episodeIndex] || show.episodes[0] || {
+    title: "News studio preview", summary: "Take a look around the news set. Episodes are coming soon.",
+  };
+  const channelCards = useMemo(() => newsMode ? [{
+    title: show.title, format: show.format, latest: null, episodeTitle: null,
+  }] : null, [newsMode, show.title, show.format]);
 
   // ?perf=1 only. Worth having on this screen too: the SitePal face crop is a
   // per-frame texture upload, which shows up as drift rather than as a hitch.
@@ -225,6 +233,7 @@ export default function MobileTalkShow({ onExit }) {
   }, []);
 
   const play = () => {
+    if (!hasEpisode) return;
     try {
       const started = window.__talkShowPlay?.();
       if (!started) setPlaying(false);
@@ -248,15 +257,17 @@ export default function MobileTalkShow({ onExit }) {
   };
 
   return (
-    <div className={`mts-root ${wide ? "mts-wide" : ""}`} ref={rootRef}>
-      <TerminalModuleHeader
-        channel="LT TV"
-        mode="BROADCAST"
-        code={playing ? "ON AIR" : `EP ${episode.number}`}
-        accent="#ef62dc"
-        active={audioReady}
-        onBack={exit}
-      />
+    <div className={`mts-root ${wide ? "mts-wide" : ""} ${hasEpisode ? "" : "mts-preview"}`} ref={rootRef}>
+      <header className="mts-header">
+        <button type="button" onClick={exit} aria-label="Return to terminal">‹ <span>LT TV</span></button>
+        <select className="mts-program-select" aria-label="Browse programs" value={showId}
+          onChange={(event) => { stop(); setPlaying(false); setShowId(event.target.value); setEpisodeIndex(0); }}>
+          {SHOWS.map((program) => <option key={program.id} value={program.id}
+            disabled={!program.episodes.length && program.id !== "news"}>
+            {program.title}{program.id === "news" ? " — Studio preview" : !program.episodes.length ? " — Coming soon" : ""}
+          </option>)}
+        </select>
+      </header>
 
       <div className="mts-stage-shell">
         <div className="mts-stage">
@@ -277,9 +288,11 @@ export default function MobileTalkShow({ onExit }) {
           }}
           style={{ width: "100%", height: "100%", background: "#000" }}
         >
-          <StageCamera />
+          <StageCamera newsMode={newsMode} />
           <ambientLight intensity={1.5} />
           <TalkShowScene
+            newsMode={newsMode}
+            channelCards={channelCards}
             soloProjection
             enableMonitorFeed={false}
             compactPortalHost
@@ -291,74 +304,40 @@ export default function MobileTalkShow({ onExit }) {
         </Canvas>
 
         {readout}
-        {/* Scanline/vignette dressing, matched to TerminalBoot's CRT. */}
-        <div className="mts-crt" />
-
-          <div className="mts-stage-readout">
-            <span>CH 01 // LIVE FEED</span>
-            <span>{playing ? "● TRANSMITTING" : "● SIGNAL LOCKED"}</span>
-          </div>
-
-          {!audioReady && (
+          {hasEpisode && !audioReady && (
             <div className="mts-overlay">
               {voiceStatus === "failed" ? (
                 <>
-                  <span className="mts-overlay-tag">SIGNAL LOST</span>
-                  <button className="mts-retry" onClick={retry}>RETRY FEED</button>
+                  <span className="mts-overlay-tag">Audio unavailable</span>
+                  <button className="mts-retry" onClick={retry}>Retry audio</button>
                 </>
               ) : (
-                <span className="mts-overlay-tag mts-blink">TUNING IN…</span>
+                <span className="mts-overlay-tag mts-blink">Preparing studio…</span>
               )}
             </div>
           )}
         </div>
       </div>
 
-      <div className="mts-controls">
-        <button
-          className="mts-play"
-          onClick={playing ? stop : play}
-          disabled={!audioReady}
-        >
-          {playing ? "■ STOP" : "▶ PLAY EPISODE"}
-        </button>
-        <div className="mts-caption">
-          {voiceStatus === "failed"
-            ? "voice feed unavailable"
-            : !audioReady
-              ? "loading voices…"
-              : playing
-                ? "GR80 & John Barron · live"
-                : "one episode. two guests. no edit."}
-        </div>
-        {/* Portrait only (hidden in the wide layout). Rotating is an upgrade,
-            not a requirement — the panel above is already watchable. */}
-        <div className="mts-rotate-hint">↻ ROTATE FOR FULL SCREEN</div>
-      </div>
-
-      {/* ── Bottom half ── Portrait left ~40% of the screen empty, so it takes
-          the desktop panel's production block: what's on, the slate you can
-          pick from, and the studio status strip. All hidden in the wide layout,
-          where the broadcast owns the full screen. */}
       <div className="mts-below">
         <div className="mts-now">
-          <div className="mts-eyebrow">
-            Current production · weekly roundtable
-          </div>
-          <h3 className="mts-ep-title">
-            <span className="mts-ep-no">EP {episode.number}</span>
-            {episode.title}
-          </h3>
+          <h2 className="mts-show-title">{show.title}</h2>
+          <div className="mts-metadata"><span>{show.format}</span>{hasEpisode && <><span>{show.episodes.length} episodes</span><span className="mts-replay">Replay</span></>}</div>
+          <div className="mts-episode-meta">{hasEpisode ? `Episode ${episode.number} · ${episode.runtime}` : "Studio preview"}</div>
+          <h3 className="mts-ep-title">{episode.title}</h3>
           <p className="mts-ep-sum">{episode.summary}</p>
-          <div className="mts-facts">
-            <span>◷ {episode.runtime}</span>
-            <span>▣ July 31, 2026</span>
-            <span className="mts-rec">● RECORDED</span>
-          </div>
         </div>
-
+        <div className="mts-controls">
+          <button type="button" className="mts-play" onClick={voiceStatus === "failed" ? retry : playing ? stop : play}
+            disabled={!hasEpisode || (!audioReady && voiceStatus !== "failed")}>
+            <span aria-hidden="true">{playing ? "■" : voiceStatus === "failed" ? "↻" : "▶"}</span>
+            {!hasEpisode ? "Episodes coming soon" : voiceStatus === "failed" ? "Retry audio" : !audioReady ? "Preparing studio…" : playing ? "Stop replay" : "Play replay"}
+          </button>
+          <div className="mts-rotate-hint">Rotate your phone for full-screen viewing</div>
+        </div>
+        {hasEpisode && <h3 className="mts-episodes-heading">Episodes</h3>}
         <div className="mts-rack" role="group" aria-label="Episodes">
-          {EPISODES.map((ep, i) => (
+          {show.episodes.map((ep, i) => (
             <button
               key={ep.number}
               className={`mts-rack-item ${i === episodeIndex ? "is-on" : ""}`}
@@ -369,211 +348,64 @@ export default function MobileTalkShow({ onExit }) {
                 setEpisodeIndex(i);
               }}
             >
-              <span className="mts-rack-no">{ep.number}</span>
+              <span className="mts-rack-no">Episode {ep.number}</span>
               <span className="mts-rack-title">{ep.title}</span>
               <span className="mts-rack-run">{ep.runtime}</span>
             </button>
           ))}
         </div>
 
-        <div className="mts-status">
-          <span><i>STUDIO</i>LT TALK SET</span>
-          <span><i>CAM</i>01</span>
-          <span><i>AUDIO</i>LIVE MIX</span>
-          <span className={playing ? "mts-rec" : ""}>
-            <i>STATUS</i>{playing ? "ON AIR" : audioReady ? "READY" : "STANDBY"}
-          </span>
-        </div>
       </div>
 
       <style>{`
-        .mts-root {
-          position: absolute; inset: 0; display: flex; flex-direction: column;
-          background:
-            linear-gradient(90deg, rgba(41,58,65,0.32) 0 8px, transparent 8px calc(100% - 8px), rgba(41,58,65,0.32) calc(100% - 8px)),
-            radial-gradient(100% 65% at 50% 25%, rgba(10,53,49,0.38), transparent 72%),
-            #000706;
-          color: #2fd6d6; font-family: 'IoskeleyMono', 'Courier New', monospace;
-          overflow: hidden; user-select: none;
-        }
-        /* The broadcast panel. 4:3 rather than 16:9 — a third more height for
-           the guests, while staying landscape enough to hold a two-shot (a
-           portrait panel would force the camera so far back the set shrinks
-           again). The modest pixel count is what pays for the live SitePal
-           face, so this grows deliberately rather than filling the screen. */
-        .mts-stage-shell {
-          position: relative; flex: 0 0 auto; margin: 10px 11px 0;
-          padding: 8px;
-          background: linear-gradient(145deg, #172427, #071010 32%, #020504 78%);
-          border: 1px solid rgba(75,219,210,0.32);
-          box-shadow: 0 9px 22px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(255,255,255,0.025);
-          clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 11px 100%, 0 calc(100% - 11px));
-        }
-        .mts-stage-shell::before {
-          content: ""; position: absolute; inset: 3px; pointer-events: none;
-          border: 1px solid rgba(239,98,220,0.18);
-        }
-        .mts-stage {
-          position: relative; width: 100%; aspect-ratio: 4 / 3; flex: 0 0 auto;
-          border: 1px solid color-mix(in srgb, #ef62dc 62%, transparent);
-          background: #000; overflow: hidden;
-          box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 0 16px rgba(239,98,220,0.08);
-        }
-
-        /* ROTATED (.mts-wide, set from the measured box — see the comment on
-           the ResizeObserver): the broadcast takes the whole screen and the
-           chrome floats over it. The width-locked camera re-solves its fov on
-           the resize, so this is the same shot at full size, not a crop of it.
-           Costs ~2.8× the portrait panel's pixels, which is why it's the
-           rotate-to-opt-in state rather than the default. */
-        .mts-wide .tmh-root {
-          position: absolute; top: 0; left: 0; right: 0; z-index: 3;
-          background: linear-gradient(180deg, rgba(0,10,9,0.94), rgba(0,10,9,0.25));
-        }
-        .mts-wide .mts-stage-shell { flex: 1 1 auto; min-height: 0; margin: 0; padding: 0; border: 0; }
-        .mts-wide .mts-stage-shell::before { display: none; }
-        .mts-wide .mts-stage { height: 100%; aspect-ratio: auto; min-height: 0; border: none; }
-        .mts-wide .mts-controls {
-          position: absolute; bottom: 0; left: 0; right: 0; z-index: 3;
-          flex: 0 0 auto; flex-direction: row; align-items: center; justify-content: center; gap: 16px;
-          padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 10px);
-          background: linear-gradient(0deg, rgba(2,16,14,0.85), transparent);
-        }
-        .mts-wide .mts-play { width: auto; padding: 11px 22px; font-size: 13px; }
-        .mts-wide .mts-caption { max-width: 40%; }
-        .mts-wide .mts-rotate-hint { display: none; }
-        .mts-crt {
-          position: absolute; inset: 0; pointer-events: none;
-          background: repeating-linear-gradient(0deg, rgba(0,0,0,0.22) 0 1px, transparent 1px 3px),
-                      radial-gradient(130% 100% at 50% 50%, transparent 58%, rgba(0,0,0,0.6));
-        }
-        .mts-stage-readout {
-          position: absolute; z-index: 2; left: 9px; right: 9px; top: 8px;
-          display: flex; justify-content: space-between; gap: 10px;
-          color: #b9dcd6; font-size: 7px; letter-spacing: 0.14em;
-          text-shadow: 0 1px 3px #000;
-        }
-        .mts-stage-readout span:first-child { color: #ef62dc; }
-        .mts-overlay {
-          position: absolute; inset: 0; display: flex; flex-direction: column;
-          align-items: center; justify-content: center; gap: 12px;
-          background: rgba(2,16,14,0.82);
-        }
-        .mts-overlay-tag { font-size: 12px; letter-spacing: 0.18em; color: #ffd23a; }
-        .mts-blink { animation: mtsBlink 1.4s steps(2, start) infinite; }
-        @keyframes mtsBlink { 0%, 60% { opacity: 1; } 61%, 100% { opacity: 0.35; } }
-        .mts-retry {
-          background: none; border: 1px solid color-mix(in srgb, #2fd6d6 55%, transparent);
-          color: #2fd6d6; font: inherit; font-size: 12px; letter-spacing: 0.08em;
-          padding: 9px 14px; cursor: pointer;
-          clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
-        }
-
-        /* Sits directly under the panel rather than centring itself in the
-           leftover height — floating it in the middle of the dead space read
-           as a layout bug. */
-        .mts-controls {
-          flex: 0 0 auto; display: flex; flex-direction: column;
-          align-items: center; justify-content: flex-start; gap: 7px; padding: 13px 16px 0;
-        }
-        .mts-play {
-          width: 100%; max-width: none;
-          background: linear-gradient(90deg, #061412, #071b18 50%, #061412);
-          border: 1px solid color-mix(in srgb, #ef62dc 55%, transparent);
-          color: #eafff9; font: inherit; font-size: 15px; font-weight: bold;
-          letter-spacing: 0.08em; padding: 15px 13px; cursor: pointer;
-          clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 11px 100%, 0 calc(100% - 11px));
-          transition: box-shadow 0.15s ease, transform 0.1s ease;
-        }
-        .mts-play:not(:disabled):active { transform: scale(0.99); }
-        .mts-play:not(:disabled):hover { box-shadow: inset 0 0 22px color-mix(in srgb, #2fd6d6 18%, transparent); }
-        .mts-play:disabled { opacity: 0.45; cursor: default; }
-        .mts-caption { font-size: 11px; color: #2fd6d6; opacity: 0.8; letter-spacing: 0.05em; text-align: center; }
-        .mts-rotate-hint {
-          font-size: 10px; letter-spacing: 0.14em; color: #ffd23a; opacity: 0.65;
-          text-align: center; margin-top: 2px;
-        }
-
-        /* ---- BOTTOM HALF (portrait only) ---- */
-        /* Scrolls rather than clips when squeezed. The body is scroll-locked
-           behind this overlay, so anything that overflows is unreachable, not
-           merely below the fold. */
-        .mts-below {
-          flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column;
-          gap: 10px; padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
-          overflow-y: auto; overscroll-behavior: contain;
-          -webkit-overflow-scrolling: touch;
-        }
-        .mts-eyebrow {
-          font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase;
-          color: #2fd6d6; opacity: 0.6;
-        }
-        .mts-ep-title {
-          margin: 5px 0 0; font-size: 17px; font-weight: bold; color: #f4fffb;
-          letter-spacing: 0.02em;
-        }
-        .mts-ep-no {
-          color: #ffd23a; font-size: 10px; letter-spacing: 0.14em;
-          margin-right: 8px; vertical-align: middle;
-        }
-        .mts-ep-sum {
-          margin: 4px 0 0; font-size: 11.5px; line-height: 1.5; color: #9fd8d0;
-        }
-        .mts-facts {
-          display: flex; flex-wrap: wrap; gap: 12px; margin-top: 7px;
-          font-size: 10px; letter-spacing: 0.06em; color: #2fd6d6; opacity: 0.75;
-        }
-        .mts-rec { color: #4dffaa; opacity: 1; }
-
-        /* The slate, as a horizontal filmstrip. A vertical list squeezed to one
-           and a half visible rows once the now-playing block and status strip
-           took their share — sideways, all six are reachable with a thumb and
-           the strip costs one fixed row of height instead of competing for it.
-           The selected episode's title is NOT repeated here; the block above
-           already carries it. */
-        .mts-rack {
-          flex: 0 0 auto; display: flex; gap: 6px; overflow-x: auto;
-          -webkit-overflow-scrolling: touch; scrollbar-width: none;
-          border-top: 1px solid color-mix(in srgb, #2fd6d6 22%, transparent);
-          padding-top: 9px;
-        }
-        .mts-rack::-webkit-scrollbar { display: none; }
-        .mts-rack-item {
-          flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
-          min-width: 96px; max-width: 128px; text-align: left;
-          background: #061a18; border: 1px solid color-mix(in srgb, #2fd6d6 22%, transparent);
-          color: #cfeee8; font: inherit; padding: 8px 10px; cursor: pointer;
-          clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
-        }
-        .mts-rack-item.is-on {
-          border-color: color-mix(in srgb, #ef62dc 70%, transparent);
-          color: #eafff9;
-          box-shadow: inset 0 0 18px color-mix(in srgb, #ef62dc 12%, transparent);
-        }
-        .mts-rack-no { color: #ffd23a; font-size: 10px; letter-spacing: 0.1em; }
+        .mts-root { position: absolute; inset: 0; display: flex; flex-direction: column; background: #050408; color: #f7f4fa; font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; overflow-y: auto; overscroll-behavior: contain; }
+        .mts-root *, .mts-root *::before { box-sizing: border-box; }
+        .mts-header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(env(safe-area-inset-top, 0px) + 8px) 20px 8px; min-height: 56px; }
+        .mts-header button { display: flex; align-items: center; gap: 12px; min-height: 44px; border: 0; padding: 0; background: transparent; color: #b7b1c0; font-size: 26px; cursor: pointer; }
+        .mts-header button span { color: #ffc096; font: 500 17px "Orbitron", sans-serif; letter-spacing: .19em; }
+        .mts-program-select { min-height: 44px; width: min(58%, 260px); border: 1px solid #302a38; border-radius: 5px; padding: 8px; background: #15121b; color: #f7f4fa; font: 500 12px "Inter", sans-serif; }
+        .mts-program-select:focus-visible { outline: 2px solid #8feeff; outline-offset: 2px; }
+        .mts-header-status { color: #b4aaba; font-size: 12px; }
+        .mts-stage-shell { position: relative; flex: 1 0 auto; aspect-ratio: 4 / 3; margin: 0; padding: 0; background: #000; }
+        .mts-stage { position: absolute; inset: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+        .mts-stage::after { content: ""; position: absolute; inset: auto 0 0; height: 34px; background: linear-gradient(transparent, #050408); pointer-events: none; }
+        .mts-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(5,4,8,.8); }
+        .mts-overlay-tag { color: #d1cad9; font-size: 14px; }
+        .mts-retry { border: 1px solid #777080; border-radius: 5px; padding: 12px 18px; min-height: 44px; background: #232027; color: #fff; font: 600 14px "Inter", sans-serif; cursor: pointer; }
+        .mts-below { flex: .6 0 auto; display: flex; flex-direction: column; padding: 14px 20px calc(env(safe-area-inset-bottom, 0px) + 24px); }
+        .mts-show-title { margin: 0; color: #20d7f2; font: 700 25px/1.25 "Orbitron", sans-serif; letter-spacing: -.035em; text-align: left; text-wrap: balance; }
+        .mts-metadata { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 22px; font-size: 12px; color: #b9b6c2; line-height: 1.5; }
+        .mts-metadata span + span::before { content: "·"; margin-right: 8px; color: #6e687b; }
+        .mts-metadata .mts-replay { color: #ef62dc; }
+        .mts-episode-meta { color: #a9a5b2; font-size: 12px; margin-bottom: 6px; }
+        .mts-ep-title { margin: 0 0 8px; font-size: 21px; line-height: 1.3; font-weight: 650; text-align: left; letter-spacing: -.02em; }
+        .mts-ep-sum { margin: 0; color: #c9c6d0; font-size: 14px; line-height: 1.6; text-align: left; }
+        .mts-preview:not(.mts-wide) .mts-controls { margin-top: auto; margin-bottom: 0; padding-top: 24px; }
+        .mts-preview .mts-rack:empty { display: none; }
+        .mts-controls { margin: 20px 0 26px; }
+        .mts-play { width: 100%; min-height: 48px; border: 0; border-radius: 5px; padding: 12px 18px; display: flex; align-items: center; justify-content: center; gap: 10px; background: #f7f4fa; color: #131019; font: 650 15px/1.3 "Inter", sans-serif; cursor: pointer; }
+        .mts-play span { font-size: 12px; }
+        .mts-play:hover:not(:disabled) { background: #dfdce5; }
+        .mts-play:disabled { opacity: .5; cursor: default; }
+        .mts-rotate-hint { text-align: center; color: #96919f; font-size: 11px; line-height: 1.5; margin-top: 10px; }
+        .mts-episodes-heading { text-align: left; font-size: 17px; font-weight: 650; margin: 0 0 12px; }
+        .mts-rack { display: flex; gap: 10px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; padding: 3px 3px 12px; margin: 0 -3px; scrollbar-width: thin; scrollbar-color: #554659 transparent; }
+        .mts-rack-item { flex: 0 0 156px; min-height: 108px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px; border: 1px solid rgba(255,255,255,.12); border-radius: 7px; background: #15121b; color: #f7f4fa; font: inherit; text-align: left; cursor: pointer; scroll-snap-align: start; }
+        .mts-rack-item.is-on { border-color: #ef62dc; background: #28172c; }
+        .mts-rack-no { color: #a9a5b2; font-size: 11px; }
         .mts-rack-item.is-on .mts-rack-no { color: #ef62dc; }
-        .mts-rack-title {
-          font-size: 11px; line-height: 1.25; width: 100%;
-          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        }
-        .mts-rack-run { font-size: 9.5px; opacity: 0.55; letter-spacing: 0.06em; }
-
-        .mts-status {
-          flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 4px 14px;
-          padding: 8px 0 2px; font-size: 9px; letter-spacing: 0.08em; color: #cfeee8;
-          border-top: 1px solid color-mix(in srgb, #2fd6d6 22%, transparent);
-        }
-        .mts-status i { font-style: normal; color: #2fd6d6; opacity: 0.55; margin-right: 5px; }
-
-        /* The wide layout gives the whole screen to the broadcast. */
-        .mts-wide .mts-below { display: none; }
-
-        .mts-play:focus-visible, .mts-retry:focus-visible, .mts-rack-item:focus-visible {
-          outline: 1px solid #effffc; outline-offset: 2px;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .mts-blink { animation: none; }
-        }
+        .mts-rack-title { font-size: 13px; font-weight: 600; line-height: 1.35; }
+        .mts-rack-run { margin-top: auto; font-size: 11px; color: #a9a5b2; }
+        .mts-root button:focus-visible { outline: 2px solid #8feeff; outline-offset: 3px; }
+        .mts-wide { overflow: hidden; }
+        .mts-wide .mts-header { position: absolute; inset: 0 0 auto; z-index: 3; padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); background: linear-gradient(#050408dd, transparent); }
+        .mts-wide .mts-stage-shell { flex: 1 1 auto; min-height: 0; aspect-ratio: auto; }
+        .mts-wide .mts-stage { height: 100%; aspect-ratio: auto; }
+        .mts-wide .mts-below { display: contents; }
+        .mts-wide .mts-now, .mts-wide .mts-rack, .mts-wide .mts-episodes-heading, .mts-wide .mts-rotate-hint { display: none; }
+        .mts-wide .mts-controls { position: absolute; inset: auto 0 0; z-index: 3; margin: 0; padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 12px); display: flex; justify-content: center; background: linear-gradient(transparent, #050408dd); }
+        .mts-wide .mts-play { width: auto; min-width: 160px; }
+        @media (max-width: 360px) { .mts-below { padding-left: 16px; padding-right: 16px; } .mts-show-title { font-size: 23px; } }
       `}</style>
     </div>
   );
