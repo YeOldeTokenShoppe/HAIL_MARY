@@ -75,7 +75,7 @@ export const RACER_VISUALS = {
     },
   },
   demon: {
-    model: "/models/John_Barron.glb",
+    model: "/models/Connor.glb",
     scale: 1,
     facing: Math.PI / 2,
     yOffset: 0,

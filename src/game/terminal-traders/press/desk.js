@@ -40,7 +40,7 @@ export const PITCH_BOT = {
   name: "Pitch Bot",
   role: "PITCHING ON COMMISSION",
   model: "/models/pitch-bot.glb",   // 566KB. Draco + EXT_texture_webp required.
-  // Its own render, 2026-07-29. This was thumbnail_johnBarron.png as a
+  // Its own render, 2026-07-29. This was thumbnail_connor.png as a
   // placeholder for a few hours, which put THE SAME FACE on the pitcher tile and
   // on Connor's tile two seats apart in the same row — the cast-legibility
   // failure this whole refactor exists to fix. SeatRow still falls back to a
@@ -112,7 +112,7 @@ export const DESK = {
   [SEATS.CONNOR]: {
     id: SEATS.CONNOR, agentId: "Demon", station: "demon",
     name: "Connor", role: "THE CHART", lane: LANES.CHART,
-    portrait: "/thumbnail_johnBarron.png", voice: "JB",
+    portrait: "/thumbnail_connor.png", voice: "JB",
     sitepal: {
       label: "Connor", account: SITEPAL_ACCOUNT,
       sceneId: 2775052, hash: "IMtOuXOufh3OnQ9ZYUXc2DoYe39vRePb",
