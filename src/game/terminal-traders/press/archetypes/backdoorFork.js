@@ -72,7 +72,7 @@ export const OUTCOMES = [
 export { PRIORS, AUDITORS } from "../identities.js";
 
 // ---------------------------------------------------------------------------
-// The claim slots. `fact`/`spin` never change — Barron says true things and
+// The claim slots. `fact`/`spin` never change — Connor says true things and
 // sells an inference. Only `rug` / `legit` differ, and they differ in what he
 // can PRODUCE when pressed. That's the whole mechanism.
 // ---------------------------------------------------------------------------

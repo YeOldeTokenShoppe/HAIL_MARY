@@ -78,7 +78,7 @@ const { final } = finalizeCalls(bt, { seed, caseIndex, signals, order: ORDER, me
 
 // Browser-captured fingerprint (identical across two independent runs).
 check("GR80 read ETHOS + MYTHOS", bt.scanned.monk, ["monk", "eugene"]);
-check("Barron read PATHOS + MYTHOS", bt.scanned.demon, ["demon", "eugene"]);
+check("Connor read PATHOS + MYTHOS", bt.scanned.demon, ["demon", "eugene"]);
 check("Marisol read LOGOS + ETHOS", bt.scanned.marisol, ["marisol", "monk"]);
 check("Eugene read MYTHOS + LOGOS", bt.scanned.eugene, ["eugene", "marisol"]);
 check("all four played their signature cards", ORDER.map((k) => !!bt.mods[k]), [true, true, true, true]);

@@ -303,8 +303,8 @@ let activeAdviserLine = null;
 // Returns the level the mouth should treat as "wide open" for this clip.
 //
 // WHY THIS EXISTS: a fixed gain does not work across two voices. Measured on one
-// exchange (2026-07-22) with playUnicornBeat's ×3.8: Barron pinned at the 1.0
-// clamp for his whole line while GR80 peaked at 0.155. Barron's mouth would hang
+// exchange (2026-07-22) with playUnicornBeat's ×3.8: Connor pinned at the 1.0
+// clamp for his whole line while GR80 peaked at 0.155. Connor's mouth would hang
 // permanently open and GR80's would barely part — the two ElevenLabs voices
 // simply render at different levels, and GR80's settings (stability 0.85, style
 // 0.1) are a flatter delivery by design. Eugene never hit this because he is one

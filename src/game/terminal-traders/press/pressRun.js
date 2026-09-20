@@ -133,13 +133,13 @@ export function resolvePress(claim, seat = PITCHER) {
     backing: claim.backing,
     // The pitcher answers under its own name in the panel, so it gets no second
     // voice. Every SEAT reports first — they're the one who went and looked,
-    // Barron included now that he is a plain specialist.
+    // Connor included now that he is a plain specialist.
     adviserSays: seat === PITCHER ? null : adviserLine(seat, result, deep),
     // Historical field name: this is whatever the PITCHER says. On a seat press
     // it is the pitcher's reaction to the finding, which is why it is still
     // populated for every seat — see the TWO VOICES PER PRESS note in
     // PressSession.jsx / PressFlat.jsx, which own that ordering.
-    barronSays: block.line ?? "",
+    connorSays: block.line ?? "",
     receipt,
     // NOTHING ON FILE is an independent party having LOOKED and found an
     // absence — strictly stronger than a board simply staying dark, and the
@@ -266,7 +266,7 @@ export const PRESSURE = {
 /**
  * WHAT THE ROOM HAS DONE TO HIM SO FAR.
  *
- * The session used to have no arc: six claims of equal weight, and Barron
+ * The session used to have no arc: six claims of equal weight, and Connor
  * delivered the sixth exactly as he delivered the first no matter what you had
  * caught him doing. He is a rigged, voiced character in a room — a tape
  * recorder was a waste of the only asset this page has.

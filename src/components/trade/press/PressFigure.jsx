@@ -35,7 +35,7 @@ const PressBotStage = dynamic(() => import("./PressBotStage"), { ssr: false });
 // number is renderer-agnostic. The same signal that rotates Eugene's jaw bone in
 // R3F drives everything below.
 //
-// IT WAS BARRON UNTIL 2026-08-02, and had been wrong since 2026-07-29 in a way
+// IT WAS CONNOR UNTIL 2026-08-02, and had been wrong since 2026-07-29 in a way
 // that looked fine: two headshot frames cross-faded on `adviserMouth.JB`, from
 // back when Connor did the selling. When the pitch bot took the pitch over, this
 // surface kept showing HIS FACE while the BOT's voice played, and read the mouth

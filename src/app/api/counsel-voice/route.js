@@ -78,7 +78,7 @@ const VOICES = {
   // 2026-07-29). It is the thing you press, not a member of the desk; see
   // PITCHER in game/terminal-traders/press/questions.js.
   //
-  // Steadier than Barron (0.4) because it is a machine and does not waver, but
+  // Steadier than Connor (0.4) because it is a machine and does not waver, but
   // far more style than GR80's procedural 0.1 because it is still SELLING — a
   // closer on commission, not a narrator reading a file.
   PB: {
@@ -106,7 +106,7 @@ const VOICES = {
   //   DOWN toward 0.1  flatter, more machine — but that is GR80's procedural
   //                    setting, and a closer who sounds like a narrator has
   //                    stopped selling, which costs the scene its whole premise.
-  //   UP toward 0.5    pushes harder, and by 0.55 it is Barron's seduction — a
+  //   UP toward 0.5    pushes harder, and by 0.55 it is Connor's seduction — a
   //                    different character, not a louder version of this one.
   // The target is a machine that never wavers and is unmistakably still selling.
   PB2: {
@@ -136,7 +136,7 @@ const VOICES = {
   // say so. Steady like GR80 because a guide who wavers is not reassuring, but
   // nowhere near his procedural 0.1 — GR80 reports what the file says and Virgil
   // is talking TO you, dryly, about what you should do next. Nothing near
-  // Barron's 0.55 push or the closers' 0.45: the moment he sounds like he is
+  // Connor's 0.55 push or the closers' 0.45: the moment he sounds like he is
   // selling you something, the one character you are meant to trust has become
   // another one to read.
   //
@@ -185,7 +185,7 @@ export async function POST(request) {
     return Response.json({ error: "bad json" }, { status: 400 });
   }
 
-  // ALLOW-LIST, so an unknown speaker falls back to Barron rather than reaching
+  // ALLOW-LIST, so an unknown speaker falls back to Connor rather than reaching
   // ElevenLabs with a voice id this route never chose. PB2 has to be added here
   // as well as to VOICES — a voice missing from this line is accepted nowhere,
   // and the symptom is the wrong character speaking, not an error.
@@ -201,7 +201,7 @@ export async function POST(request) {
             APPARITIONS.find((a) => a.key === body?.apparition)?.voice?.id ||
             ORACLE_VOICE.id,
           // Warmer and freer than GR80's procedural flatness, steadier than
-          // Barron's push: she is unhurried and means it.
+          // Connor's push: she is unhurried and means it.
           settings: { stability: 0.6, similarity_boost: 0.75, style: 0.35 },
         }
       : VOICES[speaker];

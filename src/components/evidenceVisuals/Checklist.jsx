@@ -5,8 +5,8 @@ import React from 'react';
 //   • Eugene/AI CLAIMS       — verification rows, all NONE
 //   • Eugene/WHITEPAPER      — 6 "Tokenomics" pages + missing architecture
 //   • Marisol/LP / VESTING   — exit-readiness checklist (LP unlocked, 0% vested)
-//   • Barron/KOL PROMOTERS   — paid promoters with rug history
-//   • Barron/TELEGRAM ACTIVITY — phrase-frequency report
+//   • Connor/KOL PROMOTERS   — paid promoters with rug history
+//   • Connor/TELEGRAM ACTIVITY — phrase-frequency report
 //
 //   items: [{ status: 'fail'|'warn'|'ok'|'missing', label, value?, sublabel? }]
 //   title: optional section label rendered above the rows

@@ -49,7 +49,7 @@ games — is the Prophet council:
 |---|---|---|---|---|
 | `gr80` | Saint GR80 | ETHOS · CREDIBILITY | `halo-node` | "Cold Wallet Shield" (ignore first crash) reads as divine protection — keep the ability, keep the name. |
 | `john-barron` | Connor | PATHOS · HYPE | `bullhorn-broker` | "Megaphone Wick" (+4 pump, crashes hit +3 harder) is exactly a WSB cynic diamond-handing into the dip — keep the ability, rename to **"Double Down"**. |
-| `eugene` | Eugene | MYTHOS · PATTERN | (himself, recharacterized) | Eugene is **not** the meme guy. He's pattern recognition and rare finds — the one who says "I don't predict. I remember." Memes move to Barron's lane. |
+| `eugene` | Eugene | MYTHOS · PATTERN | (himself, recharacterized) | Eugene is **not** the meme guy. He's pattern recognition and rare finds — the one who says "I don't predict. I remember." Memes move to Connor's lane. |
 | `marisol` | Detective Marisol | LOGOS · ONCHAIN | (herself) | Unchanged. "Follow the Wallets" stays. |
 
 ### 2.1 Eugene's rework
@@ -85,7 +85,7 @@ Notes:
   e.g. "Vestment Algorithm"; "Server Room Alpha" → "Cloister Uptime" — final
   names at art-pass time.)
 - `meme` cards (Meme Blessing, Copium Drip, Airdrop Ambush, and the meme
-  coins) now key off **Barron**, not Eugene. Card text like "Eugene and
+  coins) now key off **Connor**, not Eugene. Card text like "Eugene and
   Bullhorn get extra edge" gets rewritten in the same pass.
 - MYTHOS starts thin — that's fine and even correct (the myth lens should be
   scarce). Retag candidates into `pattern`: Mempool Prophecy, Oracle
@@ -93,7 +93,7 @@ Notes:
   terminal-foils (`terminal` tag) belonging to the myth lens is intentional
   poetry.
 - Style-keyed MARKET_CARDS need the same pass (e.g. Meme Season buffs
-  Barron's lane now; Halving Eve's `automation` bonus becomes `discipline`;
+  Connor's lane now; Halving Eve's `automation` bonus becomes `discipline`;
   Our Lady Appears `analysis`+`meme` → `analysis`+`pattern`).
 
 ### 2.3 The set is freely revisable — until art lock
@@ -221,7 +221,7 @@ remaining lens keys and deep scans are variations on shapes proven here.
 | # | Card | Tier | Role | Effect (mock stand-in in parens) |
 |---|---|---|---|---|
 | 1 | Audit Flare | common | Lens Key · ETHOS | GR80 slides his 2 strongest evidence cards |
-| 2 | Forked Rumor | common | Lens Key · PATHOS | Barron slides his 2 strongest evidence cards |
+| 2 | Forked Rumor | common | Lens Key · PATHOS | Connor slides his 2 strongest evidence cards |
 | 3 | Wallet Séance | common | Lens Key · LOGOS | Marisol slides her 2 strongest evidence cards |
 | 4 | Mempool Prophecy | common | Lens Key · MYTHOS | Eugene slides his 2 strongest evidence cards |
 | 5 | Cold Wallet | uncommon | Deep Scan · ETHOS | opens GR80's cold archive (mock: reveal ALL his remaining entries) — the §3.2 flavor note already names it the ETHOS deep scan |
@@ -426,7 +426,7 @@ kills liquidation drama. Analyst-with-an-allocated-book keeps both.)
   human seat; the council investigates alongside you as pundits (§4.4).
 - Before the docket you choose a **patron** — one partner sponsors your run
   with a passive perk (e.g. GR80: one crash shield per docket; Marisol:
-  first LOGOS action free; Barron: +25% payout on your boldest call;
+  first LOGOS action free; Connor: +25% payout on your boldest call;
   Eugene: one pattern hint per docket). This is what a TRADER card *is*
   now — the patron system answers GENESIS.md's open question ("what does
   owning a trader unlock?"). Choosing a patron is free; owning their
@@ -496,9 +496,9 @@ P&L = STAKE × (1 − 4B)
 The four partners investigate every case alongside you and run **benchmark
 books** — same stakes, same payout rule, visible on the ledger and
 standings. Their books never touch yours; they exist so "beat the council"
-is a measurable outcome and so their busts stay dramatic (Barron
+is a measurable outcome and so their busts stay dramatic (Connor
 liquidating is content). Learning their biases IS a game skill: a player
-who knows Barron over-believes reads his lean as signal.
+who knows Connor over-believes reads his lean as signal.
 
 Case entries gain an authored, player-invisible field:
 
@@ -627,7 +627,7 @@ regulators) enter through three lanes — only the first is a card type:
   discipline. `BOT_PERSONALITIES` migrates and gains the calibration
   parameters; `applyMarket`/shield logic transfers nearly verbatim.
 - **Sim suite before tuning ships**: 200+ seeded dockets per trader ×
-  difficulty mix, watching liquidation rate, bot win spread (Barron should
+  difficulty mix, watching liquidation rate, bot win spread (Connor should
   win ~as often as he liquidates), and whether kit-heavy beats kit-less by
   edge-not-landslide (target: single-digit pp win-rate advantage for a
   legal maxed kit over basic kit).
@@ -648,7 +648,7 @@ Implemented: [`caseTable.js`](./caseTable.js) (pure seeded table engine),
 `src/components/trade/CaseTableDev.jsx` implements §4 as written: you are
 the fifth seat with a 100-point allocated book; lobby = **patron select**
 (all four perks live: GR80 docket shield, Marisol free first question,
-Barron ±25% on bold calls, Eugene decisive-lens hint); investigation is
+Connor ±25% on bold calls, Eugene decisive-lens hint); investigation is
 turn-based rounds where an action = a question OR a kit card, with the
 partners visibly working the case in the bottom **table dock** (feed +
 hand strip); signature-card tells (Cold Wallet / Market Sermon / Wallet
@@ -712,9 +712,9 @@ Sim findings:
   `signal` schema.
 - **Payout curve at fixed STAKE 25 behaves.** Calibrated seats never
   liquidate; the −3× penalty lands almost entirely on the anti-calibrated
-  character (Barron liquidates ~44% of dockets — thematically perfect for
+  character (Connor liquidates ~44% of dockets — thematically perfect for
   him, and the cautionary tale the scoring is supposed to teach).
-  Proportional stakes (E2) also proved viable: they rubber-band (Barron
+  Proportional stakes (E2) also proved viable: they rubber-band (Connor
   liq drops to ~3%) — a real launch candidate, not just a v2 idea.
 - **One extra full scan ≈ +15pp win rate** (rational seat: 12% → 19% →
   34% → 57% across scans 1–4). This is far above the single-digit kit-edge
@@ -933,7 +933,7 @@ recycled instead of deleted.
      fraction takes the hit or the gain.
   4. **LINE** — a named Ledger line on the *sizing decision* ("right read,
      oversized — the wick got you"), same debrief voice as the ticket.
-- **Bust = out** (Barron's fate, now yours to dodge). Survive all 10 →
+- **Bust = out** (Connor's fate, now yours to dodge). Survive all 10 →
   graded on final book **and** telegraph-forecast calibration.
 
 ### 7.2 The three invariants (anti-slot-machine rules)

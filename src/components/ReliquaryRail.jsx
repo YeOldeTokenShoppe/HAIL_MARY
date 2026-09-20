@@ -127,7 +127,7 @@ const SAINT = {
   foilStyle: "v",
 };
 
-const BARRON = {
+const CONNOR = {
   name: "Connor",
   subtitle: "Pit Demon",
   cardType: "Trader",
@@ -154,7 +154,7 @@ const BARRON = {
 
 // Pool of TCG previews — one is picked at random per page load so
 // returning visitors see different faces without us paying for a carousel.
-const TCG_POOL = [EUGENE, SAINT, BARRON];
+const TCG_POOL = [EUGENE, SAINT, CONNOR];
 
 const FEATURES = [
   {

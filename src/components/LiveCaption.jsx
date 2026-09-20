@@ -13,7 +13,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 const MS_PER_CHAR = 70;
 // Match ProgressiveText's floor — raised again from 1500ms because short
-// chunks like Barron's "Cheaply. Loudly. Badly." were still finishing
+// chunks like Connor's "Cheaply. Loudly. Badly." were still finishing
 // before the voice acting on mobile.
 const MIN_CHUNK_MS = 2200;
 const TICK_MS = 120;

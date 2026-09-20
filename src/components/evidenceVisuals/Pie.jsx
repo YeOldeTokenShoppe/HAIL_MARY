@@ -1,7 +1,7 @@
 import React from 'react';
 
 // Pie — donut chart primitive for concentration / proportion evidence.
-// Drives e.g. Marisol/TOP 10 HOLDERS (71% red wedge) and Barron/TWITTER
+// Drives e.g. Marisol/TOP 10 HOLDERS (71% red wedge) and Connor/TWITTER
 // FOLLOWERS (81% botted wedge). One slice is typically `highlight: true` so
 // the threat color reads as the dominant visual signal.
 //

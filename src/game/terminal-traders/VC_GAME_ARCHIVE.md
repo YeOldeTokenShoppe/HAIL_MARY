@@ -30,7 +30,7 @@ it failed.** Measured across both archetypes: on **14 of 14 slots** the
 `generic` block and the `sharp` block discriminated *identically* between the
 rug and legit branches. Sending a specialist told you exactly as much about
 which branch you were in as pressing the seller — more detail, better drama, no
-better verdict. And because Barron is unlimited and lane-free while the
+better verdict. And because Connor is unlimited and lane-free while the
 specialists are one-use and lane-locked, **three presses on him weakly dominated
 the entire four-seat desk.**
 
@@ -467,7 +467,7 @@ was rejected for putting "agent" back on the player's side of the table the same
 the pitcher stopped being called one.**
 
 **"The Agent" became "Pitch Bot" in the same pass** — desk data, so it reached the
-record, the seat row, the transcript and Barron's asides at once. AGENT is a role
+record, the seat row, the transcript and Connor's asides at once. AGENT is a role
 that invites *"agent for whom, and where are they?"*; PITCH BOT is just what the
 thing is. **The name was asking the question the copy had stopped asking.**
 
@@ -486,7 +486,7 @@ thing is. **The name was asking the question the copy had stopped asking.**
   `deal.autopsy`) are unchanged.
 - **"THE TAPE" failed invariant 6 on the author**, 2026-07-28: *"what does 'the
   tape' mean? I never quite got what it meant."* It was the only one of four lane
-  labels that had to be *known* rather than read. Now THE CHART. Barron still
+  labels that had to be *known* rather than read. Now THE CHART. Connor still
   says "tape" in his own dialogue, where it's characterisation — the rule binds
   the UI, not the salesman. **The generalisation: a term can fail this invariant
   years after shipping, and the person who notices is the one who didn't write

@@ -80,7 +80,7 @@ export const PITCHER_FALLBACK = "v2";
  * The portrait matters more than it looks. These tiles sit in a row with the
  * four analysts, and a pitcher wearing a borrowed face is the cast-legibility
  * failure that whole row exists to prevent — desk.js records the day the bot
- * wore Barron's headshot two seats from Barron.
+ * wore Connor's headshot two seats from Connor.
  */
 /**
  * `stage` — CAN THIS RIG BE SHOWN LIVE RATHER THAN AS A PICTURE?

@@ -31,7 +31,7 @@ import {
   Meter, Nav, Transcript, VirgilRead, readDwellMs, VIRGIL_BEAT_MS, PRESS_UI_CSS,
 } from "./pressUi";
 
-// THE PRESS — slice 1. Barron, six claims, three presses, over the LIVE room.
+// THE PRESS — slice 1. Connor, six claims, three presses, over the LIVE room.
 //
 // This component is PRESENTATION ONLY. Every rule lives in pressRun.js, which
 // is pure and pinned by scripts/verify-press-run.mjs. If you find yourself
@@ -343,14 +343,14 @@ export default function PressSession({
     // THE PITCHER HAS NO MONITOR OF ITS OWN. There are four screens in this room
     // and, since 2026-07-29, four analysts to own them — the agent is an outsider
     // projected into the room. It has no evidence surface of its own: the easel it
-    // briefly had was removed from the glb on 2026-07-29, so PITCHER and Barron
-    // ALIAS one screen (station "demon" === SPEAKER_STATION, which was Barron's
+    // briefly had was removed from the glb on 2026-07-29, so PITCHER and Connor
+    // ALIAS one screen (station "demon" === SPEAKER_STATION, which was Connor's
     // all along) because creating two screens for one canvas makes them fight
     // over __screen2Canvas. A surface for the pitcher's own receipts is still
     // open — the projector is the obvious candidate.
-    const made = { [PITCHER]: s, [SEATS.BARRON]: s };
+    const made = { [PITCHER]: s, [SEATS.CONNOR]: s };
     for (const seat of SPENDABLE_SEATS) {
-      if (seat === SEATS.BARRON) continue;   // aliased above
+      if (seat === SEATS.CONNOR) continue;   // aliased above
       made[seat] = createEvidenceScreen({
         station: DESK[seat].station,
         header: DESK[seat].name.toUpperCase(),
@@ -942,7 +942,7 @@ export default function PressSession({
   const MIN_BEAT = 1400;
 
   // One path, four seats. Every seat can be sent at every claim — the lane
-  // decides DEPTH, not permission. Barron is reusable; the other three are one
+  // decides DEPTH, not permission. Connor is reusable; the other three are one
   // use each. A send is only ever refused for a reason the player can see: no
   // budget left, or that colleague is already spent.
   const press = useCallback((seat = PITCHER) => {
@@ -964,7 +964,7 @@ export default function PressSession({
       backing: outcome.backing,
       nothingOnFile: outcome.nothingOnFile,
       adviserSays: outcome.adviserSays,
-      line: outcome.barronSays,
+      line: outcome.connorSays,
       stage: "reporting",
       heard: solo,          // its own answer is the thing you already asked for
       looked: false,
@@ -994,7 +994,7 @@ export default function PressSession({
     // pitcher's reaction; it now waits behind a button.
     Promise.all([
       sayTurn([solo
-        ? { voice: VOICE, text: outcome.barronSays, agent: PITCHER_AGENT }
+        ? { voice: VOICE, text: outcome.connorSays, agent: PITCHER_AGENT }
         : {
           voice: seatMeta(outcome.seat)?.voice,
           text: outcome.adviserSays,
@@ -1061,7 +1061,7 @@ export default function PressSession({
      * SEE WHAT LANDED wants precisely that shot, so this is a lookup rather than
      * new camera work — see SCREEN_AGENTS.
      *
-     * THE PITCHER HAS NO SCREEN OF ITS OWN. Its board aliases Barron's (see the
+     * THE PITCHER HAS NO SCREEN OF ITS OWN. Its board aliases Connor's (see the
      * shared `made` map where the screens are created), so a press on the pitcher
      * sends you to the Demon's monitor — which is where its receipt actually is.
      *

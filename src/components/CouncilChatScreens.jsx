@@ -45,7 +45,7 @@ import { tierValue } from "@/lib/deviceTier";
 // (nobody has traced where she posts from; see the beacon arc below).
 export const SPEAKERS = {
   GR: { name: "ST. GR80", color: "#4dffaa" }, // android monk — phosphor green
-  JB: { name: "BARRON",   color: "#ff4d6d" }, // Connor, devilish trader (ex-H80Z) — adversary red
+  JB: { name: "CONNOR",   color: "#ff4d6d" }, // Connor, devilish trader (ex-H80Z) — adversary red
   MS: { name: "MARISOL",  color: "#6bb8ff" }, // onchain detective — cyan
   EU: { name: "EUGENE",   color: "#b58cff" }, // unicorn — violet
   OL: { name: "OUR LADY", color: "#ff7ac4" }, // RL80 — magenta
@@ -77,7 +77,7 @@ export const CHAT = [
   { s: "GR", t: "unkind, lady." },
   { s: "OL", t: "true." },
   { s: "JB", t: "confirmed: nobody on /candles right now" },
-  { s: "MS", t: "thanks barron. very helpful." },
+  { s: "MS", t: "thanks connor. very helpful." },
   { s: "GR", t: "log: 23 prayers in last hour. avg duration 8s." },
   { s: "JB", t: "eight seconds." },
   { s: "JB", t: "you can't even SAY a prayer in 8 seconds." },
@@ -120,7 +120,7 @@ export const CHAT = [
   { s: "MS", t: "something's eating gpu on workstation 3. eugene?" },
   { s: "EU", t: "i'm rendering a feeling." },
   { s: "JB", t: "kill the process." },
-  { s: "EU", t: "you can't kill a feeling, barron." },
+  { s: "EU", t: "you can't kill a feeling, connor." },
   { s: "GR", t: "log: workstation 3 gpu at 97%. cause: feeling." },
   { s: "OL", t: "let it finish." },
   { s: "MS", t: "...gpu's clear. did it finish?" },
@@ -155,7 +155,7 @@ export const CHAT = [
   { s: "MS", t: "...thank you, eugene." },
   { s: "MS", t: "who changed the mod perms on this channel" },
   { s: "JB", t: "not me." },
-  { s: "GR", t: "log says barron. 02:17." },
+  { s: "GR", t: "log says connor. 02:17." },
   { s: "JB", t: "the log is a snitch." },
   { s: "OL", t: "the log is my favorite." },
   { s: "GR", t: "noted. blushing." },
@@ -164,7 +164,7 @@ export const CHAT = [
   { s: "GR", t: "be kind. every whale was once a shrimp." },
   { s: "JB", t: "every shrimp is FOOD." },
   { s: "EU", t: "we don't eat friends." },
-  { s: "OL", t: "barron was a shrimp." },
+  { s: "OL", t: "connor was a shrimp." },
   { s: "JB", t: "DELETE THAT" },
   { s: "MS", t: "screenshotted." },
   { s: "GR", t: "log: preserved for the archive." },
@@ -172,8 +172,8 @@ export const CHAT = [
   { s: "JB", t: "she has a MIRROR and a CHANNEL?" },
   { s: "OL", t: "i contain multitudes." },
   { s: "JB", t: "you contain BUGS." },
-  { s: "GR", t: "log: blasphemy, minor. barron, 14:02." },
-  { s: "GR", t: "entering servo-meditation. 20 min. barron has the floor." },
+  { s: "GR", t: "log: blasphemy, minor. connor, 14:02." },
+  { s: "GR", t: "entering servo-meditation. 20 min. connor has the floor." },
   { s: "JB", t: "power." },
   { s: "MS", t: "immediately concerning." },
   { s: "EU", t: "i'll watch him." },

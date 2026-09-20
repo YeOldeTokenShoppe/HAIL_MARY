@@ -49,7 +49,7 @@ RECORD          in the briefing      client named. Paperwork, not a draw.
 THE PROJECTOR   centre of the desks  casts the bot. Its beam is the only    SHIPPED
                                      staging the pitcher gets.
    ↓
-FOUR ANALYSTS   at the desk, yours   Barron CHART · Marisol CHAIN          SHIPPED
+FOUR ANALYSTS   at the desk, yours   Connor CHART · Marisol CHAIN          SHIPPED
                 one use each         GR80 RECORD · Eugene SOCIAL
    ↓
 VIRGIL          on the desk          your guide. Cannot be sent anywhere.  PARTIAL
@@ -119,7 +119,7 @@ neither** — they are the evidence boards, and a receipt landing on a seat's ow
 screen is the payoff of the whole four-seat design.
 
 **THERE IS NO PITCH SURFACE IN 3D — a live gap** `[A§17]`. Claims live only in the
-reading column, and the pitcher has no board of its own (it aliases Barron's).
+reading column, and the pitcher has no board of its own (it aliases Connor's).
 `HologramCard.jsx` is the built, unused shader for exactly that job.
 
 **The pitcher is only in the room while there is a pitch** — visibility gated on
@@ -569,7 +569,7 @@ is done — derived from the face plate at focus time by `getPitchBotFocusSettin
    decision, the direction is wrong.* Free, unrun, and three subsystems have been
    built on top of it. **Do this first.**
 2. **The pitch bot and the client pool** — rules in §1.
-   - **The bot.** The model, the `PITCHER` rename and Barron's seat all landed.
+   - **The bot.** The model, the `PITCHER` rename and Connor's seat all landed.
      Left: point `claim.speaker` (`instanceDeal.js:146`, still hardcoded
      `"demon"`, read by nothing) at the bot, and key four shield textures to
      `pressure(run)`.
@@ -583,7 +583,7 @@ is done — derived from the face plate at focus time by `getPitchBotFocusSettin
      `HologramCard.jsx` a complete projection shader (holo tint, scanlines, glitch,
      halo, sway, billboard-on-yaw, three states) — off because its payload was a
      trading card. Wiring it to render the deal — and to take the pitcher's
-     receipts, which currently alias Barron's screen — is the open half of §1's
+     receipts, which currently alias Connor's screen — is the open half of §1's
      "no pitch surface in 3D".
 
    **Asset facts, `/models/pitch-bot.glb` (566KB):** Draco **and**
@@ -617,7 +617,7 @@ is done — derived from the face plate at focus time by `getPitchBotFocusSettin
    `fitHeight`, not by a scale — see that field for why the two rigs are
    deliberately *not* staged at the same height.
 
-   **The bill is mostly paid.** The one voice bank, Barron's specialist `sharp`
+   **The bill is mostly paid.** The one voice bank, Connor's specialist `sharp`
    findings and his one-use lane all landed on 2026-07-29; what's left is the two
    stake slots in §3. **Archetype #4 costs +35 lines, not +210.** Solvability
    survives: `loadBearing` claims are `HARD`, answerable by pressing the bot

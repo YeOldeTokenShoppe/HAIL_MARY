@@ -31,7 +31,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 const MS_PER_CHAR = 70;       // ~natural speaking pace
 // Floor so short chunks linger long enough to match the dramatic pauses
 // the voice actor naturally takes between snappy 1–2 word lines (e.g.
-// Barron's "Cheaply. Loudly. Badly." cadence). 900ms was too tight,
+// Connor's "Cheaply. Loudly. Badly." cadence). 900ms was too tight,
 // 1500ms still raced the audio — 2200ms lands close to the cadence
 // of voice-acted recordings without feeling sluggish for normal lines
 // (which are gated by the per-char rate, not this floor).

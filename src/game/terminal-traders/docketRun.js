@@ -112,7 +112,7 @@ export function rollEvent(rand) {
 // settle-side: GR80's own cold storage).
 export const BOT_SIG = {
   monk: { card: "COLD WALLET", line: "GR80 plays COLD WALLET — his book goes to cold storage.", mod: { botShield: true } },
-  demon: { card: "MARKET SERMON", line: "Barron plays MARKET SERMON — he's talking himself into it.", mod: { overconf: 1.5 } },
+  demon: { card: "MARKET SERMON", line: "Connor plays MARKET SERMON — he's talking himself into it.", mod: { overconf: 1.5 } },
   marisol: { card: "WALLET SÉANCE", line: "Marisol plays WALLET SÉANCE — the chain speaks to her.", mod: { lensMult: 1.9 } },
   eugene: { card: "MEMPOOL PROPHECY", line: "Eugene plays MEMPOOL PROPHECY — the pattern sharpens.", mod: { noise: 0.45 } },
 };
