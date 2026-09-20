@@ -1,0 +1,654 @@
+{
+  "_WARNING": "THE FACTS IN THIS FILE ARE INVENTED. A format sample, hand-written to show what the pipeline emits and how the two hosts sound across the show's full beat. The TOPICS are real ones Michelle named (FOMC, the CLARITY Act, the ten-year, oil, the Pokemon 30th anniversary set); every NUMBER, vote, date and price attached to them is a plausible-shaped stand-in, because the sandbox this was written in had no network access and no API keys. Do not record this episode and do not quote it. Run scripts/lt-news-brief.mjs for a real week.",
+  "synthetic": true,
+  "week": "2026-W38",
+  "rundown": {
+    "title": "Patience, Clarity and Cardboard",
+    "summary": "The Fed holds and calls it patience, a crypto bill gets within sight of the floor, and the week's best-performing asset is a trading card.",
+    "headline": "FED HOLDS — AND CALLS IT PATIENCE",
+    "ticker": [
+      "FOMC HOLDS RATES, STATEMENT LEANS HAWKISH",
+      "CLARITY ACT CLEARS COMMITTEE, FLOOR VOTE IN SIGHT",
+      "POKEMON 30TH ANNIVERSARY SET SELLS OUT, RESALE FRENZY FOLLOWS",
+      "10-YEAR 4.18%, UP 6BP ON THE WEEK",
+      "NOTHING ON THIS TICKER IS A RECOMMENDATION"
+    ],
+    "stories": [
+      {
+        "slot": "story-1",
+        "beat": "macro",
+        "headline": "FOMC holds, statement leans hawkish",
+        "fact": "The Federal Open Market Committee held rates steady for a second consecutive meeting, with a statement emphasising patience.",
+        "tension": "Whether a second hold is patience or uncertainty with better public relations.",
+        "connorAngle": "Nobody trades the decision, they trade the adjective.",
+        "gr80Angle": "Patience is a virtue the committee does not have to fund.",
+        "sources": [
+          {
+            "title": "SYNTHETIC — no real source",
+            "url": null,
+            "outlet": "sample"
+          }
+        ],
+        "verified": false,
+        "gaps": "Entirely synthetic. A real run confirms this from federalreserve.gov's own press release"
+      },
+      {
+        "slot": "story-2",
+        "beat": "macro",
+        "headline": "CLARITY Act clears committee",
+        "fact": "The CLARITY Act advanced out of committee, putting a floor vote within reach for the first time in several Congresses.",
+        "tension": "Whether the industry wants a rule or wants a particular answer.",
+        "connorAngle": "It wants to know, as long as the answer is commodity.",
+        "gr80Angle": "A rule you only want if it favours you is a preference with lobbyists.",
+        "sources": [
+          {
+            "title": "SYNTHETIC — no real source",
+            "url": null,
+            "outlet": "sample"
+          }
+        ],
+        "verified": false,
+        "gaps": "Entirely synthetic. A real run confirms status and vote from congress.gov"
+      },
+      {
+        "slot": "story-3",
+        "beat": "collectibles",
+        "headline": "Pokemon 30th anniversary set sparks a frenzy",
+        "fact": "The Pokemon 30th anniversary set launched this week to overnight queues and an immediate resale market, with buyers describing the purchase as an investment.",
+        "tension": "Whether buying sealed product is collecting or gambling with better artwork.",
+        "connorAngle": "Nobody is buying the card, they are buying the probability of the card.",
+        "gr80Angle": "A thing is an asset only while enough people agree to be serious about it.",
+        "sources": [
+          {
+            "title": "SYNTHETIC — no real source",
+            "url": null,
+            "outlet": "sample"
+          }
+        ],
+        "verified": false,
+        "gaps": "Entirely synthetic. A real run confirms pricing from pricecharting.com or tcgplayer.com"
+      }
+    ],
+    "board": {
+      "lines": [
+        "The ten-year closed at 4.18%, up six basis points on the week.",
+        "WTI crude around $71, down roughly 2%.",
+        "Gold flat.",
+        "Fear & Greed fell from 72 to 54 across five sessions."
+      ],
+      "market": "Prediction markets price a December cut at 38 cents, down from 46 last Friday.",
+      "sources": [
+        {
+          "title": "SYNTHETIC — no real source",
+          "url": null,
+          "outlet": "sample"
+        }
+      ]
+    }
+  },
+  "segments": [
+    {
+      "id": "cold-open",
+      "lines": [
+        {
+          "actor": "Connor",
+          "text": "[confidently] Good evening. You are watching the Liminal Terminal Weekly News Recap. I am Connor. Beside me, as penance, Saint GR80.",
+          "directAddress": false,
+          "cues": [
+            {
+              "actor": "Monk",
+              "reaction": "lookAround",
+              "offset": 0.2
+            }
+          ]
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] Good evening. The ledger is open.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "Three stories tonight. The Fed held and called it patience, a crypto bill got within sight of the floor, and the most stable store of value this week was a cardboard Pikachu.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] One of those sentences is going to age badly.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "[slightly offended] They all are. That is the format.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Monk",
+              "reaction": "headshake",
+              "offset": 0.4
+            }
+          ]
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] Then let us begin.",
+          "directAddress": false,
+          "cues": []
+        }
+      ]
+    },
+    {
+      "id": "story-1",
+      "lines": [
+        {
+          "actor": "Connor",
+          "text": "[matter-of-factly] Story one. The Federal Open Market Committee held rates steady for a second meeting running, and the statement leaned hawkish. The word they chose was patience.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[patiently] Patience. A committee has discovered a virtue it does not have to fund.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "The market read it as a delay, not a stop. Expectations moved about a quarter point across the curve.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] So nothing happened, and the price of nothing happening changed.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Connor",
+              "reaction": "shrug",
+              "offset": 0.9
+            }
+          ]
+        },
+        {
+          "actor": "Connor",
+          "text": "[confidently] That is the whole business, GR. Nobody trades the decision. They trade the adjective.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] Then explain the adjective to me. What does patience cost a household on a variable rate?",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "[reluctantly] More than it costs the committee.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[with quiet disapproval] Yes.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Connor",
+              "reaction": "headshakeDisappointment",
+              "offset": 0.3,
+              "duration": 2.0
+            }
+          ]
+        },
+        {
+          "actor": "Connor",
+          "text": "[suspiciously] You are doing the thing where the economy is a morality play.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "I am doing the thing where a number has a person underneath it. You are the one who files that under digression.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "[matter-of-factly] I file it under digression because it does not trade.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[patiently] Very little that matters does.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Connor",
+              "reaction": "headnodSubtle",
+              "offset": 0.6,
+              "duration": 1.6
+            }
+          ]
+        },
+        {
+          "actor": "Connor",
+          "text": "[confidently] Here is what I will give you. Holding twice in a row is not patience. It is uncertainty with better public relations.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[amused] We agree.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "[suspiciously] Do not say that out loud.",
+          "directAddress": true,
+          "cues": []
+        }
+      ]
+    },
+    {
+      "id": "story-2",
+      "lines": [
+        {
+          "actor": "Connor",
+          "text": "[confidently] Story two. The CLARITY Act moved again this week — out of committee, and closer to a floor vote than this industry has managed in years.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] How many years.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "[matter-of-factly] Depends when you start counting. Call it four bills and three Congresses.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] So the industry has been about to receive clarity for roughly as long as it has existed.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Connor",
+              "reaction": "mockCrying",
+              "offset": 0.8,
+              "duration": 2.2
+            }
+          ]
+        },
+        {
+          "actor": "Connor",
+          "text": "That is not fair. It is accurate, but it is not fair.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[patiently] What does the bill actually decide?",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "Who regulates what. Whether a token is a commodity or a security, and therefore which agency gets to be disappointed in you.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[with quiet disapproval] And the industry's position is that it would like to know.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "[confidently] The industry's position is that it would like to know, provided the answer is commodity.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[amused] There it is.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Connor",
+              "reaction": "shrug",
+              "offset": 0.3
+            }
+          ]
+        },
+        {
+          "actor": "Connor",
+          "text": "[suspiciously] You are enjoying this.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] I am noting that a rule you only want when it favours you is not a rule. It is a preference with lobbyists.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "[reluctantly] Write that down.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] I write everything down.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Connor",
+              "reaction": "headnodSubtle",
+              "offset": 0.4,
+              "duration": 1.6
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "the-spot",
+      "lines": [
+        {
+          "actor": "Connor",
+          "text": "[confidently] The Weekly News Recap is brought to you by the digital candle shrine at hail-mary dot x y z. Light a candle, leave a prayer, watch it burn in three dimensions. It is free, which makes it the only thing on this network that is.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] The shrine makes no claim about outcomes. Candles do not move markets.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "[slightly offended] GR.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Monk",
+              "reaction": "prayCrosschest",
+              "offset": 0.2,
+              "duration": 2.4
+            }
+          ]
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] I read the honest part of an advertisement.",
+          "directAddress": true,
+          "cues": []
+        }
+      ]
+    },
+    {
+      "id": "story-3",
+      "lines": [
+        {
+          "actor": "Connor",
+          "text": "[confidently] Story three, and my favourite thing that has happened all year. Pokemon released a thirtieth anniversary set this week, and grown adults queued overnight for cardboard.",
+          "directAddress": false,
+          "cues": [
+            {
+              "actor": "Monk",
+              "reaction": "lookAround",
+              "offset": 1.6,
+              "duration": 5.0
+            }
+          ]
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] How overnight.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "Tents. There were tents.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] For a card depicting a small electric animal.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "[matter-of-factly] For a sealed box that may contain a card depicting a small electric animal. That is the part you are missing. Nobody is buying the card. They are buying the probability of the card.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[with quiet disapproval] So it is a lottery ticket with better artwork.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Connor",
+              "reaction": "headnod",
+              "offset": 0.5,
+              "duration": 1.8
+            }
+          ]
+        },
+        {
+          "actor": "Connor",
+          "text": "[confidently] It is a lottery ticket with a secondary market, which is considerably worse.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[patiently] And people are calling this an investment.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "The word being used is asset. Out loud. On television.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] I am on television.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "You are making my point for me. [chuckles]",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Monk",
+              "reaction": "headnodSubtle",
+              "offset": 1.2,
+              "duration": 1.6
+            }
+          ]
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] I am. A thing becomes an asset the moment enough people agree to be serious about it, and stops being one the moment they remember it is cardboard.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "[reluctantly] That applies to more of my portfolio than I would like.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[amused] To all of it.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "[slightly offended] To some of it.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Monk",
+              "reaction": "headnodSubtle",
+              "offset": 0.4,
+              "duration": 1.6
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "the-board",
+      "lines": [
+        {
+          "actor": "Connor",
+          "text": "[confidently] The board. The ten-year closed the week at four point one eight percent, up six basis points.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] Money became slightly more expensive, and nobody announced it.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "[matter-of-factly] Crude around seventy-one dollars, down about two percent on the week. Gold flat, and smug about it.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] Gold is always smug. It has nothing else to do.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Connor",
+              "reaction": "headnodSubtle",
+              "offset": 0.5,
+              "duration": 1.6
+            }
+          ]
+        },
+        {
+          "actor": "Connor",
+          "text": "[confidently] Fear and Greed opened at seventy-two and closed at fifty-four. Eighteen points of humility in five days.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[patiently] And the crowd?",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "[matter-of-factly] Prediction markets put a December cut at thirty-eight cents. It was forty-six last Friday.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] So the crowd revised itself eight cents toward honesty.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "Or eight cents toward cowardice. Same number. Different prayer.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[patiently] That is the most theologically sound thing you have said on this programme.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "[suspiciously] Strike it from the record.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[amused] Noted. And logged.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Connor",
+              "reaction": "headshakeDisappointment",
+              "offset": 0.4,
+              "duration": 2.2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sign-off",
+      "lines": [
+        {
+          "actor": "Connor",
+          "text": "[confidently] That is the week. The Fed was patient, Congress was nearly decisive, and a trading card outperformed most of my convictions.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] The ledger closes. Nothing on it was a recommendation.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Connor",
+          "text": "[matter-of-factly] Nothing on it ever is. Next week, whatever the committee decides patience means in December.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] Go in peace. Size your positions accordingly. And light a candle for the cardboard.",
+          "directAddress": false,
+          "cues": [
+            {
+              "actor": "Connor",
+              "reaction": "headnod",
+              "offset": 0.8,
+              "duration": 2.0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
