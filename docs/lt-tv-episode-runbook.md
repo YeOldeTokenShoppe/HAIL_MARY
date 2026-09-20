@@ -41,9 +41,14 @@ is the easiest way to paste a value into the wrong place:
 | Barron | `IcFWazAaBzXNwLWpySgF` | `john` | `Barron` | `Demon_Empty` |
 | Saint GR80 | `fATgBRI8wg5KkDFg8vBd` | `gr80` | `Monk` | `Monk_Empty` |
 
+Connor is the name this character is moving to across the whole repo; that rename
+is in flight separately. Until it lands the code still says `Barron`, which is why
+this table reads as it does.
+
 The mapping between the first three columns lives at
 `elevenlabs-dialogue-test/process_dialogue.py:11`. The older production doc,
-`docs/talk-show-production.md`, calls Barron "Connor" throughout.
+`docs/talk-show-production.md`, already calls him Connor throughout, which is where
+the name is headed.
 
 ---
 
@@ -191,11 +196,11 @@ lttv_<show>_ep<NN>_<character>
 - `<show>` is `rt` (The Liminal Terminal), `news` (LT Weekly News Recap) or `mm`
   (Markets & Morality)
 - `<NN>` is the episode number, zero-padded: `02`, never `2`
-- `<character>` is `barron` or `gr80`
+- `<character>` is `connor` or `gr80`
 
-Episode 02 of the roundtable uploads as `lttv_rt_ep02_barron` and
+Episode 02 of the roundtable uploads as `lttv_rt_ep02_connor` and
 `lttv_rt_ep02_gr80`. An episode split into sections because it ran past the
-2,000-character limit appends the section number: `lttv_rt_ep07_barron_s2`.
+2,000-character limit appends the section number: `lttv_rt_ep07_connor_s2`.
 
 Lowercase and underscores throughout. SitePal accepts spaces — the two clips on air
 are `talk show test for jb` and `talk show test GR80` — but these names get retyped
@@ -203,7 +208,7 @@ by hand into a JavaScript object, and a space is a typo waiting to happen.
 
 ### Uploading
 
-1. Upload `output/john-sitepal-balanced.wav` under the Barron name.
+1. Upload `output/john-sitepal-balanced.wav` under the Connor name.
 2. Upload `output/gr80-sitepal-balanced.wav` under the GR80 name.
 3. Wait for SitePal to finish processing both.
 4. Copy those two names, character for character, into `TALK_SHOW_AUDIO` at
@@ -211,10 +216,16 @@ by hand into a JavaScript object, and a space is a typo waiting to happen.
 
 ```js
 const TALK_SHOW_AUDIO = {
-  Barron: "lttv_rt_ep02_barron",
+  Barron: "lttv_rt_ep02_connor",
   Monk: "lttv_rt_ep02_gr80",
 };
 ```
+
+The key on the left is the actor name as the code spells it, which is `Barron`
+today and becomes `Connor` once the repo-wide rename lands. The string on the
+right is the SitePal clip name, which uses `connor` from the start — clip names
+are the one thing here that is painful to change later, since renaming one means
+going back into the Audio Manager by hand.
 
 A name that does not match is a silent avatar, not an error: `sayAudio` has no
 text-to-speech fallback, so a typo simply plays nothing. `scripts/wire-audio.mjs`
