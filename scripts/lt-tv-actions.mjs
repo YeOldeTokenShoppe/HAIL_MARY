@@ -37,12 +37,20 @@ export const ACTIONS = {
     needs: ["ANTHROPIC_API_KEY"],
     stages: ["planned"],
     argv: (id) => ["node", ["scripts/lt-rt-script.mjs", "--topic", id, "--plan-only"]],
-    blurb: "Stops after the argument so you can read it before writing six minutes of it.",
+    // Deliberately not described as a first half: the plan it writes is not
+    // read back by the full run, which starts its own argument pass. It is a
+    // cheap look at whether the idea holds, and nothing more.
+    blurb: "Writes only the argument, cheaply, so you can judge the idea. A look, not a saved first half — writing the episode after this starts a fresh argument.",
   },
   "apply-edits": {
     label: "Apply my edits",
     spends: null,
     needs: [],
+    // There is nothing to apply until a screenplay has been written, and the
+    // editor's refusal in that case names the staging record rather than the
+    // episode, which reads like the episode is missing. So the page offers
+    // this only once there is text to apply.
+    needsScreenplay: true,
     stages: ["written", "recorded", "on-air"],
     argv: (id) => ["node", ["scripts/lt-tv-edit.mjs", id]],
     blurb: "Reads the screenplay back into the record. Free.",
@@ -51,6 +59,7 @@ export const ACTIONS = {
     label: "Apply my edits and clear the audio",
     spends: null,
     needs: [],
+    needsScreenplay: true,
     stages: ["recorded", "on-air"],
     argv: (id) => ["node", ["scripts/lt-tv-edit.mjs", id, "--rerecord"]],
     blurb: "For an episode already recorded. Returns it to Not recorded yet until you record it again.",

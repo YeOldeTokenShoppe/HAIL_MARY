@@ -181,6 +181,9 @@ function Keys({ env }) {
 
 function Episode({ episode: e, env, open, onToggle, onRun, running }) {
   const stage = STAGES[e.stage];
+  // null until the screenplay has been looked for. The steps that read it are
+  // offered only once it is there — see needsScreenplay in lt-tv-actions.mjs.
+  const [hasScreenplay, setHasScreenplay] = useState(null);
   return (
     <article className={`${s.episode} ${open ? s.episodeOpen : ''}`}>
       <button onClick={onToggle} className={s.episodeHead} aria-expanded={open}>
@@ -204,27 +207,37 @@ function Episode({ episode: e, env, open, onToggle, onRun, running }) {
           <div className={s.actions}>
             {e.actions.length === 0 && <p className={s.empty}>Nothing to do.</p>}
             {e.actions.map((a, i) => {
-              const blocked = a.needs.find((k) =>
+              const missingKey = a.needs.find((k) =>
                 (k === 'ANTHROPIC_API_KEY' && !env.anthropic) || (k === 'ELEVENLABS_API_KEY' && !env.elevenlabs));
+              // A step is offered only when it can actually do something. Both
+              // reasons it cannot are shown where its explanation would go.
+              const why = missingKey
+                ? `${missingKey} is not set`
+                : a.needsScreenplay && hasScreenplay === false
+                  ? 'Nothing written yet — there is no script to apply'
+                  : null;
               const busy = running === `${a.name}:${e.id}`;
               return (
                 <div key={a.name} className={s.action}>
                   <button
-                    title={blocked ? `${blocked} is not set` : undefined}
-                    disabled={Boolean(blocked) || Boolean(running)}
+                    title={why || undefined}
+                    disabled={Boolean(why) || Boolean(running)}
                     onClick={() => onRun(a.name, e.id, a.spends)}
-                    className={`${s.btn} ${i === 0 && !blocked ? s.btnPrimary : ''}`}
+                    className={`${s.btn} ${i === 0 && !why ? s.btnPrimary : ''}`}
                   >
                     {busy ? 'Running…' : a.label}
-                    {a.spends && <span className={s.cost}>costs</span>}
+                    {/* Name the cost rather than the fact of one: "costs" on
+                        its own makes you click to find out what it means, and
+                        what it means is the thing you wanted to know. */}
+                    {a.spends && <span className={s.cost}>{a.spends.replace(/^an? /, '')}</span>}
                   </button>
-                  <span className={s.actionBlurb}>{blocked ? `${blocked} is not set` : a.blurb}</span>
+                  <span className={s.actionBlurb}>{why || a.blurb}</span>
                 </div>
               );
             })}
           </div>
 
-          <Screenplay id={e.id} stage={e.stage} />
+          <Screenplay id={e.id} stage={e.stage} onPresence={setHasScreenplay} />
 
           <Files files={e.files} />
           {e.clips.length > 0 && (
@@ -275,7 +288,7 @@ function Files({ files }) {
  * which runs the same editor the terminal does — so a save can never quietly
  * rebuild the episode, and an edit you are half way through is not live.
  */
-function Screenplay({ id, stage }) {
+function Screenplay({ id, stage, onPresence }) {
   const [text, setText] = useState(null);
   const [saved, setSaved] = useState(true);
   const [note, setNote] = useState(null);
@@ -284,10 +297,10 @@ function Screenplay({ id, stage }) {
     let alive = true;
     fetch(`/api/lt-tv/script?id=${encodeURIComponent(id)}`, { cache: 'no-store' })
       .then((r) => r.json())
-      .then((d) => { if (alive) { setText(d.text); setSaved(true); } })
-      .catch(() => { if (alive) setText(null); });
+      .then((d) => { if (alive) { setText(d.text); setSaved(true); onPresence(d.text !== null); } })
+      .catch(() => { if (alive) { setText(null); onPresence(false); } });
     return () => { alive = false; };
-  }, [id, stage]);
+  }, [id, stage, onPresence]);
 
   if (text === null) {
     return (

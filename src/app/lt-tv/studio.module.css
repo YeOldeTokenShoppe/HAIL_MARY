@@ -211,14 +211,14 @@
 }
 
 /* The money marker. It is a label, not decoration: the same buttons ask for
-   confirmation before they run. */
+   confirmation before they run. It carries the cost itself, so it is set in
+   sentence case — uppercasing "an ElevenLabs render" only makes it shout. */
 .cost {
   padding: 0.8px 5.6px;
   border: 1px solid rgba(255, 203, 116, 0.4);
   border-radius: 4px;
   font-size: 10.9px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  white-space: nowrap;
   color: var(--amber);
 }
 

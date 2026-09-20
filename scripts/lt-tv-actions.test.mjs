@@ -110,6 +110,14 @@ check("applying edits is free", ACTIONS["apply-edits"].spends, null);
 check("checking the slate is free", ACTIONS.check.spends, null);
 ok("anything that costs names the key it needs", ACTION_NAMES.every((n) => !ACTIONS[n].spends || ACTIONS[n].needs.length > 0));
 
+console.log("\nThe steps that read the screenplay say that they do:");
+ok("applying edits needs a screenplay", ACTIONS["apply-edits"].needsScreenplay === true);
+ok("applying edits and re-recording needs one too", ACTIONS["apply-edits-rerecord"].needsScreenplay === true);
+ok("nothing else claims to need one",
+  ACTION_NAMES.every((n) => n.startsWith("apply-edits") || !ACTIONS[n].needsScreenplay));
+ok("actionsFor carries the flag through to the page",
+  actionsFor("on-air").find((a) => a.name === "apply-edits").needsScreenplay === true);
+
 console.log("\nThe buttons offered match the stage:");
 check("a planned episode is offered writing, not recording",
   actionsFor("planned").map((a) => a.name), ["write-roundtable", "plan-roundtable", "check"]);
