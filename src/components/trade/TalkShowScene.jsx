@@ -27,6 +27,13 @@ import { useGLTF, SpotLight } from "@react-three/drei";
 import { clone as skeletonClone } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { SITEPAL_PROJECTION_CONFIG } from "@/components/CyborgTempleScene";
 import { useChannelScreen } from "@/components/trade/ltTvChannelScreen";
+import {
+  buildEpisodeTimeline,
+  shotSubjectAt,
+  speakerAt,
+  validateEpisode,
+} from "@/lib/ltTv/episodeTimeline.mjs";
+import { findEpisode } from "@/content/lt-tv";
 
 // Version the URL when the Blender export changes so drei does not keep an
 // older GLTF from its in-memory cache during hot reloads.
@@ -49,11 +56,12 @@ const PORTAL_READY_TIMEOUT_MS = 18000;
 const PORTAL_RETRY_BACKOFF = 1.5;
 const PORTAL_MAX_ATTEMPTS = 2;
 
-// Names must match SitePal's Audio Manager exactly.
-const TALK_SHOW_AUDIO = {
-  Barron: "talk show test for jb",
-  Monk: "talk show test GR80",
-};
+// WHAT PLAYS IS THE EPISODE'S, NOT THE SET'S. The SitePal clip names, the
+// line starts, who holds each line and the reaction cues all arrive on the
+// `episode` prop as a record from src/content/lt-tv, and buildEpisodeTimeline
+// turns that record into the performance this file drives. Everything below is
+// the SET: the rig, the clips it can play, the crops, the camera. Producing an
+// episode never touches it.
 
 // Point drei at the bundled Draco decoder instead of the gstatic CDN so it
 // works offline / under CSP. NOTE: the 2026-07-31 re-export dropped Draco
@@ -120,20 +128,14 @@ const REACTION_DURATIONS = {
   },
 };
 
-// One-minute test dialogue timing returned by ElevenLabs voice_segments.
-// Cues stay attached to line numbers so a future script generator can replace
-// this array without hand-authoring absolute timestamps.
-const TEST_LINE_STARTS = [
-  0, 8.4, 13.92, 20.64, 22.24, 26.239,
-  31.92, 35.24, 39.6, 44.64, 48.88, 55.84,
-];
-
-// Seconds between the performance clock starting and the first WORD. Those
-// line starts come from ElevenLabs' voice_segments, but the clock is stamped
-// when sayAudio() is called — and SitePal reports the track as started within
+// Seconds between the performance clock starting and the first WORD. Line
+// starts come from ElevenLabs' voice_segments, but the clock is stamped when
+// sayAudio() is called — and SitePal reports the track as started within
 // ~150ms, so the difference is dead air at the head of the uploaded tracks.
 // Everything on the timeline (camera shots, reaction cues, listener gazes)
-// reads through this, so it stays in sync. Trim by ear via `window.__tsTiming`.
+// reads through this, so it stays in sync. Seeded from the episode record's
+// `leadIn` when an episode mounts; trim by ear via `window.__tsTiming` and
+// write the value you land on back into the record.
 export const TALK_SHOW_TIMING = { leadIn: 2.5 };
 
 // Procedural listener gaze is applied after the animation mixer, so it layers
@@ -143,126 +145,16 @@ const LISTENER_GAZE_YAW = {
   Monk: THREE.MathUtils.degToRad(-23),
 };
 
-const TEST_DIALOGUE_END = 57.921;
-
-// Listener turns are deliberately directed rather than automatic. Omitted
-// lines play to the audience. Each turn starts a beat into the addressed line
-// and releases shortly before it ends for a less mechanical exchange.
-const DIRECT_ADDRESS_GAZES = [
-  { line: 1, listener: "Barron" },
-  { line: 2, listener: "Monk" },
-  { line: 3, listener: "Barron" },
-  { line: 4, listener: "Monk" },
-  // Line 5 presents the choice to the audience.
-  { line: 6, listener: "Monk" },
-  { line: 7, listener: "Barron" },
-  { line: 8, listener: "Monk" },
-  { line: 9, listener: "Barron" },
-  { line: 10, listener: "Monk" },
-  { line: 11, listener: "Barron" },
-].map((cue) => ({
-  ...cue,
-  startAt: TEST_LINE_STARTS[cue.line] + 0.22,
-  endAt:
-    (TEST_LINE_STARTS[cue.line + 1] ?? TEST_DIALOGUE_END) - 0.18,
-}));
-
-const TALK_SHOW_CUE_DEFS = [
-  // Barron opens; GR80 quietly surveys the studio before answering.
-  { line: 0, offset: 0.1, actor: "Monk", reaction: "lookAround", duration: 7.5 },
-  // “Are you saving humanity, or opening a position against it?”
-  { line: 1, offset: 0.45, actor: "Monk", reaction: "headshake", duration: 1.3 },
-  // “You once shorted optimism.”
-  { line: 3, offset: 0.05, actor: "Monk", reaction: "headnodSubtle", duration: 1.55 },
-  // “I closed the position at a substantial profit.”
-  { line: 4, offset: 0.3, actor: "Barron", reaction: "shrug", duration: 3.3 },
-  // GR80 calmly enumerates what “enough” means.
-  { line: 7, offset: 0.55, actor: "Monk", reaction: "headnodSubtle", duration: 1.6 },
-  // Barron recoils at the economic consequences of peace.
-  { line: 8, offset: 0.35, actor: "Barron", reaction: "headshakeDisappointment", duration: 2.77 },
-  // “Perhaps humanity could survive one disappointing quarter.”
-  { line: 9, offset: 0.35, actor: "Monk", reaction: "shrug", duration: 3.3 },
-  // Reluctant agreement, then GR80 closes the segment.
-  { line: 10, offset: 0.5, actor: "Barron", reaction: "headnodSubtle", duration: 1.6 },
-  { line: 11, offset: 0.05, actor: "Monk", reaction: "headnodSubtle", duration: 1.6 },
-];
-
-const TALK_SHOW_CUES = TALK_SHOW_CUE_DEFS
-  .map((cue) => ({
-    ...cue,
-    duration:
-      cue.duration ?? REACTION_DURATIONS[cue.actor]?.[cue.reaction] ?? 1.5,
-    at: TEST_LINE_STARTS[cue.line] + cue.offset,
-  }))
-  .sort((a, b) => a.at - b.at);
-
-// ── Camera direction ──────────────────────────────────────────────────────
-// Who holds each line. DIRECT_ADDRESS_GAZES names the LISTENER — the one who
-// turns to face the speaker — so the speaker is the other character. Lines
-// with no listener turn are played to the room; both are Barron's (his intro
-// already aims his head at the viewer camera, and line 5 lays out the choice).
-const AUDIENCE_LINE_SPEAKERS = { 0: "Barron", 5: "Barron" };
-
-const LINE_SPEAKERS = (() => {
-  const opposite = { Barron: "Monk", Monk: "Barron" };
-  const speakers = TEST_LINE_STARTS.map(() => null);
-  DIRECT_ADDRESS_GAZES.forEach((cue) => {
-    speakers[cue.line] = opposite[cue.listener];
-  });
-  Object.entries(AUDIENCE_LINE_SPEAKERS).forEach(([line, actor]) => {
-    speakers[line] = actor;
-  });
-  return speakers;
-})();
-
-// Who holds the floor at `elapsed`. Only SOLO PROJECTION uses this (mobile):
-// it paints one face per frame instead of two, because a phone running two
-// SitePal avatar renderers plus two per-frame canvas crops is the load that
-// crashed iOS Safari on this page before. Distinct from currentShotSubject —
-// that one returns null on the two-shot, and a projection has to name someone.
-// Before the first line lands, whoever opens the show holds the face.
+// SOLO PROJECTION (mobile) paints one face per frame instead of two, because a
+// phone running two SitePal avatar renderers plus two per-frame canvas crops is
+// the load that crashed iOS Safari on this page before. It asks the timeline
+// who holds the floor (speakerAt — distinct from currentShotSubject, which
+// returns null on the two-shot, and a projection has to name someone).
+//
 // How often the LISTENER's face is resampled in solo mode, in frames. They're
 // not talking, so their face only has to carry idle motion and blinks — 1-in-6
 // reads as alive while costing a sixth of a full-rate second face.
 const SOLO_LISTENER_EVERY_NTH = 6;
-
-function currentSpeaker(elapsed, running) {
-  if (running) {
-    for (let i = TEST_LINE_STARTS.length - 1; i >= 0; i -= 1) {
-      if (TEST_LINE_STARTS[i] <= elapsed && LINE_SPEAKERS[i]) return LINE_SPEAKERS[i];
-    }
-  }
-  return LINE_SPEAKERS.find(Boolean) ?? null;
-}
-
-// The set has ONE camera, so a "cut" is a physical pan — the director commits
-// to a shot per line rather than chasing every exchange. Singles on the
-// speaker, pulling back to the two-shot for the lines played to the room and
-// whenever the exchange has sat on singles too long. `subject: null` = wide.
-const SHOT_AUDIENCE_LINES = new Set(Object.keys(AUDIENCE_LINE_SPEAKERS).map(Number));
-const SHOT_MAX_SINGLES = 3;
-// An operator reacts to a line instead of anticipating it, and won't whip off
-// a shot they only just landed — short lines play out as reaction shots on
-// whoever the camera is already holding.
-const SHOT_REACTION_DELAY = 0.3;
-const SHOT_MIN_HOLD = 2.6;
-
-const TALK_SHOW_SHOTS = (() => {
-  const shots = [{ at: 0, subject: null }];
-  let singles = 0;
-  TEST_LINE_STARTS.forEach((start, line) => {
-    const speaker = LINE_SPEAKERS[line];
-    const wide =
-      !speaker || SHOT_AUDIENCE_LINES.has(line) || singles >= SHOT_MAX_SINGLES;
-    const subject = wide ? null : speaker;
-    singles = wide ? 0 : singles + 1;
-    const at = start + SHOT_REACTION_DELAY;
-    const prev = shots[shots.length - 1];
-    if (prev.subject === subject || at - prev.at < SHOT_MIN_HOLD) return;
-    shots.push({ at, subject });
-  });
-  return shots;
-})();
 
 // ── SitePal crop / filter for the talk-show faces ──────────────────────────
 // SEPARATE from the temple's DEMON/MONK crops — these are different meshes
@@ -604,16 +496,13 @@ function buildMonitorFeed(root, viewerCamera) {
   };
 }
 
-// Which shot is live at `elapsed`. `null` subject = the two-shot.
-function currentShotSubject(elapsed, running) {
+// Which shot is live at `elapsed`, on the episode currently mounted. `null`
+// subject = the two-shot.
+function currentShotSubject(timeline, elapsed, running) {
   const override = MONITOR_FEED.shot;
   if (override !== "auto") return override === "wide" ? null : override;
   if (!running) return null;
-  const cue = elapsed - MONITOR_FEED.shotLead;
-  for (let i = TALK_SHOW_SHOTS.length - 1; i >= 0; i -= 1) {
-    if (TALK_SHOW_SHOTS[i].at <= cue) return TALK_SHOW_SHOTS[i].subject;
-  }
-  return null;
+  return shotSubjectAt(timeline, elapsed - MONITOR_FEED.shotLead);
 }
 
 // Runs EVERY frame (the feed itself may render at half rate, but the prop must
@@ -621,7 +510,7 @@ function currentShotSubject(elapsed, running) {
 // toward it. The physical swivel is cosmetic — the virtual lens aims at the
 // subject directly, so the feed stays framed even if the prop lags or the
 // authored rest pose is a few degrees off.
-function updateCameraRig(feed, headBones, elapsed, running, delta) {
+function updateCameraRig(feed, headBones, timeline, elapsed, running, delta) {
   const pivot = feed.pivot;
   const panEase = 1 - Math.exp(-MONITOR_FEED.panLambda * delta);
 
@@ -664,7 +553,7 @@ function updateCameraRig(feed, headBones, elapsed, running, delta) {
     return;
   }
 
-  const subject = currentShotSubject(elapsed, running);
+  const subject = currentShotSubject(timeline, elapsed, running);
   MONITOR_FEED.current = subject ?? "wide";
   const head = subject ? headBones[subject] : null;
 
@@ -1129,6 +1018,7 @@ function StudioLights({ fixtures }) {
 }
 
 function TalkShowModel({
+  episode,
   anchorY,
   projectCharacter,
   soloProjection,
@@ -1150,6 +1040,51 @@ function TalkShowModel({
   const playbackRef = useRef({ running: false, startedAt: 0, cueIndex: 0 });
   // Frame counter for solo mode's listener-repaint throttle.
   const solotickRef = useRef(0);
+
+  // THE EPISODE, AS A PERFORMANCE. The record is data; this is the resolved
+  // timeline the frame loop reads — absolute cue times, listener turns, camera
+  // shots. `null` for an episode that has no recording yet, which is what the
+  // START control and playShow check before offering to run anything.
+  const timeline = useMemo(
+    () => buildEpisodeTimeline(episode, { reactionDurations: REACTION_DURATIONS }),
+    [episode],
+  );
+  // The SitePal portals are built once and outlive an episode change, and the
+  // frame loop must never re-subscribe just because next week's show loaded —
+  // so both read the live timeline through a ref rather than closing over it.
+  const timelineRef = useRef(timeline);
+  timelineRef.current = timeline;
+  const stopShowRef = useRef(null);
+
+  // SWITCHING EPISODES. The portals stay up — rebuilding them costs ~18s of
+  // "Loading voices…" — so changing episode takes the set off air and swaps
+  // the preloaded clips underneath instead.
+  useEffect(() => {
+    stopShowRef.current?.();
+    Object.entries(portalsRef.current).forEach(([key, portal]) => {
+      if (!portal?.ready) return;
+      const clip = timeline?.audio?.[key];
+      if (!clip) return;
+      try {
+        portal.frame?.contentWindow?.loadAudio?.(clip);
+      } catch (e) {
+        console.warn(`[TalkShowScene] could not preload ${key} audio`, e);
+      }
+    });
+  }, [timeline]);
+
+  useEffect(() => {
+    if (!episode) return;
+    const problems = validateEpisode(episode);
+    if (problems.length && process.env.NODE_ENV !== "production") {
+      console.warn(
+        `[LT TV] episode "${episode.id}" has problems a producer should fix:\n  ` +
+          problems.join("\n  "),
+      );
+    }
+    // Per-episode lead-in, still trimmable by ear through window.__tsTiming.
+    if (timeline) TALK_SHOW_TIMING.leadIn = timeline.leadIn;
+  }, [episode, timeline]);
 
   // Clone so toggling the tab (unmount/remount) and HMR never reuse a mutated
   // tree, and so R3F isn't handed the same cached object twice.
@@ -1730,7 +1665,8 @@ function TalkShowModel({
         try {
           const w = portal.frame.contentWindow;
           w.setPlayerVolume?.(0);
-          w.loadAudio?.(TALK_SHOW_AUDIO[key]);
+          const clip = timelineRef.current?.audio?.[key];
+          if (clip) w.loadAudio?.(clip);
         } catch (e) {
           console.warn(`[TalkShowScene] could not preload ${key} audio`, e);
         }
@@ -1789,19 +1725,30 @@ function TalkShowModel({
     };
 
     const playShow = () => {
+      // Whatever episode is mounted right now — the portals outlive any one
+      // of them, so this is read at press time, not captured when they built.
+      const active = timelineRef.current;
+      if (!active) return false;
       if (stopped) stopped = false;
       if (!Object.values(portalsRef.current).every((p) => p.ready)) return false;
       ended.clear();
 
       let started = 0;
       Object.entries(portalsRef.current).forEach(([key, portal]) => {
+        const clip = active.audio?.[key];
+        if (!clip) {
+          console.warn(
+            `[TalkShowScene] episode "${active.id}" has no ${key} clip — not starting`,
+          );
+          return;
+        }
         try {
           const w = portal.frame.contentWindow;
           w.stopSpeech?.();
           w.saySilent?.(0);
           w.setPlayerVolume?.(7);
-          w.loadAudio?.(TALK_SHOW_AUDIO[key]);
-          w.sayAudio?.(TALK_SHOW_AUDIO[key]);
+          w.loadAudio?.(clip);
+          w.sayAudio?.(clip);
           started += 1;
         } catch (e) {
           console.warn(`[TalkShowScene] could not start ${key} audio`, e);
@@ -1823,6 +1770,7 @@ function TalkShowModel({
       return ok;
     };
 
+    stopShowRef.current = stopShow;
     window.__talkShowPlay = playShow;
     window.__talkShowStop = stopShow;
     window.__talkShowRetryPortals = retryPortals;
@@ -1847,6 +1795,7 @@ function TalkShowModel({
 
   useFrame(({ camera, gl, scene }, delta) => {
     const playback = playbackRef.current;
+    const timeline = timelineRef.current;
     let elapsed = 0;
     if (playback.running) {
       elapsed =
@@ -1865,11 +1814,12 @@ function TalkShowModel({
       // Consume every cue reached this frame. The performance clock is derived
       // from performance.now(), so a dropped render frame cannot permanently
       // skip a reaction.
+      const cues = timeline?.cues || [];
       while (
-        playback.cueIndex < TALK_SHOW_CUES.length &&
-        TALK_SHOW_CUES[playback.cueIndex].at <= elapsed
+        playback.cueIndex < cues.length &&
+        cues[playback.cueIndex].at <= elapsed
       ) {
-        const cue = TALK_SHOW_CUES[playback.cueIndex];
+        const cue = cues[playback.cueIndex];
         playback.cueIndex += 1;
         const emptyName = EMPTY_FOR_ACTOR[cue.actor];
         const bank = actionsRef.current[emptyName];
@@ -1904,14 +1854,14 @@ function TalkShowModel({
       animatedHeadQuaternions[actor].copy(head.quaternion);
     });
 
-    const introCameraFocus = playback.running
-      ? 1 -
-        THREE.MathUtils.smoothstep(
-          elapsed,
-          TEST_LINE_STARTS[1] - 0.6,
-          TEST_LINE_STARTS[1],
-        )
-      : 0;
+    // The opener is played to the viewer, so the host holds the camera until
+    // the second line lands.
+    const secondLineAt = timeline?.lineStarts?.[1];
+    const introCameraFocus =
+      playback.running && secondLineAt !== undefined
+        ? 1 -
+          THREE.MathUtils.smoothstep(elapsed, secondLineAt - 0.6, secondLineAt)
+        : 0;
     if (
       introCameraFocus > 0.001 &&
       headBones.Barron &&
@@ -1970,7 +1920,7 @@ function TalkShowModel({
 
     let addressedListener = null;
     if (playback.running) {
-      for (const cue of DIRECT_ADDRESS_GAZES) {
+      for (const cue of timeline?.gazes || []) {
         if (elapsed >= cue.startAt && elapsed < cue.endAt) {
           addressedListener = cue.listener;
           break;
@@ -2011,7 +1961,7 @@ function TalkShowModel({
     // rather than freezing on one frame), which is a fraction of the cost of
     // painting them every tick.
     const soloKey = soloProjection
-      ? currentSpeaker(elapsed, playback.running)
+      ? speakerAt(timeline, elapsed, playback.running)
       : null;
     solotickRef.current = (solotickRef.current + 1) % SOLO_LISTENER_EVERY_NTH;
 
@@ -2060,7 +2010,7 @@ function TalkShowModel({
       if (feed) {
         // The swivel updates every frame even when the feed renders at half
         // rate, or the prop pans in visible steps.
-        updateCameraRig(feed, headBones, elapsed, playback.running, delta);
+        updateCameraRig(feed, headBones, timeline, elapsed, playback.running, delta);
         const every = Math.max(1, Math.round(MONITOR_FEED.everyNthFrame));
         feed.tick = (feed.tick + 1) % every;
         if (feed.tick === 0) renderMonitorFeed(feed, gl, scene);
@@ -2097,6 +2047,10 @@ function TalkShowModel({
 // (and skips painting the hidden faces), and `channelCards` puts the channel on
 // the frame's screen — see ltTvChannelScreen.
 export default function TalkShowScene({
+  // WHICH EPISODE IS ON. A record from src/content/lt-tv — the guide's
+  // selection, handed straight to the set. Defaults to the slate's first
+  // episode so the set still has something to play if a caller doesn't say.
+  episode = findEpisode(),
   position = [0, -1.9, 0],
   scale = [1.2, 1.2, 1.2],
   rotation = [0, 0, 0],
@@ -2116,6 +2070,7 @@ export default function TalkShowScene({
     <group position={position} scale={scale} rotation={rotation}>
       <Suspense fallback={null}>
         <TalkShowModel
+          episode={episode}
           anchorY={anchorY}
           projectCharacter={projectCharacter}
           soloProjection={soloProjection}

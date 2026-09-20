@@ -1,0 +1,20 @@
+{
+  "shows": [
+    {
+      "id": "roundtable",
+      "title": "The Liminal Terminal",
+      "format": "Weekly roundtable"
+    },
+    {
+      "id": "news",
+      "title": "LT Weekly News Recap",
+      "format": "News",
+      "graphics": "news"
+    },
+    {
+      "id": "morality",
+      "title": "Markets & Morality",
+      "format": "Moral philosophy"
+    }
+  ]
+}
