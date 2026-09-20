@@ -22,6 +22,7 @@ export const CAST = {
     displayName: "Barron",
     voiceId: "IcFWazAaBzXNwLWpySgF",
     processorKey: "john", // process_dialogue.py SPEAKERS key → john-sitepal-balanced.wav
+    clipKey: "barron", // the SitePal clip-name suffix
     role: "anchor",
   },
   Monk: {
@@ -29,9 +30,47 @@ export const CAST = {
     displayName: "Saint GR80",
     voiceId: "fATgBRI8wg5KkDFg8vBd",
     processorKey: "gr80", // → gr80-sitepal-balanced.wav
+    clipKey: "gr80",
     role: "co-anchor",
   },
 };
+
+// ── SitePal clip names ────────────────────────────────────────────────────
+//
+// SitePal account 9308752 has ONE Audio Manager shared by every character, not
+// one per character, so a clip name has to be unique across the whole account —
+// "episode 02 barron" is not a safe name, and neither is anything a second show
+// might also reach for.
+//
+// The convention is the one agreed for LT TV as a whole (see
+// docs/lt-tv-episode-runbook.md): lttv_<show>_ep<NN>_<character>, following the
+// shape of the existing Terminal Traders clips (case001_monk_q5). A split
+// episode's later sections append _s2, _s3.
+export const SHOW_CLIP_SLUGS = {
+  roundtable: "rt",
+  news: "news",
+  morality: "mm",
+};
+
+/**
+ * The exact name to give an upload in SitePal's Audio Manager.
+ * Generated rather than invented per episode, so the name in the record and the
+ * name in SitePal cannot drift — TalkShowScene resolves clips by name, and a
+ * mismatch is a silent failure to speak.
+ *
+ * @param {string} show     — a key of SHOW_CLIP_SLUGS
+ * @param {string|number} number — episode number, zero-padded to two digits
+ * @param {string} actor    — "Barron" | "Monk"
+ * @param {number} [section] — 1-based; omitted or 1 yields no suffix
+ */
+export function sitepalClipName(show, number, actor, section = 1) {
+  const slug = SHOW_CLIP_SLUGS[show];
+  if (!slug) throw new Error(`Unknown show "${show}" — expected one of ${Object.keys(SHOW_CLIP_SLUGS).join(", ")}.`);
+  const clipKey = CAST[actor]?.clipKey;
+  if (!clipKey) throw new Error(`Unknown actor "${actor}".`);
+  const ep = String(number).padStart(2, "0");
+  return `lttv_${slug}_ep${ep}_${clipKey}${section > 1 ? `_s${section}` : ""}`;
+}
 
 export const ACTORS = Object.keys(CAST);
 
