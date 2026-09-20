@@ -135,7 +135,7 @@ const CASE_TEMPLATE = {
       tagline: "Sentiment is theater. Strip the script and read the cast.",
       voice: "2", // SitePal Neural2 US male slot — adjust to your account.
       intro: { text: "", audio: "caseNNN_demon_intro" },
-      // Barron's revisit pool is character-wide and reused across cases —
+      // Connor's revisit pool is character-wide and reused across cases —
       // these three audio files (`demon_return_1..3`) already exist.
       returnLines: [
         { text: "You're back. Smart. Very smart.", audio: "demon_return_1" },

@@ -539,7 +539,7 @@ export function AnswerBody({ flash, children }) {
         </div>
       )}
       {flash.heard && flash.line && (
-        <div className="pu-said barron">
+        <div className="pu-said connor">
           <span className="pu-said-who">{PITCH_BOT.name}</span>
           <span className="pu-said-line">“{flash.line}”</span>
         </div>
@@ -639,7 +639,7 @@ export function SeatRow({ run, live, pressed, options, onPress, compact = false 
           go on to his next point" — a complete description of the game with the
           desk left out of it, from someone who had the desk on screen. Cause:
           the only things that LOOKED like buttons were LET HIM GO ON and CALL
-          IT, so four trading cards read as a cast list. Barron's tile used to
+          IT, so four trading cards read as a cast list. Connor's tile used to
           say PRESS HIM; when he got a lane it became "THE TAPE / shallow look"
           and the last verb in the row went with it.
 
@@ -727,7 +727,7 @@ export function SeatRow({ run, live, pressed, options, onPress, compact = false 
 
                   What survives is the real distinction: you ASK the three
                   colleagues, who are neutral and pull the record on their own
-                  machine, and you PRESS Barron, who is selling you the deal.
+                  machine, and you PRESS Connor, who is selling you the deal.
                   Challenging the seller is a different act from asking a
                   colleague, and the row should never have blurred them. */}
               <span className="pu-seat-sub">
@@ -802,9 +802,9 @@ export function Transcript({ run, deal, open = true, onToggle = null }) {
                       <b>{seatMeta(o.seat)?.name}</b> {o.adviserSays}
                     </span>
                   )}
-                  {o?.barronSays && (
+                  {o?.connorSays && (
                     <span className="pu-script-said">
-                      <b>{PITCH_BOT.name}</b> {o.barronSays}
+                      <b>{PITCH_BOT.name}</b> {o.connorSays}
                     </span>
                   )}
                   {!o && <span className="pu-script-none">— you let it go on</span>}
@@ -1135,7 +1135,7 @@ export const PRESS_UI_CSS = `
 .pu-said { margin-bottom:7px; }
 .pu-said-who { display:block; font:bold 9px/1.4 'Courier New',monospace;
   letter-spacing:0.12em; color:#2fd6d6; }
-.pu-said.barron .pu-said-who { color:#ff5f9e; }
+.pu-said.connor .pu-said-who { color:#ff5f9e; }
 .pu-said-line { display:block; font-size:12.5px; line-height:1.45; font-style:italic; margin-top:2px; }
 .pu-note { font:bold 9.5px/1.45 'Courier New',monospace; letter-spacing:0.09em; color:#ffd23a; }
 .pu-answer.vibes .pu-note { color:#bfeede; }

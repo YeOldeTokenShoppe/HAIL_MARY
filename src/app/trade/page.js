@@ -1793,7 +1793,7 @@ export default function CyborgTemple() {
     const text = currentSpeech.text || '';
     const chunks = text.match(/[^.!?—]+[.!?—]+\s*|[^.!?—]+$/g) || [text];
     // Mirrors ProgressiveText's pacing: ~70ms/char with a 2200ms floor per
-    // chunk (raised from 900→1500→2200 so short chunks like Barron's
+    // chunk (raised from 900→1500→2200 so short chunks like Connor's
     // "Cheaply. Loudly. Badly." don't outrun the audio). Slight lead so
     // the swap lands just before the next audio sentence starts,
     // avoiding a beat of stale text on screen.
@@ -3375,7 +3375,7 @@ export default function CyborgTemple() {
                     })()}
                     {[
                       { agentId: 'Monk',      stationKey: 'monk',    portrait: '/thumbnail_gr80.png',        label: 'ETHOS' },
-                      { agentId: 'Demon',     stationKey: 'demon',   portrait: '/thumbnail_johnBarron.png',  label: 'PATHOS' },
+                      { agentId: 'Demon',     stationKey: 'demon',   portrait: '/thumbnail_connor.png',  label: 'PATHOS' },
                       { agentId: 'Detective', stationKey: 'marisol', portrait: '/thumbnail_marisol.png',     label: 'LOGOS' },
                       { agentId: 'RL80',      stationKey: 'eugene',  portrait: '/thumbnail_eugene.png',      label: 'MYTHOS' },
                     ].map(({ agentId, stationKey, portrait, label }) => {

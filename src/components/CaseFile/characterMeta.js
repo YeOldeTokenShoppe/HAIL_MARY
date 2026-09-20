@@ -28,7 +28,7 @@ export const CHARACTER_META = {
     role: 'PATHOS',
     roleSub: 'HYPE',
     sigil: '◬',
-    portrait: '/thumbnail_johnBarron.png',
+    portrait: '/thumbnail_connor.png',
     color: '#ff3ea0',    // magenta accent
   },
   marisol: {

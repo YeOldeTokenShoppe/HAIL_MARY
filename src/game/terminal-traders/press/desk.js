@@ -36,13 +36,13 @@ export const PITCH_BOT = {
   // reason the copy stopped calling attention to the absent client: AGENT is a
   // role that invites the question "agent for whom, and where are they", while
   // PITCH BOT is just what the thing is. This is desk data, so the rename reaches
-  // the record, the seat row, the transcript and Barron's asides at once.
+  // the record, the seat row, the transcript and Connor's asides at once.
   name: "Pitch Bot",
   role: "PITCHING ON COMMISSION",
   model: "/models/pitch-bot.glb",   // 566KB. Draco + EXT_texture_webp required.
-  // Its own render, 2026-07-29. This was thumbnail_johnBarron.png as a
+  // Its own render, 2026-07-29. This was thumbnail_connor.png as a
   // placeholder for a few hours, which put THE SAME FACE on the pitcher tile and
-  // on Barron's tile two seats apart in the same row — the cast-legibility
+  // on Connor's tile two seats apart in the same row — the cast-legibility
   // failure this whole refactor exists to fix. SeatRow still falls back to a
   // glyph if this is ever null; a borrowed face is never an acceptable fallback.
   /**
@@ -109,10 +109,10 @@ export const PITCH_BOT = {
 const SITEPAL_ACCOUNT = "9308752";
 
 export const DESK = {
-  [SEATS.BARRON]: {
-    id: SEATS.BARRON, agentId: "Demon", station: "demon",
+  [SEATS.CONNOR]: {
+    id: SEATS.CONNOR, agentId: "Demon", station: "demon",
     name: "Connor", role: "THE CHART", lane: LANES.CHART,
-    portrait: "/thumbnail_johnBarron.png", voice: "JB",
+    portrait: "/thumbnail_connor.png", voice: "JB",
     sitepal: {
       label: "Connor", account: SITEPAL_ACCOUNT,
       sceneId: 2775052, hash: "IMtOuXOufh3OnQ9ZYUXc2DoYe39vRePb",
@@ -171,10 +171,10 @@ export function seatMeta(id) {
   return id === PITCHER ? PITCH_BOT : (DESK[id] ?? null);
 }
 
-/** Seat order for every row that shows the whole desk. Barron first because he
+/** Seat order for every row that shows the whole desk. Connor first because he
  *  reads the chart the pitch leans on; the rest follow in lane order. */
 export const DESK_ORDER = [
-  DESK[SEATS.BARRON], DESK[SEATS.MARISOL], DESK[SEATS.GR80], DESK[SEATS.EUGENE],
+  DESK[SEATS.CONNOR], DESK[SEATS.MARISOL], DESK[SEATS.GR80], DESK[SEATS.EUGENE],
 ];
 
 /**
@@ -203,7 +203,7 @@ export const EUGENE = DESK[SEATS.EUGENE];
  * are plain and it wasn't — and it failed on the author, who asked what it
  * meant. That is invariant 6 (every player-facing term must parse with no
  * finance literacy) catching a term the same way it caught "Brier" and
- * "diligence". Barron still SAYS "tape" in his own dialogue, because he's the
+ * "diligence". Connor still SAYS "tape" in his own dialogue, because he's the
  * one with the jargon; the UI no longer says it back.
  */
 export const LANE_LABEL = {
@@ -361,10 +361,10 @@ export function laneSentence(claim, { spent = [], remaining = 0, earlier = 0 } =
 // are posture only, so no line here can ever carry information the pressure score
 // didn't already give you.
 //
-// THESE WERE BARRON'S UNTIL 2026-07-29 and moved wholesale to the bot, which is
+// THESE WERE CONNOR'S UNTIL 2026-07-29 and moved wholesale to the bot, which is
 // what §7 item 2 predicted ("mostly generic enough to survive, worth
 // re-reading"). One line did not survive the move: "Everyone at this table has
-// shipped something" was Barron appealing to the DESK, which an outside agent
+// shipped something" was Connor appealing to the DESK, which an outside agent
 // cannot do — it now appeals to the client instead.
 //
 // IT MAY NOW FLINCH (draft 2, 2026-08-04). This comment used to read "It never
@@ -434,7 +434,7 @@ export function pitcherAside(band, claim, index = 0) {
 
 /** @deprecated Pre-bot name. Kept so both surfaces keep rendering across the
  *  refactor — drop it once PressSession and PressFlat call pitcherAside. */
-export const barronAside = pitcherAside;
+export const connorAside = pitcherAside;
 
 /* ---------------------------------------------------------------------- *
  * THE OPENING — what it says before the first claim.
@@ -559,7 +559,7 @@ export function pitchOpening(deal) {
 // how the depth gradient becomes legible without a tooltip.
 //
 // Sixteen deep lines + four shallow ones, archetype-agnostic, paid for once.
-// (Four seats × dispatch/found/partial/nothing, plus one shallow each. Barron
+// (Four seats × dispatch/found/partial/nothing, plus one shallow each. Connor
 // joined the bank on 2026-07-29 when the pitch bot took over the selling.)
 // DRAFT 2 (2026-08-04). Retoned so each seat says WHAT KIND OF EVIDENCE it just
 // produced and what that evidence cannot settle — the old bank stated a result
@@ -595,7 +595,7 @@ const ADVISER_LINES = {
     nothing: "I cannot find anyone with first-hand knowledge making this claim. That does not prove it false; it means the story has no traceable origin.",
     shallow: "This is not really a story question. I can tell you who is promoting it and how the message spread, but not whether the underlying mechanism works.",
   },
-  // BARRON, AS A SPECIALIST — new on 2026-07-29, and the only prose the pitch-bot
+  // CONNOR, AS A SPECIALIST — new on 2026-07-29, and the only prose the pitch-bot
   // change actually required. This bank was `{}` for as long as he was the
   // pitcher: he answered in his own voice under his own name, so he never needed
   // the four retrieval lines every other seat has.
@@ -607,7 +607,7 @@ const ADVISER_LINES = {
   // and is the point: the SERIES, never the price. The chart lane's whole lesson
   // is that price movement is not evidence, so his findings are about what
   // history exists to be looked at.
-  [SEATS.BARRON]: {
+  [SEATS.CONNOR]: {
     dispatch: "Give me a moment. I'll pull the full performance history.",
     found: "There. That is the full published history, not just the favorable slice. Now we can compare the headline with ordinary and bad periods.",
     partial: "That is the entire series available. The shown number is real, but a thin history cannot tell us how it behaves across conditions.",

@@ -167,7 +167,7 @@ export function instanceDeal(seed = 1, archetypeId = null) {
   //
   // A single-slot lane whose one slot is VIBES stays exactly as it was —
   // backdoor-fork's and anon-but-real's `chart` are unsettleable on purpose,
-  // and there is no discriminating slot in that lane to pin. Barron's job there
+  // and there is no discriminating slot in that lane to pin. Connor's job there
   // is to tell you price movement is not evidence, which is `[A§15]`'s lesson
   // and not a gap.
   const PLAYED = 6;

@@ -44,7 +44,7 @@ light), supported by complementary pops and pastel fills — never more than
 Light sources are diegetic and cheerful: screens, candles, flares, halos.
 
 **Palette anchors.** Station colors carry identity: GR80/ETHOS mint-cyan
-`#53ffd6` on deep-teal grounds · Barron/PATHOS red-orange `#ff5b45` + fire
+`#53ffd6` on deep-teal grounds · Connor/PATHOS red-orange `#ff5b45` + fire
 golds on plum grounds · Marisol/LOGOS gold `#f6d365` on indigo grounds ·
 Eugene/MYTHOS pink `#ff7ad9` on violet grounds. Accents: cream `#fff7ce`,
 amber `#ffd166`, beam cyan `#35e8ff`. Grounds are *colored*, not black.
@@ -134,9 +134,9 @@ upper-weighted composition.*
 
 ---
 
-## 2. FORKED RUMOR — lens key · Barron/PATHOS · common
+## 2. FORKED RUMOR — lens key · Connor/PATHOS · common
 
-The Slide in party-fire mode. Barron's suit hand (red cuff, gold cufflink)
+The Slide in party-fire mode. Connor's suit hand (red cuff, gold cufflink)
 slides the cards while above the desk a **glowing ticker line forks into two
 diverging red-orange ribbon paths** — a road-sign made of price action, one
 path burning brighter (the version people will choose to believe). Confetti
@@ -569,7 +569,7 @@ debut stays the one card that is unmistakably theirs.
   Speech bubbles echo Pump Signal's sticker language. Signature color:
   hot pink + gold.
 - **Haunts:** Bullish Ink coin (signed by every influencer of the season) ·
-  Demon Desk coin (Barron's tuition) · Influencer Eclipse market (cameo:
+  Demon Desk coin (Connor's tuition) · Influencer Eclipse market (cameo:
   Shillbird gone dark mid-squawk — the funniest image in the set, free).
 - **Tell:** the invoice.
 
@@ -591,7 +591,7 @@ debut stays the one card that is unmistakably theirs.
   the candles have gone red and crumbled — he can never stop running.
   Signature color: candle green/red split.
 - **Haunts:** Lucky Capsule coin (the crowd ran out of quarters) · Meme
-  Season market (cameo, sprinting past Barron's desk).
+  Season market (cameo, sprinting past Connor's desk).
 - **Tell:** the crumbling red trail behind him.
 
 ### EMISSIO
@@ -762,7 +762,7 @@ megaphone, coin-slot on its back; it says whatever was last deposited.
 Speech bubbles echo Pump Signal's sticker language. Signature color:
 hot pink + gold.
 Haunts: Bullish Ink coin (signed by every influencer of the season) ·
-Demon Desk coin (Barron's tuition) · Influencer Eclipse market (cameo:
+Demon Desk coin (Connor's tuition) · Influencer Eclipse market (cameo:
 Shillbird gone dark mid-squawk — the funniest image in the set, free).
 Tell: the invoice.
 
@@ -790,7 +790,7 @@ sprinting somewhere with enormous urgency; where he's already passed,
 the candles have gone red and crumbled — he can never stop running.
 Signature color: candle green/red split.
 Haunts: Lucky Capsule coin (the crowd ran out of quarters) · Meme
-Season market (cameo, sprinting past Barron's desk).
+Season market (cameo, sprinting past Connor's desk).
 Tell: the crumbling red trail behind him.
 
 
@@ -957,7 +957,7 @@ take: the shades sit cocked so ONE big drawn eye shows (more acting
 range than opaque lenses — keep this on every future appearance), and
 the little gold sparkle-jet where the coin enters the slot. The invoice
 tell pinned at ~40–52% height sits safely inside the art window — the
-Siren's hourglass lesson, learned. His Demon Desk cameo (Barron's
+Siren's hourglass lesson, learned. His Demon Desk cameo (Connor's
 tuition) is now unblocked for the desk-coin session.
 
 ---
