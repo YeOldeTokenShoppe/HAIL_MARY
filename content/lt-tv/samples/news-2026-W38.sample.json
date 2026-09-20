@@ -943,7 +943,8 @@
             "outlet": "sample"
           }
         ],
-        "gaps": "Entirely synthetic. A real run sources this from CryptoPanic headlines plus the CMC context block."
+        "gaps": "Entirely synthetic. A real run sources this from CryptoPanic headlines plus the CMC context block.",
+        "verified": false
       },
       {
         "slot": "story-2",
@@ -959,7 +960,8 @@
             "outlet": "sample"
           }
         ],
-        "gaps": "Entirely synthetic."
+        "gaps": "Entirely synthetic.",
+        "verified": false
       },
       {
         "slot": "story-3",
@@ -975,7 +977,8 @@
             "outlet": "sample"
           }
         ],
-        "gaps": "Entirely synthetic."
+        "gaps": "Entirely synthetic.",
+        "verified": false
       }
     ],
     "gauge": {
@@ -1016,8 +1019,12 @@
     "briefId": null,
     "briefGeneratedAt": null,
     "model": "claude-opus-5",
-    "generatedAt": "2026-09-20T02:32:49.677Z",
+    "generatedAt": "2026-09-20T02:35:59.841Z",
     "pipeline": "scripts/lt-news-script.mjs"
   },
-  "warnings": []
+  "warnings": [
+    "Story \"ETF outflows without a price response\" is UNVERIFIED — Entirely synthetic. A real run sources this from CryptoPanic headlines plus the CMC context block.",
+    "Story \"Base crosses 100M weekly transactions\" is UNVERIFIED — Entirely synthetic.",
+    "Story \"An AI agent round-trips its own token\" is UNVERIFIED — Entirely synthetic."
+  ]
 }

@@ -28,7 +28,8 @@
             "outlet": "sample"
           }
         ],
-        "gaps": "Entirely synthetic. A real run sources this from CryptoPanic headlines plus the CMC context block."
+        "gaps": "Entirely synthetic. A real run sources this from CryptoPanic headlines plus the CMC context block.",
+        "verified": false
       },
       {
         "slot": "story-2",
@@ -44,7 +45,8 @@
             "outlet": "sample"
           }
         ],
-        "gaps": "Entirely synthetic."
+        "gaps": "Entirely synthetic.",
+        "verified": false
       },
       {
         "slot": "story-3",
@@ -60,7 +62,8 @@
             "outlet": "sample"
           }
         ],
-        "gaps": "Entirely synthetic."
+        "gaps": "Entirely synthetic.",
+        "verified": false
       }
     ],
     "gauge": {

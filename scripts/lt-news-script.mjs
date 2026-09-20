@@ -20,6 +20,7 @@
 //   node scripts/lt-news-script.mjs --brief content/lt-tv/briefs/news-2026-W38.json
 //   node scripts/lt-news-script.mjs --draft my-hand-written-draft.json   # no API calls
 //   node scripts/lt-news-script.mjs --brief <f> --rundown-only           # just the editorial pass
+//   node scripts/lt-news-script.mjs --brief <f> --no-search               # skip source verification
 //
 // Env: ANTHROPIC_API_KEY (required unless --draft)
 //      LT_NEWS_MODEL     (default claude-opus-5)
@@ -34,6 +35,9 @@ import {
   SEGMENTS,
   packBlocks,
   sitepalClipName,
+  NEWS_SOURCE_DOMAINS,
+  MAX_SEARCHES_PER_RUNDOWN,
+  WEB_SEARCH_TOOL_TYPE,
   CHAR_BUDGET_PER_BLOCK,
   CHAR_LIMIT_PER_BLOCK,
   RUNTIME_BOUNDS_SECONDS,
@@ -60,38 +64,69 @@ function arg(name, fallback = null) {
 // this repo is written (src/app/api/trade/director, /api/review/characters,
 // /api/council-chat). No SDK dependency is added for a script.
 
-async function claude({ system, user, maxTokens = 8000 }) {
+async function claude({ system, user, maxTokens = 8000, tools = null }) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("ANTHROPIC_API_KEY is not set (or use --draft to skip the model).");
 
-  const res = await fetch(ANTHROPIC_URL, {
-    method: "POST",
-    headers: {
-      "x-api-key": key,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: "user", content: user }],
-    }),
-  });
+  const messages = [{ role: "user", content: user }];
+  const searchNotes = [];
+  let data;
 
-  if (!res.ok) {
-    throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 500)}`);
+  // Server-side tools run on Anthropic's side, but a long tool-using turn can
+  // come back as `pause_turn` — resume it by echoing the content back and
+  // asking for the rest. Bounded so a misbehaving turn cannot loop forever.
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const res = await fetch(ANTHROPIC_URL, {
+      method: "POST",
+      headers: {
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: maxTokens,
+        system,
+        messages,
+        ...(tools ? { tools } : {}),
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 500)}`);
+    }
+
+    data = await res.json();
+
+    // A server-tool failure arrives as a 200 with an error object in place of
+    // the usual result list. The show degrades rather than dying: an
+    // unverified rundown is worse than a verified one, but far better than no
+    // episode at all.
+    for (const block of data.content || []) {
+      if (block.type === "web_search_tool_result" && !Array.isArray(block.content)) {
+        searchNotes.push(`web search unavailable: ${block.content?.error_code ?? "unknown error"}`);
+      }
+    }
+
+    if (data.stop_reason !== "pause_turn") break;
+    messages.push({ role: "assistant", content: data.content });
   }
 
-  const data = await res.json();
   if (data.stop_reason === "max_tokens") {
     throw new Error("Model hit max_tokens — the reply was cut off. Raise --max-tokens and retry.");
   }
+  if (data.stop_reason === "refusal") {
+    throw new Error("The model declined this request. Check the brief for anything unexpected.");
+  }
+
   const text = (data.content || [])
     .filter((b) => b.type === "text")
     .map((b) => b.text)
     .join("");
-  return parseJson(text);
+
+  const parsed = parseJson(text);
+  if (searchNotes.length) parsed._searchNotes = searchNotes;
+  return parsed;
 }
 
 /** Models occasionally wrap JSON in prose or fences despite instruction. */
@@ -126,7 +161,18 @@ WHAT TO REJECT:
 
 Also pick the GAUGE beat: the Fear & Greed movement across the week (the arc from the start of the week to the end, not today's reading) and ONE prediction-market line worth quoting.
 
-Invent nothing. Every fact, number and claim must come from the brief you are given. If the brief is thin on a slot, say so in that story's "gaps" field rather than filling it in.
+HOW TO SOURCE A STORY — the brief nominates, the web confirms:
+The brief you are given is made of headlines and social posts. It is enough to tell you what the week was ABOUT and nowhere near enough to read a number out loud on air. So:
+1. Pick your three candidate stories from the brief.
+2. SEARCH to confirm each one before you write it, using the web_search tool. Find the number, the date and a real article from a reputable outlet.
+3. Put the article you actually confirmed it from in that story's "sources", with its real URL and outlet. A source you did not read does not go in the list.
+4. Do the same for the gauge beat's prediction-market line.
+
+If a search does not confirm a story, you have three honest options, in this order: replace it with one you CAN confirm; keep it but strip the unconfirmed number out of "fact" and say so in "gaps"; or, if the week is genuinely thin, return fewer than three stories. Never keep a number you could not confirm.
+
+If the web search tool is unavailable to you, work from the brief alone, put "unverified — from headline only" in every affected story's "gaps", and do not state a number that appears nowhere in the brief.
+
+Invent nothing, ever. No number, date, name or quote may come from your own memory — only from the brief or from something you searched and read. Your training data is older than this week.
 
 Return ONLY a JSON object, no preamble and no code fences:
 {
@@ -143,7 +189,8 @@ Return ONLY a JSON object, no preamble and no code fences:
       "barronAngle": "the cynical market read, one sentence",
       "gr80Angle": "the reframe — what the number actually measures, one sentence",
       "sources": [{ "title": "...", "url": "...", "outlet": "..." }],
-      "gaps": "anything you could not source, or empty string"
+      "verified": true | false,
+      "gaps": "anything you could not source or confirm, or empty string"
     }
   ],
   "gauge": {
@@ -354,6 +401,13 @@ function assemble({ rundown, segments, week, brief, number = 1 }) {
     );
   }
 
+  for (const story of rundown.stories || []) {
+    if (story.verified === false) {
+      const detail = String(story.gaps || "no detail given").replace(/[.\s]+$/, "");
+      warnings.push(`Story "${story.headline}" is UNVERIFIED — ${detail}.`);
+    }
+  }
+
   const sources = [
     ...(rundown.stories || []).flatMap((s) => s.sources || []),
     ...(rundown.gauge?.sources || []),
@@ -482,12 +536,33 @@ async function main() {
     brief = JSON.parse(await readFile(resolve(briefPath), "utf8"));
     week = brief.week;
 
-    console.log(`Rundown pass (${MODEL})…`);
+    const search = arg("no-search") ? null : [
+      {
+        type: WEB_SEARCH_TOOL_TYPE,
+        name: "web_search",
+        max_uses: MAX_SEARCHES_PER_RUNDOWN,
+        allowed_domains: NEWS_SOURCE_DOMAINS,
+      },
+    ];
+
+    console.log(`Rundown pass (${MODEL})${search ? " with source verification" : " — search disabled"}…`);
     rundown = await claude({
       system: RUNDOWN_SYSTEM,
       user: `Week: ${week}\n\nTHE BRIEF\n${JSON.stringify(brief.signals, null, 2)}`,
-      maxTokens: 4000,
+      maxTokens: 8000,
+      tools: search,
     });
+
+    for (const note of rundown._searchNotes || []) console.log(`  ! ${note}`);
+    delete rundown._searchNotes;
+
+    const unverified = (rundown.stories || []).filter((story) => story.verified === false);
+    if (unverified.length) {
+      console.log(
+        `  ! ${unverified.length} of ${rundown.stories.length} stories could not be confirmed: ` +
+          unverified.map((story) => `"${story.headline}"`).join(", "),
+      );
+    }
 
     if (arg("rundown-only")) {
       const out = resolve(arg("out", `content/lt-tv/briefs/rundown-${week}.json`));
