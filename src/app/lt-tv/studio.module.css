@@ -1,0 +1,639 @@
+/* THE STUDIO'S LOOK.
+ *
+ * A stylesheet rather than utility classes, because this app does not compile
+ * Tailwind: the `@tailwind` directives in globals.css are commented out and
+ * nothing imports the framework, so a `className="rounded border"` here is
+ * three words that reach no stylesheet. The page was written in those and
+ * rendered as raw browser defaults.
+ *
+ * It also has to push back against globals.css, which is a site-wide sheet for
+ * a gothic marketing page: it centres every <p>, sets the body face to a
+ * display font, and gives bare headings poster sizes. Those are element
+ * selectors, so a class here outranks them — but only where one is applied,
+ * which is why the reset block below covers the tags rather than trusting each
+ * one to be classed.
+ *
+ * Sizes are in px, not rem: globals.css sets the root font to 16pt and drops
+ * it to 12pt under 980px, so a rem here would be 21px on a desktop and 16px on
+ * a laptop and the whole page would resize at breakpoints that have nothing to
+ * do with it.
+ *
+ * Palette: the greys are the lineup page's (src/app/admin/lt-tv/page.js), so
+ * the two admin surfaces read as one family. The accents are the channel
+ * screen's own (src/components/trade/ltTvChannelScreen.js) — the magenta rule,
+ * the cyan title, the green "latest" — so the back office looks like it makes
+ * the thing you see on /trade.
+ */
+
+.page {
+  --ink: #0b0d10;
+  --panel: #14181d;
+  --well: #0e1217;
+  --line: #222831;
+  --line-soft: #1a1f27;
+  --text: #e8eaed;
+  --muted: #9aa4b2;
+  --faint: #6f7a88;
+
+  --magenta: #ef62dc;
+  --cyan: #8feeff;
+  --green: #8effc4;
+  --amber: #ffcb74;
+  --peach: #ffc096;
+  --red: #ff9d9d;
+
+  --display: "Orbitron", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  min-height: 100dvh;
+  /* The channel screen fades from a deep purple at the top; this borrows it so
+     the studio and the thing it produces share a horizon. */
+  background: radial-gradient(120% 55% at 50% 0, #1a1030 0%, #0b0d10 58%) var(--ink);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* globals.css is written for the marketing pages. Undo it inside the studio. */
+.page :is(h1, h2, h3, p, ul, ol, li, figure) {
+  margin: 0;
+  padding: 0;
+}
+.page p {
+  text-align: left;
+  clear: none;
+}
+.page :is(ul, ol) {
+  list-style: none;
+}
+.page :is(h1, h2, h3) {
+  font-size: inherit;
+  font-weight: 600;
+  line-height: 1.3;
+  /* globals.css gives a bare h3 `font-size: 5em; text-align: center; color:
+     #fff`, which is how the section labels came out centred and white. */
+  text-align: left;
+  color: inherit;
+}
+.page code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+}
+
+.inner {
+  margin: 0 auto;
+  max-width: 864px;
+  padding: 0 16px 128px;
+}
+
+/* ---------------------------------------------------------------- masthead */
+
+.masthead {
+  /* globals.css carries `header { position: relative !important; top: auto
+     !important }` — a site-wide fix for some other page's fixed header. It
+     outranks any plain declaration, so keeping this bar in view takes the
+     same weapon. */
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 14.4px;
+  padding: 13.6px 0;
+  border-bottom: 1px solid var(--line);
+  background: rgba(11, 13, 16, 0.93);
+  backdrop-filter: blur(10px);
+}
+
+.wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: 8.8px;
+  min-width: 0;
+}
+
+.wordmarkLt {
+  white-space: nowrap;
+  font-family: var(--display);
+  font-size: 18.4px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  color: var(--peach);
+  text-shadow: 0 0 18px rgba(255, 119, 192, 0.45);
+}
+
+.wordmarkStudio {
+  white-space: nowrap;
+  font-family: var(--display);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--magenta);
+}
+
+.devPill {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 3.2px 8.8px;
+  border: 1px solid #2c3440;
+  border-radius: 999px;
+  font-size: 10.9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.page .intro {
+  margin: 22.4px 0 30.4px;
+  max-width: 704px;
+  font-size: 14.4px;
+  color: var(--muted);
+}
+
+/* ----------------------------------------------------------------- buttons */
+
+.btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7.2px;
+  padding: 6.7px 12.8px;
+  border: 1px solid #2c3440;
+  border-radius: 8px;
+  background: #1b212a;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.6px;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.btn:hover:not(:disabled) {
+  background: #232b36;
+  border-color: #3a4552;
+}
+.btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+/* The step the episode is actually waiting on. One per card, so the eye has
+   somewhere to land without reading every label. */
+.btnPrimary {
+  border-color: rgba(143, 238, 255, 0.5);
+  background: rgba(143, 238, 255, 0.12);
+  color: #d6f8ff;
+}
+.btnPrimary:hover:not(:disabled) {
+  background: rgba(143, 238, 255, 0.2);
+  border-color: rgba(143, 238, 255, 0.75);
+}
+
+.btnQuiet {
+  padding: 3.2px 6.4px;
+  border-color: transparent;
+  background: none;
+  color: var(--faint);
+  font-size: 12.5px;
+}
+.btnQuiet:hover:not(:disabled) {
+  background: none;
+  border-color: transparent;
+  color: var(--text);
+}
+
+.page :is(button, textarea):focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* The money marker. It is a label, not decoration: the same buttons ask for
+   confirmation before they run. */
+.cost {
+  padding: 0.8px 5.6px;
+  border: 1px solid rgba(255, 203, 116, 0.4);
+  border-radius: 4px;
+  font-size: 10.9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+/* -------------------------------------------------------------- key notice */
+
+.keys {
+  margin-bottom: 32px;
+  border: 1px solid #3a3222;
+  border-left: 3px solid var(--amber);
+  border-radius: 10px;
+  background: rgba(255, 203, 116, 0.05);
+  padding: 13.6px 16px;
+}
+.page .keysTitle {
+  font-size: 13.1px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+.page .keysList {
+  margin: 8px 0 9.6px;
+  display: grid;
+  gap: 3.2px;
+  font-family: var(--mono);
+  font-size: 13.1px;
+  color: #d5dae1;
+}
+.page .keysFoot {
+  font-size: 13.1px;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------- shows */
+
+.show {
+  margin-bottom: 41.6px;
+}
+
+.showHead {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  /* The channel screen's magenta rule, cut short so it reads as an underline
+     on the title rather than a divider across the page. */
+  box-shadow: inset 0 -1px 0 0 transparent;
+  position: relative;
+}
+.showHead::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 56px;
+  height: 1px;
+  background: var(--magenta);
+}
+
+.page .showTitle {
+  font-family: var(--display);
+  font-size: 15.2px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+
+.page .empty {
+  margin-top: 14.4px;
+  font-size: 14.1px;
+  color: var(--faint);
+  font-style: italic;
+}
+
+.page .orphanTitle {
+  color: var(--amber);
+}
+.orphanHead::after {
+  background: var(--amber);
+}
+
+/* ---------------------------------------------------------------- episodes */
+
+.episode {
+  margin-top: 11.2px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.episodeOpen {
+  border-color: #313a46;
+}
+
+.episodeHead {
+  display: flex;
+  align-items: center;
+  gap: 12.8px;
+  width: 100%;
+  padding: 13.6px 16px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.episodeHead:hover {
+  background: #171c23;
+}
+
+.dot {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--faint);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.03);
+}
+.dotPlanned { background: var(--faint); }
+.dotWritten { background: var(--amber); box-shadow: 0 0 10px rgba(255, 203, 116, 0.5); }
+.dotRecorded { background: var(--cyan); box-shadow: 0 0 10px rgba(143, 238, 255, 0.5); }
+.dotOnAir { background: var(--green); box-shadow: 0 0 10px rgba(142, 255, 196, 0.55); }
+
+.episodeTitles {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.episodeTitle {
+  display: block;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.episodeMeta {
+  display: block;
+  margin-top: 1.6px;
+  font-size: 12.5px;
+  color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stageWord { color: var(--muted); }
+.stagePlanned { color: var(--faint); }
+.stageWritten { color: var(--amber); }
+.stageRecorded { color: var(--cyan); }
+.stageOnAir { color: var(--green); }
+
+.disclose {
+  flex-shrink: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.episodeBody {
+  padding: 0 16px 17.6px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.page .summary {
+  margin: 14.4px 0 0;
+  font-size: 14.1px;
+  color: var(--muted);
+}
+
+.page .label {
+  margin-top: 22.4px;
+  margin-bottom: 9.6px;
+  font-size: 11.2px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.labelNote {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #59626e;
+}
+.labelWarn {
+  color: var(--amber);
+}
+
+/* ----------------------------------------------------------------- actions */
+
+.actions {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 14px;
+}
+.action {
+  display: contents;
+}
+.action .btn {
+  justify-content: space-between;
+}
+.actionBlurb {
+  font-size: 12.8px;
+  color: var(--faint);
+}
+
+@media (max-width: 640px) {
+  /* A button and its explanation side by side needs width this does not have,
+     so each pair stacks. */
+  .actions {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .action .btn {
+    margin-top: 8px;
+  }
+
+  /* The masthead is three things on one line at a width that fits two. */
+  .masthead {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .wordmarkLt {
+    font-size: 16px;
+    letter-spacing: 0.16em;
+  }
+  .devPill {
+    margin-left: auto;
+  }
+}
+
+/* -------------------------------------------------------------- screenplay */
+
+.script {
+  display: block;
+  width: 100%;
+  height: 352px;
+  padding: 12.8px 14.4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--well);
+  color: #d5dae1;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  resize: vertical;
+}
+
+.scriptBar {
+  display: flex;
+  align-items: center;
+  gap: 11.2px;
+  margin-top: 9.6px;
+  flex-wrap: wrap;
+}
+.scriptNote {
+  font-size: 12.8px;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------- files, clips, etc */
+
+.page .fileList {
+  display: grid;
+  gap: 7.2px;
+}
+.file {
+  padding-bottom: 7.2px;
+  border-bottom: 1px dashed var(--line-soft);
+}
+.file:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.filePath {
+  color: #cdd4dc;
+  font-size: 12.8px;
+  word-break: break-all;
+}
+.fileWhat {
+  display: block;
+  margin-top: 1.6px;
+  font-size: 12.2px;
+  color: var(--faint);
+}
+
+.page .clipList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.clip {
+  padding: 4px 8.8px;
+  border: 1px solid #2f3947;
+  border-radius: 6px;
+  background: var(--well);
+  color: #cdd4dc;
+  font-family: var(--mono);
+  font-size: 12.2px;
+}
+
+.page .warnList {
+  display: grid;
+  gap: 4.8px;
+  font-size: 13.6px;
+  color: #d5dae1;
+}
+.warn {
+  padding-left: 14.4px;
+  position: relative;
+}
+.warn::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--amber);
+}
+
+/* --------------------------------------------------------------- the drawer */
+
+.runlog {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 40;
+  border-top: 1px solid #323b47;
+  background: rgba(16, 20, 26, 0.97);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 -18px 40px rgba(0, 0, 0, 0.55);
+}
+.runlogInner {
+  margin: 0 auto;
+  max-width: 864px;
+  padding: 11.2px 16px 14.4px;
+}
+.runlogHead {
+  display: flex;
+  align-items: center;
+  gap: 9.6px;
+  margin-bottom: 8px;
+}
+.runState {
+  padding: 1.9px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 11.2px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.runPending { color: var(--muted); }
+.runDone { color: var(--green); }
+.runFailed { color: var(--red); }
+.runWhat {
+  font-size: 12.8px;
+  color: var(--faint);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.runTimeout {
+  color: var(--amber);
+  font-size: 12.5px;
+}
+.runClose {
+  margin-left: auto;
+}
+.runOutput {
+  max-height: 256px;
+  margin: 0;
+  overflow: auto;
+  padding: 12px 13.6px;
+  border-radius: 8px;
+  background: #07090c;
+  color: #cdd4dc;
+  font-family: var(--mono);
+  font-size: 12.2px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+/* --------------------------------------------------------------- the edges */
+
+.page .notice {
+  padding: 48px 0;
+  font-size: 14.4px;
+  color: var(--muted);
+}
+.noticeError {
+  color: var(--red);
+}
+.noticeBtn {
+  margin-top: 14.4px;
+}
+
+.footer {
+  margin-top: 48px;
+  padding-top: 17.6px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page * {
+    transition: none !important;
+  }
+}
