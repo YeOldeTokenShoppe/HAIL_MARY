@@ -49,7 +49,19 @@ def create_stem(master, destination, segments, keep_voice, total_duration):
         segment for segment in segments if segment.get("voice_id") == keep_voice
     ]
     if not kept_segments:
-        raise SystemExit(f"No dialogue segments were found for voice {keep_voice}.")
+        present = sorted({s.get("voice_id") for s in segments if s.get("voice_id")})
+        # Suggest the id nobody in the current cast claims — that is the one
+        # this speaker's voice was changed away from.
+        unclaimed = [v for v in present if v not in SPEAKERS.values()]
+        name = next((n for n, v in SPEAKERS.items() if v == keep_voice), "<name>")
+        raise SystemExit(
+            f"No dialogue segments were found for voice {keep_voice}.\n"
+            f"  This response was recorded with: {', '.join(present)}\n"
+            "  A saved response keeps the voice ids it was generated with, so a\n"
+            "  voice the cast has changed since will not match. To reprocess it,\n"
+            "  name the voice it actually used, e.g.\n"
+            f"    --voice {name}={unclaimed[0] if unclaimed else '<id from above>'}"
+        )
 
     # THE CLOSING LINE KEEPS ITS TAIL. END_GUARD_SECONDS exists to stop one
     # speaker bleeding into the next line — and the last line of the dialogue
@@ -125,6 +137,23 @@ def create_stem(master, destination, segments, keep_voice, total_duration):
     subprocess.run(command, check=True)
 
 
+def resolve_speakers(overrides):
+    """SPEAKERS, with any --voice NAME=ID applied. Validated up front so a typo
+    stops the run instead of silently producing a stem of pure silence."""
+    speakers = dict(SPEAKERS)
+    for item in overrides:
+        name, sep, voice = item.partition("=")
+        if not sep or not voice.strip():
+            raise SystemExit(f"--voice wants NAME=ID, got: {item}")
+        if name not in SPEAKERS:
+            raise SystemExit(
+                f"--voice names an unknown speaker {name!r}; "
+                f"this set has {', '.join(SPEAKERS)}."
+            )
+        speakers[name] = voice.strip()
+    return speakers
+
+
 def write_episode_record(args, show_timing):
     """A starter src/content/lt-tv episode record.
 
@@ -173,9 +202,20 @@ def main():
         help="Episode id for the starter record, e.g. roundtable-02 "
         "(default: derived from --show)",
     )
+    parser.add_argument(
+        "--voice",
+        action="append",
+        default=[],
+        metavar="NAME=ID",
+        help="Override one speaker's ElevenLabs voice id for this run "
+        "(NAME is " + " or ".join(SPEAKERS) + "). Use when reprocessing an "
+        "older response.json that was recorded before the cast changed a voice; "
+        "it does not change the voice future episodes are generated with.",
+    )
     parser.add_argument("--show", default="roundtable", help="Show id the episode belongs to")
     parser.add_argument("--title", default="", help="Episode title for the starter record")
     args = parser.parse_args()
+    speakers = resolve_speakers(args.voice)
 
     try:
         payload = json.loads(args.response.read_text(encoding="utf-8"))
@@ -199,7 +239,7 @@ def main():
         raise SystemExit(f"Could not decode the returned audio: {exc}") from exc
 
     total_duration = media_duration(master)
-    for name, voice_id in SPEAKERS.items():
+    for name, voice_id in speakers.items():
         destination = args.output_dir / f"{name}-sitepal-balanced.wav"
         create_stem(master, destination, segments, voice_id, total_duration)
 
@@ -210,7 +250,7 @@ def main():
     )
 
     actor_for_voice = {
-        voice_id: ACTOR_NAMES[name] for name, voice_id in SPEAKERS.items()
+        voice_id: ACTOR_NAMES[name] for name, voice_id in speakers.items()
     }
     show_timing = {
         "duration_seconds": round(total_duration, 3),
@@ -237,7 +277,7 @@ def main():
 
     print(f"Created a {total_duration:.1f}-second dialogue:")
     print(f"  Master: {master}")
-    for name in SPEAKERS:
+    for name in speakers:
         print(f"  {name.upper()}: {args.output_dir / f'{name}-sitepal-balanced.wav'}")
     print(f"  Timings: {timing_path}")
     print(f"  Show cues: {show_timing_path}")

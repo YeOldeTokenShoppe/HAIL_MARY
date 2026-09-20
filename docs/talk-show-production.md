@@ -190,6 +190,18 @@ episode sounds cut off, that is why: re-run the processor over the saved
 `response.json` (no ElevenLabs call, no API key, just ffmpeg) and re-upload the
 stem of whoever speaks last.
 
+A saved `response.json` keeps the voice ids it was generated with. If a
+character's ElevenLabs voice has been changed since, reprocessing that response
+fails with *No dialogue segments were found for voice …* — the script names the
+ids the response actually carries, and `--voice <name>=<id>` reprocesses it
+without changing the voice future episodes use. The committed test episode is
+exactly this case: it was recorded with GR80 on `JBFqnCBsd6RMkjVDRZzb`, and the
+cast moved to `fATgBRI8wg5KkDFg8vBd` afterwards.
+
+```bash
+python3 process_dialogue.py response.json output --voice gr80=JBFqnCBsd6RMkjVDRZzb
+```
+
 ## 3. Upload to SitePal
 
 Upload:
