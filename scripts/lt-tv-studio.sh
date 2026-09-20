@@ -7,11 +7,16 @@
 # does the same thing from a terminal.
 #
 # WHY THE STUDIO IS LOCAL ONLY, and not a password-protected page on the live
-# site: it runs the same scripts you would run by hand. It reads this folder,
-# writes episode files back into it, and spends ElevenLabs renders. A deployed
-# server has none of that — no checkout to read, a read-only filesystem, and a
-# request budget measured in seconds rather than the minutes an audio build
-# takes. A password would not make those things exist. See docs/lt-tv.md.
+# site: what this pipeline produces is source code. An episode reaches /trade
+# because its record is committed under src/content/lt-tv/episodes/ and
+# imported by index.js at build time. A server that wrote that file into its
+# own container would change nothing — the container is rebuilt from git, and
+# the write goes with it. Half the working files (content/lt-tv/) are
+# gitignored and exist only on the machine that made them.
+#
+# So a hosted studio is not this studio behind a password; it is a different
+# system that commits to GitHub or keeps episodes in Firestore. See
+# docs/lt-tv.md.
 
 set -u
 

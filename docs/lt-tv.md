@@ -14,23 +14,33 @@ one of the two deeper docs, linked at each step.
 ## The studio page
 
 The one to open if you would rather not remember any of this. **Double-click
-`Open LT TV Studio.command`** in the repo folder — no terminal, no typing. It
-starts the site and opens the studio for you, and it prints the address it
-actually used, which is not always port 3000. Close its window when you are
-done. From a terminal, `npm run lt:studio` does the same thing.
+`LT TV Studio`** in the repo folder — no terminal, no typing. It starts the
+site and opens the studio for you, and it prints the address it actually used,
+which is not always port 3000. Close its window when you are done. From a
+terminal, `npm run lt:studio` does the same thing.
+
+`Open LT TV Studio.command` does the same job and is kept as a fallback. Prefer
+the app: Finder decides what to do with a `.command` by file association, and
+an editor that has claimed `.command` will open it for reading instead of
+running it.
 
 Every episode of both shows, what stage each one is at, and the next step as a
 button — write it, record it, apply your edits, check the slate. The screenplay
 is editable in the page, with a Save button and a separate Apply, so a
 half-finished edit is never live.
 
-It runs **on your machine only**, and that is not a setting to change. The
-studio reads this folder, writes episode files back into it, and spends
-ElevenLabs renders. A deployed server has no checkout to read, a read-only
-filesystem to write to, and seconds of request budget where an audio build
-needs minutes — so a password in front of it would guard something that could
-not work anyway. The page and its routes 404 outside `npm run dev`, which means
-the honest answer to "what if someone finds it" is that there is nothing there.
+It runs **on your machine only.** What this pipeline produces is source code:
+an episode reaches /trade because its record is committed under
+`src/content/lt-tv/episodes/` and imported by `index.js` at build time. A
+server that wrote that file into its own container would change nothing, since
+the container is rebuilt from git and the write goes with it — and half the
+working files under `content/lt-tv/` are gitignored, so they only ever exist
+where they were made.
+
+A hosted studio is therefore not this one behind a password. It is a different
+system, one that commits episodes back to GitHub or keeps them in Firestore
+instead of on disk. The page and its routes 404 outside `npm run dev`, which
+means the answer to "what if someone finds it" is that there is nothing there.
 
 Two things it is careful about. A button that spends money says so and asks
 first; the free ones do not ask, because a confirm on a free action teaches you
@@ -63,7 +73,7 @@ root — the path is relative to you, not to the repo.
 
 | | |
 |---|---|
-| double-click `Open LT TV Studio.command` | the studio page — all of the below, as buttons |
+| double-click `LT TV Studio` | the studio page — all of the below, as buttons |
 | `npm run lt:studio` | the same, from a terminal |
 | `npm run lt` | where every episode is |
 | `npm run lt:check` | validate the slate |
