@@ -75,7 +75,9 @@ replace this array" — but no generator exists, and the pieces that could feed 
 
 The script itself is `elevenlabs-dialogue-test/dialogue.json`, which is literally
 the ElevenLabs request body: an `inputs` array of `{ text, voice_id }` turns in
-order, plus `model_id`, `language_code` and `seed`.
+order, plus `model_id`, `language_code` and `seed`. That shape does not change
+between episodes. It is the one the test episode used, so writing a new episode
+means replacing the text and the voice IDs and leaving the rest of the file alone.
 
 ```json
 {
@@ -113,6 +115,12 @@ One request generates the whole conversation in context. Never generate lines
 separately: the conversational timing is exactly what you lose.
 `process_dialogue.py` then reads the `voice_segments` ElevenLabs returned and
 writes five files into `output/`.
+
+That is one ElevenLabs call per episode, no matter how many people watch it.
+Recording once and uploading is what keeps the cost flat; having SitePal speak the
+lines live through `sayText` would spend a call on every playback. It is the reason
+this pipeline exists in the shape it does, and a reason not to replace it with live
+speech later.
 
 | File | What it is |
 | --- | --- |
