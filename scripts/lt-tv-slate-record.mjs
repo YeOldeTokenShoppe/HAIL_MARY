@@ -19,9 +19,9 @@
 // WHAT IT CANNOT KNOW UNTIL THE EPISODE IS RECORDED. Line starts and the
 // dialogue's end come from real audio, which the audio build writes back into
 // the production record. Run this module again afterwards and the slate record
-// picks them up. A record without them is not broken — `episodeIsPlayable` returns false and the guide
-// lists it as "Not recorded yet", which is exactly right for an episode that
-// has been written but not recorded. Everything else — speakers, audience
+// picks them up. A record without them is not broken — `episodeIsPlayable`
+// returns false and the guide lists it as "Not recorded yet", which is exactly
+// right for an episode that has been written but not recorded. Everything else — speakers, audience
 // lines, cues with their offsets — is known the moment the script exists, so
 // it is emitted now and the audio build fills in the three missing fields.
 
