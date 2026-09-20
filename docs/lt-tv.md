@@ -96,6 +96,7 @@ root — the path is relative to you, not to the repo.
 | `npm run lt:rewrite` | rewrite the lines you marked with a `#` note |
 | `npm run lt:audio` | record an episode |
 | `npm run lt:split` | split the master into the two SitePal tracks |
+| `npm run lt:slate` | put a recorded episode on the guide |
 | `npm run lt:test` | run every check |
 
 Arguments go after `--`, as in `npm run lt:roundtable -- --topic roundtable-02`.
@@ -154,10 +155,10 @@ Full detail: `docs/lt-weekly-news-workflow.md`.
 
 ```bash
 # 1. Pull the week. Check `degraded` in the output is empty or harmless.
-node scripts/lt-news-brief.mjs
+npm run lt:brief
 
 # 2. Write the script. Two Claude calls; every number is computed locally.
-node scripts/lt-news-script.mjs --brief content/lt-tv/briefs/news-2026-W38.json
+npm run lt:news -- --brief content/lt-tv/briefs/news-2026-W38.json
 ```
 
 Now **read the `.txt` screenplay** before spending any audio money. Does each
@@ -170,7 +171,7 @@ add them, delete them, change who a line is aimed at, then apply what you
 wrote. No model call and no audio call, so revise here until it reads.
 
 ```bash
-node scripts/lt-tv-edit.mjs news-2026-W38
+npm run lt:edit -- news-2026-W38
 ```
 
 The format explains itself at the top of the file; `docs/lt-weekly-news-workflow.md`
@@ -178,19 +179,28 @@ has the detail.
 
 ```bash
 # 3. Confirm it landed on the slate cleanly (it will say "not recorded yet").
-node scripts/lt-tv-check.mjs
+npm run lt:check
 
 # 4. Build the audio, then listen to the master end to end.
-node scripts/lt-tv-audio.mjs content/lt-tv/episodes/news-2026-W38.json
+npm run lt:audio -- content/lt-tv/episodes/news-2026-W38.json
 
 # 5. Split the master into the two balanced tracks. Needs ffmpeg.
 #    The studio's "Split it into the two tracks" button runs exactly this.
 npm run lt:split -- news-2026-W38
 
-# 6. Re-run the script step so the record picks up the real timing.
-node scripts/lt-news-script.mjs --brief content/lt-tv/briefs/news-2026-W38.json
-node scripts/lt-tv-check.mjs          # should now report a runtime
+# 6. Put it on the guide. Run this AFTER the split, which is what works out
+#    the section boundaries the guide needs.
+npm run lt:slate -- news-2026-W38
+npm run lt:check   # should now report a runtime
 ```
+
+Step 6 is a join, not a rebuild, and that distinction is worth a sentence
+because getting it wrong is expensive. **Never re-run the generator to refresh
+a recorded episode.** `lt-news-script.mjs` and `lt-rt-script.mjs` write an
+episode from scratch every time, so re-running one spends two model calls,
+overwrites the screenplay you edited, and clears the timing you just paid to
+record — leaving the guide saying *Not recorded yet* over perfectly good
+audio. It would also throw away the section cuts step 5 just worked out.
 
 Because a news episode is generated in blocks laid end to end, check **each
 block join for a seam** and the **last block for drift** against the picture.
@@ -229,10 +239,10 @@ named on the slate.
 ```bash
 # 1. See what is waiting. Five episodes were titled long before there was any
 #    way to write one; these are the queue.
-node scripts/lt-rt-script.mjs --list
+npm run lt:roundtable -- --list
 
 # 2. Write one. Two Claude calls: the argument, then the dialogue.
-node scripts/lt-rt-script.mjs --topic roundtable-02
+npm run lt:roundtable -- --topic roundtable-02
 ```
 
 An episode already on the slate **keeps the title and summary it was given** —
@@ -243,7 +253,7 @@ is not on the slate yet.
 Then read and revise exactly as you would a news episode:
 
 ```bash
-node scripts/lt-tv-edit.mjs roundtable-02
+npm run lt:edit -- roundtable-02
 ```
 
 What to look for is specific to this show: **both of them have to be right
@@ -253,10 +263,24 @@ every exchange you have a sermon, and the fix is in the script, not the audio.
 
 ```bash
 # 3. Record it — the same audio build the news show uses.
-node scripts/lt-tv-audio.mjs content/lt-tv/episodes/roundtable-02.json
+npm run lt:audio -- content/lt-tv/episodes/roundtable-02.json
 ```
 
-From here it is the shared path below: split, upload, tune the lead-in, check.
+From here it is the same tail as the news show — steps 5 and 6 above, then the
+shared sections below:
+
+```bash
+# Split the master into the two SitePal tracks. Needs ffmpeg.
+# It ends by printing which file to upload under which clip name.
+npm run lt:split -- roundtable-02
+
+# Then, once they are uploaded, put it on the guide. After the split, so the
+# section boundaries come with it.
+npm run lt:slate -- roundtable-02
+npm run lt:check -- roundtable-02
+```
+
+Then upload, tune the lead-in and test.
 
 `content/lt-tv/samples/roundtable-02.draft.json` is a worked example, written by
 hand to show the format and the two voices. **Its argument is invented** and it
@@ -425,7 +449,7 @@ Editing the screenplay of an episode that already has audio is refused — the
 clips would still be saying the old words. To go ahead anyway:
 
 ```bash
-node scripts/lt-tv-edit.mjs news-2026-W38 --rerecord
+npm run lt:edit -- news-2026-W38 --rerecord
 ```
 
 That clears the timing and returns the episode to *Not recorded yet* on the
@@ -459,7 +483,8 @@ how next week's show goes up early.
 [ ] audienceLines covers every line played to the room
 [ ] Reaction cues use valid names and sensible durations
 [ ] Record in src/content/lt-tv/episodes/ and imported in index.js
-[ ] node scripts/lt-tv-check.mjs passes, and reports a runtime
+[ ] npm run lt:slate -- <id> run after the split, so the guide gets the sections
+[ ] npm run lt:check passes, and reports a runtime
 [ ] Every section under 90s and starting where the last one ended (the check
     says so)
 [ ] Each section join watched once — the picture should not jump at one

@@ -353,7 +353,11 @@ async function main() {
       console.log(`    name  ${row.clip}\n`);
     }
   }
-  console.log("Then re-run the script step to refresh the slate record.");
+  // The split step is what hands over the last command, because it is the one
+  // that knows the section boundaries. Naming the generator here, which this
+  // used to do, points at the run that rebuilds the episode and discards the
+  // timing written a few lines above.
+  console.log("Then that step tells you how to put it on the guide.");
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

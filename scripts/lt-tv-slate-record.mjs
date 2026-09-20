@@ -16,15 +16,17 @@
 // is the source of truth and the slate record is derived from it, so the two
 // can never disagree about who speaks line 41.
 //
-// WHAT IT CANNOT KNOW YET. Line starts and the dialogue's end come from real
-// audio, which is the audio build (step 3), which is not written. A record
-// without them is not broken — `episodeIsPlayable` returns false and the guide
-// lists it as "Not recorded yet", which is exactly right for an episode that
-// has been written but not recorded. Everything else — speakers, audience
+// WHAT IT CANNOT KNOW UNTIL THE EPISODE IS RECORDED. Line starts and the
+// dialogue's end come from real audio, which the audio build writes back into
+// the production record. Run this module again afterwards and the slate record
+// picks them up. A record without them is not broken — `episodeIsPlayable`
+// returns false and the guide lists it as "Not recorded yet", which is exactly
+// right for an episode that has been written but not recorded. Everything else — speakers, audience
 // lines, cues with their offsets — is known the moment the script exists, so
 // it is emitted now and the audio build fills in the three missing fields.
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { sectionsForRecord } from "./lt-tv-sections.mjs";
 
@@ -224,4 +226,64 @@ export function registerEpisode(source, id) {
     return null;
   }
   return replaced;
+}
+
+// ── running it ────────────────────────────────────────────────────────────
+//
+//   node scripts/lt-tv-slate-record.mjs roundtable-02
+//
+// The generators call this module as a library on their way past, so a freshly
+// written episode reaches the slate without anyone running this. The case it
+// exists for is the one after that: the audio build has just written real
+// timing into the production record, and the slate record still says the
+// episode is not recorded.
+//
+// The obvious way to refresh it is to re-run the generator, and that is what
+// this pipeline used to tell you to do. It is the wrong instruction — the
+// generator rebuilds the episode from scratch, so it spends two model calls,
+// overwrites the screenplay you edited, and drops the timing you just paid to
+// record. This walks the one-way join instead, which is all that step needs.
+
+async function main() {
+  const argument = process.argv[2];
+  if (!argument) {
+    console.error("Usage: node scripts/lt-tv-slate-record.mjs <episode id or record path>");
+    console.error("  e.g. node scripts/lt-tv-slate-record.mjs roundtable-02");
+    process.exit(2);
+  }
+
+  const name = argument.replace(/\.(json|txt)$/, "");
+  const candidates = argument.includes("/")
+    ? [resolve(argument.replace(/\.txt$/, ".json"))]
+    : [resolve("content/lt-tv/episodes", `${name}.json`), resolve("content/lt-tv/samples", `${name}.json`)];
+  const found = candidates.find((p) => existsSync(p));
+  if (!found) {
+    console.error(`No episode record for "${argument}". Looked in:\n  ${candidates.join("\n  ")}`);
+    process.exit(1);
+  }
+
+  const episode = JSON.parse(await readFile(found, "utf8"));
+  const record = toSlateRecord(episode);
+  const { path, registered, importLine, arrayLine } = await writeSlateRecord(record);
+
+  const playable = Array.isArray(record.lineStarts) && record.lineStarts.length > 0;
+  console.log(`${episode.id} → ${path}`);
+  console.log(
+    playable
+      ? `Playable: ${record.lineStarts.length} line starts, ends at ${record.dialogueEnd}s.`
+      : "Not recorded yet — the guide will list it without playing it.",
+  );
+  if (!registered) {
+    console.log(`Could NOT register it in ${SLATE_INDEX} — add these two lines by hand:`);
+    console.log(`  ${importLine}`);
+    console.log(`  ${arrayLine.trim()}   (in EPISODE_RECORDS)`);
+  }
+  console.log("\nCheck it with:\n  node scripts/lt-tv-check.mjs " + record.id);
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((err) => {
+    console.error(err.message || err);
+    process.exit(1);
+  });
 }

@@ -191,7 +191,14 @@ async function main() {
     console.log("Upload all of them. The set plays each character's sections in order, and a");
     console.log("missing one stops the episode where it should have carried on.\n");
   }
-  console.log("Then re-run the script step to refresh the slate record.");
+  // The end of the chain, so it hands over the last step. Re-running the script
+  // step, which this used to say, rebuilds the episode from scratch and throws
+  // away both the edits and the timing — including the section cuts just
+  // written above.
+  console.log("Then put the episode on the guide:");
+  console.log(`  npm run lt:slate -- ${id}`);
+  console.log("Not the generator — that would rebuild the episode and discard your edits,");
+  console.log("the recorded timing, and the section boundaries above.");
 }
 
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;

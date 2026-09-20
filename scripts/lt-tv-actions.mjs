@@ -93,6 +93,19 @@ export const ACTIONS = {
     argv: (id) => ["node", ["scripts/lt-tv-split.mjs", id]],
     blurb: "Turns the one master into the two balanced WAVs you upload to SitePal, one per character. Needs ffmpeg. Free.",
   },
+  slate: {
+    label: "Put it on the guide",
+    spends: null,
+    needs: [],
+    // Same stage as split: the audio step has written real timing into the
+    // production record, and the slate record has not been told. Left off the
+    // table, the studio stops one step short of a playable episode, and the
+    // obvious-looking way to finish by hand is to re-run the generator, which
+    // rebuilds the episode and discards the edits and the timing.
+    stages: ["recorded", "on-air"],
+    argv: (id) => ["node", ["scripts/lt-tv-slate-record.mjs", id]],
+    blurb: "Carries the recorded timing into the slate record, so the guide plays the episode instead of listing it as not recorded. Do this after the two clips are uploaded. Free.",
+  },
   check: {
     label: "Check the slate",
     spends: null,

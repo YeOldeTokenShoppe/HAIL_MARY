@@ -411,8 +411,19 @@ python3 elevenlabs-dialogue-test/process_dialogue.py \
 response JSON it decoded itself, which a concatenated master is not. Its
 actual stem-splitting is untouched.
 
-Finally re-run `scripts/lt-news-script.mjs` so the slate record picks up the
-timing and the episode becomes playable rather than a slate entry.
+Finally refresh the slate record, so it picks up the timing and the episode
+becomes playable rather than a slate entry:
+
+```bash
+node scripts/lt-tv-slate-record.mjs news-2026-W38
+```
+
+**Not** by re-running `scripts/lt-news-script.mjs`. That is what this step used
+to say, and it is the one instruction here that can cost you the afternoon: the
+generator rebuilds the episode from scratch, so it spends two model calls,
+overwrites the screenplay you edited, and clears the timing you have just paid
+to record. The join above only walks the production record into the slate's
+shape, which is all this step needs.
 
 Hand-copying `line_starts` into a constant and re-stating the speaker mapping
 for the gazes are gone from `docs/talk-show-production.md` at this point — the

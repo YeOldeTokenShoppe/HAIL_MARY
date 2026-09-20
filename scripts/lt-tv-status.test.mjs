@@ -66,7 +66,8 @@ ok("pointing first at the screenplay", e.next.then.includes("lt:edit"));
 
 e = await only({ [slatePath("roundtable-02")]: written, [stagePath("roundtable-02")]: staging([0, 4]), "src/content/lt-tv/index.js": indexFor(["roundtable-02"]) });
 check("timing in the working record means recorded", e.stage, "recorded");
-ok("and the next step splits the master", e.next.run.includes("process_dialogue.py"));
+ok("and the next step splits the master", e.next.run.includes("lt:split"));
+ok("then hands over to the join, never to the generator", e.next.then.includes("lt:slate"));
 
 e = await only({ [slatePath("roundtable-02")]: onAir, [stagePath("roundtable-02")]: staging([0, 4]), "src/content/lt-tv/index.js": indexFor(["roundtable-02"]) });
 check("clip names and line starts mean on air", e.stage, "on-air");

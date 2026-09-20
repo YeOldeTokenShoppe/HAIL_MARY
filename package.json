@@ -19,6 +19,7 @@
     "lt:rewrite": "node scripts/lt-tv-rewrite.mjs",
     "lt:audio": "node scripts/lt-tv-audio.mjs",
     "lt:split": "node scripts/lt-tv-split.mjs",
+    "lt:slate": "node scripts/lt-tv-slate-record.mjs",
     "lt:brief": "node scripts/lt-news-brief.mjs",
     "lt:news": "node scripts/lt-news-script.mjs",
     "lt:roundtable": "node scripts/lt-rt-script.mjs",
