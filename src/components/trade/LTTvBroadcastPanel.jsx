@@ -2,56 +2,14 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import LTTvChiron from "@/components/trade/LTTvChiron";
+import { SHOWS } from "@/content/lt-tv";
 
-// Exported so the mobile LT TV screen (MobileTalkShow) shows the same slate
-// rather than keeping a second copy that drifts from this one.
-export const EPISODES = [
-  {
-    number: "01",
-    title: "The Halo Effect",
-    runtime: "03:42",
-    summary: "How perception shapes markets, and why narratives become reality.",
-  },
-  {
-    number: "02",
-    title: "The Wealth Effect",
-    runtime: "03:15",
-    summary: "Paper gains, real confidence, and the stories a rising chart tells.",
-  },
-  {
-    number: "03",
-    title: "Meme Season",
-    runtime: "03:28",
-    summary: "When attention becomes an asset, the joke may be the honest part.",
-  },
-  {
-    number: "04",
-    title: "Why We Chase Tops",
-    runtime: "03:05",
-    summary: "FOMO, belonging, and the comfort of arriving with everyone else.",
-  },
-  {
-    number: "05",
-    title: "Bull Markets",
-    runtime: "03:37",
-    summary: "What optimism reveals when every chart seems to point upward.",
-  },
-  {
-    number: "06",
-    title: "Fear & Greed",
-    runtime: "03:11",
-    summary: "The two oldest signals in finance—and why neither stays quiet.",
-  },
-];
-
-// The LT TV lineup. A show with no episodes yet is listed in the guide as
-// Coming soon. `graphics: "news"` gives a show the full chiron (headline bar,
-// ticker, quote); every other show — and the lineup — wears only the logo cube.
-export const SHOWS = [
-  { id: "roundtable", title: "The Liminal Terminal", format: "Weekly roundtable", episodes: EPISODES },
-  { id: "news", title: "LT Weekly News Recap", format: "News", graphics: "news", episodes: [] },
-  { id: "morality", title: "Markets & Morality", format: "Moral philosophy", episodes: [] },
-];
+// THE SLATE IS DATA. Both the shows and their episodes come from
+// src/content/lt-tv — one JSON record per episode, the same record the set
+// plays — so the guide and the performance can't disagree about what an
+// episode is. Re-exported here because the mobile LT TV screen and the /trade
+// page already import them from this module.
+export { EPISODES, SHOWS } from "@/content/lt-tv";
 
 // `view` is 'lineup' (the LT TV landing — the set off air, channel on the
 // frame's screen) or 'set' (a show on). On the lineup the primary action tunes
@@ -85,6 +43,9 @@ export default function LTTvBroadcastPanel({
     number: "—", title: "News studio preview",
     summary: "Take a look around the news set. Episodes are coming soon.",
   };
+  // `playable` comes off the record: a slate entry with no recording yet says
+  // so instead of quietly replaying whichever episode the set had loaded.
+  const canPlay = hasEpisode && selected.playable !== false;
   const loading = !audioReady && voiceStatus !== "failed";
 
   useEffect(() => {
@@ -213,7 +174,8 @@ export default function LTTvBroadcastPanel({
         </div>
 
         <div className="ltv-current" aria-live="polite">
-          <div className="ltv-eyebrow">{hasEpisode ? `Episode ${selected.number} · ${selected.runtime}` : "Studio preview"}</div>
+          <div className="ltv-eyebrow">{!hasEpisode ? "Studio preview"
+            : `Episode ${selected.number} · ${selected.runtime || "Not recorded yet"}`}</div>
           <h3>{selected.title}</h3>
           <p>{selected.summary}</p>
 
@@ -230,13 +192,13 @@ export default function LTTvBroadcastPanel({
             ref={primaryButtonRef}
             type="button"
             className={`ltv-start ${playing ? "is-live" : ""}`}
-            disabled={loading || !hasEpisode}
+            disabled={loading || !canPlay}
             onClick={handlePrimaryAction}
           >
             <span aria-hidden="true">
               {playing ? "■" : voiceStatus === "failed" ? "↻" : "▶"}
             </span>
-            {!hasEpisode ? "Episodes coming soon" : loading
+            {!hasEpisode ? "Episodes coming soon" : !canPlay ? "Not recorded yet" : loading
               ? "Preparing studio…"
               : playing
                 ? "Stop episode"
@@ -303,7 +265,7 @@ export default function LTTvBroadcastPanel({
                           <span className="ltv-ep-number">{episode.number}</span>
                           <span className="ltv-ep-copy">
                             <b>{episode.title}</b>
-                            <small>{episode.runtime}</small>
+                            <small>{episode.runtime || "Not recorded yet"}</small>
                           </span>
                           {active && <span className="ltv-row-play" aria-hidden="true">▶</span>}
                         </button>

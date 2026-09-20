@@ -4,8 +4,11 @@ This is the repeatable workflow for producing a Saint GR80 and Connor
 episode with expressive ElevenLabs dialogue, clean SitePal audio tracks, and
 scripted body animation.
 
-The working files live in `elevenlabs-dialogue-test/`. The runtime director is
-`src/components/trade/TalkShowScene.jsx`.
+The working files live in `elevenlabs-dialogue-test/`. The finished episode is
+one JSON record in `src/content/lt-tv/episodes/`, and that record is the whole
+episode: what the guide lists and what the set performs. `TalkShowScene.jsx`
+is the SET — the rig, the clips, the camera — and producing an episode never
+edits it.
 
 ## What the pipeline produces
 
@@ -13,11 +16,13 @@ One ElevenLabs request generates the whole conversation in context. The local
 processor then creates:
 
 - `master-dialogue.mp3` — the unedited conversation, useful for review.
-- `john-sitepal-balanced.wav` — Barron plus silence during every GR80 line.
-- `gr80-sitepal-balanced.wav` — GR80 plus silence during every Barron line.
+- `john-sitepal-balanced.wav` — Connor plus silence during every GR80 line.
+- `gr80-sitepal-balanced.wav` — GR80 plus silence during every Connor line.
 - `voice-segments.json` — ElevenLabs' complete turn timing response.
 - `talk-show-timing.json` — compact line starts, ends, speakers, and total
   duration for the animation director.
+- `episode-record.json` — a starter LT TV episode record with that timing
+  already in it. Finish it in step 4 and it becomes the episode.
 
 The two balanced WAV files have identical duration and begin at time zero.
 Starting both SitePal audios together reconstructs the conversation while each
@@ -65,7 +70,7 @@ delivery tag at the beginning of the turn it controls:
 
 Tags that have worked well for these characters include:
 
-- Barron: `[confidently]`, `[slightly offended]`, `[suspiciously]`,
+- Connor: `[confidently]`, `[slightly offended]`, `[suspiciously]`,
   `[horrified]`, `[reluctantly]`, `[matter-of-factly]`
 - GR80: `[dryly]`, `[patiently]`, `[amused]`, `[calmly]`,
   `[with quiet disapproval]`
@@ -173,68 +178,75 @@ Boundary processing cannot repair a word ElevenLabs itself cut short.
 
 Upload:
 
-- `john-sitepal-balanced.wav` to Barron's SitePal Audio Manager.
+- `john-sitepal-balanced.wav` to Connor's SitePal Audio Manager.
 - `gr80-sitepal-balanced.wav` to GR80's SitePal Audio Manager.
 
 Give each upload a short, unique episode name. After SitePal finishes
-processing, copy the names exactly into `TALK_SHOW_AUDIO` near the top of
-`TalkShowScene.jsx`:
-
-```js
-const TALK_SHOW_AUDIO = {
-  Barron: "episode 02 barron",
-  Monk: "episode 02 gr80",
-};
-```
+processing, copy the names exactly into the record's `audio` block (step 4).
 
 Do not remove the leading silence or independently shift either file. The live
 show starts both full-length tracks together; their shared timeline is what
 keeps the voices and faces synchronized. The master MP3 is for review and
 editing reference, not live playback.
 
-## 4. Transfer the line timing
+## 4. Finish the episode record
 
-Open the generated `output/talk-show-timing.json`. Copy its `line_starts` array
-into `TEST_LINE_STARTS` in `TalkShowScene.jsx`.
+`run_test.sh` already wrote `output/episode-record.json`, with the line starts,
+the speakers and the dialogue length filled in from the generation. Name the
+episode while you generate it and the record arrives named too:
 
-The line number is zero-based and matches the order of `inputs` in
-`dialogue.json`:
-
-```js
-const TEST_LINE_STARTS = [0, 8.4, 13.92, 20.64];
+```bash
+./run_test.sh --episode-id roundtable-02 --title "The Wealth Effect"
 ```
 
-The generated `speakers` array is a quick check that every voice ID was mapped
-to the intended character.
+What is left to fill in is what only you know:
 
-## 5. Add animation cues
+```json
+{
+  "title": "The Wealth Effect",
+  "summary": "Paper gains, real confidence, and the stories a rising chart tells.",
+  "audio": { "Connor": "episode 02 barron", "Monk": "episode 02 gr80" },
+  "audienceLines": [0, 5],
+  "cues": [
+    { "line": 4, "offset": 0.3, "actor": "Connor", "reaction": "shrug", "duration": 3.3,
+      "note": "I closed the position at a substantial profit." }
+  ]
+}
+```
 
-The available clips are registered in `CHARACTER_CLIPS`; their full authored
-lengths are in `REACTION_DURATIONS`. The current cue names are:
+- **`audio`** — the two SitePal clip names from step 3, exactly.
+- **`summary`** — one line, shown in the program guide.
+- **`audienceLines`** — the zero-based lines played to the room rather than to
+  the other character. Those lines turn no one's head, and the camera pulls
+  back to the two-shot for them. Everything else is a direct address: the
+  listener turns to the speaker automatically, because the record already says
+  who is speaking.
+- **`cues`** — the reaction beats, below.
+- **`leadIn`** — seconds of dead air at the head of the uploaded tracks, before
+  the first word. 2.5 is the usual value. Trim it by ear during step 6 with
+  `window.__tsTiming.leadIn` and write the value you land on back here.
+- **`note`** on a cue is a comment for the next person; nothing reads it.
+
+Do not hand-edit `lineStarts`, `speakers` or `dialogueEnd` — they come from the
+generation, and the listener turns, the camera shots and the guide's runtime
+are all derived from them.
+
+### Reaction cues
+
+The available clips are registered in `CHARACTER_CLIPS` in `TalkShowScene.jsx`;
+their full authored lengths are in `REACTION_DURATIONS`. The cue names are:
 
 - Both: `headnod`, `headnodSubtle`, `headshakeDisappointment`, `lookAround`,
   `shrug`
 - Monk only: `headshake`, `prayCrosschest`
-- Barron only: `mockCrying`
+- Connor only: `mockCrying`
 
 Use `headnodSubtle` for ordinary agreement. Reserve `headnod` for an emphatic
 beat.
 
-Add direction to `TALK_SHOW_CUE_DEFS`:
-
-```js
-{
-  line: 4,
-  offset: 0.3,
-  actor: "Barron",
-  reaction: "shrug",
-  duration: 3.3,
-}
-```
-
 - `line` — zero-based dialogue turn.
 - `offset` — seconds after that turn begins.
-- `actor` — `"Barron"` or `"Monk"`.
+- `actor` — `"Connor"` or `"Monk"`.
 - `reaction` — one of the registered cue names.
 - `duration` — how long to play before returning to the breathing idle.
 
@@ -246,29 +258,41 @@ the return crossfade finishes, preventing T-pose flashes.
 Avoid overlapping two reactions on the same character unless the interruption
 is intentional. Reactions on different characters may overlap.
 
-## 6. Direct listener gaze
+## 5. Put it on the slate
 
-Head turns are explicit, not automatic. Add a line to
-`DIRECT_ADDRESS_GAZES` only when the speaker is directly addressing the other
-character:
+1. Move the finished record to `src/content/lt-tv/episodes/<id>.json`. The
+   filename must match its `id`.
+2. Add it to `EPISODE_RECORDS` in `src/content/lt-tv/index.js` — one import
+   line and one array entry. That is the only code a new episode touches.
+3. Check it:
 
-```js
-{ line: 6, listener: "Monk" }
+```bash
+node scripts/lt-tv-check.mjs                # the whole slate
+node scripts/lt-tv-check.mjs roundtable-02  # one episode, line by line
 ```
 
-Omit broad statements delivered to the audience. Barron's intro uses the
-camera-facing Demon head calibration; GR80's opening `lookAround` surveys the
-audience. Listener turns currently use approximately 30 degrees for Barron and
-23 degrees for GR80.
+The checker reads every record, reports anything the set would choke on (a
+cue pointing at a line that doesn't exist, a reaction the rig can't play, a
+speaker list that doesn't match the line count, a record nobody imported), and
+prints the performance the record resolves to: the camera shots, the listener
+turns and which reaction lands on which line. It exits non-zero when something
+is wrong, so it can gate a deploy.
 
-## 7. Test the episode
+A record with no `audio` is a slate entry: the guide lists it and labels it
+*Not recorded yet* rather than playing another episode in its place. That is
+how to announce next week's show before it exists.
 
-1. Open `/trade` and enter **THE SHOW**.
-2. Wait for **START TEST** rather than **LOADING VOICES**.
-3. Play the entire episode once without stopping.
-4. Check voice handoffs, final syllables, face sync, reaction timing, gaze,
+## 6. Test the episode
+
+1. Open `/trade` and enter **LT TV**.
+2. Pick the episode in the program guide.
+3. Wait for **Play replay** rather than **Preparing studio…**.
+4. Play the entire episode once without stopping.
+5. Check voice handoffs, final syllables, face sync, reaction timing, gaze,
    crossfades, and the final return to idle.
-5. Test a second playback; stale actions should reset cleanly.
+6. Test a second playback; stale actions should reset cleanly.
+7. Switch to another episode and back. The set takes itself off air and swaps
+   the loaded clips; it should not go back to **Preparing studio…**.
 
 When `talk_show.glb` is re-exported, bump the query version in `MODEL_URL` so
 the browser does not retain the previous animation library.
@@ -280,8 +304,11 @@ the browser does not retain the previous animation library.
 - [ ] Master performance is approved.
 - [ ] No blips or clipped syllables in either balanced WAV.
 - [ ] Both balanced WAV files have equal duration.
-- [ ] SitePal upload names exactly match `TALK_SHOW_AUDIO`.
-- [ ] `TEST_LINE_STARTS` matches `talk-show-timing.json`.
+- [ ] SitePal upload names exactly match the record's `audio`.
+- [ ] `summary` reads well in the guide.
+- [ ] `audienceLines` covers every line played to the room.
 - [ ] Reaction cues use valid names and appropriate durations.
-- [ ] Direct-address gaze cues are intentional.
+- [ ] The record is in `src/content/lt-tv/episodes/` and imported in `index.js`.
+- [ ] `node scripts/lt-tv-check.mjs` passes.
 - [ ] Full first and second playback pass cleanly.
+- [ ] Switching episodes and back works without a reload.

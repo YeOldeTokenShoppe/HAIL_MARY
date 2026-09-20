@@ -2,6 +2,7 @@
 
 import argparse
 import base64
+import datetime
 import json
 import subprocess
 import sys
@@ -14,7 +15,7 @@ SPEAKERS = {
 }
 
 ACTOR_NAMES = {
-    "john": "Barron",
+    "john": "Connor",
     "gr80": "Monk",
 }
 
@@ -113,12 +114,56 @@ def create_stem(master, destination, segments, keep_voice, total_duration):
     subprocess.run(command, check=True)
 
 
+def write_episode_record(args, show_timing):
+    """A starter src/content/lt-tv episode record.
+
+    Everything the pipeline already knows is filled in: the line starts, who
+    holds each line, and where the dialogue ends. What a producer still decides
+    — the SitePal clip names (which only exist after the upload), which lines
+    are played to the room, and the reaction beats — is left blank rather than
+    guessed. Nothing here is copied by hand any more.
+    """
+    episode_id = args.episode_id or f"{args.show}-XX"
+    record = {
+        "id": episode_id,
+        "showId": args.show,
+        "number": episode_id.rsplit("-", 1)[-1],
+        "title": args.title or "Untitled episode",
+        "summary": "",
+        "airDate": datetime.date.today().isoformat(),
+        "status": "published",
+        # Fill these in from SitePal's Audio Manager after uploading the two
+        # balanced WAVs. The names must match exactly.
+        "audio": {"Connor": "", "Monk": ""},
+        "leadIn": 2.5,
+        "lineStarts": show_timing["line_starts"],
+        "dialogueEnd": show_timing["duration_seconds"],
+        "speakers": show_timing["speakers"],
+        # Lines played to the room rather than to the other character: no
+        # listener turn, and the camera pulls back to the two-shot.
+        "audienceLines": [],
+        # Reaction beats. See docs/talk-show-production.md for the clip names.
+        "cues": [],
+    }
+    record_path = args.output_dir / "episode-record.json"
+    record_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    return record_path
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Decode ElevenLabs dialogue and make one SitePal track per speaker."
     )
     parser.add_argument("response", type=Path, help="ElevenLabs response JSON")
     parser.add_argument("output_dir", type=Path, help="Folder for generated audio")
+    parser.add_argument(
+        "--episode-id",
+        default="",
+        help="Episode id for the starter record, e.g. roundtable-02 "
+        "(default: derived from --show)",
+    )
+    parser.add_argument("--show", default="roundtable", help="Show id the episode belongs to")
+    parser.add_argument("--title", default="", help="Episode title for the starter record")
     args = parser.parse_args()
 
     try:
@@ -177,12 +222,20 @@ def main():
         encoding="utf-8",
     )
 
+    record_path = write_episode_record(args, show_timing)
+
     print(f"Created a {total_duration:.1f}-second dialogue:")
     print(f"  Master: {master}")
     for name in SPEAKERS:
         print(f"  {name.upper()}: {args.output_dir / f'{name}-sitepal-balanced.wav'}")
     print(f"  Timings: {timing_path}")
     print(f"  Show cues: {show_timing_path}")
+    print(f"  Episode record: {record_path}")
+    print(
+        "\nNext: upload both WAVs to SitePal, put their clip names in the "
+        "record's `audio`, add your reaction cues, then move it to "
+        "src/content/lt-tv/episodes/ and run `node scripts/lt-tv-check.mjs`."
+    )
 
 
 if __name__ == "__main__":

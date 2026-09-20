@@ -24,7 +24,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import TalkShowScene from "./TalkShowScene";
-import { SHOWS } from "./LTTvBroadcastPanel";
+import { SHOWS } from "@/content/lt-tv";
 import usePerfHud from "./PerfHud";
 
 // Camera + aim carried over from the desktop talk-show pose (`talkShowPose` in
@@ -195,17 +195,18 @@ export default function MobileTalkShow({ onExit }) {
     return () => ro.disconnect();
   }, []);
 
-  // Episode slate, shared with the desktop panel. NOTE: selection is
-  // PRESENTATIONAL on both platforms — TalkShowScene's TALK_SHOW_AUDIO is a
-  // fixed pair of uploaded tracks, so every episode plays the same recording
-  // today. Mirrored here rather than "fixed" on mobile only, so the two
-  // surfaces don't disagree about what picking an episode means.
+  // Episode slate, shared with the desktop panel — the same records from
+  // src/content/lt-tv. Selection is real on both platforms: the chosen record
+  // carries the clip names the set loads, so picking an episode plays that
+  // episode (or says it isn't recorded yet).
   const [episodeIndex, setEpisodeIndex] = useState(0);
   const [showId, setShowId] = useState(SHOWS[0].id);
   const show = SHOWS.find((item) => item.id === showId) || SHOWS[0];
   const newsMode = show.id === "news";
   const hasEpisode = show.episodes.length > 0;
-  const episode = show.episodes[episodeIndex] || show.episodes[0] || {
+  const selectedEpisode = show.episodes[episodeIndex] || show.episodes[0] || null;
+  const canPlay = Boolean(selectedEpisode?.playable);
+  const episode = selectedEpisode || {
     title: "News studio preview", summary: "Take a look around the news set. Episodes are coming soon.",
   };
   const channelCards = useMemo(() => newsMode ? [{
@@ -233,7 +234,7 @@ export default function MobileTalkShow({ onExit }) {
   }, []);
 
   const play = () => {
-    if (!hasEpisode) return;
+    if (!canPlay) return;
     try {
       const started = window.__talkShowPlay?.();
       if (!started) setPlaying(false);
@@ -291,6 +292,7 @@ export default function MobileTalkShow({ onExit }) {
           <StageCamera newsMode={newsMode} />
           <ambientLight intensity={1.5} />
           <TalkShowScene
+            episode={selectedEpisode}
             newsMode={newsMode}
             channelCards={channelCards}
             soloProjection
@@ -323,15 +325,16 @@ export default function MobileTalkShow({ onExit }) {
         <div className="mts-now">
           <h2 className="mts-show-title">{show.title}</h2>
           <div className="mts-metadata"><span>{show.format}</span>{hasEpisode && <><span>{show.episodes.length} episodes</span><span className="mts-replay">Replay</span></>}</div>
-          <div className="mts-episode-meta">{hasEpisode ? `Episode ${episode.number} · ${episode.runtime}` : "Studio preview"}</div>
+          <div className="mts-episode-meta">{!hasEpisode ? "Studio preview"
+            : `Episode ${episode.number} · ${episode.runtime || "Not recorded yet"}`}</div>
           <h3 className="mts-ep-title">{episode.title}</h3>
           <p className="mts-ep-sum">{episode.summary}</p>
         </div>
         <div className="mts-controls">
           <button type="button" className="mts-play" onClick={voiceStatus === "failed" ? retry : playing ? stop : play}
-            disabled={!hasEpisode || (!audioReady && voiceStatus !== "failed")}>
+            disabled={!canPlay || (!audioReady && voiceStatus !== "failed")}>
             <span aria-hidden="true">{playing ? "■" : voiceStatus === "failed" ? "↻" : "▶"}</span>
-            {!hasEpisode ? "Episodes coming soon" : voiceStatus === "failed" ? "Retry audio" : !audioReady ? "Preparing studio…" : playing ? "Stop episode" : "Play episode"}
+            {!hasEpisode ? "Episodes coming soon" : !canPlay ? "Not recorded yet" : voiceStatus === "failed" ? "Retry audio" : !audioReady ? "Preparing studio…" : playing ? "Stop episode" : "Play episode"}
           </button>
           <div className="mts-rotate-hint">Rotate your phone for full-screen viewing</div>
         </div>
@@ -342,7 +345,7 @@ export default function MobileTalkShow({ onExit }) {
               key={ep.number}
               className={`mts-rack-item ${i === episodeIndex ? "is-on" : ""}`}
               aria-pressed={i === episodeIndex}
-              aria-label={`Episode ${ep.number}: ${ep.title}, ${ep.runtime}`}
+              aria-label={`Episode ${ep.number}: ${ep.title}, ${ep.runtime || "not recorded yet"}`}
               onClick={() => {
                 if (playing) stop();
                 setEpisodeIndex(i);
@@ -350,7 +353,7 @@ export default function MobileTalkShow({ onExit }) {
             >
               <span className="mts-rack-no">Episode {ep.number}</span>
               <span className="mts-rack-title">{ep.title}</span>
-              <span className="mts-rack-run">{ep.runtime}</span>
+              <span className="mts-rack-run">{ep.runtime || "Not recorded yet"}</span>
             </button>
           ))}
         </div>

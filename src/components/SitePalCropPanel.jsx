@@ -78,7 +78,7 @@ const TEMPLE_CHARACTERS = Object.entries(SITEPAL_PROJECTION_CONFIG).map(([id, co
 // with the temple tabs in localStorage.
 const TALKSHOW_CONST_NAMES = {
   Monk: { crop: "TALKSHOW_MONK_CROP", filter: "TALKSHOW_MONK_FILTER" },
-  Barron: { crop: "TALKSHOW_BARRON_CROP", filter: "TALKSHOW_BARRON_FILTER" },
+  Connor: { crop: "TALKSHOW_CONNOR_CROP", filter: "TALKSHOW_CONNOR_FILTER" },
 };
 const TALKSHOW_CHARACTERS = Object.entries(TALKSHOW_PROJECTION_CONFIG).map(([id, config]) => ({
   id: `TS_${id}`,
