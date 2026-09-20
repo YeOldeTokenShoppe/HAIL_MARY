@@ -51,6 +51,15 @@ def create_stem(master, destination, segments, keep_voice, total_duration):
     if not kept_segments:
         raise SystemExit(f"No dialogue segments were found for voice {keep_voice}.")
 
+    # THE CLOSING LINE KEEPS ITS TAIL. END_GUARD_SECONDS exists to stop one
+    # speaker bleeding into the next line — and the last line of the dialogue
+    # has no next line. ElevenLabs' final end_time_seconds can also fall well
+    # short of where the master actually stops (1.1s short on the 2026-07-31
+    # test episode), so trimming the closing line to it drops the end of the
+    # performance and leaves silence in its place. Nothing follows it, so it
+    # runs to the end of the master.
+    closing_segment = segments[-1] if segments else None
+
     filters = [
         (
             f"anullsrc=r=44100:cl=mono,"
@@ -67,6 +76,8 @@ def create_stem(master, destination, segments, keep_voice, total_duration):
         end = reported_end - END_GUARD_SECONDS
         if reported_start == 0:
             start = 0
+        if segment is closing_segment:
+            end = max(end, total_duration)
         duration = max(0.001, end - start)
         fade = min(BOUNDARY_FADE_SECONDS, duration / 4)
         fade_out_start = max(0, duration - fade)
