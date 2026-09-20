@@ -320,11 +320,33 @@ each character's sections in order; a missing one stops the episode where it
 should have carried on. The Halo Effect is 59 seconds and needed only one,
 which is why this never came up until an episode ran to four minutes.
 
-Cuts land in the pause between two lines, never inside one, and both characters
-are cut at the same instants — so a join sounds like a beat someone took, and
-the two tracks stay locked to each other. If a single line is ever longer than
-the limit there is no pause to cut in, and the split step says so rather than
-producing a clip that silently will not play.
+Both characters are cut at the same instants, so the two tracks stay locked to
+each other, and a cut is placed for the SILENCE around it rather than wherever
+the arithmetic runs out. That matters more than it sounds: a join is always a
+pause, because SitePal has to stop one clip and start the next, so a boundary
+inside a sentence is heard as a fault. The split step chooses the widest pause
+near the limit, and prints what each cut had to work with:
+
+```
+  section 1  0:00 – 1:23  (84s, lines 0–13)  cut in 0.90s of silence
+  section 2  1:23 – 2:46  (82s, lines 14–27)  cut in 0.90s of silence
+```
+
+It also prints the pauses across the whole episode. If most of them are near
+zero, no choice of boundary is a good one and the answer is in the writing —
+the lines were written to run straight into each other.
+
+**To put a join somewhere else, write `# cut` on its own line in the
+screenplay** where you want it, and split again. The line numbers in the report
+above are the screenplay's own, so a join that sounded wrong can be moved
+without working out which line 2:46 falls in. A mark is not an edit — it
+changes no words — so it does not need applying and works on an episode that is
+already recorded. Applying edits re-renders the screenplay and clears the
+marks, so mark cuts after the words are settled.
+
+If a single line is ever longer than the limit there is no pause to cut in at
+all, and the split step says so rather than producing a clip that silently will
+not play.
 
 **There is one Audio Manager for the whole account** (`9308752`), not one per
 character. Every clip for every character and every show sits in the same list,
@@ -391,6 +413,13 @@ Three things you can do with a bad line, in rising order of effort.
 
 **Rewrite it yourself.** Open the screenplay, change the words, then
 **Apply my edits**. Nothing is spent and nothing else in the episode moves.
+
+Saving is not applying. **Save** writes the screenplay file; **Apply my edits**
+is what reads it back into the episode, and recording renders the EPISODE. An
+edit that is saved but never applied used to be recorded as the old words,
+paid for, and mentioned nowhere — you found out by listening. **Record it** now
+refuses to start while the screenplay is ahead of the record, and says which
+button to press, so the worst case costs a click instead of a render.
 
 **Ask for a new one.** Put a note under the line saying what is wrong with it,
 starting with `#`, then press **Rewrite the lines I marked** — or

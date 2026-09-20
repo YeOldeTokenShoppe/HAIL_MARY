@@ -122,9 +122,14 @@ console.log("\nThe steps that read the screenplay say that they do:");
 ok("applying edits needs a screenplay", ACTIONS["apply-edits"].needsScreenplay === true);
 ok("applying edits and re-recording needs one too", ACTIONS["apply-edits-rerecord"].needsScreenplay === true);
 ok("rewriting a marked line needs one", ACTIONS["rewrite-marked"].needsScreenplay === true);
+// Recording renders the record and refuses when the screenplay disagrees with
+// it; splitting reads the `# cut` marks out of the screenplay. Both are about
+// what is in the box, so both save it first.
+ok("recording needs one", ACTIONS.record.needsScreenplay === true);
+ok("splitting needs one", ACTIONS.split.needsScreenplay === true);
 check("and nothing else claims to",
   ACTION_NAMES.filter((n) => ACTIONS[n].needsScreenplay),
-  ["apply-edits", "apply-edits-rerecord", "rewrite-marked"]);
+  ["apply-edits", "apply-edits-rerecord", "rewrite-marked", "record", "split"]);
 ok("actionsFor carries the flag through to the page",
   actionsFor("on-air").find((a) => a.name === "apply-edits").needsScreenplay === true);
 

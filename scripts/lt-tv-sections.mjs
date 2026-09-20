@@ -24,6 +24,16 @@
 // timings said would be refused by SitePal rather than clipped. Michelle chose
 // 85 over SitePal's recommended 60 on 2026-09-20, to keep the number of joins
 // down.
+//
+// A JOIN IS ALWAYS A PAUSE, which is the thing this file exists to place well.
+// No audio is lost at a boundary — one section ends where the next begins — but
+// SitePal has to stop one clip and start another, and that takes real time the
+// recording knows nothing about. So the cut has to land where a pause belongs.
+// Michelle played the first sectioned episode on 2026-09-20 and the joins fell
+// in the middle of sentences: cutting at the MIDPOINT of the reported gap is
+// only in silence if there is a gap, and in real dialogue there often is not.
+// A boundary is now chosen for the silence around it, and a join that could not
+// find any is reported rather than shipped quietly.
 
 import { sitepalClipName } from "./lt-tv-format.mjs";
 
@@ -31,48 +41,185 @@ export const SITEPAL_MAX_CLIP_SECONDS = 90;
 export const TARGET_SECTION_SECONDS = 85;
 
 /**
+ * The least silence a join is willing to land in.
+ *
+ * Below this the stop-and-start is heard inside a word rather than between two
+ * of them. It is deliberately small: the aim is to rule out the gaps that are
+ * effectively zero, not to hold out for a dramatic pause.
+ */
+export const MIN_JOIN_SILENCE = 0.25;
+
+/**
+ * How much of the target a section must still fill after backing off to a
+ * better pause. Without a floor, hunting for the widest silence could cut a
+ * section in half and add a join, and every join is a risk — which is the
+ * whole reason the target is 85 and not 60.
+ */
+const LENGTH_FLOOR = 0.75;
+
+/**
  * Cut points for one episode, from the times its lines actually landed.
  *
- * Greedy and forward-only: take lines until one more would push the section
- * past the target, then cut. Greedy is right here because the only thing being
- * optimised is the NUMBER of joins, and taking as much as fits each time
- * cannot produce more sections than any other rule would.
+ * Forward-only, and greedy about length: take lines until one more would push
+ * the section past the target. Where exactly to cut is then chosen among the
+ * lines near that limit, by the silence in front of each — the LAST line that
+ * fits is rarely the best place to stop, and it was the only place this used to
+ * consider.
  *
  * @param lineStarts  seconds, one per line, ascending
  * @param lineEnds    seconds, one per line
  * @param dialogueEnd seconds; where the last section ends
  * @param max         longest a section may be
- * @returns [{ startsAt, endsAt, firstLine, lastLine }], always at least one
+ * @param minSilence  the least silence a join will land in
+ * @param cuts        line numbers to cut in front of, whatever the times say
+ * @returns [{ startsAt, endsAt, firstLine, lastLine, silenceAfter, forcedJoin,
+ *          manual }], always at least one. `silenceAfter` is the pause the cut
+ *          at the END of this section sits in, and is null on the last one.
  */
-export function planSections(lineStarts, lineEnds, dialogueEnd, max = TARGET_SECTION_SECONDS) {
+export function planSections(
+  lineStarts,
+  lineEnds,
+  dialogueEnd,
+  max = TARGET_SECTION_SECONDS,
+  { minSilence = MIN_JOIN_SILENCE, cuts = [] } = {},
+) {
   if (!Array.isArray(lineStarts) || lineStarts.length === 0) {
     throw new Error("planSections needs the line starts from a recorded episode.");
   }
+  // Without an end per start every gap is NaN, which reads as "does not fit"
+  // and silently cuts at every line. Said plainly rather than discovered on air.
+  if (!Array.isArray(lineEnds) || lineEnds.length !== lineStarts.length) {
+    throw new Error(
+      `planSections needs a line end for every line start (${lineStarts.length} starts, ` +
+        `${Array.isArray(lineEnds) ? lineEnds.length : "no"} ends). Re-record the episode.`,
+    );
+  }
   const end = Number.isFinite(dialogueEnd) ? dialogueEnd : lineEnds[lineEnds.length - 1];
+
+  /** The reported silence in front of line k. Negative when lines overlap. */
+  const silenceBefore = (k) => lineStarts[k] - lineEnds[k - 1];
+
+  /**
+   * Where a cut in front of line k goes: the middle of the pause, so neither
+   * side eats the other's breath. With no pause to halve — the lines abut, or
+   * overlap, or the timings are noisy — it goes at the start of line k.
+   */
+  const cutBefore = (k) => {
+    const from = lineEnds[k - 1];
+    const to = lineStarts[k];
+    return round(to > from ? (from + to) / 2 : to);
+  };
+
+  // Where the screenplay asked for a boundary. A person who has heard the
+  // episode knows better than the timings do, so these are not negotiated
+  // with: the only ones dropped are the ones that are not lines.
+  const asked = new Set(
+    cuts.filter((n) => Number.isInteger(n) && n > 0 && n < lineStarts.length),
+  );
 
   const sections = [];
   let startsAt = 0;
   let firstLine = 0;
 
   for (let i = 1; i < lineStarts.length; i += 1) {
+    const askedHere = asked.has(i);
     // Would this line still be inside the section? Measured to where the line
     // ENDS, because a section has to contain the whole of what it carries.
-    if (lineEnds[i] - startsAt <= max) continue;
+    if (!askedHere && lineEnds[i] - startsAt <= max) continue;
 
-    // It would not. Cut in the gap before it — halfway, so neither side eats
-    // the other's breath. A line that starts before the previous one ended
-    // (they overlap, or the timings are noisy) cuts at the start.
-    const gapFrom = lineEnds[i - 1];
-    const gapTo = lineStarts[i];
-    const boundary = gapTo > gapFrom ? (gapFrom + gapTo) / 2 : gapTo;
+    // Either the screenplay asked to cut here, or line i does not fit and this
+    // section ends at or before it. In the second case every line back to the
+    // start of the section is a candidate: take the one with the most silence
+    // in front of it, as long as the section it leaves is still most of a
+    // section. Later wins a tie, because a longer section is fewer joins.
+    let chosen = askedHere ? i : null;
+    let widest = -Infinity;
+    if (!askedHere) {
+      for (let k = firstLine + 1; k <= i; k += 1) {
+        const silence = silenceBefore(k);
+        if (silence < minSilence) continue;
+        if (cutBefore(k) - startsAt < max * LENGTH_FLOOR) continue;
+        if (silence >= widest) {
+          widest = silence;
+          chosen = k;
+        }
+      }
+    }
 
-    sections.push({ startsAt, endsAt: round(boundary), firstLine, lastLine: i - 1 });
-    startsAt = round(boundary);
-    firstLine = i;
+    // Nowhere in range has a real pause. Take the last line that fits, which is
+    // what this always did, and mark the join so the split step can say the
+    // sentence it is about to cut through was not a choice.
+    const forcedJoin = chosen === null;
+    if (forcedJoin) chosen = i;
+
+    const boundary = cutBefore(chosen);
+    sections.push({
+      startsAt,
+      endsAt: boundary,
+      firstLine,
+      lastLine: chosen - 1,
+      silenceAfter: round(Math.max(0, silenceBefore(chosen))),
+      forcedJoin,
+      manual: askedHere,
+    });
+    startsAt = boundary;
+    firstLine = chosen;
+
+    // Backing off to a better pause can leave lines that were inside the old
+    // section, so carry on from the new one rather than from line i.
+    i = chosen;
   }
 
-  sections.push({ startsAt, endsAt: round(end), firstLine, lastLine: lineStarts.length - 1 });
+  sections.push({
+    startsAt,
+    endsAt: round(end),
+    firstLine,
+    lastLine: lineStarts.length - 1,
+    silenceAfter: null,
+    forcedJoin: false,
+    manual: false,
+  });
   return sections;
+}
+
+/**
+ * The joins that had no pause to land in, in words.
+ *
+ * Not fatal — the episode plays, and no audio is missing — so this is separate
+ * from `sectionProblems`. It is audible, though, and it is the difference
+ * between a join that sounds like a breath and one that sounds like a fault.
+ */
+export function forcedJoins(sections, minSilence = MIN_JOIN_SILENCE) {
+  return sections
+    .filter((s) => s.forcedJoin)
+    .map(
+      (s) =>
+        `The cut after line ${s.lastLine} has ${s.silenceAfter.toFixed(2)}s of silence to land ` +
+        `in, and a join needs about ${minSilence}s, so it will be heard inside a sentence.`,
+    );
+}
+
+/**
+ * What the pauses in this episode look like overall.
+ *
+ * The one measurement that says whether cutting anywhere can work: if most
+ * gaps are near zero then no choice of boundary is a good one, and the answer
+ * is in how the audio was recorded rather than in where it is cut.
+ */
+export function gapSummary(lineStarts, lineEnds, minSilence = MIN_JOIN_SILENCE) {
+  const gaps = lineStarts.slice(1).map((start, i) => round(start - lineEnds[i]));
+  if (!gaps.length) return null;
+  const sorted = [...gaps].sort((a, b) => a - b);
+  const middle = sorted.length % 2
+    ? sorted[(sorted.length - 1) / 2]
+    : round((sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2);
+  return {
+    count: gaps.length,
+    median: middle,
+    smallest: sorted[0],
+    largest: sorted[sorted.length - 1],
+    tooSmall: gaps.filter((g) => g < minSilence).length,
+  };
 }
 
 /**

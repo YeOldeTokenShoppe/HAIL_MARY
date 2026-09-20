@@ -79,6 +79,10 @@ export const ACTIONS = {
     label: "Record it",
     spends: "an ElevenLabs render",
     needs: ["ELEVENLABS_API_KEY"],
+    // It renders the RECORD, not the screenplay, and refuses when the two
+    // disagree. Saving the box first means that refusal is about what is on
+    // screen rather than about a file nobody has looked at.
+    needsScreenplay: true,
     stages: ["written"],
     argv: (id) => ["node", ["scripts/lt-tv-audio.mjs", `content/lt-tv/episodes/${id}.json`]],
     blurb: "Generates every block and joins them into one master.",
@@ -90,8 +94,10 @@ export const ACTIONS = {
     // Only once there is a master to split. `recorded` is exactly that: the
     // audio step wrote the timing back, which it does after writing the WAV.
     stages: ["recorded", "on-air"],
+    // It reads `# cut` marks out of the screenplay, so the box is saved first.
+    needsScreenplay: true,
     argv: (id) => ["node", ["scripts/lt-tv-split.mjs", id]],
-    blurb: "Turns the one master into the two balanced WAVs you upload to SitePal, one per character. Needs ffmpeg. Free.",
+    blurb: "Cuts the master into the clips you upload to SitePal, one per character per section. To move a join, put `# cut` on its own line in the screenplay where you want it and split again. Needs ffmpeg. Free.",
   },
   slate: {
     label: "Put it on the guide",

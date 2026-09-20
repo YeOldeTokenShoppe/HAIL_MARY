@@ -13,8 +13,11 @@
 // here, and its duration is a byte count rather than something only a decoder
 // can tell you — which is the reason this step uses PCM in the first place.
 
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { readFile, writeFile, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { resolve, join } from "node:path";
+import { tmpdir } from "node:os";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import {
   PCM,
   PCM_RATES,
@@ -26,6 +29,8 @@ import {
   timingFromSegments,
   tierRefusal,
 } from "./lt-tv-audio.mjs";
+import { renderScript } from "./lt-tv-episode.mjs";
+import { pendingEdits } from "./lt-tv-edit.mjs";
 
 let failures = 0;
 const check = (label, actual, expected) => {
@@ -210,6 +215,60 @@ console.log("\nWhat a plan that cannot have 44.1kHz is told:");
   check("every rate it offers is one ElevenLabs has", PCM_RATES.includes(24000), true);
   check("an unrelated failure is left alone", tierRefusal('{"detail":"quota exceeded"}'), null);
   check("and so is a plain server error", tierRefusal("Bad Gateway"), null);
+}
+
+console.log("\nRecording refuses a screenplay that was never applied:");
+{
+  // THE FAILURE THIS PREVENTS COST A WHOLE EPISODE on 2026-09-20. Saving the
+  // screenplay does not change the record, and the render reads the record, so
+  // an edit that was saved but not applied was rendered as the OLD words, paid
+  // for, and never mentioned. It is invisible until you play it back.
+  const run = promisify(execFile);
+  const episode = JSON.parse(
+    await readFile(resolve("content/lt-tv/samples/roundtable-02.sample.json"), "utf8"),
+  );
+  delete episode.synthetic; // the sample is refused on its own account
+
+  check(
+    "the screenplay a record renders is not an edit",
+    pendingEdits(episode, renderScript(episode) + "\n"),
+    null,
+  );
+
+  const edited = renderScript(episode).replace(
+    /^(\s*0\s+)(>\s*)?(\S.*?)(\s\s+)(\S.*)$/m,
+    (_, n, aim, who, gap) => `${n}${aim ?? ""}${who}${gap}Something she typed instead.`,
+  );
+  ok("and a reworded line is", pendingEdits(episode, edited) !== null);
+
+  const dir = await mkdtemp(join(tmpdir(), "lt-tv-audio-"));
+  try {
+    await mkdir(join(dir, "content/lt-tv/episodes"), { recursive: true });
+    await writeFile(
+      join(dir, "content/lt-tv/episodes/roundtable-02.json"),
+      JSON.stringify(episode, null, 2) + "\n",
+    );
+    await writeFile(join(dir, "content/lt-tv/episodes/roundtable-02.txt"), edited + "\n");
+
+    let failed = null;
+    try {
+      await run("node", [resolve("scripts/lt-tv-audio.mjs"), "content/lt-tv/episodes/roundtable-02.json"], {
+        cwd: dir,
+        env: { ...process.env, ELEVENLABS_API_KEY: "not-used-because-it-refuses-first" },
+      });
+    } catch (err) {
+      failed = err;
+    }
+    ok("the run stops", failed !== null);
+    check("without spending anything", failed?.code, 2);
+    const said = failed?.stderr ?? "";
+    ok("saying the screenplay is ahead of the record", said.includes("not in the record yet"));
+    ok("naming the button that fixes it", said.includes("Apply my edits"));
+    ok("and the command, for a terminal", said.includes("npm run lt:edit -- roundtable-02"));
+    ok("and that no money went", said.includes("Nothing has been spent"));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
 console.log(failures ? `\n${failures} check(s) failed.\n` : "\nAll checks passed.\n");

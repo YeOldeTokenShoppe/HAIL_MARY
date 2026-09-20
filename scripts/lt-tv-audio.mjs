@@ -33,6 +33,7 @@ import { existsSync } from "node:fs";
 import { resolve, dirname, join, basename } from "node:path";
 
 import { uploadPlan } from "./lt-tv-split.mjs";
+import { pendingEdits, summariseEdits } from "./lt-tv-edit.mjs";
 
 const ENDPOINT = "https://api.elevenlabs.io/v1/text-to-dialogue/with-timestamps";
 
@@ -273,6 +274,29 @@ async function main() {
       "This record is marked synthetic — its numbers are invented and it must not be recorded.",
     );
     process.exit(2);
+  }
+
+  // THE WORDS ABOUT TO BE RENDERED ARE THE RECORD'S, NOT THE SCREENPLAY'S.
+  // Saving the screenplay does not change the record; applying it does. Those
+  // are two buttons in the studio and it is not obvious that recording reads
+  // the second one's output, so this used to render the old words, pay for
+  // them, and say nothing. Michelle lost a full episode to it on 2026-09-20.
+  const scriptPath = resolve(recordPath).replace(/\.json$/, ".txt");
+  if (existsSync(scriptPath)) {
+    const pending = pendingEdits(episode, await readFile(scriptPath, "utf8"), {
+      scriptName: basename(scriptPath),
+      recordName: basename(recordPath),
+    });
+    if (pending) {
+      console.error(
+        `${basename(scriptPath)} has edits that are not in the record yet, so recording\n` +
+          `now would render the old words: ${summariseEdits(pending.changes)}.\n\n` +
+          'Apply them first — the studio button is "Apply my edits", or:\n' +
+          `  npm run lt:edit -- ${episode.id}\n\n` +
+          "Nothing has been spent.",
+      );
+      process.exit(2);
+    }
   }
 
   const outDir = resolve("content/lt-tv/audio", episode.id);

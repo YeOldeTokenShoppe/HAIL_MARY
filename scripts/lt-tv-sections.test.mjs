@@ -19,9 +19,14 @@ import {
   planSections,
   sectionProblems,
   sectionsForRecord,
+  forcedJoins,
+  gapSummary,
+  MIN_JOIN_SILENCE,
   SITEPAL_MAX_CLIP_SECONDS,
   TARGET_SECTION_SECONDS,
 } from "./lt-tv-sections.mjs";
+import { readCutMarks } from "./lt-tv-edit.mjs";
+import { sectionLine, pauseLine, cutHint } from "./lt-tv-split.mjs";
 import { episodeSections, validateEpisode } from "../src/lib/ltTv/episodeTimeline.mjs";
 
 let failures = 0;
@@ -34,8 +39,15 @@ const check = (label, actual, expected) => {
 };
 const ok = (label, cond) => check(label, Boolean(cond), true);
 
-/** An episode of `count` lines, each `spoken` long with `gap` between them. */
+/**
+ * An episode of `count` lines, each `spoken` long.
+ *
+ * `gap` is the pause AFTER each line, and may be a function of the line's
+ * index — real dialogue does not breathe evenly, which is the whole reason
+ * where a cut lands has to be chosen rather than computed.
+ */
 function episodeOf(count, spoken = 5.7, gap = 0.4, head = 2) {
+  const gapAfter = typeof gap === "function" ? gap : () => gap;
   const lineStarts = [];
   const lineEnds = [];
   let t = head;
@@ -43,7 +55,7 @@ function episodeOf(count, spoken = 5.7, gap = 0.4, head = 2) {
     lineStarts.push(round(t));
     t += spoken;
     lineEnds.push(round(t));
-    t += gap;
+    t += gapAfter(i);
   }
   return { lineStarts, lineEnds, dialogueEnd: round(t) };
 }
@@ -229,6 +241,162 @@ console.log("\nA record that would fail silently on air is caught here:");
     { startsAt: 160, audio: { Connor: "e", Monk: "f" } },
     { startsAt: 240, audio: { Connor: "g", Monk: "h" } },
   ]).some((p) => p.includes("after the dialogue ends")));
+}
+
+console.log("\nA cut goes where the pause is, not where the arithmetic stops:");
+{
+  // Lines that run straight into each other, except every seventh, which is
+  // followed by a real breath. The last line that fits is almost never one of
+  // those, so a planner that only ever cuts there cuts inside a sentence.
+  const breath = (i) => (i % 7 === 6 ? 0.9 : 0.04);
+  const e = episodeOf(44, 5.7, breath);
+  const plan = planSections(e.lineStarts, e.lineEnds, e.dialogueEnd);
+
+  ok("every join landed in a real pause",
+    plan.slice(0, -1).every((s) => s.silenceAfter >= MIN_JOIN_SILENCE));
+  ok("so none of them is flagged", plan.every((s) => !s.forcedJoin));
+  check("and there is nothing to warn about", forcedJoins(plan), []);
+  ok("every section is still inside SitePal's limit",
+    plan.every((s) => s.endsAt - s.startsAt <= SITEPAL_MAX_CLIP_SECONDS));
+
+  // Backing off to a pause must not fragment the episode: the whole point of
+  // the 85s target is that joins are risk, so fewer is better.
+  const naive = planSections(e.lineStarts, e.lineEnds, e.dialogueEnd, TARGET_SECTION_SECONDS, {
+    minSilence: 0,
+  });
+  ok("and it costs at most one extra join", plan.length <= naive.length + 1);
+
+  const lines = plan.flatMap((s) => range(s.firstLine, s.lastLine));
+  check("with every line still in exactly one section", lines, range(0, 43));
+  ok("and the sections still run end to end",
+    plan.every((s, i) => i === 0 || s.startsAt === plan[i - 1].endsAt));
+}
+
+console.log("\nAn episode with no pauses at all is reported, not shipped quietly:");
+{
+  // This is what Michelle heard on 2026-09-20: joins in the middle of
+  // sentences. If the recording has nowhere to cut, no choice of boundary
+  // fixes it, and saying so is the only useful thing left to do.
+  const e = episodeOf(44, 5.7, 0.03);
+  const plan = planSections(e.lineStarts, e.lineEnds, e.dialogueEnd);
+  ok("the joins are marked as forced", plan.slice(0, -1).every((s) => s.forcedJoin));
+  ok("the last section is not a join", plan.at(-1).forcedJoin === false);
+  const said = forcedJoins(plan);
+  check("one warning per join", said.length, plan.length - 1);
+  ok("naming the line it cuts after", /after line \d+/.test(said[0]));
+  ok("and how little silence there was", said[0].includes("0.03s"));
+
+  const gaps = gapSummary(e.lineStarts, e.lineEnds);
+  check("the pause summary counts them all", gaps.count, 43);
+  check("and says every one is too short", gaps.tooSmall, 43);
+  ok("with a median that shows why", gaps.median < MIN_JOIN_SILENCE);
+}
+
+console.log("\nThe screenplay gets the last word on where a join goes:");
+{
+  const e = episodeOf(44);
+  const plan = planSections(e.lineStarts, e.lineEnds, e.dialogueEnd, TARGET_SECTION_SECONDS, {
+    cuts: [9, 20],
+  });
+  check("the first section ends at the line asked for", plan[0].lastLine, 8);
+  check("and the second at the next one", plan[1].lastLine, 19);
+  ok("both are marked as hers", plan[0].manual && plan[1].manual);
+  ok("and not as forced, because she chose them", !plan[0].forcedJoin && !plan[1].forcedJoin);
+  ok("the rest is still cut to fit",
+    plan.every((s) => s.endsAt - s.startsAt <= SITEPAL_MAX_CLIP_SECONDS));
+  const lines = plan.flatMap((s) => range(s.firstLine, s.lastLine));
+  check("and no line is lost or repeated", lines, range(0, 43));
+
+  // A mark in a silent-running episode is honoured even though nothing else
+  // would cut there — that is the point of being able to say it.
+  const tight = episodeOf(44, 5.7, 0.03);
+  const forced = planSections(tight.lineStarts, tight.lineEnds, tight.dialogueEnd,
+    TARGET_SECTION_SECONDS, { cuts: [5] });
+  check("a mark wins even with no pause to land in", forced[0].lastLine, 4);
+
+  check("a mark in front of line 0 is dropped",
+    planSections(e.lineStarts, e.lineEnds, e.dialogueEnd, TARGET_SECTION_SECONDS, { cuts: [0] })[0]
+      .manual, false);
+}
+
+console.log("\nCut marks are read out of the screenplay:");
+{
+  const script = [
+    "The Liminal Terminal — The Wealth Effect",
+    "episode: roundtable-02",
+    "",
+    "── The question [the-question]",
+    "  0    CONNOR     Paper gains are still gains, aren't they?",
+    "  1  > SAINT GR80 They are still paper.",
+    "# cut",
+    "  2    CONNOR     Then let me put it another way.",
+    "# this line is flat, make it land",
+    "  3  > SAINT GR80 Put it however you like.",
+    "  # Cut Here  ",
+    "  4    CONNOR     Fine.",
+  ].join("\n");
+
+  check("a mark names the line it precedes", readCutMarks(script), [2, 4]);
+  ok("and an ordinary note is not one", !readCutMarks(script).includes(3));
+  check("a screenplay with no marks asks for nothing", readCutMarks("  0    CONNOR     Hello."), []);
+}
+
+console.log("\nA recorded episode must carry an end for every line:");
+{
+  const e = episodeOf(9);
+  let threw = null;
+  try {
+    planSections(e.lineStarts, undefined, e.dialogueEnd);
+  } catch (err) {
+    threw = err.message;
+  }
+  // Without this the gaps are all NaN, which reads as "does not fit" and cuts
+  // at every single line — 88 clips, and no error anywhere.
+  ok("missing ends are refused outright", threw?.includes("line end for every line start"));
+
+  let mismatched = null;
+  try {
+    planSections(e.lineStarts, e.lineEnds.slice(0, 3), e.dialogueEnd);
+  } catch (err) {
+    mismatched = err.message;
+  }
+  ok("and so is a short list", mismatched?.includes("9 starts, 3 ends"));
+}
+
+console.log("\nThe cutting report says what a join will sound like:");
+{
+  // This report is the only thing anyone sees before uploading eight clips,
+  // and every number in it is the difference between a join that works and
+  // one that has to be found by listening to the whole episode again.
+  const e = episodeOf(44, 5.7, (i) => (i % 7 === 6 ? 0.9 : 0.04));
+  const plan = planSections(e.lineStarts, e.lineEnds, e.dialogueEnd);
+
+  const first = sectionLine(plan[0], 0);
+  ok("a section is numbered from one", first.startsWith("  section 1"));
+  ok("and timed in minutes", first.includes("0:00 –"));
+  ok("naming the lines it carries", /lines 0–\d+/.test(first));
+  ok("and the pause its cut sits in", first.includes("cut in 0.90s of silence"));
+
+  const last = sectionLine(plan.at(-1), plan.length - 1);
+  ok("the last section has no cut to describe", !last.includes("silence"));
+
+  const tight = episodeOf(12, 5.7, 0.03);
+  const forced = planSections(tight.lineStarts, tight.lineEnds, tight.dialogueEnd, 40);
+  ok("a forced cut is worded as a warning",
+    sectionLine(forced[0], 0).includes("cut with only 0.03s of silence"));
+
+  const hers = planSections(e.lineStarts, e.lineEnds, e.dialogueEnd, TARGET_SECTION_SECONDS,
+    { cuts: [9] });
+  ok("and a cut she asked for is credited to her",
+    sectionLine(hers[0], 0).endsWith("(your cut)"));
+
+  const pauses = pauseLine(gapSummary(tight.lineStarts, tight.lineEnds));
+  ok("the pause summary leads with the median", pauses.includes("median 0.03s"));
+  ok("and counts the ones too short to cut in", pauses.includes(`11 of 11 are under ${MIN_JOIN_SILENCE}s`));
+  check("with nothing to say about a single-line episode", pauseLine(gapSummary([0], [5])), null);
+
+  ok("with no marks, the report says how to add one", cutHint([]).includes("`# cut` on its own line"));
+  ok("and with marks, which ones it used", cutHint([9, 20]).includes("9, 20"));
 }
 
 function range(from, to) {

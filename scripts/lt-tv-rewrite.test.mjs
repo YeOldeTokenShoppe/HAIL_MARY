@@ -57,6 +57,18 @@ console.log("\nThe header's own # lines are not notes:");
 check("an unmarked script has nothing marked", findMarks(SCRIPT), []);
 ok("even though the header is full of them", SCRIPT.includes("\n# Reword any line"));
 
+console.log("\nA cut mark is a section boundary, not a complaint:");
+{
+  // `# cut` reads exactly like a note about the line above it, and a note is
+  // sent to the model as something wrong with that line. Left alone, marking
+  // where a join should go would quietly rewrite a line she was happy with.
+  check("a cut mark marks nothing", findMarks(mark(SCRIPT, lineB, "# cut")), []);
+  check("whatever the casing", findMarks(mark(SCRIPT, lineB, "  # Cut Here ")), []);
+  const both = findMarks(mark(mark(SCRIPT, lineB, "# cut"), lineA, "# too on-the-nose"));
+  check("and a real note beside one still counts", both.length, 1);
+  check("as a note on its own line", both[0].n, lineA);
+}
+
 console.log("\nA note belongs to the line above it:");
 {
   const marks = findMarks(mark(SCRIPT, lineB, "# too on-the-nose"));

@@ -257,6 +257,89 @@ export function applyScript(episode, parsed) {
   };
 }
 
+/**
+ * A cut mark: `# cut` alone on a line, meaning put a section boundary here.
+ *
+ * It is a `#` line, so the script parser already ignores it and applying edits
+ * is unaffected. The rewrite step has to be told about it, because every other
+ * `#` line there is a note about the line above.
+ */
+export const CUT_MARK_RE = /^\s*#\s*cut(\s+here)?\s*$/i;
+
+/**
+ * The line numbers a screenplay asks to be cut in FRONT of.
+ *
+ * Where an episode is cut for SitePal is chosen from the reported line times,
+ * and those are only as good as what ElevenLabs reported. The person listening
+ * is the better judge, so a mark in the screenplay wins: put `# cut` on its own
+ * line and the boundary goes there, between the line above it and the line
+ * below.
+ *
+ * A mark in front of line 0 is dropped — the first section starts there anyway.
+ */
+export function readCutMarks(text) {
+  const marks = [];
+  let pending = false;
+  for (const raw of text.split(/\r?\n/)) {
+    if (CUT_MARK_RE.test(raw)) {
+      pending = true;
+      continue;
+    }
+    const line = raw.match(LINE_RE);
+    if (!line) continue;
+    if (pending) {
+      const n = Number(line[1]);
+      if (n > 0 && !marks.includes(n)) marks.push(n);
+      pending = false;
+    }
+  }
+  return marks;
+}
+
+/**
+ * What the screenplay would change about the record, or null when it matches.
+ *
+ * Pulled out of the edit run so that OTHER steps can ask the question. The
+ * audio build is the one that matters: it renders the record, not the
+ * screenplay, so an edit that was saved but never applied is rendered as the
+ * old words, silently, for real money. Asking here means asking the same way
+ * the editor does rather than by comparing text, which would call a reflowed
+ * line an edit.
+ *
+ * @param scriptName  what to call the screenplay in the mismatch error
+ * @param recordName  and the record
+ * @returns { rebuilt, changes } | null
+ */
+export function pendingEdits(episode, scriptText, { scriptName, recordName } = {}) {
+  const parsed = parseScript(scriptText, showFormat(episode.show));
+
+  // Applying the wrong file would rebuild an episode out of another episode's
+  // words and look like it worked, so the script names the record it came from.
+  if (parsed.episodeId && parsed.episodeId !== episode.id) {
+    throw new Error(
+      `${scriptName || `${parsed.episodeId}.txt`} is the script for ${parsed.episodeId}, ` +
+        `but ${recordName || `${episode.id}.json`} is ${episode.id}.`,
+    );
+  }
+
+  const rebuilt = applyScript(episode, parsed);
+  const changes = describeEdit(episode, rebuilt);
+  return anyChange(changes) ? { rebuilt, changes } : null;
+}
+
+/** An edit summary as a phrase, e.g. "3 line(s) reworded, 1 added". */
+export function summariseEdits(changes) {
+  return [
+    changes.reworded && `${changes.reworded} line(s) reworded`,
+    changes.added && `${changes.added} added`,
+    changes.removed && `${changes.removed} removed`,
+    changes.aimChanged && `${changes.aimChanged} re-aimed`,
+    changes.cuesChanged && `${changes.cuesChanged} with changed beats`,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
 // ── running it ────────────────────────────────────────────────────────────
 
 function resolvePaths(argument) {
@@ -289,23 +372,16 @@ async function main() {
   const episode = JSON.parse(await readFile(json, "utf8"));
   // The record names its show, and the show decides which segment headings are
   // legal — so the record is read before the script, not after.
-  const parsed = parseScript(await readFile(txt, "utf8"), showFormat(episode.show));
+  const pending = pendingEdits(episode, await readFile(txt, "utf8"), {
+    scriptName: basename(txt),
+    recordName: basename(json),
+  });
 
-  // Applying the wrong file would rebuild an episode out of another episode's
-  // words and look like it worked, so the script names the record it came from.
-  if (parsed.episodeId && parsed.episodeId !== episode.id) {
-    throw new Error(
-      `${basename(txt)} is the script for ${parsed.episodeId}, but ${basename(json)} is ${episode.id}.`,
-    );
-  }
-
-  const rebuilt = applyScript(episode, parsed);
-  const changes = describeEdit(episode, rebuilt);
-
-  if (!anyChange(changes)) {
+  if (!pending) {
     console.log("The script matches the record already — nothing to apply.");
     return;
   }
+  const { rebuilt, changes } = pending;
 
   // Once an episode is recorded, the audio is the timing. New words do not
   // have any, and the old timing describes sentences that no longer exist, so
@@ -330,14 +406,7 @@ async function main() {
   await writeFile(json, JSON.stringify(rebuilt, null, 2) + "\n");
   await writeFile(txt, renderScript(rebuilt) + "\n");
 
-  const said = [
-    changes.reworded && `${changes.reworded} line(s) reworded`,
-    changes.added && `${changes.added} added`,
-    changes.removed && `${changes.removed} removed`,
-    changes.aimChanged && `${changes.aimChanged} re-aimed`,
-    changes.cuesChanged && `${changes.cuesChanged} with changed beats`,
-  ].filter(Boolean);
-  console.log(`${episode.id}: ${said.join(", ")}.`);
+  console.log(`${episode.id}: ${summariseEdits(changes)}.`);
   console.log(
     `Runtime ${episode.slate.runtime} → ${rebuilt.slate.runtime}, ` +
       `${episode.slate.words} → ${rebuilt.slate.words} words.`,

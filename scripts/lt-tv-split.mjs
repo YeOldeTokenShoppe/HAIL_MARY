@@ -15,10 +15,15 @@
 // already proven, and is the one step here that needs ffmpeg.
 //
 // PER SECTION. SitePal will not play a clip longer than 90 seconds, so each of
-// those tracks is then cut into sections at the same instants — in the pauses
-// between lines, never inside one. See lt-tv-sections.mjs for where the cuts
-// go and why. An episode short enough to be one clip is cut into one section
-// and comes out exactly as it did before any of this existed.
+// those tracks is then cut into sections at the same instants, in the pauses
+// between lines rather than inside them. See lt-tv-sections.mjs for how a cut
+// point is chosen and why it is chosen rather than computed. An episode short
+// enough to be one clip is cut into one section and comes out exactly as it did
+// before any of this existed.
+//
+// This step also reports what each cut had to land in, because a join is heard
+// and a file list is not, and it honours `# cut` marks from the screenplay:
+// the person who listened to the episode outranks the reported line times.
 //
 // Each section is written under the NAME IT WILL HAVE IN SITEPAL, so uploading
 // is a matter of dragging files in and not of reading a table.
@@ -28,8 +33,16 @@ import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { resolve, join } from "node:path";
 
-import { planSections, sectionProblems, TARGET_SECTION_SECONDS } from "./lt-tv-sections.mjs";
+import {
+  planSections,
+  sectionProblems,
+  forcedJoins,
+  gapSummary,
+  MIN_JOIN_SILENCE,
+  TARGET_SECTION_SECONDS,
+} from "./lt-tv-sections.mjs";
 import { sitepalClipName } from "./lt-tv-format.mjs";
+import { readCutMarks } from "./lt-tv-edit.mjs";
 
 const AUDIO_DIR = "content/lt-tv/audio";
 const EPISODE_DIR = "content/lt-tv/episodes";
@@ -80,6 +93,60 @@ export function uploadPlan(episode, id, sections = [{ startsAt: 0 }]) {
   );
 }
 
+const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+/**
+ * One line of the cutting report, as it is printed.
+ *
+ * What each cut had to land in, because that is what a join sounds like: a
+ * boundary in a real pause is heard as a breath, one in 0.02s of nothing is
+ * heard as a fault, and the two look identical in a list of files. Exported so
+ * the thing she actually reads is checked rather than assumed.
+ */
+export function sectionLine(section, index) {
+  const length = section.endsAt - section.startsAt;
+  const cut =
+    section.silenceAfter === null
+      ? ""
+      : section.forcedJoin
+        ? `  cut with only ${section.silenceAfter.toFixed(2)}s of silence`
+        : `  cut in ${section.silenceAfter.toFixed(2)}s of silence`;
+  return (
+    `  section ${index + 1}  ${fmt(section.startsAt)} – ${fmt(section.endsAt)}  ` +
+    `(${length.toFixed(0)}s, lines ${section.firstLine}–${section.lastLine})${cut}` +
+    `${section.manual ? " (your cut)" : ""}`
+  );
+}
+
+/**
+ * What the pauses in this episode look like, in one line.
+ *
+ * The measurement that says whether cutting anywhere can work. If most gaps
+ * are near zero, no choice of boundary is a good one and the answer is in how
+ * the episode was written, not in where it is cut.
+ */
+export function pauseLine(gaps) {
+  if (!gaps) return null;
+  return (
+    `  Pauses between lines: median ${gaps.median.toFixed(2)}s, ` +
+    `shortest ${gaps.smallest.toFixed(2)}s, longest ${gaps.largest.toFixed(2)}s. ` +
+    `${gaps.tooSmall} of ${gaps.count} are under ${MIN_JOIN_SILENCE}s.`
+  );
+}
+
+/**
+ * How to move a join, or which moves were honoured.
+ *
+ * The line numbers in the report are the screenplay's own, so a join can be
+ * moved by hand without anyone working out which line 2:40 falls in.
+ */
+export function cutHint(cuts) {
+  return cuts.length
+    ? `  Honoured ${cuts.length} cut mark(s) from the screenplay: ${cuts.join(", ")}.`
+    : "  To put a join somewhere else, write `# cut` on its own line in the\n" +
+        "  screenplay where you want it and split again.";
+}
+
 /** Run a command, inheriting its output, and resolve its exit code. */
 function run(command, args, { quiet = false } = {}) {
   return new Promise((done) => {
@@ -127,11 +194,18 @@ async function main() {
   if (code !== 0) process.exit(code);
 
   // ── into sections ────────────────────────────────────────────────────────
+  // The screenplay gets the last word on where a join goes. Read here rather
+  // than from the record because a mark is not an edit: it changes nothing
+  // about the words, so applying it would be refused on a recorded episode.
+  const scriptPath = resolve(EPISODE_DIR, `${id}.txt`);
+  const cuts = existsSync(scriptPath) ? readCutMarks(await readFile(scriptPath, "utf8")) : [];
+
   const sections = planSections(
     timing.lineStarts,
     timing.lineEnds,
     timing.durationSeconds,
     TARGET_SECTION_SECONDS,
+    { cuts },
   );
   const problems = sectionProblems(sections);
   if (problems.length) {
@@ -150,13 +224,24 @@ async function main() {
           `over 90 seconds:\n`,
   );
   if (sections.length > 1) {
-    for (const [i, s] of sections.entries()) {
-      console.log(
-        `  section ${i + 1}  ${fmt(s.startsAt)} – ${fmt(s.endsAt)}  ` +
-          `(${length(s).toFixed(0)}s, lines ${s.firstLine}–${s.lastLine})`,
+    for (const [i, s] of sections.entries()) console.log(sectionLine(s, i));
+    console.log("");
+
+    const pauses = pauseLine(gapSummary(timing.lineStarts, timing.lineEnds));
+    if (pauses) console.log(`${pauses}\n`);
+
+    const rough = forcedJoins(sections);
+    if (rough.length) {
+      console.error("These joins had no pause to land in:");
+      for (const line of rough) console.error(`  ${line}`);
+      console.error(
+        "\nThe episode still plays and no audio is missing, but those joins will be\n" +
+          "heard. If most pauses above are near zero it is the recording, not the cut:\n" +
+          "the lines were written to run straight into each other.\n",
       );
     }
-    console.log("");
+
+    console.log(`${cutHint(cuts)}\n`);
   }
 
   for (const row of plan) {
@@ -200,8 +285,6 @@ async function main() {
   console.log("Not the generator — that would rebuild the episode and discard your edits,");
   console.log("the recorded timing, and the section boundaries above.");
 }
-
-const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((err) => {
