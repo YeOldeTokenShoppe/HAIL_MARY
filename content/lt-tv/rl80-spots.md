@@ -4,7 +4,7 @@ This file is yours. The pipeline reads it; nothing else does.
 
 Each `-` bullet below is one thing the show can plug in its commercial break.
 The writer picks **one** per episode and turns it into a sixty-second-style ad
-read: Barron does the sponsor voice, grand and overclaimed and delighted with
+read: Connor does the sponsor voice, grand and overclaimed and delighted with
 himself, and GR80 reads the disclaimer as if it were scripture. It is a joke
 about advertising. It is never a recommendation to buy anything, and the
 pipeline's rules will not let it become one.
