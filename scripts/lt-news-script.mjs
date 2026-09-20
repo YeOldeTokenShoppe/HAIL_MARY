@@ -59,6 +59,52 @@ function arg(name, fallback = null) {
   return next && !next.startsWith("--") ? next : true;
 }
 
+// Every flag this script knows. An unrecognised one is almost always a typo,
+// and silently ignoring it is how `--check-sources.` — one stray full stop —
+// quietly generated a brief instead of checking anything.
+const KNOWN_FLAGS = ["brief", "draft", "rundown-only", "no-search", "number", "out", "max-tokens"];
+
+// The max_tokens error tells you to raise --max-tokens, so --max-tokens has to
+// actually do something.
+const MAX_TOKENS = { rundown: 8000, dialogue: 16000 };
+
+function maxTokensOverride() {
+  const raw = arg("max-tokens");
+  if (!raw || raw === true) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) {
+    console.error(`--max-tokens expects a positive number, got "${raw}".`);
+    process.exit(2);
+  }
+  return Math.round(n);
+}
+
+function maxTokensFor(pass) {
+  const n = maxTokensOverride();
+  if (n === null) return MAX_TOKENS[pass];
+  // The value given names the rundown pass. Dialogue keeps the 2x ratio the
+  // defaults have, because it writes roughly twice as much.
+  return pass === "dialogue" ? n * 2 : n;
+}
+
+function rejectUnknownFlags(known) {
+  const unknown = process.argv.slice(2).filter(
+    (a) => a.startsWith("--") && !known.includes(a.slice(2)),
+  );
+  if (!unknown.length) return;
+  for (const flag of unknown) {
+    // Strip punctuation a shell or a paste may have carried in, so a near
+    // miss is named rather than just rejected.
+    const bare = flag.slice(2).replace(/[^a-z0-9-]/gi, "");
+    const near = known.find((k) => k === bare) ||
+      known.find((k) => k.startsWith(bare) || bare.startsWith(k));
+    console.error(`Unknown option ${flag}${near ? ` — did you mean --${near}?` : ""}`);
+  }
+  console.error(`Known options: ${known.map((k) => `--${k}`).join(", ")}`);
+  console.error("Values are passed with a space, as in --out path/to/file.json");
+  process.exit(2);
+}
+
 // ── Anthropic ─────────────────────────────────────────────────────────────
 //
 // Raw fetch against the Messages API, matching how every other Claude call in
@@ -556,6 +602,11 @@ async function resolveEpisodeNumber() {
 // ── main ──────────────────────────────────────────────────────────────────
 
 async function main() {
+  rejectUnknownFlags(KNOWN_FLAGS);
+  // Checked up front, not at the call site: --draft never reaches the model,
+  // and a bad value should still be a typo you hear about immediately.
+  maxTokensOverride();
+
   const draftPath = arg("draft");
   const briefPath = arg("brief");
 
@@ -589,7 +640,7 @@ async function main() {
     rundown = await claude({
       system: RUNDOWN_SYSTEM,
       user: `Week: ${week}\n\nTHE BRIEF\n${JSON.stringify(brief.signals, null, 2)}`,
-      maxTokens: 8000,
+      maxTokens: maxTokensFor("rundown"),
       tools: search,
     });
 
@@ -617,7 +668,7 @@ async function main() {
     const written = await claude({
       system: SCRIPT_SYSTEM,
       user: scriptUserMessage(rundown, week, spots),
-      maxTokens: 16000,
+      maxTokens: maxTokensFor("dialogue"),
     });
     segments = written.segments;
   }

@@ -53,6 +53,29 @@ function arg(name, fallback = null) {
   return next && !next.startsWith("--") ? next : true;
 }
 
+// Every flag this script knows. An unrecognised one is almost always a typo,
+// and silently ignoring it is how `--check-sources.` — one stray full stop —
+// quietly generated a brief instead of checking anything.
+const KNOWN_FLAGS = ["check-sources", "out", "week"];
+
+function rejectUnknownFlags(known) {
+  const unknown = process.argv.slice(2).filter(
+    (a) => a.startsWith("--") && !known.includes(a.slice(2)),
+  );
+  if (!unknown.length) return;
+  for (const flag of unknown) {
+    // Strip punctuation a shell or a paste may have carried in, so a near
+    // miss is named rather than just rejected.
+    const bare = flag.slice(2).replace(/[^a-z0-9-]/gi, "");
+    const near = known.find((k) => k === bare) ||
+      known.find((k) => k.startsWith(bare) || bare.startsWith(k));
+    console.error(`Unknown option ${flag}${near ? ` — did you mean --${near}?` : ""}`);
+  }
+  console.error(`Known options: ${known.map((k) => `--${k}`).join(", ")}`);
+  console.error("Values are passed with a space, as in --out path/to/file.json");
+  process.exit(2);
+}
+
 /** ISO week label, e.g. 2026-W38 — the brief's identity and the episode's. */
 export function isoWeek(date = new Date()) {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -653,6 +676,8 @@ const countOf = (value) =>
   Array.isArray(value) ? value.length : value === null ? 0 : typeof value === "object" ? 1 : 0;
 
 export async function main() {
+  rejectUnknownFlags(KNOWN_FLAGS);
+
   const table = sourceTable();
   const settled = await Promise.allSettled(table.map(([, , promise]) => promise));
 
