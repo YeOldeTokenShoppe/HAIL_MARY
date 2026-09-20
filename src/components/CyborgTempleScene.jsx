@@ -365,7 +365,7 @@ export const DEMON_SITEPAL_CONTAINER_ID = "sitepal-container-host";
 //
 // PLACEHOLDERS — record these in the SitePal account on scene 2774900, save
 // each under the name shown, then uncomment. Names must match EXACTLY.
-// Voice: John Connor (old logs call him H80Z) — smug, market-brained, hostile
+// Voice: Connor (old logs call him H80Z) — smug, market-brained, hostile
 // to new wallets as a bit. Short sentences, one clipped cut per line.
 export const DEMON_SITEPAL_AUDIO_NAMES = [
   '11devil1',

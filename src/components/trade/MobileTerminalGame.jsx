@@ -44,7 +44,7 @@ const HUB_OPTIONS = [
   // LT TV (2026-08-01) — the talk_show2.glb set, live on mobile. Desktop runs
   // it as a scene swap in the page's canvas; here it plays as a 16:9 broadcast
   // panel inside the terminal. See MobileTalkShow for why the shapes differ.
-  { key: "lttv", label: "LT TV", sub: "the talk show — GR80 & John Connor" },
+  { key: "lttv", label: "LT TV", sub: "the talk show — GR80 & Connor" },
   // THE VC GAME (2026-07-26) — the one game we ship. Renders through PressFlat:
   // same pure controller as desktop, no WebGL. The pitch bot speaks here through
   // ElevenLabs and the amplitude drives the projection panel rather than a
