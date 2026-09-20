@@ -14,14 +14,32 @@ one of the two deeper docs, linked at each step.
 ## Where is everything
 
 ```bash
-node scripts/lt-tv-status.mjs                 # every episode, both shows
-node scripts/lt-tv-status.mjs roundtable-02   # one, in detail
-node scripts/lt-tv-status.mjs --html          # a page to keep open in a tab
+npm run lt                        # every episode, both shows
+npm run lt -- roundtable-02       # one, in detail
+npm run lt -- --html              # a page to keep open in a tab
 ```
 
 Producing an episode leaves files in four directories, so this reads all of
 them and tells you, per episode, what stage it is at, which files exist for it
-and **the one command to run next**. Run it from anywhere in the repo.
+and **the one command to run next**.
+
+Every command on this page has an `npm run` form, and that is the one to use:
+`npm run` starts in the repo root wherever you happen to be, so none of them
+care which directory you are in. `node scripts/…` works too, but only from the
+root — the path is relative to you, not to the repo.
+
+| | |
+|---|---|
+| `npm run lt` | where every episode is |
+| `npm run lt:check` | validate the slate |
+| `npm run lt:brief` | pull the week (news) |
+| `npm run lt:news` | write a news episode |
+| `npm run lt:roundtable` | write a roundtable episode |
+| `npm run lt:edit` | apply your edits to a screenplay |
+| `npm run lt:audio` | record an episode |
+| `npm run lt:test` | run every check |
+
+Arguments go after `--`, as in `npm run lt:roundtable -- --topic roundtable-02`.
 
 The four stages are `planned` (named on the slate, unwritten), `written` (has a
 script), `recorded` (audio built) and `on air` (playable in the guide). Each one

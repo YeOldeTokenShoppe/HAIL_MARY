@@ -10,7 +10,16 @@
     "dev": "NODE_OPTIONS='--max-old-space-size=8192' next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+
+    "lt": "node scripts/lt-tv-status.mjs",
+    "lt:check": "node scripts/lt-tv-check.mjs",
+    "lt:edit": "node scripts/lt-tv-edit.mjs",
+    "lt:audio": "node scripts/lt-tv-audio.mjs",
+    "lt:brief": "node scripts/lt-news-brief.mjs",
+    "lt:news": "node scripts/lt-news-script.mjs",
+    "lt:roundtable": "node scripts/lt-rt-script.mjs",
+    "lt:test": "for f in scripts/*.test.mjs; do echo \"\\n$f\"; node \"$f\" || exit 1; done"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.31.1",
