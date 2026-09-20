@@ -180,6 +180,16 @@ reduce `END_GUARD_SECONDS`; do not increase the end trim. Keep
 Regenerate the dialogue when the defect exists in `master-dialogue.mp3`.
 Boundary processing cannot repair a word ElevenLabs itself cut short.
 
+**The closing line is a special case.** ElevenLabs' `end_time_seconds` for the
+last turn can fall short of where the master actually stops — on the 2026-07-31
+test episode the master runs 59.04s while the last turn is reported to end at
+57.92s, a 1.1-second gap. The end guard exists to stop one speaker bleeding
+into the next line, and the last line has no next line, so it now runs to the
+end of the master instead of to its reported end. If the close of an older
+episode sounds cut off, that is why: re-run the processor over the saved
+`response.json` (no ElevenLabs call, no API key, just ffmpeg) and re-upload the
+stem of whoever speaks last.
+
 ## 3. Upload to SitePal
 
 Upload:
