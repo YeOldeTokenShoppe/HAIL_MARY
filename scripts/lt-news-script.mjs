@@ -57,7 +57,6 @@ import { claude as callClaude } from "./lt-tv-claude.mjs";
 const claude = (opts) => callClaude({ ...opts, model: MODEL });
 
 const MODEL = process.env.LT_NEWS_MODEL || "claude-opus-5";
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
 // Every flag this script knows. An unrecognised one is almost always a typo,
 // and silently ignoring it is how `--check-sources.` — one stray full stop —
