@@ -99,13 +99,7 @@
         },
         {
           "actor": "Barron",
-          "text": "It is week thirty-eight. The market spent it changing its mind in public, which is the only thing it does well.",
-          "directAddress": false,
-          "cues": []
-        },
-        {
-          "actor": "Barron",
-          "text": "Three stories this week. Money left a door it spent all summer walking through, a chain got crowded, and a robot made four million dollars disappear before lunch.",
+          "text": "It is week thirty-eight. The market spent it changing its mind in public, which is the only thing it does well. Three stories: money left a door it spent all summer walking through, a chain got crowded, and a robot made four million dollars disappear before lunch.",
           "directAddress": false,
           "cues": []
         },
@@ -317,8 +311,14 @@
           ]
         },
         {
+          "actor": "Barron",
+          "text": "You say that like it is a criticism. [chuckles]",
+          "directAddress": true,
+          "cues": []
+        },
+        {
           "actor": "Monk",
-          "text": "What were they doing?",
+          "text": "It was intended as one. What were they doing?",
           "directAddress": true,
           "cues": []
         },
@@ -363,18 +363,6 @@
               "offset": 1.0
             }
           ]
-        },
-        {
-          "actor": "Barron",
-          "text": "You say that like it is a criticism. [chuckles]",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "actor": "Monk",
-          "text": "It was intended as one.",
-          "directAddress": true,
-          "cues": []
         },
         {
           "actor": "Barron",
@@ -517,8 +505,14 @@
           ]
         },
         {
+          "actor": "Barron",
+          "text": "It is going to keep posting, is it not.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
           "actor": "Monk",
-          "text": "[patiently] Then it has learned the genre perfectly. This is not a machine failing to be human. This is a machine succeeding at being us.",
+          "text": "[patiently] It has learned the genre perfectly. This is not a machine failing to be human. This is a machine succeeding at being us.",
           "directAddress": false,
           "cues": [
             {
