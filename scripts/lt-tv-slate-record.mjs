@@ -68,6 +68,13 @@ export function toSlateRecord(episode) {
     // losing it here would mean going back to the staging record to ask.
     week: episode.week,
 
+    // A PLACEHOLDER, to be tuned by ear after the clips are uploaded. Most of
+    // what leadIn absorbs is how long SitePal takes to start serving a file,
+    // so it is a property of the upload rather than of the script — roundtable
+    // 01 needed 2.5 → 3 after only one of its tracks was re-rendered. Getting
+    // it wrong looks like the two hosts talking over each other even though
+    // the tracks never overlap. docs/talk-show-production.md has the
+    // procedure; it is tunable live from the browser console.
     leadIn: timing.leadIn ?? 2.5,
 
     // Derived, never restated: the pipeline knows who holds each line, so the
