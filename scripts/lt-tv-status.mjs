@@ -26,6 +26,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
+import { sectionsForRecord } from "./lt-tv-sections.mjs";
 
 import { SHOW_FORMATS, formatRuntime } from "./lt-tv-format.mjs";
 import { SLATE_DIR, SLATE_INDEX } from "./lt-tv-slate-record.mjs";
@@ -121,11 +122,10 @@ async function inspect(id, { root, slate, staging, registered }) {
       : (slate?.estimatedRuntime ?? staging?.slate?.runtime ?? null),
     runtimeIsEstimate: !playable,
     registered,
-    clips: staging?.cast
-      ? Object.values(staging.cast).map((c) => c.sitepalAudio)
-      : slate?.audio
-        ? Object.values(slate.audio)
-        : [],
+    // Every clip the episode asks SitePal for, sections included. An episode
+    // over 90 seconds goes up as several per character (SitePal's own limit),
+    // and listing only the first would have you upload two files out of eight.
+    clips: clipNames(staging, slate),
     warnings: staging?.warnings ?? [],
     files,
     // `hasWorkingCopy` is passed rather than re-checked, because the check
@@ -154,6 +154,19 @@ async function inspect(id, { root, slate, staging, registered }) {
  * relative to whoever types it — and a dashboard exists to be read from
  * whatever directory you are already standing in.
  */
+/** Every SitePal clip name an episode needs, in playing order. */
+function clipNames(staging, slate) {
+  if (Array.isArray(slate?.sections) && slate.sections.length) {
+    return slate.sections.flatMap((section) => Object.values(section.audio ?? {}));
+  }
+  const cut = staging?.timing?.sections;
+  if (staging?.cast && Array.isArray(cut) && cut.length > 1) {
+    return sectionsForRecord(staging, cut).flatMap((s) => Object.values(s.audio));
+  }
+  if (staging?.cast) return Object.values(staging.cast).map((c) => c.sitepalAudio);
+  return slate?.audio ? Object.values(slate.audio) : [];
+}
+
 function nextStep({ id, stage, registered, slate, staging, hasWorkingCopy }) {
   if (stage === "on-air") {
     if (!registered) {

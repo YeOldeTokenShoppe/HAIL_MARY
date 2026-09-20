@@ -166,8 +166,13 @@ console.log("\nWhat to upload, and under what name, comes from the record:");
 {
   const plan = uploadPlan(SAMPLE, "roundtable-02");
   check("one upload per cast member", plan.length, Object.keys(SAMPLE.cast).length);
-  ok("each names a file the processor writes", plan.every((r) => r.file.endsWith("-sitepal-balanced.wav")));
-  ok("and the clip name the runtime will ask for", plan.every((r) => r.clip && !r.clip.includes(" ")));
+  ok("each is cut from a track the processor writes",
+    plan.every((r) => r.source.endsWith("-sitepal-balanced.wav")));
+  // The file on disk is named for the clip it becomes, so uploading is
+  // dragging files in rather than reading a table.
+  ok("and written under the name it will have in SitePal",
+    plan.every((r) => r.file.endsWith(`${r.clip}.wav`)));
+  ok("which is a name with no spaces in it", plan.every((r) => r.clip && !r.clip.includes(" ")));
   check("no two clips share a name", new Set(plan.map((r) => r.clip)).size, plan.length);
   check("and no two files either", new Set(plan.map((r) => r.file)).size, plan.length);
 }
