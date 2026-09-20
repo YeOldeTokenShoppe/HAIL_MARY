@@ -26,6 +26,7 @@
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { resolve, dirname, join } from "node:path";
+import { sectionsForRecord } from "./lt-tv-sections.mjs";
 
 export const SLATE_DIR = "src/content/lt-tv/episodes";
 export const SLATE_INDEX = "src/content/lt-tv/index.js";
@@ -110,6 +111,13 @@ export function toSlateRecord(episode) {
     );
     record.lineStarts = timing.lineStarts;
     record.dialogueEnd = timing.durationSeconds;
+    // SitePal will not play a clip over 90 seconds, so an episode of any real
+    // length went up as several and the set plays them in order. Carried only
+    // when there is more than one: an episode that fits in a single clip has
+    // no sections and reads as it always did.
+    if (Array.isArray(timing.sections) && timing.sections.length > 1) {
+      record.sections = sectionsForRecord(episode, timing.sections);
+    }
   } else {
     // Deliberately NOT `runtime`: the slate would advertise this in the guide
     // as if it were the length of a recording that does not exist. It is an

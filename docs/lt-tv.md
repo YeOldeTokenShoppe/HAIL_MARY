@@ -283,12 +283,24 @@ are no joins to be wrong.
 Upload the two balanced WAVs to the SitePal Audio Manager and copy the names
 into the record's `audio` block, exactly.
 
-**You do not have to work the names out.** Both the record step and
-`npm run lt:split` end by printing which file goes to which character under
-which name, and the studio lists them under **SitePal clip names** in the
-episode's panel. For roundtable 02 they are `lttv_rt_ep02_connor` and
-`lttv_rt_ep02_gr80`. Note that Connor's file is `john-sitepal-balanced.wav` —
-`john` is the processor's own key for him and is not the clip name.
+**You do not have to work the names out.** `npm run lt:split` writes each file
+under the name it will have in SitePal, so the name to type is the filename
+without `.wav`. It also prints the list, and the studio shows it under
+**SitePal clip names** in the episode's panel.
+
+**An episode over 90 seconds is several clips per character.** SitePal will not
+play a clip longer than that — its own limit, on every plan — so the split step
+cuts each track into sections of about 85 seconds and names them
+`lttv_rt_ep02_connor`, `..._s2`, `..._s3`. Upload all of them. The set plays
+each character's sections in order; a missing one stops the episode where it
+should have carried on. The Halo Effect is 59 seconds and needed only one,
+which is why this never came up until an episode ran to four minutes.
+
+Cuts land in the pause between two lines, never inside one, and both characters
+are cut at the same instants — so a join sounds like a beat someone took, and
+the two tracks stay locked to each other. If a single line is ever longer than
+the limit there is no pause to cut in, and the split step says so rather than
+producing a clip that silently will not play.
 
 **There is one Audio Manager for the whole account** (`9308752`), not one per
 character. Every clip for every character and every show sits in the same list,
@@ -441,13 +453,16 @@ how next week's show goes up early.
 [ ] Script read through; every number spot-checked against its source
 [ ] Master performance approved; no blips, no clipped syllables
 [ ] Both balanced WAVs the same duration
-[ ] Clips named lttv_<show>_ep<NN>_<character>, uploaded
+[ ] Clips named lttv_<show>_ep<NN>_<character>, uploaded — every section
 [ ] Record's `audio` matches the upload names exactly
 [ ] summary reads well in the guide
 [ ] audienceLines covers every line played to the room
 [ ] Reaction cues use valid names and sensible durations
 [ ] Record in src/content/lt-tv/episodes/ and imported in index.js
 [ ] node scripts/lt-tv-check.mjs passes, and reports a runtime
+[ ] Every section under 90s and starting where the last one ended (the check
+    says so)
+[ ] Each section join watched once — the picture should not jump at one
 [ ] leadIn tuned by ear on /trade and written back into the record
 [ ] First and second playback clean; episode switching clean
 ```
