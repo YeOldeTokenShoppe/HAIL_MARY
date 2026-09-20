@@ -142,39 +142,57 @@ node scripts/lt-news-brief.mjs
 # → content/lt-tv/briefs/news-2026-W38.json
 ```
 
-Five families of source, all free and keyless except the last:
+Five families of source. Eleven of the thirteen are free and keyless; two are
+switched off until someone sets a key.
 
 **Macro**
 - **Federal Reserve** press releases (`press_monetary.xml`) — the authoritative
   source for an FOMC decision, ahead of anybody's coverage of it.
-- **Treasury daily yield curve** — the three-month, two-year, ten-year and
-  thirty-year, a week of them, with the ten-year's move and the 2s10s spread
-  computed.
+- **The yield curve** — the three-month, two-year, ten-year and thirty-year, a
+  week of them, with the ten-year's move and the 2s10s spread computed. Read
+  from **FRED** (`DGS3MO`, `DGS2`, `DGS10`, `DGS30`), with Treasury's own
+  monthly XML as the fallback.
 - **Economy and markets headlines** — CNBC economy, CNBC markets, Yahoo Finance.
 
 **Markets**
-- **Index levels** — S&P 500, Nasdaq 100, Dow, week over week, from Stooq's
-  keyless daily CSV.
-- **Commodities** — WTI crude and gold, same source.
+- **Index levels** — S&P 500, Nasdaq Composite, Dow, week over week, from FRED.
+- **Commodities** — WTI crude from FRED; gold, best-effort, from Stooq. A week
+  with no gold print is a missing line on the board, not a failed source.
 
-**Crypto** — Reddit's weekly top from r/bitcoin, r/ethereum and
-r/cryptocurrency; CryptoPanic RSS; CoinGecko trending; Fear & Greed across eight
-days so the show can read the *arc* rather than today's number; and
-CoinMarketCap if `CMC_PRO_API_KEY` is set.
+**Crypto** — CoinDesk, Decrypt, Cointelegraph and The Block RSS; CoinGecko
+trending; Fear & Greed across eight days so the show can read the *arc* rather
+than today's number; Reddit's weekly top from r/bitcoin, r/ethereum and
+r/cryptocurrency if Reddit credentials are set; and CoinMarketCap if
+`CMC_PRO_API_KEY` is set.
 
-**Collectibles** — r/PokemonTCG, r/sportscards and r/collectibles, weekly top.
-There is no free price API for trading cards worth wiring, so the beat is
-sourced the way a human notices it: a set launch or a frenzy pushes a post to
-the top of the week, and the editorial pass confirms any actual number from a
-real article.
+**Collectibles** — Google News queries for the card and collectibles beats,
+plus the collector subreddits when Reddit is switched on. There is no free
+price API for trading cards worth wiring, so the beat is sourced the way a
+human notices it — a set launch or a frenzy makes the news — and the editorial
+pass confirms any actual number from a real article.
 
 **Predictions** — Polymarket and Kalshi, filtered to the show's beats (rates,
 inflation, recession, the indices, oil, crypto, legislation) and normalised so
 both quote a probability.
 
 A source that fails lands in the brief's `degraded` array and the brief is
-still written. A news show that cannot run because Stooq rate-limited is not a
-sustainable news show.
+still written. A news show that cannot run because one upstream rate-limited is
+not a sustainable news show.
+
+### Reddit needs credentials
+
+Reddit returns 403 to unauthenticated API calls now. It is not broken and it is
+not worth spoofing a browser over: create a **script** app at
+<https://www.reddit.com/prefs/apps> and set
+
+```
+REDDIT_CLIENT_ID=...
+REDDIT_CLIENT_SECRET=...
+REDDIT_USER_AGENT="node:lt-tv-newsroom:1.0 (by /u/yourname)"
+```
+
+Without them the two Reddit-backed sources report `skipped`, not `failed`, and
+everything else runs. Collectibles no longer depends on Reddit at all.
 
 ### Checking the sources
 
@@ -185,8 +203,9 @@ machine. To tell them apart:
 node scripts/lt-news-brief.mjs --check-sources
 ```
 
-It pings every upstream, reports which answered and with how many items, and
-writes nothing.
+It pings every upstream, writes nothing, and marks each one three ways: `✓`
+answered, `–` switched off for want of a key, `✗` failed with the reason. Only
+a `✗` is a problem.
 
 **Why not just call `/api/ai/trending`?** That route hits three of the same
 crypto upstreams, but it is tuned for the live `/trade` page: a six-hour cache,
@@ -408,6 +427,11 @@ news episode exists to list until step 3 runs and the schemas meet.
 - **Step 3 is not built.** The design above is sound but unproven — the sandbox
   this was written in had no `ffmpeg` and no ElevenLabs key, so the
   concatenation and the offset arithmetic have not been run against real audio.
+- **The replacement upstreams have not been run against the real internet.**
+  FRED, the four crypto RSS desks, the Google News queries and Reddit's OAuth
+  handshake were all written in a sandbox with no outbound network, and
+  verified against recorded fixtures rather than live responses. `--check-sources`
+  is how you find out; the fixtures cover the parsing, not the endpoints.
 - **The speaking rate is a guess.** `ESTIMATED_WPM = 145` produces the runtime
   in the slate. Recalibrate from the first real render: measured duration ÷
   measured word count.
