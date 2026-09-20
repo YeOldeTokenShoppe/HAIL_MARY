@@ -13,8 +13,10 @@
 // audience lines or cue offsets wrong, the timeline says so here rather than
 // on air.
 
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { readFile, writeFile, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { resolve, join } from "node:path";
+import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
 import { toSlateRecord, registerEpisode, slateId } from "./lt-tv-slate-record.mjs";
 import {
   buildEpisodeTimeline,
@@ -135,6 +137,55 @@ try {
   threw = err.message;
 }
 ok("renumbered lines are refused, not silently mismapped", threw?.includes("disagree about who speaks"));
+
+console.log("\nThe command line, which is the refresh after a recording:");
+{
+  // The regression this locks: refreshing a recorded episode used to mean
+  // re-running the generator, which rebuilds from scratch — two model calls,
+  // the edited screenplay overwritten and the timing cleared. This path must
+  // read the production record and write the slate record, and touch nothing
+  // else.
+  const dir = await mkdtemp(join(tmpdir(), "lt-tv-slate-"));
+  const root = join(dir, "repo");
+  await mkdir(join(root, "content/lt-tv/episodes"), { recursive: true });
+  await mkdir(join(root, "src/content/lt-tv/episodes"), { recursive: true });
+
+  const lines = episode.segments.flatMap((s) => s.lines);
+  const staged = structuredClone(episode);
+  staged.timing = {
+    lineStarts: lines.map((_, i) => i * 3),
+    lineEnds: lines.map((_, i) => i * 3 + 2.5),
+    durationSeconds: lines.length * 3,
+    leadIn: 3,
+  };
+  const recordPath = join(root, "content/lt-tv/episodes", `${staged.id}.json`);
+  await writeFile(recordPath, JSON.stringify(staged, null, 2) + "\n");
+  const before = await readFile(recordPath, "utf8");
+  await writeFile(join(root, "src/content/lt-tv/index.js"), await readFile(resolve(INDEX), "utf8"));
+
+  const run = spawnSync(process.execPath, [resolve("scripts/lt-tv-slate-record.mjs"), staged.id], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  ok("it exits clean", run.status === 0);
+  ok("it reports the episode as playable", /Playable: \d+ line starts/.test(run.stdout));
+
+  const written = JSON.parse(
+    await readFile(join(root, "src/content/lt-tv/episodes", `${slateId(staged)}.json`), "utf8"),
+  );
+  ok("the slate record it wrote is playable", episodeIsPlayable(written));
+  ok("and it carries the recorded timing", written.lineStarts.length === lines.length);
+  ok("the leadIn tuned by ear survives", written.leadIn === 3);
+  check("the production record is left exactly as it was", await readFile(recordPath, "utf8"), before);
+
+  const missing = spawnSync(process.execPath, [resolve("scripts/lt-tv-slate-record.mjs"), "no-such-episode"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  ok("an unknown episode is named, not crashed on", missing.status === 1 && /No episode record/.test(missing.stderr));
+
+  await rm(dir, { recursive: true, force: true });
+}
 
 console.log(failures ? `\n${failures} check(s) failed.\n` : "\nAll checks passed.\n");
 process.exit(failures ? 1 : 0);

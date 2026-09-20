@@ -270,7 +270,10 @@ async function main() {
       `  python3 elevenlabs-dialogue-test/process_dialogue.py --master ${masterPath} \\\n` +
       `      --segments ${join(outDir, "voice-segments.json")} ${outDir}\n` +
       "Then upload both WAVs under the names the record prescribes in `cast`, and\n" +
-      "re-run scripts/lt-news-script.mjs to refresh the slate record.",
+      `refresh the slate record so the guide plays it:\n` +
+      `  node scripts/lt-tv-slate-record.mjs ${episode.id}\n` +
+      "Do NOT re-run the generator for this — it rebuilds the episode from\n" +
+      "scratch and would discard both your edits and the timing above.",
   );
 }
 

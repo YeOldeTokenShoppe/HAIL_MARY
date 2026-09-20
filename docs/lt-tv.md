@@ -89,10 +89,18 @@ python3 elevenlabs-dialogue-test/process_dialogue.py \
     --segments content/lt-tv/audio/news-01/voice-segments.json \
     content/lt-tv/audio/news-01
 
-# 6. Re-run the script step so the record picks up the real timing.
-node scripts/lt-news-script.mjs --brief content/lt-tv/briefs/news-2026-W38.json
+# 6. Refresh the slate record so the guide plays it rather than listing it.
+node scripts/lt-tv-slate-record.mjs news-2026-W38
 node scripts/lt-tv-check.mjs          # should now report a runtime
 ```
+
+Step 6 is a join, not a rebuild, and that distinction is worth a sentence
+because getting it wrong is expensive. **Never re-run the generator to refresh
+a recorded episode.** `lt-news-script.mjs` and `lt-rt-script.mjs` write an
+episode from scratch every time, so re-running one spends two model calls,
+overwrites the screenplay you edited, and clears the timing you just paid to
+record — leaving the guide saying *Not recorded yet* over perfectly good
+audio.
 
 Because a news episode is generated in blocks laid end to end, check **each
 block join for a seam** and the **last block for drift** against the picture.
@@ -141,7 +149,22 @@ every exchange you have a sermon, and the fix is in the script, not the audio.
 node scripts/lt-tv-audio.mjs content/lt-tv/episodes/roundtable-02.json
 ```
 
-From here it is the shared path below: split, upload, tune the lead-in, check.
+From here it is the same tail as the news show — steps 5 and 6 above, then the
+shared sections below:
+
+```bash
+# Split the master into the two balanced tracks. Needs ffmpeg.
+python3 elevenlabs-dialogue-test/process_dialogue.py \
+    --master content/lt-tv/audio/roundtable-02/master-dialogue.wav \
+    --segments content/lt-tv/audio/roundtable-02/voice-segments.json \
+    content/lt-tv/audio/roundtable-02
+
+# Refresh the slate record.
+node scripts/lt-tv-slate-record.mjs roundtable-02
+node scripts/lt-tv-check.mjs roundtable-02
+```
+
+Then upload, tune the lead-in and test.
 
 `content/lt-tv/samples/roundtable-02.draft.json` is a worked example, written by
 hand to show the format and the two voices. **Its argument is invented** and it
@@ -262,6 +285,7 @@ how next week's show goes up early.
 [ ] audienceLines covers every line played to the room
 [ ] Reaction cues use valid names and sensible durations
 [ ] Record in src/content/lt-tv/episodes/ and imported in index.js
+[ ] node scripts/lt-tv-slate-record.mjs <id> run after the audio build
 [ ] node scripts/lt-tv-check.mjs passes, and reports a runtime
 [ ] leadIn tuned by ear on /trade and written back into the record
 [ ] First and second playback clean; episode switching clean
