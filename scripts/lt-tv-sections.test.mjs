@@ -21,6 +21,9 @@ import {
   sectionsForRecord,
   forcedJoins,
   gapSummary,
+  silenceSummary,
+  parseSilences,
+  silenceCommand,
   MIN_JOIN_SILENCE,
   SITEPAL_MAX_CLIP_SECONDS,
   TARGET_SECTION_SECONDS,
@@ -390,13 +393,88 @@ console.log("\nThe cutting report says what a join will sound like:");
   ok("and a cut she asked for is credited to her",
     sectionLine(hers[0], 0).endsWith("(your cut)"));
 
-  const pauses = pauseLine(gapSummary(tight.lineStarts, tight.lineEnds));
-  ok("the pause summary leads with the median", pauses.includes("median 0.03s"));
-  ok("and counts the ones too short to cut in", pauses.includes(`11 of 11 are under ${MIN_JOIN_SILENCE}s`));
-  check("with nothing to say about a single-line episode", pauseLine(gapSummary([0], [5])), null);
+  const pauses = pauseLine(silenceSummary([
+    { start: 10, end: 10.9, width: 0.9 },
+    { start: 20, end: 20.1, width: 0.1 },
+    { start: 30, end: 32.48, width: 2.48 },
+  ]));
+  ok("the pause summary counts what was measured", pauses.includes("3 found"));
+  ok("and leads with the median", pauses.includes("median 0.90s"));
+  ok("and says how many are wide enough to use", pauses.includes("2 are wide enough"));
+  ok("and with nothing measured it says the cuts will be heard",
+    pauseLine(silenceSummary([])).includes("expect the joins to be heard"));
 
   ok("with no marks, the report says how to add one", cutHint([]).includes("`# cut` on its own line"));
   ok("and with marks, which ones it used", cutHint([9, 20]).includes("9, 20"));
+}
+
+console.log("\nffmpeg's silence report is read back as windows:");
+{
+  // Real silencedetect output. It goes to stderr, interleaved with everything
+  // else ffmpeg says, and the duration is on the end line rather than the
+  // start one — so the windows have to be paired up rather than read off.
+  const real = [
+    "  Stream #0:0: Audio: pcm_s16le, 44100 Hz, mono, s16, 705 kb/s",
+    "[silencedetect @ 0x55d1c0] silence_start: 12.3456",
+    "[silencedetect @ 0x55d1c0] silence_end: 13.2 | silence_duration: 0.8544",
+    "size=N/A time=00:05:51.00 bitrate=N/A speed= 812x",
+    "[silencedetect @ 0x55d1c0] silence_start: 70.01",
+    "[silencedetect @ 0x55d1c0] silence_end: 70.46 | silence_duration: 0.45",
+  ].join("\n");
+
+  const found = parseSilences(real);
+  check("both windows come back", found.length, 2);
+  check("with the times ffmpeg reported", found[0], { start: 12.346, end: 13.2, width: 0.854 });
+  check("and the width computed rather than trusted", found[1].width, 0.45);
+
+  // A run that ends mid-silence reports a start and no end. Guessing where it
+  // finished would put a cut point in a place nothing measured.
+  check("an unclosed window is dropped", parseSilences("silence_start: 40.0"), []);
+  check("and noise with no report at all is nothing", parseSilences("no silence here"), []);
+
+  const [cmd, args] = silenceCommand("content/lt-tv/audio/x/master-dialogue.wav");
+  check("the command is ffmpeg", cmd, "ffmpeg");
+  ok("it writes no file", args.includes("-f") && args.includes("null"));
+  ok("and asks for the threshold in dB", args.some((a) => /silencedetect=noise=-\d+dB:d=/.test(a)));
+}
+
+console.log("\nWith the real pauses measured, the joins land in them:");
+{
+  // ElevenLabs' line times TILE — one line's end is the next one's start — so
+  // every reported gap is zero and no choice made from them can be right.
+  // This is roundtable-02 as Michelle recorded it on 2026-09-20.
+  const e = episodeOf(40, 8.775, 0);
+  check("every reported gap is zero", gapSummary(e.lineStarts, e.lineEnds).largest, 0);
+
+  // The audio does have pauses; they are just not in the timings. Put a real
+  // one at every third junction.
+  const silences = e.lineStarts
+    .map((start, i) => ({ start: round(start - 0.45), end: round(start + 0.45), width: 0.9 }))
+    .filter((_, i) => i > 0 && i % 3 === 0);
+
+  const blind = planSections(e.lineStarts, e.lineEnds, e.dialogueEnd);
+  ok("without them every join is forced", blind.slice(0, -1).every((s) => s.forcedJoin));
+
+  const plan = planSections(e.lineStarts, e.lineEnds, e.dialogueEnd, TARGET_SECTION_SECONDS, {
+    silences,
+  });
+  ok("with them, none is", plan.every((s) => !s.forcedJoin));
+  check("and nothing is left to warn about", forcedJoins(plan), []);
+  ok("every join reports the pause that was measured",
+    plan.slice(0, -1).every((s) => s.silenceAfter === 0.9));
+  ok("and every boundary sits inside one of them",
+    plan.slice(0, -1).every((s) => silences.some((w) => w.start <= s.endsAt && w.end >= s.endsAt)));
+
+  ok("the sections still fit SitePal",
+    plan.every((s) => s.endsAt - s.startsAt <= SITEPAL_MAX_CLIP_SECONDS));
+  check("and carry every line once", plan.flatMap((s) => range(s.firstLine, s.lastLine)), range(0, 39));
+
+  // A quiet stretch nowhere near a junction is not that junction's pause —
+  // it is a lull inside somebody's sentence, and cutting there is the bug.
+  const faraway = planSections(e.lineStarts, e.lineEnds, e.dialogueEnd, TARGET_SECTION_SECONDS, {
+    silences: [{ start: 3, end: 4.2, width: 1.2 }],
+  });
+  ok("a pause far from any junction is not used", faraway.slice(0, -1).every((s) => s.forcedJoin));
 }
 
 function range(from, to) {

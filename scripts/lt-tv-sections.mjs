@@ -10,12 +10,12 @@
 // is why nothing in this pipeline knew about it until an episode ran to four
 // and a half minutes.
 //
-// WHERE A CUT GOES. Never inside a line. A section boundary lands in the
-// silence between two lines, at its midpoint, so each section opens and closes
-// on a breath: the join sounds like a pause someone took rather than a tape
-// splice. It also means the two characters' sections are cut at the same
-// instants, which is what keeps them together — they are the same timeline
-// twice, not two things to line up.
+// WHERE A CUT GOES. In a measured pause, at its midpoint, so each section opens
+// and closes on a breath: the join sounds like a pause someone took rather than
+// a tape splice. MEASURED is the load-bearing word — see SILENCE_DB below, and
+// do not go back to choosing by the reported line times. Both characters are
+// cut at the same instants, which is what keeps them together: they are the
+// same timeline twice, not two things to line up.
 //
 // WHY 85 AND NOT 90. Every join is a risk, so fewer is better and the target
 // is as close to the ceiling as is safe. The five seconds are for the
@@ -58,6 +58,92 @@ export const MIN_JOIN_SILENCE = 0.25;
 const LENGTH_FLOOR = 0.75;
 
 /**
+ * WHY THE LINE TIMES ARE NOT WHERE THE PAUSES ARE.
+ *
+ * ElevenLabs reports a start and an end for every line, and they TILE: line
+ * k's start is line k-1's end, to the millisecond. Measured on roundtable-02
+ * on 2026-09-20: median gap 0.00s, 37 of 39 under 0.25s. That is not an
+ * episode with no pauses in it — you can hear them — it is a timeline carved
+ * into segments with no gaps between them. Choosing a cut by those numbers is
+ * choosing by a measurement that does not exist, which is why the first fix
+ * for mid-sentence joins did not move them.
+ *
+ * So the pauses are measured from the audio instead, with ffmpeg's
+ * silencedetect over the MASTER — silence there means neither voice is
+ * speaking, which is exactly the condition a join needs. The reported times
+ * still say which line is which; they just no longer say where it is quiet.
+ */
+export const SILENCE_DB = -40;
+export const SILENCE_MIN_SECONDS = 0.15;
+
+/**
+ * How far from a line junction a measured pause may sit and still be that
+ * junction's pause. Generous, because the reported end of a line can fall
+ * over a second short of where the speech actually stops — the processor
+ * already compensates for that on the closing line.
+ */
+const JOIN_SEARCH_SECONDS = 1.5;
+
+/** The ffmpeg run that finds the quiet stretches. Decodes only; writes nothing. */
+export function silenceCommand(master, { db = SILENCE_DB, min = SILENCE_MIN_SECONDS } = {}) {
+  return [
+    "ffmpeg",
+    [
+      "-hide_banner", "-nostats",
+      "-i", String(master),
+      "-af", `silencedetect=noise=${db}dB:d=${min}`,
+      "-f", "null", "-",
+    ],
+  ];
+}
+
+/**
+ * The quiet stretches ffmpeg found, from what it printed.
+ *
+ * silencedetect writes to stderr, a line per event:
+ *
+ *   [silencedetect @ 0x…] silence_start: 12.3456
+ *   [silencedetect @ 0x…] silence_end: 13.2 | silence_duration: 0.8544
+ *
+ * A run that ends during a silence reports the start and never the end, so an
+ * unclosed window is dropped rather than guessed at.
+ */
+export function parseSilences(text) {
+  const windows = [];
+  let open = null;
+  for (const line of String(text).split(/\r?\n/)) {
+    const start = line.match(/silence_start:\s*(-?[\d.]+)/);
+    if (start) {
+      open = Number(start[1]);
+      continue;
+    }
+    const end = line.match(/silence_end:\s*(-?[\d.]+)/);
+    if (end && open !== null) {
+      const to = Number(end[1]);
+      if (to > open) windows.push({ start: round(open), end: round(to), width: round(to - open) });
+      open = null;
+    }
+  }
+  return windows;
+}
+
+/** What the measured pauses look like overall, for the cutting report. */
+export function silenceSummary(silences, minSilence = MIN_JOIN_SILENCE) {
+  if (!silences?.length) return null;
+  const widths = silences.map((w) => w.width).sort((a, b) => a - b);
+  const middle = widths.length % 2
+    ? widths[(widths.length - 1) / 2]
+    : round((widths[widths.length / 2 - 1] + widths[widths.length / 2]) / 2);
+  return {
+    count: widths.length,
+    median: middle,
+    smallest: widths[0],
+    largest: widths[widths.length - 1],
+    usable: silences.filter((w) => w.width >= minSilence).length,
+  };
+}
+
+/**
  * Cut points for one episode, from the times its lines actually landed.
  *
  * Forward-only, and greedy about length: take lines until one more would push
@@ -72,6 +158,9 @@ const LENGTH_FLOOR = 0.75;
  * @param max         longest a section may be
  * @param minSilence  the least silence a join will land in
  * @param cuts        line numbers to cut in front of, whatever the times say
+ * @param silences    measured quiet stretches, from parseSilences. When given,
+ *                    these decide where it is quiet; the line times only say
+ *                    which line is which. See SILENCE_DB above for why.
  * @returns [{ startsAt, endsAt, firstLine, lastLine, silenceAfter, forcedJoin,
  *          manual }], always at least one. `silenceAfter` is the pause the cut
  *          at the END of this section sits in, and is null on the last one.
@@ -81,7 +170,7 @@ export function planSections(
   lineEnds,
   dialogueEnd,
   max = TARGET_SECTION_SECONDS,
-  { minSilence = MIN_JOIN_SILENCE, cuts = [] } = {},
+  { minSilence = MIN_JOIN_SILENCE, cuts = [], silences = [] } = {},
 ) {
   if (!Array.isArray(lineStarts) || lineStarts.length === 0) {
     throw new Error("planSections needs the line starts from a recorded episode.");
@@ -96,8 +185,37 @@ export function planSections(
   }
   const end = Number.isFinite(dialogueEnd) ? dialogueEnd : lineEnds[lineEnds.length - 1];
 
-  /** The reported silence in front of line k. Negative when lines overlap. */
-  const silenceBefore = (k) => lineStarts[k] - lineEnds[k - 1];
+  /**
+   * The measured pause at the junction in front of line k, if one was found.
+   *
+   * The junction is where line k-1's reported end meets line k's reported
+   * start, which for tiled timings is a single instant. A window CONTAINING it
+   * is that junction's pause; failing that, the nearest window within
+   * JOIN_SEARCH_SECONDS, because the reported end of a line can fall short of
+   * where the speech actually stops.
+   */
+  const measuredAt = (k) => {
+    if (!silences.length) return null;
+    const from = lineEnds[k - 1];
+    const to = lineStarts[k];
+    const spanning = silences.find((w) => w.end >= from && w.start <= to);
+    if (spanning) return spanning;
+
+    let nearest = null;
+    let best = Infinity;
+    for (const w of silences) {
+      const middle = (w.start + w.end) / 2;
+      const away = middle < from ? from - middle : middle > to ? middle - to : 0;
+      if (away <= JOIN_SEARCH_SECONDS && away < best) {
+        best = away;
+        nearest = w;
+      }
+    }
+    return nearest;
+  };
+
+  /** The silence in front of line k: measured where possible, reported where not. */
+  const silenceBefore = (k) => measuredAt(k)?.width ?? lineStarts[k] - lineEnds[k - 1];
 
   /**
    * Where a cut in front of line k goes: the middle of the pause, so neither
@@ -105,6 +223,8 @@ export function planSections(
    * overlap, or the timings are noisy — it goes at the start of line k.
    */
   const cutBefore = (k) => {
+    const window = measuredAt(k);
+    if (window) return round((window.start + window.end) / 2);
     const from = lineEnds[k - 1];
     const to = lineStarts[k];
     return round(to > from ? (from + to) / 2 : to);

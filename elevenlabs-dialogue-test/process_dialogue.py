@@ -341,11 +341,13 @@ def main():
     print(f"  Timings: {timing_path}")
     print(f"  Show cues: {show_timing_path}")
     print(f"  Episode record: {record_path}")
-    print(
-        "\nNext: upload both WAVs to SitePal, put their clip names in the "
-        "record's `audio`, add your reaction cues, then move it to "
-        "src/content/lt-tv/episodes/ and run `node scripts/lt-tv-check.mjs`."
-    )
+    # Deliberately says nothing about what comes next. This runs as the first
+    # half of `npm run lt:split`, which cuts these tracks into the sections
+    # SitePal will accept and then prints what to upload and what to run. The
+    # advice that used to be here predated all of that: it described moving the
+    # record by hand and named neither the sections nor the slate join, and it
+    # printed immediately above the instructions that supersede it.
+    print(f"\n{len(speakers)} balanced tracks written, one per character.")
 
 
 if __name__ == "__main__":

@@ -324,17 +324,28 @@ Both characters are cut at the same instants, so the two tracks stay locked to
 each other, and a cut is placed for the SILENCE around it rather than wherever
 the arithmetic runs out. That matters more than it sounds: a join is always a
 pause, because SitePal has to stop one clip and start the next, so a boundary
-inside a sentence is heard as a fault. The split step chooses the widest pause
-near the limit, and prints what each cut had to work with:
+inside a sentence is heard as a fault.
+
+**The pauses are measured from the master, not read off the line times.** This
+is the part that is easy to get wrong, and we did: ElevenLabs reports a start
+and an end for every line, and they tile — line 12's start IS line 11's end, to
+the millisecond. Measured on roundtable-02, the median reported gap was 0.00s
+and 37 of 39 were under a quarter second. The episode is not gapless; the
+timings simply carry no gaps. So the split step runs ffmpeg's `silencedetect`
+over the master, where silence means neither voice is speaking, and cuts in
+what that finds:
 
 ```
-  section 1  0:00 – 1:23  (84s, lines 0–13)  cut in 0.90s of silence
-  section 2  1:23 – 2:46  (82s, lines 14–27)  cut in 0.90s of silence
+  section 1  0:00 – 1:10  (70s, lines 0–7)  cut in 0.70s of silence
+  section 2  1:10 – 2:20  (70s, lines 8–15)  cut in 0.70s of silence
+
+  Pauses in the audio: 19 found, median 0.70s, shortest 0.35s, longest 2.48s.
+  19 are wide enough to cut in (0.25s or more).
 ```
 
-It also prints the pauses across the whole episode. If most of them are near
-zero, no choice of boundary is a good one and the answer is in the writing —
-the lines were written to run straight into each other.
+If that summary says few pauses are wide enough, the answer is in the writing
+rather than in the cutting: the lines run straight into each other and there is
+nowhere good to join.
 
 **To put a join somewhere else, write `# cut` on its own line in the
 screenplay** where you want it, and split again. The line numbers in the report

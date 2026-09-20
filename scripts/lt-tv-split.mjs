@@ -37,8 +37,11 @@ import {
   planSections,
   sectionProblems,
   forcedJoins,
-  gapSummary,
+  silenceCommand,
+  parseSilences,
+  silenceSummary,
   MIN_JOIN_SILENCE,
+  SILENCE_DB,
   TARGET_SECTION_SECONDS,
 } from "./lt-tv-sections.mjs";
 import { sitepalClipName } from "./lt-tv-format.mjs";
@@ -119,18 +122,26 @@ export function sectionLine(section, index) {
 }
 
 /**
- * What the pauses in this episode look like, in one line.
+ * What the pauses in this episode actually are, in one line.
  *
- * The measurement that says whether cutting anywhere can work. If most gaps
- * are near zero, no choice of boundary is a good one and the answer is in how
- * the episode was written, not in where it is cut.
+ * These are measured from the master rather than read off the line times,
+ * which tile and so report no pauses at all. It is the measurement that says
+ * whether cutting anywhere can work: if the episode really does run without
+ * pauses, no choice of boundary is a good one and the answer is in how the
+ * lines were written.
  */
-export function pauseLine(gaps) {
-  if (!gaps) return null;
+export function pauseLine(silences) {
+  if (!silences) {
+    return (
+      `  No pauses measured — ffmpeg found nothing quieter than ${SILENCE_DB}dB.\n` +
+      "  Cuts fall back to the reported line times, which are not where the\n" +
+      "  pauses are, so expect the joins to be heard."
+    );
+  }
   return (
-    `  Pauses between lines: median ${gaps.median.toFixed(2)}s, ` +
-    `shortest ${gaps.smallest.toFixed(2)}s, longest ${gaps.largest.toFixed(2)}s. ` +
-    `${gaps.tooSmall} of ${gaps.count} are under ${MIN_JOIN_SILENCE}s.`
+    `  Pauses in the audio: ${silences.count} found, median ${silences.median.toFixed(2)}s, ` +
+    `shortest ${silences.smallest.toFixed(2)}s, longest ${silences.largest.toFixed(2)}s. ` +
+    `${silences.usable} are wide enough to cut in (${MIN_JOIN_SILENCE}s or more).`
   );
 }
 
@@ -145,6 +156,26 @@ export function cutHint(cuts) {
     ? `  Honoured ${cuts.length} cut mark(s) from the screenplay: ${cuts.join(", ")}.`
     : "  To put a join somewhere else, write `# cut` on its own line in the\n" +
         "  screenplay where you want it and split again.";
+}
+
+/**
+ * Run a command and resolve what it wrote to stderr.
+ *
+ * silencedetect reports there rather than on stdout, and ffmpeg's exit code
+ * says nothing about whether it found anything, so this resolves the text and
+ * leaves reading it to the caller. A missing ffmpeg resolves empty, and the
+ * cutting falls back to the reported line times.
+ */
+function capture(command, args) {
+  return new Promise((done) => {
+    const child = spawn(command, args, { stdio: ["ignore", "ignore", "pipe"] });
+    let text = "";
+    child.stderr.on("data", (chunk) => {
+      text += chunk;
+    });
+    child.on("close", () => done(text));
+    child.on("error", () => done(""));
+  });
 }
 
 /** Run a command, inheriting its output, and resolve its exit code. */
@@ -200,12 +231,19 @@ async function main() {
   const scriptPath = resolve(EPISODE_DIR, `${id}.txt`);
   const cuts = existsSync(scriptPath) ? readCutMarks(await readFile(scriptPath, "utf8")) : [];
 
+  // WHERE IT IS ACTUALLY QUIET. The reported line times tile — one line's end
+  // is the next one's start — so they say nothing about where the pauses are.
+  // Silence in the MASTER means neither voice is speaking, which is the
+  // condition a join needs, so that is what the cut points are chosen from.
+  const [silenceCmd, silenceArgs] = silenceCommand(master);
+  const silences = parseSilences(await capture(silenceCmd, silenceArgs));
+
   const sections = planSections(
     timing.lineStarts,
     timing.lineEnds,
     timing.durationSeconds,
     TARGET_SECTION_SECONDS,
-    { cuts },
+    { cuts, silences },
   );
   const problems = sectionProblems(sections);
   if (problems.length) {
@@ -227,8 +265,8 @@ async function main() {
     for (const [i, s] of sections.entries()) console.log(sectionLine(s, i));
     console.log("");
 
-    const pauses = pauseLine(gapSummary(timing.lineStarts, timing.lineEnds));
-    if (pauses) console.log(`${pauses}\n`);
+    const pauses = pauseLine(silenceSummary(silences));
+    console.log(`${pauses}\n`);
 
     const rough = forcedJoins(sections);
     if (rough.length) {
