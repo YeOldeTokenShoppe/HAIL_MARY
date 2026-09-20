@@ -42,6 +42,18 @@ system, one that commits episodes back to GitHub or keeps them in Firestore
 instead of on disk. The page and its routes 404 outside `npm run dev`, which
 means the answer to "what if someone finds it" is that there is nothing there.
 
+## The lineup page — the half that is on the live site
+
+`/admin/lt-tv` on the deployed site, behind the admin password. It lists every
+episode of every show and whether it is on air or planned, which is useful from
+a phone. It is **read only**: it cannot write, run or spend anything, because
+the slate is all that ships with a build.
+
+Its password is checked **on the server** (`src/lib/ltTv/lineupAuth.mjs`) and
+what the browser gets is a signed, expiring, httpOnly cookie. The repo's older
+`/admin` page compares `NEXT_PUBLIC_ADMIN_PASSWORD` in the browser and trusts a
+`localStorage` flag, which is not protection — do not copy it.
+
 Two things it is careful about. A button that spends money says so and asks
 first; the free ones do not ask, because a confirm on a free action teaches you
 to click through confirms. And it prints each step's real output rather than a
