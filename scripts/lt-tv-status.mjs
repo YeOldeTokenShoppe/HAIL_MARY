@@ -169,7 +169,7 @@ function nextStep({ id, stage, registered, slate, staging, hasWorkingCopy }) {
     return {
       why: "the audio exists; the slate has not been told about it",
       run: `python3 elevenlabs-dialogue-test/process_dialogue.py --master ${AUDIO_DIR}/${id}/master-dialogue.wav --segments ${AUDIO_DIR}/${id}/voice-segments.json ${AUDIO_DIR}/${id}`,
-      then: `upload both WAVs under the clip names above, then node scripts/lt-tv-slate-record.mjs ${id}`,
+      then: `upload both WAVs under the clip names above, then npm run lt:slate -- ${id}`,
     };
   }
 

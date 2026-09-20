@@ -37,6 +37,7 @@ root — the path is relative to you, not to the repo.
 | `npm run lt:roundtable` | write a roundtable episode |
 | `npm run lt:edit` | apply your edits to a screenplay |
 | `npm run lt:audio` | record an episode |
+| `npm run lt:slate` | put a recorded episode on the guide |
 | `npm run lt:test` | run every check |
 
 Arguments go after `--`, as in `npm run lt:roundtable -- --topic roundtable-02`.
@@ -95,10 +96,10 @@ Full detail: `docs/lt-weekly-news-workflow.md`.
 
 ```bash
 # 1. Pull the week. Check `degraded` in the output is empty or harmless.
-node scripts/lt-news-brief.mjs
+npm run lt:brief
 
 # 2. Write the script. Two Claude calls; every number is computed locally.
-node scripts/lt-news-script.mjs --brief content/lt-tv/briefs/news-2026-W38.json
+npm run lt:news -- --brief content/lt-tv/briefs/news-2026-W38.json
 ```
 
 Now **read the `.txt` screenplay** before spending any audio money. Does each
@@ -111,7 +112,7 @@ add them, delete them, change who a line is aimed at, then apply what you
 wrote. No model call and no audio call, so revise here until it reads.
 
 ```bash
-node scripts/lt-tv-edit.mjs news-2026-W38
+npm run lt:edit -- news-2026-W38
 ```
 
 The format explains itself at the top of the file; `docs/lt-weekly-news-workflow.md`
@@ -119,10 +120,10 @@ has the detail.
 
 ```bash
 # 3. Confirm it landed on the slate cleanly (it will say "not recorded yet").
-node scripts/lt-tv-check.mjs
+npm run lt:check
 
 # 4. Build the audio, then listen to the master end to end.
-node scripts/lt-tv-audio.mjs content/lt-tv/episodes/news-2026-W38.json
+npm run lt:audio -- content/lt-tv/episodes/news-2026-W38.json
 
 # 5. Split the master into the two balanced tracks. Needs ffmpeg.
 python3 elevenlabs-dialogue-test/process_dialogue.py \
@@ -131,8 +132,8 @@ python3 elevenlabs-dialogue-test/process_dialogue.py \
     content/lt-tv/audio/news-01
 
 # 6. Refresh the slate record so the guide plays it rather than listing it.
-node scripts/lt-tv-slate-record.mjs news-2026-W38
-node scripts/lt-tv-check.mjs          # should now report a runtime
+npm run lt:slate -- news-2026-W38
+npm run lt:check   # should now report a runtime
 ```
 
 Step 6 is a join, not a rebuild, and that distinction is worth a sentence
@@ -163,10 +164,10 @@ named on the slate.
 ```bash
 # 1. See what is waiting. Five episodes were titled long before there was any
 #    way to write one; these are the queue.
-node scripts/lt-rt-script.mjs --list
+npm run lt:roundtable -- --list
 
 # 2. Write one. Two Claude calls: the argument, then the dialogue.
-node scripts/lt-rt-script.mjs --topic roundtable-02
+npm run lt:roundtable -- --topic roundtable-02
 ```
 
 An episode already on the slate **keeps the title and summary it was given** —
@@ -177,7 +178,7 @@ is not on the slate yet.
 Then read and revise exactly as you would a news episode:
 
 ```bash
-node scripts/lt-tv-edit.mjs roundtable-02
+npm run lt:edit -- roundtable-02
 ```
 
 What to look for is specific to this show: **both of them have to be right
@@ -187,7 +188,7 @@ every exchange you have a sermon, and the fix is in the script, not the audio.
 
 ```bash
 # 3. Record it — the same audio build the news show uses.
-node scripts/lt-tv-audio.mjs content/lt-tv/episodes/roundtable-02.json
+npm run lt:audio -- content/lt-tv/episodes/roundtable-02.json
 ```
 
 From here it is the same tail as the news show — steps 5 and 6 above, then the
@@ -201,8 +202,8 @@ python3 elevenlabs-dialogue-test/process_dialogue.py \
     content/lt-tv/audio/roundtable-02
 
 # Refresh the slate record.
-node scripts/lt-tv-slate-record.mjs roundtable-02
-node scripts/lt-tv-check.mjs roundtable-02
+npm run lt:slate -- roundtable-02
+npm run lt:check -- roundtable-02
 ```
 
 Then upload, tune the lead-in and test.
@@ -292,7 +293,7 @@ Editing the screenplay of an episode that already has audio is refused — the
 clips would still be saying the old words. To go ahead anyway:
 
 ```bash
-node scripts/lt-tv-edit.mjs news-2026-W38 --rerecord
+npm run lt:edit -- news-2026-W38 --rerecord
 ```
 
 That clears the timing and returns the episode to *Not recorded yet* on the
@@ -326,8 +327,8 @@ how next week's show goes up early.
 [ ] audienceLines covers every line played to the room
 [ ] Reaction cues use valid names and sensible durations
 [ ] Record in src/content/lt-tv/episodes/ and imported in index.js
-[ ] node scripts/lt-tv-slate-record.mjs <id> run after the audio build
-[ ] node scripts/lt-tv-check.mjs passes, and reports a runtime
+[ ] npm run lt:slate -- <id> run after the audio build
+[ ] npm run lt:check passes, and reports a runtime
 [ ] leadIn tuned by ear on /trade and written back into the record
 [ ] First and second playback clean; episode switching clean
 ```
