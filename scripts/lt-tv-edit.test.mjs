@@ -1,6 +1,6 @@
 // Tests for editing an episode by editing its script, run with:
 //
-//   node scripts/lt-news-edit.test.mjs
+//   node scripts/lt-tv-edit.test.mjs
 //
 // Two things here are worth more than the rest. The first is that a rendered
 // script parses back into the episode it was rendered from, exactly — if that
@@ -11,8 +11,8 @@
 
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { renderScript } from "./lt-news-script.mjs";
-import { parseScript, applyScript, describeEdit } from "./lt-news-edit.mjs";
+import { renderScript } from "./lt-tv-episode.mjs";
+import { parseScript, applyScript, describeEdit } from "./lt-tv-edit.mjs";
 
 let failures = 0;
 const check = (label, actual, expected) => {

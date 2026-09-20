@@ -31,10 +31,17 @@ comes from:
 
 | | Weekly news | Roundtable |
 |---|---|---|
-| Script from | `scripts/lt-news-brief.mjs` → `lt-news-script.mjs` | you write `dialogue.json` by hand |
-| Audio from | `scripts/lt-news-audio.mjs` (multi-block) | `elevenlabs-dialogue-test/run_test.sh` (single call) |
+| Starts from | a week of market signal | one idea |
+| Script from | `lt-news-brief.mjs` → `lt-news-script.mjs` | `lt-rt-script.mjs` |
+| Topics from | the feeds, verified against real articles | the slate's own running order, or `--theme` |
+| Segments | 7, built around three stories | 6, built around one argument |
+| Chiron | yes | no |
 | Clip prefix | `lttv_news_ep<NN>_` | `lttv_rt_ep<NN>_` |
-| Length | 5–10 min | under ~2,000 characters per generated section |
+| Length | 5–10 min | 4–9 min |
+
+Everything after the script is the same for both: `lt-tv-edit.mjs` to revise,
+`lt-tv-audio.mjs` to record, `lt-tv-check.mjs` to verify. One `assemble()`
+builds both records, so a validation either show gains, both gain.
 
 Both end the same way: two balanced WAVs uploaded to SitePal, a record on the
 slate, and a lead-in tuned by ear.
@@ -63,7 +70,7 @@ add them, delete them, change who a line is aimed at, then apply what you
 wrote. No model call and no audio call, so revise here until it reads.
 
 ```bash
-node scripts/lt-news-edit.mjs news-2026-W38
+node scripts/lt-tv-edit.mjs news-2026-W38
 ```
 
 The format explains itself at the top of the file; `docs/lt-weekly-news-workflow.md`
@@ -74,7 +81,7 @@ has the detail.
 node scripts/lt-tv-check.mjs
 
 # 4. Build the audio, then listen to the master end to end.
-node scripts/lt-news-audio.mjs content/lt-tv/episodes/news-2026-W38.json
+node scripts/lt-tv-audio.mjs content/lt-tv/episodes/news-2026-W38.json
 
 # 5. Split the master into the two balanced tracks. Needs ffmpeg.
 python3 elevenlabs-dialogue-test/process_dialogue.py \
@@ -100,31 +107,54 @@ shows.
 
 Full detail: `docs/talk-show-production.md`.
 
-```bash
-# 1. Write the turns in elevenlabs-dialogue-test/dialogue.json.
-#    Connor: IcFWazAaBzXNwLWpySgF   Saint GR80: fATgBRI8wg5KkDFg8vBd
-#    Keep one request under ~2,000 characters; longer episodes generate as
-#    contiguous sections, each its own production unit.
-
-# 2. Generate and clean. Asks for the ElevenLabs key; never stores it.
-cd elevenlabs-dialogue-test
-./run_test.sh --episode-id roundtable-02 --title "The Wealth Effect"
-```
-
-Listen to all three output files before uploading: the master has the
-performances you want, each balanced WAV has only its own character, no blips at
-the handoffs, no clipped final syllables, both WAVs the same duration. A defect
-present in `master-dialogue.mp3` cannot be fixed by the processor — regenerate.
+The roundtable does not start from anything that happened. It is one argument
+about one idea, so there is no brief step — the topics are the episodes already
+named on the slate.
 
 ```bash
-# 3. Finish output/episode-record.json: summary, audio clip names,
-#    audienceLines, cues, leadIn. Do NOT hand-edit lineStarts, speakers
-#    or dialogueEnd — the set derives everything from them.
+# 1. See what is waiting. Five episodes were titled long before there was any
+#    way to write one; these are the queue.
+node scripts/lt-rt-script.mjs --list
 
-# 4. Move it to src/content/lt-tv/episodes/<id>.json, add the import and the
-#    EPISODE_RECORDS entry in src/content/lt-tv/index.js, then:
-node scripts/lt-tv-check.mjs roundtable-02
+# 2. Write one. Two Claude calls: the argument, then the dialogue.
+node scripts/lt-rt-script.mjs --topic roundtable-02
 ```
+
+An episode already on the slate **keeps the title and summary it was given** —
+the generator writes the argument, not the running order. Pass `--retitle` if
+you want the model's title instead, or `--theme "..."` to write an episode that
+is not on the slate yet.
+
+Then read and revise exactly as you would a news episode:
+
+```bash
+node scripts/lt-tv-edit.mjs roundtable-02
+```
+
+What to look for is specific to this show: **both of them have to be right
+about something.** Connor's case should be one a thoughtful person would make,
+not greed wearing a hat, and the hard case should cost them both. If GR80 wins
+every exchange you have a sermon, and the fix is in the script, not the audio.
+
+```bash
+# 3. Record it — the same audio build the news show uses.
+node scripts/lt-tv-audio.mjs content/lt-tv/episodes/roundtable-02.json
+```
+
+From here it is the shared path below: split, upload, tune the lead-in, check.
+
+`content/lt-tv/samples/roundtable-02.draft.json` is a worked example, written by
+hand to show the format and the two voices. **Its argument is invented** and it
+is not a scheduled episode.
+
+### The older hand-written path
+
+`elevenlabs-dialogue-test/run_test.sh` still works and is how roundtable 01 was
+made: write the turns into `dialogue.json` by hand, generate in one call, and
+finish `output/episode-record.json` yourself. It is the right tool for a one-off
+that does not belong on the slate. For an episode of the show, prefer the
+generator — it numbers the lines, packs the blocks, validates the cues and puts
+the record on the guide, all of which that path leaves to you.
 
 ---
 

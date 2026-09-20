@@ -66,3 +66,9 @@ contracts/lib/
 # Raw screen-recording masters — ship the compressed .mp4 instead
 public/videos/*.mov
 content/lt-tv/audio/
+# The staging area: briefs and episode records are regenerated on every run,
+# and the slate under src/content/lt-tv/episodes/ is the committed copy.
+content/lt-tv/episodes/*.json
+content/lt-tv/episodes/*.txt
+content/lt-tv/briefs/
+content/lt-tv/plans/

@@ -1,6 +1,6 @@
 // Tests for the audio build's arithmetic, run with:
 //
-//   node scripts/lt-news-audio.test.mjs
+//   node scripts/lt-tv-audio.test.mjs
 //
 // The thing most likely to be silently wrong here is the offset arithmetic:
 // blocks are generated separately, each timestamped from zero, and laid end to
@@ -23,7 +23,7 @@ import {
   wavHeader,
   blockInputs,
   timingFromSegments,
-} from "./lt-news-audio.mjs";
+} from "./lt-tv-audio.mjs";
 
 let failures = 0;
 const check = (label, actual, expected) => {

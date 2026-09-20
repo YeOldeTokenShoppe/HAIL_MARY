@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // STEP 3 — BUILD THE AUDIO FOR AN EPISODE.
 //
-//   node scripts/lt-news-audio.mjs content/lt-tv/episodes/news-2026-W38.json
+//   node scripts/lt-tv-audio.mjs content/lt-tv/episodes/news-2026-W38.json
 //
 // An episode runs five to ten minutes. One text-to-dialogue request does not,
 // reliably, past about two thousand characters — so the episode is generated
@@ -189,7 +189,7 @@ async function generateBlock({ inputs, key, outDir, id }) {
 async function main() {
   const recordPath = process.argv[2];
   if (!recordPath) {
-    console.error("Usage: node scripts/lt-news-audio.mjs <episode record.json>");
+    console.error("Usage: node scripts/lt-tv-audio.mjs <episode record.json>");
     process.exit(2);
   }
   const key = process.env.ELEVENLABS_API_KEY;

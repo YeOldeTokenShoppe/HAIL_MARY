@@ -1,0 +1,91 @@
+{
+  "_note": "A WORKED SAMPLE, written by hand to show the roundtable's format and the two voices. It calls no model. Its argument is invented, which is fine — this show argues from reasoning rather than evidence — but it is a demonstration, not a scheduled episode.",
+  "topic": { "number": 2, "keep": { "title": "The Wealth Effect", "summary": "Paper gains, real confidence, and the stories a rising chart tells." }, "from": "roundtable-02" },
+  "plan": {
+    "title": "The Wealth Effect",
+    "summary": "Paper gains, real confidence, and the stories a rising chart tells.",
+    "question": "If your portfolio doubles on paper and you never sell a share, did you get richer, or did you just get braver?",
+    "flaw": "The question assumes those are different things, when for most of what people actually do with money they are the same thing.",
+    "connorCase": "Confidence is not a delusion, it is a real input. A person who feels wealthy starts the business, hires the cousin, and takes the risk that the cautious version of them would not. The number on the screen does work in the world long before anyone sells anything.",
+    "gr80Reframe": "The confidence is real and so is the bill. What the rising chart buys is permission to spend money that has not arrived, and the permission is issued to everyone at once, which is why it is withdrawn from everyone at once.",
+    "hardCase": "A man remortgages a house he has lived in for thirty years to fund his daughter's clinic. On paper he is wealthier than he has ever been. Connor's principle says let him — it is his risk and his daughter. GR80's principle says stop him, and stopping him means the clinic does not open and the people it would have treated are not in the room to be consulted either.",
+    "concession": { "who": "Monk", "what": "He concedes that refusing the risk is also a decision made on someone else's behalf, and that he cannot claim to be the only one in the room who counts the cost." },
+    "landing": "A rising number does not make you wealthy. It makes you willing. Those are different virtues, and only one of them is yours to keep."
+  },
+  "segments": [
+    {
+      "id": "the-question",
+      "lines": [
+        { "actor": "Connor", "text": "[confidently] Good evening. You are watching the Liminal Terminal. Tonight, one question, and I want a straight answer out of the monk.", "directAddress": false, "cues": [] },
+        { "actor": "Monk", "text": "[dryly] You have never once wanted a straight answer.", "directAddress": true, "cues": [{ "actor": "Connor", "reaction": "shrug", "offset": 0.4 }] },
+        { "actor": "Connor", "text": "Your portfolio doubles. On paper. You never sell a single share. Did you get richer, or did you just get braver?", "directAddress": true, "cues": [] },
+        { "actor": "Monk", "text": "[patiently] The question assumes those are different things.", "directAddress": true, "cues": [] },
+        { "actor": "Connor", "text": "[suspiciously] They are obviously different things.", "directAddress": true, "cues": [] },
+        { "actor": "Monk", "text": "Then watch what a man does the morning after his number goes up, and tell me which one he acted on.", "directAddress": true, "cues": [{ "actor": "Connor", "reaction": "headnodSubtle", "offset": 0.6 }] }
+      ]
+    },
+    {
+      "id": "the-case",
+      "lines": [
+        { "actor": "Connor", "text": "[matter-of-factly] Fine. Here is the case, and it is better than you want it to be. Confidence is not a delusion. It is an input.", "directAddress": true, "cues": [] },
+        { "actor": "Monk", "text": "Go on.", "directAddress": true, "cues": [] },
+        { "actor": "Connor", "text": "A man who feels wealthy starts the business. He hires the cousin. He takes the risk that the careful version of him talks himself out of at two in the morning.", "directAddress": true, "cues": [] },
+        { "actor": "Monk", "text": "[calmly] And the careful version is sometimes right.", "directAddress": true, "cues": [] },
+        { "actor": "Connor", "text": "Sometimes. But the careful version never builds anything. The number on the screen does real work in the world months before anybody sells a share. That is not a trick. That is how anything gets started.", "directAddress": true, "cues": [{ "actor": "Monk", "reaction": "headnodSubtle", "offset": 0.5 }] },
+        { "actor": "Monk", "text": "You are saying the belief is load-bearing.", "directAddress": true, "cues": [] },
+        { "actor": "Connor", "text": "[confidently] I am saying the belief is the beam.", "directAddress": true, "cues": [] },
+        { "actor": "Monk", "text": "Then I would like to ask who else is standing under it.", "directAddress": true, "cues": [] }
+      ]
+    },
+    {
+      "id": "the-turn",
+      "lines": [
+        { "actor": "Connor", "text": "Here we go.", "directAddress": true, "cues": [{ "actor": "Monk", "reaction": "lookAround", "offset": 0.2 }] },
+        { "actor": "Monk", "text": "[patiently] I am not going to tell you the confidence is fake. It is not. I am going to tell you what it buys.", "directAddress": true, "cues": [] },
+        { "actor": "Connor", "text": "[reluctantly] Which is.", "directAddress": true, "cues": [] },
+        { "actor": "Monk", "text": "Permission. A rising chart does not hand anybody money. It hands them permission to spend money that has not arrived yet.", "directAddress": true, "cues": [] },
+        { "actor": "Connor", "text": "That is called credit. We invented it. You are welcome.", "directAddress": true, "cues": [] },
+        { "actor": "Monk", "text": "[with quiet disapproval] The difficulty is not the credit. It is that the permission is issued to everyone on the same morning, by the same chart, for the same reason.", "directAddress": true, "cues": [] },
+        { "actor": "Connor", "text": "[slightly offended] And?", "directAddress": true, "cues": [] },
+        { "actor": "Monk", "text": "And it is withdrawn from everyone on the same morning, for the same reason. A man alone can be wrong about his own courage. A market cannot be wrong quietly.", "directAddress": true, "cues": [{ "actor": "Connor", "reaction": "headshakeDisappointment", "offset": 0.4 }] }
+      ]
+    },
+    {
+      "id": "the-hard-case",
+      "lines": [
+        { "actor": "Connor", "text": "[matter-of-factly] Alright. Real one. A man has lived in the same house for thirty years. His daughter is a doctor and she wants to open a clinic.", "directAddress": true, "cues": [] },
+        { "actor": "Monk", "text": "And his number is the highest it has ever been.", "directAddress": true, "cues": [] },
+        { "actor": "Connor", "text": "So he remortgages the house. My principle says let him. It is his house, his risk, his daughter.", "directAddress": true, "cues": [] },
+        { "actor": "Monk", "text": "[calmly] And mine says stop him, because the number that made him brave was not a promise.", "directAddress": true, "cues": [] },
+        { "actor": "Connor", "text": "[confidently] Then say the rest of it. Say what stopping him costs.", "directAddress": true, "cues": [{ "actor": "Monk", "reaction": "prayCrosschest", "offset": 0.5 }] },
+        { "actor": "Monk", "text": "The clinic does not open.", "directAddress": true, "cues": [] },
+        { "actor": "Connor", "text": "The clinic does not open. And the people who would have walked into it are not sitting in this studio either, are they. Nobody polls them.", "directAddress": true, "cues": [] },
+        { "actor": "Monk", "text": "[patiently] No. They are not.", "directAddress": true, "cues": [] },
+        { "actor": "Connor", "text": "[horrified] So your caution has a body count and mine has a repossession notice, and neither of us gets to feel clean about it.", "directAddress": true, "cues": [] },
+        { "actor": "Monk", "text": "That is the honest shape of it, yes.", "directAddress": true, "cues": [] }
+      ]
+    },
+    {
+      "id": "the-concession",
+      "lines": [
+        { "actor": "Connor", "text": "[suspiciously] You are being agreeable. I dislike it.", "directAddress": true, "cues": [] },
+        { "actor": "Monk", "text": "[calmly] I will give you something and it will cost me. Refusing the risk is also a decision made on somebody else's behalf.", "directAddress": true, "cues": [] },
+        { "actor": "Connor", "text": "Say that again slowly, I want to frame it.", "directAddress": true, "cues": [{ "actor": "Monk", "reaction": "headshake", "offset": 0.4 }] },
+        { "actor": "Monk", "text": "I spend a great deal of time counting what your optimism costs. I have been counting it from a chair, and the man in the chair is never the one who pays either way.", "directAddress": true, "cues": [] },
+        { "actor": "Connor", "text": "[reluctantly] That is a real concession. I am not going to enjoy it as much as I expected.", "directAddress": true, "cues": [] },
+        { "actor": "Monk", "text": "You will recover.", "directAddress": true, "cues": [] }
+      ]
+    },
+    {
+      "id": "the-close",
+      "lines": [
+        { "actor": "Connor", "text": "So where does that leave the man with the house.", "directAddress": true, "cues": [] },
+        { "actor": "Monk", "text": "[patiently] Choosing, like everyone. But knowing what he is choosing with.", "directAddress": true, "cues": [] },
+        { "actor": "Connor", "text": "Land it. You have been waiting all night.", "directAddress": true, "cues": [{ "actor": "Connor", "reaction": "headnodSubtle", "offset": 0.8 }] },
+        { "actor": "Monk", "text": "A rising number does not make you wealthy. It makes you willing. Those are different virtues, and only one of them is yours to keep.", "directAddress": false, "cues": [] },
+        { "actor": "Connor", "text": "[matter-of-factly] I still think he should build the clinic. I just think he should know he is building it on a mood.", "directAddress": false, "cues": [] },
+        { "actor": "Monk", "text": "The ledger is closed. None of this was advice.", "directAddress": false, "cues": [] }
+      ]
+    }
+  ]
+}

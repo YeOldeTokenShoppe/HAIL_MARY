@@ -31,6 +31,50 @@ avatar lip-syncs only its own lines.
 
 ## 1. Write the dialogue
 
+There are two ways in. **Generate the episode** with `scripts/lt-rt-script.mjs`,
+which is the path for an episode of the show; or **write the turns by hand**
+into `dialogue.json`, which is the path for a one-off that does not belong on
+the slate. The rest of this document — the tags, the cleanup, the upload, the
+lead-in — is the same either way.
+
+### Generating one
+
+```bash
+node scripts/lt-rt-script.mjs --list                 # what is waiting
+node scripts/lt-rt-script.mjs --topic roundtable-02  # write it
+node scripts/lt-tv-edit.mjs roundtable-02            # revise it, free
+```
+
+It runs two Claude calls. The first writes **the argument**, not the dialogue:
+the question, Connor's honest case, GR80's reframe, a hard case, and who
+concedes what. The second writes the lines from that plan. Splitting it is
+deliberate — an argument that does not work is much cheaper to spot as five
+fields than as six minutes of dialogue, and `--plan-only` stops after the first
+call so you can read it.
+
+**The thing to judge, and the only one that matters:** both of them have to be
+right about something. Connor's case should be the one a thoughtful opponent
+would concede is fair, GR80's reframe should name a cost the case really does
+carry, and the hard case should be uncomfortable for both. A plan where GR80
+simply corrects Connor produces a sermon. Reject it and re-run rather than
+fixing it in the dialogue — the flaw is upstream.
+
+**This show states no statistics.** The prompt forbids inventing numbers,
+studies, dates and quotes outright, because the roundtable argues from
+reasoning and example rather than evidence. That is why there is no sourcing
+pass here and why the news show has one: a wrong number spoken in a
+character's voice is expensive to undo, and the cheapest guarantee is having
+no numbers to get wrong. If a generated line states a figure as fact, cut it
+in the editor.
+
+An episode already on the slate keeps the title and summary it was given. The
+generator writes the argument; it does not rename the running order.
+
+`content/lt-tv/samples/roundtable-02.draft.json` is a worked example, written by
+hand. **Its argument is invented** and it is not a scheduled episode.
+
+### Writing the turns by hand
+
 Edit `elevenlabs-dialogue-test/dialogue.json`. Each item is one spoken turn:
 
 ```json

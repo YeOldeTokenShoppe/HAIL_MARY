@@ -1,0 +1,88 @@
+THE LIMINAL TERMINAL — The Wealth Effect
+2026-09-20   ·   04:29 estimated   ·   649 words
+episode: roundtable-02
+
+# Edit this file, then apply it with:
+#     node scripts/lt-tv-edit.mjs roundtable-02
+#
+# Reword any line. Add lines, delete lines, reorder them — they renumber
+# themselves and the counts above are recomputed, so do not keep them
+# current by hand.
+#
+# The > before a speaker means the line is aimed at the other host, who
+# turns to face them. Without it the line is played to the room and the
+# camera pulls back to the two-shot. Bracketed words like [dryly] are
+# delivery directions ElevenLabs performs, and they are part of the line.
+# An indented (Monk headshake @ +0.4s) is an animation beat on the line
+# above it. Lines starting with # are ignored.
+
+── THE QUESTION  [the-question] — 83 words, ~34s
+
+  0    CONNOR     [confidently] Good evening. You are watching the Liminal Terminal. Tonight, one question, and I want a straight answer out of the monk.
+  1  > SAINT GR80 [dryly] You have never once wanted a straight answer.
+                  (Connor shrug @ +0.4s)
+  2  > CONNOR     Your portfolio doubles. On paper. You never sell a single share. Did you get richer, or did you just get braver?
+  3  > SAINT GR80 [patiently] The question assumes those are different things.
+  4  > CONNOR     [suspiciously] They are obviously different things.
+  5  > SAINT GR80 Then watch what a man does the morning after his number goes up, and tell me which one he acted on.
+                  (Connor headnodSubtle @ +0.6s)
+
+── THE CASE  [the-case] — 127 words, ~53s
+
+  6  > CONNOR     [matter-of-factly] Fine. Here is the case, and it is better than you want it to be. Confidence is not a delusion. It is an input.
+  7  > SAINT GR80 Go on.
+  8  > CONNOR     A man who feels wealthy starts the business. He hires the cousin. He takes the risk that the careful version of him talks himself out of at two in the morning.
+  9  > SAINT GR80 [calmly] And the careful version is sometimes right.
+ 10  > CONNOR     Sometimes. But the careful version never builds anything. The number on the screen does real work in the world months before anybody sells a share. That is not a trick. That is how anything gets started.
+                  (Monk headnodSubtle @ +0.5s)
+ 11  > SAINT GR80 You are saying the belief is load-bearing.
+ 12  > CONNOR     [confidently] I am saying the belief is the beam.
+ 13  > SAINT GR80 Then I would like to ask who else is standing under it.
+
+── THE TURN  [the-turn] — 117 words, ~48s
+
+ 14  > CONNOR     Here we go.
+                  (Monk lookAround @ +0.2s)
+ 15  > SAINT GR80 [patiently] I am not going to tell you the confidence is fake. It is not. I am going to tell you what it buys.
+ 16  > CONNOR     [reluctantly] Which is.
+ 17  > SAINT GR80 Permission. A rising chart does not hand anybody money. It hands them permission to spend money that has not arrived yet.
+ 18  > CONNOR     That is called credit. We invented it. You are welcome.
+ 19  > SAINT GR80 [with quiet disapproval] The difficulty is not the credit. It is that the permission is issued to everyone on the same morning, by the same chart, for the same reason.
+ 20  > CONNOR     [slightly offended] And?
+ 21  > SAINT GR80 And it is withdrawn from everyone on the same morning, for the same reason. A man alone can be wrong about his own courage. A market cannot be wrong quietly.
+                  (Connor headshakeDisappointment @ +0.4s)
+
+── THE HARD CASE  [the-hard-case] — 147 words, ~61s
+
+ 22  > CONNOR     [matter-of-factly] Alright. Real one. A man has lived in the same house for thirty years. His daughter is a doctor and she wants to open a clinic.
+ 23  > SAINT GR80 And his number is the highest it has ever been.
+ 24  > CONNOR     So he remortgages the house. My principle says let him. It is his house, his risk, his daughter.
+ 25  > SAINT GR80 [calmly] And mine says stop him, because the number that made him brave was not a promise.
+ 26  > CONNOR     [confidently] Then say the rest of it. Say what stopping him costs.
+                  (Monk prayCrosschest @ +0.5s)
+ 27  > SAINT GR80 The clinic does not open.
+ 28  > CONNOR     The clinic does not open. And the people who would have walked into it are not sitting in this studio either, are they. Nobody polls them.
+ 29  > SAINT GR80 [patiently] No. They are not.
+ 30  > CONNOR     [horrified] So your caution has a body count and mine has a repossession notice, and neither of us gets to feel clean about it.
+ 31  > SAINT GR80 That is the honest shape of it, yes.
+
+── THE CONCESSION  [the-concession] — 92 words, ~38s
+
+ 32  > CONNOR     [suspiciously] You are being agreeable. I dislike it.
+ 33  > SAINT GR80 [calmly] I will give you something and it will cost me. Refusing the risk is also a decision made on somebody else's behalf.
+ 34  > CONNOR     Say that again slowly, I want to frame it.
+                  (Monk headshake @ +0.4s)
+ 35  > SAINT GR80 I spend a great deal of time counting what your optimism costs. I have been counting it from a chair, and the man in the chair is never the one who pays either way.
+ 36  > CONNOR     [reluctantly] That is a real concession. I am not going to enjoy it as much as I expected.
+ 37  > SAINT GR80 You will recover.
+
+── THE CLOSE  [the-close] — 83 words, ~34s
+
+ 38  > CONNOR     So where does that leave the man with the house.
+ 39  > SAINT GR80 [patiently] Choosing, like everyone. But knowing what he is choosing with.
+ 40  > CONNOR     Land it. You have been waiting all night.
+                  (Connor headnodSubtle @ +0.8s)
+ 41    SAINT GR80 A rising number does not make you wealthy. It makes you willing. Those are different virtues, and only one of them is yours to keep.
+ 42    CONNOR     [matter-of-factly] I still think he should build the clinic. I just think he should know he is building it on a mood.
+ 43    SAINT GR80 The ledger is closed. None of this was advice.
+

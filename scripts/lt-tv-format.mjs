@@ -230,6 +230,107 @@ export const SEGMENTS = [
 // script may legitimately omit.
 export const OPTIONAL_SEGMENTS = new Set(["the-spot"]);
 
+// ── The roundtable's shape ────────────────────────────────────────────────
+//
+// The Liminal Terminal is not a news show and does not borrow the news show's
+// skeleton. It is a two-hander argument about one idea, and the thing that
+// makes an episode work is that BOTH characters are right about something.
+// Connor is not a fool who exists to be corrected, and GR80 is not a scold who
+// wins by default — the roundtable-01 recording earns its ending because
+// Connor's position survives contact with the moral case and is only bent by
+// it. A skeleton that walks straight from "Connor is wrong" to "GR80 explains
+// why" produces five minutes nobody wants to hear twice.
+//
+// So the middle of the show is a hard case that costs them both something,
+// and the concession is partial and in character. The closer is deliberately
+// the same shape every week, the way a real show's closer is.
+
+export const ROUNDTABLE_SEGMENTS = [
+  {
+    id: "the-question",
+    label: "The question",
+    targetWords: 110,
+    intent:
+      "Connor welcomes the audience and puts tonight's idea as one concrete question — a thought experiment with a choice in it, not a topic. GR80 answers by finding the flaw in how the question was asked. No positions yet; the audience should want the answer.",
+  },
+  {
+    id: "the-case",
+    label: "The case",
+    targetWords: 170,
+    intent:
+      "Connor makes the strongest HONEST case for the market's side of it: what the mechanism actually does well, who it actually helps, why a sensible person believes it. Write the version a smart opponent would concede is fair. GR80 presses on specifics rather than disagreeing yet.",
+  },
+  {
+    id: "the-turn",
+    label: "The turn",
+    targetWords: 170,
+    intent:
+      "GR80 reframes. He does not contradict the case — he names what it quietly costs and who is not in the room to object. This is the moral centre of the episode and it should land as a reframing the audience had not made themselves. Connor feels it and does not yet concede.",
+  },
+  {
+    id: "the-hard-case",
+    label: "The hard case",
+    targetWords: 180,
+    intent:
+      "One specific, concrete example that is uncomfortable for BOTH of them — where Connor's principle produces something he does not like, and GR80's produces something he cannot pay for. Neither gets a clean win here. This is the segment that keeps the show from being a sermon.",
+  },
+  {
+    id: "the-concession",
+    label: "The concession",
+    targetWords: 120,
+    intent:
+      "One of them gives ground, partially, and entirely in character — Connor concedes the moral point while keeping the position, or GR80 concedes the practical one while keeping the judgment. It is a real concession, not a setup for a better line.",
+  },
+  {
+    id: "the-close",
+    label: "The close",
+    targetWords: 90,
+    intent:
+      "GR80 lands the idea in one sentence a listener could repeat tomorrow. Connor keeps his position and is visibly changed by about ten percent, which is the most this show ever grants. Recurring closer — keep the shape week to week.",
+  },
+];
+
+// ── The shows, as the pipeline sees them ──────────────────────────────────
+//
+// Both shows share the set, the cast, the recording blocks, the record format
+// and the audio build. They differ in their segment skeleton, how long an
+// episode runs, and whether there is a chiron. Collecting those differences
+// here is what lets one `assemble()` serve both — the alternative is a second
+// copy of the generator that drifts out of step with the first.
+
+export const SHOW_FORMATS = {
+  news: {
+    id: "news",
+    title: "LT Weekly News Recap",
+    segments: SEGMENTS,
+    optional: OPTIONAL_SEGMENTS,
+    // Michelle's call: a weekly recap people put on is five to ten minutes.
+    runtime: { min: 300, max: 600 },
+    graphicsMode: "news",
+    // A news episode is identified by the week it covers; a roundtable is not.
+    dated: true,
+  },
+  roundtable: {
+    id: "roundtable",
+    title: "The Liminal Terminal",
+    segments: ROUNDTABLE_SEGMENTS,
+    optional: new Set(),
+    // Shorter at the top end than the news show: this is one argument, and an
+    // argument that runs ten minutes has started repeating itself.
+    runtime: { min: 240, max: 540 },
+    graphicsMode: null,
+    dated: false,
+  },
+};
+
+export function showFormat(id) {
+  const format = SHOW_FORMATS[id];
+  if (!format) {
+    throw new Error(`Unknown show "${id}" — expected one of ${Object.keys(SHOW_FORMATS).join(", ")}.`);
+  }
+  return format;
+}
+
 
 // ── Recording blocks ──────────────────────────────────────────────────────
 //

@@ -205,7 +205,7 @@ def main():
         "--master",
         type=Path,
         help="An audio file to split instead of decoding one from a response. "
-        "This is how a multi-block episode is finished: scripts/lt-news-audio.mjs "
+        "This is how a multi-block episode is finished: scripts/lt-tv-audio.mjs "
         "generates each block separately, concatenates them into one master and "
         "writes the merged, offset-shifted segments, then hands both here.",
     )

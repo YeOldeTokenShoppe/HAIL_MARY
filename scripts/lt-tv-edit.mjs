@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // EDIT AN EPISODE BY EDITING ITS SCRIPT.
 //
-//   node scripts/lt-news-edit.mjs news-2026-W38
+//   node scripts/lt-tv-edit.mjs news-2026-W38
 //
 // Step 2 writes two files side by side: the episode record, which is JSON and
 // which everything downstream reads, and the screenplay, which is the only
@@ -30,8 +30,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve, basename } from "node:path";
 
-import { CAST, ACTORS, REACTIONS, SEGMENTS } from "./lt-tv-format.mjs";
-import { assemble, renderScript } from "./lt-news-script.mjs";
+import { CAST, ACTORS, REACTIONS, SHOW_FORMATS, showFormat } from "./lt-tv-format.mjs";
+import { assemble, renderScript } from "./lt-tv-episode.mjs";
 import { toSlateRecord, writeSlateRecord, slateId, SLATE_DIR } from "./lt-tv-slate-record.mjs";
 
 const EPISODE_DIR = "content/lt-tv/episodes";
@@ -50,14 +50,17 @@ const LINE_RE = new RegExp(`^\\s*(\\d+)\\s+(>\\s*)?(${SPEAKER_ALTERNATIVES})\\s+
 const CUE_RE = /^\s*\(\s*(\w+)\s+(\w+)\s*@\s*\+?\s*([\d.]+)\s*s\s*\)\s*$/;
 const SEGMENT_RE = /^\s*──\s*(.+?)\s*\[([a-z0-9-]+)\]/;
 const CHIRON_RE = /^CHIRON:\s*(.*)$/;
-const TITLE_RE = /^LT WEEKLY NEWS RECAP\s*—\s*(.*)$/;
+// Built from the shows themselves, so a screenplay cannot be applied to the
+// wrong show by way of its title line.
+const SHOW_TITLES = Object.values(SHOW_FORMATS)
+  .map((f) => f.title.toUpperCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+  .join("|");
+const TITLE_RE = new RegExp(`^(?:${SHOW_TITLES})\\s*—\\s*(.*)$`);
 const EPISODE_RE = /^episode:\s*(\S+)\s*$/;
 // The counts line under the title. Recomputed on every write, so it is read
 // past rather than read — but matched explicitly, so that a genuine typo in
 // the header is still reported instead of quietly skipped.
 const STATS_RE = /·.*\bestimated\b.*·.*\bwords\b/;
-
-const SEGMENT_IDS = new Set(SEGMENTS.map((s) => s.id));
 
 /**
  * Read a screenplay back into the shape `assemble()` takes.
@@ -68,9 +71,12 @@ const SEGMENT_IDS = new Set(SEGMENTS.map((s) => s.id));
  * matters here, because the episode would still build and simply be missing a
  * sentence nobody notices until it is on air.
  *
+ * @param format — which show's skeleton to validate segment ids against.
+ *   Defaults to the news show so an existing caller keeps working.
  * @returns { title, chiron, episodeId, segments: [{ id, lines }] }
  */
-export function parseScript(text) {
+export function parseScript(text, format = SHOW_FORMATS.news) {
+  const segmentIds = new Set(format.segments.map((s) => s.id));
   const errors = [];
   const segments = [];
   let current = null;
@@ -111,8 +117,8 @@ export function parseScript(text) {
     const segmentMatch = SEGMENT_RE.exec(trimmed);
     if (segmentMatch) {
       const id = segmentMatch[2];
-      if (!SEGMENT_IDS.has(id)) {
-        errors.push(`line ${lineNo}: unknown segment "${id}" — this show has ${[...SEGMENT_IDS].join(", ")}.`);
+      if (!segmentIds.has(id)) {
+        errors.push(`line ${lineNo}: unknown segment "${id}" — this show has ${[...segmentIds].join(", ")}.`);
         current = null;
         continue;
       }
@@ -215,13 +221,14 @@ const anyChange = (c) => c.reworded + c.added + c.removed + c.aimChanged + c.cue
 
 /** Rebuild a record from an edited screenplay. Pure, so it is testable. */
 export function applyScript(episode, parsed) {
+  const format = showFormat(episode.show);
   const rebuilt = assemble({
     rundown: {
       ...episode.rundown,
       // The chiron and the title live in the script, so the script wins.
       title: parsed.title ?? episode.title,
-      headline: parsed.chiron ?? episode.graphics.headline,
-      ticker: episode.graphics.ticker,
+      headline: parsed.chiron ?? episode.graphics?.headline,
+      ticker: episode.graphics?.ticker,
     },
     segments: parsed.segments,
     week: episode.week,
@@ -230,6 +237,7 @@ export function applyScript(episode, parsed) {
       generatedAt: episode.provenance?.briefGeneratedAt ?? null,
     },
     number: Number(episode.number),
+    format,
   });
 
   return {
@@ -242,7 +250,7 @@ export function applyScript(episode, parsed) {
       ...rebuilt.provenance,
       ...episode.provenance,
       editedAt: new Date().toISOString(),
-      editedBy: "scripts/lt-news-edit.mjs",
+      editedBy: "scripts/lt-tv-edit.mjs",
     },
   };
 }
@@ -266,8 +274,8 @@ function resolvePaths(argument) {
 async function main() {
   const argument = process.argv[2];
   if (!argument) {
-    console.error("Usage: node scripts/lt-news-edit.mjs <episode id or record path>");
-    console.error("  e.g. node scripts/lt-news-edit.mjs news-2026-W38");
+    console.error("Usage: node scripts/lt-tv-edit.mjs <episode id or record path>");
+    console.error("  e.g. node scripts/lt-tv-edit.mjs news-2026-W38");
     process.exit(2);
   }
 
@@ -277,7 +285,9 @@ async function main() {
   }
 
   const episode = JSON.parse(await readFile(json, "utf8"));
-  const parsed = parseScript(await readFile(txt, "utf8"));
+  // The record names its show, and the show decides which segment headings are
+  // legal — so the record is read before the script, not after.
+  const parsed = parseScript(await readFile(txt, "utf8"), showFormat(episode.show));
 
   // Applying the wrong file would rebuild an episode out of another episode's
   // words and look like it worked, so the script names the record it came from.

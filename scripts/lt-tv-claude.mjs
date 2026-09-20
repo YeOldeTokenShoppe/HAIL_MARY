@@ -1,0 +1,94 @@
+#!/usr/bin/env node
+// Talking to Claude, for whichever LT TV generator needs it.
+//
+// Raw fetch against the Messages API, matching how every other Claude call in
+// this repo is written (src/app/api/trade/director, /api/review/characters,
+// /api/council-chat). No SDK dependency is added for a script.
+//
+// The model is passed in rather than read from the environment here, because
+// the two shows are written by different prompts and there is no reason they
+// must always share a model.
+
+// ── Anthropic ─────────────────────────────────────────────────────────────
+//
+// Raw fetch against the Messages API, matching how every other Claude call in
+// this repo is written (src/app/api/trade/director, /api/review/characters,
+// /api/council-chat). No SDK dependency is added for a script.
+
+export async function claude({ system, user, model, maxTokens = 8000, tools = null }) {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) throw new Error("ANTHROPIC_API_KEY is not set (or use --draft to skip the model).");
+
+  const messages = [{ role: "user", content: user }];
+  const searchNotes = [];
+  let data;
+
+  // Server-side tools run on Anthropic's side, but a long tool-using turn can
+  // come back as `pause_turn` — resume it by echoing the content back and
+  // asking for the rest. Bounded so a misbehaving turn cannot loop forever.
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const res = await fetch(ANTHROPIC_URL, {
+      method: "POST",
+      headers: {
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        system,
+        messages,
+        ...(tools ? { tools } : {}),
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 500)}`);
+    }
+
+    data = await res.json();
+
+    // A server-tool failure arrives as a 200 with an error object in place of
+    // the usual result list. The show degrades rather than dying: an
+    // unverified rundown is worse than a verified one, but far better than no
+    // episode at all.
+    for (const block of data.content || []) {
+      if (block.type === "web_search_tool_result" && !Array.isArray(block.content)) {
+        searchNotes.push(`web search unavailable: ${block.content?.error_code ?? "unknown error"}`);
+      }
+    }
+
+    if (data.stop_reason !== "pause_turn") break;
+    messages.push({ role: "assistant", content: data.content });
+  }
+
+  if (data.stop_reason === "max_tokens") {
+    throw new Error("Model hit max_tokens — the reply was cut off. Raise --max-tokens and retry.");
+  }
+  if (data.stop_reason === "refusal") {
+    throw new Error("The model declined this request. Check the brief for anything unexpected.");
+  }
+
+  const text = (data.content || [])
+    .filter((b) => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+
+  const parsed = parseJson(text);
+  if (searchNotes.length) parsed._searchNotes = searchNotes;
+  return parsed;
+}
+
+/** Models occasionally wrap JSON in prose or fences despite instruction. */
+export function parseJson(text) {
+  const trimmed = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+    if (start === -1 || end <= start) throw new Error(`Model did not return JSON:\n${text.slice(0, 400)}`);
+    return JSON.parse(trimmed.slice(start, end + 1));
+  }
+}

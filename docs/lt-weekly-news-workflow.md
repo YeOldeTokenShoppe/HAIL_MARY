@@ -41,14 +41,14 @@ record's contents rather than typing them.
            ▼
   content/lt-tv/episodes/news-2026-W38.json     ← THE EPISODE RECORD (staging)
            ▲           └── .txt  ← you read and edit this
-           └───────────────┘  scripts/lt-news-edit.mjs, no API calls
+           └───────────────┘  scripts/lt-tv-edit.mjs, no API calls
   content/lt-tv/episodes/news-2026-W38.txt      ← the read-through, for review
            │
            │  scripts/lt-tv-slate-record.mjs    ← step 4, the join
            ▼
   src/content/lt-tv/episodes/news-01.json       ← on the LT TV guide
            │
-           │  scripts/lt-news-audio.mjs         ← step 3, the audio
+           │  scripts/lt-tv-audio.mjs         ← step 3, the audio
            ▼
   one pair of balanced WAVs  →  SitePal Audio Manager
   timing + cues              →  back into the record
@@ -289,7 +289,7 @@ and edit the screenplay.** It is the source, not a printout — change the words
 in it and apply them back with:
 
 ```bash
-node scripts/lt-news-edit.mjs news-2026-W38
+node scripts/lt-tv-edit.mjs news-2026-W38
 ```
 
 Reword lines, add them, delete them, reorder them. They renumber themselves and
@@ -383,7 +383,7 @@ appending bytes, so a join is exact to the sample and a block's duration is a
 byte count rather than a measurement. It also means this step needs no ffmpeg.
 
 ```bash
-node scripts/lt-news-audio.mjs content/lt-tv/episodes/news-2026-W38.json
+node scripts/lt-tv-audio.mjs content/lt-tv/episodes/news-2026-W38.json
 ```
 
 That generates each block, cross-checks the decoded length against the
@@ -514,12 +514,12 @@ pointing the component at it is a one-line change nobody has made yet.
 - [ ] `node scripts/lt-news-brief.mjs` — check `degraded` is empty or harmless
 - [ ] `node scripts/lt-news-script.mjs --brief <brief>`
 - [ ] Read the `.txt`. Does each story have a real number? Does GR80 lose one?
-- [ ] Fix what you found in the `.txt`, then `node scripts/lt-news-edit.mjs <id>`
+- [ ] Fix what you found in the `.txt`, then `node scripts/lt-tv-edit.mjs <id>`
 - [ ] Zero warnings, or each one understood and accepted
 - [ ] Check `rundown.stories[].gaps` — anything non-empty is unsourced
 - [ ] Spot-check every number in the script against `sources`
 - [ ] `node scripts/lt-tv-check.mjs` — the new record is on the slate and consistent
-- [ ] `node scripts/lt-news-audio.mjs <record>` — then listen to the master end to end
+- [ ] `node scripts/lt-tv-audio.mjs <record>` — then listen to the master end to end
 - [ ] Check each block join for a seam, and the last block for drift against the picture
 - [ ] `process_dialogue.py --master ... --segments ...` for the two balanced tracks
 - [ ] Upload two WAVs under the names the record prescribes
@@ -534,7 +534,7 @@ pointing the component at it is a one-line change nobody has made yet.
 
 - **Step 3 has never met real audio.** It was written without an ElevenLabs key
   and without ffmpeg. The offset arithmetic, the PCM handling and the WAV
-  header are covered by `scripts/lt-news-audio.test.mjs` against synthetic
+  header are covered by `scripts/lt-tv-audio.test.mjs` against synthetic
   buffers of known length, and the processor's new `--master` path was
   exercised to the point where it calls `ffprobe`. What is unverified is
   everything past that line: that `pcm_44100` really is 44.1kHz mono 16-bit

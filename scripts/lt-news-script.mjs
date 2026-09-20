@@ -34,6 +34,7 @@ import {
   REACTIONS,
   SEGMENTS,
   OPTIONAL_SEGMENTS,
+  SHOW_FORMATS,
   packBlocks,
   sitepalClipName,
   NEWS_SOURCE_DOMAINS,
@@ -49,16 +50,14 @@ import {
   formatRuntime,
 } from "./lt-tv-format.mjs";
 import { toSlateRecord, writeSlateRecord, SLATE_DIR, SLATE_INDEX } from "./lt-tv-slate-record.mjs";
+import { assemble, renderScript } from "./lt-tv-episode.mjs";
+import { arg, rejectUnknownFlags } from "./lt-tv-cli.mjs";
+import { claude as callClaude } from "./lt-tv-claude.mjs";
+
+const claude = (opts) => callClaude({ ...opts, model: MODEL });
 
 const MODEL = process.env.LT_NEWS_MODEL || "claude-opus-5";
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-
-function arg(name, fallback = null) {
-  const i = process.argv.indexOf(`--${name}`);
-  if (i === -1) return fallback;
-  const next = process.argv[i + 1];
-  return next && !next.startsWith("--") ? next : true;
-}
 
 // Every flag this script knows. An unrecognised one is almost always a typo,
 // and silently ignoring it is how `--check-sources.` — one stray full stop —
@@ -86,108 +85,6 @@ function maxTokensFor(pass) {
   // The value given names the rundown pass. Dialogue keeps the 2x ratio the
   // defaults have, because it writes roughly twice as much.
   return pass === "dialogue" ? n * 2 : n;
-}
-
-function rejectUnknownFlags(known) {
-  const unknown = process.argv.slice(2).filter(
-    (a) => a.startsWith("--") && !known.includes(a.slice(2)),
-  );
-  if (!unknown.length) return;
-  for (const flag of unknown) {
-    // Strip punctuation a shell or a paste may have carried in, so a near
-    // miss is named rather than just rejected.
-    const bare = flag.slice(2).replace(/[^a-z0-9-]/gi, "");
-    const near = known.find((k) => k === bare) ||
-      known.find((k) => k.startsWith(bare) || bare.startsWith(k));
-    console.error(`Unknown option ${flag}${near ? ` — did you mean --${near}?` : ""}`);
-  }
-  console.error(`Known options: ${known.map((k) => `--${k}`).join(", ")}`);
-  console.error("Values are passed with a space, as in --out path/to/file.json");
-  process.exit(2);
-}
-
-// ── Anthropic ─────────────────────────────────────────────────────────────
-//
-// Raw fetch against the Messages API, matching how every other Claude call in
-// this repo is written (src/app/api/trade/director, /api/review/characters,
-// /api/council-chat). No SDK dependency is added for a script.
-
-async function claude({ system, user, maxTokens = 8000, tools = null }) {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new Error("ANTHROPIC_API_KEY is not set (or use --draft to skip the model).");
-
-  const messages = [{ role: "user", content: user }];
-  const searchNotes = [];
-  let data;
-
-  // Server-side tools run on Anthropic's side, but a long tool-using turn can
-  // come back as `pause_turn` — resume it by echoing the content back and
-  // asking for the rest. Bounded so a misbehaving turn cannot loop forever.
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    const res = await fetch(ANTHROPIC_URL, {
-      method: "POST",
-      headers: {
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: maxTokens,
-        system,
-        messages,
-        ...(tools ? { tools } : {}),
-      }),
-    });
-
-    if (!res.ok) {
-      throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 500)}`);
-    }
-
-    data = await res.json();
-
-    // A server-tool failure arrives as a 200 with an error object in place of
-    // the usual result list. The show degrades rather than dying: an
-    // unverified rundown is worse than a verified one, but far better than no
-    // episode at all.
-    for (const block of data.content || []) {
-      if (block.type === "web_search_tool_result" && !Array.isArray(block.content)) {
-        searchNotes.push(`web search unavailable: ${block.content?.error_code ?? "unknown error"}`);
-      }
-    }
-
-    if (data.stop_reason !== "pause_turn") break;
-    messages.push({ role: "assistant", content: data.content });
-  }
-
-  if (data.stop_reason === "max_tokens") {
-    throw new Error("Model hit max_tokens — the reply was cut off. Raise --max-tokens and retry.");
-  }
-  if (data.stop_reason === "refusal") {
-    throw new Error("The model declined this request. Check the brief for anything unexpected.");
-  }
-
-  const text = (data.content || [])
-    .filter((b) => b.type === "text")
-    .map((b) => b.text)
-    .join("");
-
-  const parsed = parseJson(text);
-  if (searchNotes.length) parsed._searchNotes = searchNotes;
-  return parsed;
-}
-
-/** Models occasionally wrap JSON in prose or fences despite instruction. */
-function parseJson(text) {
-  const trimmed = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    const start = trimmed.indexOf("{");
-    const end = trimmed.lastIndexOf("}");
-    if (start === -1 || end <= start) throw new Error(`Model did not return JSON:\n${text.slice(0, 400)}`);
-    return JSON.parse(trimmed.slice(start, end + 1));
-  }
 }
 
 // ── Pass 1: the rundown (editorial judgment) ──────────────────────────────
@@ -342,285 +239,6 @@ ${skeleton}
 Hit the word targets within about fifteen percent. They add up to a six-and-a-half-minute episode, and the show has to land between five and ten minutes.`;
 }
 
-// ── Assembly ──────────────────────────────────────────────────────────────
-//
-// Turns the writer's segments into the episode record: global line numbering,
-// recording blocks under the character budget, derived runtime, and a warning
-// list. Assembly is deliberately local and deterministic — the model writes
-// words, this code owns every number.
-
-function assemble({ rundown, segments, week, brief, number = 1 }) {
-  const warnings = [];
-  const bySegment = new Map(segments.map((s) => [s.id, s]));
-
-  let n = 0;
-  const outSegments = [];
-
-  for (const spec of SEGMENTS) {
-    const written = bySegment.get(spec.id);
-    if (!written || !(written.lines || []).length) {
-      // The spot is skipped in a week with no ad copy — that is normal, not a gap.
-      if (!OPTIONAL_SEGMENTS.has(spec.id)) {
-        warnings.push(`Segment "${spec.id}" is missing from the script.`);
-      }
-      continue;
-    }
-
-    const lines = [];
-    for (const line of written.lines || []) {
-      if (!ACTORS.includes(line.actor)) {
-        warnings.push(`Line ${n}: unknown actor "${line.actor}" — dropped.`);
-        continue;
-      }
-      const text = String(line.text || "").trim();
-      if (!text) {
-        warnings.push(`Line ${n}: empty text — dropped.`);
-        continue;
-      }
-
-      const cues = [];
-      for (const cue of line.cues || []) {
-        const table = REACTIONS[cue.actor];
-        if (!table) {
-          warnings.push(`Line ${n}: cue names unknown actor "${cue.actor}" — dropped.`);
-          continue;
-        }
-        if (!(cue.reaction in table)) {
-          warnings.push(
-            `Line ${n}: ${cue.actor} has no reaction "${cue.reaction}" — dropped. ` +
-              `Valid: ${Object.keys(table).join(", ")}.`,
-          );
-          continue;
-        }
-        cues.push({
-          actor: cue.actor,
-          reaction: cue.reaction,
-          offset: Number(cue.offset ?? 0.3),
-          // Full authored clip length; trim per episode if the gesture finishes early.
-          duration: table[cue.reaction],
-        });
-      }
-
-      // An event tag at the very start of a line is eaten by the handoff trim.
-      const leadingEvent = EVENT_TAGS.find((t) => text.startsWith(t));
-      if (leadingEvent) {
-        warnings.push(
-          `Line ${n}: opens with the event tag ${leadingEvent}; the 120ms handoff trim will eat it. Move it a few words in.`,
-        );
-      }
-
-      // Two turns in a row from the same host is almost always a writing slip:
-      // the camera derives its shot from who is speaking (TALK_SHOW_SHOTS), so
-      // the set just holds on one face while the other sits idle.
-      if (lines.length && lines[lines.length - 1].actor === line.actor) {
-        warnings.push(
-          `Line ${n}: ${line.actor} speaks twice in a row — merge the turns or put a line between them.`,
-        );
-      }
-
-      lines.push({
-        n,
-        actor: line.actor,
-        voiceId: CAST[line.actor].voiceId,
-        text,
-        // Only two seats, so the listener is always the other one — derived, never
-        // hand-restated, which is how the speaker mapping drifts today.
-        directAddress: Boolean(line.directAddress),
-        cues,
-      });
-      n += 1;
-    }
-
-    const words = lines.reduce((sum, l) => sum + countWords(l.text), 0);
-    const drift = spec.targetWords ? (words - spec.targetWords) / spec.targetWords : 0;
-    if (Math.abs(drift) > 0.25) {
-      warnings.push(
-        `Segment "${spec.id}": ${words} words against a ${spec.targetWords} target (${drift > 0 ? "+" : ""}${Math.round(drift * 100)}%).`,
-      );
-    }
-
-    outSegments.push({
-      id: spec.id,
-      label: spec.label,
-      words,
-      estimatedSeconds: Number(estimateSeconds(words).toFixed(1)),
-      lines,
-    });
-  }
-
-  // Recording blocks: each is one ElevenLabs request, generated in context.
-  // Packed from this episode's actual lengths, so a long week re-packs instead
-  // of silently overrunning the request ceiling.
-  const segmentChars = outSegments.map((s) => ({
-    id: s.id,
-    chars: s.lines.reduce((sum, l) => sum + l.text.length, 0),
-  }));
-
-  const blocks = packBlocks(segmentChars).map((blockSpec) => {
-    const lines = outSegments
-      .filter((s) => blockSpec.segments.includes(s.id))
-      .flatMap((s) => s.lines);
-    const chars = lines.reduce((sum, l) => sum + l.text.length, 0);
-    if (chars > CHAR_LIMIT_PER_BLOCK) {
-      warnings.push(
-        `${blockSpec.id}: ${chars} characters exceeds the ${CHAR_LIMIT_PER_BLOCK} ElevenLabs ceiling — split it before generating.`,
-      );
-    } else if (chars > CHAR_BUDGET_PER_BLOCK) {
-      warnings.push(`${blockSpec.id}: ${chars} characters is over the ${CHAR_BUDGET_PER_BLOCK} target but under the ceiling.`);
-    }
-    return {
-      id: blockSpec.id,
-      segments: blockSpec.segments,
-      chars,
-      firstLine: lines[0]?.n ?? null,
-      lastLine: lines[lines.length - 1]?.n ?? null,
-      // Filled in by the audio build once this block has been generated.
-      durationSeconds: null,
-      offsetSeconds: null,
-    };
-  });
-
-  const words = outSegments.reduce((sum, s) => sum + s.words, 0);
-  const seconds = estimateSeconds(words);
-  if (seconds < RUNTIME_BOUNDS_SECONDS.min || seconds > RUNTIME_BOUNDS_SECONDS.max) {
-    warnings.push(
-      `Estimated runtime ${formatRuntime(seconds)} falls outside the ${formatRuntime(RUNTIME_BOUNDS_SECONDS.min)}–${formatRuntime(RUNTIME_BOUNDS_SECONDS.max)} window.`,
-    );
-  }
-
-  for (const story of rundown.stories || []) {
-    if (story.verified === false) {
-      const detail = String(story.gaps || "no detail given").replace(/[.\s]+$/, "");
-      warnings.push(`Story "${story.headline}" is UNVERIFIED — ${detail}.`);
-    }
-  }
-
-  const sources = [
-    ...(rundown.stories || []).flatMap((s) => s.sources || []),
-    ...(rundown.board?.sources || []),
-  ].filter((s) => s && s.title);
-
-  return {
-    id: `news-${week}`,
-    show: "news",
-    week,
-    number: String(number).padStart(2, "0"),
-    title: rundown.title,
-    summary: rundown.summary,
-    airDate: new Date().toISOString().slice(0, 10),
-
-    // What the LT TV slate and the chiron read. Today EPISODES in
-    // LTTvBroadcastPanel.jsx and TICKER_COPY in LTTvChiron.jsx are hardcoded;
-    // these are the fields that would replace them.
-    slate: {
-      runtime: formatRuntime(seconds),
-      estimatedSeconds: Number(seconds.toFixed(1)),
-      words,
-    },
-    graphics: {
-      mode: "news",
-      headline: rundown.headline,
-      ticker: rundown.ticker || [],
-    },
-
-    cast: Object.fromEntries(
-      ACTORS.map((a) => [
-        a,
-        {
-          displayName: CAST[a].displayName,
-          voiceId: CAST[a].voiceId,
-          processorKey: CAST[a].processorKey,
-          // The name to give this character's upload in SitePal's Audio Manager.
-          // Prescribed rather than left blank: the account has one shared Audio
-          // Manager, TalkShowScene resolves clips by name, and a mismatch is a
-          // silent failure to speak — so the record states the name and the
-          // producer types it, instead of inventing one and copying it back.
-          sitepalAudio: sitepalClipName("news", number, a),
-        },
-      ]),
-    ),
-
-    segments: outSegments,
-    blocks,
-
-    // Populated by the audio build from talk-show-timing.json, per block, with
-    // each block's starts shifted by the summed duration of the blocks before it.
-    timing: { lineStarts: null, lineEnds: null, durationSeconds: null, leadIn: 2.5 },
-
-    rundown,
-    sources,
-    provenance: {
-      briefId: brief?.id ?? null,
-      briefGeneratedAt: brief?.generatedAt ?? null,
-      model: MODEL,
-      generatedAt: new Date().toISOString(),
-      pipeline: "scripts/lt-news-script.mjs",
-    },
-    warnings,
-  };
-}
-
-/** The human-readable read-through. The JSON is for machines; this is for ears. */
-/**
- * The episode as a screenplay — and as the thing a producer edits.
- *
- * This is the only view of an episode anyone actually reads, so it is also
- * where changes are made: `scripts/lt-news-edit.mjs` parses this exact format
- * back into a record. That makes the layout load-bearing rather than
- * cosmetic, and it is why two things appear here that a pure printout would
- * not bother with.
- *
- * The `>` marker is `directAddress`, and it has to be on the page because it
- * cannot be recovered from anything else. It decides whether the listener
- * turns to face the speaker or the camera pulls back to the two-shot, and a
- * line that loses it does not fail — it just quietly plays to the room. It is
- * also a real editorial choice, so a producer should be able to see and change
- * who a line is aimed at.
- *
- * The bracketed segment id is there because lines are reassembled into
- * segments by id, and a label is a display string that may be reworded.
- */
-export function renderScript(episode) {
-  const out = [
-    `LT WEEKLY NEWS RECAP — ${episode.title}`,
-    `${episode.week}   ·   ${episode.slate.runtime} estimated   ·   ${episode.slate.words} words`,
-    `episode: ${episode.id}`,
-    "",
-    `CHIRON: ${episode.graphics.headline}`,
-    "",
-    "# Edit this file, then apply it with:",
-    `#     node scripts/lt-news-edit.mjs ${episode.id}`,
-    "#",
-    "# Reword any line. Add lines, delete lines, reorder them — they renumber",
-    "# themselves and the counts above are recomputed, so do not keep them",
-    "# current by hand.",
-    "#",
-    "# The > before a speaker means the line is aimed at the other host, who",
-    "# turns to face them. Without it the line is played to the room and the",
-    "# camera pulls back to the two-shot. Bracketed words like [dryly] are",
-    "# delivery directions ElevenLabs performs, and they are part of the line.",
-    "# An indented (Monk headshake @ +0.4s) is an animation beat on the line",
-    "# above it. Lines starting with # are ignored.",
-    "",
-  ];
-  for (const segment of episode.segments) {
-    out.push(
-      `── ${segment.label.toUpperCase()}  [${segment.id}] — ${segment.words} words, ~${Math.round(segment.estimatedSeconds)}s`,
-      "",
-    );
-    for (const line of segment.lines) {
-      const who = CAST[line.actor].displayName.toUpperCase().padEnd(10);
-      const aim = line.directAddress ? "> " : "  ";
-      out.push(`${String(line.n).padStart(3)}  ${aim}${who} ${line.text}`);
-      for (const cue of line.cues) {
-        out.push(`${" ".repeat(17)} (${cue.actor} ${cue.reaction} @ +${cue.offset}s)`);
-      }
-    }
-    out.push("");
-  }
-  return out.join("\n");
-}
-
 /**
  * Episode number for the slate and the SitePal clip name. Explicit via
  * --number, otherwise one past however many news records already exist — so a
@@ -745,7 +363,10 @@ async function main() {
   }
 
   const number = await resolveEpisodeNumber(week);
-  const episode = assemble({ rundown, segments, week, brief, number });
+  const episode = assemble({
+    rundown, segments, week, brief, number,
+    producedBy: { model: MODEL, pipeline: "scripts/lt-news-script.mjs" },
+  });
 
   const jsonPath = resolve(arg("out", `content/lt-tv/episodes/${episode.id}.json`));
   const txtPath = jsonPath.replace(/\.json$/, ".txt");
@@ -814,4 +435,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 }
 
-export { assemble };
