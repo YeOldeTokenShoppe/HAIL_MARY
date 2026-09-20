@@ -388,12 +388,16 @@ async function main() {
   // it cannot simply be carried over.
   const recorded = Array.isArray(episode.timing?.lineStarts);
   if (recorded && !process.argv.includes("--rerecord")) {
+    // Naming only the flag sends whoever is holding a mouse looking for a
+    // terminal. The studio offers this exact run as its own button, so the
+    // refusal names that first and the flag second.
     console.error(
       `${episode.id} has already been recorded, and these edits would leave the\n` +
         "audio saying something the record no longer claims.\n\n" +
-        "To edit it anyway, pass --rerecord. That clears the timing, which returns\n" +
-        "the episode to \"Not recorded yet\" on the guide until you run the audio\n" +
-        "build again.",
+        'In the studio, press "Apply my edits and clear the audio". From a\n' +
+        `terminal, that is:\n  npm run lt:edit -- ${episode.id} --rerecord\n\n` +
+        "Either way the timing is cleared, which returns the episode to \"Not\n" +
+        "recorded yet\" on the guide until you record it again.",
     );
     process.exit(2);
   }
