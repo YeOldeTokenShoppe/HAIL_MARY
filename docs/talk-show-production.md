@@ -16,8 +16,8 @@ One ElevenLabs request generates the whole conversation in context. The local
 processor then creates:
 
 - `master-dialogue.mp3` — the unedited conversation, useful for review.
-- `john-sitepal-balanced.wav` — Barron plus silence during every GR80 line.
-- `gr80-sitepal-balanced.wav` — GR80 plus silence during every Barron line.
+- `john-sitepal-balanced.wav` — Connor plus silence during every GR80 line.
+- `gr80-sitepal-balanced.wav` — GR80 plus silence during every Connor line.
 - `voice-segments.json` — ElevenLabs' complete turn timing response.
 - `talk-show-timing.json` — compact line starts, ends, speakers, and total
   duration for the animation director.
@@ -70,7 +70,7 @@ delivery tag at the beginning of the turn it controls:
 
 Tags that have worked well for these characters include:
 
-- Barron: `[confidently]`, `[slightly offended]`, `[suspiciously]`,
+- Connor: `[confidently]`, `[slightly offended]`, `[suspiciously]`,
   `[horrified]`, `[reluctantly]`, `[matter-of-factly]`
 - GR80: `[dryly]`, `[patiently]`, `[amused]`, `[calmly]`,
   `[with quiet disapproval]`
@@ -178,7 +178,7 @@ Boundary processing cannot repair a word ElevenLabs itself cut short.
 
 Upload:
 
-- `john-sitepal-balanced.wav` to Barron's SitePal Audio Manager.
+- `john-sitepal-balanced.wav` to Connor's SitePal Audio Manager.
 - `gr80-sitepal-balanced.wav` to GR80's SitePal Audio Manager.
 
 Give each upload a short, unique episode name. After SitePal finishes
@@ -205,10 +205,10 @@ What is left to fill in is what only you know:
 {
   "title": "The Wealth Effect",
   "summary": "Paper gains, real confidence, and the stories a rising chart tells.",
-  "audio": { "Barron": "episode 02 barron", "Monk": "episode 02 gr80" },
+  "audio": { "Connor": "episode 02 barron", "Monk": "episode 02 gr80" },
   "audienceLines": [0, 5],
   "cues": [
-    { "line": 4, "offset": 0.3, "actor": "Barron", "reaction": "shrug", "duration": 3.3,
+    { "line": 4, "offset": 0.3, "actor": "Connor", "reaction": "shrug", "duration": 3.3,
       "note": "I closed the position at a substantial profit." }
   ]
 }
@@ -239,14 +239,14 @@ their full authored lengths are in `REACTION_DURATIONS`. The cue names are:
 - Both: `headnod`, `headnodSubtle`, `headshakeDisappointment`, `lookAround`,
   `shrug`
 - Monk only: `headshake`, `prayCrosschest`
-- Barron only: `mockCrying`
+- Connor only: `mockCrying`
 
 Use `headnodSubtle` for ordinary agreement. Reserve `headnod` for an emphatic
 beat.
 
 - `line` — zero-based dialogue turn.
 - `offset` — seconds after that turn begins.
-- `actor` — `"Barron"` or `"Monk"`.
+- `actor` — `"Connor"` or `"Monk"`.
 - `reaction` — one of the registered cue names.
 - `duration` — how long to play before returning to the breathing idle.
 

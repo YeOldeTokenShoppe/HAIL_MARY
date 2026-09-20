@@ -1370,7 +1370,7 @@ export default function CyborgTemple() {
     }];
   }, [ltTvSelection, ltTvEpisode]);
   // Which talk-show character projects the live SitePal face — for fitting the
-  // crop onto Face2/FaceDemon2. 'Monk' | 'Barron' | null. Driven by the dev
+  // crop onto Face2/FaceDemon2. 'Monk' | 'Connor' | null. Driven by the dev
   // fitting control (?tune=sitepal); one at a time (single shared portal).
   const [talkShowProject, setTalkShowProject] = useState(null);
   // The talk-show set owns two isolated SitePal iframe portals. These flags
@@ -4748,7 +4748,7 @@ export default function CyborgTemple() {
             </div>
             {[
               { key: 'Monk', label: 'Project Monk (Face2)' },
-              { key: 'Barron', label: 'Project Barron (FaceDemon2)' },
+              { key: 'Connor', label: 'Project Connor (FaceDemon2)' },
               { key: null, label: 'Both (live show)' },
               { key: 'Off', label: 'Off (static faces)' },
             ].map(({ key, label }) => {
