@@ -99,6 +99,42 @@ export const REACTIONS = {
   },
 };
 
+// ── Where a story may be verified from ────────────────────────────────────
+//
+// The free feeds in scripts/lt-news-brief.mjs surface HEADLINES, not articles.
+// A headline is enough to nominate a story and nowhere near enough to read a
+// number out loud on air, so the editorial pass is given web search over this
+// allowlist and told to confirm each story before it is written.
+//
+// The list is deliberately short and reputable: a crypto news show that quotes
+// an aggregator quoting a press release is how a wrong number gets spoken in a
+// character's voice, which is the one failure that is expensive to undo.
+// Add to it as needed — it is an allowlist, so anything absent is simply
+// unreachable rather than silently trusted.
+export const NEWS_SOURCE_DOMAINS = [
+  "coindesk.com",
+  "theblock.co",
+  "blockworks.co",
+  "decrypt.co",
+  "dlnews.com",
+  "cointelegraph.com",
+  "reuters.com",
+  "cnbc.com",
+  "apnews.com",
+  "sec.gov",
+  "defillama.com",
+  "farside.co.uk", // ETF flow tables
+  "dune.com",
+];
+
+// Bounds the cost of one editorial pass. Three stories plus the gauge is a
+// handful of searches; anything far above this means the model is wandering.
+export const MAX_SEARCHES_PER_RUNDOWN = 8;
+
+// The web_search tool type below is available on Opus 4.6+ and Sonnet 4.6+.
+// A cheaper model set via LT_NEWS_MODEL may reject it — run with --no-search.
+export const WEB_SEARCH_TOOL_TYPE = "web_search_20260209";
+
 // ── The rundown ───────────────────────────────────────────────────────────
 //
 // A fixed skeleton is the point: the same six segments every week is what makes
