@@ -12,17 +12,24 @@
 // Demon_Empty (actor "Barron") and Monk_Empty (actor "Monk") and nothing else,
 // so a news desk with a third voice is not producible on this set today.
 //
-// One character, five names, depending on which file you are in: the animation
-// config calls him Barron, the production doc calls him Connor, the Python
-// processor calls him john, the GLB calls him Demon_Empty, and old council logs
-// call him H80Z. `actor` below is the only name the pipeline uses.
+// The character is CONNOR. He has picked up other names in other files over
+// time — the animation config in TalkShowScene calls him Barron, the Python
+// processor calls him john, the GLB node is Demon_Empty, and old council logs
+// call him H80Z — but Connor is the name, and `actor` below is the only one
+// this pipeline uses.
+//
+// NOTE: TalkShowScene's CHARACTER_CLIPS still maps `Demon_Empty` to the actor
+// string "Barron", and process_dialogue.py's ACTOR_NAMES still maps `john` to
+// "Barron". Those are shared files being renamed separately; until they are,
+// anything joining this pipeline to the runtime has to bridge the two spellings.
 export const CAST = {
-  Barron: {
-    actor: "Barron",
-    displayName: "Barron",
+  Connor: {
+    actor: "Connor",
+    displayName: "Connor",
     voiceId: "IcFWazAaBzXNwLWpySgF",
     processorKey: "john", // process_dialogue.py SPEAKERS key → john-sitepal-balanced.wav
-    clipKey: "barron", // the SitePal clip-name suffix
+    sceneActorKey: "Barron", // what TalkShowScene's CHARACTER_CLIPS calls him today
+    clipKey: "connor", // the SitePal clip-name suffix
     role: "anchor",
   },
   Monk: {
@@ -39,7 +46,7 @@ export const CAST = {
 //
 // SitePal account 9308752 has ONE Audio Manager shared by every character, not
 // one per character, so a clip name has to be unique across the whole account —
-// "episode 02 barron" is not a safe name, and neither is anything a second show
+// "episode 02 connor" is not a safe name, and neither is anything a second show
 // might also reach for.
 //
 // The convention is the one agreed for LT TV as a whole (see
@@ -60,7 +67,7 @@ export const SHOW_CLIP_SLUGS = {
  *
  * @param {string} show     — a key of SHOW_CLIP_SLUGS
  * @param {string|number} number — episode number, zero-padded to two digits
- * @param {string} actor    — "Barron" | "Monk"
+ * @param {string} actor    — "Connor" | "Monk"
  * @param {number} [section] — 1-based; omitted or 1 yields no suffix
  */
 export function sitepalClipName(show, number, actor, section = 1) {
@@ -80,7 +87,7 @@ export const ACTORS = Object.keys(CAST);
 // naming a reaction its actor does not have will T-pose or no-op at runtime,
 // so the generator refuses one rather than shipping it into an upload.
 export const REACTIONS = {
-  Barron: {
+  Connor: {
     headnod: 4.33,
     headnodSubtle: 4.33,
     headshakeDisappointment: 4.33,
@@ -176,14 +183,14 @@ export const SEGMENTS = [
     label: "Cold open",
     targetWords: 95,
     intent:
-      "Barron welcomes the audience and previews the three stories in one breath. GR80 undercuts the preview in a line. Fast, no news yet.",
+      "Connor welcomes the audience and previews the three stories in one breath. GR80 undercuts the preview in a line. Fast, no news yet.",
   },
   {
     id: "story-1",
     label: "Lead story",
     targetWords: 210,
     intent:
-      "The week's biggest story, from ANY market — a rate decision, a bill moving through Congress, the ten-year, oil, the indices, or crypto. Barron states the fact with its number, GR80 reframes what the number actually measures, Barron pushes back, GR80 lands the button.",
+      "The week's biggest story, from ANY market — a rate decision, a bill moving through Congress, the ten-year, oil, the indices, or crypto. Connor states the fact with its number, GR80 reframes what the number actually measures, Connor pushes back, GR80 lands the button.",
   },
   {
     id: "story-2",
@@ -197,14 +204,14 @@ export const SEGMENTS = [
     label: "The spot",
     targetWords: 55,
     intent:
-      "A commercial-style read for RL80, played completely straight as an ad break and then punctured. Barron does the sponsor voice — grand, overclaimed, delighted. GR80 reads the disclaimer as if it were scripture, or refuses to read it. It is a joke about advertising, never a recommendation to buy anything. Skipped entirely when there is no spot copy for the week.",
+      "A commercial-style read for RL80, played completely straight as an ad break and then punctured. Connor does the sponsor voice — grand, overclaimed, delighted. GR80 reads the disclaimer as if it were scripture, or refuses to read it. It is a joke about advertising, never a recommendation to buy anything. Skipped entirely when there is no spot copy for the week.",
   },
   {
     id: "story-3",
     label: "Third story",
     targetWords: 185,
     intent:
-      "The week's absurd one — usually collectibles, a mania, or whatever people have newly decided is an asset. The comedy slot: Barron enjoys it, GR80 finds the uncomfortable truth underneath it.",
+      "The week's absurd one — usually collectibles, a mania, or whatever people have newly decided is an asset. The comedy slot: Connor enjoys it, GR80 finds the uncomfortable truth underneath it.",
   },
   {
     id: "the-board",
@@ -218,7 +225,7 @@ export const SEGMENTS = [
     label: "Sign-off",
     targetWords: 70,
     intent:
-      "Barron recaps the three stories in one sentence. GR80 closes the ledger and states plainly that none of it was a recommendation. Recurring closer — keep the shape week to week.",
+      "Connor recaps the three stories in one sentence. GR80 closes the ledger and states plainly that none of it was a recommendation. Recurring closer — keep the shape week to week.",
   },
 ];
 
@@ -290,7 +297,7 @@ export const RUNTIME_BOUNDS_SECONDS = { min: 300, max: 600 };
 // in the first instant of a turn — process_dialogue.py trims 120ms off every
 // speaker handoff and would eat it.
 export const DELIVERY_TAGS = {
-  Barron: [
+  Connor: [
     "[confidently]",
     "[matter-of-factly]",
     "[suspiciously]",

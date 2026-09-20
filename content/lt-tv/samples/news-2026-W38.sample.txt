@@ -5,108 +5,108 @@ CHIRON: FED HOLDS — AND CALLS IT PATIENCE
 
 ── COLD OPEN — 78 words, ~32s
 
-  0  BARRON     [confidently] Good evening. You are watching the Liminal Terminal Weekly News Recap. I am Barron. Beside me, as penance, Saint GR80.
+  0  CONNOR     [confidently] Good evening. You are watching the Liminal Terminal Weekly News Recap. I am Connor. Beside me, as penance, Saint GR80.
                 (Monk lookAround @ +0.2s)
   1  SAINT GR80 [dryly] Good evening. The ledger is open.
-  2  BARRON     Three stories tonight. The Fed held and called it patience, a crypto bill got within sight of the floor, and the most stable store of value this week was a cardboard Pikachu.
+  2  CONNOR     Three stories tonight. The Fed held and called it patience, a crypto bill got within sight of the floor, and the most stable store of value this week was a cardboard Pikachu.
   3  SAINT GR80 [calmly] One of those sentences is going to age badly.
-  4  BARRON     [slightly offended] They all are. That is the format.
+  4  CONNOR     [slightly offended] They all are. That is the format.
                 (Monk headshake @ +0.4s)
   5  SAINT GR80 [dryly] Then let us begin.
 
 ── LEAD STORY — 184 words, ~76s
 
-  6  BARRON     [matter-of-factly] Story one. The Federal Open Market Committee held rates steady for a second meeting running, and the statement leaned hawkish. The word they chose was patience.
+  6  CONNOR     [matter-of-factly] Story one. The Federal Open Market Committee held rates steady for a second meeting running, and the statement leaned hawkish. The word they chose was patience.
   7  SAINT GR80 [patiently] Patience. A committee has discovered a virtue it does not have to fund.
-  8  BARRON     The market read it as a delay, not a stop. Expectations moved about a quarter point across the curve.
+  8  CONNOR     The market read it as a delay, not a stop. Expectations moved about a quarter point across the curve.
   9  SAINT GR80 [dryly] So nothing happened, and the price of nothing happening changed.
-                (Barron shrug @ +0.9s)
- 10  BARRON     [confidently] That is the whole business, GR. Nobody trades the decision. They trade the adjective.
+                (Connor shrug @ +0.9s)
+ 10  CONNOR     [confidently] That is the whole business, GR. Nobody trades the decision. They trade the adjective.
  11  SAINT GR80 [calmly] Then explain the adjective to me. What does patience cost a household on a variable rate?
- 12  BARRON     [reluctantly] More than it costs the committee.
+ 12  CONNOR     [reluctantly] More than it costs the committee.
  13  SAINT GR80 [with quiet disapproval] Yes.
-                (Barron headshakeDisappointment @ +0.3s)
- 14  BARRON     [suspiciously] You are doing the thing where the economy is a morality play.
+                (Connor headshakeDisappointment @ +0.3s)
+ 14  CONNOR     [suspiciously] You are doing the thing where the economy is a morality play.
  15  SAINT GR80 I am doing the thing where a number has a person underneath it. You are the one who files that under digression.
- 16  BARRON     [matter-of-factly] I file it under digression because it does not trade.
+ 16  CONNOR     [matter-of-factly] I file it under digression because it does not trade.
  17  SAINT GR80 [patiently] Very little that matters does.
-                (Barron headnodSubtle @ +0.6s)
- 18  BARRON     [confidently] Here is what I will give you. Holding twice in a row is not patience. It is uncertainty with better public relations.
+                (Connor headnodSubtle @ +0.6s)
+ 18  CONNOR     [confidently] Here is what I will give you. Holding twice in a row is not patience. It is uncertainty with better public relations.
  19  SAINT GR80 [amused] We agree.
- 20  BARRON     [suspiciously] Do not say that out loud.
+ 20  CONNOR     [suspiciously] Do not say that out loud.
 
 ── SECOND STORY — 161 words, ~67s
 
- 21  BARRON     [confidently] Story two. The CLARITY Act moved again this week — out of committee, and closer to a floor vote than this industry has managed in years.
+ 21  CONNOR     [confidently] Story two. The CLARITY Act moved again this week — out of committee, and closer to a floor vote than this industry has managed in years.
  22  SAINT GR80 [dryly] How many years.
- 23  BARRON     [matter-of-factly] Depends when you start counting. Call it four bills and three Congresses.
+ 23  CONNOR     [matter-of-factly] Depends when you start counting. Call it four bills and three Congresses.
  24  SAINT GR80 [calmly] So the industry has been about to receive clarity for roughly as long as it has existed.
-                (Barron mockCrying @ +0.8s)
- 25  BARRON     That is not fair. It is accurate, but it is not fair.
+                (Connor mockCrying @ +0.8s)
+ 25  CONNOR     That is not fair. It is accurate, but it is not fair.
  26  SAINT GR80 [patiently] What does the bill actually decide?
- 27  BARRON     Who regulates what. Whether a token is a commodity or a security, and therefore which agency gets to be disappointed in you.
+ 27  CONNOR     Who regulates what. Whether a token is a commodity or a security, and therefore which agency gets to be disappointed in you.
  28  SAINT GR80 [with quiet disapproval] And the industry's position is that it would like to know.
- 29  BARRON     [confidently] The industry's position is that it would like to know, provided the answer is commodity.
+ 29  CONNOR     [confidently] The industry's position is that it would like to know, provided the answer is commodity.
  30  SAINT GR80 [amused] There it is.
-                (Barron shrug @ +0.3s)
- 31  BARRON     [suspiciously] You are enjoying this.
+                (Connor shrug @ +0.3s)
+ 31  CONNOR     [suspiciously] You are enjoying this.
  32  SAINT GR80 [calmly] I am noting that a rule you only want when it favours you is not a rule. It is a preference with lobbyists.
- 33  BARRON     [reluctantly] Write that down.
+ 33  CONNOR     [reluctantly] Write that down.
  34  SAINT GR80 [dryly] I write everything down.
-                (Barron headnodSubtle @ +0.4s)
+                (Connor headnodSubtle @ +0.4s)
 
 ── THE SPOT — 66 words, ~27s
 
- 35  BARRON     [confidently] The Weekly News Recap is brought to you by the digital candle shrine at hail-mary dot x y z. Light a candle, leave a prayer, watch it burn in three dimensions. It is free, which makes it the only thing on this network that is.
+ 35  CONNOR     [confidently] The Weekly News Recap is brought to you by the digital candle shrine at hail-mary dot x y z. Light a candle, leave a prayer, watch it burn in three dimensions. It is free, which makes it the only thing on this network that is.
  36  SAINT GR80 [calmly] The shrine makes no claim about outcomes. Candles do not move markets.
- 37  BARRON     [slightly offended] GR.
+ 37  CONNOR     [slightly offended] GR.
                 (Monk prayCrosschest @ +0.2s)
  38  SAINT GR80 [dryly] I read the honest part of an advertisement.
 
 ── THIRD STORY — 171 words, ~71s
 
- 39  BARRON     [confidently] Story three, and my favourite thing that has happened all year. Pokemon released a thirtieth anniversary set this week, and grown adults queued overnight for cardboard.
+ 39  CONNOR     [confidently] Story three, and my favourite thing that has happened all year. Pokemon released a thirtieth anniversary set this week, and grown adults queued overnight for cardboard.
                 (Monk lookAround @ +1.6s)
  40  SAINT GR80 [dryly] How overnight.
- 41  BARRON     Tents. There were tents.
+ 41  CONNOR     Tents. There were tents.
  42  SAINT GR80 [calmly] For a card depicting a small electric animal.
- 43  BARRON     [matter-of-factly] For a sealed box that may contain a card depicting a small electric animal. That is the part you are missing. Nobody is buying the card. They are buying the probability of the card.
+ 43  CONNOR     [matter-of-factly] For a sealed box that may contain a card depicting a small electric animal. That is the part you are missing. Nobody is buying the card. They are buying the probability of the card.
  44  SAINT GR80 [with quiet disapproval] So it is a lottery ticket with better artwork.
-                (Barron headnod @ +0.5s)
- 45  BARRON     [confidently] It is a lottery ticket with a secondary market, which is considerably worse.
+                (Connor headnod @ +0.5s)
+ 45  CONNOR     [confidently] It is a lottery ticket with a secondary market, which is considerably worse.
  46  SAINT GR80 [patiently] And people are calling this an investment.
- 47  BARRON     The word being used is asset. Out loud. On television.
+ 47  CONNOR     The word being used is asset. Out loud. On television.
  48  SAINT GR80 [dryly] I am on television.
- 49  BARRON     You are making my point for me. [chuckles]
+ 49  CONNOR     You are making my point for me. [chuckles]
                 (Monk headnodSubtle @ +1.2s)
  50  SAINT GR80 [calmly] I am. A thing becomes an asset the moment enough people agree to be serious about it, and stops being one the moment they remember it is cardboard.
- 51  BARRON     [reluctantly] That applies to more of my portfolio than I would like.
+ 51  CONNOR     [reluctantly] That applies to more of my portfolio than I would like.
  52  SAINT GR80 [amused] To all of it.
- 53  BARRON     [slightly offended] To some of it.
+ 53  CONNOR     [slightly offended] To some of it.
                 (Monk headnodSubtle @ +0.4s)
 
 ── THE BOARD — 126 words, ~52s
 
- 54  BARRON     [confidently] The board. The ten-year closed the week at four point one eight percent, up six basis points.
+ 54  CONNOR     [confidently] The board. The ten-year closed the week at four point one eight percent, up six basis points.
  55  SAINT GR80 [calmly] Money became slightly more expensive, and nobody announced it.
- 56  BARRON     [matter-of-factly] Crude around seventy-one dollars, down about two percent on the week. Gold flat, and smug about it.
+ 56  CONNOR     [matter-of-factly] Crude around seventy-one dollars, down about two percent on the week. Gold flat, and smug about it.
  57  SAINT GR80 [dryly] Gold is always smug. It has nothing else to do.
-                (Barron headnodSubtle @ +0.5s)
- 58  BARRON     [confidently] Fear and Greed opened at seventy-two and closed at fifty-four. Eighteen points of humility in five days.
+                (Connor headnodSubtle @ +0.5s)
+ 58  CONNOR     [confidently] Fear and Greed opened at seventy-two and closed at fifty-four. Eighteen points of humility in five days.
  59  SAINT GR80 [patiently] And the crowd?
- 60  BARRON     [matter-of-factly] Prediction markets put a December cut at thirty-eight cents. It was forty-six last Friday.
+ 60  CONNOR     [matter-of-factly] Prediction markets put a December cut at thirty-eight cents. It was forty-six last Friday.
  61  SAINT GR80 [calmly] So the crowd revised itself eight cents toward honesty.
- 62  BARRON     Or eight cents toward cowardice. Same number. Different prayer.
+ 62  CONNOR     Or eight cents toward cowardice. Same number. Different prayer.
  63  SAINT GR80 [patiently] That is the most theologically sound thing you have said on this programme.
- 64  BARRON     [suspiciously] Strike it from the record.
+ 64  CONNOR     [suspiciously] Strike it from the record.
  65  SAINT GR80 [amused] Noted. And logged.
-                (Barron headshakeDisappointment @ +0.4s)
+                (Connor headshakeDisappointment @ +0.4s)
 
 ── SIGN-OFF — 59 words, ~24s
 
- 66  BARRON     [confidently] That is the week. The Fed was patient, Congress was nearly decisive, and a trading card outperformed most of my convictions.
+ 66  CONNOR     [confidently] That is the week. The Fed was patient, Congress was nearly decisive, and a trading card outperformed most of my convictions.
  67  SAINT GR80 [calmly] The ledger closes. Nothing on it was a recommendation.
- 68  BARRON     [matter-of-factly] Nothing on it ever is. Next week, whatever the committee decides patience means in December.
+ 68  CONNOR     [matter-of-factly] Nothing on it ever is. Next week, whatever the committee decides patience means in December.
  69  SAINT GR80 [dryly] Go in peace. Size your positions accordingly. And light a candle for the cardboard.
-                (Barron headnod @ +0.8s)
+                (Connor headnod @ +0.8s)
 

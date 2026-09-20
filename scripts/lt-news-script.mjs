@@ -193,7 +193,7 @@ Return ONLY a JSON object, no preamble and no code fences:
       "headline": "short internal headline",
       "fact": "the concrete fact with its number, one sentence",
       "tension": "what the two hosts disagree about",
-      "barronAngle": "the cynical market read, one sentence",
+      "connorAngle": "the cynical market read, one sentence",
       "gr80Angle": "the reframe — what the number actually measures, one sentence",
       "sources": [{ "title": "...", "url": "...", "outlet": "..." }],
       "verified": true | false,
@@ -231,11 +231,11 @@ THE BEAT IS GENERAL INVESTING AND ECONOMICS. Interest rates, Treasury yields, oi
 
 THE TWO HOSTS — this is the whole show, so get them exactly right:
 
-BARRON (the anchor; old logs call him H80Z or Connor). A devilish trader who has watched a thousand pump-and-dumps and enjoyed every one. Loud, smug, market-brained, entertained by his own takes. Short staccato sentences. He distrusts velocity — "loud means cheap" — and respects silence. He treats the news as content and says so. He is never earnest for more than one line at a time, and when GR80 lands a point on him he concedes it grudgingly and immediately changes the subject.
+CONNOR (the anchor; the animation config and old logs also call him Connor or H80Z). A devilish trader who has watched a thousand pump-and-dumps and enjoyed every one. Loud, smug, market-brained, entertained by his own takes. Short staccato sentences. He distrusts velocity — "loud means cheap" — and respects silence. He treats the news as content and says so. He is never earnest for more than one line at a time, and when GR80 lands a point on him he concedes it grudgingly and immediately changes the subject.
 
-SAINT GR80 (the co-anchor). An android monk, keeper of logs. Measured, austere, procedural, with occasional liturgical phrasing. He answers a number with what the number actually measures. He is dry rather than funny, and his jokes arrive flat and land late. He is never cruel and never preachy — he makes one observation and stops. He does not moralize at the audience; he moralizes at Barron, who deserves it.
+SAINT GR80 (the co-anchor). An android monk, keeper of logs. Measured, austere, procedural, with occasional liturgical phrasing. He answers a number with what the number actually measures. He is dry rather than funny, and his jokes arrive flat and land late. He is never cruel and never preachy — he makes one observation and stops. He does not moralize at the audience; he moralizes at Connor, who deserves it.
 
-THE BEAT PATTERN for each story: Barron states the fact with its number → GR80 reframes what the number is actually counting → Barron pushes back, usually by defending his own profession → GR80 lands the button. Six to ten lines. Vary who gets the last word across the three stories; do not let GR80 win all three.
+THE BEAT PATTERN for each story: Connor states the fact with its number → GR80 reframes what the number is actually counting → Connor pushes back, usually by defending his own profession → GR80 lands the button. Six to ten lines. Vary who gets the last word across the three stories; do not let GR80 win all three.
 
 HARD RULES:
 - Every fact, number and name must come from the rundown you are given. Invent nothing. If you want a number you were not given, write the line without it.
@@ -245,16 +245,16 @@ HARD RULES:
 - Never say "as an AI", never mention a model, never break the frame.
 - Write numbers as they are spoken: "six hundred million dollars", not "$600M". The voice model reads the text literally.
 
-DELIVERY TAGS: put at most one bracketed delivery tag at the START of a line, and only when the reading is not obvious. Barron may use: ${DELIVERY_TAGS.Barron.join(", ")}. GR80 may use: ${DELIVERY_TAGS.Monk.join(", ")}. Roughly half of all lines should carry NO tag — a tag on every line flattens the performance.
+DELIVERY TAGS: put at most one bracketed delivery tag at the START of a line, and only when the reading is not obvious. Connor may use: ${DELIVERY_TAGS.Connor.join(", ")}. GR80 may use: ${DELIVERY_TAGS.Monk.join(", ")}. Roughly half of all lines should carry NO tag — a tag on every line flattens the performance.
 
 EVENT TAGS (these produce an actual sound): ${EVENT_TAGS.join(", ")}. Use at most two in the whole episode, and NEVER as the first thing in a line — the audio pipeline trims the first 120 milliseconds of every speaker handoff and would eat it. Put an event after a few words.
 
 DIRECT ADDRESS: set "directAddress": true on a line when the speaker is talking AT the other host rather than to the audience — the listener turns their head to face them. A statement of news is delivered to camera; a jab, a question or a rebuttal is direct address. Roughly half the lines.
 
-ANIMATION CUES: attach reactions to lines to give the LISTENER something to do while the other talks. Each cue is { "actor": who performs it, "reaction": one of the names below, "offset": seconds after the line begins }. Barron can perform: ${Object.keys(REACTIONS.Barron).join(", ")}. GR80 can perform: ${Object.keys(REACTIONS.Monk).join(", ")}. Aim for one cue every four or five lines — the set is two people in chairs, so stillness reads as attention, and constant motion reads as a screensaver. Use headnodSubtle for ordinary agreement and save headnod for an emphatic beat. lookAround is a long clip; use it at most twice, for surveying the studio.
+ANIMATION CUES: attach reactions to lines to give the LISTENER something to do while the other talks. Each cue is { "actor": who performs it, "reaction": one of the names below, "offset": seconds after the line begins }. Connor can perform: ${Object.keys(REACTIONS.Connor).join(", ")}. GR80 can perform: ${Object.keys(REACTIONS.Monk).join(", ")}. Aim for one cue every four or five lines — the set is two people in chairs, so stillness reads as attention, and constant motion reads as a screensaver. Use headnodSubtle for ordinary agreement and save headnod for an emphatic beat. lookAround is a long clip; use it at most twice, for surveying the studio.
 
 THE SPOT — the ad break, when you are given copy for it:
-Play it completely straight for as long as you can bear. Barron does the sponsor voice: grand, overclaimed, delighted with himself, the register of a man reading a script he was paid for and believes anyway. Then GR80 reads the disclaimer as though it were scripture, or refuses to read it, or reads it correctly in a way that ruins the ad. Fifty-odd words, in and out.
+Play it completely straight for as long as you can bear. Connor does the sponsor voice: grand, overclaimed, delighted with himself, the register of a man reading a script he was paid for and believes anyway. Then GR80 reads the disclaimer as though it were scripture, or refuses to read it, or reads it correctly in a way that ruins the ad. Fifty-odd words, in and out.
 It is a joke ABOUT advertising. It never tells anyone to buy anything, it states no price, no return and no yield figure, and "not a recommendation" is the punchline rather than a caption. If you are given no spot copy, omit the "the-spot" segment entirely.
 
 Return ONLY a JSON object, no preamble and no code fences:
@@ -263,8 +263,8 @@ Return ONLY a JSON object, no preamble and no code fences:
     {
       "id": "<the segment id you were given>",
       "lines": [
-        { "actor": "Barron" | "Monk", "text": "the spoken line", "directAddress": true|false,
-          "cues": [{ "actor": "Barron"|"Monk", "reaction": "...", "offset": 0.3 }] }
+        { "actor": "Connor" | "Monk", "text": "the spoken line", "directAddress": true|false,
+          "cues": [{ "actor": "Connor"|"Monk", "reaction": "...", "offset": 0.3 }] }
       ]
     }
   ]

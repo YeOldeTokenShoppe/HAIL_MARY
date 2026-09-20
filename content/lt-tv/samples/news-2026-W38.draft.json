@@ -20,7 +20,7 @@
         "headline": "FOMC holds, statement leans hawkish",
         "fact": "The Federal Open Market Committee held rates steady for a second consecutive meeting, with a statement emphasising patience.",
         "tension": "Whether a second hold is patience or uncertainty with better public relations.",
-        "barronAngle": "Nobody trades the decision, they trade the adjective.",
+        "connorAngle": "Nobody trades the decision, they trade the adjective.",
         "gr80Angle": "Patience is a virtue the committee does not have to fund.",
         "sources": [
           {
@@ -38,7 +38,7 @@
         "headline": "CLARITY Act clears committee",
         "fact": "The CLARITY Act advanced out of committee, putting a floor vote within reach for the first time in several Congresses.",
         "tension": "Whether the industry wants a rule or wants a particular answer.",
-        "barronAngle": "It wants to know, as long as the answer is commodity.",
+        "connorAngle": "It wants to know, as long as the answer is commodity.",
         "gr80Angle": "A rule you only want if it favours you is a preference with lobbyists.",
         "sources": [
           {
@@ -56,7 +56,7 @@
         "headline": "Pokemon 30th anniversary set sparks a frenzy",
         "fact": "The Pokemon 30th anniversary set launched this week to overnight queues and an immediate resale market, with buyers describing the purchase as an investment.",
         "tension": "Whether buying sealed product is collecting or gambling with better artwork.",
-        "barronAngle": "Nobody is buying the card, they are buying the probability of the card.",
+        "connorAngle": "Nobody is buying the card, they are buying the probability of the card.",
         "gr80Angle": "A thing is an asset only while enough people agree to be serious about it.",
         "sources": [
           {
@@ -91,8 +91,8 @@
       "id": "cold-open",
       "lines": [
         {
-          "actor": "Barron",
-          "text": "[confidently] Good evening. You are watching the Liminal Terminal Weekly News Recap. I am Barron. Beside me, as penance, Saint GR80.",
+          "actor": "Connor",
+          "text": "[confidently] Good evening. You are watching the Liminal Terminal Weekly News Recap. I am Connor. Beside me, as penance, Saint GR80.",
           "directAddress": false,
           "cues": [
             {
@@ -109,7 +109,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "Three stories tonight. The Fed held and called it patience, a crypto bill got within sight of the floor, and the most stable store of value this week was a cardboard Pikachu.",
           "directAddress": false,
           "cues": []
@@ -121,7 +121,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[slightly offended] They all are. That is the format.",
           "directAddress": true,
           "cues": [
@@ -144,7 +144,7 @@
       "id": "story-1",
       "lines": [
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[matter-of-factly] Story one. The Federal Open Market Committee held rates steady for a second meeting running, and the statement leaned hawkish. The word they chose was patience.",
           "directAddress": false,
           "cues": []
@@ -156,7 +156,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "The market read it as a delay, not a stop. Expectations moved about a quarter point across the curve.",
           "directAddress": true,
           "cues": []
@@ -167,14 +167,14 @@
           "directAddress": true,
           "cues": [
             {
-              "actor": "Barron",
+              "actor": "Connor",
               "reaction": "shrug",
               "offset": 0.9
             }
           ]
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[confidently] That is the whole business, GR. Nobody trades the decision. They trade the adjective.",
           "directAddress": true,
           "cues": []
@@ -186,7 +186,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[reluctantly] More than it costs the committee.",
           "directAddress": true,
           "cues": []
@@ -197,7 +197,7 @@
           "directAddress": true,
           "cues": [
             {
-              "actor": "Barron",
+              "actor": "Connor",
               "reaction": "headshakeDisappointment",
               "offset": 0.3,
               "duration": 2.0
@@ -205,7 +205,7 @@
           ]
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[suspiciously] You are doing the thing where the economy is a morality play.",
           "directAddress": true,
           "cues": []
@@ -217,7 +217,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[matter-of-factly] I file it under digression because it does not trade.",
           "directAddress": true,
           "cues": []
@@ -228,7 +228,7 @@
           "directAddress": true,
           "cues": [
             {
-              "actor": "Barron",
+              "actor": "Connor",
               "reaction": "headnodSubtle",
               "offset": 0.6,
               "duration": 1.6
@@ -236,7 +236,7 @@
           ]
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[confidently] Here is what I will give you. Holding twice in a row is not patience. It is uncertainty with better public relations.",
           "directAddress": false,
           "cues": []
@@ -248,7 +248,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[suspiciously] Do not say that out loud.",
           "directAddress": true,
           "cues": []
@@ -259,7 +259,7 @@
       "id": "story-2",
       "lines": [
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[confidently] Story two. The CLARITY Act moved again this week — out of committee, and closer to a floor vote than this industry has managed in years.",
           "directAddress": false,
           "cues": []
@@ -271,7 +271,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[matter-of-factly] Depends when you start counting. Call it four bills and three Congresses.",
           "directAddress": true,
           "cues": []
@@ -282,7 +282,7 @@
           "directAddress": true,
           "cues": [
             {
-              "actor": "Barron",
+              "actor": "Connor",
               "reaction": "mockCrying",
               "offset": 0.8,
               "duration": 2.2
@@ -290,7 +290,7 @@
           ]
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "That is not fair. It is accurate, but it is not fair.",
           "directAddress": true,
           "cues": []
@@ -302,7 +302,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "Who regulates what. Whether a token is a commodity or a security, and therefore which agency gets to be disappointed in you.",
           "directAddress": false,
           "cues": []
@@ -314,7 +314,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[confidently] The industry's position is that it would like to know, provided the answer is commodity.",
           "directAddress": true,
           "cues": []
@@ -325,14 +325,14 @@
           "directAddress": true,
           "cues": [
             {
-              "actor": "Barron",
+              "actor": "Connor",
               "reaction": "shrug",
               "offset": 0.3
             }
           ]
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[suspiciously] You are enjoying this.",
           "directAddress": true,
           "cues": []
@@ -344,7 +344,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[reluctantly] Write that down.",
           "directAddress": true,
           "cues": []
@@ -355,7 +355,7 @@
           "directAddress": true,
           "cues": [
             {
-              "actor": "Barron",
+              "actor": "Connor",
               "reaction": "headnodSubtle",
               "offset": 0.4,
               "duration": 1.6
@@ -368,7 +368,7 @@
       "id": "the-spot",
       "lines": [
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[confidently] The Weekly News Recap is brought to you by the digital candle shrine at hail-mary dot x y z. Light a candle, leave a prayer, watch it burn in three dimensions. It is free, which makes it the only thing on this network that is.",
           "directAddress": false,
           "cues": []
@@ -380,7 +380,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[slightly offended] GR.",
           "directAddress": true,
           "cues": [
@@ -404,7 +404,7 @@
       "id": "story-3",
       "lines": [
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[confidently] Story three, and my favourite thing that has happened all year. Pokemon released a thirtieth anniversary set this week, and grown adults queued overnight for cardboard.",
           "directAddress": false,
           "cues": [
@@ -423,7 +423,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "Tents. There were tents.",
           "directAddress": true,
           "cues": []
@@ -435,7 +435,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[matter-of-factly] For a sealed box that may contain a card depicting a small electric animal. That is the part you are missing. Nobody is buying the card. They are buying the probability of the card.",
           "directAddress": true,
           "cues": []
@@ -446,7 +446,7 @@
           "directAddress": true,
           "cues": [
             {
-              "actor": "Barron",
+              "actor": "Connor",
               "reaction": "headnod",
               "offset": 0.5,
               "duration": 1.8
@@ -454,7 +454,7 @@
           ]
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[confidently] It is a lottery ticket with a secondary market, which is considerably worse.",
           "directAddress": true,
           "cues": []
@@ -466,7 +466,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "The word being used is asset. Out loud. On television.",
           "directAddress": true,
           "cues": []
@@ -478,7 +478,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "You are making my point for me. [chuckles]",
           "directAddress": true,
           "cues": [
@@ -497,7 +497,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[reluctantly] That applies to more of my portfolio than I would like.",
           "directAddress": true,
           "cues": []
@@ -509,7 +509,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[slightly offended] To some of it.",
           "directAddress": true,
           "cues": [
@@ -527,7 +527,7 @@
       "id": "the-board",
       "lines": [
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[confidently] The board. The ten-year closed the week at four point one eight percent, up six basis points.",
           "directAddress": false,
           "cues": []
@@ -539,7 +539,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[matter-of-factly] Crude around seventy-one dollars, down about two percent on the week. Gold flat, and smug about it.",
           "directAddress": false,
           "cues": []
@@ -550,7 +550,7 @@
           "directAddress": true,
           "cues": [
             {
-              "actor": "Barron",
+              "actor": "Connor",
               "reaction": "headnodSubtle",
               "offset": 0.5,
               "duration": 1.6
@@ -558,7 +558,7 @@
           ]
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[confidently] Fear and Greed opened at seventy-two and closed at fifty-four. Eighteen points of humility in five days.",
           "directAddress": false,
           "cues": []
@@ -570,7 +570,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[matter-of-factly] Prediction markets put a December cut at thirty-eight cents. It was forty-six last Friday.",
           "directAddress": true,
           "cues": []
@@ -582,7 +582,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "Or eight cents toward cowardice. Same number. Different prayer.",
           "directAddress": true,
           "cues": []
@@ -594,7 +594,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[suspiciously] Strike it from the record.",
           "directAddress": true,
           "cues": []
@@ -605,7 +605,7 @@
           "directAddress": true,
           "cues": [
             {
-              "actor": "Barron",
+              "actor": "Connor",
               "reaction": "headshakeDisappointment",
               "offset": 0.4,
               "duration": 2.2
@@ -618,7 +618,7 @@
       "id": "sign-off",
       "lines": [
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[confidently] That is the week. The Fed was patient, Congress was nearly decisive, and a trading card outperformed most of my convictions.",
           "directAddress": false,
           "cues": []
@@ -630,7 +630,7 @@
           "cues": []
         },
         {
-          "actor": "Barron",
+          "actor": "Connor",
           "text": "[matter-of-factly] Nothing on it ever is. Next week, whatever the committee decides patience means in December.",
           "directAddress": false,
           "cues": []
@@ -641,7 +641,7 @@
           "directAddress": false,
           "cues": [
             {
-              "actor": "Barron",
+              "actor": "Connor",
               "reaction": "headnod",
               "offset": 0.8,
               "duration": 2.0

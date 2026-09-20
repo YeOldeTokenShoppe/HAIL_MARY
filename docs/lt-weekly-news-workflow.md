@@ -63,7 +63,7 @@ turns "design an episode" into "fill an episode." Defined in
 
 | Segment | Target | What it is |
 |---|---|---|
-| Cold open | 95 words | Barron previews the three stories; GR80 undercuts the preview. |
+| Cold open | 95 words | Connor previews the three stories; GR80 undercuts the preview. |
 | Lead story | 210 words | The week's biggest, from any beat. |
 | Second story | 200 words | A different corner of the market from the lead. |
 | The spot | 55 words | The RL80 ad break. Skipped when there is no copy. |
@@ -75,8 +75,8 @@ About 950 words, roughly **6:33** at the estimated speaking rate — the middle 
 the 5–10 minute target, so one long segment does not push the episode out of
 the window.
 
-**The beat pattern inside a story** — Barron states the fact with its number,
-GR80 reframes what the number is actually counting, Barron pushes back (usually
+**The beat pattern inside a story** — Connor states the fact with its number,
+GR80 reframes what the number is actually counting, Connor pushes back (usually
 by defending his own profession), GR80 lands the button. Six to ten lines. GR80
 does not get the last word in all three stories.
 
@@ -88,7 +88,7 @@ second story should not be.
 
 The one hand-fed input in the whole pipeline. `content/lt-tv/rl80-spots.md` is
 a plain markdown file of `-` bullets — one line per thing the show can plug.
-The writer picks one and builds an ad read around it: Barron does the sponsor
+The writer picks one and builds an ad read around it: Connor does the sponsor
 voice, grand and overclaimed; GR80 reads the disclaimer as though it were
 scripture, or refuses to.
 
@@ -111,8 +111,15 @@ One character has five names depending on which file you are in:
 
 | `actor` | Display | ElevenLabs voice | Python key | GLB node | Also called |
 |---|---|---|---|---|---|
-| `Barron` | Barron | `IcFWazAaBzXNwLWpySgF` | `john` | `Demon_Empty` | Connor, H80Z, JB |
+| `Connor` | Connor | `IcFWazAaBzXNwLWpySgF` | `john` | `Demon_Empty` | Connor, H80Z, JB |
 | `Monk` | Saint GR80 | `fATgBRI8wg5KkDFg8vBd` | `gr80` | `Monk_Empty` | GR |
+
+**The character is Connor.** The pipeline uses that name throughout. Two shared
+files have not caught up: `TalkShowScene.jsx`'s `CHARACTER_CLIPS` still maps
+`Demon_Empty` to the actor string `"Connor"`, and `process_dialogue.py`'s
+`ACTOR_NAMES` still maps `john` to `"Connor"`. `CAST.Connor.sceneActorKey`
+records what the scene currently expects, so whatever joins this pipeline to the
+runtime can bridge the two spellings until the repo-wide rename lands.
 
 `scripts/lt-tv-format.mjs` is the one place this mapping is written down, and
 the pipeline uses `actor` and nothing else.
@@ -232,7 +239,7 @@ from the clip table. It also **validates**, and the warnings are the review
 checklist:
 
 - a cue naming a reaction its actor does not have (`prayCrosschest` is GR80's
-  only — Barron would T-pose) — dropped, with the valid list printed
+  only — Connor would T-pose) — dropped, with the valid list printed
 - a cue naming an actor who is not on this set — dropped
 - a line opening with an event tag like `[sighs]`, which the 120 ms handoff trim
   in `process_dialogue.py` would eat — flagged, not dropped
@@ -322,10 +329,10 @@ attached to line numbers so a future script generator can replace this array."*)
 That is the one step the spike proved cannot be automated from the site.
 
 The names are **not** yours to invent — the record already states them, in
-`cast.Barron.sitepalAudio` and `cast.Monk.sitepalAudio`:
+`cast.Connor.sitepalAudio` and `cast.Monk.sitepalAudio`:
 
 ```
-lttv_news_ep01_barron
+lttv_news_ep01_connor
 lttv_news_ep01_gr80
 ```
 
@@ -333,7 +340,7 @@ That is the LT TV convention, `lttv_<show>_ep<NN>_<character>`, following the
 shape of the existing Terminal Traders clips (`case001_monk_q5`). It matters
 that it is generated rather than chosen per episode for two reasons. The
 account has **one** Audio Manager shared by every character, not one per
-character, so a name like "episode 02 barron" is not safe against a second
+character, so a name like "episode 02 connor" is not safe against a second
 show reaching for the same words. And `TalkShowScene` resolves clips by name,
 so a name that does not match is a silent failure to speak — no error, just an
 avatar that never opens its mouth.
