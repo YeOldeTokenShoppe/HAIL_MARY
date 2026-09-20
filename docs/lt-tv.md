@@ -11,6 +11,29 @@ one of the two deeper docs, linked at each step.
 
 ---
 
+## Where is everything
+
+```bash
+node scripts/lt-tv-status.mjs                 # every episode, both shows
+node scripts/lt-tv-status.mjs roundtable-02   # one, in detail
+node scripts/lt-tv-status.mjs --html          # a page to keep open in a tab
+```
+
+Producing an episode leaves files in four directories, so this reads all of
+them and tells you, per episode, what stage it is at, which files exist for it
+and **the one command to run next**. Run it from anywhere in the repo.
+
+The four stages are `planned` (named on the slate, unwritten), `written` (has a
+script), `recorded` (audio built) and `on air` (playable in the guide). Each one
+is decided by a file being there or not, never by a note a previous run left
+behind — so it stays right when you do a step by hand.
+
+The one thing it cannot see is **SitePal**. The Audio Manager lives outside the
+repo, so a clip name it shows means the record asks for that name, not that the
+upload exists.
+
+---
+
 ## What an episode is
 
 One JSON file. Its title, its chiron copy, every spoken line and who speaks it,
