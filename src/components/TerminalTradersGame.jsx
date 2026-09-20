@@ -10,7 +10,7 @@ const TRADER_THUMBNAILS = {
   "eugene": { portrait: "/thumbnail_eugene.png", label: "MYTHOS" },
   "marisol": { portrait: "/thumbnail_marisol.png", label: "LOGOS" },
   "gr80": { portrait: "/thumbnail_gr80.png", label: "ETHOS" },
-  "john-barron": { portrait: "/thumbnail_johnBarron.png", label: "PATHOS" },
+  "john-barron": { portrait: "/thumbnail_connor.png", label: "PATHOS" },
 };
 
 export default function TerminalTradersGame({ variant = "page", onExit, cardPool = null } = {}) {

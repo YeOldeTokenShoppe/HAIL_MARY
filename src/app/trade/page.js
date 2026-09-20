@@ -3362,7 +3362,7 @@ export default function CyborgTemple() {
                     })()}
                     {[
                       { agentId: 'Monk',      stationKey: 'monk',    portrait: '/thumbnail_gr80.png',        label: 'ETHOS' },
-                      { agentId: 'Demon',     stationKey: 'demon',   portrait: '/thumbnail_johnBarron.png',  label: 'PATHOS' },
+                      { agentId: 'Demon',     stationKey: 'demon',   portrait: '/thumbnail_connor.png',  label: 'PATHOS' },
                       { agentId: 'Detective', stationKey: 'marisol', portrait: '/thumbnail_marisol.png',     label: 'LOGOS' },
                       { agentId: 'RL80',      stationKey: 'eugene',  portrait: '/thumbnail_eugene.png',      label: 'MYTHOS' },
                     ].map(({ agentId, stationKey, portrait, label }) => {

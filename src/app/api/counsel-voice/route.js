@@ -40,7 +40,7 @@ const ELEVENLABS_MODEL = process.env.ELEVENLABS_MODEL || "eleven_turbo_v2_5";
 // the two are reconciled.
 const VOICES = {
   JB: {
-    id: process.env.ELEVENLABS_VOICE_BARRON || "IcFWazAaBzXNwLWpySgF",
+    id: process.env.ELEVENLABS_VOICE_CONNOR || "IcFWazAaBzXNwLWpySgF",
     // Low stability = he wanders and pushes; he's a seducer, not a narrator.
     settings: { stability: 0.4, similarity_boost: 0.75, style: 0.55 },
   },
