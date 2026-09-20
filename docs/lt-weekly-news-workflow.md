@@ -371,8 +371,10 @@ shows up as a truncated generation rather than an error.
 A block boundary is always a segment boundary, so the join lands on a beat that
 was already there.
 
-**PCM, not mp3 — this matters.** The blocks are requested as `pcm_44100`
-rather than the `mp3_44100_128` the single-block test script uses, because mp3
+**PCM, not mp3 — this matters.** The blocks are requested as PCM (`pcm_44100`
+by default, or whatever `LT_TV_PCM_RATE` says — see the note on plan tiers in
+`docs/lt-tv.md`) rather than the `mp3_44100_128` the single-block test script
+uses, because mp3
 frames carry encoder delay and padding. Concatenating them inserts a few
 milliseconds of silence at *every join* that the timestamps know nothing
 about, and since each block's offset is the sum of the ones before it, that

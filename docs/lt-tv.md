@@ -197,6 +197,23 @@ Because a news episode is generated in blocks laid end to end, check **each
 block join for a seam** and the **last block for drift** against the picture.
 Drift looks exactly like a mistuned lead-in, so rule the audio out first.
 
+**If ElevenLabs refuses the format** — `Output format 'pcm_44100' is only
+available on the Pro tier` — that is the plan, not a fault. 44.1kHz PCM is the
+only part of this that needs Pro. Every lower rate is allowed on every plan and
+the pipeline works identically at one, because the joins are exact at any rate
+and a block's length is still a byte count. Put this in `.env.local` and
+restart:
+
+```
+LT_TV_PCM_RATE=24000
+```
+
+24kHz carries 12kHz of bandwidth, which is more than a speaking voice uses, and
+SitePal re-encodes the upload anyway. Blocks already recorded at another rate
+are re-recorded rather than reused, because reusing them would place every
+later line wrong — so change the rate before starting an episode, not part way
+through.
+
 Then upload and test — see the two sections below, which are the same for both
 shows.
 
@@ -254,6 +271,11 @@ finish `output/episode-record.json` yourself. It is the right tool for a one-off
 that does not belong on the slate. For an episode of the show, prefer the
 generator — it numbers the lines, packs the blocks, validates the cues and puts
 the record on the guide, all of which that path leaves to you.
+
+It asks for `mp3_44100_128`, which every plan allows, and `process_dialogue.py`
+decodes it to WAV with ffmpeg. That is why it never hit the tier limit above.
+It gets away with mp3 because it makes one call — with nothing to join, there
+are no joins to be wrong.
 
 ---
 

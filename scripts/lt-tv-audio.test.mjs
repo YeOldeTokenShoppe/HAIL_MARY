@@ -17,12 +17,14 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
   PCM,
+  PCM_RATES,
   pcmSeconds,
   pcmLooksRight,
   mergeBlocks,
   wavHeader,
   blockInputs,
   timingFromSegments,
+  tierRefusal,
 } from "./lt-tv-audio.mjs";
 
 let failures = 0;
@@ -158,6 +160,57 @@ try {
   threw = err.message;
 }
 ok("a short segment list is refused rather than mis-assigned", threw?.includes("cannot be trusted"));
+
+// ── recording at a rate the account is actually allowed ───────────────────
+//
+// 44.1kHz PCM is Pro-tier only, so an account below it must record at another
+// rate. The design survives that — joins stay sample-exact — but only if every
+// number is derived from the rate in force rather than from 44100 baked in
+// somewhere. So the arithmetic is re-run at a second rate and must agree with
+// itself just as well.
+
+console.log("\nThe same arithmetic at a rate a smaller plan is allowed:");
+const was = PCM.sampleRate;
+PCM.sampleRate = 24000;
+{
+  const secondsOf = (n) => n * PCM.sampleRate * PCM.channels * PCM.bytesPerSample;
+  check("a second of audio is a second", pcmSeconds(secondsOf(1)), 1);
+  check("and ninety are ninety", pcmSeconds(secondsOf(90)), 90);
+  // Why a kept block may not be reused across a rate change: one second
+  // recorded at 44.1kHz reads as 1.84 seconds here, and every line after it
+  // would be placed that much late.
+  check("a 44.1kHz second read at this rate is not a second", pcmSeconds(44100 * 2), 1.8375);
+
+  const q = wavHeader(secondsOf(3));
+  check("the header says the rate in force", q.readUInt32LE(24), 24000);
+  check("its byte rate follows", q.readUInt32LE(28), 24000 * PCM.channels * PCM.bytesPerSample);
+  check("and it still implies the same duration", q.readUInt32LE(40) / q.readUInt32LE(28), 3);
+
+  const at24 = mergeBlocks([
+    { id: "a", byteLength: secondsOf(10), segments: [{ start_time_seconds: 0, end_time_seconds: 9 }] },
+    { id: "b", byteLength: secondsOf(20), segments: [{ start_time_seconds: 0, end_time_seconds: 19 }] },
+  ]);
+  check("a block still begins where the one before it ended", at24.blocks[1].offsetSeconds, 10);
+  check("and the episode is as long as its blocks", at24.durationSeconds, 30);
+  ok("the format cross-check works at this rate too", pcmLooksRight(secondsOf(10), at24.segments.slice(0, 1)).ok);
+}
+PCM.sampleRate = was;
+check("and the rate this run started with is put back", PCM.sampleRate, was);
+
+console.log("\nWhat a plan that cannot have 44.1kHz is told:");
+{
+  const real = '{"detail":{"type":"authorization_error","code":"subscription_required",' +
+    '"message":"Output format \'pcm_44100\' is only available on the Pro tier and above.",' +
+    '"status":"output_format_not_allowed"}}';
+  const said = tierRefusal(real);
+  ok("it is recognised as a plan limit, not a bug", said);
+  ok("it names the setting to change", said.includes("LT_TV_PCM_RATE=24000"));
+  ok("and where to put it", said.includes(".env.local"));
+  ok("and still shows what ElevenLabs actually said", said.includes("Pro tier"));
+  check("every rate it offers is one ElevenLabs has", PCM_RATES.includes(24000), true);
+  check("an unrelated failure is left alone", tierRefusal('{"detail":"quota exceeded"}'), null);
+  check("and so is a plain server error", tierRefusal("Bad Gateway"), null);
+}
 
 console.log(failures ? `\n${failures} check(s) failed.\n` : "\nAll checks passed.\n");
 process.exit(failures ? 1 : 0);
