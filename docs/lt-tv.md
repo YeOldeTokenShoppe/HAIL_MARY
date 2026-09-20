@@ -53,10 +53,21 @@ node scripts/lt-news-brief.mjs
 node scripts/lt-news-script.mjs --brief content/lt-tv/briefs/news-2026-W38.json
 ```
 
-Now **read the `.txt` read-through** before spending any audio money. Does each
+Now **read the `.txt` screenplay** before spending any audio money. Does each
 story carry a real number? Does GR80 get a line worth hearing? Is
 `rundown.stories[].gaps` empty — anything in it is unsourced. Spot-check the
-numbers against `sources`. Revise and re-run until it reads.
+numbers against `sources`.
+
+The `.txt` is the thing you edit, not a printout of the record. Reword lines,
+add them, delete them, change who a line is aimed at, then apply what you
+wrote. No model call and no audio call, so revise here until it reads.
+
+```bash
+node scripts/lt-news-edit.mjs news-2026-W38
+```
+
+The format explains itself at the top of the file; `docs/lt-weekly-news-workflow.md`
+has the detail.
 
 ```bash
 # 3. Confirm it landed on the slate cleanly (it will say "not recorded yet").
