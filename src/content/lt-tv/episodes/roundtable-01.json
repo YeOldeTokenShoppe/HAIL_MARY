@@ -10,7 +10,7 @@
     "Connor": "talk show test for jb",
     "Monk": "talk show test GR80"
   },
-  "leadIn": 2.5,
+  "leadIn": 3,
   "lineStarts": [0, 8.4, 13.92, 20.64, 22.24, 26.239, 31.92, 35.24, 39.6, 44.64, 48.88, 55.84],
   "dialogueEnd": 59.037,
   "speakers": [

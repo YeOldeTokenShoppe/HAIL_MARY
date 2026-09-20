@@ -284,8 +284,17 @@ What is left to fill in is what only you know:
   who is speaking.
 - **`cues`** — the reaction beats, below.
 - **`leadIn`** — seconds of dead air at the head of the uploaded tracks, before
-  the first word. 2.5 is the usual value. Trim it by ear during step 6 with
+  the first word. 2.5 to 3 is the usual range. Trim it by ear during step 6 with
   `window.__tsTiming.leadIn` and write the value you land on back here.
+
+  Re-check it whenever you REPLACE a clip that is already on air, not just for
+  a new episode. Most of what this number absorbs is how long SitePal takes to
+  start a file, so a value tuned against the previous upload can be wrong for
+  the new one even when the audio inside is identical. Roundtable 01 needed
+  2.5 -> 3 after its GR80 track was re-rendered. The symptom is the picture
+  drifting against the dialogue — the camera cutting to someone before they
+  speak, or holding on them after they stop — which reads as the two
+  characters talking over each other even though the tracks never overlap.
 - **`note`** on a cue is a comment for the next person; nothing reads it.
 
 Do not hand-edit `lineStarts`, `speakers` or `dialogueEnd` — they come from the
