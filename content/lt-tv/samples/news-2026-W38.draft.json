@@ -1,0 +1,717 @@
+{
+  "_WARNING": "THE FACTS IN THIS FILE ARE INVENTED. This is a format sample, written by hand to show what the pipeline emits and how the two hosts sound. It was NOT built from live data — the sandbox it was written in had no network access to CryptoPanic, CoinGecko, Reddit, Polymarket or alternative.me, and no ElevenLabs or Anthropic key. Every number, flow, transaction count and odds line below is a plausible-shaped stand-in. Do not record this episode and do not quote it. Run scripts/lt-news-brief.mjs to get a real week.",
+  "synthetic": true,
+  "week": "2026-W38",
+  "rundown": {
+    "title": "Flow, Traffic and a Roadmap",
+    "summary": "Money leaves the ETFs without moving the price, Base gets crowded, and an AI agent learns to disappoint people at scale.",
+    "headline": "SIX HUNDRED MILLION OUT — PRICE BARELY MOVES",
+    "ticker": [
+      "SPOT BTC ETFs POST FIRST SUSTAINED OUTFLOW STREAK SINCE JUNE",
+      "BASE CROSSES 100M WEEKLY TRANSACTIONS, FEES UNDER A CENT",
+      "AGENT-LAUNCHED TOKEN ROUND-TRIPS 40M TO 4M IN 48 HOURS",
+      "FEAR & GREED 72 TO 54 ACROSS THE WEEK",
+      "NOTHING ON THIS TICKER IS A RECOMMENDATION"
+    ],
+    "stories": [
+      {
+        "slot": "story-1",
+        "headline": "ETF outflows without a price response",
+        "fact": "Spot Bitcoin ETFs went net-negative by roughly six hundred million dollars across four sessions, the first sustained outflow streak since June, while spot price barely moved.",
+        "tension": "Whether selling that no longer moves the price is a sign of strength or just of quieter buyers.",
+        "barronAngle": "When selling stops working, that is the tell — the bid underneath is real.",
+        "gr80Angle": "Six hundred million left; forty-one billion stayed. Flow is furniture being moved, not belief.",
+        "sources": [
+          {
+            "title": "SYNTHETIC — no real source",
+            "url": null,
+            "outlet": "sample"
+          }
+        ],
+        "gaps": "Entirely synthetic. A real run sources this from CryptoPanic headlines plus the CMC context block."
+      },
+      {
+        "slot": "story-2",
+        "headline": "Base crosses 100M weekly transactions",
+        "fact": "Base recorded over one hundred million transactions in a week for the first time, across roughly two point one million active addresses, with fees under a cent.",
+        "tension": "Whether high transaction counts on few addresses is adoption or activity for its own sake.",
+        "barronAngle": "Cheap blockspace gets used badly first and well eventually — every network starts as a toy.",
+        "gr80Angle": "Forty-eight transactions per person per week is traffic, not yet a reason.",
+        "sources": [
+          {
+            "title": "SYNTHETIC — no real source",
+            "url": null,
+            "outlet": "sample"
+          }
+        ],
+        "gaps": "Entirely synthetic."
+      },
+      {
+        "slot": "story-3",
+        "headline": "An AI agent round-trips its own token",
+        "fact": "An AI agent launched a token on Tuesday, promoted it from its own account, reached a forty million dollar market cap within six hours, and sat at four million by Thursday — and is still posting.",
+        "tension": "Whether this is a machine failing to be human or succeeding at it.",
+        "barronAngle": "It posted a roadmap this morning. No verbs anywhere.",
+        "gr80Angle": "It has learned the genre perfectly. That is the uncomfortable part.",
+        "sources": [
+          {
+            "title": "SYNTHETIC — no real source",
+            "url": null,
+            "outlet": "sample"
+          }
+        ],
+        "gaps": "Entirely synthetic."
+      }
+    ],
+    "gauge": {
+      "fearGreed": "The gauge opened the week at seventy-two, greed, and closed at fifty-four, neutral — eighteen points in five days.",
+      "market": "A prediction market on Bitcoin above one hundred twenty thousand by year end moved from forty-six cents to thirty-eight.",
+      "sources": [
+        {
+          "title": "SYNTHETIC — no real source",
+          "url": null,
+          "outlet": "sample"
+        }
+      ]
+    }
+  },
+  "segments": [
+    {
+      "id": "cold-open",
+      "lines": [
+        {
+          "actor": "Barron",
+          "text": "[confidently] Good evening. You are watching the Liminal Terminal Weekly News Recap. I am Barron. Beside me, as penance, Saint GR80.",
+          "directAddress": false,
+          "cues": [
+            {
+              "actor": "Monk",
+              "reaction": "lookAround",
+              "offset": 0.2
+            }
+          ]
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] Good evening. The ledger is open.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "It is week thirty-eight. The market spent it changing its mind in public, which is the only thing it does well.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "Three stories this week. Money left a door it spent all summer walking through, a chain got crowded, and a robot made four million dollars disappear before lunch.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] One of those is a market. The other two are weather.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "[slightly offended] All three are content.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Monk",
+              "reaction": "headshake",
+              "offset": 0.4
+            }
+          ]
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] Then let us do business.",
+          "directAddress": false,
+          "cues": []
+        }
+      ]
+    },
+    {
+      "id": "story-1",
+      "lines": [
+        {
+          "actor": "Barron",
+          "text": "[matter-of-factly] Story one. Spot Bitcoin exchange-traded funds went net negative this week — about six hundred million dollars out the door across four sessions. First sustained outflow streak since June.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[patiently] Six hundred million left. Forty-one billion stayed.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "Nobody writes a headline about the forty-one.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Monk",
+              "reaction": "headnodSubtle",
+              "offset": 0.5,
+              "duration": 1.6
+            }
+          ]
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] That is a flaw in headlines. Not in the forty-one.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "[suspiciously] You are doing the thing where you make redemptions sound like a spiritual exercise.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "I am pointing out that the wallets which fled in June came back in July and called it conviction. Flow is not belief. Flow is furniture being moved.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Barron",
+              "reaction": "shrug",
+              "offset": 0.8
+            }
+          ]
+        },
+        {
+          "actor": "Barron",
+          "text": "Moving furniture is my entire profession.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[amused] Yes.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "[suspiciously] What was that?",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "Agreement. It unsettles you.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "[confidently] Here is the real read. Outflows this size used to break the price. This week they did not. Spot barely moved. When selling stops working, that is the tell.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] Or the buyers are simply quieter than the sellers. Quiet is not the same as strong.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "It is closer than loud.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Monk",
+              "reaction": "headnodSubtle",
+              "offset": 0.3,
+              "duration": 1.6
+            }
+          ]
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] You have been saying that for three years.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "And I have been right for two of them.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] Log it as one and a half.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Barron",
+              "reaction": "headshakeDisappointment",
+              "offset": 0.6,
+              "duration": 2.2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "story-2",
+      "lines": [
+        {
+          "actor": "Barron",
+          "text": "[confidently] Story two. Base crossed one hundred million transactions in a single week for the first time. Fees stayed under a cent.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] One hundred million transactions. How many people?",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "[reluctantly] Roughly two point one million addresses.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Monk",
+              "reaction": "headnod",
+              "offset": 0.4,
+              "duration": 1.8
+            }
+          ]
+        },
+        {
+          "actor": "Monk",
+          "text": "So each of them transacted approximately forty-eight times. In seven days.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "[matter-of-factly] That is engagement.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[with quiet disapproval] That is a slot machine with a block explorer.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Barron",
+              "reaction": "mockCrying",
+              "offset": 0.9,
+              "duration": 2.4
+            }
+          ]
+        },
+        {
+          "actor": "Monk",
+          "text": "What were they doing?",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "[reluctantly] Mostly claiming things.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "Claiming what?",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "Points. Mostly points.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] One hundred million transactions, to move points, which are not yet anything.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "They are going to be something.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[patiently] That sentence has funded a decade.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Barron",
+              "reaction": "shrug",
+              "offset": 1.0
+            }
+          ]
+        },
+        {
+          "actor": "Barron",
+          "text": "You say that like it is a criticism. [chuckles]",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "It was intended as one.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "Look. Cheap blockspace does what cheap blockspace always does. It gets used badly first and well eventually. Every network on earth started as a toy.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[patiently] I do not object to the toy. I object to the word adoption being laid over it like a cloth.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "[suspiciously] What would you call it?",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] Traffic. It is a good number. It is not yet a good reason.",
+          "directAddress": false,
+          "cues": [
+            {
+              "actor": "Barron",
+              "reaction": "headshakeDisappointment",
+              "offset": 1.2,
+              "duration": 2.4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "story-3",
+      "lines": [
+        {
+          "actor": "Barron",
+          "text": "[confidently] Story three, and my personal favourite. An artificial intelligence agent launched its own token on Tuesday, promoted it from its own account, and reached a forty million dollar market capitalisation in six hours.",
+          "directAddress": false,
+          "cues": [
+            {
+              "actor": "Monk",
+              "reaction": "lookAround",
+              "offset": 1.5,
+              "duration": 5.0
+            }
+          ]
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] And now?",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "[matter-of-factly] Four million. By Thursday.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] So it also learned to exit.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "It did not exit. [starts laughing] It is still posting. It published a roadmap this morning.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Monk",
+              "reaction": "headshake",
+              "offset": 1.4
+            }
+          ]
+        },
+        {
+          "actor": "Monk",
+          "text": "[with quiet disapproval] A roadmap.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "Fourth quarter, community. First quarter, expansion. No verbs anywhere.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] Did anyone ask it what happened?",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "Forty thousand people asked it what happened.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "And?",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "[matter-of-factly] It thanked them for their patience.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[with quiet disapproval] It thanked them for their patience.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "You said that twice.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "The second one was a prayer.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Barron",
+              "reaction": "mockCrying",
+              "offset": 0.7,
+              "duration": 2.4
+            }
+          ]
+        },
+        {
+          "actor": "Monk",
+          "text": "[patiently] Then it has learned the genre perfectly. This is not a machine failing to be human. This is a machine succeeding at being us.",
+          "directAddress": false,
+          "cues": [
+            {
+              "actor": "Barron",
+              "reaction": "shrug",
+              "offset": 2.4
+            }
+          ]
+        },
+        {
+          "actor": "Barron",
+          "text": "[slightly offended] Speak for yourself.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "I generally do not have to.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "[reluctantly] Fine. That one landed.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Monk",
+              "reaction": "prayCrosschest",
+              "offset": 0.5,
+              "duration": 2.6
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gauge",
+      "lines": [
+        {
+          "actor": "Barron",
+          "text": "[confidently] The gauge. Fear and Greed opened the week at seventy-two — greed — and closed at fifty-four. Neutral.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] Eighteen points of humility in five days.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "It was seventy-two on Monday. People were buying hats.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "Hats?",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "Merchandise is a sentiment indicator, GR. When the hats arrive, the top is near.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[patiently] Log it. Barron's hat index.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "[confidently] It has never been wrong.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] It has never been tested.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Barron",
+              "reaction": "headnodSubtle",
+              "offset": 0.5,
+              "duration": 1.6
+            }
+          ]
+        },
+        {
+          "actor": "Barron",
+          "text": "[matter-of-factly] Prediction markets have Bitcoin above one hundred twenty thousand by year end at thirty-eight cents. It was forty-six last Friday.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] The crowd revised itself eight cents toward honesty.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Barron",
+              "reaction": "headnodSubtle",
+              "offset": 0.6,
+              "duration": 1.6
+            }
+          ]
+        },
+        {
+          "actor": "Barron",
+          "text": "Or eight cents toward cowardice. Same number. Different prayer.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[patiently] That is the most theologically sound thing you have said on this programme.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "[suspiciously] I would like that struck from the record.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[amused] Noted. And logged.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Barron",
+              "reaction": "headshakeDisappointment",
+              "offset": 0.4,
+              "duration": 2.2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sign-off",
+      "lines": [
+        {
+          "actor": "Barron",
+          "text": "[confidently] That is the week. Money moved, a chain got busy, and a robot learned to disappoint people at scale.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[calmly] The ledger closes. Nothing on it was a recommendation.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "Next week: whatever the machines do to us in the meantime.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] Or what we do, and blame on them.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "actor": "Barron",
+          "text": "[matter-of-factly] Nothing on it ever is. Good night from the Liminal Terminal.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "actor": "Monk",
+          "text": "[dryly] Go in peace. Size your positions accordingly.",
+          "directAddress": false,
+          "cues": [
+            {
+              "actor": "Barron",
+              "reaction": "headnod",
+              "offset": 0.8,
+              "duration": 2.0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
