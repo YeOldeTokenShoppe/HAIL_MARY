@@ -124,6 +124,8 @@ export const NEWS_SOURCE_DOMAINS = [
   "bea.gov",
   "eia.gov",
   "sec.gov",
+  "fred.stlouisfed.org",
+  "stlouisfed.org",
 
   // General business and economics desks.
   "reuters.com",
