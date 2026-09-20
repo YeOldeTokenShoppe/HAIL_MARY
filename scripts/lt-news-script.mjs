@@ -24,7 +24,7 @@
 // Env: ANTHROPIC_API_KEY (required unless --draft)
 //      LT_NEWS_MODEL     (default claude-opus-5)
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import {
@@ -33,6 +33,7 @@ import {
   REACTIONS,
   SEGMENTS,
   packBlocks,
+  sitepalClipName,
   CHAR_BUDGET_PER_BLOCK,
   CHAR_LIMIT_PER_BLOCK,
   RUNTIME_BOUNDS_SECONDS,
@@ -217,7 +218,7 @@ Hit the word targets within about fifteen percent. They add up to a six-minute e
 // list. Assembly is deliberately local and deterministic — the model writes
 // words, this code owns every number.
 
-function assemble({ rundown, segments, week, brief }) {
+function assemble({ rundown, segments, week, brief, number = 1 }) {
   const warnings = [];
   const bySegment = new Map(segments.map((s) => [s.id, s]));
 
@@ -362,6 +363,7 @@ function assemble({ rundown, segments, week, brief }) {
     id: `news-${week}`,
     show: "news",
     week,
+    number: String(number).padStart(2, "0"),
     title: rundown.title,
     summary: rundown.summary,
     airDate: new Date().toISOString().slice(0, 10),
@@ -387,9 +389,12 @@ function assemble({ rundown, segments, week, brief }) {
           displayName: CAST[a].displayName,
           voiceId: CAST[a].voiceId,
           processorKey: CAST[a].processorKey,
-          // The SitePal Audio Manager clip name. Null until the audio is built
-          // and uploaded; this is the join that does not exist in the repo today.
-          sitepalAudio: null,
+          // The name to give this character's upload in SitePal's Audio Manager.
+          // Prescribed rather than left blank: the account has one shared Audio
+          // Manager, TalkShowScene resolves clips by name, and a mismatch is a
+          // silent failure to speak — so the record states the name and the
+          // producer types it, instead of inventing one and copying it back.
+          sitepalAudio: sitepalClipName("news", number, a),
         },
       ]),
     ),
@@ -435,6 +440,23 @@ export function renderScript(episode) {
     out.push("");
   }
   return out.join("\n");
+}
+
+/**
+ * Episode number for the slate and the SitePal clip name. Explicit via
+ * --number, otherwise one past however many news records already exist — so a
+ * normal weekly run needs no argument and a re-run of an existing week is
+ * corrected by hand rather than silently renumbering.
+ */
+async function resolveEpisodeNumber() {
+  const flag = arg("number");
+  if (flag && flag !== true) return Number(flag);
+  try {
+    const files = await readdir(resolve("content/lt-tv/episodes"));
+    return files.filter((f) => /^news-.*\.json$/.test(f)).length + 1;
+  } catch {
+    return 1;
+  }
 }
 
 // ── main ──────────────────────────────────────────────────────────────────
@@ -484,7 +506,8 @@ async function main() {
     segments = written.segments;
   }
 
-  const episode = assemble({ rundown, segments, week, brief });
+  const number = await resolveEpisodeNumber();
+  const episode = assemble({ rundown, segments, week, brief, number });
 
   const jsonPath = resolve(arg("out", `content/lt-tv/episodes/${episode.id}.json`));
   const txtPath = jsonPath.replace(/\.json$/, ".txt");

@@ -245,9 +245,29 @@ speaks each line, so gaze and camera derive from it instead of being
 transcribed. (`TalkShowScene.jsx:123` anticipates exactly this: *"Cues stay
 attached to line numbers so a future script generator can replace this array."*)
 
-**Uploading stays manual.** Two files per episode into SitePal's Audio Manager,
-then their names into `cast.Barron.sitepalAudio` and `cast.Monk.sitepalAudio`.
+**Uploading stays manual.** Two files per episode into SitePal's Audio Manager.
 That is the one step the spike proved cannot be automated from the site.
+
+The names are **not** yours to invent — the record already states them, in
+`cast.Barron.sitepalAudio` and `cast.Monk.sitepalAudio`:
+
+```
+lttv_news_ep01_barron
+lttv_news_ep01_gr80
+```
+
+That is the LT TV convention, `lttv_<show>_ep<NN>_<character>`, following the
+shape of the existing Terminal Traders clips (`case001_monk_q5`). It matters
+that it is generated rather than chosen per episode for two reasons. The
+account has **one** Audio Manager shared by every character, not one per
+character, so a name like "episode 02 barron" is not safe against a second
+show reaching for the same words. And `TalkShowScene` resolves clips by name,
+so a name that does not match is a silent failure to speak — no error, just an
+avatar that never opens its mouth.
+
+The episode number comes from `--number`, defaulting to one past however many
+news records already exist. A re-run of a week you have already produced needs
+the number passed explicitly.
 
 ---
 

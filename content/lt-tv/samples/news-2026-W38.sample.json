@@ -4,6 +4,7 @@
   "id": "news-2026-W38",
   "show": "news",
   "week": "2026-W38",
+  "number": "01",
   "title": "Flow, Traffic and a Roadmap",
   "summary": "Money leaves the ETFs without moving the price, Base gets crowded, and an AI agent learns to disappoint people at scale.",
   "airDate": "2026-09-20",
@@ -28,13 +29,13 @@
       "displayName": "Barron",
       "voiceId": "IcFWazAaBzXNwLWpySgF",
       "processorKey": "john",
-      "sitepalAudio": null
+      "sitepalAudio": "lttv_news_ep01_barron"
     },
     "Monk": {
       "displayName": "Saint GR80",
       "voiceId": "fATgBRI8wg5KkDFg8vBd",
       "processorKey": "gr80",
-      "sitepalAudio": null
+      "sitepalAudio": "lttv_news_ep01_gr80"
     }
   },
   "segments": [
@@ -1015,7 +1016,7 @@
     "briefId": null,
     "briefGeneratedAt": null,
     "model": "claude-opus-5",
-    "generatedAt": "2026-09-20T01:51:47.377Z",
+    "generatedAt": "2026-09-20T02:32:49.677Z",
     "pipeline": "scripts/lt-news-script.mjs"
   },
   "warnings": []
