@@ -11,7 +11,36 @@ one of the two deeper docs, linked at each step.
 
 ---
 
-## Where is everything
+## The studio page
+
+The one to open if you would rather not remember any of this.
+
+```bash
+npm run dev
+```
+
+Then **http://localhost:3000/lt-tv**. Every episode of both shows, what stage
+each one is at, and the next step as a button — write it, record it, apply your
+edits, check the slate. The screenplay is editable in the page, with a Save
+button and a separate Apply, so a half-finished edit is never live.
+
+It is **development only**. It reads this checkout and runs pipeline steps on
+this machine, neither of which means anything on a deployed server, so the page
+and its routes 404 outside `npm run dev` rather than sitting behind a password.
+
+Two things it is careful about. A button that spends money says so and asks
+first; the free ones do not ask, because a confirm on a free action teaches you
+to click through confirms. And it prints each step's real output rather than a
+tick — the scripts say useful things, and swallowing them would send you back
+to a terminal to find out what happened.
+
+Every button runs the same command you would have typed, so the page cannot
+drift from the tools, and nothing you do in it is anything you could not have
+done by hand.
+
+---
+
+## Where is everything, from a terminal
 
 ```bash
 npm run lt                        # every episode, both shows
@@ -30,6 +59,7 @@ root — the path is relative to you, not to the repo.
 
 | | |
 |---|---|
+| `npm run dev` then `/lt-tv` | the studio page — all of the below, as buttons |
 | `npm run lt` | where every episode is |
 | `npm run lt:check` | validate the slate |
 | `npm run lt:brief` | pull the week (news) |

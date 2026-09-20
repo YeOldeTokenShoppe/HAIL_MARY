@@ -1,0 +1,116 @@
+#!/usr/bin/env node
+// THE ONLY THINGS THE STUDIO PAGE IS ALLOWED TO RUN.
+//
+// The dashboard at /lt-tv has buttons that run real pipeline steps, which
+// means a browser can ask this machine to execute something. The rule that
+// makes that safe is here and nowhere else:
+//
+//   THE CLIENT NEVER SENDS A COMMAND. It sends an action name and an episode
+//   id. This module turns those into a fixed argv array. Nothing the browser
+//   sends is ever concatenated into a string a shell will read, and the
+//   episode id is checked against the episodes that actually exist rather
+//   than against a pattern.
+//
+// So the worst a malformed or malicious request can do is name an action that
+// is not in this table, or an episode that is not on the slate, and be
+// refused. There is no path from a request to an arbitrary command, because
+// there is no place in this file where request text becomes part of one.
+//
+// The page itself is development-only — see src/lib/ltTv/devOnly.mjs — so
+// none of this exists in a deployed build. That is the second lock, not the
+// first; this table is written to be safe on its own.
+
+/** Actions, each one a function from a validated id to an argv array. */
+export const ACTIONS = {
+  "write-roundtable": {
+    label: "Write this episode",
+    // Two Claude calls. The button says so and asks first.
+    spends: "an Anthropic call",
+    needs: ["ANTHROPIC_API_KEY"],
+    stages: ["planned"],
+    argv: (id) => ["node", ["scripts/lt-rt-script.mjs", "--topic", id]],
+    blurb: "Writes the argument, then the dialogue. Keeps the title you gave it.",
+  },
+  "plan-roundtable": {
+    label: "Draft the argument only",
+    spends: "an Anthropic call",
+    needs: ["ANTHROPIC_API_KEY"],
+    stages: ["planned"],
+    argv: (id) => ["node", ["scripts/lt-rt-script.mjs", "--topic", id, "--plan-only"]],
+    blurb: "Stops after the argument so you can read it before writing six minutes of it.",
+  },
+  "apply-edits": {
+    label: "Apply my edits",
+    spends: null,
+    needs: [],
+    stages: ["written", "recorded", "on-air"],
+    argv: (id) => ["node", ["scripts/lt-tv-edit.mjs", id]],
+    blurb: "Reads the screenplay back into the record. Free.",
+  },
+  "apply-edits-rerecord": {
+    label: "Apply my edits and clear the audio",
+    spends: null,
+    needs: [],
+    stages: ["recorded", "on-air"],
+    argv: (id) => ["node", ["scripts/lt-tv-edit.mjs", id, "--rerecord"]],
+    blurb: "For an episode already recorded. Returns it to Not recorded yet until you record it again.",
+  },
+  record: {
+    label: "Record it",
+    spends: "an ElevenLabs render",
+    needs: ["ELEVENLABS_API_KEY"],
+    stages: ["written"],
+    argv: (id) => ["node", ["scripts/lt-tv-audio.mjs", `content/lt-tv/episodes/${id}.json`]],
+    blurb: "Generates every block and joins them into one master.",
+  },
+  check: {
+    label: "Check the slate",
+    spends: null,
+    needs: [],
+    stages: ["planned", "written", "recorded", "on-air"],
+    argv: () => ["node", ["scripts/lt-tv-check.mjs"]],
+    blurb: "Validates every record against what the set expects.",
+  },
+};
+
+export const ACTION_NAMES = Object.keys(ACTIONS);
+
+/**
+ * Turn a request into something safe to execute, or explain the refusal.
+ *
+ * `knownIds` is the list of episodes that actually exist, read from disk by
+ * the caller. Checking against it rather than against a regular expression is
+ * the point: a pattern says what an id looks like, and this says which ones
+ * there are.
+ *
+ * @returns {{ ok: true, command: string, args: string[] }
+ *          |{ ok: false, status: number, error: string }}
+ */
+export function resolveAction(action, id, knownIds) {
+  if (typeof action !== "string" || !Object.hasOwn(ACTIONS, action)) {
+    return { ok: false, status: 400, error: `Not an action: ${String(action).slice(0, 40)}` };
+  }
+  const spec = ACTIONS[action];
+
+  // `check` is the one action that is about the whole slate, so it takes no id.
+  if (spec.argv.length === 0) {
+    const [command, args] = spec.argv();
+    return { ok: true, command, args };
+  }
+
+  if (typeof id !== "string" || !knownIds.includes(id)) {
+    return { ok: false, status: 400, error: `Not an episode on the slate: ${String(id).slice(0, 40)}` };
+  }
+
+  const [command, args] = spec.argv(id);
+  return { ok: true, command, args };
+}
+
+/** Which actions make sense for an episode at this stage, in offer order. */
+export function actionsFor(stage) {
+  return ACTION_NAMES.filter((name) => ACTIONS[name].stages.includes(stage)).map((name) => ({
+    name,
+    ...ACTIONS[name],
+    argv: undefined,
+  }));
+}
