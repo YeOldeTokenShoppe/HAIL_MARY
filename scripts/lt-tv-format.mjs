@@ -9,26 +9,21 @@
 // ── The cast ──────────────────────────────────────────────────────────────
 //
 // The set has exactly TWO seats. TalkShowScene's CHARACTER_CLIPS registers
-// Demon_Empty (actor "Barron") and Monk_Empty (actor "Monk") and nothing else,
+// Demon_Empty (actor "Connor") and Monk_Empty (actor "Monk") and nothing else,
 // so a news desk with a third voice is not producible on this set today.
 //
-// The character is CONNOR. He has picked up other names in other files over
-// time — the animation config in TalkShowScene calls him Barron, the Python
-// processor calls him john, the GLB node is Demon_Empty, and old council logs
-// call him H80Z — but Connor is the name, and `actor` below is the only one
-// this pipeline uses.
-//
-// NOTE: TalkShowScene's CHARACTER_CLIPS still maps `Demon_Empty` to the actor
-// string "Barron", and process_dialogue.py's ACTOR_NAMES still maps `john` to
-// "Barron". Those are shared files being renamed separately; until they are,
-// anything joining this pipeline to the runtime has to bridge the two spellings.
+// The character is CONNOR, and the runtime agrees: CHARACTER_CLIPS and
+// process_dialogue.py's ACTOR_NAMES both say "Connor" now. What is left is
+// plumbing that was never his name — the GLB node is Demon_Empty, the baked
+// animation clips are barron_*, and the processor's speaker key is john.
+// Those are strings inside the model file and the audio pipeline; `actor`
+// below is the only name this pipeline uses.
 export const CAST = {
   Connor: {
     actor: "Connor",
     displayName: "Connor",
     voiceId: "IcFWazAaBzXNwLWpySgF",
     processorKey: "john", // process_dialogue.py SPEAKERS key → john-sitepal-balanced.wav
-    sceneActorKey: "Barron", // what TalkShowScene's CHARACTER_CLIPS calls him today
     clipKey: "connor", // the SitePal clip-name suffix
     role: "anchor",
   },
