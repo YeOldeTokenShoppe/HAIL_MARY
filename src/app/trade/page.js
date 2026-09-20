@@ -26,7 +26,8 @@ import VideoScreens from "@/components/VideoScreens";
 // import VideoScreensOptimized from "@/components/VideoScreensOptimized";
 import CouncilChatScreens from "@/components/CouncilChatScreens";
 import TalkShowScene, { preloadTalkShow } from "@/components/trade/TalkShowScene";
-import LTTvBroadcastPanel, { SHOWS as LT_TV_SHOWS } from "@/components/trade/LTTvBroadcastPanel";
+import LTTvBroadcastPanel from "@/components/trade/LTTvBroadcastPanel";
+import { SHOWS as LT_TV_SHOWS, findEpisode as findLtTvEpisode } from "@/content/lt-tv";
 import TickerDisplay3 from "@/components/TickerDisplay3";
 import { useMusic } from '@/components/MusicContext';
 import { useUser, useClerk } from "@clerk/nextjs";
@@ -1351,11 +1352,23 @@ export default function CyborgTemple() {
   // ('lineup' | 'set'). Same model either way, so tuning in is instant.
   const [ltTvView, setLtTvView] = useState('lineup');
   const [ltTvSelection, setLtTvSelection] = useState({ showId: LT_TV_SHOWS[0].id, episodeIndex: 0 });
+  // The selected episode's record — the guide, the channel card and the set
+  // all read this one object, so picking an episode is what changes the show.
+  const ltTvEpisode = useMemo(
+    () => findLtTvEpisode(ltTvSelection.showId, ltTvSelection.episodeIndex),
+    [ltTvSelection],
+  );
   const ltTvChannelCards = useMemo(() => {
     const show = LT_TV_SHOWS.find((item) => item.id === ltTvSelection.showId) || LT_TV_SHOWS[0];
-    const episode = show.episodes[ltTvSelection.episodeIndex] || show.episodes[0];
-    return [{ title: show.title, format: show.format, episodeTitle: episode?.title, latest: episode ? `EP ${episode.number} · REPLAY` : null }];
-  }, [ltTvSelection]);
+    return [{
+      title: show.title,
+      format: show.format,
+      episodeTitle: ltTvEpisode?.title,
+      latest: ltTvEpisode
+        ? `EP ${ltTvEpisode.number} · ${ltTvEpisode.playable ? 'REPLAY' : 'COMING SOON'}`
+        : null,
+    }];
+  }, [ltTvSelection, ltTvEpisode]);
   // Which talk-show character projects the live SitePal face — for fitting the
   // crop onto Face2/FaceDemon2. 'Monk' | 'Barron' | null. Driven by the dev
   // fitting control (?tune=sitepal); one at a time (single shared portal).
@@ -4150,6 +4163,7 @@ export default function CyborgTemple() {
                 the same volume. */}
             {talkShowMode && (
               <TalkShowScene
+                episode={ltTvEpisode}
                 position={isMobileView ? [0, -1.2, 0] : [0, -1.9, 0]}
                 scale={[1.2, 1.2, 1.2]}
                 rotation={[0, 0, 0]}

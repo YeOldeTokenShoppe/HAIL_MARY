@@ -27,7 +27,11 @@ curl --silent --show-error --fail-with-body \
   --output "$RESPONSE_FILE"
 
 echo "Creating the master and character tracks..."
-python3 "$SCRIPT_DIR/process_dialogue.py" "$RESPONSE_FILE" "$OUTPUT_DIR"
+# Any extra arguments go to the processor, which is how an episode names
+# itself in the starter record it writes:
+#   ./run_test.sh --episode-id roundtable-02 --title "The Wealth Effect"
+python3 "$SCRIPT_DIR/process_dialogue.py" "$RESPONSE_FILE" "$OUTPUT_DIR" "$@"
 
 echo
-echo "Done. Upload john-sitepal-balanced.wav to John and gr80-sitepal-balanced.wav to Saint GR80."
+echo "Done. Upload john-sitepal-balanced.wav to John and gr80-sitepal-balanced.wav to Saint GR80,"
+echo "then finish output/episode-record.json — see docs/talk-show-production.md."
