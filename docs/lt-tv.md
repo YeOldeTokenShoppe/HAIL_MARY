@@ -228,7 +228,7 @@ Editing the screenplay of an episode that already has audio is refused — the
 clips would still be saying the old words. To go ahead anyway:
 
 ```bash
-node scripts/lt-news-edit.mjs news-2026-W38 --rerecord
+node scripts/lt-tv-edit.mjs news-2026-W38 --rerecord
 ```
 
 That clears the timing and returns the episode to *Not recorded yet* on the
