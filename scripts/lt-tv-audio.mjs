@@ -32,6 +32,8 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve, dirname, join, basename } from "node:path";
 
+import { uploadPlan } from "./lt-tv-split.mjs";
+
 const ENDPOINT = "https://api.elevenlabs.io/v1/text-to-dialogue/with-timestamps";
 
 // ── the PCM assumption, made self-checking ────────────────────────────────
@@ -335,13 +337,23 @@ async function main() {
       `across ${built.length} block(s), ${merged.segments.length} lines timed.`,
   );
   console.log(`Updated ${recordPath} with the real timing.`);
+  // Naming the clips here rather than pointing at the record: "the names the
+  // record prescribes in `cast`" is a true sentence that leaves you opening a
+  // JSON file to find two strings, and a wrong one plays nothing.
+  const plan = uploadPlan(episode, episode.id);
   console.log(
-    "\nNext, split it into the two balanced tracks (this part needs ffmpeg):\n" +
-      `  python3 elevenlabs-dialogue-test/process_dialogue.py --master ${masterPath} \\\n` +
-      `      --segments ${join(outDir, "voice-segments.json")} ${outDir}\n` +
-      "Then upload both WAVs under the names the record prescribes in `cast`, and\n" +
-      "re-run scripts/lt-news-script.mjs to refresh the slate record.",
+    `\nNext, split it into the two tracks SitePal plays (this part needs ffmpeg):\n` +
+      `  npm run lt:split -- ${episode.id}\n`,
   );
+  if (plan.length) {
+    console.log("That writes the two WAVs you upload, which will be:\n");
+    for (const row of plan) {
+      console.log(`  ${row.who}`);
+      console.log(`    file  ${row.file}`);
+      console.log(`    name  ${row.clip}\n`);
+    }
+  }
+  console.log("Then re-run the script step to refresh the slate record.");
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -4,6 +4,7 @@ import argparse
 import base64
 import datetime
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -190,6 +191,24 @@ def write_episode_record(args, show_timing):
     return record_path
 
 
+def require_ffmpeg():
+    """Say what is missing, rather than raising FileNotFoundError on 'ffprobe'.
+
+    Splitting the master is the one step in this pipeline that shells out, and
+    a machine without ffmpeg fails here with a traceback that names a binary
+    and nothing else — which reads like a broken script.
+    """
+    missing = [tool for tool in ("ffmpeg", "ffprobe") if shutil.which(tool) is None]
+    if not missing:
+        return
+    raise SystemExit(
+        f"This step needs {' and '.join(missing)}, which {'are' if len(missing) > 1 else 'is'} "
+        "not installed.\n"
+        "On a Mac:  brew install ffmpeg\n"
+        "Everything up to here is finished and kept, so install it and run this again."
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Decode ElevenLabs dialogue and make one SitePal track per speaker."
@@ -242,6 +261,7 @@ def main():
     if not args.master and not args.response:
         raise SystemExit("Pass a response JSON, or --master with --segments.")
 
+    require_ffmpeg()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     if args.master:
@@ -334,3 +354,6 @@ if __name__ == "__main__":
     except subprocess.CalledProcessError as exc:
         print(f"Audio processing failed: {exc}", file=sys.stderr)
         raise SystemExit(exc.returncode) from exc
+    except FileNotFoundError as exc:
+        print(f"Audio processing failed — {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc

@@ -83,6 +83,16 @@ export const ACTIONS = {
     argv: (id) => ["node", ["scripts/lt-tv-audio.mjs", `content/lt-tv/episodes/${id}.json`]],
     blurb: "Generates every block and joins them into one master.",
   },
+  split: {
+    label: "Split it into the two tracks",
+    spends: null,
+    needs: [],
+    // Only once there is a master to split. `recorded` is exactly that: the
+    // audio step wrote the timing back, which it does after writing the WAV.
+    stages: ["recorded", "on-air"],
+    argv: (id) => ["node", ["scripts/lt-tv-split.mjs", id]],
+    blurb: "Turns the one master into the two balanced WAVs you upload to SitePal, one per character. Needs ffmpeg. Free.",
+  },
   check: {
     label: "Check the slate",
     spends: null,

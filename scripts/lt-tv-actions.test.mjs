@@ -10,9 +10,17 @@
 //
 // So the checks below are mostly attempts to smuggle something through.
 
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+
 import { ACTIONS, ACTION_NAMES, resolveAction, actionsFor } from "./lt-tv-actions.mjs";
+import { splitCommand, uploadPlan } from "./lt-tv-split.mjs";
 import { STAGES } from "./lt-tv-status.mjs";
 import { IS_DEV, refuseOutsideDev } from "../src/lib/ltTv/devOnly.mjs";
+
+const SAMPLE = JSON.parse(
+  await readFile(resolve("content/lt-tv/samples/roundtable-02.sample.json"), "utf8"),
+);
 
 let failures = 0;
 const check = (label, actual, expected) => {
@@ -131,6 +139,38 @@ ok("an on-air one is never offered a plain write",
   !actionsFor("on-air").some((a) => a.name.startsWith("write-") || a.name.startsWith("plan-")));
 ok("but it can still have one line rewritten",
   actionsFor("on-air").some((a) => a.name === "rewrite-marked"));
+
+console.log("\nThe master is split into the two SitePal tracks from here too:");
+ok("not before there is a master", !actionsFor("written").some((a) => a.name === "split"));
+ok("offered once there is one", actionsFor("recorded").some((a) => a.name === "split"));
+ok("and still offered after, for a re-record", actionsFor("on-air").some((a) => a.name === "split"));
+check("it costs nothing", ACTIONS.split.spends, null);
+check("and needs no key", ACTIONS.split.needs, []);
+{
+  // The button runs the same wrapper `npm run lt:split` does, so the page and
+  // the terminal cannot drift into two ideas of what splitting means.
+  const [cmd, args] = ACTIONS.split.argv("roundtable-02");
+  check("it runs the same step the terminal runs", [cmd, ...args], ["node", "scripts/lt-tv-split.mjs", "roundtable-02"]);
+  const [pcmd, pargs] = splitCommand("roundtable-02");
+  check("which shells out to the processor that already exists", pcmd, "python3");
+  ok("on that episode's master", pargs.includes("content/lt-tv/audio/roundtable-02/master-dialogue.wav"));
+  ok("with the merged, offset-shifted segments", pargs.includes("content/lt-tv/audio/roundtable-02/voice-segments.json"));
+  // The show is read off the id rather than sent by the browser, so it cannot
+  // be steered; getting it wrong would only mislabel the starter record.
+  check("the show comes from the id", pargs[pargs.indexOf("--show") + 1], "roundtable");
+  const newsArgs = splitCommand("news-2026-W38")[1];
+  check("and a news episode is news", newsArgs[newsArgs.indexOf("--show") + 1], "news");
+}
+
+console.log("\nWhat to upload, and under what name, comes from the record:");
+{
+  const plan = uploadPlan(SAMPLE, "roundtable-02");
+  check("one upload per cast member", plan.length, Object.keys(SAMPLE.cast).length);
+  ok("each names a file the processor writes", plan.every((r) => r.file.endsWith("-sitepal-balanced.wav")));
+  ok("and the clip name the runtime will ask for", plan.every((r) => r.clip && !r.clip.includes(" ")));
+  check("no two clips share a name", new Set(plan.map((r) => r.clip)).size, plan.length);
+  check("and no two files either", new Set(plan.map((r) => r.file)).size, plan.length);
+}
 ok("every stage is offered something", STAGES.every((s) => actionsFor(s.id).length > 0));
 ok("no offered action leaks the argv builder", actionsFor("planned").every((a) => a.argv === undefined));
 

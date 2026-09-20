@@ -25,8 +25,8 @@ an editor that has claimed `.command` will open it for reading instead of
 running it.
 
 Every episode of both shows, what stage each one is at, and the next step as a
-button — write it, record it, apply your edits, rewrite a line you marked,
-check the slate. The screenplay is editable in the page, with a Save button and
+button — write it, record it, split the master into the two tracks, apply your
+edits, rewrite a line you marked, check the slate. The screenplay is editable in the page, with a Save button and
 a separate Apply, so a half-finished edit is never live.
 
 It runs **on your machine only.** What this pipeline produces is source code:
@@ -95,6 +95,7 @@ root — the path is relative to you, not to the repo.
 | `npm run lt:edit` | apply your edits to a screenplay |
 | `npm run lt:rewrite` | rewrite the lines you marked with a `#` note |
 | `npm run lt:audio` | record an episode |
+| `npm run lt:split` | split the master into the two SitePal tracks |
 | `npm run lt:test` | run every check |
 
 Arguments go after `--`, as in `npm run lt:roundtable -- --topic roundtable-02`.
@@ -183,10 +184,8 @@ node scripts/lt-tv-check.mjs
 node scripts/lt-tv-audio.mjs content/lt-tv/episodes/news-2026-W38.json
 
 # 5. Split the master into the two balanced tracks. Needs ffmpeg.
-python3 elevenlabs-dialogue-test/process_dialogue.py \
-    --master content/lt-tv/audio/news-01/master-dialogue.wav \
-    --segments content/lt-tv/audio/news-01/voice-segments.json \
-    content/lt-tv/audio/news-01
+#    The studio's "Split it into the two tracks" button runs exactly this.
+npm run lt:split -- news-2026-W38
 
 # 6. Re-run the script step so the record picks up the real timing.
 node scripts/lt-news-script.mjs --brief content/lt-tv/briefs/news-2026-W38.json
@@ -283,6 +282,13 @@ are no joins to be wrong.
 
 Upload the two balanced WAVs to the SitePal Audio Manager and copy the names
 into the record's `audio` block, exactly.
+
+**You do not have to work the names out.** Both the record step and
+`npm run lt:split` end by printing which file goes to which character under
+which name, and the studio lists them under **SitePal clip names** in the
+episode's panel. For roundtable 02 they are `lttv_rt_ep02_connor` and
+`lttv_rt_ep02_gr80`. Note that Connor's file is `john-sitepal-balanced.wav` —
+`john` is the processor's own key for him and is not the clip name.
 
 **There is one Audio Manager for the whole account** (`9308752`), not one per
 character. Every clip for every character and every show sits in the same list,
