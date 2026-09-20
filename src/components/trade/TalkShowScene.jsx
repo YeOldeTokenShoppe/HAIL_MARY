@@ -16,7 +16,7 @@
 //
 // SITEPAL FACE PROJECTION. Each character owns an isolated, same-origin iframe
 // running public/sitepal-portal.html. SitePal's globals collide when two embeds
-// share a document; one iframe per character gives Barron and GR80 independent
+// share a document; one iframe per character gives Connor and GR80 independent
 // players, canvases, audio, and lifecycle callbacks. Both canvases are cropped
 // onto the GLB face meshes every frame, and the two equal-length uploaded tracks
 // start back-to-back from one user gesture.
@@ -75,7 +75,7 @@ const DRACO_PATH = "/draco/";
 // back before the trailing idle section.
 const CHARACTER_CLIPS = {
   Demon_Empty: {
-    actor: "Barron",
+    actor: "Connor",
     root: "Armature",
     base: "barron_sit_pose2",
     reactions: {
@@ -104,12 +104,12 @@ const CHARACTER_CLIPS = {
   },
 };
 
-const EMPTY_FOR_ACTOR = { Monk: "Monk_Empty", Barron: "Demon_Empty" };
+const EMPTY_FOR_ACTOR = { Monk: "Monk_Empty", Connor: "Demon_Empty" };
 
 // Full authored lengths at 30fps. A cue may still supply a shorter `duration`
 // when only the expressive portion of a pose-2 clip should play.
 const REACTION_DURATIONS = {
-  Barron: {
+  Connor: {
     headnod: 4.33,
     headnodSubtle: 4.33,
     headshakeDisappointment: 4.33,
@@ -141,7 +141,7 @@ export const TALK_SHOW_TIMING = { leadIn: 2.5 };
 // Procedural listener gaze is applied after the animation mixer, so it layers
 // over breathing and reaction clips without needing separate look-at actions.
 const LISTENER_GAZE_YAW = {
-  Barron: THREE.MathUtils.degToRad(30),
+  Connor: THREE.MathUtils.degToRad(30),
   Monk: THREE.MathUtils.degToRad(-23),
 };
 
@@ -160,15 +160,15 @@ const SOLO_LISTENER_EVERY_NTH = 6;
 // SEPARATE from the temple's DEMON/MONK crops — these are different meshes
 // with their own UVs, so the numbers won't transfer 1:1. Seeded from the
 // temple Monk/Demon values as a starting point; fit them live with the
-// SitePalCropPanel (?tune=sitepal → "TS Monk" / "TS Barron" tabs). The
+// SitePalCropPanel (?tune=sitepal → "TS Monk" / "TS Connor" tabs). The
 // per-frame compositor reads these fields every tick, so edits go live.
 export const TALKSHOW_MONK_CROP = { cropX: 249, cropY: 150, cropW: 160, cropH: 205, rotateZ: 0, rotateX: 0 };
 export const TALKSHOW_MONK_FILTER = { saturate: 99, contrast: 99, brightness: 93, hueRotate: -27, sepia: 0 };
-export const TALKSHOW_BARRON_CROP = { cropX: 180, cropY: 118, cropW: 145, cropH: 195, rotateZ: 0, rotateX: 0 };
-export const TALKSHOW_BARRON_FILTER = { saturate: 106, contrast: 102, brightness: 73, hueRotate: 0, sepia: 20 };
+export const TALKSHOW_CONNOR_CROP = { cropX: 180, cropY: 118, cropW: 145, cropH: 195, rotateZ: 0, rotateX: 0 };
+export const TALKSHOW_CONNOR_FILTER = { saturate: 106, contrast: 102, brightness: 73, hueRotate: 0, sepia: 20 };
 
 // Projection registry. sceneId reuses the temple's SitePal scenes (Monk =
-// GR80, Barron = the Demon/H80Z scene). face1 = static face to hide, face2 =
+// GR80, Connor = the Demon/H80Z scene). face1 = static face to hide, face2 =
 // projection target to reveal.
 export const TALKSHOW_PROJECTION_CONFIG = {
   Monk: {
@@ -183,14 +183,14 @@ export const TALKSHOW_PROJECTION_CONFIG = {
     // lives under Monk_Empty, so it pairs with the Monk's Face1.
     hideExtra: ["Brows"],
   },
-  Barron: {
-    label: "TS Barron",
+  Connor: {
+    label: "TS Connor",
     sceneId: SITEPAL_PROJECTION_CONFIG.Demon.sceneId,
     face1: "FaceDemon1",
     face2: "FaceDemon2",
-    crop: TALKSHOW_BARRON_CROP,
-    filter: TALKSHOW_BARRON_FILTER,
-    // Barron's brows live under Demon_Empty as `Demon_Brows` (the Monk's are
+    crop: TALKSHOW_CONNOR_CROP,
+    filter: TALKSHOW_CONNOR_FILTER,
+    // Connor's brows live under Demon_Empty as `Demon_Brows` (the Monk's are
     // just `Brows`). Hide with the face swap so they don't float over Face2.
     hideExtra: ["Demon_Brows"],
   },
@@ -334,7 +334,7 @@ export const MONITOR_FEED = {
   // this should stay near 0; it's here to trim the pans without touching the
   // reaction cues, which read from the same clock.
   shotLead: 0,
-  // 'auto' follows the shot list; 'wide' | 'Barron' | 'Monk' holds one shot
+  // 'auto' follows the shot list; 'wide' | 'Connor' | 'Monk' holds one shot
   // (for fitting without running the show).
   shot: "auto",
   // Read-only: the shot the director is on, written every frame. Watch it
@@ -673,7 +673,7 @@ function renderMonitorFeed(feed, gl, scene) {
 // pointing lights at hand-picked coordinates that a re-export would invalidate.
 const LAMP_HEAD_NODES = [
   // Bar order as modelled, +x first — so 01 is on GR80's side of the set and
-  // 04 is on Barron's.
+  // 04 is on Connor's.
   "SM_Prop_Light_Spotlight_02_Light_01",
   "SM_Prop_Light_Spotlight_02_Light_02",
   "SM_Prop_Light_Spotlight_02_Light_03",
@@ -727,7 +727,7 @@ export const STUDIO_LIGHTS = {
   //
   // `yaw` / `pitch` are DEGREES OFF THE MODELLED AIM, not absolute angles, so 0
   // is always whatever Blender authored. Positive yaw swings the beam toward
-  // Barron (−x), positive pitch lifts it. The lamp head itself turns with the
+  // Connor (−x), positive pitch lifts it. The lamp head itself turns with the
   // beam, so a re-aim still looks like it is coming out of the fixture.
   plot: [
     // key — lands on GR80
@@ -736,7 +736,7 @@ export const STUDIO_LIGHTS = {
     { intensity: 4, color: "#ffd9b0", opacity: 0.085, yaw: 0, pitch: 0 },
     // fill — neon frame
     { intensity: 4, color: "#ffd9b0", opacity: 0.085, yaw: 0, pitch: 0 },
-    // key — lands on Barron
+    // key — lands on Connor
     { intensity: 8, color: "#ffe6c4", opacity: 0.13, yaw: 0, pitch: 0 },
   ],
 };
@@ -1035,7 +1035,7 @@ function TalkShowModel({
   const raisedSet = castHidden || newsMode;
   const portalsRef = useRef({
     Monk: { frame: null, ready: false, source: null },
-    Barron: { frame: null, ready: false, source: null },
+    Connor: { frame: null, ready: false, source: null },
   });
   const playbackRef = useRef({ running: false, startedAt: 0, cueIndex: 0 });
   // Frame counter for solo mode's listener-repaint throttle.
@@ -1422,7 +1422,7 @@ function TalkShowModel({
   }, [cloned]);
 
   // The bind-pose head orientation is the neutral, straight-ahead direction
-  // for these rigs. Barron's intro blends toward it to address the camera
+  // for these rigs. Connor's intro blends toward it to address the camera
   // without completely removing the breathing motion underneath.
   const neutralHeadQuaternions = useMemo(
     () =>
@@ -1441,7 +1441,7 @@ function TalkShowModel({
     () => Object.fromEntries(Object.entries(headBones).map(([actor, head]) => [actor, head.quaternion.clone()])),
     [headBones],
   );
-  const listenerGazeRef = useRef({ Barron: 0, Monk: 0 });
+  const listenerGazeRef = useRef({ Connor: 0, Monk: 0 });
   const listenerGazeQuatRef = useRef(new THREE.Quaternion());
   const listenerGazeAxisRef = useRef(new THREE.Vector3(0, 1, 0));
   const cameraAimRef = useRef({
@@ -1788,7 +1788,7 @@ function TalkShowModel({
       host.remove();
       portalsRef.current = {
         Monk: { frame: null, ready: false, source: null, attempt: 0, exhausted: false, loads: 0 },
-        Barron: { frame: null, ready: false, source: null, attempt: 0, exhausted: false, loads: 0 },
+        Connor: { frame: null, ready: false, source: null, attempt: 0, exhausted: false, loads: 0 },
       };
     };
   }, [onPlaybackReady, onPlaybackStateChange, compactPortalHost]);
@@ -1864,10 +1864,10 @@ function TalkShowModel({
         : 0;
     if (
       introCameraFocus > 0.001 &&
-      headBones.Barron &&
-      neutralHeadQuaternions.Barron
+      headBones.Connor &&
+      neutralHeadQuaternions.Connor
     ) {
-      const head = headBones.Barron;
+      const head = headBones.Connor;
       if (head.parent) {
         // Mirror CyborgTempleScene's proven Demon look-at math. A dummy
         // Object3D aims at the actual viewer camera, then its world rotation is
@@ -1883,7 +1883,7 @@ function TalkShowModel({
           .copy(aim.parentWorldQuaternion)
           .multiply(aim.dummy.quaternion);
 
-        const baseLocal = neutralHeadQuaternions.Barron;
+        const baseLocal = neutralHeadQuaternions.Connor;
         aim.deltaQuaternion
           .copy(baseLocal)
           .invert()
@@ -1908,11 +1908,11 @@ function TalkShowModel({
         aim.smoothedQuaternion.slerp(aim.blendedTargetQuaternion, 0.08);
         head.quaternion.copy(aim.smoothedQuaternion);
       }
-    } else if (cameraAimRef.current.smoothedQuaternion && headBones.Barron) {
+    } else if (cameraAimRef.current.smoothedQuaternion && headBones.Connor) {
       const aim = cameraAimRef.current;
-      const animQuaternion = headBones.Barron.quaternion.clone();
+      const animQuaternion = headBones.Connor.quaternion.clone();
       aim.smoothedQuaternion.slerp(animQuaternion, 0.08);
-      headBones.Barron.quaternion.copy(aim.smoothedQuaternion);
+      headBones.Connor.quaternion.copy(aim.smoothedQuaternion);
       if (aim.smoothedQuaternion.angleTo(animQuaternion) < 0.01) {
         aim.smoothedQuaternion = null;
       }
@@ -2032,7 +2032,7 @@ function TalkShowModel({
 
 // Mounts inside a host Canvas (no Canvas of its own). Takes the same
 // position/scale/rotation CyborgTempleScene receives so the swap keeps the
-// model in the same spot. `projectCharacter` ('Monk' | 'Barron' | null)
+// model in the same spot. `projectCharacter` ('Monk' | 'Connor' | null)
 // activates the live SitePal projection on that character's face for fitting.
 //
 // The last four props are the MOBILE switches (see MobileTalkShow):

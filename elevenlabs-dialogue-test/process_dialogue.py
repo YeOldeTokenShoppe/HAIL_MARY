@@ -15,7 +15,7 @@ SPEAKERS = {
 }
 
 ACTOR_NAMES = {
-    "john": "Barron",
+    "john": "Connor",
     "gr80": "Monk",
 }
 
@@ -134,7 +134,7 @@ def write_episode_record(args, show_timing):
         "status": "published",
         # Fill these in from SitePal's Audio Manager after uploading the two
         # balanced WAVs. The names must match exactly.
-        "audio": {"Barron": "", "Monk": ""},
+        "audio": {"Connor": "", "Monk": ""},
         "leadIn": 2.5,
         "lineStarts": show_timing["line_starts"],
         "dialogueEnd": show_timing["duration_seconds"],

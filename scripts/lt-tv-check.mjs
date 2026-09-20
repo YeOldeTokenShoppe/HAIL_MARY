@@ -29,7 +29,7 @@ const EPISODES_DIR = path.join(CONTENT, "episodes");
 // The rig's authored clip lengths — the one thing the set knows and a record
 // doesn't. Kept in step with CHARACTER_CLIPS in TalkShowScene.jsx.
 const REACTIONS = {
-  Barron: ["headnod", "headnodSubtle", "headshakeDisappointment", "lookAround", "shrug", "mockCrying"],
+  Connor: ["headnod", "headnodSubtle", "headshakeDisappointment", "lookAround", "shrug", "mockCrying"],
   Monk: ["headnod", "headnodSubtle", "headshake", "headshakeDisappointment", "lookAround", "shrug", "prayCrosschest"],
 };
 
