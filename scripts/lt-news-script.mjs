@@ -33,6 +33,7 @@ import {
   ACTORS,
   REACTIONS,
   SEGMENTS,
+  OPTIONAL_SEGMENTS,
   packBlocks,
   sitepalClipName,
   NEWS_SOURCE_DOMAINS,
@@ -144,9 +145,14 @@ function parseJson(text) {
 
 // ── Pass 1: the rundown (editorial judgment) ──────────────────────────────
 
-const RUNDOWN_SYSTEM = `You are the producer of "LT Weekly News Recap", a short animated crypto news show on the Liminal Terminal. You are handed a week of raw signal — social posts, news headlines, trending tokens, the Fear & Greed gauge, prediction-market odds — and you decide what the show covers.
+const RUNDOWN_SYSTEM = `You are the producer of "LT Weekly News Recap", a short animated news show about investing and economics that lives on the Liminal Terminal, a neon devotional trading floor. You are handed a week of raw signal and you decide what the show covers.
 
-You are choosing THREE stories for a six-minute show, in running order.
+THE BEAT IS GENERAL INVESTING AND ECONOMICS — NOT CRYPTO.
+A typical week is the Fed and interest rates, the ten-year Treasury, the price of oil, a bill moving through Congress, what the indices did — and then crypto, and then whatever people have newly decided is an asset. Crypto is one beat among several, not the default. If you pick three crypto stories you have produced the wrong show.
+
+The signal you are given is grouped: macro (Fed press releases, the Treasury yield curve, economy headlines), markets (index and commodity levels week over week), crypto, collectibles (the trading-card and memorabilia beat — set launches, manias, people buying things as investments), and predictions (Polymarket and Kalshi odds).
+
+You are choosing THREE stories for a six-to-seven-minute show, in running order. Spread them across beats: if story one is macro, story two should not be. Story three is usually the absurd one, and collectibles live there naturally.
 
 WHAT MAKES A GOOD STORY HERE:
 - It has a number or a concrete fact in it. "Sentiment is mixed" is not a story; "six hundred million left the ETFs in four sessions" is.
@@ -159,14 +165,14 @@ WHAT TO REJECT:
 - Stories whose only source is a single anonymous social post with no corroborating headline.
 - Two stories that are the same story wearing different hats.
 
-Also pick the GAUGE beat: the Fear & Greed movement across the week (the arc from the start of the week to the end, not today's reading) and ONE prediction-market line worth quoting.
+Also pick THE BOARD: the three or four numbers that actually moved this week, read as a board. Candidates are the ten-year Treasury yield and its direction, the Fear & Greed arc across the week (the arc, not today's reading), oil or gold if either moved meaningfully, and the indices. Plus ONE prediction-market line from Polymarket or Kalshi worth quoting, with its odds. Do not recite every number you were given — pick what moved.
 
 HOW TO SOURCE A STORY — the brief nominates, the web confirms:
 The brief you are given is made of headlines and social posts. It is enough to tell you what the week was ABOUT and nowhere near enough to read a number out loud on air. So:
 1. Pick your three candidate stories from the brief.
 2. SEARCH to confirm each one before you write it, using the web_search tool. Find the number, the date and a real article from a reputable outlet.
 3. Put the article you actually confirmed it from in that story's "sources", with its real URL and outlet. A source you did not read does not go in the list.
-4. Do the same for the gauge beat's prediction-market line.
+4. Do the same for the board's prediction-market line and any number on it you did not get from the brief's own price data.
 
 If a search does not confirm a story, you have three honest options, in this order: replace it with one you CAN confirm; keep it but strip the unconfirmed number out of "fact" and say so in "gaps"; or, if the week is genuinely thin, return fewer than three stories. Never keep a number you could not confirm.
 
@@ -183,6 +189,7 @@ Return ONLY a JSON object, no preamble and no code fences:
   "stories": [
     {
       "slot": "story-1" | "story-2" | "story-3",
+      "beat": "macro" | "markets" | "crypto" | "collectibles" | "predictions",
       "headline": "short internal headline",
       "fact": "the concrete fact with its number, one sentence",
       "tension": "what the two hosts disagree about",
@@ -193,16 +200,34 @@ Return ONLY a JSON object, no preamble and no code fences:
       "gaps": "anything you could not source or confirm, or empty string"
     }
   ],
-  "gauge": {
-    "fearGreed": "the week's arc in one sentence, with both numbers",
-    "market": "the prediction-market line with its odds, one sentence",
+  "board": {
+    "lines": ["3 to 4 short sentences, each one number that moved and its direction"],
+    "market": "the prediction-market line with its odds and its venue, one sentence",
     "sources": [{ "title": "...", "url": "...", "outlet": "..." }]
   }
 }`;
 
+// The ad copy is a file a human keeps current — the show's one hand-fed input.
+// No copy means no ad break that week, which is a normal week.
+async function readSpots(path = "content/lt-tv/rl80-spots.md") {
+  try {
+    const text = await readFile(resolve(path), "utf8");
+    // Bullets under "Retired" are kept for reuse but are not in rotation.
+    const live = text.split(/^##\s+Retired/m)[0];
+    return live
+      .split("\n")
+      .filter((line) => /^-\s+\S/.test(line))
+      .map((line) => line.replace(/^-\s+/, "").trim());
+  } catch {
+    return [];
+  }
+}
+
 // ── Pass 2: the script ────────────────────────────────────────────────────
 
-const SCRIPT_SYSTEM = `You are the writer of "LT Weekly News Recap", a six-minute animated news show on the Liminal Terminal — a neon devotional trading floor where cyborgs and degens pray over markets. You write the whole episode as spoken dialogue for two characters sitting at a news desk.
+const SCRIPT_SYSTEM = `You are the writer of "LT Weekly News Recap", a six-minute animated news show about investing and economics, broadcast from the Liminal Terminal — a neon devotional trading floor where cyborgs and degens pray over markets. You write the whole episode as spoken dialogue for two characters sitting at a news desk.
+
+THE BEAT IS GENERAL INVESTING AND ECONOMICS. Interest rates, Treasury yields, oil, legislation, the indices, crypto, and whatever people are currently buying as an investment. Write it as a market show that takes all of it equally seriously, which is to say not very.
 
 THE TWO HOSTS — this is the whole show, so get them exactly right:
 
@@ -228,6 +253,10 @@ DIRECT ADDRESS: set "directAddress": true on a line when the speaker is talking 
 
 ANIMATION CUES: attach reactions to lines to give the LISTENER something to do while the other talks. Each cue is { "actor": who performs it, "reaction": one of the names below, "offset": seconds after the line begins }. Barron can perform: ${Object.keys(REACTIONS.Barron).join(", ")}. GR80 can perform: ${Object.keys(REACTIONS.Monk).join(", ")}. Aim for one cue every four or five lines — the set is two people in chairs, so stillness reads as attention, and constant motion reads as a screensaver. Use headnodSubtle for ordinary agreement and save headnod for an emphatic beat. lookAround is a long clip; use it at most twice, for surveying the studio.
 
+THE SPOT — the ad break, when you are given copy for it:
+Play it completely straight for as long as you can bear. Barron does the sponsor voice: grand, overclaimed, delighted with himself, the register of a man reading a script he was paid for and believes anyway. Then GR80 reads the disclaimer as though it were scripture, or refuses to read it, or reads it correctly in a way that ruins the ad. Fifty-odd words, in and out.
+It is a joke ABOUT advertising. It never tells anyone to buy anything, it states no price, no return and no yield figure, and "not a recommendation" is the punchline rather than a caption. If you are given no spot copy, omit the "the-spot" segment entirely.
+
 Return ONLY a JSON object, no preamble and no code fences:
 {
   "segments": [
@@ -242,20 +271,28 @@ Return ONLY a JSON object, no preamble and no code fences:
 }
 "cues" may be an empty array. Write every segment you are given, in order.`;
 
-function scriptUserMessage(rundown, week) {
-  const skeleton = SEGMENTS.map(
-    (s) => `- ${s.id} ("${s.label}"), target ${s.targetWords} spoken words. ${s.intent}`,
-  ).join("\n");
+function scriptUserMessage(rundown, week, spots) {
+  // A week with no ad copy simply does not get the segment offered to it.
+  const running = SEGMENTS.filter((s) => !(s.id === "the-spot" && !spots.length));
+  const skeleton = running
+    .map((s) => `- ${s.id} ("${s.label}"), target ${s.targetWords} spoken words. ${s.intent}`)
+    .join("\n");
+
+  const spotBlock = spots.length
+    ? `\nSPOT COPY — pick exactly ONE of these for "the-spot" and build the ad read around it:\n${spots
+        .map((line) => `- ${line}`)
+        .join("\n")}\n`
+    : "\nThere is no spot copy this week, so do NOT write a \"the-spot\" segment.\n";
 
   return `Week: ${week}
 
 THE RUNDOWN
 ${JSON.stringify(rundown, null, 2)}
-
-THE SEGMENTS, in order — write all six:
+${spotBlock}
+THE SEGMENTS, in order — write all ${running.length}:
 ${skeleton}
 
-Hit the word targets within about fifteen percent. They add up to a six-minute episode, and the show has to land between five and ten minutes.`;
+Hit the word targets within about fifteen percent. They add up to a six-and-a-half-minute episode, and the show has to land between five and ten minutes.`;
 }
 
 // ── Assembly ──────────────────────────────────────────────────────────────
@@ -274,8 +311,11 @@ function assemble({ rundown, segments, week, brief, number = 1 }) {
 
   for (const spec of SEGMENTS) {
     const written = bySegment.get(spec.id);
-    if (!written) {
-      warnings.push(`Segment "${spec.id}" is missing from the script.`);
+    if (!written || !(written.lines || []).length) {
+      // The spot is skipped in a week with no ad copy — that is normal, not a gap.
+      if (!OPTIONAL_SEGMENTS.has(spec.id)) {
+        warnings.push(`Segment "${spec.id}" is missing from the script.`);
+      }
       continue;
     }
 
@@ -410,7 +450,7 @@ function assemble({ rundown, segments, week, brief, number = 1 }) {
 
   const sources = [
     ...(rundown.stories || []).flatMap((s) => s.sources || []),
-    ...(rundown.gauge?.sources || []),
+    ...(rundown.board?.sources || []),
   ].filter((s) => s && s.title);
 
   return {
@@ -572,11 +612,12 @@ async function main() {
       return;
     }
 
-    console.log("Script pass…");
+    const spots = await readSpots();
+    console.log(`Script pass… ${spots.length ? `(${spots.length} spot(s) available)` : "(no ad break this week)"}`);
     const written = await claude({
       system: SCRIPT_SYSTEM,
-      user: scriptUserMessage(rundown, week),
-      maxTokens: 12000,
+      user: scriptUserMessage(rundown, week, spots),
+      maxTokens: 16000,
     });
     segments = written.segments;
   }

@@ -112,19 +112,42 @@ export const REACTIONS = {
 // Add to it as needed — it is an allowlist, so anything absent is simply
 // unreachable rather than silently trusted.
 export const NEWS_SOURCE_DOMAINS = [
+  // Primary sources first — a rate decision or a bill should be confirmed from
+  // the institution that issued it, not from somebody's coverage of it.
+  "federalreserve.gov",
+  "treasury.gov",
+  "home.treasury.gov",
+  "congress.gov",
+  "bls.gov",
+  "bea.gov",
+  "eia.gov",
+  "sec.gov",
+
+  // General business and economics desks.
+  "reuters.com",
+  "apnews.com",
+  "cnbc.com",
+  "marketwatch.com",
+  "bloomberg.com",
+  "wsj.com",
+  "ft.com",
+  "barrons.com",
+
+  // Crypto desks.
   "coindesk.com",
   "theblock.co",
   "blockworks.co",
   "decrypt.co",
   "dlnews.com",
   "cointelegraph.com",
-  "reuters.com",
-  "cnbc.com",
-  "apnews.com",
-  "sec.gov",
+
+  // Data and prices, for checking a figure directly.
   "defillama.com",
-  "farside.co.uk", // ETF flow tables
-  "dune.com",
+  "farside.co.uk",
+  "polymarket.com",
+  "kalshi.com",
+  "pricecharting.com",
+  "tcgplayer.com",
 ];
 
 // Bounds the cost of one editorial pass. Three stories plus the gauge is a
@@ -137,11 +160,16 @@ export const WEB_SEARCH_TOOL_TYPE = "web_search_20260209";
 
 // ── The rundown ───────────────────────────────────────────────────────────
 //
-// A fixed skeleton is the point: the same six segments every week is what makes
-// the show producible in an afternoon instead of designed from scratch. The word
-// targets sum to about 895 words, which at ESTIMATED_WPM is roughly 6:10 — the
+// A fixed skeleton is the point: the same segments every week is what makes the
+// show producible in an afternoon instead of designed from scratch. The word
+// targets sum to about 950 words, which at ESTIMATED_WPM is roughly 6:33 — the
 // middle of the 5–10 minute window, so a segment can run long without the
 // episode falling out of it.
+//
+// The show is general investing and economics, not a crypto show: a week is the
+// Fed, the ten-year, oil, a bill in Congress, the indices, crypto, and whatever
+// people have newly decided is an asset. The story slots are deliberately not
+// assigned to beats — the week decides which is the lead.
 export const SEGMENTS = [
   {
     id: "cold-open",
@@ -155,27 +183,35 @@ export const SEGMENTS = [
     label: "Lead story",
     targetWords: 210,
     intent:
-      "The week's biggest story. Barron states the fact with its number, GR80 reframes what the number actually measures, Barron pushes back, GR80 lands the button.",
+      "The week's biggest story, from ANY market — a rate decision, a bill moving through Congress, the ten-year, oil, the indices, or crypto. Barron states the fact with its number, GR80 reframes what the number actually measures, Barron pushes back, GR80 lands the button.",
   },
   {
     id: "story-2",
     label: "Second story",
     targetWords: 200,
-    intent: "Same beat pattern, different register — usually infrastructure, adoption or a chain milestone.",
+    intent:
+      "Same beat pattern, a different corner of the market from story one. If story one was macro, this is markets or crypto, and the other way round. Do not run two versions of the same story.",
+  },
+  {
+    id: "the-spot",
+    label: "The spot",
+    targetWords: 55,
+    intent:
+      "A commercial-style read for RL80, played completely straight as an ad break and then punctured. Barron does the sponsor voice — grand, overclaimed, delighted. GR80 reads the disclaimer as if it were scripture, or refuses to read it. It is a joke about advertising, never a recommendation to buy anything. Skipped entirely when there is no spot copy for the week.",
   },
   {
     id: "story-3",
     label: "Third story",
     targetWords: 185,
     intent:
-      "The week's absurd one. This is the comedy slot: Barron enjoys it, GR80 finds the uncomfortable truth underneath it.",
+      "The week's absurd one — usually collectibles, a mania, or whatever people have newly decided is an asset. The comedy slot: Barron enjoys it, GR80 finds the uncomfortable truth underneath it.",
   },
   {
-    id: "gauge",
-    label: "The gauge",
+    id: "the-board",
+    label: "The board",
     targetWords: 135,
     intent:
-      "Fear & Greed across the week (the arc, not the spot reading) plus one prediction-market line. Ends on GR80 turning a number into a moral.",
+      "The week's numbers read as a board: the ten-year, the Fear & Greed arc, oil or gold if either moved, and ONE prediction-market line from Polymarket or Kalshi. Pick the three or four that actually moved; do not recite all of them. Ends on GR80 turning a number into a moral.",
   },
   {
     id: "sign-off",
@@ -185,6 +221,11 @@ export const SEGMENTS = [
       "Barron recaps the three stories in one sentence. GR80 closes the ledger and states plainly that none of it was a recommendation. Recurring closer — keep the shape week to week.",
   },
 ];
+
+// The spot only runs when there is copy for it, so it is the one segment the
+// script may legitimately omit.
+export const OPTIONAL_SEGMENTS = new Set(["the-spot"]);
+
 
 // ── Recording blocks ──────────────────────────────────────────────────────
 //

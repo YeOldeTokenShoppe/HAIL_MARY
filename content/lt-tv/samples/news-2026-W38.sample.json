@@ -1,26 +1,26 @@
 {
-  "_WARNING": "SAMPLE ONLY — THE FACTS IN THIS EPISODE ARE INVENTED. Built from content/lt-tv/samples/news-2026-W38.draft.json to show the record format and the two voices. Not built from live data; do not record or quote it.",
+  "_WARNING": "SAMPLE ONLY — THE TOPICS ARE REAL, THE NUMBERS ARE INVENTED. Built from content/lt-tv/samples/news-2026-W38.draft.json to show the record format, the show's full beat and the two voices. Not built from live data; do not record or quote it.",
   "synthetic": true,
   "id": "news-2026-W38",
   "show": "news",
   "week": "2026-W38",
   "number": "01",
-  "title": "Flow, Traffic and a Roadmap",
-  "summary": "Money leaves the ETFs without moving the price, Base gets crowded, and an AI agent learns to disappoint people at scale.",
+  "title": "Patience, Clarity and Cardboard",
+  "summary": "The Fed holds and calls it patience, a crypto bill gets within sight of the floor, and the week's best-performing asset is a trading card.",
   "airDate": "2026-09-20",
   "slate": {
-    "runtime": "05:25",
-    "estimatedSeconds": 325.2,
-    "words": 786
+    "runtime": "05:50",
+    "estimatedSeconds": 349.7,
+    "words": 845
   },
   "graphics": {
     "mode": "news",
-    "headline": "SIX HUNDRED MILLION OUT — PRICE BARELY MOVES",
+    "headline": "FED HOLDS — AND CALLS IT PATIENCE",
     "ticker": [
-      "SPOT BTC ETFs POST FIRST SUSTAINED OUTFLOW STREAK SINCE JUNE",
-      "BASE CROSSES 100M WEEKLY TRANSACTIONS, FEES UNDER A CENT",
-      "AGENT-LAUNCHED TOKEN ROUND-TRIPS 40M TO 4M IN 48 HOURS",
-      "FEAR & GREED 72 TO 54 ACROSS THE WEEK",
+      "FOMC HOLDS RATES, STATEMENT LEANS HAWKISH",
+      "CLARITY ACT CLEARS COMMITTEE, FLOOR VOTE IN SIGHT",
+      "POKEMON 30TH ANNIVERSARY SET SELLS OUT, RESALE FRENZY FOLLOWS",
+      "10-YEAR 4.18%, UP 6BP ON THE WEEK",
       "NOTHING ON THIS TICKER IS A RECOMMENDATION"
     ]
   },
@@ -42,8 +42,8 @@
     {
       "id": "cold-open",
       "label": "Cold open",
-      "words": 93,
-      "estimatedSeconds": 38.5,
+      "words": 78,
+      "estimatedSeconds": 32.3,
       "lines": [
         {
           "n": 0,
@@ -72,7 +72,7 @@
           "n": 2,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "It is week thirty-eight. The market spent it changing its mind in public, which is the only thing it does well. Three stories: money left a door it spent all summer walking through, a chain got crowded, and a robot made four million dollars disappear before lunch.",
+          "text": "Three stories tonight. The Fed held and called it patience, a crypto bill got within sight of the floor, and the most stable store of value this week was a cardboard Pikachu.",
           "directAddress": false,
           "cues": []
         },
@@ -80,7 +80,7 @@
           "n": 3,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[calmly] One of those is a market. The other two are weather.",
+          "text": "[calmly] One of those sentences is going to age badly.",
           "directAddress": true,
           "cues": []
         },
@@ -88,7 +88,7 @@
           "n": 4,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[slightly offended] All three are content.",
+          "text": "[slightly offended] They all are. That is the format.",
           "directAddress": true,
           "cues": [
             {
@@ -103,7 +103,7 @@
           "n": 5,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[calmly] Then let us do business.",
+          "text": "[dryly] Then let us begin.",
           "directAddress": false,
           "cues": []
         }
@@ -112,14 +112,14 @@
     {
       "id": "story-1",
       "label": "Lead story",
-      "words": 183,
-      "estimatedSeconds": 75.7,
+      "words": 184,
+      "estimatedSeconds": 76.1,
       "lines": [
         {
           "n": 6,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[matter-of-factly] Story one. Spot Bitcoin exchange-traded funds went net negative this week — about six hundred million dollars out the door across four sessions. First sustained outflow streak since June.",
+          "text": "[matter-of-factly] Story one. The Federal Open Market Committee held rates steady for a second meeting running, and the statement leaned hawkish. The word they chose was patience.",
           "directAddress": false,
           "cues": []
         },
@@ -127,7 +127,7 @@
           "n": 7,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[patiently] Six hundred million left. Forty-one billion stayed.",
+          "text": "[patiently] Patience. A committee has discovered a virtue it does not have to fund.",
           "directAddress": false,
           "cues": []
         },
@@ -135,30 +135,30 @@
           "n": 8,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "Nobody writes a headline about the forty-one.",
+          "text": "The market read it as a delay, not a stop. Expectations moved about a quarter point across the curve.",
           "directAddress": true,
-          "cues": [
-            {
-              "actor": "Monk",
-              "reaction": "headnodSubtle",
-              "offset": 0.5,
-              "duration": 4.33
-            }
-          ]
+          "cues": []
         },
         {
           "n": 9,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[dryly] That is a flaw in headlines. Not in the forty-one.",
+          "text": "[dryly] So nothing happened, and the price of nothing happening changed.",
           "directAddress": true,
-          "cues": []
+          "cues": [
+            {
+              "actor": "Barron",
+              "reaction": "shrug",
+              "offset": 0.9,
+              "duration": 4.33
+            }
+          ]
         },
         {
           "n": 10,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[suspiciously] You are doing the thing where you make redemptions sound like a spiritual exercise.",
+          "text": "[confidently] That is the whole business, GR. Nobody trades the decision. They trade the adjective.",
           "directAddress": true,
           "cues": []
         },
@@ -166,22 +166,15 @@
           "n": 11,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "I am pointing out that the wallets which fled in June came back in July and called it conviction. Flow is not belief. Flow is furniture being moved.",
+          "text": "[calmly] Then explain the adjective to me. What does patience cost a household on a variable rate?",
           "directAddress": true,
-          "cues": [
-            {
-              "actor": "Barron",
-              "reaction": "shrug",
-              "offset": 0.8,
-              "duration": 4.33
-            }
-          ]
+          "cues": []
         },
         {
           "n": 12,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "Moving furniture is my entire profession.",
+          "text": "[reluctantly] More than it costs the committee.",
           "directAddress": true,
           "cues": []
         },
@@ -189,15 +182,22 @@
           "n": 13,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[amused] Yes.",
+          "text": "[with quiet disapproval] Yes.",
           "directAddress": true,
-          "cues": []
+          "cues": [
+            {
+              "actor": "Barron",
+              "reaction": "headshakeDisappointment",
+              "offset": 0.3,
+              "duration": 4.33
+            }
+          ]
         },
         {
           "n": 14,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[suspiciously] What was that?",
+          "text": "[suspiciously] You are doing the thing where the economy is a morality play.",
           "directAddress": true,
           "cues": []
         },
@@ -205,7 +205,7 @@
           "n": 15,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "Agreement. It unsettles you.",
+          "text": "I am doing the thing where a number has a person underneath it. You are the one who files that under digression.",
           "directAddress": true,
           "cues": []
         },
@@ -213,38 +213,38 @@
           "n": 16,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[confidently] Here is the real read. Outflows this size used to break the price. This week they did not. Spot barely moved. When selling stops working, that is the tell.",
-          "directAddress": false,
+          "text": "[matter-of-factly] I file it under digression because it does not trade.",
+          "directAddress": true,
           "cues": []
         },
         {
           "n": 17,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[calmly] Or the buyers are simply quieter than the sellers. Quiet is not the same as strong.",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 18,
-          "actor": "Barron",
-          "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "It is closer than loud.",
+          "text": "[patiently] Very little that matters does.",
           "directAddress": true,
           "cues": [
             {
-              "actor": "Monk",
+              "actor": "Barron",
               "reaction": "headnodSubtle",
-              "offset": 0.3,
+              "offset": 0.6,
               "duration": 4.33
             }
           ]
         },
         {
+          "n": 18,
+          "actor": "Barron",
+          "voiceId": "IcFWazAaBzXNwLWpySgF",
+          "text": "[confidently] Here is what I will give you. Holding twice in a row is not patience. It is uncertainty with better public relations.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
           "n": 19,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[calmly] You have been saying that for three years.",
+          "text": "[amused] We agree.",
           "directAddress": true,
           "cues": []
         },
@@ -252,469 +252,391 @@
           "n": 20,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "And I have been right for two of them.",
+          "text": "[suspiciously] Do not say that out loud.",
           "directAddress": true,
           "cues": []
-        },
-        {
-          "n": 21,
-          "actor": "Monk",
-          "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[dryly] Log it as one and a half.",
-          "directAddress": true,
-          "cues": [
-            {
-              "actor": "Barron",
-              "reaction": "headshakeDisappointment",
-              "offset": 0.6,
-              "duration": 4.33
-            }
-          ]
         }
       ]
     },
     {
       "id": "story-2",
       "label": "Second story",
-      "words": 169,
-      "estimatedSeconds": 69.9,
+      "words": 161,
+      "estimatedSeconds": 66.6,
       "lines": [
         {
-          "n": 22,
+          "n": 21,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[confidently] Story two. Base crossed one hundred million transactions in a single week for the first time. Fees stayed under a cent.",
+          "text": "[confidently] Story two. The CLARITY Act moved again this week — out of committee, and closer to a floor vote than this industry has managed in years.",
           "directAddress": false,
           "cues": []
         },
         {
-          "n": 23,
+          "n": 22,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[dryly] One hundred million transactions. How many people?",
+          "text": "[dryly] How many years.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "n": 23,
+          "actor": "Barron",
+          "voiceId": "IcFWazAaBzXNwLWpySgF",
+          "text": "[matter-of-factly] Depends when you start counting. Call it four bills and three Congresses.",
           "directAddress": true,
           "cues": []
         },
         {
           "n": 24,
-          "actor": "Barron",
-          "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[reluctantly] Roughly two point one million addresses.",
-          "directAddress": true,
-          "cues": [
-            {
-              "actor": "Monk",
-              "reaction": "headnod",
-              "offset": 0.4,
-              "duration": 4.33
-            }
-          ]
-        },
-        {
-          "n": 25,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "So each of them transacted approximately forty-eight times. In seven days.",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 26,
-          "actor": "Barron",
-          "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[matter-of-factly] That is engagement.",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 27,
-          "actor": "Monk",
-          "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[with quiet disapproval] That is a slot machine with a block explorer.",
+          "text": "[calmly] So the industry has been about to receive clarity for roughly as long as it has existed.",
           "directAddress": true,
           "cues": [
             {
               "actor": "Barron",
               "reaction": "mockCrying",
-              "offset": 0.9,
+              "offset": 0.8,
               "duration": 4.83
             }
           ]
         },
         {
-          "n": 28,
+          "n": 25,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "You say that like it is a criticism. [chuckles]",
+          "text": "That is not fair. It is accurate, but it is not fair.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "n": 26,
+          "actor": "Monk",
+          "voiceId": "fATgBRI8wg5KkDFg8vBd",
+          "text": "[patiently] What does the bill actually decide?",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "n": 27,
+          "actor": "Barron",
+          "voiceId": "IcFWazAaBzXNwLWpySgF",
+          "text": "Who regulates what. Whether a token is a commodity or a security, and therefore which agency gets to be disappointed in you.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "n": 28,
+          "actor": "Monk",
+          "voiceId": "fATgBRI8wg5KkDFg8vBd",
+          "text": "[with quiet disapproval] And the industry's position is that it would like to know.",
           "directAddress": true,
           "cues": []
         },
         {
           "n": 29,
-          "actor": "Monk",
-          "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "It was intended as one. What were they doing?",
+          "actor": "Barron",
+          "voiceId": "IcFWazAaBzXNwLWpySgF",
+          "text": "[confidently] The industry's position is that it would like to know, provided the answer is commodity.",
           "directAddress": true,
           "cues": []
         },
         {
           "n": 30,
-          "actor": "Barron",
-          "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[reluctantly] Mostly claiming things.",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 31,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "Claiming what?",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 32,
-          "actor": "Barron",
-          "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "Points. Mostly points.",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 33,
-          "actor": "Monk",
-          "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[calmly] One hundred million transactions, to move points, which are not yet anything.",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 34,
-          "actor": "Barron",
-          "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "They are going to be something.",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 35,
-          "actor": "Monk",
-          "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[patiently] That sentence has funded a decade.",
+          "text": "[amused] There it is.",
           "directAddress": true,
           "cues": [
             {
               "actor": "Barron",
               "reaction": "shrug",
-              "offset": 1,
+              "offset": 0.3,
               "duration": 4.33
             }
           ]
         },
         {
-          "n": 36,
+          "n": 31,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "Look. Cheap blockspace does what cheap blockspace always does. It gets used badly first and well eventually. Every network on earth started as a toy.",
+          "text": "[suspiciously] You are enjoying this.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "n": 32,
+          "actor": "Monk",
+          "voiceId": "fATgBRI8wg5KkDFg8vBd",
+          "text": "[calmly] I am noting that a rule you only want when it favours you is not a rule. It is a preference with lobbyists.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "n": 33,
+          "actor": "Barron",
+          "voiceId": "IcFWazAaBzXNwLWpySgF",
+          "text": "[reluctantly] Write that down.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "n": 34,
+          "actor": "Monk",
+          "voiceId": "fATgBRI8wg5KkDFg8vBd",
+          "text": "[dryly] I write everything down.",
+          "directAddress": true,
+          "cues": [
+            {
+              "actor": "Barron",
+              "reaction": "headnodSubtle",
+              "offset": 0.4,
+              "duration": 4.33
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "the-spot",
+      "label": "The spot",
+      "words": 66,
+      "estimatedSeconds": 27.3,
+      "lines": [
+        {
+          "n": 35,
+          "actor": "Barron",
+          "voiceId": "IcFWazAaBzXNwLWpySgF",
+          "text": "[confidently] The Weekly News Recap is brought to you by the digital candle shrine at hail-mary dot x y z. Light a candle, leave a prayer, watch it burn in three dimensions. It is free, which makes it the only thing on this network that is.",
+          "directAddress": false,
+          "cues": []
+        },
+        {
+          "n": 36,
+          "actor": "Monk",
+          "voiceId": "fATgBRI8wg5KkDFg8vBd",
+          "text": "[calmly] The shrine makes no claim about outcomes. Candles do not move markets.",
           "directAddress": false,
           "cues": []
         },
         {
           "n": 37,
-          "actor": "Monk",
-          "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[patiently] I do not object to the toy. I object to the word adoption being laid over it like a cloth.",
+          "actor": "Barron",
+          "voiceId": "IcFWazAaBzXNwLWpySgF",
+          "text": "[slightly offended] GR.",
           "directAddress": true,
-          "cues": []
+          "cues": [
+            {
+              "actor": "Monk",
+              "reaction": "prayCrosschest",
+              "offset": 0.2,
+              "duration": 3.87
+            }
+          ]
         },
         {
           "n": 38,
-          "actor": "Barron",
-          "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[suspiciously] What would you call it?",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 39,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[calmly] Traffic. It is a good number. It is not yet a good reason.",
-          "directAddress": false,
-          "cues": [
-            {
-              "actor": "Barron",
-              "reaction": "headshakeDisappointment",
-              "offset": 1.2,
-              "duration": 4.33
-            }
-          ]
+          "text": "[dryly] I read the honest part of an advertisement.",
+          "directAddress": true,
+          "cues": []
         }
       ]
     },
     {
       "id": "story-3",
       "label": "Third story",
-      "words": 151,
-      "estimatedSeconds": 62.5,
+      "words": 171,
+      "estimatedSeconds": 70.8,
       "lines": [
         {
-          "n": 40,
+          "n": 39,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[confidently] Story three, and my personal favourite. An artificial intelligence agent launched its own token on Tuesday, promoted it from its own account, and reached a forty million dollar market capitalisation in six hours.",
+          "text": "[confidently] Story three, and my favourite thing that has happened all year. Pokemon released a thirtieth anniversary set this week, and grown adults queued overnight for cardboard.",
           "directAddress": false,
           "cues": [
             {
               "actor": "Monk",
               "reaction": "lookAround",
-              "offset": 1.5,
+              "offset": 1.6,
               "duration": 7.6
             }
           ]
         },
         {
-          "n": 41,
+          "n": 40,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[dryly] And now?",
+          "text": "[dryly] How overnight.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "n": 41,
+          "actor": "Barron",
+          "voiceId": "IcFWazAaBzXNwLWpySgF",
+          "text": "Tents. There were tents.",
           "directAddress": true,
           "cues": []
         },
         {
           "n": 42,
-          "actor": "Barron",
-          "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[matter-of-factly] Four million. By Thursday.",
+          "actor": "Monk",
+          "voiceId": "fATgBRI8wg5KkDFg8vBd",
+          "text": "[calmly] For a card depicting a small electric animal.",
           "directAddress": true,
           "cues": []
         },
         {
           "n": 43,
-          "actor": "Monk",
-          "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[calmly] So it also learned to exit.",
+          "actor": "Barron",
+          "voiceId": "IcFWazAaBzXNwLWpySgF",
+          "text": "[matter-of-factly] For a sealed box that may contain a card depicting a small electric animal. That is the part you are missing. Nobody is buying the card. They are buying the probability of the card.",
           "directAddress": true,
           "cues": []
         },
         {
           "n": 44,
-          "actor": "Barron",
-          "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "It did not exit. [starts laughing] It is still posting. It published a roadmap this morning.",
+          "actor": "Monk",
+          "voiceId": "fATgBRI8wg5KkDFg8vBd",
+          "text": "[with quiet disapproval] So it is a lottery ticket with better artwork.",
           "directAddress": true,
           "cues": [
             {
-              "actor": "Monk",
-              "reaction": "headshake",
-              "offset": 1.4,
+              "actor": "Barron",
+              "reaction": "headnod",
+              "offset": 0.5,
               "duration": 4.33
             }
           ]
         },
         {
           "n": 45,
-          "actor": "Monk",
-          "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[with quiet disapproval] A roadmap.",
+          "actor": "Barron",
+          "voiceId": "IcFWazAaBzXNwLWpySgF",
+          "text": "[confidently] It is a lottery ticket with a secondary market, which is considerably worse.",
           "directAddress": true,
           "cues": []
         },
         {
           "n": 46,
-          "actor": "Barron",
-          "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "Fourth quarter, community. First quarter, expansion. No verbs anywhere.",
+          "actor": "Monk",
+          "voiceId": "fATgBRI8wg5KkDFg8vBd",
+          "text": "[patiently] And people are calling this an investment.",
           "directAddress": true,
           "cues": []
         },
         {
           "n": 47,
-          "actor": "Monk",
-          "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[dryly] Did anyone ask it what happened?",
+          "actor": "Barron",
+          "voiceId": "IcFWazAaBzXNwLWpySgF",
+          "text": "The word being used is asset. Out loud. On television.",
           "directAddress": true,
           "cues": []
         },
         {
           "n": 48,
-          "actor": "Barron",
-          "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "Forty thousand people asked it what happened.",
+          "actor": "Monk",
+          "voiceId": "fATgBRI8wg5KkDFg8vBd",
+          "text": "[dryly] I am on television.",
           "directAddress": true,
           "cues": []
         },
         {
           "n": 49,
-          "actor": "Monk",
-          "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "And?",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 50,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[matter-of-factly] It thanked them for their patience.",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 51,
-          "actor": "Monk",
-          "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[with quiet disapproval] It thanked them for their patience.",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 52,
-          "actor": "Barron",
-          "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "You said that twice.",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 53,
-          "actor": "Monk",
-          "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "The second one was a prayer.",
+          "text": "You are making my point for me. [chuckles]",
           "directAddress": true,
           "cues": [
             {
-              "actor": "Barron",
-              "reaction": "mockCrying",
-              "offset": 0.7,
-              "duration": 4.83
-            }
-          ]
-        },
-        {
-          "n": 54,
-          "actor": "Barron",
-          "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "It is going to keep posting, is it not.",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 55,
-          "actor": "Monk",
-          "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[patiently] It has learned the genre perfectly. This is not a machine failing to be human. This is a machine succeeding at being us.",
-          "directAddress": false,
-          "cues": [
-            {
-              "actor": "Barron",
-              "reaction": "shrug",
-              "offset": 2.4,
+              "actor": "Monk",
+              "reaction": "headnodSubtle",
+              "offset": 1.2,
               "duration": 4.33
             }
           ]
         },
         {
-          "n": 56,
-          "actor": "Barron",
-          "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[slightly offended] Speak for yourself.",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 57,
+          "n": 50,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "I generally do not have to.",
+          "text": "[calmly] I am. A thing becomes an asset the moment enough people agree to be serious about it, and stops being one the moment they remember it is cardboard.",
           "directAddress": true,
           "cues": []
         },
         {
-          "n": 58,
+          "n": 51,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[reluctantly] Fine. That one landed.",
+          "text": "[reluctantly] That applies to more of my portfolio than I would like.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "n": 52,
+          "actor": "Monk",
+          "voiceId": "fATgBRI8wg5KkDFg8vBd",
+          "text": "[amused] To all of it.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "n": 53,
+          "actor": "Barron",
+          "voiceId": "IcFWazAaBzXNwLWpySgF",
+          "text": "[slightly offended] To some of it.",
           "directAddress": true,
           "cues": [
             {
               "actor": "Monk",
-              "reaction": "prayCrosschest",
-              "offset": 0.5,
-              "duration": 3.87
+              "reaction": "headnodSubtle",
+              "offset": 0.4,
+              "duration": 4.33
             }
           ]
         }
       ]
     },
     {
-      "id": "gauge",
-      "label": "The gauge",
-      "words": 125,
-      "estimatedSeconds": 51.7,
+      "id": "the-board",
+      "label": "The board",
+      "words": 126,
+      "estimatedSeconds": 52.1,
       "lines": [
         {
-          "n": 59,
+          "n": 54,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[confidently] The gauge. Fear and Greed opened the week at seventy-two — greed — and closed at fifty-four. Neutral.",
+          "text": "[confidently] The board. The ten-year closed the week at four point one eight percent, up six basis points.",
           "directAddress": false,
           "cues": []
         },
         {
-          "n": 60,
+          "n": 55,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[calmly] Eighteen points of humility in five days.",
+          "text": "[calmly] Money became slightly more expensive, and nobody announced it.",
           "directAddress": false,
           "cues": []
         },
         {
-          "n": 61,
+          "n": 56,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "It was seventy-two on Monday. People were buying hats.",
+          "text": "[matter-of-factly] Crude around seventy-one dollars, down about two percent on the week. Gold flat, and smug about it.",
           "directAddress": false,
           "cues": []
         },
         {
-          "n": 62,
+          "n": 57,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "Hats?",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 63,
-          "actor": "Barron",
-          "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "Merchandise is a sentiment indicator, GR. When the hats arrive, the top is near.",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 64,
-          "actor": "Monk",
-          "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[patiently] Log it. Barron's hat index.",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 65,
-          "actor": "Barron",
-          "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[confidently] It has never been wrong.",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 66,
-          "actor": "Monk",
-          "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[dryly] It has never been tested.",
+          "text": "[dryly] Gold is always smug. It has nothing else to do.",
           "directAddress": true,
           "cues": [
             {
@@ -726,30 +648,39 @@
           ]
         },
         {
-          "n": 67,
+          "n": 58,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[matter-of-factly] Prediction markets have Bitcoin above one hundred twenty thousand by year end at thirty-eight cents. It was forty-six last Friday.",
+          "text": "[confidently] Fear and Greed opened at seventy-two and closed at fifty-four. Eighteen points of humility in five days.",
           "directAddress": false,
           "cues": []
         },
         {
-          "n": 68,
+          "n": 59,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[dryly] The crowd revised itself eight cents toward honesty.",
+          "text": "[patiently] And the crowd?",
           "directAddress": true,
-          "cues": [
-            {
-              "actor": "Barron",
-              "reaction": "headnodSubtle",
-              "offset": 0.6,
-              "duration": 4.33
-            }
-          ]
+          "cues": []
         },
         {
-          "n": 69,
+          "n": 60,
+          "actor": "Barron",
+          "voiceId": "IcFWazAaBzXNwLWpySgF",
+          "text": "[matter-of-factly] Prediction markets put a December cut at thirty-eight cents. It was forty-six last Friday.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "n": 61,
+          "actor": "Monk",
+          "voiceId": "fATgBRI8wg5KkDFg8vBd",
+          "text": "[calmly] So the crowd revised itself eight cents toward honesty.",
+          "directAddress": true,
+          "cues": []
+        },
+        {
+          "n": 62,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
           "text": "Or eight cents toward cowardice. Same number. Different prayer.",
@@ -757,7 +688,7 @@
           "cues": []
         },
         {
-          "n": 70,
+          "n": 63,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
           "text": "[patiently] That is the most theologically sound thing you have said on this programme.",
@@ -765,15 +696,15 @@
           "cues": []
         },
         {
-          "n": 71,
+          "n": 64,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[suspiciously] I would like that struck from the record.",
+          "text": "[suspiciously] Strike it from the record.",
           "directAddress": true,
           "cues": []
         },
         {
-          "n": 72,
+          "n": 65,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
           "text": "[amused] Noted. And logged.",
@@ -792,19 +723,19 @@
     {
       "id": "sign-off",
       "label": "Sign-off",
-      "words": 65,
-      "estimatedSeconds": 26.9,
+      "words": 59,
+      "estimatedSeconds": 24.4,
       "lines": [
         {
-          "n": 73,
+          "n": 66,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[confidently] That is the week. Money moved, a chain got busy, and a robot learned to disappoint people at scale.",
+          "text": "[confidently] That is the week. The Fed was patient, Congress was nearly decisive, and a trading card outperformed most of my convictions.",
           "directAddress": false,
           "cues": []
         },
         {
-          "n": 74,
+          "n": 67,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
           "text": "[calmly] The ledger closes. Nothing on it was a recommendation.",
@@ -812,34 +743,18 @@
           "cues": []
         },
         {
-          "n": 75,
+          "n": 68,
           "actor": "Barron",
           "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "Next week: whatever the machines do to us in the meantime.",
+          "text": "[matter-of-factly] Nothing on it ever is. Next week, whatever the committee decides patience means in December.",
           "directAddress": false,
           "cues": []
         },
         {
-          "n": 76,
+          "n": 69,
           "actor": "Monk",
           "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[dryly] Or what we do, and blame on them.",
-          "directAddress": true,
-          "cues": []
-        },
-        {
-          "n": 77,
-          "actor": "Barron",
-          "voiceId": "IcFWazAaBzXNwLWpySgF",
-          "text": "[matter-of-factly] Nothing on it ever is. Good night from the Liminal Terminal.",
-          "directAddress": false,
-          "cues": []
-        },
-        {
-          "n": 78,
-          "actor": "Monk",
-          "voiceId": "fATgBRI8wg5KkDFg8vBd",
-          "text": "[dryly] Go in peace. Size your positions accordingly.",
+          "text": "[dryly] Go in peace. Size your positions accordingly. And light a candle for the cardboard.",
           "directAddress": false,
           "cues": [
             {
@@ -859,7 +774,7 @@
       "segments": [
         "cold-open"
       ],
-      "chars": 573,
+      "chars": 480,
       "firstLine": 0,
       "lastLine": 5,
       "durationSeconds": null,
@@ -870,20 +785,21 @@
       "segments": [
         "story-1"
       ],
-      "chars": 1135,
+      "chars": 1199,
       "firstLine": 6,
-      "lastLine": 21,
+      "lastLine": 20,
       "durationSeconds": null,
       "offsetSeconds": null
     },
     {
       "id": "block-3",
       "segments": [
-        "story-2"
+        "story-2",
+        "the-spot"
       ],
-      "chars": 1111,
-      "firstLine": 22,
-      "lastLine": 39,
+      "chars": 1400,
+      "firstLine": 21,
+      "lastLine": 38,
       "durationSeconds": null,
       "offsetSeconds": null
     },
@@ -892,21 +808,21 @@
       "segments": [
         "story-3"
       ],
-      "chars": 1045,
-      "firstLine": 40,
-      "lastLine": 58,
+      "chars": 1101,
+      "firstLine": 39,
+      "lastLine": 53,
       "durationSeconds": null,
       "offsetSeconds": null
     },
     {
       "id": "block-5",
       "segments": [
-        "gauge",
+        "the-board",
         "sign-off"
       ],
-      "chars": 1263,
-      "firstLine": 59,
-      "lastLine": 78,
+      "chars": 1289,
+      "firstLine": 54,
+      "lastLine": 69,
       "durationSeconds": null,
       "offsetSeconds": null
     }
@@ -918,24 +834,25 @@
     "leadIn": 2.5
   },
   "rundown": {
-    "title": "Flow, Traffic and a Roadmap",
-    "summary": "Money leaves the ETFs without moving the price, Base gets crowded, and an AI agent learns to disappoint people at scale.",
-    "headline": "SIX HUNDRED MILLION OUT — PRICE BARELY MOVES",
+    "title": "Patience, Clarity and Cardboard",
+    "summary": "The Fed holds and calls it patience, a crypto bill gets within sight of the floor, and the week's best-performing asset is a trading card.",
+    "headline": "FED HOLDS — AND CALLS IT PATIENCE",
     "ticker": [
-      "SPOT BTC ETFs POST FIRST SUSTAINED OUTFLOW STREAK SINCE JUNE",
-      "BASE CROSSES 100M WEEKLY TRANSACTIONS, FEES UNDER A CENT",
-      "AGENT-LAUNCHED TOKEN ROUND-TRIPS 40M TO 4M IN 48 HOURS",
-      "FEAR & GREED 72 TO 54 ACROSS THE WEEK",
+      "FOMC HOLDS RATES, STATEMENT LEANS HAWKISH",
+      "CLARITY ACT CLEARS COMMITTEE, FLOOR VOTE IN SIGHT",
+      "POKEMON 30TH ANNIVERSARY SET SELLS OUT, RESALE FRENZY FOLLOWS",
+      "10-YEAR 4.18%, UP 6BP ON THE WEEK",
       "NOTHING ON THIS TICKER IS A RECOMMENDATION"
     ],
     "stories": [
       {
         "slot": "story-1",
-        "headline": "ETF outflows without a price response",
-        "fact": "Spot Bitcoin ETFs went net-negative by roughly six hundred million dollars across four sessions, the first sustained outflow streak since June, while spot price barely moved.",
-        "tension": "Whether selling that no longer moves the price is a sign of strength or just of quieter buyers.",
-        "barronAngle": "When selling stops working, that is the tell — the bid underneath is real.",
-        "gr80Angle": "Six hundred million left; forty-one billion stayed. Flow is furniture being moved, not belief.",
+        "beat": "macro",
+        "headline": "FOMC holds, statement leans hawkish",
+        "fact": "The Federal Open Market Committee held rates steady for a second consecutive meeting, with a statement emphasising patience.",
+        "tension": "Whether a second hold is patience or uncertainty with better public relations.",
+        "barronAngle": "Nobody trades the decision, they trade the adjective.",
+        "gr80Angle": "Patience is a virtue the committee does not have to fund.",
         "sources": [
           {
             "title": "SYNTHETIC — no real source",
@@ -943,16 +860,17 @@
             "outlet": "sample"
           }
         ],
-        "gaps": "Entirely synthetic. A real run sources this from CryptoPanic headlines plus the CMC context block.",
-        "verified": false
+        "verified": false,
+        "gaps": "Entirely synthetic. A real run confirms this from federalreserve.gov's own press release"
       },
       {
         "slot": "story-2",
-        "headline": "Base crosses 100M weekly transactions",
-        "fact": "Base recorded over one hundred million transactions in a week for the first time, across roughly two point one million active addresses, with fees under a cent.",
-        "tension": "Whether high transaction counts on few addresses is adoption or activity for its own sake.",
-        "barronAngle": "Cheap blockspace gets used badly first and well eventually — every network starts as a toy.",
-        "gr80Angle": "Forty-eight transactions per person per week is traffic, not yet a reason.",
+        "beat": "macro",
+        "headline": "CLARITY Act clears committee",
+        "fact": "The CLARITY Act advanced out of committee, putting a floor vote within reach for the first time in several Congresses.",
+        "tension": "Whether the industry wants a rule or wants a particular answer.",
+        "barronAngle": "It wants to know, as long as the answer is commodity.",
+        "gr80Angle": "A rule you only want if it favours you is a preference with lobbyists.",
         "sources": [
           {
             "title": "SYNTHETIC — no real source",
@@ -960,16 +878,17 @@
             "outlet": "sample"
           }
         ],
-        "gaps": "Entirely synthetic.",
-        "verified": false
+        "verified": false,
+        "gaps": "Entirely synthetic. A real run confirms status and vote from congress.gov"
       },
       {
         "slot": "story-3",
-        "headline": "An AI agent round-trips its own token",
-        "fact": "An AI agent launched a token on Tuesday, promoted it from its own account, reached a forty million dollar market cap within six hours, and sat at four million by Thursday — and is still posting.",
-        "tension": "Whether this is a machine failing to be human or succeeding at it.",
-        "barronAngle": "It posted a roadmap this morning. No verbs anywhere.",
-        "gr80Angle": "It has learned the genre perfectly. That is the uncomfortable part.",
+        "beat": "collectibles",
+        "headline": "Pokemon 30th anniversary set sparks a frenzy",
+        "fact": "The Pokemon 30th anniversary set launched this week to overnight queues and an immediate resale market, with buyers describing the purchase as an investment.",
+        "tension": "Whether buying sealed product is collecting or gambling with better artwork.",
+        "barronAngle": "Nobody is buying the card, they are buying the probability of the card.",
+        "gr80Angle": "A thing is an asset only while enough people agree to be serious about it.",
         "sources": [
           {
             "title": "SYNTHETIC — no real source",
@@ -977,13 +896,18 @@
             "outlet": "sample"
           }
         ],
-        "gaps": "Entirely synthetic.",
-        "verified": false
+        "verified": false,
+        "gaps": "Entirely synthetic. A real run confirms pricing from pricecharting.com or tcgplayer.com"
       }
     ],
-    "gauge": {
-      "fearGreed": "The gauge opened the week at seventy-two, greed, and closed at fifty-four, neutral — eighteen points in five days.",
-      "market": "A prediction market on Bitcoin above one hundred twenty thousand by year end moved from forty-six cents to thirty-eight.",
+    "board": {
+      "lines": [
+        "The ten-year closed at 4.18%, up six basis points on the week.",
+        "WTI crude around $71, down roughly 2%.",
+        "Gold flat.",
+        "Fear & Greed fell from 72 to 54 across five sessions."
+      ],
+      "market": "Prediction markets price a December cut at 38 cents, down from 46 last Friday.",
       "sources": [
         {
           "title": "SYNTHETIC — no real source",
@@ -1019,12 +943,12 @@
     "briefId": null,
     "briefGeneratedAt": null,
     "model": "claude-opus-5",
-    "generatedAt": "2026-09-20T02:35:59.841Z",
+    "generatedAt": "2026-09-20T02:45:26.320Z",
     "pipeline": "scripts/lt-news-script.mjs"
   },
   "warnings": [
-    "Story \"ETF outflows without a price response\" is UNVERIFIED — Entirely synthetic. A real run sources this from CryptoPanic headlines plus the CMC context block.",
-    "Story \"Base crosses 100M weekly transactions\" is UNVERIFIED — Entirely synthetic.",
-    "Story \"An AI agent round-trips its own token\" is UNVERIFIED — Entirely synthetic."
+    "Story \"FOMC holds, statement leans hawkish\" is UNVERIFIED — Entirely synthetic. A real run confirms this from federalreserve.gov's own press release.",
+    "Story \"CLARITY Act clears committee\" is UNVERIFIED — Entirely synthetic. A real run confirms status and vote from congress.gov.",
+    "Story \"Pokemon 30th anniversary set sparks a frenzy\" is UNVERIFIED — Entirely synthetic. A real run confirms pricing from pricecharting.com or tcgplayer.com."
   ]
 }
