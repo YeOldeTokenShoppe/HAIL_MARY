@@ -280,7 +280,7 @@ point; reactions on different characters may overlap freely.
    air, channel cards cycling on the frame screen.
 3. Press **Enter studio**.
 4. Wait for the button to stop reading **Preparing studio…**. Once both SitePal
-   portals report ready it becomes **Play replay**.
+   portals report ready it becomes **Play episode**.
 5. Play the whole episode once without stopping. Watch the handoffs, the final
    syllables, face sync, reaction timing, gaze, the crossfades back, and the return
    to idle at the end.
@@ -288,7 +288,7 @@ point; reactions on different characters may overlap freely.
    bad `duration` or an overlapping cue shows itself.
 7. Check the phone layout as well. `MobileTalkShow.jsx` shares the same
    `TalkShowScene` and the same `SHOWS` list but has its own controls, labelled
-   **Play replay** and **Stop replay**.
+   **Play episode** and **Stop episode**.
 
 If the button reads **Retry signal**, a SitePal portal came up without building its
 player. The scene reloads a stuck iframe by itself — 18 s to the first timeout, two

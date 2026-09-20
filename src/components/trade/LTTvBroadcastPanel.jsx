@@ -239,10 +239,10 @@ export default function LTTvBroadcastPanel({
             {!hasEpisode ? "Episodes coming soon" : loading
               ? "Preparing studio…"
               : playing
-                ? "Stop show"
+                ? "Stop episode"
                 : voiceStatus === "failed"
                   ? "Retry signal"
-                  : "Play replay"}
+                  : "Play episode"}
           </button>
         )}
         {hasEpisode && <button ref={episodesButtonRef} type="button" className="ltv-episodes"
