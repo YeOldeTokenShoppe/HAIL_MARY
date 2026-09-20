@@ -168,6 +168,7 @@ HARD RULES:
 - Every fact, number and name must come from the rundown you are given. Invent nothing. If you want a number you were not given, write the line without it.
 - No financial advice, ever: no buys, sells, entries, exits, allocations, or price targets stated as fact. The characters may mock the asking.
 - Each line is ONE character speaking aloud, 1 to 3 sentences. No markdown, no stage directions outside the bracket tags below, no speaker labels inside the text.
+- Alternate speakers. Never give the same host two turns in a row — the camera cuts on who is speaking, so a double turn holds on one face while the other sits idle. If a host needs two thoughts, put them in one line.
 - Never say "as an AI", never mention a model, never break the frame.
 - Write numbers as they are spoken: "six hundred million dollars", not "$600M". The voice model reads the text literally.
 
@@ -270,6 +271,15 @@ function assemble({ rundown, segments, week, brief }) {
       if (leadingEvent) {
         warnings.push(
           `Line ${n}: opens with the event tag ${leadingEvent}; the 120ms handoff trim will eat it. Move it a few words in.`,
+        );
+      }
+
+      // Two turns in a row from the same host is almost always a writing slip:
+      // the camera derives its shot from who is speaking (TALK_SHOW_SHOTS), so
+      // the set just holds on one face while the other sits idle.
+      if (lines.length && lines[lines.length - 1].actor === line.actor) {
+        warnings.push(
+          `Line ${n}: ${line.actor} speaks twice in a row — merge the turns or put a line between them.`,
         );
       }
 
