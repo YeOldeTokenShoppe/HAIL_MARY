@@ -1,0 +1,345 @@
+#!/usr/bin/env node
+// WHERE IS EVERY EPISODE, AND WHAT DO I RUN NEXT.
+//
+//   node scripts/lt-tv-status.mjs
+//   node scripts/lt-tv-status.mjs roundtable-02     # one episode, in detail
+//   node scripts/lt-tv-status.mjs --html            # a page to keep open
+//
+// Producing an episode touches four directories and leaves a different trace
+// in each, so "how far along is this one" has been a question you answer by
+// listing directories and remembering what the files mean. This answers it by
+// reading them.
+//
+// IT REPORTS, IT NEVER INFERS. Every stage below is decided by a file that is
+// either on disk or is not, and the episode's own contents — never by a note
+// left behind by a previous run. A dashboard that remembers what it did is a
+// dashboard that is wrong the first time you do something by hand, and doing
+// things by hand is most of how this show gets made.
+//
+// The one thing it cannot see is SitePal. The Audio Manager lives outside the
+// repo, so "uploaded" is inferred from the record naming its clips, and the
+// dashboard says as much rather than implying it checked.
+
+import { readFile, readdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { join, dirname, resolve } from "node:path";
+
+import { SHOW_FORMATS, formatRuntime } from "./lt-tv-format.mjs";
+import { SLATE_DIR, SLATE_INDEX } from "./lt-tv-slate-record.mjs";
+import { arg, rejectUnknownFlags } from "./lt-tv-cli.mjs";
+
+const STAGING_DIR = "content/lt-tv/episodes";
+const AUDIO_DIR = "content/lt-tv/audio";
+const SAMPLE_DIR = "content/lt-tv/samples";
+
+const KNOWN_FLAGS = ["html", "out"];
+
+// The pipeline in order. An episode is at the last stage it has reached.
+export const STAGES = [
+  { id: "planned", label: "Planned", blurb: "named on the slate, no script yet" },
+  { id: "written", label: "Written", blurb: "has a script, nothing recorded" },
+  { id: "recorded", label: "Recorded", blurb: "audio built, not yet on the slate" },
+  { id: "on-air", label: "On air", blurb: "playable in the guide" },
+];
+
+/**
+ * The repo root, found by walking up from wherever this was run.
+ *
+ * A dashboard is the one script you reach for from inside whatever directory
+ * you happen to be in, so requiring the repo root would make it wrong exactly
+ * when it is most useful — and wrong quietly, by reporting an empty slate
+ * rather than an error.
+ */
+export function findRoot(from = process.cwd()) {
+  let dir = resolve(from);
+  for (;;) {
+    if (existsSync(join(dir, SLATE_DIR))) return dir;
+    const up = dirname(dir);
+    if (up === dir) return resolve(from); // not in the repo; report honestly
+    dir = up;
+  }
+}
+
+const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));
+
+/**
+ * Everything that is true about one episode, read from disk.
+ *
+ * `slate` is the committed record the site reads; `staging` is the working
+ * copy the pipeline writes, which is gitignored and therefore local to
+ * whoever last generated it. An episode can have either, or both, and which
+ * ones exist is most of the answer.
+ */
+async function inspect(id, { root, slate, staging, registered }) {
+  const files = [];
+  const add = (path, what) => {
+    if (existsSync(join(root, path))) files.push({ path, what });
+  };
+
+  add(join(SLATE_DIR, `${id}.json`), "the record the site reads");
+  add(join(STAGING_DIR, `${id}.json`), "the working record");
+  add(join(STAGING_DIR, `${id}.txt`), "the screenplay — read and edit this one");
+  add(join(AUDIO_DIR, id, "master-dialogue.wav"), "the recorded master");
+  add(join(AUDIO_DIR, id, "voice-segments.json"), "the line timings");
+  for (const f of ["draft", "sample"]) {
+    add(join(SAMPLE_DIR, `${id}.${f}.json`), `a worked ${f}, not a scheduled episode`);
+  }
+
+  const playable =
+    Boolean(slate?.audio && Object.keys(slate.audio).length) &&
+    Array.isArray(slate?.lineStarts) &&
+    slate.lineStarts.length > 0;
+  const recorded = Array.isArray(staging?.timing?.lineStarts) && staging.timing.lineStarts.length > 0;
+  const written =
+    Boolean(staging?.segments?.length) ||
+    Boolean(slate?.speakers?.length);
+
+  let stage = "planned";
+  if (written) stage = "written";
+  if (recorded) stage = "recorded";
+  if (playable) stage = "on-air";
+
+  const lines =
+    staging?.segments?.reduce((n, s) => n + s.lines.length, 0) ?? slate?.speakers?.length ?? 0;
+
+  return {
+    id,
+    show: slate?.showId ?? staging?.show ?? null,
+    number: slate?.number ?? staging?.number ?? null,
+    title: slate?.title ?? staging?.title ?? "(untitled)",
+    summary: slate?.summary ?? staging?.summary ?? "",
+    stage,
+    lines,
+    // Same derivation the guide uses: a playable record's runtime is the end
+    // of the dialogue it carries, not a number anyone typed. Reading
+    // `runtime` alone would show nothing for every episode recorded so far.
+    runtime: playable
+      ? slate.runtime || formatRuntime(slate.dialogueEnd)
+      : (slate?.estimatedRuntime ?? staging?.slate?.runtime ?? null),
+    runtimeIsEstimate: !playable,
+    registered,
+    clips: staging?.cast
+      ? Object.values(staging.cast).map((c) => c.sitepalAudio)
+      : slate?.audio
+        ? Object.values(slate.audio)
+        : [],
+    warnings: staging?.warnings ?? [],
+    files,
+    // `hasWorkingCopy` is passed rather than re-checked, because the check
+    // has to be made against the root this run was given — an earlier version
+    // resolved it against the process's own directory, which is right only
+    // when you happen to run this from the repo root.
+    next: nextStep({
+      id,
+      stage,
+      registered,
+      slate,
+      staging,
+      hasWorkingCopy: existsSync(join(root, STAGING_DIR, `${id}.json`)),
+    }),
+  };
+}
+
+/**
+ * The one command to run next, and why.
+ *
+ * Deliberately one, not a list: the value of this whole thing is not having to
+ * decide which of six commands applies.
+ */
+function nextStep({ id, stage, registered, slate, staging, hasWorkingCopy }) {
+  if (stage === "on-air") {
+    if (!registered) {
+      return {
+        why: "it is playable but nothing imports it, so the guide will not show it",
+        run: `add the import and the EPISODE_RECORDS entry in ${SLATE_INDEX}`,
+      };
+    }
+    return { why: "nothing — it is playable in the guide", run: null };
+  }
+
+  if (stage === "recorded") {
+    return {
+      why: "the audio exists; the slate has not been told about it",
+      run: `python3 elevenlabs-dialogue-test/process_dialogue.py --master ${AUDIO_DIR}/${id}/master-dialogue.wav --segments ${AUDIO_DIR}/${id}/voice-segments.json ${AUDIO_DIR}/${id}`,
+      then: "upload both WAVs under the clip names above, then re-run the script step to refresh the slate",
+    };
+  }
+
+  if (stage === "written") {
+    if (!hasWorkingCopy) {
+      return {
+        why: "the slate has this episode's script, but there is no working copy here to record from",
+        run: `it was written on another machine, or the staging copy was cleaned up — re-run the script step for ${id}`,
+      };
+    }
+    return {
+      why: "it has a script and no audio",
+      run: `node scripts/lt-tv-audio.mjs ${STAGING_DIR}/${id}.json`,
+      then: `read ${STAGING_DIR}/${id}.txt first, and apply any changes with node scripts/lt-tv-edit.mjs ${id}`,
+    };
+  }
+
+  const show = slate?.showId ?? staging?.show;
+  return {
+    why: "it is named on the slate and nobody has written it",
+    run:
+      show === "roundtable"
+        ? `node scripts/lt-rt-script.mjs --topic ${id}`
+        : "node scripts/lt-news-brief.mjs && node scripts/lt-news-script.mjs --brief <brief>",
+  };
+}
+
+/** Every episode either show knows about, slate and staging merged. */
+export async function readStatus(root = process.cwd()) {
+  const slate = new Map();
+  try {
+    for (const f of await readdir(join(root, SLATE_DIR))) {
+      if (f.endsWith(".json")) slate.set(f.replace(/\.json$/, ""), await readJson(join(root, SLATE_DIR, f)));
+    }
+  } catch { /* no slate yet */ }
+
+  const staging = new Map();
+  try {
+    for (const f of await readdir(join(root, STAGING_DIR))) {
+      if (!f.endsWith(".json")) continue;
+      const record = await readJson(join(root, STAGING_DIR, f));
+      // A staging record is named for its week; the slate names it by number.
+      // The slate id is the one a producer sees, so it is the one used here.
+      const id = record.show && record.number ? `${record.show}-${record.number}` : f.replace(/\.json$/, "");
+      staging.set(id, record);
+    }
+  } catch { /* nothing generated here */ }
+
+  let index = "";
+  try {
+    index = await readFile(join(root, SLATE_INDEX), "utf8");
+  } catch { /* no index */ }
+
+  const ids = [...new Set([...slate.keys(), ...staging.keys()])].sort();
+  const episodes = await Promise.all(
+    ids.map((id) =>
+      inspect(id, {
+        root,
+        slate: slate.get(id),
+        staging: staging.get(id),
+        registered: index.includes(`./episodes/${id}.json`),
+      }),
+    ),
+  );
+
+  const shows = Object.values(SHOW_FORMATS).map((f) => ({
+    id: f.id,
+    title: f.title,
+    episodes: episodes.filter((e) => e.show === f.id),
+  }));
+  const orphans = episodes.filter((e) => !SHOW_FORMATS[e.show]);
+
+  return { shows, orphans, episodes };
+}
+
+// ── the terminal view ─────────────────────────────────────────────────────
+
+const C = {
+  dim: (s) => `\x1b[2m${s}\x1b[0m`,
+  bold: (s) => `\x1b[1m${s}\x1b[0m`,
+  green: (s) => `\x1b[32m${s}\x1b[0m`,
+  yellow: (s) => `\x1b[33m${s}\x1b[0m`,
+  blue: (s) => `\x1b[36m${s}\x1b[0m`,
+  grey: (s) => `\x1b[90m${s}\x1b[0m`,
+};
+
+const STAGE_MARK = {
+  planned: C.grey("○ planned "),
+  written: C.yellow("◐ written "),
+  recorded: C.blue("◕ recorded"),
+  "on-air": C.green("● on air  "),
+};
+
+function printOne(e) {
+  console.log(`\n${C.bold(e.title)}  ${C.dim(e.id)}`);
+  if (e.summary) console.log(C.dim(`  ${e.summary}`));
+  console.log(
+    `  ${STAGE_MARK[e.stage].trim()}` +
+      (e.lines ? C.dim(`  ·  ${e.lines} lines`) : "") +
+      (e.runtime ? C.dim(`  ·  ${e.runtime}${e.runtimeIsEstimate ? " estimated" : ""}`) : ""),
+  );
+
+  if (e.files.length) {
+    console.log("\n  Files:");
+    for (const f of e.files) console.log(`    ${f.path}\n      ${C.dim(f.what)}`);
+  } else {
+    console.log(C.dim("\n  No files for this episode yet."));
+  }
+
+  if (e.clips.length) {
+    console.log(`\n  SitePal clip names ${C.dim("(this cannot check the Audio Manager)")}:`);
+    for (const c of e.clips) console.log(`    ${c}`);
+  }
+
+  if (e.warnings.length) {
+    console.log(`\n  ${C.yellow(`${e.warnings.length} warning(s) from the script step:`)}`);
+    for (const w of e.warnings) console.log(C.dim(`    · ${w}`));
+  }
+
+  console.log(`\n  Next: ${e.next.why}`);
+  if (e.next.run) console.log(`    ${C.bold(e.next.run)}`);
+  if (e.next.then) console.log(C.dim(`    then ${e.next.then}`));
+}
+
+function printAll({ shows, orphans }) {
+  for (const show of shows) {
+    console.log(`\n${C.bold(show.title)} ${C.dim(`(${show.id})`)}`);
+    if (!show.episodes.length) {
+      console.log(C.dim("  nothing on the slate yet"));
+      continue;
+    }
+    for (const e of show.episodes) {
+      const title = e.title.length > 26 ? `${e.title.slice(0, 25)}…` : e.title.padEnd(26);
+      console.log(
+        `  ${STAGE_MARK[e.stage]}  ${C.dim(e.id.padEnd(15))} ${title}` +
+          C.dim(e.runtime ? `  ${e.runtime}${e.runtimeIsEstimate ? "~" : " "}` : "        "),
+      );
+    }
+  }
+
+  if (orphans.length) {
+    console.log(`\n${C.yellow("Not attached to any show")}`);
+    for (const e of orphans) console.log(`  ${C.dim(e.id.padEnd(15))} ${e.title}`);
+  }
+
+  // What to do next, for the whole slate rather than one episode: the earliest
+  // unfinished episode is almost always the one you meant.
+  const next = [...shows.flatMap((s) => s.episodes)]
+    .filter((e) => e.next.run)
+    .sort((a, b) => STAGES.findIndex((s) => s.id === b.stage) - STAGES.findIndex((s) => s.id === a.stage))[0];
+  if (next) {
+    console.log(`\n${C.dim("Closest to done:")} ${C.bold(next.title)} — ${next.next.why}`);
+    console.log(`  ${next.next.run}`);
+  }
+  console.log(C.dim(`\nOne episode in detail:  node scripts/lt-tv-status.mjs <id>`));
+  console.log(C.dim(`A page to keep open:    node scripts/lt-tv-status.mjs --html\n`));
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  rejectUnknownFlags(KNOWN_FLAGS);
+  const status = await readStatus(findRoot());
+  const wanted = process.argv.slice(2).find((a) => !a.startsWith("--"));
+
+  if (wanted) {
+    const episode = status.episodes.find((e) => e.id === wanted);
+    if (!episode) {
+      console.error(`No episode "${wanted}". Known: ${status.episodes.map((e) => e.id).join(", ")}`);
+      process.exit(1);
+    }
+    printOne(episode);
+    console.log("");
+  } else if (arg("html")) {
+    const { writeStatusPage } = await import("./lt-tv-status-page.mjs");
+    const out = arg("out");
+    const path = await writeStatusPage(status, typeof out === "string" ? out : undefined);
+    console.log(`Wrote ${path}`);
+    console.log("Open it in a browser. It is a snapshot — re-run this to refresh it.");
+  } else {
+    printAll(status);
+  }
+}
