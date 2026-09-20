@@ -3,10 +3,12 @@
 How one episode of the weekly news show gets made, from "it is Friday" to
 "it is on the site."
 
-This document covers the **news** show. `docs/talk-show-production.md` remains
-the reference for the audio mechanics (ElevenLabs tags, the balanced-WAV
-cleanup, SitePal uploads); this one is the layer above it — what the show is,
-where its topics come from, and what file holds an episode.
+This document covers the **news** show in depth. If you just want the commands
+in order, start at `docs/lt-tv.md` and come back here for the why.
+`docs/talk-show-production.md` remains the reference for the audio mechanics
+(ElevenLabs tags, the balanced-WAV cleanup, SitePal uploads); this one is the
+layer above it — what the show is, where its topics come from, and what file
+holds an episode.
 
 > **Status.** All four steps are written: a week of signal becomes a script,
 > the script becomes audio, and the episode lands on the LT TV guide. Step 3
@@ -44,7 +46,7 @@ record's contents rather than typing them.
            ▼
   src/content/lt-tv/episodes/news-01.json       ← on the LT TV guide
            │
-           │  audio build (step 3 — not built yet)
+           │  scripts/lt-news-audio.mjs         ← step 3, the audio
            ▼
   one pair of balanced WAVs  →  SitePal Audio Manager
   timing + cues              →  back into the record

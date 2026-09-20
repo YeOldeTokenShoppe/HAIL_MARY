@@ -2,7 +2,8 @@
 
 This is the repeatable workflow for producing a Saint GR80 and Connor
 episode with expressive ElevenLabs dialogue, clean SitePal audio tracks, and
-scripted body animation.
+scripted body animation. If you just want the commands in order, start at
+`docs/lt-tv.md` and come back here for the detail.
 
 The working files live in `elevenlabs-dialogue-test/`. The finished episode is
 one JSON record in `src/content/lt-tv/episodes/`, and that record is the whole
