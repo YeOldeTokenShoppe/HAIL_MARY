@@ -325,7 +325,7 @@ the browser does not keep the old animation library.
 
 Three things you can do with a bad line, in rising order of effort.
 
-**Rewrite it yourself.** Open the screenplay, change the words, Save, then
+**Rewrite it yourself.** Open the screenplay, change the words, then
 **Apply my edits**. Nothing is spent and nothing else in the episode moves.
 
 **Ask for a new one.** Put a note under the line saying what is wrong with it,
@@ -342,6 +342,21 @@ different, so the replacement picks up the line before it and sets up the line
 after it. The note disappears with the edit. Mark several lines at once, or
 put two notes under one line. Pressing it with nothing marked costs nothing
 and says so.
+
+A long line is often wrong in one sentence of several, so you can break it
+where the trouble is and put the note there. The two halves are read as the
+one line they were, both notes count, and the rewrite comes back as a single
+line again:
+
+```
+  0    CONNOR     Welcome back to the Liminal Terminal, where the lights are holy.
+ # that first bit makes no sense
+Here is tonight, and it is a Tuesday problem.
+ # and neither does this — no cheesy lines
+```
+
+**You do not have to press Save first.** A step that reads the screenplay
+saves the box for you, so what runs is what you can see.
 
 It writes the `.txt` only, so a rewrite you dislike is thrown away by not
 applying it — and a line the model left alone stays marked, which is how you

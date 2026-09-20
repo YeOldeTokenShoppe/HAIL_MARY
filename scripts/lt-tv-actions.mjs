@@ -73,7 +73,7 @@ export const ACTIONS = {
     stages: ["written", "recorded", "on-air"],
     needsScreenplay: true,
     argv: (id) => ["node", ["scripts/lt-tv-rewrite.mjs", id]],
-    blurb: "Put a # note under a line saying what is wrong with it, Save, then press this. Only the marked lines change. Start the note #! to keep it as a rule for future episodes.",
+    blurb: "Put a # note under a line saying what is wrong with it, then press this. Only the lines you marked change. Start the note #! to keep it as a rule for future episodes too.",
   },
   record: {
     label: "Record it",

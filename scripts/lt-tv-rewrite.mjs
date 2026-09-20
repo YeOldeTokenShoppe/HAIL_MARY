@@ -33,15 +33,17 @@ import { existsSync } from "node:fs";
 import { resolve, basename } from "node:path";
 
 import { claude } from "./lt-tv-claude.mjs";
-import { LINE_RE } from "./lt-tv-edit.mjs";
+import { LINE_RE, CUE_RE, SEGMENT_RE, parseScript } from "./lt-tv-edit.mjs";
+import { showFormat } from "./lt-tv-format.mjs";
 import { readStyleNotes, withStyleNotes, rememberStyleNote, STYLE_NOTES_PATH } from "./lt-tv-style-notes.mjs";
 
 const EPISODE_DIR = "content/lt-tv/episodes";
 const MODEL = process.env.LT_TV_MODEL || "claude-opus-5";
 const MAX_TOKENS = 4000;
 
-// A note is `#` then the text. `#!` means remember it as well as fix it.
-const NOTE_RE = /^\s*#(!)?\s*(.*\S)\s*$/;
+// A note is `#` then the text. `#!` means remember it as well as fix it — and
+// `# !`, with the space, means the same, because that is what gets typed.
+const NOTE_RE = /^\s*#\s*(!)?\s*(.*\S)\s*$/;
 
 const SYSTEM = `You are rewriting individual lines of an animated talk show script.
 
@@ -70,23 +72,57 @@ Every n must be one you were given. Say nothing else.`;
  * A note attaches to the nearest dialogue line above it, which is why the
  * header's own `#` lines are never mistaken for notes: nothing has been said
  * yet when they are read.
+ *
+ * A spoken line can be long, and the natural way to complain about one
+ * sentence of it is to press Return in front of that sentence and write the
+ * note there. That splits the line in two, and the second half no longer looks
+ * like dialogue. So text that can only be the rest of the line above is read
+ * as part of it, and the rewrite puts the line back together as one.
  */
 export function findMarks(text) {
   const lines = text.split("\n");
   const marks = [];
   let current = null;
+  let openLine = null; // the line still able to absorb a stray sentence
 
   lines.forEach((line, index) => {
     const dialogue = line.match(LINE_RE);
     if (dialogue) {
-      current = { n: Number(dialogue[1]), speaker: dialogue[3], text: dialogue[4], index, notes: [], noteIndexes: [] };
+      const body = dialogue[4];
+      current = {
+        n: Number(dialogue[1]),
+        speaker: dialogue[3],
+        text: body,
+        prefix: line.slice(0, line.length - body.length),
+        index,
+        parts: [],
+        notes: [],
+        noteIndexes: [],
+      };
+      openLine = current;
       return;
     }
+
     const note = line.match(NOTE_RE);
-    if (!note || !current) return;
-    if (!marks.includes(current)) marks.push(current);
-    current.notes.push({ text: note[2], remember: Boolean(note[1]) });
-    current.noteIndexes.push(index);
+    if (note) {
+      if (!current) return;
+      if (!marks.includes(current)) marks.push(current);
+      current.notes.push({ text: note[2], remember: Boolean(note[1]) });
+      current.noteIndexes.push(index);
+      return;
+    }
+
+    // Anything that belongs to the screenplay's own structure ends the line
+    // above, and so does a blank: text after one is a new thought, not the
+    // rest of a sentence.
+    if (!line.trim() || CUE_RE.test(line) || SEGMENT_RE.test(line)) {
+      openLine = null;
+      return;
+    }
+
+    if (!openLine) return;
+    openLine.text = `${openLine.text.trim()} ${line.trim()}`;
+    openLine.parts.push(index);
   });
 
   return marks;
@@ -108,10 +144,11 @@ export function applyRewrites(text, marks, replacements) {
   for (const mark of marks) {
     const replacement = byLine.get(mark.n);
     if (replacement === undefined) continue;
-    const original = lines[mark.index];
-    const prefix = original.slice(0, original.length - mark.text.length);
-    lines[mark.index] = `${prefix}${replacement}`;
+    lines[mark.index] = `${mark.prefix}${replacement}`;
+    // The notes go, and so does any half of the line that was left stranded
+    // below one — the replacement is the whole line.
     for (const i of mark.noteIndexes) drop.add(i);
+    for (const i of mark.parts) drop.add(i);
     changed.push({ n: mark.n, speaker: mark.speaker, before: mark.text, after: replacement });
   }
 
@@ -147,6 +184,22 @@ function resolveScript(argument) {
     throw new Error(`No screenplay for "${argument}". Looked in:\n  ${candidates.join("\n  ")}`);
   }
   return txt;
+}
+
+/**
+ * Whatever a later apply would refuse to read, or nothing.
+ *
+ * Needs the record beside the script only to know which show's cast to expect.
+ * No record, no check — the rewrite itself still stands.
+ */
+async function parseErrors(txtPath, text) {
+  try {
+    const record = JSON.parse(await readFile(txtPath.replace(/\.txt$/, ".json"), "utf8"));
+    parseScript(text, showFormat(record.show));
+    return [];
+  } catch (err) {
+    return err.parseErrors ?? [];
+  }
 }
 
 function requestMessage(script, marks) {
@@ -201,6 +254,10 @@ async function main() {
   const { text, changed } = applyRewrites(script, marks, replacements);
   await writeFile(txt, text.endsWith("\n") ? text : `${text}\n`);
 
+  // The whole promise of this step is that the file still applies afterwards,
+  // so say now if it does not, rather than at the apply two steps later.
+  const unreadable = await parseErrors(txt, text);
+
   console.log(`\nRewrote ${changed.length} line(s) in ${basename(txt)}:\n`);
   for (const c of changed) {
     console.log(`  ${String(c.n).padStart(3)}  ${c.speaker}`);
@@ -228,6 +285,12 @@ async function main() {
   const missed = marks.filter((m) => !changed.some((c) => c.n === m.n));
   if (missed.length) {
     console.log(`Left alone, and still marked: ${missed.map((m) => m.n).join(", ")}.`);
+  }
+
+  if (unreadable.length) {
+    console.log("Heads up — the script will not apply until these are fixed:");
+    for (const e of unreadable) console.log(`  ${e}`);
+    return;
   }
   console.log("Read it, then apply it: node scripts/lt-tv-edit.mjs " + basename(txt).replace(/\.txt$/, ""));
 }

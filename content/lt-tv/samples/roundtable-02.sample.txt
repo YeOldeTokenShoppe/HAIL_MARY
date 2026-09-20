@@ -20,7 +20,8 @@ episode: roundtable-02
 # under it saying what is wrong, then run:
 #     node scripts/lt-tv-rewrite.mjs roundtable-02
 # Start the note #! to also keep it as a standing rule for future
-# episodes, in docs/lt-tv-style-notes.md.
+# episodes, in docs/lt-tv-style-notes.md. If only one sentence of a
+# long line is wrong, break the line there and note it there.
 
 ── THE QUESTION  [the-question] — 83 words, ~34s
 

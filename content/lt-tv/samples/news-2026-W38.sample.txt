@@ -22,7 +22,8 @@ CHIRON: FED HOLDS — AND CALLS IT PATIENCE
 # under it saying what is wrong, then run:
 #     node scripts/lt-tv-rewrite.mjs news-2026-W38
 # Start the note #! to also keep it as a standing rule for future
-# episodes, in docs/lt-tv-style-notes.md.
+# episodes, in docs/lt-tv-style-notes.md. If only one sentence of a
+# long line is wrong, break the line there and note it there.
 
 ── COLD OPEN  [cold-open] — 78 words, ~32s
 

@@ -47,10 +47,10 @@ const SPEAKER_ALTERNATIVES = [...DISPLAY_TO_ACTOR.keys()]
   .join("|");
 
 // Exported so the rewrite step can find and replace a line without keeping a
-// second idea of what a line looks like — two copies of this would drift.
+// second idea of what any of these look like — two copies would drift.
 export const LINE_RE = new RegExp(`^\\s*(\\d+)\\s+(>\\s*)?(${SPEAKER_ALTERNATIVES})\\s+(\\S.*)$`);
-const CUE_RE = /^\s*\(\s*(\w+)\s+(\w+)\s*@\s*\+?\s*([\d.]+)\s*s\s*\)\s*$/;
-const SEGMENT_RE = /^\s*──\s*(.+?)\s*\[([a-z0-9-]+)\]/;
+export const CUE_RE = /^\s*\(\s*(\w+)\s+(\w+)\s*@\s*\+?\s*([\d.]+)\s*s\s*\)\s*$/;
+export const SEGMENT_RE = /^\s*──\s*(.+?)\s*\[([a-z0-9-]+)\]/;
 const CHIRON_RE = /^CHIRON:\s*(.*)$/;
 // Built from the shows themselves, so a screenplay cannot be applied to the
 // wrong show by way of its title line.

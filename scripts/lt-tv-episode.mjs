@@ -328,7 +328,8 @@ export function renderScript(episode) {
     "# under it saying what is wrong, then run:",
     `#     node scripts/lt-tv-rewrite.mjs ${episode.id}`,
     "# Start the note #! to also keep it as a standing rule for future",
-    "# episodes, in docs/lt-tv-style-notes.md.",
+    "# episodes, in docs/lt-tv-style-notes.md. If only one sentence of a",
+    "# long line is wrong, break the line there and note it there.",
     "",
   ];
   for (const segment of episode.segments) {

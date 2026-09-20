@@ -17,7 +17,7 @@
 // utility classes because this app does not compile Tailwind — see the note at
 // the top of that file.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import s from './studio.module.css';
 
 const STAGES = {
@@ -184,6 +184,21 @@ function Episode({ episode: e, env, open, onToggle, onRun, running }) {
   // null until the screenplay has been looked for. The steps that read it are
   // offered only once it is there — see needsScreenplay in lt-tv-actions.mjs.
   const [hasScreenplay, setHasScreenplay] = useState(null);
+
+  // A step that reads the screenplay reads the FILE, so an edit still sitting
+  // in the box below is invisible to it. That failed silently and looked like
+  // the step doing nothing — you marked four lines and it said nothing was
+  // marked. So such a step saves the box first, and runs on what you can see.
+  const [unsaved, setUnsaved] = useState(false);
+  const saveScreenplay = useRef(null);
+
+  const runAction = async (a) => {
+    if (a.needsScreenplay && unsaved && saveScreenplay.current) {
+      if (!(await saveScreenplay.current())) return; // it said why; do not spend anything
+    }
+    onRun(a.name, e.id, a.spends);
+  };
+
   return (
     <article className={`${s.episode} ${open ? s.episodeOpen : ''}`}>
       <button onClick={onToggle} className={s.episodeHead} aria-expanded={open}>
@@ -222,7 +237,7 @@ function Episode({ episode: e, env, open, onToggle, onRun, running }) {
                   <button
                     title={why || undefined}
                     disabled={Boolean(why) || Boolean(running)}
-                    onClick={() => onRun(a.name, e.id, a.spends)}
+                    onClick={() => runAction(a)}
                     className={`${s.btn} ${i === 0 && !why ? s.btnPrimary : ''}`}
                   >
                     {busy ? 'Running…' : a.label}
@@ -237,7 +252,8 @@ function Episode({ episode: e, env, open, onToggle, onRun, running }) {
             })}
           </div>
 
-          <Screenplay id={e.id} stage={e.stage} onPresence={setHasScreenplay} />
+          <Screenplay id={e.id} stage={e.stage} onPresence={setHasScreenplay}
+            onDirty={setUnsaved} saveRef={saveScreenplay} />
 
           <Files files={e.files} />
           {e.clips.length > 0 && (
@@ -287,8 +303,12 @@ function Files({ files }) {
  * Saving writes the file and nothing else. Applying it is the separate button,
  * which runs the same editor the terminal does — so a save can never quietly
  * rebuild the episode, and an edit you are half way through is not live.
+ *
+ * The Save button therefore stays, and stays explicit. What is automatic is
+ * only the save a step needs in order to see your edits at all: see runAction
+ * above.
  */
-function Screenplay({ id, stage, onPresence }) {
+function Screenplay({ id, stage, onPresence, onDirty, saveRef }) {
   const [text, setText] = useState(null);
   const [saved, setSaved] = useState(true);
   const [note, setNote] = useState(null);
@@ -302,15 +322,6 @@ function Screenplay({ id, stage, onPresence }) {
     return () => { alive = false; };
   }, [id, stage, onPresence]);
 
-  if (text === null) {
-    return (
-      <>
-        <h3 className={s.label}>Screenplay</h3>
-        <p className={s.empty}>Nothing written yet.</p>
-      </>
-    );
-  }
-
   const save = async () => {
     const res = await fetch('/api/lt-tv/script', {
       method: 'PUT',
@@ -319,8 +330,23 @@ function Screenplay({ id, stage, onPresence }) {
     });
     const data = await res.json();
     setSaved(res.ok);
-    setNote(res.ok ? 'Saved. Now press Apply my edits to fold it into the record.' : data.error);
+    setNote(res.ok ? 'Saved.' : data.error);
+    return res.ok;
   };
+
+  // Handed up so a step that reads the file can save the box first. Rewritten
+  // every render because `save` closes over the text as it is now.
+  useEffect(() => { saveRef.current = save; });
+  useEffect(() => { onDirty(!saved && text !== null); }, [saved, text, onDirty]);
+
+  if (text === null) {
+    return (
+      <>
+        <h3 className={s.label}>Screenplay</h3>
+        <p className={s.empty}>Nothing written yet.</p>
+      </>
+    );
+  }
 
   return (
     <>

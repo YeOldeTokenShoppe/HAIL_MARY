@@ -66,6 +66,13 @@ console.log("\nA note belongs to the line above it:");
   check("and not flagged to remember", marks[0].notes[0].remember, false);
 }
 
+console.log("\nA note typed with a space after the hash still counts:");
+{
+  const marks = findMarks(mark(SCRIPT, lineB, "# ! he explains his own joke"));
+  check("the text is the note", marks[0].notes[0].text, "he explains his own joke");
+  check("and the space did not lose the marker", marks[0].notes[0].remember, true);
+}
+
 console.log("\n#! means remember it too:");
 {
   const marks = findMarks(mark(SCRIPT, lineB, "#! he never explains his own joke"));
@@ -116,6 +123,63 @@ console.log("\nAnd the screenplay still parses, with only that line different:")
   const differing = flat(after).filter((l, i) => l.text !== flat(before)[i].text);
   check("exactly one line differs", differing.length, 1);
   check("and it is the one that was rewritten", differing[0].text, REPLACEMENT);
+}
+
+// The way a long line actually gets marked: press Return in front of the
+// sentence you object to, and write the note there. That splits the line, and
+// the second half stops looking like dialogue.
+function splitAt(script, n, at, ...notes) {
+  const lines = script.split("\n");
+  const i = lines.findIndex((l) => new RegExp(`^\\s*${n}\\s`).test(l));
+  if (i === -1) throw new Error(`no line ${n} in the sample`);
+  const cut = lines[i].indexOf(at);
+  if (cut === -1) throw new Error(`"${at}" is not in line ${n}`);
+  lines.splice(i, 1, lines[i].slice(0, cut).trimEnd(), notes[0], lines[i].slice(cut), ...notes.slice(1));
+  return lines.join("\n");
+}
+
+console.log("\nA note in the MIDDLE of a line belongs to that line:");
+{
+  // Pick a line long enough to have a second sentence to object to.
+  const long = parseScript(SCRIPT, FORMAT).segments
+    .flatMap((s) => s.lines)
+    .map((l, i) => ({ l, i }))
+    .find(({ l }) => / [A-Z]/.test(l.text.slice(20)));
+  const numbers = SCRIPT.split("\n").map((l) => l.match(/^\s*(\d+)\s+\S/)).filter(Boolean).map((m) => Number(m[1]));
+  const n = numbers[long.i];
+  const whole = long.l.text;
+  const at = whole.slice(20).match(/ ([A-Z][a-z]+)/)[1];
+  const stranded = whole.slice(whole.indexOf(at, 20)); // what ends up below the note
+
+  const marked = splitAt(SCRIPT, n, at, "# the first half is corny", "# and so is the second");
+  const marks = findMarks(marked);
+  check("one line is marked, not two", marks.length, 1);
+  check("and it is the line that was split", marks[0].n, n);
+  check("its text is the whole line, put back together", marks[0].text, whole);
+  check("with both notes on it", marks[0].notes.length, 2);
+
+  const { text, changed } = applyRewrites(marked, marks, [{ n, text: REPLACEMENT }]);
+  check("one line changed", changed.length, 1);
+  check("and what it replaced was the whole line", changed[0].before, whole);
+  ok("the stranded half is gone", !text.split("\n").some((l) => l.trim() === stranded.trim()));
+
+  const after = parseScript(text, FORMAT);
+  const before = parseScript(SCRIPT, FORMAT);
+  const flat = (p) => p.segments.flatMap((s) => s.lines);
+  check("the script still parses, same number of lines", flat(after).length, flat(before).length);
+  const differing = flat(after).filter((l, i) => l.text !== flat(before)[i].text);
+  check("exactly one line differs", differing.length, 1);
+  check("and it is the rewritten one", differing[0].text, REPLACEMENT);
+}
+
+console.log("\nStructure is never swallowed as part of a line:");
+{
+  // A cue, a heading and a blank all end the line above them, so none of them
+  // can be absorbed into the line's text by the rule that repairs a split.
+  const cueLine = SCRIPT.split("\n").find((l) => /^\s*\(/.test(l));
+  const marks = findMarks(mark(SCRIPT, lineB, "# too on-the-nose"));
+  ok("a cue is not part of the line above it", !marks[0].text.includes(cueLine.trim()));
+  check("and nothing was absorbed at all", marks[0].parts, []);
 }
 
 console.log("\nA line the model left alone is left alone:");
