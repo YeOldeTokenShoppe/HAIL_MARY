@@ -13,6 +13,7 @@
     "lint": "next lint",
 
     "lt": "node scripts/lt-tv-status.mjs",
+    "lt:studio": "echo \"Start the app with npm run dev, then open http://localhost:3000/lt-tv\"",
     "lt:check": "node scripts/lt-tv-check.mjs",
     "lt:edit": "node scripts/lt-tv-edit.mjs",
     "lt:audio": "node scripts/lt-tv-audio.mjs",
