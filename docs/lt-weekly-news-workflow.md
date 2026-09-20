@@ -30,7 +30,7 @@ one. The record is what makes a *second* episode possible.
            │  scripts/lt-news-brief.mjs          ← step 1, runs anywhere
            ▼
   content/lt-tv/briefs/news-2026-W38.json
-           │
+           │                       ↖ content/lt-tv/rl80-spots.md (you edit this)
            │  scripts/lt-news-script.mjs         ← step 2, two Claude calls
            ▼
   content/lt-tv/episodes/news-2026-W38.json     ← THE EPISODE RECORD
@@ -50,20 +50,28 @@ one. The record is what makes a *second* episode possible.
 
 ## The show
 
-Six segments, every week, in this order. The skeleton is the point: a fixed
-shape is what turns "design an episode" into "fill an episode in an afternoon."
-Defined in `scripts/lt-tv-format.mjs`.
+**It is not a crypto show.** It is a general investing and economics show that
+happens to live on a crypto site. A typical week is the Fed and interest rates,
+the ten-year Treasury, the price of oil, a bill moving through Congress, what
+the indices did — and then crypto, and then whatever people have newly decided
+is an asset. Crypto is one beat among several. Three crypto stories in one
+episode means the rundown picked wrong.
+
+Seven segments, in this order. The skeleton is the point: a fixed shape is what
+turns "design an episode" into "fill an episode." Defined in
+`scripts/lt-tv-format.mjs`.
 
 | Segment | Target | What it is |
 |---|---|---|
 | Cold open | 95 words | Barron previews the three stories; GR80 undercuts the preview. |
-| Lead story | 210 words | The week's biggest story. |
-| Second story | 200 words | Infrastructure, adoption, a chain milestone. |
-| Third story | 185 words | The absurd one. The comedy slot. |
-| The gauge | 135 words | Fear & Greed across the week, plus one prediction-market line. |
+| Lead story | 210 words | The week's biggest, from any beat. |
+| Second story | 200 words | A different corner of the market from the lead. |
+| The spot | 55 words | The RL80 ad break. Skipped when there is no copy. |
+| Third story | 185 words | The absurd one — usually collectibles or a mania. |
+| The board | 135 words | The numbers that moved, plus one prediction-market line. |
 | Sign-off | 70 words | Recap, and "none of it was a recommendation." |
 
-About 895 words, roughly **6:10** at the estimated speaking rate — the middle of
+About 950 words, roughly **6:33** at the estimated speaking rate — the middle of
 the 5–10 minute target, so one long segment does not push the episode out of
 the window.
 
@@ -71,6 +79,27 @@ the window.
 GR80 reframes what the number is actually counting, Barron pushes back (usually
 by defending his own profession), GR80 lands the button. Six to ten lines. GR80
 does not get the last word in all three stories.
+
+**The story slots are not assigned to beats.** The week decides which is the
+lead. What the rundown is told is to *spread* them: if the lead is macro, the
+second story should not be.
+
+### The spot
+
+The one hand-fed input in the whole pipeline. `content/lt-tv/rl80-spots.md` is
+a plain markdown file of `-` bullets — one line per thing the show can plug.
+The writer picks one and builds an ad read around it: Barron does the sponsor
+voice, grand and overclaimed; GR80 reads the disclaimer as though it were
+scripture, or refuses to.
+
+RL80 is not newsworthy, so it never gets a news slot. It gets an ad break,
+which is funnier and honest. The rules forbid the segment from becoming an
+actual recommendation — no price, no yield, no return figure, and "not a
+recommendation" is the punchline rather than a caption.
+
+**An empty file means no ad break that week**, and the segment is dropped
+without a warning. Bullets under `## Retired` are kept for reuse and stay out
+of rotation.
 
 ### The cast, and the naming trap
 
@@ -103,30 +132,58 @@ node scripts/lt-news-brief.mjs
 # → content/lt-tv/briefs/news-2026-W38.json
 ```
 
-Reads, in parallel and with graceful degradation:
+Five families of source, all free and keyless except the last:
 
-- **Reddit** `r/bitcoin`, `r/ethereum`, `r/cryptocurrency` — *top of the week*,
-  not hot. The show covers a week, so it wants what the week decided mattered.
-- **CryptoPanic RSS** — free and unlimited, filtered to the last seven days,
-  keeping the headline and its link.
-- **CoinGecko trending** — what the market was looking up.
-- **Fear & Greed** — eight days of it, so the show can read the *arc*
-  ("seventy-two on Monday, fifty-four on Friday") rather than today's number.
-- **Polymarket** — open crypto markets by volume, with the YES price.
-- **CoinMarketCap** — global metrics and BTC/ETH, only if `CMC_PRO_API_KEY` is
-  set. Skipped silently otherwise.
+**Macro**
+- **Federal Reserve** press releases (`press_monetary.xml`) — the authoritative
+  source for an FOMC decision, ahead of anybody's coverage of it.
+- **Treasury daily yield curve** — the three-month, two-year, ten-year and
+  thirty-year, a week of them, with the ten-year's move and the 2s10s spread
+  computed.
+- **Economy and markets headlines** — CNBC economy, CNBC markets, Yahoo Finance.
 
-A source that fails lands in the brief's `degraded` array and the brief is still
-written. A news show that cannot run because CoinGecko rate-limited is not a
+**Markets**
+- **Index levels** — S&P 500, Nasdaq 100, Dow, week over week, from Stooq's
+  keyless daily CSV.
+- **Commodities** — WTI crude and gold, same source.
+
+**Crypto** — Reddit's weekly top from r/bitcoin, r/ethereum and
+r/cryptocurrency; CryptoPanic RSS; CoinGecko trending; Fear & Greed across eight
+days so the show can read the *arc* rather than today's number; and
+CoinMarketCap if `CMC_PRO_API_KEY` is set.
+
+**Collectibles** — r/PokemonTCG, r/sportscards and r/collectibles, weekly top.
+There is no free price API for trading cards worth wiring, so the beat is
+sourced the way a human notices it: a set launch or a frenzy pushes a post to
+the top of the week, and the editorial pass confirms any actual number from a
+real article.
+
+**Predictions** — Polymarket and Kalshi, filtered to the show's beats (rates,
+inflation, recession, the indices, oil, crypto, legislation) and normalised so
+both quote a probability.
+
+A source that fails lands in the brief's `degraded` array and the brief is
+still written. A news show that cannot run because Stooq rate-limited is not a
 sustainable news show.
 
-**Why not just call `/api/ai/trending`?** That route hits three of the same
-upstreams, but it is tuned for the live `/trade` page: a six-hour cache,
-Reddit's *hot* listing, titles truncated to 40 characters, and only the top
-three topics kept. A weekly show needs the opposite of all four. So this reads
-the same upstreams directly and leaves the route untouched.
+### Checking the sources
 
----
+Silent degradation is right on a Friday and wrong on the first run on a new
+machine. To tell them apart:
+
+```bash
+node scripts/lt-news-brief.mjs --check-sources
+```
+
+It pings every upstream, reports which answered and with how many items, and
+writes nothing.
+
+**Why not just call `/api/ai/trending`?** That route hits three of the same
+crypto upstreams, but it is tuned for the live `/trade` page: a six-hour cache,
+Reddit's *hot* listing, titles truncated to 40 characters, and only the top
+three topics kept. A weekly show needs the opposite of all four — and it needs
+four families of source that route has never had. So this reads its own
+upstreams and leaves the route untouched.
 
 ## Step 2 — Write the script
 
@@ -180,6 +237,7 @@ checklist:
 - a line opening with an event tag like `[sighs]`, which the 120 ms handoff trim
   in `process_dialogue.py` would eat — flagged, not dropped
 - a story the editorial pass could not confirm from a real source
+- a host given two turns in a row (the camera cuts on who speaks)
 - a segment more than 25% off its word target
 - an episode estimated outside 5–10 minutes
 - a recording block over the character budget
