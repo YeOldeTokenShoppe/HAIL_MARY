@@ -8,11 +8,12 @@ the reference for the audio mechanics (ElevenLabs tags, the balanced-WAV
 cleanup, SitePal uploads); this one is the layer above it — what the show is,
 where its topics come from, and what file holds an episode.
 
-> **Status.** Steps 1 and 2 are built and runnable. Step 3 is designed here but
-> not yet written. Step 4 is half done and not by this pipeline: the slate under
-> `src/content/lt-tv/` already reads one JSON record per episode, but this
-> pipeline's record is a different shape and has not been converged onto it.
-> Nothing in this workflow has modified an existing route or component.
+> **Status.** Steps 1, 2 and 4 are built and runnable: a week of signal becomes
+> a script, and the script lands on the LT TV guide as an episode. Step 3, the
+> audio build, is designed here but not yet written, so an episode arrives on
+> the guide listed as "Not recorded yet" until someone records it. No existing
+> route has been modified; the only component-adjacent file this touches is
+> `src/content/lt-tv/index.js`, whose episode list it appends to.
 
 ---
 
@@ -37,6 +38,10 @@ record's contents rather than typing them.
            ▼
   content/lt-tv/episodes/news-2026-W38.json     ← THE EPISODE RECORD (staging)
   content/lt-tv/episodes/news-2026-W38.txt      ← the read-through, for review
+           │
+           │  scripts/lt-tv-slate-record.mjs    ← step 4, the join
+           ▼
+  src/content/lt-tv/episodes/news-01.json       ← on the LT TV guide
            │
            │  audio build (step 3 — not built yet)
            ▼
@@ -372,32 +377,68 @@ the number passed explicitly.
 
 ---
 
-## Step 4 — Put it on the site *(the slate is wired; this pipeline is not)*
+## Step 4 — Put it on the site *(joined; the audio is what is left)*
 
-The component half of this is **done**, by the episode-records change rather
-than by this pipeline. `src/content/lt-tv/` is now the slate: one JSON record
-per episode under `episodes/`, decorated by `index.js`, read by
-`LTTvBroadcastPanel`, the mobile screen and `TalkShowScene`. Adding an episode
-is adding a file and one import line. A record with no `audio` is listed as
-"Not recorded yet" instead of silently replaying another episode.
+The slate under `src/content/lt-tv/` is the site's episode list: one JSON
+record per episode under `episodes/`, decorated by `index.js`, read by
+`LTTvBroadcastPanel`, the mobile screen and `TalkShowScene`.
 
-What is left is joining the two halves, and it is one real task:
+**The pipeline now writes into it.** `scripts/lt-tv-slate-record.mjs` is the
+join: it takes the production record and emits the slate's flat shape, writes
+it to `src/content/lt-tv/episodes/news-<NN>.json`, and adds the import and the
+`EPISODE_RECORDS` entry to `index.js` — a record nobody imports is a record the
+site never shows, and bundlers cannot glob a directory at build time.
 
-- **The two record schemas have not been converged.** The slate's shape is
-  flat — `showId`, `audio: { Connor, Monk }`, `lineStarts`, `speakers`,
-  `audienceLines`, `cues`, `dialogueEnd`. This pipeline's is nested —
-  `show`, `segments[].lines[]`, `cast[].sitepalAudio`, `timing.lineStarts`,
-  `blocks`. Both describe the same episode; neither reads the other. Until
-  `assemble()` emits the slate's shape (or writes it alongside), a generated
-  news record cannot be dropped into `src/content/lt-tv/episodes/`, which is
-  why this pipeline still writes to `content/lt-tv/episodes/` at the repo
-  root. That directory is a staging area, not the slate.
-- **`LTTvChiron.jsx`'s `TICKER_COPY` is still lorem ipsum**, with a comment
-  saying the content is undecided. It becomes `graphics.ticker` from the
-  record — the news record already carries the copy.
+```bash
+node scripts/lt-news-script.mjs --brief content/lt-tv/briefs/news-2026-W38.json
+# → content/lt-tv/episodes/news-2026-W38.json   the production record
+# → src/content/lt-tv/episodes/news-01.json     the slate record, on the guide
+node scripts/lt-tv-check.mjs
+```
 
-The honest note: the guide can now list and play more than one episode, but no
-news episode exists to list until step 3 runs and the schemas meet.
+A **draft run does not touch the slate.** `--draft` exists to look at the
+format and hear the two voices, and the worked sample is synthetic, so it must
+not be one flag away from being listed as an episode of the show. Pass
+`--slate` to add it anyway when you are testing this path, or `--no-slate` to
+suppress it always.
+
+### What the record can and cannot know
+
+Three fields come from real audio and nothing else: `audio` (the SitePal clip
+names), `lineStarts`, and `dialogueEnd`. Until the audio build (step 3) runs,
+the record omits all three, `episodeIsPlayable` returns false, and **the guide
+lists the episode as "Not recorded yet"** — which is exactly right for an
+episode that has been written but not recorded. Everything else is known the
+moment the script exists and is written now:
+
+| Slate field | Comes from |
+|---|---|
+| `speakers` | who holds each line — the listener turns and camera shots derive from it |
+| `audienceLines` | the lines **not** marked `directAddress` (see below) |
+| `cues` | each line's reaction beats, with their offsets and clip lengths |
+| `leadIn`, `graphics`, `sources`, `week` | the production record |
+
+**`audienceLines` is an inversion, and it reads like a typo.** The pipeline's
+`directAddress: true` means the speaker is talking *at* the other host, so the
+listener turns to face them. The slate's `audienceLines` means the opposite —
+played to the room, nobody turns, the camera pulls back to the two-shot.
+`buildEpisodeTimeline` skips the gaze for precisely those lines. Mapping one
+straight onto the other sends most of the episode wide; there is a test
+asserting the two partition the episode.
+
+### The episode number is load-bearing
+
+It names the slate record (`news-03.json`) **and** both SitePal uploads
+(`lttv_news_ep03_connor`). So it is read from the slate rather than counted
+from the staging directory, and a week already on the slate keeps the number it
+was given — a re-run of the same week updates that episode instead of becoming
+a second one. `--number` overrides it.
+
+### Still hand-wired
+
+`LTTvChiron.jsx`'s `TICKER_COPY` is lorem ipsum with a comment saying the
+content is undecided. The record already carries the copy at `graphics.ticker`;
+pointing the component at it is a one-line change nobody has made yet.
 
 ---
 
@@ -409,9 +450,11 @@ news episode exists to list until step 3 runs and the schemas meet.
 - [ ] Zero warnings, or each one understood and accepted
 - [ ] Check `rundown.stories[].gaps` — anything non-empty is unsourced
 - [ ] Spot-check every number in the script against `sources`
+- [ ] `node scripts/lt-tv-check.mjs` — the new record is on the slate and consistent
 - [ ] Build the audio, listen to the master end to end
 - [ ] Check each block join for a seam
-- [ ] Upload two WAVs, put the names in the record
+- [ ] Upload two WAVs under the names the record prescribes
+- [ ] `node scripts/lt-tv-check.mjs` again — it should now report a runtime, not "not recorded yet"
 - [ ] Play it once through on `/trade`, then a second time for stale state
 
 ---
