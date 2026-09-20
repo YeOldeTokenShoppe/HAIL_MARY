@@ -164,17 +164,47 @@ never accepts a URL. That was tested directly here: the spike page is
 `src/app/api/trade/director/route.js:7`. So an episode's audio has to be sitting in
 the account's Audio Manager before the site can play a second of it.
 
-1. Upload `output/john-sitepal-balanced.wav` to Barron's Audio Manager.
-2. Upload `output/gr80-sitepal-balanced.wav` to GR80's.
-3. Give each one a short, unique name that says which episode it belongs to.
-4. Wait for SitePal to finish processing both.
-5. Copy those two names, character for character, into `TALK_SHOW_AUDIO` at
+The Audio Manager is that account's shared clip library: the list of uploaded audio
+files `sayAudio` looks names up in. There is one for account `9308752`, not one per
+character, so every clip for every character and every show sits in the same list.
+It has nothing to do with the ElevenLabs voice each SitePal character is configured
+with — the talk show never uses SitePal's own text-to-speech, only these
+pre-rendered uploads.
+
+### Naming clips
+
+One shared list means the name has to carry its own namespace. The Terminal Traders
+clips already in there look like `case001_monk_q5`, so LT TV follows the same shape:
+
+```
+lttv_<show>_ep<NN>_<character>
+```
+
+- `<show>` is `rt` (The Liminal Terminal), `news` (LT Weekly News Recap) or `mm`
+  (Markets & Morality)
+- `<NN>` is the episode number, zero-padded: `02`, never `2`
+- `<character>` is `barron` or `gr80`
+
+Episode 02 of the roundtable uploads as `lttv_rt_ep02_barron` and
+`lttv_rt_ep02_gr80`. An episode split into sections because it ran past the
+2,000-character limit appends the section number: `lttv_rt_ep07_barron_s2`.
+
+Lowercase and underscores throughout. SitePal accepts spaces — the two clips on air
+are `talk show test for jb` and `talk show test GR80` — but these names get retyped
+by hand into a JavaScript object, and a space is a typo waiting to happen.
+
+### Uploading
+
+1. Upload `output/john-sitepal-balanced.wav` under the Barron name.
+2. Upload `output/gr80-sitepal-balanced.wav` under the GR80 name.
+3. Wait for SitePal to finish processing both.
+4. Copy those two names, character for character, into `TALK_SHOW_AUDIO` at
    `TalkShowScene.jsx:53`.
 
 ```js
 const TALK_SHOW_AUDIO = {
-  Barron: "episode 02 barron",
-  Monk: "episode 02 gr80",
+  Barron: "lttv_rt_ep02_barron",
+  Monk: "lttv_rt_ep02_gr80",
 };
 ```
 
@@ -283,6 +313,7 @@ to make.
 - [ ] No blips at handoffs and no clipped final syllables in either balanced WAV
 - [ ] Both balanced WAVs report the same duration
 - [ ] Both WAVs uploaded and finished processing in SitePal
+- [ ] Clips named to the convention: `lttv_<show>_ep<NN>_<character>`
 - [ ] `TALK_SHOW_AUDIO` matches the SitePal names character for character
 - [ ] `TEST_LINE_STARTS` and `TEST_DIALOGUE_END` copied from `talk-show-timing.json`
 - [ ] The `speakers` array in that file matches the characters you intended
@@ -315,12 +346,6 @@ One of the six passes is a script. The rest are you.
 These are the places where this document records what the code implies rather than
 what actually happens at the desk.
 
-- [ ] **One Audio Manager or two?** The code points at a single SitePal account,
-      `9308752`, with two scene IDs. `docs/talk-show-production.md` says "Barron's
-      Audio Manager" and "GR80's", which reads like two.
-- [ ] **Clip naming.** The two clips on air are `talk show test for jb` and
-      `talk show test GR80`. Is there a convention for real episodes, or should this
-      document set one (`ep02_barron`, `ep02_gr80`)?
 - [ ] **Anything between generating and uploading?** Trimming in a DAW, normalising,
       format conversion — anything done to the WAVs that is not in `process_dialogue.py`.
 - [ ] **The lead-in.** Is `TALK_SHOW_TIMING.leadIn` re-checked per episode, or was
