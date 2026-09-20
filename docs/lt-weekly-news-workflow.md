@@ -40,6 +40,8 @@ record's contents rather than typing them.
            │  scripts/lt-news-script.mjs         ← step 2, two Claude calls
            ▼
   content/lt-tv/episodes/news-2026-W38.json     ← THE EPISODE RECORD (staging)
+           ▲           └── .txt  ← you read and edit this
+           └───────────────┘  scripts/lt-news-edit.mjs, no API calls
   content/lt-tv/episodes/news-2026-W38.txt      ← the read-through, for review
            │
            │  scripts/lt-tv-slate-record.mjs    ← step 4, the join
@@ -281,17 +283,52 @@ checklist:
 
 ### Reviewing and revising
 
-Read `content/lt-tv/episodes/news-2026-W38.txt` — the read-through, one line per
-turn with its cues. To fix a line, edit the draft and re-assemble without
-spending another model call:
+Step 2 writes two files side by side: the record, which is JSON and which
+everything downstream reads, and `news-2026-W38.txt`, the screenplay. **Read
+and edit the screenplay.** It is the source, not a printout — change the words
+in it and apply them back with:
+
+```bash
+node scripts/lt-news-edit.mjs news-2026-W38
+```
+
+Reword lines, add them, delete them, reorder them. They renumber themselves and
+every derived number is recomputed. This costs nothing: no model call, no
+ElevenLabs call. Review happens two steps before anything is spent, so a script
+should be read and fixed here rather than after it is recorded.
+
+Three things in the file are more than decoration:
+
+- **The `>` before a speaker** means the line is aimed at the other host, who
+  turns to face them. Without it the line plays to the room and the camera pulls
+  back to the two-shot. It is on the page because it cannot be recovered from
+  anything else, and because who a line is aimed at is a real editorial choice.
+- **Bracketed words like `[dryly]`** are delivery directions ElevenLabs performs.
+  They are part of the line and count toward the block budget.
+- **An indented `(Monk headshake @ +0.4s)`** is an animation beat on the line
+  above it. A reaction a character does not have is refused by name, with the
+  valid list printed.
+
+Anything the parser cannot read is an **error naming the line in the file**,
+never a line quietly dropped — a missing line still builds, still records, and
+is noticed only on air. Lines starting with `#` are ignored, so a note to
+yourself is safe to leave in.
+
+Editing an episode that has **already been recorded** is refused, because the
+audio would still be saying the old words. `--rerecord` overrides it, clears the
+timing and returns the episode to "Not recorded yet" until step 3 runs again.
+An episode already on the slate has its slate record refreshed in the same run.
+
+The older path still works and is what `--draft` is for: the same
+`{ rundown, segments }` shape the model returns, re-assembled without a model
+call.
 
 ```bash
 node scripts/lt-news-script.mjs --draft content/lt-tv/samples/news-2026-W38.draft.json
 ```
 
-The draft format is the same `{ rundown, segments }` shape the model returns, so
-a hand-edit and a generated script go through identical assembly and identical
-validation.
+A hand-edit, an edited screenplay and a generated script all go through the
+identical `assemble()` and the identical validation.
 
 `content/lt-tv/samples/` holds a worked example — the draft, the assembled
 record and its read-through (`news-2026-W38.sample.txt`). **Its facts are
@@ -477,6 +514,7 @@ pointing the component at it is a one-line change nobody has made yet.
 - [ ] `node scripts/lt-news-brief.mjs` — check `degraded` is empty or harmless
 - [ ] `node scripts/lt-news-script.mjs --brief <brief>`
 - [ ] Read the `.txt`. Does each story have a real number? Does GR80 lose one?
+- [ ] Fix what you found in the `.txt`, then `node scripts/lt-news-edit.mjs <id>`
 - [ ] Zero warnings, or each one understood and accepted
 - [ ] Check `rundown.stories[].gaps` — anything non-empty is unsourced
 - [ ] Spot-check every number in the script against `sources`

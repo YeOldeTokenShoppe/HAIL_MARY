@@ -561,21 +561,59 @@ function assemble({ rundown, segments, week, brief, number = 1 }) {
 }
 
 /** The human-readable read-through. The JSON is for machines; this is for ears. */
+/**
+ * The episode as a screenplay — and as the thing a producer edits.
+ *
+ * This is the only view of an episode anyone actually reads, so it is also
+ * where changes are made: `scripts/lt-news-edit.mjs` parses this exact format
+ * back into a record. That makes the layout load-bearing rather than
+ * cosmetic, and it is why two things appear here that a pure printout would
+ * not bother with.
+ *
+ * The `>` marker is `directAddress`, and it has to be on the page because it
+ * cannot be recovered from anything else. It decides whether the listener
+ * turns to face the speaker or the camera pulls back to the two-shot, and a
+ * line that loses it does not fail — it just quietly plays to the room. It is
+ * also a real editorial choice, so a producer should be able to see and change
+ * who a line is aimed at.
+ *
+ * The bracketed segment id is there because lines are reassembled into
+ * segments by id, and a label is a display string that may be reworded.
+ */
 export function renderScript(episode) {
   const out = [
     `LT WEEKLY NEWS RECAP — ${episode.title}`,
     `${episode.week}   ·   ${episode.slate.runtime} estimated   ·   ${episode.slate.words} words`,
+    `episode: ${episode.id}`,
     "",
     `CHIRON: ${episode.graphics.headline}`,
     "",
+    "# Edit this file, then apply it with:",
+    `#     node scripts/lt-news-edit.mjs ${episode.id}`,
+    "#",
+    "# Reword any line. Add lines, delete lines, reorder them — they renumber",
+    "# themselves and the counts above are recomputed, so do not keep them",
+    "# current by hand.",
+    "#",
+    "# The > before a speaker means the line is aimed at the other host, who",
+    "# turns to face them. Without it the line is played to the room and the",
+    "# camera pulls back to the two-shot. Bracketed words like [dryly] are",
+    "# delivery directions ElevenLabs performs, and they are part of the line.",
+    "# An indented (Monk headshake @ +0.4s) is an animation beat on the line",
+    "# above it. Lines starting with # are ignored.",
+    "",
   ];
   for (const segment of episode.segments) {
-    out.push(`── ${segment.label.toUpperCase()} — ${segment.words} words, ~${Math.round(segment.estimatedSeconds)}s`, "");
+    out.push(
+      `── ${segment.label.toUpperCase()}  [${segment.id}] — ${segment.words} words, ~${Math.round(segment.estimatedSeconds)}s`,
+      "",
+    );
     for (const line of segment.lines) {
       const who = CAST[line.actor].displayName.toUpperCase().padEnd(10);
-      out.push(`${String(line.n).padStart(3)}  ${who} ${line.text}`);
+      const aim = line.directAddress ? "> " : "  ";
+      out.push(`${String(line.n).padStart(3)}  ${aim}${who} ${line.text}`);
       for (const cue of line.cues) {
-        out.push(`     ${" ".repeat(10)} (${cue.actor} ${cue.reaction} @ +${cue.offset}s)`);
+        out.push(`${" ".repeat(17)} (${cue.actor} ${cue.reaction} @ +${cue.offset}s)`);
       }
     }
     out.push("");
