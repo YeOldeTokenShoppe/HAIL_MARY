@@ -26,7 +26,7 @@
 //      LT_NEWS_MODEL     (default claude-opus-5)
 
 import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import {
   CAST,
@@ -48,6 +48,7 @@ import {
   estimateSeconds,
   formatRuntime,
 } from "./lt-tv-format.mjs";
+import { toSlateRecord, writeSlateRecord, SLATE_DIR, SLATE_INDEX } from "./lt-tv-slate-record.mjs";
 
 const MODEL = process.env.LT_NEWS_MODEL || "claude-opus-5";
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
@@ -62,7 +63,7 @@ function arg(name, fallback = null) {
 // Every flag this script knows. An unrecognised one is almost always a typo,
 // and silently ignoring it is how `--check-sources.` — one stray full stop —
 // quietly generated a brief instead of checking anything.
-const KNOWN_FLAGS = ["brief", "draft", "rundown-only", "no-search", "number", "out", "max-tokens"];
+const KNOWN_FLAGS = ["brief", "draft", "rundown-only", "no-search", "number", "out", "max-tokens", "slate", "no-slate"];
 
 // The max_tokens error tells you to raise --max-tokens, so --max-tokens has to
 // actually do something.
@@ -588,15 +589,47 @@ export function renderScript(episode) {
  * normal weekly run needs no argument and a re-run of an existing week is
  * corrected by hand rather than silently renumbering.
  */
-async function resolveEpisodeNumber() {
+/**
+ * Which episode of the news show this is.
+ *
+ * The number is not cosmetic: it names the slate record (news-03.json) and it
+ * names both SitePal uploads (lttv_news_ep03_connor). So it has to be the same
+ * number every time this week is built, or a re-run silently becomes a second
+ * episode with a second pair of clip names.
+ *
+ * It is therefore read from the SLATE, which is the list of episodes that
+ * actually exist, and a week already on the slate keeps the number it was
+ * given. Counting the staging directory — which is what this did — allocated a
+ * fresh number on every re-run, because each run leaves another file there.
+ */
+async function resolveEpisodeNumber(week) {
   const flag = arg("number");
-  if (flag && flag !== true) return Number(flag);
-  try {
-    const files = await readdir(resolve("content/lt-tv/episodes"));
-    return files.filter((f) => /^news-.*\.json$/.test(f)).length + 1;
-  } catch {
-    return 1;
+  if (flag && flag !== true) {
+    const n = Number(flag);
+    if (!Number.isInteger(n) || n < 1) {
+      console.error(`--number expects a whole number from 1, got "${flag}".`);
+      process.exit(2);
+    }
+    return n;
   }
+
+  let records = [];
+  try {
+    const dir = resolve(SLATE_DIR);
+    const files = (await readdir(dir)).filter((f) => /^news-\d+\.json$/.test(f));
+    records = await Promise.all(
+      files.map(async (f) => JSON.parse(await readFile(join(dir, f), "utf8"))),
+    );
+  } catch {
+    return 1; // no slate yet
+  }
+
+  const existing = records.find((r) => r.week === week);
+  if (existing) {
+    console.log(`Week ${week} is already episode ${existing.number} on the slate — reusing that number.`);
+    return Number(existing.number);
+  }
+  return records.length + 1;
 }
 
 // ── main ──────────────────────────────────────────────────────────────────
@@ -673,7 +706,7 @@ async function main() {
     segments = written.segments;
   }
 
-  const number = await resolveEpisodeNumber();
+  const number = await resolveEpisodeNumber(week);
   const episode = assemble({ rundown, segments, week, brief, number });
 
   const jsonPath = resolve(arg("out", `content/lt-tv/episodes/${episode.id}.json`));
@@ -695,6 +728,44 @@ async function main() {
   }
   console.log(`\nWrote ${jsonPath}`);
   console.log(`Wrote ${txtPath}`);
+
+  await emitSlateRecord(episode, { fromDraft: Boolean(arg("draft")) });
+}
+
+/**
+ * Put the episode on the LT TV guide.
+ *
+ * A draft does not land by default. `--draft` exists to look at the format and
+ * hear the two voices; the worked sample in content/lt-tv/samples is marked
+ * synthetic and its numbers are invented, so a draft run must not be one typo
+ * away from listing it as an episode of the show. `--slate` forces it when you
+ * are deliberately testing this path; `--no-slate` suppresses it always.
+ */
+async function emitSlateRecord(episode, { fromDraft }) {
+  if (arg("no-slate")) return;
+  if (fromDraft && !arg("slate")) {
+    console.log("\nNot added to the slate (draft run). Pass --slate to add it anyway.");
+    return;
+  }
+
+  const record = toSlateRecord(episode);
+  const { path, registered, importLine, arrayLine } = await writeSlateRecord(record);
+
+  console.log(`\nWrote ${path}`);
+  if (registered) {
+    console.log(`Registered in ${SLATE_INDEX}.`);
+  } else {
+    console.log(`Could NOT register it in ${SLATE_INDEX} — add these two lines by hand:`);
+    console.log(`  ${importLine}`);
+    console.log(`  ${arrayLine.trim()}   (in EPISODE_RECORDS)`);
+  }
+  console.log(
+    record.lineStarts
+      ? "It is playable: the guide will offer Play episode."
+      : "The guide will list it as \"Not recorded yet\" until the audio build fills in " +
+        "audio, lineStarts and dialogueEnd.",
+  );
+  console.log("Check it with: node scripts/lt-tv-check.mjs");
 }
 
 // Only run when invoked directly, so assemble/renderScript can be imported.
