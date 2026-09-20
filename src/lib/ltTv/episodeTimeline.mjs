@@ -33,6 +33,18 @@ const SHOT_MIN_HOLD = 2.6;
 const DEFAULT_REACTION_DURATION = 1.5;
 const DEFAULT_LEAD_IN = 2.5;
 
+// SitePal will not play a clip longer than 90 seconds — its own limit, not a
+// plan one — so an episode of any real length goes up as several clips per
+// character and the set plays them in order. A record says where each one
+// begins on the episode's own timeline; everything else (line starts, cues,
+// shots) is unchanged, because a section is a cut in the audio and not a cut
+// in the show.
+//
+// An episode short enough to be one clip has no `sections` at all, and reads
+// here as a single section starting at zero. That is not a special case in the
+// set: it plays a list of one.
+export const SITEPAL_MAX_CLIP_SECONDS = 90;
+
 /** "MM:SS" for a guide listing. */
 export function formatRuntime(seconds) {
   if (!Number.isFinite(seconds)) return null;
@@ -54,6 +66,25 @@ export function episodeIsPlayable(record) {
       Array.isArray(record.lineStarts) &&
       record.lineStarts.length > 0,
   );
+}
+
+/**
+ * Where each clip begins on the episode timeline, and what to play there.
+ *
+ * `record.audio` is always the first section, so a record written before
+ * sections existed — and the cast lookup everything else does through
+ * `record.audio` — keeps working untouched.
+ */
+export function episodeSections(record) {
+  const first = { startsAt: 0, audio: record.audio };
+  if (!Array.isArray(record.sections) || record.sections.length === 0) return [first];
+  return [
+    first,
+    ...record.sections.slice(1).map((section) => ({
+      startsAt: Number(section.startsAt) || 0,
+      audio: section.audio,
+    })),
+  ];
 }
 
 /**
@@ -86,6 +117,35 @@ export function validateEpisode(record) {
       problems.push(`cues[${i}] points at line ${cue.line}, which doesn't exist`);
     }
   });
+
+  // A section that is wrong is silent about it: the set plays a clip SitePal
+  // refuses, or resumes at the wrong second, and neither looks like a record
+  // problem when you are watching it.
+  const sections = episodeSections(record);
+  const cast = Object.keys(record.audio);
+  sections.forEach((section, i) => {
+    if (i > 0 && section.startsAt <= sections[i - 1].startsAt) {
+      problems.push(`sections[${i}] starts at or before the one before it`);
+    }
+    if (section.startsAt > record.dialogueEnd) {
+      problems.push(`sections[${i}] starts after the dialogue ends`);
+    }
+    const names = section.audio ? Object.keys(section.audio) : [];
+    if (names.length !== cast.length || cast.some((who) => !section.audio?.[who])) {
+      problems.push(`sections[${i}] does not name a clip for every character`);
+    }
+    const ends = sections[i + 1]?.startsAt ?? record.dialogueEnd;
+    if (ends - section.startsAt > SITEPAL_MAX_CLIP_SECONDS) {
+      problems.push(
+        `sections[${i}] is ${Math.round(ends - section.startsAt)}s, over SitePal's ` +
+          `${SITEPAL_MAX_CLIP_SECONDS}s limit — it will not play`,
+      );
+    }
+  });
+  const clips = sections.flatMap((s) => Object.values(s.audio ?? {}));
+  if (new Set(clips).size !== clips.length) {
+    problems.push("two sections ask SitePal for the same clip name");
+  }
   return problems;
 }
 
@@ -146,6 +206,7 @@ export function buildEpisodeTimeline(record, { reactionDurations = {} } = {}) {
   return {
     id: record.id,
     audio: record.audio,
+    sections: episodeSections(record),
     leadIn: record.leadIn ?? DEFAULT_LEAD_IN,
     lineStarts,
     dialogueEnd,

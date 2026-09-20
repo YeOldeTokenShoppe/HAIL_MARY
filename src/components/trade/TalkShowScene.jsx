@@ -136,7 +136,34 @@ const REACTION_DURATIONS = {
 // reads through this, so it stays in sync. Seeded from the episode record's
 // `leadIn` when an episode mounts; trim by ear via `window.__tsTiming` and
 // write the value you land on back into the record.
-export const TALK_SHOW_TIMING = { leadIn: 2.5 };
+export const TALK_SHOW_TIMING = {
+  leadIn: 2.5,
+  // The same idea at a SECTION join. SitePal will not play a clip over 90
+  // seconds, so an episode of any length is several clips per character and
+  // the set plays them in order. Section one is stamped as it always was; the
+  // rest re-stamp the clock when SitePal says it has started talking, so a
+  // slow join cannot push the picture out. This trims what is left, and starts
+  // at zero because there is no dead air at the head of a section — it was cut
+  // out of the middle of a track, not rendered.
+  sectionLeadIn: 0,
+};
+
+// How long to wait at a section join for SitePal to say it has started before
+// carrying on regardless. Generous — a join is normally well under a second —
+// because this only exists so a dropped message cannot stall an episode.
+const HOLD_FAILSAFE_MS = 6000;
+
+// Nothing playing. `section` is which clip of the episode is up; `holdingAt`
+// is the second of the episode to freeze the picture on while the next one
+// starts, and null the rest of the time.
+const idlePlayback = () => ({
+  running: false,
+  startedAt: 0,
+  cueIndex: 0,
+  section: 0,
+  holdingAt: null,
+  heldSince: 0,
+});
 
 // Procedural listener gaze is applied after the animation mixer, so it layers
 // over breathing and reaction clips without needing separate look-at actions.
@@ -330,9 +357,10 @@ export const MONITOR_FEED = {
   flipY: false,
   mirrorX: false,
   // Seconds to shift every shot change, CAMERA ONLY — positive lands the pan
-  // later. The clock itself is stamped on SitePal's talk-started message, so
-  // this should stay near 0; it's here to trim the pans without touching the
-  // reaction cues, which read from the same clock.
+  // later. This should stay near 0; it's here to trim the pans without
+  // touching the reaction cues, which read from the same clock. That clock is
+  // `leadIn` for the first section and SitePal's own talk-started message for
+  // every section after it — see TALK_SHOW_TIMING.
   shotLead: 0,
   // 'auto' follows the shot list; 'wide' | 'Connor' | 'Monk' holds one shot
   // (for fitting without running the show).
@@ -1037,7 +1065,7 @@ function TalkShowModel({
     Monk: { frame: null, ready: false, source: null },
     Connor: { frame: null, ready: false, source: null },
   });
-  const playbackRef = useRef({ running: false, startedAt: 0, cueIndex: 0 });
+  const playbackRef = useRef(idlePlayback());
   // Frame counter for solo mode's listener-repaint throttle.
   const solotickRef = useRef(0);
 
@@ -1500,7 +1528,7 @@ function TalkShowModel({
     });
     actionsRef.current = out;
     return () => {
-      playbackRef.current = { running: false, startedAt: 0, cueIndex: 0 };
+      playbackRef.current = idlePlayback();
       Object.values(out).forEach((bank) => {
         Object.values(bank.reactions).forEach((action) => action.stop());
       });
@@ -1564,7 +1592,7 @@ function TalkShowModel({
     const ended = new Set();
 
     const resetPerformance = () => {
-      playbackRef.current = { running: false, startedAt: 0, cueIndex: 0 };
+      playbackRef.current = idlePlayback();
       Object.values(actionsRef.current).forEach((bank) => {
         if (!bank) return;
         Object.values(bank.reactions || {}).forEach((action) => {
@@ -1673,12 +1701,46 @@ function TalkShowModel({
         notifyReady();
       }
 
+      if (event.data?.type === "sitepal-portal-talk-started") {
+        // Only sections past the first re-stamp, and only on the first portal
+        // to report — the two are told to start in the same tick, so the
+        // second is milliseconds behind and would only add jitter.
+        const playback = playbackRef.current;
+        if (!playback.running || playback.holdingAt === null) return;
+        const sections = timelineRef.current?.sections || [];
+        const startsAt = sections[playback.section]?.startsAt ?? playback.holdingAt;
+        playback.startedAt =
+          performance.now() -
+          (startsAt + TALK_SHOW_TIMING.leadIn + TALK_SHOW_TIMING.sectionLeadIn) * 1000;
+        playback.holdingAt = null;
+        playback.heldSince = 0;
+      }
+
       if (event.data?.type === "sitepal-portal-talk-ended") {
         ended.add(key);
-        if (ended.size === Object.keys(portalsRef.current).length) {
-          resetPerformance();
-          onPlaybackStateChange?.(false);
+        if (ended.size !== Object.keys(portalsRef.current).length) return;
+
+        // Both tracks have run out. On a sectioned episode that is a join, not
+        // the end: the next clip goes in and the picture holds where the cut
+        // was until it is actually heard to start.
+        const playback = playbackRef.current;
+        const sections = timelineRef.current?.sections || [];
+        const next = playback.section + 1;
+        if (playback.running && sections[next]) {
+          ended.clear();
+          playback.section = next;
+          playback.holdingAt = sections[next].startsAt;
+          playback.heldSince = performance.now();
+          if (startSection(next) === 0) {
+            console.warn(`[TalkShowScene] section ${next + 1} would not start`);
+            resetPerformance();
+            onPlaybackStateChange?.(false);
+          }
+          return;
         }
+
+        resetPerformance();
+        onPlaybackStateChange?.(false);
       }
     };
 
@@ -1724,21 +1786,24 @@ function TalkShowModel({
       onPlaybackStateChange?.(false);
     };
 
-    const playShow = () => {
-      // Whatever episode is mounted right now — the portals outlive any one
-      // of them, so this is read at press time, not captured when they built.
+    /**
+     * Tell both portals to play section `index`, and say how many took it.
+     *
+     * Every section is the same length in both tracks and was cut at the same
+     * instant, so telling both at once is all the synchronising there is: they
+     * are one timeline twice over, not two things to line up.
+     */
+    const startSection = (index) => {
       const active = timelineRef.current;
-      if (!active) return false;
-      if (stopped) stopped = false;
-      if (!Object.values(portalsRef.current).every((p) => p.ready)) return false;
-      ended.clear();
+      const section = active?.sections?.[index];
+      if (!section) return 0;
 
       let started = 0;
       Object.entries(portalsRef.current).forEach(([key, portal]) => {
-        const clip = active.audio?.[key];
+        const clip = section.audio?.[key];
         if (!clip) {
           console.warn(
-            `[TalkShowScene] episode "${active.id}" has no ${key} clip — not starting`,
+            `[TalkShowScene] episode "${active.id}" section ${index + 1} has no ${key} clip`,
           );
           return;
         }
@@ -1754,16 +1819,28 @@ function TalkShowModel({
           console.warn(`[TalkShowScene] could not start ${key} audio`, e);
         }
       });
+      return started;
+    };
 
-      const ok = started === Object.keys(portalsRef.current).length;
+    const playShow = () => {
+      // Whatever episode is mounted right now — the portals outlive any one
+      // of them, so this is read at press time, not captured when they built.
+      const active = timelineRef.current;
+      if (!active) return false;
+      if (stopped) stopped = false;
+      if (!Object.values(portalsRef.current).every((p) => p.ready)) return false;
+      ended.clear();
+
+      const ok = startSection(0) === Object.keys(portalsRef.current).length;
       if (ok) {
         resetPerformance();
         playbackRef.current = {
+          ...idlePlayback(),
           running: true,
+          // Section one keeps the clock it has always had, stamped here and
+          // trimmed by `leadIn`, because `leadIn` was tuned against exactly
+          // this. Later sections re-stamp on SitePal's talk-started instead.
           startedAt: performance.now(),
-          cueIndex: 0,
-          // Provisional clock; the first talk-started message re-stamps it.
-          audioStarted: false,
         };
       }
       onPlaybackStateChange?.(ok);
@@ -1798,9 +1875,27 @@ function TalkShowModel({
     const timeline = timelineRef.current;
     let elapsed = 0;
     if (playback.running) {
-      elapsed =
-        (performance.now() - playback.startedAt) / 1000 -
-        TALK_SHOW_TIMING.leadIn;
+      if (playback.holdingAt !== null) {
+        // Between one section ending and the next being heard to start, the
+        // picture holds on the cut rather than running on through silence —
+        // otherwise the camera and the reactions would spend the join playing
+        // the next section's opening to nobody.
+        elapsed = playback.holdingAt;
+        // Unless the start never comes. A portal that drops its talk-started
+        // would otherwise freeze the show at a join forever, which is a worse
+        // failure than a join that lands a little late.
+        if (performance.now() - playback.heldSince > HOLD_FAILSAFE_MS) {
+          playback.startedAt =
+            performance.now() -
+            (playback.holdingAt + TALK_SHOW_TIMING.leadIn + TALK_SHOW_TIMING.sectionLeadIn) * 1000;
+          playback.holdingAt = null;
+          playback.heldSince = 0;
+        }
+      } else {
+        elapsed =
+          (performance.now() - playback.startedAt) / 1000 -
+          TALK_SHOW_TIMING.leadIn;
+      }
 
       // Finish reactions at their authored gesture length instead of allowing
       // the pose-2 clip's trailing breathing idle to run to frame 129.

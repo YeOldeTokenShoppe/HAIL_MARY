@@ -16,6 +16,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { toSlateRecord, registerEpisode, slateId } from "./lt-tv-slate-record.mjs";
+import { planSections, sectionsForRecord } from "./lt-tv-sections.mjs";
 import {
   buildEpisodeTimeline,
   episodeIsPlayable,
@@ -79,17 +80,33 @@ const lineStarts = lines.map((l) => {
   at += Math.max(1.2, (l.text.split(/\s+/).length / 145) * 60);
   return start;
 });
+const dialogueEnd = Number((at + 1).toFixed(2));
+// A line ends shortly before the next one starts. Needed because a full-length
+// episode does not go up as one clip: SitePal refuses anything over 90
+// seconds, so the audio step cuts it into sections and the record carries
+// them. A record of this length WITHOUT sections is genuinely broken, and
+// validateEpisode says so — which is why they are here rather than omitted.
+const lineEnds = lineStarts.map((start, i) =>
+  Number(((lineStarts[i + 1] ?? dialogueEnd) - 0.3).toFixed(2)),
+);
+const sections = planSections(lineStarts, lineEnds, dialogueEnd);
 const recorded = {
   ...record,
   audio: Object.fromEntries(
     Object.entries(episode.cast).map(([actor, c]) => [actor, c.sitepalAudio]),
   ),
+  sections: sectionsForRecord(episode, sections),
   lineStarts,
-  dialogueEnd: Number((at + 1).toFixed(2)),
+  dialogueEnd,
 };
 
 ok("the set now calls it playable", episodeIsPlayable(recorded));
 check("and finds nothing to complain about", validateEpisode(recorded), []);
+ok("it needed more than one clip per character", sections.length > 1);
+check("and the first is the plain, unsuffixed name", recorded.sections[0].audio, recorded.audio);
+check("a clip the set asks for that nobody uploaded is caught",
+  validateEpisode({ ...recorded, sections: recorded.sections.map((x, i) =>
+    i === 1 ? { ...x, audio: { Connor: x.audio.Connor } } : x) }).length, 1);
 
 const timeline = buildEpisodeTimeline(recorded, { reactionDurations: {} });
 ok("a timeline builds", Boolean(timeline));
