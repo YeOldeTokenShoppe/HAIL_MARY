@@ -194,8 +194,26 @@ def main():
     parser = argparse.ArgumentParser(
         description="Decode ElevenLabs dialogue and make one SitePal track per speaker."
     )
-    parser.add_argument("response", type=Path, help="ElevenLabs response JSON")
+    parser.add_argument(
+        "response",
+        type=Path,
+        nargs="?",
+        help="ElevenLabs response JSON (omit when using --master/--segments)",
+    )
     parser.add_argument("output_dir", type=Path, help="Folder for generated audio")
+    parser.add_argument(
+        "--master",
+        type=Path,
+        help="An audio file to split instead of decoding one from a response. "
+        "This is how a multi-block episode is finished: scripts/lt-news-audio.mjs "
+        "generates each block separately, concatenates them into one master and "
+        "writes the merged, offset-shifted segments, then hands both here.",
+    )
+    parser.add_argument(
+        "--segments",
+        type=Path,
+        help="Voice segments for --master, as voice-segments.json.",
+    )
     parser.add_argument(
         "--episode-id",
         default="",
@@ -217,26 +235,47 @@ def main():
     args = parser.parse_args()
     speakers = resolve_speakers(args.voice)
 
-    try:
-        payload = json.loads(args.response.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise SystemExit(f"Could not read response JSON: {exc}") from exc
-
-    if "audio_base64" not in payload:
-        detail = payload.get("detail", payload)
-        raise SystemExit(f"ElevenLabs did not return audio: {detail}")
-
-    segments = payload.get("voice_segments", [])
-    if not segments:
-        raise SystemExit("ElevenLabs returned audio but no voice segment timestamps.")
+    if bool(args.master) != bool(args.segments):
+        raise SystemExit("--master and --segments go together; pass both or neither.")
+    if args.master and args.response:
+        raise SystemExit("Pass a response JSON or --master, not both.")
+    if not args.master and not args.response:
+        raise SystemExit("Pass a response JSON, or --master with --segments.")
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    master = args.output_dir / "master-dialogue.mp3"
 
-    try:
-        master.write_bytes(base64.b64decode(payload["audio_base64"], validate=True))
-    except (ValueError, OSError) as exc:
-        raise SystemExit(f"Could not decode the returned audio: {exc}") from exc
+    if args.master:
+        # An already-assembled master: one block's audio, or several blocks
+        # concatenated. Its segments were merged and offset-shifted upstream,
+        # so they are already on this file's timeline.
+        if not args.master.exists():
+            raise SystemExit(f"No such master: {args.master}")
+        try:
+            segments = json.loads(args.segments.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SystemExit(f"Could not read segments: {exc}") from exc
+        if not segments:
+            raise SystemExit(f"{args.segments} holds no voice segments.")
+        master = args.master
+    else:
+        try:
+            payload = json.loads(args.response.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SystemExit(f"Could not read response JSON: {exc}") from exc
+
+        if "audio_base64" not in payload:
+            detail = payload.get("detail", payload)
+            raise SystemExit(f"ElevenLabs did not return audio: {detail}")
+
+        segments = payload.get("voice_segments", [])
+        if not segments:
+            raise SystemExit("ElevenLabs returned audio but no voice segment timestamps.")
+
+        master = args.output_dir / "master-dialogue.mp3"
+        try:
+            master.write_bytes(base64.b64decode(payload["audio_base64"], validate=True))
+        except (ValueError, OSError) as exc:
+            raise SystemExit(f"Could not decode the returned audio: {exc}") from exc
 
     total_duration = media_duration(master)
     for name, voice_id in speakers.items():
