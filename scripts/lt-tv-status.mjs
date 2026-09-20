@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 // WHERE IS EVERY EPISODE, AND WHAT DO I RUN NEXT.
 //
-//   node scripts/lt-tv-status.mjs
-//   node scripts/lt-tv-status.mjs roundtable-02     # one episode, in detail
-//   node scripts/lt-tv-status.mjs --html            # a page to keep open
+//   npm run lt                        # every episode, both shows
+//   npm run lt -- roundtable-02       # one episode, in detail
+//   npm run lt -- --html              # a page to keep open
+//
+// Given as `npm run` throughout because that starts in the repo root wherever
+// it is invoked; `node scripts/lt-tv-status.mjs` works only from the root.
 //
 // Producing an episode touches four directories and leaves a different trace
 // in each, so "how far along is this one" has been a question you answer by
@@ -145,6 +148,11 @@ async function inspect(id, { root, slate, staging, registered }) {
  *
  * Deliberately one, not a list: the value of this whole thing is not having to
  * decide which of six commands applies.
+ *
+ * Given in its `npm run` form, because that is the one that works. `npm run`
+ * starts in the repo root wherever it is invoked, while `node scripts/...` is
+ * relative to whoever types it — and a dashboard exists to be read from
+ * whatever directory you are already standing in.
  */
 function nextStep({ id, stage, registered, slate, staging, hasWorkingCopy }) {
   if (stage === "on-air") {
@@ -174,8 +182,8 @@ function nextStep({ id, stage, registered, slate, staging, hasWorkingCopy }) {
     }
     return {
       why: "it has a script and no audio",
-      run: `node scripts/lt-tv-audio.mjs ${STAGING_DIR}/${id}.json`,
-      then: `read ${STAGING_DIR}/${id}.txt first, and apply any changes with node scripts/lt-tv-edit.mjs ${id}`,
+      run: `npm run lt:audio -- ${STAGING_DIR}/${id}.json`,
+      then: `read ${STAGING_DIR}/${id}.txt first, and apply any changes with npm run lt:edit -- ${id}`,
     };
   }
 
@@ -184,8 +192,8 @@ function nextStep({ id, stage, registered, slate, staging, hasWorkingCopy }) {
     why: "it is named on the slate and nobody has written it",
     run:
       show === "roundtable"
-        ? `node scripts/lt-rt-script.mjs --topic ${id}`
-        : "node scripts/lt-news-brief.mjs && node scripts/lt-news-script.mjs --brief <brief>",
+        ? `npm run lt:roundtable -- --topic ${id}`
+        : "npm run lt:brief, then npm run lt:news -- --brief <brief>",
   };
 }
 
@@ -316,8 +324,8 @@ function printAll({ shows, orphans }) {
     console.log(`\n${C.dim("Closest to done:")} ${C.bold(next.title)} — ${next.next.why}`);
     console.log(`  ${next.next.run}`);
   }
-  console.log(C.dim(`\nOne episode in detail:  node scripts/lt-tv-status.mjs <id>`));
-  console.log(C.dim(`A page to keep open:    node scripts/lt-tv-status.mjs --html\n`));
+  console.log(C.dim(`\nOne episode in detail:  npm run lt -- <id>`));
+  console.log(C.dim(`A page to keep open:    npm run lt -- --html\n`));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

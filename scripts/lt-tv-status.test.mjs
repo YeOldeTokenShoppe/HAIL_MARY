@@ -57,12 +57,12 @@ const only = async (files) => (await readStatus(await fixture(files))).episodes[
 console.log("\nEach stage is decided by a file, not by memory:");
 let e = await only({ [slatePath("roundtable-02")]: planned, "src/content/lt-tv/index.js": indexFor(["roundtable-02"]) });
 check("a title and nothing else is planned", e.stage, "planned");
-check("and the next step is to write it", e.next.run, "node scripts/lt-rt-script.mjs --topic roundtable-02");
+check("and the next step is to write it", e.next.run, "npm run lt:roundtable -- --topic roundtable-02");
 
 e = await only({ [slatePath("roundtable-02")]: written, [stagePath("roundtable-02")]: staging(), "src/content/lt-tv/index.js": indexFor(["roundtable-02"]) });
 check("a script with no audio is written", e.stage, "written");
-ok("and the next step records it", e.next.run.startsWith("node scripts/lt-tv-audio.mjs"));
-ok("pointing first at the screenplay", e.next.then.includes("lt-tv-edit.mjs"));
+ok("and the next step records it", e.next.run.startsWith("npm run lt:audio"));
+ok("pointing first at the screenplay", e.next.then.includes("lt:edit"));
 
 e = await only({ [slatePath("roundtable-02")]: written, [stagePath("roundtable-02")]: staging([0, 4]), "src/content/lt-tv/index.js": indexFor(["roundtable-02"]) });
 check("timing in the working record means recorded", e.stage, "recorded");
@@ -146,6 +146,18 @@ const empty = await readStatus(await fixture({ "src/content/lt-tv/index.js": "" 
 check("no episodes", empty.episodes.length, 0);
 ok("both shows still appear", empty.shows.length === 2);
 ok("and the page renders", renderStatusPage(empty).includes("Nothing on the slate yet"));
+
+console.log("\nThe commands it prints are the ones that work from anywhere:");
+// `npm run` starts in the repo root; `node scripts/...` is relative to whoever
+// typed it. A dashboard is read from whatever directory you are standing in,
+// so printing the second form makes it hand out commands that fail.
+const everyRun = (await readStatus(await fixture({
+  [slatePath("roundtable-02")]: planned,
+  [slatePath("news-01")]: { id: "news-01", showId: "news", number: "01", title: "A Week" },
+  "src/content/lt-tv/index.js": indexFor(["roundtable-02", "news-01"]),
+}))).episodes.map((e) => e.next.run).filter(Boolean);
+ok("there are commands to check", everyRun.length >= 2);
+ok("none of them is a bare node path", everyRun.every((r) => !r.startsWith("node scripts/")));
 
 console.log("\nIt finds the repo from wherever you run it:");
 // A dashboard is the script you reach for from whatever directory you are
