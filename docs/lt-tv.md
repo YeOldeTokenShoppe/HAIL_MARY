@@ -192,6 +192,26 @@ the browser does not keep the old animation library.
 
 ---
 
+## Fixing a line after it's recorded
+
+Editing the screenplay of an episode that already has audio is refused — the
+clips would still be saying the old words. To go ahead anyway:
+
+```bash
+node scripts/lt-news-edit.mjs news-2026-W38 --rerecord
+```
+
+That clears the timing and returns the episode to *Not recorded yet* on the
+guide until you build the audio again. So the rest of the sequence is: steps 4
+to 6 of the news run above, then re-upload **under the same clip names** the
+record already carries.
+
+Then **re-tune the lead-in.** `--rerecord` keeps the old value, and a value
+tuned against the previous upload is not reliable for the new one — see the
+section above. This is the exact case that bit roundtable 01.
+
+---
+
 ## Announcing an episode before it exists
 
 A record with no `audio` block is a slate entry: the guide lists it and labels
