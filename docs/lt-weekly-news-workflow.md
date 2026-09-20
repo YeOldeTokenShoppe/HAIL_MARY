@@ -492,12 +492,6 @@ pointing the component at it is a one-line change nobody has made yet.
 
 ## Still open
 
-- **The two episode-record schemas have not been converged.** The slate under
-  `src/content/lt-tv/episodes/` is flat (`showId`, `audio`, `lineStarts`,
-  `speakers`, `cues`); this pipeline emits a nested record with segments,
-  blocks and sources. Making `assemble()` also emit the slate's shape is the
-  single change that lets a generated news episode appear on the site. Until
-  then `content/lt-tv/episodes/` at the repo root is a staging area.
 - **Step 3 has never met real audio.** It was written without an ElevenLabs key
   and without ffmpeg. The offset arithmetic, the PCM handling and the WAV
   header are covered by `scripts/lt-news-audio.test.mjs` against synthetic
@@ -518,11 +512,11 @@ pointing the component at it is a one-line change nobody has made yet.
   story against a real article, which removes the worst failure — a number
   invented wholesale. It does not remove the need for a human glance at the
   link on a story worth leading on.
-- **The show has no way to mention its own world.** Nothing sources RL80,
-  staking, the shrine or anything HAIL MARY ships. The nearest thing in the
-  repo is `eliza/rl80-agent/src/talking-points.ts`, a hand-edited file used by
-  the Telegram debate plugin. A project-news slot would need the same: a short
-  file a human keeps current.
+- **RL80 has no news slot, deliberately.** Nothing sources RL80, staking, the
+  shrine or anything HAIL MARY ships into the rundown, because the show would
+  be reporting on itself. Michelle's call: RL80 appears as the ad break, which
+  is `content/lt-tv/rl80-spots.md` and hand-fed. Revisit only when there is
+  project news a stranger would find newsworthy.
 - **The roundtable show is a separate workflow.** It shares the record format
   and the audio build, but its topics do not come from a news feed and its
   segment skeleton is different.
