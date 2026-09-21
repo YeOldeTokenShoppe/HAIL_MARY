@@ -1999,7 +1999,17 @@ function TalkShowModel({
         }
         try {
           const w = portal.frame.contentWindow;
+          // EVERYTHING THAT DISTURBS THE PLAYER HAPPENS BEFORE THE LOAD, and
+          // the order here is load-bearing. The original sequence was
+          // stopSpeech, saySilent, setPlayerVolume, loadAudio, sayAudio, all
+          // in one breath. Splitting it left `saySilent(0)` sitting between
+          // the load and the speak, and that threw the loaded clip away:
+          // measured 2026-09-21, the portals took 3159ms and 6732ms to start
+          // talking AFTER both had reported their audio was in, which is a
+          // fresh fetch rather than a warm start. Nothing may come between
+          // loadAudio and sayAudio except the unmute.
           w.stopSpeech?.();
+          w.saySilent?.(0);
           // Muted while it loads: `loadAudio` PLAYS, which is why the portals
           // are silenced before they are preloaded anywhere else in this file.
           w.setPlayerVolume?.(0);
@@ -2035,7 +2045,8 @@ function TalkShowModel({
         for (const [key, clip] of clips) {
           try {
             const w = portalsRef.current[key]?.frame?.contentWindow;
-            w?.saySilent?.(0);
+            // Unmute and speak. NOTHING ELSE BELONGS HERE — see the note in
+            // the arming loop above about what an extra call costs.
             w?.setPlayerVolume?.(7);
             w?.sayAudio?.(clip);
           } catch (e) {
@@ -2054,9 +2065,27 @@ function TalkShowModel({
         if (index === 0 && playback.running && playback.holdingAt === null) {
           playback.startedAt = performance.now();
         }
+        // WHAT THE ARMING ACTUALLY DID, in one readable place.
+        //
+        // Whether a section waited for its clips or gave up and started
+        // anyway has so far had to be inferred from how far apart the voices
+        // came out, which is the reasoning that has been wrong all night.
+        // `window.__tsArm` says it outright: which portals reported in, how
+        // long it took, and whether the release was the clips landing or the
+        // failsafe running out.
+        const armMs = Math.round(performance.now() - armedAt);
+        window.__tsArm = window.__tsArm || [];
+        window.__tsArm.push({
+          section: index + 1,
+          why,
+          ms: armMs,
+          reported: [...armed],
+          expected: clips.size,
+        });
         console.info(
           `[TalkShowScene] section ${index + 1} released after ${why} ` +
-            `(${Math.round(performance.now() - armedAt)}ms arming)`,
+            `(${armMs}ms arming, ${armed.size} of ${clips.size} reported; ` +
+            "window.__tsArm holds every reading)",
         );
       };
 
