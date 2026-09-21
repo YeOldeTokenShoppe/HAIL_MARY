@@ -1591,6 +1591,7 @@ function TalkShowModel({
     let stopped = false;
     const ended = new Set();
     const started = new Map();
+    const finished = new Map();
     let issuedAt = 0;
 
     /**
@@ -1625,17 +1626,79 @@ function TalkShowModel({
       if (started.size !== Object.keys(portalsRef.current).length) return;
       const times = [...started.values()];
       const ms = Math.round(Math.max(...times) - Math.min(...times));
+      window.__tsSkew = window.__tsSkew || [];
+
+      // The portal-ready preload calls loadAudio, which SitePal answers with a
+      // talk-started of its own — before anything has been told to play, so
+      // `issuedAt` is still zero and `took` would be the raw page clock. It
+      // read as a section-one reading of 35797ms on 2026-09-21 and cost a
+      // round explaining itself. It is worth keeping (it says how far apart
+      // the two portals become ready) but not worth disguising as playback.
+      if (!issuedAt) {
+        window.__tsSkew.push({ phase: "preload", ms });
+        console.info(`[TalkShowScene] the two portals finished preloading ${ms}ms apart`);
+        return;
+      }
+
       const section = (playbackRef.current.section ?? 0) + 1;
       // How long each portal took from being told to play to actually
       // speaking. A cold fetch shows up here and nowhere else.
       const took = {};
       for (const [who, at] of started) took[who] = Math.round(at - issuedAt);
-      window.__tsSkew = window.__tsSkew || [];
       window.__tsSkew.push({ section, ms, took });
       console.info(
         `[TalkShowScene] section ${section}: the two portals started ${ms}ms apart ` +
           `(${Object.entries(took).map(([w, t]) => `${w} ${t}ms`).join(", ")} ` +
           "from being told to play; window.__tsSkew holds every reading)",
+      );
+    };
+
+    /**
+     * HOW LONG EACH PORTAL ACTUALLY PLAYED, which is the number that was
+     * missing.
+     *
+     * `recordStart` measured the two portals as 0-2ms apart on every section
+     * join, and that reading cannot be taken at face value: 1-2ms is far too
+     * quick to contain the fetch of a 60-second clip, so `vh_talkStarted`
+     * is almost certainly SitePal acknowledging the command rather than
+     * announcing the first sample. The gap it measures is therefore the gap
+     * between two messages, not between two voices.
+     *
+     * Talk-ENDED does not have that problem. Both characters' clips for a
+     * section are cut from the same two byte offsets, so they are identical
+     * in length by construction — checked in `lt-tv-split.mjs`, which slices
+     * both actors with the same section bounds. Two clips of equal length
+     * that are commanded together can only END apart if one of them STARTED
+     * apart. So `played` (end minus start, per portal) measures the real
+     * onset skew through a signal that cannot be faked by an early ack.
+     *
+     * Michelle confirmed on 2026-09-21 that the master WAV has no overlap at
+     * all while the set does, which leaves the two players as the only thing
+     * that differs between them. This says whether they drift, and by how
+     * much. It still only WATCHES: no timing anywhere is changed by it.
+     */
+    const recordEnd = (key) => {
+      if (finished.has(key)) return;
+      finished.set(key, performance.now());
+      const count = Object.keys(portalsRef.current).length;
+      if (finished.size !== count || started.size !== count) return;
+      // The silent preload plays a clip too, and it ends. Same guard as
+      // recordStart: nothing has been told to play, so there is no playback
+      // to time and `played` would be measured from the wrong instant.
+      if (!issuedAt) return;
+      const times = [...finished.values()];
+      const ms = Math.round(Math.max(...times) - Math.min(...times));
+      const section = (playbackRef.current.section ?? 0) + 1;
+      const played = {};
+      for (const [who, at] of finished) played[who] = Math.round(at - (started.get(who) ?? at));
+      const spread = Math.max(...Object.values(played)) - Math.min(...Object.values(played));
+      window.__tsPlayed = window.__tsPlayed || [];
+      window.__tsPlayed.push({ section, ms, played, spread });
+      console.info(
+        `[TalkShowScene] section ${section}: the two portals ended ${ms}ms apart ` +
+          `(played ${Object.entries(played).map(([w, t]) => `${w} ${t}ms`).join(", ")}, ` +
+          `a spread of ${spread}ms — identical clips, so this is the real start skew; ` +
+          "window.__tsPlayed holds every reading)",
       );
     };
 
@@ -1771,6 +1834,10 @@ function TalkShowModel({
 
       if (event.data?.type === "sitepal-portal-talk-ended") {
         ended.add(key);
+        // Before the early return below, for the same reason recordStart sits
+        // at the top of talk-started: the second portal to report is the one
+        // that carries the skew, and everything after this line discards it.
+        recordEnd(key);
         if (ended.size !== Object.keys(portalsRef.current).length) return;
 
         // Both tracks have run out. On a sectioned episode that is a join, not
@@ -1782,6 +1849,7 @@ function TalkShowModel({
         if (playback.running && sections[next]) {
           ended.clear();
           started.clear();
+          finished.clear();
           playback.section = next;
           playback.holdingAt = sections[next].startsAt;
           playback.heldSince = performance.now();
@@ -1837,6 +1905,7 @@ function TalkShowModel({
       });
       ended.clear();
       started.clear();
+      finished.clear();
       resetPerformance();
       onPlaybackStateChange?.(false);
     };
@@ -1889,6 +1958,7 @@ function TalkShowModel({
       if (!Object.values(portalsRef.current).every((p) => p.ready)) return false;
       ended.clear();
       started.clear();
+      finished.clear();
 
       const ok = startSection(0) === Object.keys(portalsRef.current).length;
       if (ok) {
