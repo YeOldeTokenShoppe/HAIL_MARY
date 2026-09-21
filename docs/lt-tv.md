@@ -418,14 +418,14 @@ wipes the marks.)
 
 **"Record it again" always warns that it spends an ElevenLabs render, because
 the button cannot know whether it will.** What gets sent depends on which lines
-are already on disk with the same words in the same voice, and that is a
-question about files, not about the button.
+are already on disk with the same words in the same voice. The run's first
+line of output says how many it is sending and how many are already on disk,
+before anything is sent.
 
-So ask, with **"What would recording again cost?"** — or
-`npm run lt:audio -- content/lt-tv/episodes/<id>.json --dry-run`. It reads the
-same plan the real run would, line by line, and prints what would be reused,
-what would be sent and how many characters that is. It contacts nothing, needs
-no API key and ends with "Nothing has been spent".
+To see that line by line without running anything,
+`npm run lt:audio -- content/lt-tv/episodes/<id>.json --dry-run` prints what
+would be reused, what would be sent and how many characters that is. It
+contacts nothing, needs no API key and ends with "Nothing has been spent".
 
 What does and does not cost a render:
 
@@ -591,8 +591,7 @@ A recorded line is kept so a failed run resumes instead of paying twice, and
 it is kept **by its words**, not by its number. Line numbers are positions —
 they shift whenever a line is added or removed above them — so a recording is
 filed under a fingerprint of the voice and the words, and a re-record after an
-edit sends exactly the lines whose words changed. "What would recording again
-cost?" shows which.
+edit sends exactly the lines whose words changed, and says so as it starts.
 
 Saving is not applying. **Save** writes the screenplay file; **Apply my edits**
 is what reads it back into the episode, and recording renders the EPISODE. An

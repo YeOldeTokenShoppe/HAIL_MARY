@@ -129,24 +129,17 @@ ok("recording needs one", ACTIONS.record.needsScreenplay === true);
 ok("splitting needs one", ACTIONS.split.needsScreenplay === true);
 // Recording again is for a changed `# pause` mark, which is read off the page.
 ok("recording again needs one", ACTIONS.rerecord.needsScreenplay === true);
-// And so does the estimate, or it would price a plan the page has moved past:
-// a pause mark splits a block in two, and a split block is not on disk yet.
-ok("so does asking what it would cost", ACTIONS["record-cost"].needsScreenplay === true);
 check("and nothing else claims to",
   ACTION_NAMES.filter((n) => ACTIONS[n].needsScreenplay),
   ["apply-edits", "apply-edits-rerecord", "rewrite-marked", "record", "rerecord",
-   "record-cost", "split", "split-report"]);
+   "split", "split-report"]);
 
-console.log("\nAsking what something costs never costs anything:");
-check("the estimate spends nothing", ACTIONS["record-cost"].spends, null);
-check("and needs no key to answer", ACTIONS["record-cost"].needs, []);
-ok("it passes --dry-run, which is what makes that true",
-  ACTIONS["record-cost"].argv("roundtable-02")[1].includes("--dry-run"));
-ok("it runs the same script recording does, so it cannot describe a different plan",
-  ACTIONS["record-cost"].argv("x")[1][0] === ACTIONS.rerecord.argv("x")[1][0]);
-// It is offered before the first recording too: "written" is exactly when the
-// question "what will this cost me" is worth asking.
-ok("it is offered on a written episode", ACTIONS["record-cost"].stages.includes("written"));
+// There is no separate "what would it cost" button: Michelle found it one
+// press too many (2026-09-21). The recording run itself says how many lines
+// it is sending before it sends any, and --dry-run stays on the command line.
+ok("no button exists only to estimate a cost", !ACTION_NAMES.includes("record-cost"));
+ok("and no button passes --dry-run",
+  ACTION_NAMES.every((n) => !ACTIONS[n].argv("x")[1].includes("--dry-run")));
 ok("actionsFor carries the flag through to the page",
   actionsFor("on-air").find((a) => a.name === "apply-edits").needsScreenplay === true);
 
