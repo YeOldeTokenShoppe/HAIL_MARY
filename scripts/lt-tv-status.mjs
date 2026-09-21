@@ -35,6 +35,7 @@ import { arg, rejectUnknownFlags } from "./lt-tv-cli.mjs";
 const STAGING_DIR = "content/lt-tv/episodes";
 const AUDIO_DIR = "content/lt-tv/audio";
 const SAMPLE_DIR = "content/lt-tv/samples";
+const PLAN_DIR = "content/lt-tv/plans";
 
 const KNOWN_FLAGS = ["html", "out"];
 
@@ -83,6 +84,38 @@ async function readChannelShows(root) {
 }
 
 /**
+ * Every pitch on disk: pass 1, saved, whether or not it has been written yet.
+ *
+ * The show is read out of the file rather than off the id, because a pitch
+ * named for its week says nothing about which show it belongs to. A file
+ * written by an older run is the bare plan with no envelope, and falls back
+ * to the id's prefix.
+ */
+async function readPitches(root) {
+  const out = [];
+  let files = [];
+  try {
+    files = (await readdir(join(root, PLAN_DIR))).filter((f) => f.endsWith(".json"));
+  } catch {
+    return out;
+  }
+  for (const file of files) {
+    const id = file.replace(/\.json$/, "");
+    const data = (await readJson(join(root, PLAN_DIR, file))) ?? {};
+    const plan = data.plan ?? data;
+    out.push({
+      id,
+      show: data.show ?? id.replace(/-[^-]+$/, ""),
+      week: data.week ?? null,
+      title: plan.title ?? "(untitled)",
+      summary: plan.summary ?? "",
+      stories: (plan.stories || []).length,
+    });
+  }
+  return out.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
  * Everything that is true about one episode, read from disk.
  *
  * `slate` is the committed record the site reads; `staging` is the working
@@ -99,6 +132,8 @@ async function inspect(id, { root, slate, staging, registered }) {
   add(join(SLATE_DIR, `${id}.json`), "the record the site reads");
   add(join(STAGING_DIR, `${id}.json`), "the working record");
   add(join(STAGING_DIR, `${id}.txt`), "the screenplay — read and edit this one");
+  add(join(PLAN_DIR, `${id}.json`), "the pitch it was written from");
+  add(join(PLAN_DIR, `${id}.txt`), "the pitch, as an outline");
   add(join(AUDIO_DIR, id, "master-dialogue.wav"), "the recorded master");
   add(join(AUDIO_DIR, id, "voice-segments.json"), "the line timings");
   for (const f of ["draft", "sample"]) {
@@ -124,6 +159,10 @@ async function inspect(id, { root, slate, staging, registered }) {
 
   return {
     id,
+    // A pitch is pass 1 saved: what the episode is going to be, before any of
+    // it is written. It outlives the writing, so it is here at every stage —
+    // an episode on air still answers "why did we cover that".
+    pitch: existsSync(join(root, PLAN_DIR, `${id}.json`)),
     show: slate?.showId ?? staging?.show ?? null,
     number: slate?.number ?? staging?.number ?? null,
     title: slate?.title ?? staging?.title ?? "(untitled)",
@@ -243,6 +282,10 @@ export async function readStatus(root = process.cwd()) {
   try {
     for (const f of await readdir(join(root, STAGING_DIR))) {
       if (!f.endsWith(".json")) continue;
+      // A writers'-room transcript written here before rooms had a directory
+      // of their own. It is a conversation, not an episode, and it was listed
+      // as one called "morality-02.room" under no show.
+      if (f.endsWith(".room.json")) continue;
       // Named by id, the same id the slate uses, so the file name is the key.
       // It used to be derived from show + number so that a week-named news
       // record (news-2026-W39) could pair with its slate entry; that pairing
@@ -280,17 +323,37 @@ export async function readStatus(root = process.cwd()) {
   const channel = await readChannelShows(root);
   const listed = channel.length ? channel : Object.keys(SHOW_FORMATS);
   const order = [...listed, ...Object.keys(SHOW_FORMATS).filter((id) => !listed.includes(id))];
+  // A PITCH THAT IS NOT AN EPISODE YET. The news show pitches a WEEK
+  // (news-2026-W39) and only takes an episode number when it is written, so
+  // its pitch has nowhere to hang until then. It belongs under the show.
+  const loose = (await readPitches(root)).filter((p) => !episodes.some((e) => e.id === p.id));
+
   const shows = order
     .filter((id) => SHOW_FORMATS[id])
     .map((id) => ({
       id,
       title: SHOW_FORMATS[id].title,
       episodes: episodes.filter((e) => e.show === id),
+      pitches: loose.filter((p) => p.show === id),
     }))
-    .filter((show) => listed.includes(show.id) || show.episodes.length > 0);
+    .filter((show) => listed.includes(show.id) || show.episodes.length > 0 || show.pitches.length > 0);
   const orphans = episodes.filter((e) => !SHOW_FORMATS[e.show]);
 
-  return { shows, orphans, episodes };
+  // A SHOW THAT IS OFF THE CHANNEL LIST IS NOT A SHOW. It used to keep its own
+  // heading here for as long as it still held episodes, so that leaving a
+  // channel could not hide the records that needed moving — but a heading is
+  // how this page says "this is a programme", and The Liminal Terminal went on
+  // looking like one months after it stopped being one (Michelle,
+  // 2026-09-21). The records still cannot hide: they move in with the other
+  // episodes that are not on the guide, which says exactly that about them.
+  const off = shows.filter((s) => !listed.includes(s.id));
+  const stranded = off.flatMap((s) => s.episodes.map((e) => ({ ...e, strandedFrom: SHOW_FORMATS[s.id].title })));
+
+  return {
+    shows: shows.filter((s) => listed.includes(s.id)),
+    orphans: [...orphans, ...stranded],
+    episodes,
+  };
 }
 
 // ── the terminal view ─────────────────────────────────────────────────────
@@ -345,6 +408,11 @@ function printOne(e) {
 function printAll({ shows, orphans }) {
   for (const show of shows) {
     console.log(`\n${C.bold(show.title)} ${C.dim(`(${show.id})`)}`);
+    // A pitch with no episode yet is the next thing that happens on this show,
+    // so it goes above the episodes rather than under them.
+    for (const p of show.pitches ?? []) {
+      console.log(`  ${C.yellow("◇ pitched ")}  ${C.dim(p.id.padEnd(15))} ${p.title}${C.dim("  not written yet")}`);
+    }
     if (!show.episodes.length) {
       console.log(C.dim("  nothing on the slate yet"));
       continue;
@@ -360,7 +428,10 @@ function printAll({ shows, orphans }) {
 
   if (orphans.length) {
     console.log(`\n${C.yellow("Not attached to any show")}`);
-    for (const e of orphans) console.log(`  ${C.dim(e.id.padEnd(15))} ${e.title}`);
+    for (const e of orphans) {
+      const why = e.strandedFrom ? C.dim(`  — filed under ${e.strandedFrom}, which is not on the guide`) : "";
+      console.log(`  ${C.dim(e.id.padEnd(15))} ${e.title}${why}`);
+    }
   }
 
   // What to do next, for the whole slate rather than one episode: the earliest

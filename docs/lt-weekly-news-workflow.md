@@ -225,10 +225,29 @@ three topics kept. A weekly show needs the opposite of all four — and it needs
 four families of source that route has never had. So this reads its own
 upstreams and leaves the route untouched.
 
-## Step 2 — Write the script
+## Step 2 — Pitch the week, then write it
 
 ```bash
 export ANTHROPIC_API_KEY=...
+
+# 2a. The pitch: the editorial pass on its own. It stops here.
+node scripts/lt-news-script.mjs --brief content/lt-tv/briefs/news-2026-W38.json --rundown-only
+
+# 2b. Read content/lt-tv/plans/news-2026-W38.txt, argue with it in the
+#     writers' room at /lt-tv, then write the dialogue from it.
+node scripts/lt-news-script.mjs --brief content/lt-tv/briefs/news-2026-W38.json \
+                               --rundown content/lt-tv/plans/news-2026-W38.json
+```
+
+Splitting it this way is the point: pass 1 is the editorial judgment and pass 2
+is six minutes of dialogue built on top of it, so a disagreement about which
+three stories the show covers is far cheaper before the second one runs.
+`--rundown <file>` uses the pitch exactly as it stands — the editorial pass does
+NOT run again, so what you approved is what gets written. Without either flag
+both passes run back to back, which is the old behaviour and still right for a
+week you do not want to think about:
+
+```bash
 node scripts/lt-news-script.mjs --brief content/lt-tv/briefs/news-2026-W38.json
 ```
 
@@ -267,11 +286,12 @@ call in this repo, so no SDK dependency is added.
 2. **The script** — writes all six segments as dialogue, with delivery tags,
    direct-address flags and animation cues.
 
-To see just the editorial decisions before spending a script call:
-
-```bash
-node scripts/lt-news-script.mjs --brief <brief> --rundown-only
-```
+`--rundown-only` writes both `content/lt-tv/plans/news-<week>.json` and an
+outline beside it as `.txt`, which is what the studio page shows and what the
+writers' room reads. `--out <path>` writes the bare JSON somewhere else
+instead, for a one-off. What the room may and may not change about a pitch —
+angles yes, facts and sources never — is in `docs/lt-tv.md` under **The
+pitch**.
 
 ### Everything numeric is computed locally
 

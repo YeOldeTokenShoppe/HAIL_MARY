@@ -111,6 +111,15 @@ export default function Studio() {
           {show.actions?.length > 0 && (
             <ShowActions show={show} env={status.env} onRun={run} running={running} />
           )}
+          {(show.pitches ?? []).map((p) => (
+            <PitchPanel
+              key={p.id}
+              pitch={p}
+              env={status.env}
+              ran={ran}
+              onChanged={() => setRan((n) => n + 1)}
+            />
+          ))}
           {show.episodes.length === 0 ? (
             <p className={s.empty}>{show.actions?.length ? 'Nothing on the slate yet. Start above.' : 'Nothing on the slate yet.'}</p>
           ) : (
@@ -198,9 +207,12 @@ function Keys({ env }) {
 // script written before there is an episode to open, so they sit under the
 // show's heading rather than inside one. Same table, same runner, no id.
 function ShowActions({ show, env, onRun, running }) {
+  // A button that writes from a pitch is not offered until there is one. It
+  // would only be able to fail, and the failure would be a file path.
+  const pitched = (show.pitches ?? []).length > 0;
   return (
     <div className={`${s.actions} ${s.showActions}`}>
-      {show.actions.map((a, i) => {
+      {show.actions.filter((a) => !a.needsPitch || pitched).map((a, i) => {
         const missingKey = a.needs.find((k) =>
           (k === 'ANTHROPIC_API_KEY' && !env.anthropic) || (k === 'ELEVENLABS_API_KEY' && !env.elevenlabs));
         const why = missingKey ? `${missingKey} is not set` : null;
@@ -266,7 +278,7 @@ function Episode({ episode: e, env, ran, onScriptChanged, open, onToggle, onRun,
           <h3 className={s.label}>Next — {e.next.why}</h3>
           <div className={s.actions}>
             {e.actions.length === 0 && <p className={s.empty}>Nothing to do.</p>}
-            {e.actions.map((a, i) => {
+            {e.actions.filter((a) => !a.needsPitch || e.pitch).map((a, i) => {
               const missingKey = a.needs.find((k) =>
                 (k === 'ANTHROPIC_API_KEY' && !env.anthropic) || (k === 'ELEVENLABS_API_KEY' && !env.elevenlabs));
               // A step is offered only when it can actually do something. Both
@@ -297,13 +309,29 @@ function Episode({ episode: e, env, ran, onScriptChanged, open, onToggle, onRun,
             })}
           </div>
 
-          {hasScreenplay && (
+          {e.pitch && (
             <>
               <h3 className={s.label}>
-                Writers&rsquo; room <span className={s.labelNote}>&mdash; talk it through, then agree to the changes</span>
+                The pitch{' '}
+                <span className={s.labelNote}>
+                  &mdash; {hasScreenplay ? 'what this episode was written from' : 'the idea, before anything is written'}
+                </span>
+              </h3>
+              <PitchText id={e.id} ran={ran} />
+            </>
+          )}
+
+          {(hasScreenplay || e.pitch) && (
+            <>
+              <h3 className={s.label}>
+                Writers&rsquo; room{' '}
+                <span className={s.labelNote}>
+                  &mdash; talk {hasScreenplay ? 'it' : 'the pitch'} through, then agree to the changes
+                </span>
               </h3>
               <Room
                 id={e.id}
+                mode={hasScreenplay ? 'script' : 'pitch'}
                 hasKey={env.anthropic}
                 unsaved={unsaved}
                 saveScreenplay={saveScreenplay}
@@ -340,6 +368,65 @@ function Episode({ episode: e, env, ran, onScriptChanged, open, onToggle, onRun,
   );
 }
 
+// THE PITCH — pass 1, before anything is written.
+//
+// Read-only here, and that is the interesting decision. Everything else on
+// this page you can edit in place, but a pitch's facts were checked against a
+// real article and its sources are in the record; a text box would let a
+// number be reworded by hand, and a number reworded by hand is a number nobody
+// checked being spoken on air. So the pitch is changed by talking to the room
+// underneath it, which is allowed to move the judgment and refuses the
+// evidence.
+
+function PitchText({ id, ran }) {
+  const [text, setText] = useState(undefined);
+
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/lt-tv/pitch?id=${encodeURIComponent(id)}`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => { if (alive) setText(d.text ?? null); })
+      .catch(() => { if (alive) setText(null); });
+    return () => { alive = false; };
+  }, [id, ran]);
+
+  if (text === undefined) return <p className={s.empty}>Reading the pitch…</p>;
+  if (text === null) return <p className={s.empty}>No pitch was saved for this one.</p>;
+  return <pre className={s.pitch}>{text}</pre>;
+}
+
+// A pitch with no episode yet. The news show pitches a WEEK and only takes an
+// episode number when it is written, so this sits under the show's heading
+// rather than in a drawer — there is nothing to open yet.
+function PitchPanel({ pitch, env, ran, onChanged }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className={s.pitchPanel}>
+      <button onClick={() => setOpen(!open)} className={s.pitchHead} aria-expanded={open}>
+        <span className={`${s.dot} ${s.dotPitched}`} aria-hidden />
+        <span className={s.episodeTitles}>
+          <span className={s.episodeTitle}>{pitch.title}</span>
+          <span className={s.episodeMeta}>
+            <span className={s.stagePitched}>Pitched</span> · not written yet
+            {pitch.stories ? ` · ${pitch.stories} stories` : ''}
+            {pitch.week ? ` · ${pitch.week}` : ''}
+          </span>
+        </span>
+        <span className={s.disclose}>{open ? 'Hide' : 'Open'}</span>
+      </button>
+      {open && (
+        <div className={s.pitchBody}>
+          <PitchText id={pitch.id} ran={ran} />
+          <h3 className={s.label}>
+            Writers&rsquo; room <span className={s.labelNote}>&mdash; argue with it before it is written</span>
+          </h3>
+          <Room id={pitch.id} mode="pitch" hasKey={env.anthropic} onScriptChanged={onChanged} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // THE WRITERS' ROOM.
 //
 // The other way to change a line is to write in the file: reword it yourself,
@@ -359,7 +446,8 @@ function Episode({ episode: e, env, ran, onScriptChanged, open, onToggle, onRun,
 // closing the tab does not lose the room, and `node scripts/lt-tv-room.mjs
 // <id>` is the same room from a terminal.
 
-function Room({ id, hasKey, unsaved, saveScreenplay, onScriptChanged }) {
+function Room({ id, mode = 'script', hasKey, unsaved = false, saveScreenplay = null, onScriptChanged }) {
+  const pitch = mode === 'pitch';
   const [messages, setMessages] = useState(null);
   const [said, setSaid] = useState('');
   const [busy, setBusy] = useState(false);
@@ -386,7 +474,7 @@ function Room({ id, hasKey, unsaved, saveScreenplay, onScriptChanged }) {
     // The writer reads the FILE. An edit still sitting in the box below is
     // invisible to it, which would look like the room ignoring what is on
     // screen — the same trap the marked-lines rewrite hit. So save first.
-    if (unsaved && saveScreenplay.current && !(await saveScreenplay.current())) return;
+    if (unsaved && saveScreenplay?.current && !(await saveScreenplay.current())) return;
 
     setBusy(true);
     setError(null);
@@ -422,7 +510,7 @@ function Room({ id, hasKey, unsaved, saveScreenplay, onScriptChanged }) {
     // Applying writes the screenplay file. An edit still sitting unsaved in the
     // box below would be written over it by the next Save, so it is saved
     // first and the room's changes land on top of what you can see.
-    if (decision === 'apply' && unsaved && saveScreenplay.current && !(await saveScreenplay.current())) return;
+    if (decision === 'apply' && unsaved && saveScreenplay?.current && !(await saveScreenplay.current())) return;
     setBusy(true);
     setError(null);
     try {
@@ -454,10 +542,15 @@ function Room({ id, hasKey, unsaved, saveScreenplay, onScriptChanged }) {
         <p className={s.roomEmpty}>Opening the room…</p>
       ) : messages.length === 0 ? (
         <p className={s.roomEmpty}>
-          Nobody has said anything yet. Talk to the writer about this episode the way you would
-          talk to a person — what drags, who should have the last word, whether the ending lands.
-          It has the whole screenplay in front of it. When you agree on something it offers the
-          change, and nothing is written until you say so.
+          {pitch
+            ? `Nobody has said anything yet. This is the idea, not the script — say what you think of it
+               the way you would to a person: whether story three is really the funny one, whether the
+               argument cuts both ways, what is missing. Facts and sources are not up for discussion here;
+               everything else is.`
+            : `Nobody has said anything yet. Talk to the writer about this episode the way you would
+               talk to a person — what drags, who should have the last word, whether the ending lands.
+               It has the whole screenplay in front of it. When you agree on something it offers the
+               change, and nothing is written until you say so.`}
         </p>
       ) : (
         <div className={s.roomLog} ref={log}>
@@ -494,8 +587,10 @@ function Room({ id, hasKey, unsaved, saveScreenplay, onScriptChanged }) {
         <p className={s.roomError}>{error}</p>
       ) : (
         <p className={s.roomHint}>
-          Enter sends, Shift+Enter starts a line. Changes you accept are written to the screenplay
-          below — apply them to the episode with &ldquo;Apply my edits&rdquo;.
+          Enter sends, Shift+Enter starts a line.{' '}
+          {pitch
+            ? 'Changes you accept go into the pitch above, and the episode is written from it.'
+            : 'Changes you accept are written to the screenplay below — apply them to the episode with “Apply my edits”.'}
         </p>
       )}
     </div>
@@ -598,6 +693,25 @@ function Change({ change: c }) {
       <div className={s.roomChange}>
         <span className={s.roomChangeWhat}>title</span>
         <span className={s.roomLine}>{c.text}</span>
+        {why}
+      </div>
+    );
+  }
+  if (c.op === 'set') {
+    return (
+      <div className={s.roomChange}>
+        <span className={s.roomChangeWhat}>{c.field.replace('.', ' · ')}</span>
+        <span className={s.roomLine}>{c.text}</span>
+        {c.was && <span className={s.roomWas}>{c.was}</span>}
+        {why}
+      </div>
+    );
+  }
+  if (c.op === 'order') {
+    return (
+      <div className={s.roomChange}>
+        <span className={s.roomChangeWhat}>running order</span>
+        <span className={s.roomLine}>{c.slots.join('  →  ')}</span>
         {why}
       </div>
     );

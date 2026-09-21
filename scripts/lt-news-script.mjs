@@ -19,7 +19,8 @@
 // Usage:
 //   node scripts/lt-news-script.mjs --brief content/lt-tv/briefs/news-2026-W38.json
 //   node scripts/lt-news-script.mjs --draft my-hand-written-draft.json   # no API calls
-//   node scripts/lt-news-script.mjs --brief <f> --rundown-only           # just the editorial pass
+//   node scripts/lt-news-script.mjs --brief <f> --rundown-only           # pitch only: the editorial pass
+//   node scripts/lt-news-script.mjs --brief <f> --rundown <pitch.json>    # write the dialogue from an approved pitch
 //   node scripts/lt-news-script.mjs --brief <f> --no-search               # skip source verification
 //
 // Env: ANTHROPIC_API_KEY (required unless --draft)
@@ -58,6 +59,7 @@ import { assemble, renderScript } from "./lt-tv-episode.mjs";
 import { arg, rejectUnknownFlags } from "./lt-tv-cli.mjs";
 import { claude as callClaude } from "./lt-tv-claude.mjs";
 import { readStyleNotes, withStyleNotes } from "./lt-tv-style-notes.mjs";
+import { writePlan } from "./lt-tv-pitch.mjs";
 
 const claude = (opts) => callClaude({ ...opts, model: MODEL });
 
@@ -66,7 +68,7 @@ const MODEL = process.env.LT_NEWS_MODEL || "claude-opus-5";
 // Every flag this script knows. An unrecognised one is almost always a typo,
 // and silently ignoring it is how `--check-sources.` — one stray full stop —
 // quietly generated a brief instead of checking anything.
-const KNOWN_FLAGS = ["brief", "draft", "rundown-only", "no-search", "number", "out", "max-tokens", "slate", "no-slate"];
+const KNOWN_FLAGS = ["brief", "draft", "rundown-only", "rundown", "no-search", "number", "out", "max-tokens", "slate", "no-slate"];
 
 // The max_tokens error tells you to raise --max-tokens, so --max-tokens has to
 // actually do something.
@@ -183,7 +185,9 @@ async function readSpots(path = "content/lt-tv/rl80-spots.md") {
 
 // ── Pass 2: the script ────────────────────────────────────────────────────
 
-export const SCRIPT_BIBLE = `You are the writer of "LT Weekly News Recap", a six-minute animated news show about investing and economics, broadcast from the Liminal Terminal — a neon devotional trading floor where cyborgs and degens pray over markets. You write the whole episode as spoken dialogue for two characters sitting at a news desk.
+// Takes the show for symmetry with the argument shows, which have two
+// banners between them; this one has only ever been itself.
+export const scriptBible = () => `You are the writer of "LT Weekly News Recap", a six-minute animated news show about investing and economics, broadcast from the Liminal Terminal — a neon devotional trading floor where cyborgs and degens pray over markets. You write the whole episode as spoken dialogue for two characters sitting at a news desk.
 
 THE BEAT IS GENERAL INVESTING AND ECONOMICS. Interest rates, Treasury yields, oil, legislation, the indices, crypto, and whatever people are currently buying as an investment. Write it as a market show that takes all of it equally seriously, which is to say not very.
 
@@ -221,7 +225,7 @@ It is a joke ABOUT advertising. It never tells anyone to buy anything, it states
 // The same brief, plus what a whole-episode run has to return. The writer's
 // room reuses the part above and answers in its own shape instead, so the two
 // cannot describe the characters differently — see scripts/lt-tv-room.mjs.
-const SCRIPT_SYSTEM = `${SCRIPT_BIBLE}
+const SCRIPT_SYSTEM = `${scriptBible()}
 Return ONLY a JSON object, no preamble and no code fences:
 {
   "segments": [
@@ -351,30 +355,52 @@ async function main() {
     // a line is written.
     const houseNotes = await readStyleNotes();
     if (houseNotes.length) console.log(`House notes: ${houseNotes.length} in force.`);
-    console.log(`Rundown pass (${MODEL})${search ? " with source verification" : " — search disabled"}…`);
-    rundown = await claude({
-      system: withStyleNotes(RUNDOWN_SYSTEM, houseNotes),
-      user: `Week: ${week}\n\nTHE BRIEF\n${JSON.stringify(brief.signals, null, 2)}`,
-      maxTokens: maxTokensFor("rundown"),
-      tools: search,
-    });
 
-    for (const note of rundown._searchNotes || []) console.log(`  ! ${note}`);
-    delete rundown._searchNotes;
+    // WRITING FROM AN APPROVED PITCH. The rundown pass is the expensive,
+    // searching, judgment-making one, and re-running it would produce a
+    // different show from the one that was agreed to — so when a pitch is
+    // handed in, it is used exactly as it stands and pass 1 does not happen.
+    const pitchPath = arg("rundown");
+    if (pitchPath && pitchPath !== true) {
+      const file = JSON.parse(await readFile(resolve(pitchPath), "utf8"));
+      rundown = file.plan ?? file;
+      console.log(`Writing from the pitch in ${pitchPath}: "${rundown.title}".`);
+    } else {
+      console.log(`Rundown pass (${MODEL})${search ? " with source verification" : " — search disabled"}…`);
+      rundown = await claude({
+        system: withStyleNotes(RUNDOWN_SYSTEM, houseNotes),
+        user: `Week: ${week}\n\nTHE BRIEF\n${JSON.stringify(brief.signals, null, 2)}`,
+        maxTokens: maxTokensFor("rundown"),
+        tools: search,
+      });
 
-    const unverified = (rundown.stories || []).filter((story) => story.verified === false);
-    if (unverified.length) {
-      console.log(
-        `  ! ${unverified.length} of ${rundown.stories.length} stories could not be confirmed: ` +
-          unverified.map((story) => `"${story.headline}"`).join(", "),
-      );
+      for (const note of rundown._searchNotes || []) console.log(`  ! ${note}`);
+      delete rundown._searchNotes;
+
+      const unverified = (rundown.stories || []).filter((story) => story.verified === false);
+      if (unverified.length) {
+        console.log(
+          `  ! ${unverified.length} of ${rundown.stories.length} stories could not be confirmed: ` +
+            unverified.map((story) => `"${story.headline}"`).join(", "),
+        );
+      }
     }
 
+    // THE PITCH: pass 1, saved and rendered as an outline, for reading and
+    // arguing with before six minutes of dialogue exists. It stops here.
     if (arg("rundown-only")) {
-      const out = resolve(arg("out", `content/lt-tv/briefs/rundown-${week}.json`));
-      await mkdir(dirname(out), { recursive: true });
-      await writeFile(out, JSON.stringify(rundown, null, 2) + "\n");
-      console.log(`Wrote ${out}`);
+      const out = arg("out");
+      if (typeof out === "string") {
+        await mkdir(dirname(resolve(out)), { recursive: true });
+        await writeFile(resolve(out), JSON.stringify(rundown, null, 2) + "\n");
+        console.log(`Wrote ${out}`);
+        return;
+      }
+      const written = await writePlan(`news-${week}`, { plan: rundown, show: "news", week });
+      console.log(`\nPitched "${rundown.title}" — ${(rundown.stories || []).length} stories.`);
+      for (const story of rundown.stories || []) console.log(`  ${story.slot}  ${story.headline}`);
+      console.log(`\nWrote ${written.json}\n      ${written.text}`);
+      console.log("Read it, talk it over at /lt-tv, then write it with --rundown <that file>.");
       return;
     }
 

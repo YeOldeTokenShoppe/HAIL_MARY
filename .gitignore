@@ -72,6 +72,8 @@ content/lt-tv/episodes/*.json
 content/lt-tv/episodes/*.txt
 content/lt-tv/briefs/
 content/lt-tv/plans/
+# Writers'-room conversations: local, per-episode, and nobody else's business.
+content/lt-tv/rooms/
 content/lt-tv/status.html
 # The old pipeline writes its masters and its starter record here (see
 # docs/talk-show-production.md). Same rule as content/lt-tv/audio/ above:

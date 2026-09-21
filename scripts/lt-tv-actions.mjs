@@ -44,8 +44,45 @@ export const ACTIONS = {
     blurb:
       "Collects this week's market signal into a brief: the Fed, the curve, oil, crypto headlines, collectibles, prediction markets. Free. Read the Degraded line in the output; anything named there answered badly.",
   },
+  "pitch-news": {
+    label: "Pitch this week",
+    scope: "show",
+    show: "news",
+    // One call: the editorial pass and its searches, and then it stops.
+    spends: "an Anthropic call",
+    needs: ["ANTHROPIC_API_KEY"],
+    stages: [],
+    argv: () => [
+      "node",
+      ["scripts/lt-news-script.mjs", "--brief", `content/lt-tv/briefs/news-${isoWeek()}.json`, "--rundown-only"],
+    ],
+    blurb:
+      "Picks the three stories out of the brief and confirms every number against a real article, then stops and shows you the outline. Nothing is written yet, so disagreeing with it is free. Pull the week first.",
+  },
+  "write-from-pitch-news": {
+    label: "Write it from this pitch",
+    scope: "show",
+    show: "news",
+    spends: "an Anthropic call",
+    needs: ["ANTHROPIC_API_KEY"],
+    stages: [],
+    // Offered only once there is a pitch to write from; see the studio page.
+    needsPitch: true,
+    argv: () => [
+      "node",
+      [
+        "scripts/lt-news-script.mjs",
+        "--brief",
+        `content/lt-tv/briefs/news-${isoWeek()}.json`,
+        "--rundown",
+        `content/lt-tv/plans/news-${isoWeek()}.json`,
+      ],
+    ],
+    blurb:
+      "Writes the dialogue from the pitch exactly as it stands — the editorial pass does not run again, so what you approved is what gets written.",
+  },
   "write-news": {
-    label: "Write this week's news",
+    label: "Write it in one go, without pitching",
     scope: "show",
     show: "news",
     // Two Claude calls: the editorial pass, then the dialogue.
@@ -56,27 +93,38 @@ export const ACTIONS = {
     // Fixed here rather than sent by the browser, like every other argument.
     argv: () => ["node", ["scripts/lt-news-script.mjs", "--brief", `content/lt-tv/briefs/news-${isoWeek()}.json`]],
     blurb:
-      "Writes the rundown and the dialogue from this week's brief, verifying every number against its source, and puts the episode on the slate as Not recorded yet. Pull the week first. Two Claude calls.",
+      "The old way, for a week you do not want to think about: rundown and dialogue in one run, first draft straight to the slate. Two Claude calls.",
+  },
+  "plan-roundtable": {
+    label: "Pitch the argument",
+    spends: "an Anthropic call",
+    needs: ["ANTHROPIC_API_KEY"],
+    stages: ["planned"],
+    argv: (id) => ["node", ["scripts/lt-rt-script.mjs", "--topic", id, "--plan-only"]],
+    // It IS the saved first half now. It used to be a look and nothing more —
+    // the full run started its own argument pass and threw this one away,
+    // which made judging the idea and then writing it two different ideas.
+    blurb:
+      "Writes only the argument — the question, both cases, the hard case, who concedes — and stops. Read it, argue with it in the room, then write the episode from it.",
+  },
+  "write-from-pitch-roundtable": {
+    label: "Write it from this pitch",
+    spends: "an Anthropic call",
+    needs: ["ANTHROPIC_API_KEY"],
+    stages: ["planned"],
+    needsPitch: true,
+    argv: (id) => ["node", ["scripts/lt-rt-script.mjs", "--topic", id, "--plan", `content/lt-tv/plans/${id}.json`]],
+    blurb:
+      "Writes the dialogue from the argument you approved, exactly as it stands. The argument pass does not run again.",
   },
   "write-roundtable": {
-    label: "Write this episode",
+    label: "Write it in one go, without pitching",
     // Two Claude calls. The button says so and asks first.
     spends: "an Anthropic call",
     needs: ["ANTHROPIC_API_KEY"],
     stages: ["planned"],
     argv: (id) => ["node", ["scripts/lt-rt-script.mjs", "--topic", id]],
-    blurb: "Writes the argument, then the dialogue. Keeps the title you gave it.",
-  },
-  "plan-roundtable": {
-    label: "Draft the argument only",
-    spends: "an Anthropic call",
-    needs: ["ANTHROPIC_API_KEY"],
-    stages: ["planned"],
-    argv: (id) => ["node", ["scripts/lt-rt-script.mjs", "--topic", id, "--plan-only"]],
-    // Deliberately not described as a first half: the plan it writes is not
-    // read back by the full run, which starts its own argument pass. It is a
-    // cheap look at whether the idea holds, and nothing more.
-    blurb: "Writes only the argument, cheaply, so you can judge the idea. A look, not a saved first half — writing the episode after this starts a fresh argument.",
+    blurb: "Argument and dialogue in one run, without showing you the argument first. Keeps the title you gave it.",
   },
   "apply-edits": {
     label: "Apply my edits",

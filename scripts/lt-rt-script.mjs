@@ -2,7 +2,9 @@
 //
 // lt-rt-script — the script step for "The Liminal Terminal", the roundtable.
 //
-//   node scripts/lt-rt-script.mjs --topic roundtable-03
+//   node scripts/lt-rt-script.mjs --topic morality-03
+//   node scripts/lt-rt-script.mjs --topic morality-03 --plan-only        # pitch the argument only
+//   node scripts/lt-rt-script.mjs --topic morality-03 --plan <pitch.json> # write it from an approved pitch
 //   node scripts/lt-rt-script.mjs --theme "what a bailout actually buys"
 //   node scripts/lt-rt-script.mjs --list          # what is on the slate, unwritten
 //
@@ -46,6 +48,7 @@ import { assemble, renderScript } from "./lt-tv-episode.mjs";
 import { arg, rejectUnknownFlags } from "./lt-tv-cli.mjs";
 import { claude as callClaude } from "./lt-tv-claude.mjs";
 import { readStyleNotes, withStyleNotes } from "./lt-tv-style-notes.mjs";
+import { writePlan } from "./lt-tv-pitch.mjs";
 import { toSlateRecord, writeSlateRecord, SLATE_DIR, SLATE_INDEX } from "./lt-tv-slate-record.mjs";
 
 const MODEL = process.env.LT_TV_MODEL || "claude-opus-5";
@@ -63,14 +66,20 @@ const SHOWS = ["roundtable", "morality"];
 const DEFAULT_SHOW = "morality";
 const EPISODE_DIR = "content/lt-tv/episodes";
 
-const KNOWN_FLAGS = ["topic", "theme", "show", "list", "draft", "plan-only", "number", "out", "max-tokens", "slate", "no-slate", "retitle"];
+const KNOWN_FLAGS = ["topic", "theme", "show", "list", "draft", "plan-only", "plan", "number", "out", "max-tokens", "slate", "no-slate", "retitle"];
 const MAX_TOKENS = { plan: 6000, dialogue: 16000 };
 
 const claude = (opts) => callClaude({ ...opts, model: MODEL });
 
 // ── Pass 1: the argument ──────────────────────────────────────────────────
 
-const PLAN_SYSTEM = `You are the producer of "The Liminal Terminal", a weekly animated roundtable broadcast from a neon devotional trading floor where cyborgs and degens pray over markets. Two hosts sit and argue about one idea for about six minutes. You are handed tonight's theme and you decide what the argument actually IS.
+// THE SHOW NAMES ITSELF. Both of these used to open "The Liminal Terminal",
+// which stopped being a channel on 2026-09-21 — so every Markets & Morality
+// episode was written by a model that had been told it was writing a
+// programme that does not exist, and the writers' room, which reads the same
+// brief, said so out loud. The format is still the roundtable; the BANNER is
+// whichever show this episode belongs to.
+const planSystem = (show) => `You are the producer of "${showFormat(show).title}", a weekly animated roundtable broadcast from a neon devotional trading floor where cyborgs and degens pray over markets. Two hosts sit and argue about one idea for about six minutes. You are handed tonight's theme and you decide what the argument actually IS.
 
 THE SHOW IS NOT A NEWS SHOW. Nothing happened this week. The subject is an idea about markets, money and what people do to each other with them — the psychology, the morality, the stories people tell to make a number feel like a virtue.
 
@@ -107,7 +116,7 @@ Return ONLY a JSON object, no preamble and no code fences:
 
 // ── Pass 2: the dialogue ──────────────────────────────────────────────────
 
-export const SCRIPT_BIBLE = `You are the writer of "The Liminal Terminal", a six-minute animated roundtable broadcast from a neon devotional trading floor. Two characters sit in two chairs and argue about one idea. You write the whole episode as spoken dialogue.
+export const scriptBible = (show) => `You are the writer of "${showFormat(show).title}", a six-minute animated roundtable broadcast from a neon devotional trading floor. Two characters sit in two chairs and argue about one idea. You write the whole episode as spoken dialogue.
 
 THE TWO HOSTS — this is the whole show, so get them exactly right:
 
@@ -137,7 +146,7 @@ ANIMATION CUES: attach reactions to lines to give the LISTENER something to do w
 // The same brief, plus what a whole-episode run has to return. The writer's
 // room reuses the part above and answers in its own shape instead, so the two
 // cannot describe the characters differently — see scripts/lt-tv-room.mjs.
-const SCRIPT_SYSTEM = `${SCRIPT_BIBLE}
+const scriptSystem = (show) => `${scriptBible(show)}
 Return ONLY a JSON object, no preamble and no code fences:
 {
   "segments": [
@@ -313,27 +322,45 @@ async function main() {
     // as well as the dialogue.
     const houseNotes = await readStyleNotes();
     if (houseNotes.length) console.log(`House notes: ${houseNotes.length} in force.`);
-    console.log(`Argument pass (${MODEL})…`);
-    plan = await claude({
-      system: withStyleNotes(PLAN_SYSTEM, houseNotes),
-      user: `TONIGHT'S THEME\n${topic.theme}\n\nWrite the argument.`,
-      maxTokens: MAX_TOKENS.plan,
-    });
-    console.log(`  "${plan.title}" — ${plan.question}`);
-    console.log(`  ${plan.concession.who} concedes: ${plan.concession.what}`);
+    // WRITING FROM AN APPROVED PITCH. The argument pass decides what the
+    // episode IS, so re-running it would write a different episode from the
+    // one that was agreed to. A pitch handed in is used exactly as it stands.
+    const pitchPath = arg("plan");
+    if (pitchPath && pitchPath !== true) {
+      const file = JSON.parse(await readFile(resolve(pitchPath), "utf8"));
+      plan = file.plan ?? file;
+      console.log(`Writing from the pitch in ${pitchPath}: "${plan.title}".`);
+    } else {
+      console.log(`Argument pass (${MODEL})…`);
+      plan = await claude({
+        system: withStyleNotes(planSystem(topic.show), houseNotes),
+        user: `TONIGHT'S THEME\n${topic.theme}\n\nWrite the argument.`,
+        maxTokens: MAX_TOKENS.plan,
+      });
+      console.log(`  "${plan.title}" — ${plan.question}`);
+      console.log(`  ${plan.concession.who} concedes: ${plan.concession.what}`);
+    }
 
+    // THE PITCH: pass 1, saved and rendered as an outline, for reading and
+    // arguing with before six minutes of dialogue exists. It stops here.
     if (arg("plan-only")) {
       const out = arg("out");
-      const path = typeof out === "string" ? out : `content/lt-tv/plans/${topic.show}-${String(topic.number).padStart(2, "0")}.json`;
-      await mkdir(dirname(resolve(path)), { recursive: true });
-      await writeFile(resolve(path), JSON.stringify(plan, null, 2) + "\n");
-      console.log(`Wrote ${path}`);
+      const id = `${topic.show}-${String(topic.number).padStart(2, "0")}`;
+      if (typeof out === "string") {
+        await mkdir(dirname(resolve(out)), { recursive: true });
+        await writeFile(resolve(out), JSON.stringify(plan, null, 2) + "\n");
+        console.log(`Wrote ${out}`);
+        return;
+      }
+      const written = await writePlan(id, { plan, show: topic.show });
+      console.log(`\nWrote ${written.json}\n      ${written.text}`);
+      console.log("Read it, talk it over at /lt-tv, then write it with --plan <that file>.");
       return;
     }
 
     console.log("Dialogue pass…");
     ({ segments } = await claude({
-      system: withStyleNotes(SCRIPT_SYSTEM, houseNotes),
+      system: withStyleNotes(scriptSystem(topic.show), houseNotes),
       user: scriptUserMessage(plan, showFormat(topic.show)),
       maxTokens: MAX_TOKENS.dialogue,
     }));

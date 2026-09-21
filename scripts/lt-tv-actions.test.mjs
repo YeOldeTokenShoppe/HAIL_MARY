@@ -110,7 +110,18 @@ console.log("\nThe news show starts from its heading, with no episode to point a
   ok("and it says it spends a model call", ACTIONS["write-news"].spends && ACTIONS["write-news"].needs.includes("ANTHROPIC_API_KEY"));
   ok("an id sent along is simply ignored", resolveAction("pull-week", "rm -rf /", []).ok
     && resolveAction("pull-week", "rm -rf /", []).args.length === 1);
-  check("they are offered under the news show", showActionsFor("news").map((a) => a.name), ["pull-week", "write-news"]);
+  // In the order a week is made: pull it, pitch it, write the pitch. The
+  // one-run version stays at the end for a week nobody wants to think about.
+  check("they are offered under the news show, pitch before script",
+    showActionsFor("news").map((a) => a.name),
+    ["pull-week", "pitch-news", "write-from-pitch-news", "write-news"]);
+  ok("writing from a pitch is only offered once there is one",
+    ACTIONS["write-from-pitch-news"].needsPitch === true && !ACTIONS["pitch-news"].needsPitch);
+  ok("the pitch does not write an episode",
+    ACTIONS["pitch-news"].argv()[1].includes("--rundown-only"));
+  ok("and writing from it does not pitch again",
+    ACTIONS["write-from-pitch-news"].argv()[1].includes("--rundown")
+      && !ACTIONS["write-from-pitch-news"].argv()[1].includes("--rundown-only"));
   check("and not under the roundtable", showActionsFor("roundtable"), []);
   ok("and never as an episode button",
     ["planned", "written", "recorded", "on-air"].every((st) => !actionsFor(st).some((a) => a.scope === "show")));
@@ -166,8 +177,12 @@ ok("actionsFor carries the flag through to the page",
   actionsFor("on-air").find((a) => a.name === "apply-edits").needsScreenplay === true);
 
 console.log("\nThe buttons offered match the stage:");
-check("a planned episode is offered writing, not recording",
-  actionsFor("planned").map((a) => a.name), ["write-roundtable", "plan-roundtable", "check"]);
+check("a planned episode is offered pitching first, then writing, and never recording",
+  actionsFor("planned").map((a) => a.name),
+  ["plan-roundtable", "write-from-pitch-roundtable", "write-roundtable", "check"]);
+ok("the argument pitch is saved where the page can find it",
+  ACTIONS["write-from-pitch-roundtable"].argv("morality-02")[1]
+    .includes("content/lt-tv/plans/morality-02.json"));
 ok("a written one is offered recording", actionsFor("written").some((a) => a.name === "record"));
 ok("a recorded one is not offered a first recording", !actionsFor("recorded").some((a) => a.name === "record"));
 // A pause mark only takes effect by recording, and the edit step refuses when

@@ -15,12 +15,20 @@
 // the whole episode in front of it, and when the two of you agree on something
 // it offers the change.
 //
+// TWO ROOMS, ONE DOOR. Before an episode is written there is a PITCH — what it
+// is going to be — and that is the cheap moment to disagree, so the room opens
+// on the pitch when there is no screenplay yet (scripts/lt-tv-pitch.mjs). What
+// it may change there is narrower on purpose: the judgment, never the facts,
+// which were confirmed against real articles. Once the episode is written the
+// screenplay wins and the pitch is locked, because changing it then would
+// change nothing anybody watches.
+//
 // WHAT IT IS NOT. It is not a second script format and it is not a second
 // writer. The screenplay stays exactly what it was, `# cut`, `# pause` and all
 // — those marks are how the recording is steered, so the room PLACES them for
 // you rather than replacing the language. And the voice of the show comes from
-// the same brief the generator uses: SCRIPT_BIBLE is imported from whichever
-// generator writes this show, so the room cannot describe Connor differently
+// the same brief the generator uses: the script bible is imported from
+// whichever generator writes this show, so the room cannot describe Connor differently
 // from the writer that wrote him. That import is the whole reason the prompts
 // were split.
 //
@@ -48,9 +56,19 @@ import {
   parseScript,
 } from "./lt-tv-edit.mjs";
 import { CAST, ACTORS, SHOW_FORMATS, showFormat } from "./lt-tv-format.mjs";
-import { SCRIPT_BIBLE as NEWS_BIBLE } from "./lt-news-script.mjs";
-import { SCRIPT_BIBLE as ARGUMENT_BIBLE } from "./lt-rt-script.mjs";
+import { scriptBible as newsBible } from "./lt-news-script.mjs";
+import { scriptBible as argumentBible } from "./lt-rt-script.mjs";
 import { readStyleNotes, withStyleNotes, rememberStyleNote, STYLE_NOTES_PATH } from "./lt-tv-style-notes.mjs";
+import {
+  readPlan,
+  writePlan,
+  renderPitch,
+  pitchKind,
+  editableFields,
+  validatePitchChanges,
+  applyPitchChanges,
+  summarisePitch,
+} from "./lt-tv-pitch.mjs";
 
 const EPISODE_DIR = "content/lt-tv/episodes";
 const SAMPLE_DIR = "content/lt-tv/samples";
@@ -58,8 +76,15 @@ const MODEL = process.env.LT_TV_MODEL || "claude-opus-5";
 const MAX_TOKENS = 4000;
 
 // The two shows are written by two generators, so the room reads from the one
-// that wrote this show. Same object, not a copy of it.
-const BIBLES = { news: NEWS_BIBLE, roundtable: ARGUMENT_BIBLE, morality: ARGUMENT_BIBLE };
+// that wrote this show. The same brief the writer is given, built the same way
+// — the argument one names its own show, which is why these are functions.
+const BIBLES = { news: newsBible, roundtable: argumentBible, morality: argumentBible };
+
+// A show nobody recognises is briefed as the argument format, which is what
+// every show but the news one is. The fallback names Markets & Morality
+// rather than the older roundtable banner, because the brief names the show
+// it is for out loud and that one is no longer on the channel.
+const bibleFor = (show) => (BIBLES[show] ? BIBLES[show](show) : argumentBible("morality"));
 
 // How much conversation is carried into a turn. A room that remembers the
 // whole night is nice and a room that re-sends fifty turns of it on every
@@ -126,6 +151,40 @@ Reply with JSON only, no preamble and no code fences:
 "changes" is an empty list when you are only talking. Say nothing outside the
 JSON.`;
 
+const PITCH_RULES = `YOU ARE IN THE WRITER'S ROOM, AND NOTHING IS WRITTEN YET.
+
+What you have below is the PITCH: what this episode is going to be. The
+producer is reading it and telling you what she thinks. Nobody has written a
+line of dialogue, which is the point — this is the cheap moment to disagree.
+
+Talk like a writer in a room with one other person: short, specific, two or
+three sentences, with an opinion. If the pitch has a weak story or an argument
+that only cuts one way, say so before she does.
+
+WHEN TO PROPOSE CHANGES. Only when she has asked for one, or agreed to one you
+suggested. Thinking out loud with her is the job too.
+
+WHAT YOU MAY CHANGE — the judgment, not the evidence:
+
+  {"op":"set","field":"<one of the fields listed below>","text":"...","why":"..."}
+  {"op":"order","slots":["story-2","story-1","story-3"],"why":"..."}
+      News only: the running order. Name the stories by the slot they have
+      now, in the order they should be played. Story three is the week's
+      absurd one, so what goes there is an editorial choice.
+
+WHAT YOU MAY NOT CHANGE, and this matters more than anything else here: a
+story's FACT, its SOURCES, whether it is VERIFIED, and the BOARD. Each of those
+was confirmed against a real article in the pass that made this pitch. A number
+reworded in conversation is a number nobody checked, and this show's whole
+claim is that it checked. If she wants a different story or a different number,
+the answer is to pitch the week again — say so plainly; it is one call.
+
+Reply with JSON only, no preamble and no code fences:
+{"say":"what you say to her","changes":[]}
+
+"changes" is an empty list when you are only talking. Say nothing outside the
+JSON.`;
+
 /**
  * The system prompt for one turn of the room.
  *
@@ -136,7 +195,7 @@ JSON.`;
  * screen.
  */
 export function roomSystem({ show, script, rules = [], episode = null }) {
-  const bible = BIBLES[show] ?? ARGUMENT_BIBLE;
+  const bible = bibleFor(show);
   const format = SHOW_FORMATS[show] ?? SHOW_FORMATS.news;
   const heading = episode
     ? `THE EPISODE: ${episode.id}${episode.title ? ` — "${episode.title}"` : ""}, ${format.title}.`
@@ -152,6 +211,33 @@ export function roomSystem({ show, script, rules = [], episode = null }) {
       "",
       "THE SCREENPLAY AS IT STANDS",
       script,
+    ].join("\n"),
+    rules,
+  );
+}
+
+/**
+ * The system prompt for one turn about a pitch.
+ *
+ * Same shape as roomSystem and for the same reason: the pitch is sent fresh
+ * every turn, so the outline the writer is looking at is the one on screen.
+ * The editable fields are listed rather than described, because the refusal
+ * for anything else is written to be read by a person and should not be the
+ * way the writer discovers what it may touch.
+ */
+export function pitchRoomSystem({ show, plan, rules = [], id = null, week = null }) {
+  const bible = bibleFor(show);
+  const kind = pitchKind(show);
+  return withStyleNotes(
+    [
+      bible,
+      "",
+      PITCH_RULES,
+      "",
+      `THE FIELDS YOU MAY SET: ${editableFields(plan, kind).join(", ")}.`,
+      "",
+      `THE PITCH${id ? ` FOR ${id}` : ""}${week ? `, WEEK ${week}` : ""}, AS IT STANDS`,
+      renderPitch(plan, { show, id, week }),
     ].join("\n"),
     rules,
   );
@@ -447,9 +533,18 @@ export function screenplayPath(id, root = process.cwd()) {
   return found;
 }
 
-/** Where the conversation itself is kept, beside the screenplay it is about. */
+/**
+ * Where the conversation itself is kept.
+ *
+ * In a directory of its own rather than beside the screenplay: the staging
+ * directory is read as "one .json per episode" by the status page, and a
+ * transcript dropped in there was listed as an episode called
+ * "morality-02.room" that belonged to no show. A room is not an episode.
+ */
+export const ROOM_DIR = "content/lt-tv/rooms";
+
 export function transcriptPath(id, root = process.cwd()) {
-  return resolve(root, EPISODE_DIR, `${basename(String(id))}.room.json`);
+  return resolve(root, ROOM_DIR, `${basename(String(id))}.json`);
 }
 
 /**
@@ -513,40 +608,86 @@ export function toMessages(transcript) {
  * changes are validated here and stored with it, so applying them later needs
  * nothing from the browser but which message they were on.
  */
+/**
+ * What this room is about: a screenplay if there is one, otherwise the pitch.
+ *
+ * A WRITTEN SCREENPLAY WINS. Once the episode exists, the script is the live
+ * thing and the pitch is history — changing the pitch then would change
+ * nothing anybody watches, which is a worse outcome than refusing.
+ */
+export async function subjectOf(id, root = process.cwd()) {
+  let script = null;
+  try {
+    const path = screenplayPath(id, root);
+    script = { path, text: await readFile(path, "utf8") };
+  } catch { /* nothing written yet */ }
+
+  if (script) {
+    return {
+      mode: "script",
+      path: script.path,
+      text: script.text,
+      show: showFromScript(script.text),
+      title: titleOf(script.text),
+    };
+  }
+
+  const pitched = await readPlan(id, root);
+  if (pitched) {
+    return {
+      mode: "pitch",
+      show: pitched.show ?? String(id).replace(/-[^-]+$/, ""),
+      week: pitched.week ?? null,
+      plan: pitched.plan,
+      title: pitched.plan?.title ?? null,
+    };
+  }
+
+  throw new Error(
+    `Nothing to talk about for "${id}" yet — there is no pitch and no screenplay. ` +
+      "Pitch it first, and the room has something to argue with.",
+  );
+}
+
 export async function say({ id, text, root = process.cwd(), model = MODEL }) {
   const message = String(text ?? "").trim();
   if (!message) throw new Error("Say something first.");
 
-  const path = screenplayPath(id, root);
-  const script = await readFile(path, "utf8");
-  const show = showFromScript(script);
-  const entries = indexScript(script);
+  const subject = await subjectOf(id, root);
+  const rules = await readStyleNotes(root);
 
   const transcript = await readTranscript(id, root);
   transcript.push({ role: "producer", text: message.slice(0, MAX_MESSAGE_CHARS), at: new Date().toISOString() });
 
-  const reply = await claude({
-    system: roomSystem({
-      show,
-      script,
-      rules: await readStyleNotes(root),
-      episode: { id: basename(path).replace(/\.txt$/, ""), title: titleOf(script) },
-    }),
-    messages: toMessages(transcript),
-    model,
-    maxTokens: MAX_TOKENS,
-  });
+  const system =
+    subject.mode === "pitch"
+      ? pitchRoomSystem({ show: subject.show, plan: subject.plan, rules, id, week: subject.week })
+      : roomSystem({
+          show: subject.show,
+          script: subject.text,
+          rules,
+          episode: { id: basename(subject.path).replace(/\.txt$/, ""), title: subject.title },
+        });
+
+  const reply = await claude({ system, messages: toMessages(transcript), model, maxTokens: MAX_TOKENS });
 
   const entry = {
     role: "writer",
     text: String(reply?.say ?? "").trim() || "(the writer said nothing)",
     at: new Date().toISOString(),
-    changes: validateChanges(reply?.changes, entries),
+    // The mode is recorded with the message, not worked out again at apply
+    // time: what she agreed to was a change to the thing that was in front of
+    // her, and between the two a pitch can become a screenplay.
+    mode: subject.mode,
+    changes:
+      subject.mode === "pitch"
+        ? validatePitchChanges(reply?.changes, subject.plan, pitchKind(subject.show))
+        : validateChanges(reply?.changes, indexScript(subject.text)),
     applied: false,
   };
   transcript.push(entry);
   await writeTranscript(id, transcript, root);
-  return { entry, transcript, show };
+  return { entry, transcript, show: subject.show, mode: subject.mode };
 }
 
 /**
@@ -562,6 +703,8 @@ export async function applyMessage({ id, index, root = process.cwd() }) {
   if (!entry || entry.role !== "writer") throw new Error("That is not a message from the writer.");
   if (entry.applied) throw new Error("Those changes are already in the script.");
   if (!entry.changes?.length) throw new Error("There is nothing to apply on that message.");
+
+  if (entry.mode === "pitch") return applyPitch({ id, entry, transcript, root });
 
   const path = screenplayPath(id, root);
   const script = await readFile(path, "utf8");
@@ -587,7 +730,44 @@ export async function applyMessage({ id, index, root = process.cwd() }) {
   });
   await writeTranscript(id, transcript, root);
 
-  return { text, applied, remembered, parseErrors: await parseErrors(path, text) };
+  return { text, applied, what: summarise(applied), remembered, parseErrors: await parseErrors(path, text), mode: "script" };
+}
+
+/**
+ * Put agreed changes into the pitch, and re-render the outline beside it.
+ *
+ * Refuses once the episode has been written, because at that point the pitch
+ * is a record of what was agreed and changing it would change nothing on air
+ * while making the two disagree.
+ */
+async function applyPitch({ id, entry, transcript, root }) {
+  const pitched = await readPlan(id, root);
+  if (!pitched) throw new Error(`The pitch for "${id}" is gone.`);
+  if (existsSync(resolve(root, EPISODE_DIR, `${id}.txt`))) {
+    throw new Error("This episode has been written — change the screenplay rather than the pitch it came from.");
+  }
+
+  const show = pitched.show ?? String(id).replace(/-[^-]+$/, "");
+  const changes = validatePitchChanges(entry.changes, pitched.plan, pitchKind(show));
+  const { plan, applied } = applyPitchChanges(pitched.plan, changes);
+  const written = await writePlan(id, { plan, show, week: pitched.week }, root);
+
+  entry.applied = true;
+  transcript.push({
+    role: "note",
+    text: `applied to the pitch: ${summarisePitch(applied)}`,
+    at: new Date().toISOString(),
+  });
+  await writeTranscript(id, transcript, root);
+
+  return {
+    text: await readFile(written.text, "utf8"),
+    applied,
+    what: summarisePitch(applied),
+    remembered: [],
+    parseErrors: [],
+    mode: "pitch",
+  };
 }
 
 /** Mark a proposal as turned down, so the writer stops offering it. */
@@ -645,8 +825,10 @@ async function main() {
 
   const { createInterface } = await import("node:readline/promises");
   const rl = createInterface({ input: process.stdin, output: process.stdout });
-  const path = screenplayPath(id);
-  console.log(`The writer's room — ${basename(path)} (${MODEL}).`);
+  const opening = await subjectOf(id);
+  console.log(
+    `The writer's room — ${id}, ${opening.mode === "pitch" ? "the pitch" : "the screenplay"} (${MODEL}).`,
+  );
   console.log("Say what you think. An empty line leaves; nothing is written until you say yes.\n");
 
   for (;;) {
@@ -660,8 +842,8 @@ async function main() {
     for (const change of entry.changes) console.log(`  · ${describe(change)}`);
     const yes = (await rl.question("\napply these? [y/N] ")).trim().toLowerCase();
     if (yes === "y" || yes === "yes") {
-      const { applied, remembered, parseErrors: bad } = await applyMessage({ id, index: transcript.length - 1 });
-      console.log(`\n${basename(path)}: ${summarise(applied)}`);
+      const { what, remembered, parseErrors: bad } = await applyMessage({ id, index: transcript.length - 1 });
+      console.log(`\n${id}: ${what}`);
       for (const r of remembered) {
         console.log(`${STYLE_NOTES_PATH}: ${r.added ? "added" : `not added (${r.reason})`} — ${r.rule}`);
       }
@@ -677,12 +859,18 @@ async function main() {
   }
 
   rl.close();
-  console.log(`\nApply it when you are happy: node scripts/lt-tv-edit.mjs ${basename(path).replace(/\.txt$/, "")}`);
+  console.log(
+    opening.mode === "pitch"
+      ? `\nWrite it when you are happy with it, from the studio page or with --plan/--rundown.`
+      : `\nApply it when you are happy: node scripts/lt-tv-edit.mjs ${id}`,
+  );
 }
 
 /** One proposed change, for a person reading it in a terminal. */
 export function describe(change) {
   const why = change.why ? `  (${change.why})` : "";
+  if (change.op === "set") return `${change.field}: ${change.text}${why}${change.was ? `\n        was  ${change.was}` : ""}`;
+  if (change.op === "order") return `running order: ${change.slots.join(", ")}${why}`;
   if (change.op === "reword") return `line ${change.n}: ${change.text}${why}\n        was  ${change.was}`;
   if (change.op === "add") return `after ${change.after}, ${change.speaker}: ${change.text}${why}`;
   if (change.op === "drop") return `drop ${change.n} (${change.speaker}: ${change.was})${why}`;

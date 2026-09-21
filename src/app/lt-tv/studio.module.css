@@ -866,3 +866,63 @@
     grid-column: 1;
   }
 }
+
+/* ------------------------------------------------------------- the pitch */
+
+/* Pass 1, as a page you read before anything is written. Set in the mono face
+   the screenplay uses, because it is the same kind of object — the thing the
+   episode is made from, rendered for a person rather than for the next
+   prompt. Read-only: it is changed by talking to the room under it. */
+
+.page .pitch {
+  margin: 0;
+  padding: 14.4px 16px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--amber);
+  border-radius: 10px;
+  background: var(--well);
+  color: #d5dae1;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+/* A pitch with no episode yet sits under the show's heading, so it needs to
+   read as a card in its own right rather than as part of the button row. */
+.pitchPanel {
+  margin-top: 12.8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.pitchHead {
+  display: flex;
+  align-items: center;
+  gap: 11.2px;
+  width: 100%;
+  padding: 12.8px 14.4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pitchHead:hover {
+  background: #171c23;
+}
+.pitchBody {
+  padding: 0 14.4px 16px;
+}
+.dotPitched {
+  background: var(--amber);
+  box-shadow: 0 0 0 3px rgba(255, 203, 116, 0.14);
+}
+.stagePitched {
+  color: var(--amber);
+}

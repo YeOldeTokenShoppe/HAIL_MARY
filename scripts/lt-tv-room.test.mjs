@@ -226,5 +226,34 @@ console.log("\nthe conversation as the writer receives it");
   );
 }
 
+console.log("\nwhat the room is about");
+{
+  const { mkdtemp, mkdir, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { subjectOf } = await import("./lt-tv-room.mjs");
+
+  const root = await mkdtemp(join(tmpdir(), "lttv-room-"));
+  await mkdir(join(root, "content/lt-tv/plans"), { recursive: true });
+  await mkdir(join(root, "content/lt-tv/episodes"), { recursive: true });
+  await writeFile(
+    join(root, "content/lt-tv/plans/morality-09.json"),
+    JSON.stringify({ id: "morality-09", show: "morality", plan: { title: "Pitched Only", question: "Well?" } }),
+  );
+
+  const pitched = await subjectOf("morality-09", root);
+  check("a pitch with no screenplay is what there is to talk about", pitched.mode, "pitch");
+  check("and it knows whose show it is", pitched.show, "morality");
+
+  // Once the episode is written the screenplay is the live thing. Talking
+  // about the pitch then would change something nobody watches.
+  await writeFile(join(root, "content/lt-tv/episodes/morality-09.txt"), SCRIPT);
+  check("a screenplay wins over the pitch it came from", (await subjectOf("morality-09", root)).mode, "script");
+
+  let refused = null;
+  await subjectOf("morality-11", root).catch((err) => { refused = err.message; });
+  ok("neither is not a crash, it is an answer", refused?.includes("no pitch and no screenplay"));
+}
+
 console.log(failures ? `\n${failures} failure(s)\n` : "\nAll good.\n");
 process.exit(failures ? 1 : 0);

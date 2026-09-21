@@ -181,7 +181,7 @@ root — the path is relative to you, not to the repo.
 | `npm run lt:roundtable` | write a roundtable episode |
 | `npm run lt:edit` | apply your edits to a screenplay |
 | `npm run lt:rewrite` | rewrite the lines you marked with a `#` note |
-| `npm run lt:room` | the writers' room: talk an episode over, line by line |
+| `npm run lt:room` | the writers' room: talk an episode or a pitch over |
 | `npm run lt:audio` | record an episode |
 | `npm run lt:split` | cut the two tracks into the SitePal clips |
 | `npm run lt:slate` | put a recorded episode on the guide |
@@ -280,18 +280,32 @@ a git rename plus an edit to `index.js`, and it belongs in a commit.
 
 Full detail: `docs/lt-weekly-news-workflow.md`.
 
-On the studio page, steps 1 and 2 are the two buttons under the show's
-heading, **Pull the week** and **Write this week's news**. From there the
-episode appears on the slate and every later step is a button on it, exactly
-as for the roundtable. From a terminal:
+On the studio page the week runs left to right under the show's heading:
+**Pull the week**, then **Pitch this week**, then **Write it from this pitch**.
+The pitch is the step worth having — it is the editorial judgment on its own,
+before there is a script to throw away. From there the episode appears on the
+slate and every later step is a button on it, exactly as for the roundtable.
+From a terminal:
 
 ```bash
 # 1. Pull the week. Check `degraded` in the output is empty or harmless.
 npm run lt:brief
 
-# 2. Write the script. Two Claude calls; every number is computed locally.
-npm run lt:news -- --brief content/lt-tv/briefs/news-2026-W38.json
+# 2. Pitch it. One Claude call: it picks the three stories and confirms every
+#    number against a real article, then stops. Read what comes out.
+npm run lt:news -- --brief content/lt-tv/briefs/news-2026-W38.json --rundown-only
+
+# 3. Write the dialogue from the pitch you approved. It is used as it stands;
+#    the editorial pass does not run again.
+npm run lt:news -- --brief content/lt-tv/briefs/news-2026-W38.json \
+                   --rundown content/lt-tv/plans/news-2026-W38.json
 ```
+
+There is still a **Write it in one go, without pitching** button, and
+`npm run lt:news -- --brief <f>` with no other flag is still that run — both
+passes, straight to a first draft. Use it for a week you do not want to think
+about. See **The pitch** below for what the outline holds and how to argue
+with it.
 
 Now **read the `.txt` screenplay** before spending any audio money. Does each
 story carry a real number? Does GR80 get a line worth hearing? Is
@@ -436,9 +450,16 @@ named on the slate.
 #    way to write one; these are the queue.
 npm run lt:roundtable -- --list
 
-# 2. Write one. Two Claude calls: the argument, then the dialogue.
-npm run lt:roundtable -- --topic morality-02
+# 2. Pitch the argument. One Claude call, and it stops: the question, both
+#    cases, the hard case, who concedes. This is the part worth arguing with.
+npm run lt:roundtable -- --topic morality-02 --plan-only
+
+# 3. Write the dialogue from the argument you approved.
+npm run lt:roundtable -- --topic morality-02 --plan content/lt-tv/plans/morality-02.json
 ```
+
+`npm run lt:roundtable -- --topic morality-02` on its own still does both
+passes in one run, which is the **Write it in one go** button on the page.
 
 An episode already on the slate **keeps the title and summary it was given** —
 the generator writes the argument, not the running order. Pass `--retitle` if
@@ -953,12 +974,74 @@ A script run prints `House notes: 3 in force.` when it is using them.
 
 ---
 
+## The pitch (both shows)
+
+Both shows are written in two passes. The first decides what the episode IS —
+which three stories and what the hosts disagree about, or what the argument is
+and who concedes — and the second writes the dialogue from it. Until recently
+only the second pass left anything a person could read, so the first time you
+saw the editorial judgment was as six minutes of finished script, and
+disagreeing with it meant throwing the script away.
+
+The first pass is now a **pitch** you read first:
+
+```
+LT WEEKLY NEWS RECAP — PITCH FOR 2026-W39
+"Patience, Clarity and Cardboard"
+
+CHIRON: FED HOLDS — AND CALLS IT PATIENCE
+
+1.  MACRO       FOMC holds, statement leans hawkish
+    Fact:             The committee held rates steady for a second meeting…
+    They differ on:   Whether a second hold is patience or uncertainty.
+    Connor:           Nobody trades the decision, they trade the adjective.
+    GR80:             Patience is a virtue the committee does not have to fund.
+    Source:           Federal Reserve — FOMC statement, 17 September
+```
+
+It lands in `content/lt-tv/plans/` as JSON and as that outline, and the studio
+page shows the outline: under the show's heading for the news week, in the
+episode's own drawer for Markets & Morality. **Write it from this pitch** then
+writes the dialogue from exactly what you read.
+
+**A pitch is read-only on the page, and that is deliberate.** Every number in
+it was confirmed against a real article in the pass that produced it, and the
+article is named beside it. A text box would let a fact be reworded by hand,
+and a fact reworded by hand is a number nobody checked being spoken in a
+character's voice — which is the one failure this show cannot afford. So the
+pitch is changed by talking to the writers' room under it, which is allowed to
+move the judgment and refuses the evidence:
+
+| it may change | it will refuse |
+|---|---|
+| the title, the summary, the chiron | a story's fact |
+| what the hosts disagree about | its sources, or whether it is verified |
+| either host's angle on a story | the board |
+| the running order of the three stories | |
+| any part of an argument: the question, both cases, the hard case, who concedes | |
+
+Wanting a different story or a different number is not an edit, it is a
+different pitch — which is one call, and the room says so rather than quietly
+obliging.
+
+A pitch that has already been written into an episode is locked: the
+screenplay is the live thing from then on, and the pitch stays as the record
+of what was agreed. It is listed in the episode's files at every stage, so an
+episode on air can still answer "why did we cover that".
+
+---
+
 ## The writers' room (both shows)
 
 Everything above needs you to know which line is wrong before you can say
 anything. Often you don't — the middle of story two drags, GR80 concedes too
 early, the ending is soft. That is a conversation, so have one: open the
 episode at `/lt-tv` and there is a **writers' room** under the screenplay.
+
+The same room sits under a **pitch**, before a line has been written, and that
+is the cheaper place to disagree. What it may change there is the table in
+**The pitch** above; everything below is about an episode that has a
+screenplay.
 
 ```
 you     the middle of story two drags and I can't see why
@@ -1004,10 +1087,10 @@ thrown away by not applying it. A change that would make the screenplay
 unreadable is refused when it arrives rather than when you apply it, and if the
 file will not parse afterwards the room says so immediately.
 
-The conversation is kept beside the episode, in
-`content/lt-tv/episodes/<id>.room.json`, so closing the tab does not lose it.
-Staging is gitignored, so it is yours and it is not committed. The same room
-from a terminal:
+The conversation is kept in `content/lt-tv/rooms/<id>.json`, so closing the
+tab does not lose it. That directory is gitignored, so it is yours and it is
+not committed. The same room from a terminal — it opens on the screenplay if
+there is one, and on the pitch if there is not:
 
 ```
 npm run lt:room -- morality-02

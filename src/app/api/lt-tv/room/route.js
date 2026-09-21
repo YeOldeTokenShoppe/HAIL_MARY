@@ -1,11 +1,5 @@
 import { readStatus } from '../../../../../scripts/lt-tv-status.mjs';
-import {
-  readTranscript,
-  say,
-  applyMessage,
-  declineMessage,
-  summarise,
-} from '../../../../../scripts/lt-tv-room.mjs';
+import { readTranscript, say, applyMessage, declineMessage } from '../../../../../scripts/lt-tv-room.mjs';
 import { refuseOutsideDev } from '@/lib/ltTv/devOnly.mjs';
 
 export const runtime = 'nodejs';
@@ -31,14 +25,24 @@ export const dynamic = 'force-dynamic';
 // themselves, so what lands is necessarily what was checked when it arrived
 // and what she was looking at when she said yes.
 
-/** The episode ids on the slate, or null when there is no such episode. */
+/**
+ * The id, if it names something there is a room about.
+ *
+ * Two kinds: an episode on the slate, and a PITCH that has no episode yet —
+ * the news show pitches a week and only takes an episode number when it is
+ * written, so the room about this week's pitch is keyed by the week.
+ */
 async function known(id) {
-  const { episodes } = await readStatus(process.cwd());
-  return typeof id === 'string' && episodes.some((e) => e.id === id) ? id : null;
+  const status = await readStatus(process.cwd());
+  const ids = [
+    ...status.episodes.map((e) => e.id),
+    ...status.shows.flatMap((s) => (s.pitches ?? []).map((p) => p.id)),
+  ];
+  return typeof id === 'string' && ids.includes(id) ? id : null;
 }
 
 const notAnEpisode = (id) =>
-  Response.json({ error: `Not an episode on the slate: ${String(id).slice(0, 40)}` }, { status: 400 });
+  Response.json({ error: `Not an episode or a pitch: ${String(id).slice(0, 40)}` }, { status: 400 });
 
 async function body(request) {
   try {
@@ -101,11 +105,12 @@ export async function PUT(request) {
       return Response.json({ id: data.id, applied: false, messages: transcript });
     }
 
-    const { applied, remembered, parseErrors } = await applyMessage({ id: data.id, index });
+    const { applied, what, remembered, parseErrors, mode } = await applyMessage({ id: data.id, index });
     return Response.json({
       id: data.id,
       applied: true,
-      what: summarise(applied),
+      mode,
+      what,
       remembered,
       parseErrors,
       messages: await readTranscript(data.id),

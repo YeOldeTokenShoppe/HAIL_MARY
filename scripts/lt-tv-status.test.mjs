@@ -179,5 +179,49 @@ const outside = await fixture({ "unrelated.txt": "" });
 check("and outside a repo it reports where it looked", findRoot(outside), outside);
 check("which is an empty slate, not a crash", (await readStatus(outside)).episodes.length, 0);
 
+console.log("\nA show that is off the channel list is not a show:");
+// The Liminal Terminal came off the guide and kept a heading here for as long
+// as it still held episodes, so that leaving a channel could not hide the
+// records that needed moving. A heading is how this page says "this is a
+// programme", and Michelle was still looking at one on 2026-09-21. The records
+// still cannot hide — they move in with the other episodes that are not on the
+// guide, which says exactly that about them.
+const retired = await readStatus(await fixture({
+  "src/content/lt-tv/shows.json": { shows: [{ id: "news", title: "LT Weekly News Recap" }, { id: "morality", title: "Markets & Morality" }] },
+  [slatePath("roundtable-02")]: planned,
+  [slatePath("news-01")]: { id: "news-01", showId: "news", number: "01", title: "A Week" },
+  [slatePath("orphan-01")]: { id: "orphan-01", showId: "gardening", number: "01", title: "Compost" },
+  "src/content/lt-tv/index.js": indexFor(["roundtable-02", "news-01"]),
+}));
+check("only the channels get a heading", retired.shows.map((s) => s.id), ["news", "morality"]);
+check("the episode it left behind is not lost", retired.orphans.map((e) => e.id).sort(), ["orphan-01", "roundtable-02"]);
+check("and it says which show it was filed under",
+  retired.orphans.find((e) => e.id === "roundtable-02").strandedFrom, "The Liminal Terminal");
+check("an episode of no show at all says nothing of the kind",
+  retired.orphans.find((e) => e.id === "orphan-01").strandedFrom, undefined);
+ok("the page surfaces them", renderStatusPage(retired).includes("Not attached to any show"));
+ok("and no longer draws the retired show", !renderStatusPage(retired).includes("The Liminal Terminal<"));
+
+console.log("\nA pitch is listed under its show before it is an episode:");
+const pitched = await readStatus(await fixture({
+  "src/content/lt-tv/shows.json": { shows: [{ id: "news", title: "LT Weekly News Recap" }] },
+  "content/lt-tv/plans/news-2026-W39.json": { id: "news-2026-W39", show: "news", week: "2026-W39", plan: { title: "Hike Barrel Charizard", stories: [{}, {}, {}] } },
+  [slatePath("news-01")]: { id: "news-01", showId: "news", number: "01", title: "A Week" },
+  "src/content/lt-tv/index.js": indexFor(["news-01"]),
+}));
+check("it is under the show it belongs to", pitched.shows.find((s) => s.id === "news").pitches.map((p) => p.id), ["news-2026-W39"]);
+check("with what it is called", pitched.shows.find((s) => s.id === "news").pitches[0].title, "Hike Barrel Charizard");
+check("and it is not mistaken for an episode", pitched.episodes.map((e) => e.id), ["news-01"]);
+// An episode written FROM a pitch keeps it, and the pitch must not then be
+// listed a second time as something still waiting to be written.
+const both = await readStatus(await fixture({
+  "src/content/lt-tv/shows.json": { shows: [{ id: "morality", title: "Markets & Morality" }] },
+  "content/lt-tv/plans/morality-02.json": { id: "morality-02", show: "morality", plan: { title: "Meme Season" } },
+  [slatePath("morality-02")]: { id: "morality-02", showId: "morality", number: "02", title: "Meme Season" },
+  "src/content/lt-tv/index.js": indexFor(["morality-02"]),
+}));
+check("a pitch that became an episode is not listed twice", both.shows[0].pitches, []);
+ok("the episode says it has one", both.episodes[0].pitch === true);
+
 console.log(failures ? `\n${failures} check(s) failed.\n` : "\nAll checks passed.\n");
 process.exit(failures ? 1 : 0);
