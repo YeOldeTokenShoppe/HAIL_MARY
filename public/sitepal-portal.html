@@ -141,20 +141,26 @@
   // off to the next character. Each frame reports only its OWN character.
   window.vh_talkStarted = function () { tell("sitepal-portal-talk-started"); };
   window.vh_talkEnded = function () { tell("sitepal-portal-talk-ended"); };
+  // Per-audio, and the documented "audio playback begins" signal
+  // (docs/sitepal.md, Status Callback Functions). talkStarted also fires for
+  // a loadAudio, which makes it useless for timing; this one does not.
+  window.vh_audioStarted = function (audID) {
+    tell("sitepal-portal-audio-started", { audID: audID || "" });
+  };
+  window.vh_audioEnded = function (audID) {
+    tell("sitepal-portal-audio-ended", { audID: audID || "" });
+  };
 
-  // `vh_audioLoaded` IS NOT IN SITEPAL'S DOCUMENTATION. It was found on
-  // 2026-09-21 by wiring six guessed callback names into /sitepal-test and
-  // seeing which one fired; this is the one, and it is what lets the parent
-  // wait for a clip instead of hoping. Michelle's log: a cold 88-second clip
-  // reported loaded 6939ms after it was asked for. Before this, the parent
-  // called loadAudio and sayAudio in consecutive statements, so whichever
-  // character's audio was still in flight began late — measured at 662ms,
-  // which is most of the gap between two lines.
+  // `vh_audioLoaded(audioName, portal)` is documented in docs/sitepal.md
+  // (Status Callback Functions): "triggered when an audio preload is done".
+  // It was rediscovered on 2026-09-21 by guessing callback names on
+  // /sitepal-test before anyone looked in that file. It is what lets the
+  // parent wait for a clip instead of hoping. Michelle's log: a cold
+  // 88-second clip reported loaded 6939ms after it was asked for.
   //
   // `name` is the clip when the load came from loadAudio and empty when it
-  // came from sayAudio, so the parent counts portals rather than matching
-  // names. Being undocumented, it may simply stop arriving one day: the
-  // parent starts the section anyway after a failsafe, and must keep doing so.
+  // came from sayAudio. The parent still starts a section after a failsafe
+  // if this never arrives, and must keep doing so.
   window.vh_audioLoaded = function (name, errCode) {
     tell("sitepal-portal-audio-loaded", { name: name || "", errCode: errCode });
   };

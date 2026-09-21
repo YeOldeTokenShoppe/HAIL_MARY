@@ -1090,6 +1090,9 @@ function TalkShowModel({
   const timelineRef = useRef(timeline);
   timelineRef.current = timeline;
   const stopShowRef = useRef(null);
+  // Set by the portal effect below: preloads every section of the mounted
+  // episode into one portal. The timeline effect calls it on an episode swap.
+  const preloadRef = useRef(null);
 
   // SWITCHING EPISODES. The portals stay up — rebuilding them costs ~18s of
   // "Loading voices…" — so changing episode takes the set off air and swaps
@@ -1098,13 +1101,7 @@ function TalkShowModel({
     stopShowRef.current?.();
     Object.entries(portalsRef.current).forEach(([key, portal]) => {
       if (!portal?.ready) return;
-      const clip = timeline?.audio?.[key];
-      if (!clip) return;
-      try {
-        portal.frame?.contentWindow?.loadAudio?.(clip);
-      } catch (e) {
-        console.warn(`[TalkShowScene] could not preload ${key} audio`, e);
-      }
+      preloadRef.current?.(key);
     });
   }, [timeline]);
 
@@ -1599,6 +1596,7 @@ function TalkShowModel({
     const ended = new Set();
     const started = new Map();
     const finished = new Map();
+    const audioStarted = new Map();
     let issuedAt = 0;
     // The arm/release handshake. `phase` is "idle" until a section is being
     // loaded, "arming" while its clips are in flight, "playing" once both have
@@ -1610,6 +1608,7 @@ function TalkShowModel({
     let armTimer = 0;
     let armedExpected = 0;
     let releaseArmed = null;
+    const armingClips = new Map();
     // Which arming this is. Pressing play twice would otherwise let a stale
     // release fire with the previous attempt's clips, because two attempts at
     // the same section share an index but not a set of buffers.
@@ -1703,7 +1702,7 @@ function TalkShowModel({
       finished.set(key, performance.now());
       const count = Object.keys(portalsRef.current).length;
       if (finished.size !== count || started.size !== count) return;
-      // The silent preload plays a clip too, and it ends. Same guard as
+      // A preload reports talk-started too, and may report an end. Same guard as
       // recordStart: nothing has been told to play, so there is no playback
       // to time and `played` would be measured from the wrong instant.
       if (!issuedAt) return;
@@ -1811,6 +1810,65 @@ function TalkShowModel({
     const portalForSource = (source) =>
       Object.entries(portalsRef.current).find(([, p]) => p.frame?.contentWindow === source);
 
+    /**
+     * PRELOAD EVERY SECTION, ONE CLIP AT A TIME, FROM THE MOMENT A PORTAL IS
+     * READY.
+     *
+     * Only section one was ever preloaded here, and the one playthrough taken
+     * with the browser cache on (2026-09-21 05:07) showed exactly that:
+     * section one started 25ms apart with no overlap, and the first overlap
+     * was line 22, the first line of section two, whose clips nobody had
+     * asked for until the join. `loadAudio` is documented (docs/sitepal.md,
+     * Speech Functions) as a preload that shortens the later `sayAudio`, and
+     * calling it again for a loaded clip "has no effect", so the arm/release
+     * in startSection keeps working on top of this: a clip that is already in
+     * reports loaded at once and the section releases without a hold.
+     *
+     * Sequential, not parallel, so section one's clip is never slowed by the
+     * three behind it. Paused while a section is arming or playing — nothing
+     * is loaded into a portal that is speaking, because whether `loadAudio`
+     * interrupts speech under interruptMode 1 has not been tested — and it
+     * picks up again when the set goes idle, so a replay finds the rest warm.
+     * Every readiness callback is optional, so a step that never reports
+     * moves on after a timeout rather than stalling the chain.
+     *
+     * Note that DevTools' "Disable cache" defeats all of this by design: the
+     * player fetches the clip again on `sayAudio` and the two portals race.
+     * A play with that ticked says nothing about the set.
+     */
+    const PRELOAD_STEP_TIMEOUT_MS = 15000;
+    const preloads = {};
+    const preloadNext = (key) => {
+      const q = preloads[key];
+      if (!q) return;
+      clearTimeout(q.timer);
+      q.timer = 0;
+      if (phase !== "idle") return; // resumes from the next idle audio-loaded
+      const clip = q.clips[q.at];
+      if (!clip) return;
+      q.at += 1;
+      q.inFlight = clip;
+      try {
+        portalsRef.current[key]?.frame?.contentWindow?.loadAudio?.(clip);
+      } catch (e) {
+        console.warn(`[TalkShowScene] could not preload ${key} audio`, e);
+      }
+      q.timer = setTimeout(() => preloadNext(key), PRELOAD_STEP_TIMEOUT_MS);
+    };
+    const preloadEpisode = (key) => {
+      const sections = timelineRef.current?.sections || [];
+      const clips = sections.map((s) => s.audio?.[key]).filter(Boolean);
+      clearTimeout(preloads[key]?.timer);
+      preloads[key] = { clips, at: 0, inFlight: null, timer: 0 };
+      preloadNext(key);
+    };
+    const resumePreloads = () => {
+      Object.keys(preloads).forEach((key) => {
+        if (!preloads[key].timer && !preloads[key].inFlight) preloadNext(key);
+      });
+    };
+    preloadRef.current = preloadEpisode;
+
     const onMessage = (event) => {
       if (event.origin !== window.location.origin) return;
       const match = portalForSource(event.source);
@@ -1823,22 +1881,54 @@ function TalkShowModel({
         portal.source = null;
         clearTimeout(timers[key]);
         try {
-          const w = portal.frame.contentWindow;
-          w.setPlayerVolume?.(0);
-          const clip = timelineRef.current?.audio?.[key];
-          if (clip) w.loadAudio?.(clip);
+          portal.frame.contentWindow.setPlayerVolume?.(0);
         } catch (e) {
-          console.warn(`[TalkShowScene] could not preload ${key} audio`, e);
+          console.warn(`[TalkShowScene] could not silence ${key} portal`, e);
         }
+        preloadEpisode(key);
         notifyReady();
       }
 
       if (event.data?.type === "sitepal-portal-audio-loaded") {
-        // `vh_audioLoaded` — undocumented, and the whole reason a section can
-        // now wait for its audio instead of hoping for it.
+        // `vh_audioLoaded` (docs/sitepal.md, Status Callback Functions): a
+        // preload is done. `name` is the clip for a `loadAudio`, and empty
+        // when `sayAudio` loaded it itself.
+        const name = event.data.name || "";
+        const q = preloads[key];
+        if (q && q.inFlight && (!name || name === q.inFlight)) {
+          q.inFlight = null;
+          if (phase === "idle") preloadNext(key);
+        }
         if (phase !== "arming") return;
+        // Only the clip this section asked for counts. A step of the preload
+        // chain landing mid-arm would otherwise release the section on a
+        // different section's audio.
+        const wanted = armingClips.get(key);
+        if (name && wanted && name !== wanted) return;
         armed.add(key);
         if (armed.size >= armedExpected) releaseArmed?.("both clips landed");
+        return;
+      }
+
+      if (event.data?.type === "sitepal-portal-audio-started") {
+        // `vh_audioStarted` (docs/sitepal.md): "triggered when audio playback
+        // begins", per audio. Unlike talk-started it does not fire for a
+        // `loadAudio`, so the gap between the two portals' audio-started is
+        // how far apart the voices actually began. Measured only; it changes
+        // no timing. `window.__tsStart` holds every reading.
+        if (phase !== "playing" || audioStarted.has(key)) return;
+        audioStarted.set(key, performance.now());
+        if (audioStarted.size !== Object.keys(portalsRef.current).length) return;
+        const times = [...audioStarted.values()];
+        const ms = Math.round(Math.max(...times) - Math.min(...times));
+        const section = (playbackRef.current.section ?? 0) + 1;
+        const late = [...audioStarted.entries()].sort((a, b) => b[1] - a[1])[0][0];
+        window.__tsStart = window.__tsStart || [];
+        window.__tsStart.push({ section, ms, late });
+        console.info(
+          `[TalkShowScene] section ${section}: the voices began ${ms}ms apart ` +
+            `(${late} second; window.__tsStart holds every reading)`,
+        );
         return;
       }
 
@@ -1887,6 +1977,7 @@ function TalkShowModel({
           ended.clear();
           started.clear();
           finished.clear();
+          audioStarted.clear();
           playback.section = next;
           playback.holdingAt = sections[next].startsAt;
           playback.heldSince = performance.now();
@@ -1895,6 +1986,7 @@ function TalkShowModel({
             phase = "idle";
             resetPerformance();
             onPlaybackStateChange?.(false);
+            resumePreloads();
           }
           return;
         }
@@ -1902,6 +1994,7 @@ function TalkShowModel({
         phase = "idle";
         resetPerformance();
         onPlaybackStateChange?.(false);
+        resumePreloads();
       }
     };
 
@@ -1951,6 +2044,7 @@ function TalkShowModel({
       finished.clear();
       resetPerformance();
       onPlaybackStateChange?.(false);
+      resumePreloads();
     };
 
     /**
@@ -1970,9 +2064,10 @@ function TalkShowModel({
      * however long it had left.
      *
      * So a section is now armed and then released. `vh_audioLoaded` — which is
-     * UNDOCUMENTED, and was found on 2026-09-21 by wiring up guessed callback
-     * names until one fired — says when a clip is genuinely ready. Both
-     * portals load muted, both report, and only then does either speak.
+     * documented in docs/sitepal.md, though it was found on 2026-09-21 by
+     * wiring up guessed callback names until one fired — says when a clip is
+     * genuinely ready. Both portals load muted, both report, and only then
+     * does either speak.
      *
      * Returns how many portals took the load, so the callers that check for
      * "none of them would start" keep working unchanged.
@@ -1984,9 +2079,20 @@ function TalkShowModel({
 
       clearTimeout(armTimer);
       armed.clear();
+      armingClips.clear();
       phase = "arming";
       arming = index;
       const gen = ++armGen;
+      // Any preload step still in flight is abandoned to the arm, which loads
+      // what it needs itself; the chain resumes when the set is idle again.
+      Object.values(preloads).forEach((q) => {
+        clearTimeout(q.timer);
+        q.timer = 0;
+        if (q.inFlight) {
+          q.at -= 1;
+          q.inFlight = null;
+        }
+      });
 
       const clips = new Map();
       Object.entries(portalsRef.current).forEach(([key, portal]) => {
@@ -2010,11 +2116,12 @@ function TalkShowModel({
           // loadAudio and sayAudio except the unmute.
           w.stopSpeech?.();
           w.saySilent?.(0);
-          // Muted while it loads: `loadAudio` PLAYS, which is why the portals
+          // Muted while it loads: `loadAudio` raises talk-started, which is why the portals
           // are silenced before they are preloaded anywhere else in this file.
           w.setPlayerVolume?.(0);
           w.loadAudio?.(clip);
           clips.set(key, clip);
+          armingClips.set(key, clip);
         } catch (e) {
           console.warn(`[TalkShowScene] could not load ${key} audio`, e);
         }
@@ -2023,6 +2130,7 @@ function TalkShowModel({
       if (clips.size === 0) {
         phase = "idle";
         arming = null;
+        resumePreloads();
         return 0;
       }
 
@@ -2036,6 +2144,7 @@ function TalkShowModel({
         ended.clear();
         started.clear();
         finished.clear();
+        audioStarted.clear();
         // Set before the calls below, so a talk-started that follows one of
         // them is recorded rather than dropped. A stray event left over from
         // the muted load cannot be mistaken for playback: `ended` only counts
@@ -2140,6 +2249,8 @@ function TalkShowModel({
     return () => {
       stopShow();
       Object.values(timers).forEach(clearTimeout);
+      Object.values(preloads).forEach((q) => clearTimeout(q.timer));
+      if (preloadRef.current === preloadEpisode) preloadRef.current = null;
       onPlaybackReady?.(false, "loading");
       window.removeEventListener("message", onMessage);
       clearTimeout(armTimer);
