@@ -31,7 +31,7 @@
 import { readFile, writeFile, readdir, unlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
-import { resolve, join } from "node:path";
+import { resolve, join, basename } from "node:path";
 
 import {
   planSections,
@@ -377,10 +377,15 @@ async function main() {
   await writeFile(recordPath, JSON.stringify(episode, null, 2) + "\n");
 
   console.log("Upload these to the SitePal Audio Manager. Each file is named for the clip");
-  console.log("it becomes, so the name to type is the filename without .wav:\n");
+  console.log("it becomes, so the name to type is the filename without .wav.\n");
+  // The full path, because a path relative to the repo is not something you can
+  // paste into Finder — Michelle went looking for one on 2026-09-21 and could
+  // not find it. In Finder, Go > Go to Folder (Cmd-Shift-G) takes this.
+  console.log("They are all in this folder:");
+  console.log(`  ${resolve(AUDIO_DIR, id)}\n`);
   for (const row of plan) {
     console.log(`  ${row.clip}`);
-    console.log(`    ${row.file}\n`);
+    console.log(`    ${basename(row.file)}\n`);
   }
   if (sections.length > 1) {
     console.log("Upload all of them. The set plays each character's sections in order, and a");
