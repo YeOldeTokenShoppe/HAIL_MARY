@@ -681,3 +681,188 @@
   font-size: 12px;
   color: var(--muted);
 }
+
+/* ------------------------------------------------------- the writers' room */
+
+/* A conversation, so it is laid out like one: her turns and the writer's,
+   oldest at the top, with what the writer is OFFERING to change attached to
+   the message that offered it rather than floating in a panel of its own. A
+   proposal you have to go and find is one you approve without reading. */
+
+.room {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--well);
+  overflow: hidden;
+}
+
+.roomLog {
+  display: flex;
+  flex-direction: column;
+  gap: 12.8px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 14.4px;
+}
+
+.roomEmpty {
+  padding: 19.2px 14.4px;
+  font-size: 13.6px;
+  color: var(--faint);
+}
+.roomEmpty code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.roomTurn {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 11.2px;
+  align-items: baseline;
+}
+.roomWho {
+  font-size: 10.9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.roomWhoWriter {
+  color: var(--magenta);
+}
+.page .roomSaid {
+  margin: 0;
+  font-size: 14.1px;
+  white-space: pre-wrap;
+}
+
+/* What the room did to the file, in the transcript where it happened — the
+   same place she agreed to it, so scrolling back tells the whole story. */
+.roomNote {
+  grid-column: 2;
+  font-size: 12.5px;
+  color: var(--green);
+}
+
+/* ---- a proposal */
+
+.roomProposal {
+  grid-column: 2;
+  margin-top: 9.6px;
+  border: 1px solid #2c3440;
+  border-left: 2px solid var(--magenta);
+  border-radius: 8px;
+  background: #12161c;
+  padding: 11.2px 12.8px;
+}
+.roomChange {
+  padding: 6.4px 0;
+  border-top: 1px solid var(--line-soft);
+  font-size: 13.2px;
+}
+.roomChange:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+.roomChangeWhat {
+  font-size: 10.9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-right: 8px;
+}
+.roomLine {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #d5dae1;
+}
+/* The line it replaces, kept next to it: a replacement reads fine on its own
+   and the question is always whether it is better than what is there. */
+.roomWas {
+  display: block;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: #7c8593;
+  text-decoration: line-through;
+  text-decoration-color: #4a525f;
+}
+.roomWhy {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+.roomRule {
+  color: var(--amber);
+}
+.roomProposalBar {
+  display: flex;
+  align-items: center;
+  gap: 9.6px;
+  margin-top: 11.2px;
+  flex-wrap: wrap;
+}
+.roomProposalDone {
+  font-size: 12.5px;
+  color: var(--green);
+}
+.roomProposalLeft {
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+/* ---- saying something */
+
+.roomBar {
+  display: flex;
+  align-items: flex-end;
+  gap: 9.6px;
+  padding: 11.2px 14.4px;
+  border-top: 1px solid var(--line);
+  background: #10141a;
+}
+.roomInput {
+  flex: 1;
+  min-height: 42px;
+  max-height: 160px;
+  padding: 9.6px 11.2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--well);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14.1px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.roomInput:focus {
+  outline: none;
+  border-color: rgba(239, 98, 220, 0.6);
+}
+.roomHint {
+  padding: 0 14.4px 11.2px;
+  font-size: 12px;
+  color: var(--faint);
+  background: #10141a;
+}
+.roomError {
+  padding: 0 14.4px 11.2px;
+  font-size: 12.8px;
+  color: var(--red);
+  background: #10141a;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 640px) {
+  .roomTurn {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3.2px;
+  }
+  .roomProposal,
+  .roomNote {
+    grid-column: 1;
+  }
+}

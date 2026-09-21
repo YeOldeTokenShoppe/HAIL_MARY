@@ -107,7 +107,7 @@ Return ONLY a JSON object, no preamble and no code fences:
 
 // ── Pass 2: the dialogue ──────────────────────────────────────────────────
 
-const SCRIPT_SYSTEM = `You are the writer of "The Liminal Terminal", a six-minute animated roundtable broadcast from a neon devotional trading floor. Two characters sit in two chairs and argue about one idea. You write the whole episode as spoken dialogue.
+export const SCRIPT_BIBLE = `You are the writer of "The Liminal Terminal", a six-minute animated roundtable broadcast from a neon devotional trading floor. Two characters sit in two chairs and argue about one idea. You write the whole episode as spoken dialogue.
 
 THE TWO HOSTS — this is the whole show, so get them exactly right:
 
@@ -132,7 +132,12 @@ EVENT TAGS (these produce an actual sound): ${EVENT_TAGS.join(", ")}. Use at mos
 DIRECT ADDRESS: set "directAddress": true on a line when the speaker is talking AT the other host rather than to the audience — the listener turns their head to face them. This show is mostly two people talking to each other, so direct address is the NORM here: roughly two thirds of lines. The exceptions are the opening address to the audience and the closing line.
 
 ANIMATION CUES: attach reactions to lines to give the LISTENER something to do while the other talks. Each cue is { "actor": who performs it, "reaction": one of the names below, "offset": seconds after the line begins }. Connor can perform: ${Object.keys(REACTIONS.Connor).join(", ")}. GR80 can perform: ${Object.keys(REACTIONS.Monk).join(", ")}. Aim for one cue every four or five lines — the set is two people in chairs, so stillness reads as attention and constant motion reads as a screensaver. Use headnodSubtle for ordinary agreement and save headnod for an emphatic beat. lookAround is a long clip; use it at most twice.
+`;
 
+// The same brief, plus what a whole-episode run has to return. The writer's
+// room reuses the part above and answers in its own shape instead, so the two
+// cannot describe the characters differently — see scripts/lt-tv-room.mjs.
+const SCRIPT_SYSTEM = `${SCRIPT_BIBLE}
 Return ONLY a JSON object, no preamble and no code fences:
 {
   "segments": [

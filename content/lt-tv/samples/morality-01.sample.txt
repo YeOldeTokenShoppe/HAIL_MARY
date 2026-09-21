@@ -36,6 +36,12 @@ episode: morality-01
 # Start the note #! to also keep it as a standing rule for future
 # episodes, in docs/lt-tv-style-notes.md. If only one sentence of a
 # long line is wrong, break the line there and note it there.
+#
+# To talk it over instead of marking it up — when you know something is
+# wrong but not which line — open this episode at /lt-tv and use the
+# writers' room under the script, or:
+#     node scripts/lt-tv-room.mjs morality-01
+# It proposes changes and writes none of them until you agree.
 
 ── THE QUESTION  [the-question] — 83 words, ~34s
 

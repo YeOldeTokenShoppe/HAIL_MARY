@@ -120,6 +120,7 @@ export default function Studio() {
                 episode={e}
                 env={status.env}
                 ran={ran}
+                onScriptChanged={() => setRan((n) => n + 1)}
                 open={openId === e.id}
                 onToggle={() => setOpenId(openId === e.id ? null : e.id)}
                 onRun={run}
@@ -136,7 +137,8 @@ export default function Studio() {
             <h2 className={`${s.showTitle} ${s.orphanTitle}`}>Not attached to any show</h2>
           </div>
           {status.orphans.map((e) => (
-            <Episode key={e.id} episode={e} env={status.env} open={openId === e.id}
+            <Episode key={e.id} episode={e} env={status.env} ran={ran}
+              onScriptChanged={() => setRan((n) => n + 1)} open={openId === e.id}
               onToggle={() => setOpenId(openId === e.id ? null : e.id)} onRun={run} running={running} />
           ))}
         </section>
@@ -222,7 +224,7 @@ function ShowActions({ show, env, onRun, running }) {
   );
 }
 
-function Episode({ episode: e, env, ran, open, onToggle, onRun, running }) {
+function Episode({ episode: e, env, ran, onScriptChanged, open, onToggle, onRun, running }) {
   const stage = STAGES[e.stage];
   // null until the screenplay has been looked for. The steps that read it are
   // offered only once it is there — see needsScreenplay in lt-tv-actions.mjs.
@@ -295,6 +297,21 @@ function Episode({ episode: e, env, ran, open, onToggle, onRun, running }) {
             })}
           </div>
 
+          {hasScreenplay && (
+            <>
+              <h3 className={s.label}>
+                Writers&rsquo; room <span className={s.labelNote}>&mdash; talk it through, then agree to the changes</span>
+              </h3>
+              <Room
+                id={e.id}
+                hasKey={env.anthropic}
+                unsaved={unsaved}
+                saveScreenplay={saveScreenplay}
+                onScriptChanged={onScriptChanged}
+              />
+            </>
+          )}
+
           <Screenplay id={e.id} stage={e.stage} ran={ran} onPresence={setHasScreenplay}
             onDirty={setUnsaved} saveRef={saveScreenplay} />
 
@@ -321,6 +338,280 @@ function Episode({ episode: e, env, ran, open, onToggle, onRun, running }) {
       )}
     </article>
   );
+}
+
+// THE WRITERS' ROOM.
+//
+// The other way to change a line is to write in the file: reword it yourself,
+// or put a `# note` under it and press "Rewrite the lines I marked". Both stay.
+// What neither does is let you say "the middle of story two is flabby" before
+// you know which line is wrong — this is the conversation for that. Michelle
+// asked for it on 2026-09-21.
+//
+// THE SCRIPT IS STILL THE SCRIPT. The room proposes changes, you see each one
+// next to the line it replaces, and only the button writes them. It places
+// `# cut` and `# pause` marks for you rather than inventing a second way to
+// say them, and applying its changes to the RECORD is the same explicit "Apply
+// my edits" as any other edit — so a conversation you did not like is
+// discarded by not applying it.
+//
+// The conversation lives on disk beside the screenplay, not in this component:
+// closing the tab does not lose the room, and `node scripts/lt-tv-room.mjs
+// <id>` is the same room from a terminal.
+
+function Room({ id, hasKey, unsaved, saveScreenplay, onScriptChanged }) {
+  const [messages, setMessages] = useState(null);
+  const [said, setSaid] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const log = useRef(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/lt-tv/room?id=${encodeURIComponent(id)}`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => { if (alive) setMessages(d.messages || []); })
+      .catch(() => { if (alive) setMessages([]); });
+    return () => { alive = false; };
+  }, [id]);
+
+  // Newest at the bottom, like every other conversation.
+  useEffect(() => {
+    if (log.current) log.current.scrollTop = log.current.scrollHeight;
+  }, [messages, busy]);
+
+  const send = async () => {
+    const text = said.trim();
+    if (!text || busy) return;
+    // The writer reads the FILE. An edit still sitting in the box below is
+    // invisible to it, which would look like the room ignoring what is on
+    // screen — the same trap the marked-lines rewrite hit. So save first.
+    if (unsaved && saveScreenplay.current && !(await saveScreenplay.current())) return;
+
+    setBusy(true);
+    setError(null);
+    setSaid('');
+    // Her line shows immediately; nothing is written until the reply lands, so
+    // a failed turn takes it back rather than leaving a message that is not
+    // in the transcript on disk.
+    setMessages((m) => [...(m || []), { role: 'producer', text }]);
+    try {
+      const res = await fetch('/api/lt-tv/room', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id, text }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessages((m) => (m || []).slice(0, -1));
+        setSaid(text);
+        setError(data.error || `room ${res.status}`);
+      } else {
+        setMessages(data.messages);
+      }
+    } catch (err) {
+      setMessages((m) => (m || []).slice(0, -1));
+      setSaid(text);
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const decide = async (index, decision) => {
+    // Applying writes the screenplay file. An edit still sitting unsaved in the
+    // box below would be written over it by the next Save, so it is saved
+    // first and the room's changes land on top of what you can see.
+    if (decision === 'apply' && unsaved && saveScreenplay.current && !(await saveScreenplay.current())) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/lt-tv/room', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id, index, decision }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || `room ${res.status}`); return; }
+      setMessages(data.messages);
+      if (data.applied) {
+        // The box below is showing the file as it was a moment ago.
+        onScriptChanged();
+        if (data.parseErrors?.length) {
+          setError(`The script will not apply until these are fixed:\n  ${data.parseErrors.join('\n  ')}`);
+        }
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={s.room}>
+      {messages === null ? (
+        <p className={s.roomEmpty}>Opening the room…</p>
+      ) : messages.length === 0 ? (
+        <p className={s.roomEmpty}>
+          Nobody has said anything yet. Talk to the writer about this episode the way you would
+          talk to a person — what drags, who should have the last word, whether the ending lands.
+          It has the whole screenplay in front of it. When you agree on something it offers the
+          change, and nothing is written until you say so.
+        </p>
+      ) : (
+        <div className={s.roomLog} ref={log}>
+          {messages.map((m, i) => (
+            <Turn key={`${m.at || i}-${i}`} message={m} index={i} busy={busy} onDecide={decide} />
+          ))}
+          {busy && (
+            <div className={s.roomTurn}>
+              <span className={`${s.roomWho} ${s.roomWhoWriter}`}>writer</span>
+              <p className={s.roomSaid}>…</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className={s.roomBar}>
+        <textarea
+          value={said}
+          onChange={(e) => setSaid(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+          }}
+          placeholder={hasKey ? 'Say what you think…' : 'ANTHROPIC_API_KEY is not set in this dev server'}
+          disabled={!hasKey}
+          rows={1}
+          className={s.roomInput}
+        />
+        <button onClick={send} disabled={!hasKey || busy || !said.trim()} className={`${s.btn} ${s.btnPrimary}`}>
+          {busy ? 'Thinking…' : 'Say it'}
+          <span className={s.cost}>Anthropic call</span>
+        </button>
+      </div>
+      {error ? (
+        <p className={s.roomError}>{error}</p>
+      ) : (
+        <p className={s.roomHint}>
+          Enter sends, Shift+Enter starts a line. Changes you accept are written to the screenplay
+          below — apply them to the episode with &ldquo;Apply my edits&rdquo;.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Turn({ message: m, index, busy, onDecide }) {
+  if (m.role === 'note') {
+    return (
+      <div className={s.roomTurn}>
+        <span className={s.roomWho} />
+        <p className={s.roomNote}>{m.text}</p>
+      </div>
+    );
+  }
+  const writer = m.role === 'writer';
+  return (
+    <div className={s.roomTurn}>
+      <span className={`${s.roomWho} ${writer ? s.roomWhoWriter : ''}`}>{writer ? 'writer' : 'you'}</span>
+      <p className={s.roomSaid}>{m.text}</p>
+      {writer && m.changes?.length > 0 && (
+        <div className={s.roomProposal}>
+          {m.changes.map((c, i) => <Change key={i} change={c} />)}
+          <div className={s.roomProposalBar}>
+            {m.applied ? (
+              <span className={s.roomProposalDone}>In the script.</span>
+            ) : m.declined ? (
+              <span className={s.roomProposalLeft}>Left alone.</span>
+            ) : (
+              <>
+                <button disabled={busy} onClick={() => onDecide(index, 'apply')} className={`${s.btn} ${s.btnPrimary}`}>
+                  Put {m.changes.length === 1 ? 'it' : 'them'} in the script
+                </button>
+                <button disabled={busy} onClick={() => onDecide(index, 'leave')} className={s.btn}>
+                  Leave it
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One proposed change, with whatever it would replace shown under it. */
+function Change({ change: c }) {
+  const why = c.why ? <span className={s.roomWhy}>{c.why}</span> : null;
+
+  if (c.op === 'reword') {
+    return (
+      <div className={s.roomChange}>
+        <span className={s.roomChangeWhat}>line {c.n}</span>
+        <span className={s.roomLine}>{c.text}</span>
+        {c.was && <span className={s.roomWas}>{c.was}</span>}
+        {why}
+      </div>
+    );
+  }
+  if (c.op === 'add') {
+    return (
+      <div className={s.roomChange}>
+        <span className={s.roomChangeWhat}>new after {c.after}</span>
+        <span className={s.roomLine}>{c.speaker}  {c.text}</span>
+        {why}
+      </div>
+    );
+  }
+  if (c.op === 'drop') {
+    return (
+      <div className={s.roomChange}>
+        <span className={s.roomChangeWhat}>cut line {c.n}</span>
+        <span className={s.roomWas}>{c.was}</span>
+        {why}
+      </div>
+    );
+  }
+  if (c.op === 'pause') {
+    return (
+      <div className={s.roomChange}>
+        <span className={s.roomChangeWhat}>{c.seconds === 0 ? 'no pause' : 'pause'}</span>
+        <span className={s.roomLine}>
+          {c.seconds === 0 ? `before line ${c.n}` : `${c.seconds}s before line ${c.n}`}
+        </span>
+        {why}
+      </div>
+    );
+  }
+  if (c.op === 'cut') {
+    return (
+      <div className={s.roomChange}>
+        <span className={s.roomChangeWhat}>{c.on ? 'section break' : 'no section break'}</span>
+        <span className={s.roomLine}>before line {c.n}</span>
+        {why}
+      </div>
+    );
+  }
+  if (c.op === 'title') {
+    return (
+      <div className={s.roomChange}>
+        <span className={s.roomChangeWhat}>title</span>
+        <span className={s.roomLine}>{c.text}</span>
+        {why}
+      </div>
+    );
+  }
+  if (c.op === 'rule') {
+    return (
+      <div className={s.roomChange}>
+        <span className={s.roomChangeWhat}>house note</span>
+        <span className={`${s.roomLine} ${s.roomRule}`}>{c.text}</span>
+        <span className={s.roomWhy}>Kept for every future episode of both shows.</span>
+      </div>
+    );
+  }
+  return null;
 }
 
 function Files({ files }) {
