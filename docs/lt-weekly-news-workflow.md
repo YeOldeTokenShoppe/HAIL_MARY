@@ -237,9 +237,18 @@ raw `fetch` against the Messages API — the same convention as every other Clau
 call in this repo, so no SDK dependency is added.
 
 1. **The rundown** — the editorial pass. Picks three stories in running order,
-   the gauge beat, the chiron headline and the ticker items. It is told to
-   reject price predictions, single-source social posts, and two stories that
-   are the same story wearing different hats.
+   the gauge beat, the chiron headline, the ticker items and the **sidebar**.
+   It is told to reject price predictions, single-source social posts, and two
+   stories that are the same story wearing different hats.
+
+   The sidebar is the near-misses: four to six headlines from the brief that
+   made the week but did not make a three-story show. They crawl along the
+   ticker under the episode, which is what makes a ticker read like a real
+   newscast instead of a repeat of the segment you are watching. It is the
+   only copy on screen that no segment reads aloud and no verification pass
+   confirmed, so `assemble()` holds it to the brief and warns about any item
+   it cannot trace back to something the brief nominated — confirm those or
+   cut them before recording.
 
    Crucially, it then **verifies**. The brief is headlines; a headline is
    enough to nominate a story and nowhere near enough to read a number out
@@ -277,6 +286,8 @@ checklist:
 - a line opening with an event tag like `[sighs]`, which the 120 ms handoff trim
   in `process_dialogue.py` would eat — flagged, not dropped
 - a story the editorial pass could not confirm from a real source
+- a ticker sidebar item that traces to nothing in the brief, or that restates a
+  story the episode is covering (that one is dropped, not just flagged)
 - a host given two turns in a row (the camera cuts on who speaks)
 - a segment more than 25% off its word target
 - an episode estimated outside 5–10 minutes

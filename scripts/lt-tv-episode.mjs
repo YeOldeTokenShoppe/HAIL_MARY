@@ -32,6 +32,110 @@ import {
   unexpandedAcronyms,
 } from "./lt-tv-format.mjs";
 
+// ── The ticker ────────────────────────────────────────────────────────────
+//
+// A newscast's crawl is not a summary of the segment you are watching. It is
+// the rest of the day's news going past underneath it — which is exactly what
+// the brief has plenty of and the show has no room for. So the ticker is built
+// from two lists: the few items about tonight's stories, and the SIDEBAR, the
+// headlines the rundown pass considered and did not cover.
+//
+// The sidebar is the only copy on screen that no segment reads aloud and no
+// search pass confirmed, so it is held to the brief. An item that cannot be
+// traced back to something the brief nominated is a claim from nowhere,
+// crawling under a show whose whole editorial rule is that it verifies what it
+// says. That is a warning rather than a drop, the same as an unverified story:
+// the producer decides, because the check is a word-overlap heuristic and a
+// heuristic should not silently delete a real headline.
+
+const TICKER_DISCLAIMER = "NOTHING ON THIS TICKER IS A RECOMMENDATION";
+const TICKER_MAX_CHARS = 80;
+// TWO THRESHOLDS, BECAUSE THE TWO CHECKS COST DIFFERENT THINGS WHEN WRONG.
+//
+// Failing to trace an item to the brief only prints a warning, so it can
+// afford to be loose: a paraphrase should still match and a false alarm costs
+// a line of output. Calling an item a restatement DELETES it, so it has to be
+// near-certain — "ECB holds its deposit rate" shares "holds" and "rate" with a
+// story about the FOMC holding rates and is a different central bank on a
+// different continent. A real restatement of tonight's lead overlaps almost
+// completely; a near-miss headline from the same beat does not.
+const TICKER_TRACEABLE = 0.6;
+const TICKER_RESTATES = 0.8;
+
+function significantWords(text) {
+  return String(text).toLowerCase().match(/[a-z0-9]{4,}/g) || [];
+}
+
+/** What share of `text`'s distinctive words appear in `haystack` (lowercase). */
+function wordOverlap(text, haystack) {
+  const words = significantWords(text);
+  if (!words.length) return 0;
+  return words.filter((word) => haystack.includes(word)).length / words.length;
+}
+
+/**
+ * The crawl under the show, and what a producer should know about it.
+ *
+ * @param rundown  the editorial pass's output (`ticker` and `sidebar`)
+ * @param brief    the week's brief, if there is one — what the sidebar is
+ *                 checked against. Without it the check is skipped rather
+ *                 than failed, because a hand-written episode has no brief.
+ */
+export function buildTicker(rundown = {}, brief = null) {
+  const warnings = [];
+  const items = [];
+  const seen = new Set();
+
+  const add = (text) => {
+    const clean = String(text || "").replace(/\s+/g, " ").trim().replace(/[.]+$/, "");
+    if (!clean) return;
+    // The disclaimer is appended below, once, by this function. A model that
+    // wrote its own would otherwise put two of them on the crawl.
+    if (/recommendation/i.test(clean)) return;
+    const key = clean.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    if (clean.length > TICKER_MAX_CHARS) {
+      warnings.push(
+        `Ticker item "${clean.slice(0, 40)}…" is ${clean.length} characters against an ${TICKER_MAX_CHARS} target — it will scroll for a long time.`,
+      );
+    }
+    items.push(clean);
+  };
+
+  for (const item of rundown.ticker || []) add(item);
+
+  const covered = (rundown.stories || [])
+    .map((story) => `${story.headline || ""} ${story.fact || ""}`)
+    .join(" ")
+    .toLowerCase();
+  const haystack = brief ? JSON.stringify(brief).toLowerCase() : null;
+
+  for (const entry of rundown.sidebar || []) {
+    const text = String((typeof entry === "string" ? entry : entry?.text) || "").trim();
+    if (!text) continue;
+    if (covered && wordOverlap(text, covered) >= TICKER_RESTATES) {
+      warnings.push(
+        `Ticker: "${text}" restates a story the episode covers — dropped, the crawl is for what is NOT in the show.`,
+      );
+      continue;
+    }
+    const source = String((typeof entry === "string" ? entry : entry?.source) || text);
+    if (haystack && wordOverlap(source, haystack) < TICKER_TRACEABLE) {
+      warnings.push(
+        `Ticker: "${text}" cannot be traced back to the brief — confirm it or cut it before recording.`,
+      );
+    }
+    add(text);
+  }
+
+  // Said once, by the code, on every episode. The crawl now carries headlines
+  // nobody reads aloud, so the line is more load-bearing than it was when the
+  // model happened to write it.
+  items.push(TICKER_DISCLAIMER);
+  return { items, warnings };
+}
+
 // ── Assembly ──────────────────────────────────────────────────────────────
 //
 // Turns the writer's segments into the episode record: global line numbering,
@@ -222,6 +326,9 @@ function assemble({
     ...(rundown.board?.sources || []),
   ].filter((s) => s && s.title);
 
+  const ticker = buildTicker(rundown, brief);
+  warnings.push(...ticker.warnings);
+
   const padded = String(number).padStart(2, "0");
 
   return {
@@ -255,7 +362,7 @@ function assemble({
           graphics: {
             mode: format.graphicsMode,
             headline: rundown.headline,
-            ticker: rundown.ticker || [],
+            ticker: ticker.items,
           },
         }
       : {}),

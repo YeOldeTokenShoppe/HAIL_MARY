@@ -70,6 +70,43 @@ done by hand.
 
 ---
 
+## Watching an episode — pause and skipping
+
+On the set (`/trade`, and the LT TV screen on a phone) the controls are pause
+and resume, skip back, skip forward, and a bar of blocks you can click.
+
+**Pause is exact.** It holds the line where it is and picks it up on the same
+syllable — SitePal's `freezeToggle` does that, and the picture (camera cuts,
+head turns, reactions) is held on the same second so nothing drifts while you
+are away. The old ■ button ENDED the episode, which is why pressing play again
+started it from the top.
+
+**Skipping lands on the start of a part, and cannot be finer than that.**
+SitePal has no seek: its speech functions take a clip name and start it at the
+beginning, and there is no call that sets a position. What there is instead:
+an episode over 90 seconds is already several clips, because SitePal refuses
+one longer than that, and starting a clip is what the set does at every join.
+So those joins are the seek points — about every 75 to 90 seconds, six of them
+in a seven-minute episode — and the bar is drawn as those blocks rather than as
+a continuous line, so it promises exactly what it can do. Skip back inside the
+first three seconds of a part goes to the part before; later it starts the part
+you are in again.
+
+If you want finer landing points on a particular episode, cut it into more
+parts: a `# cut` mark in the screenplay puts a join on a line of your choosing
+(see **Pauses**), and every join is a place a viewer can jump to.
+
+Keyboard, while an episode is on: **space** (or **k**) pauses and resumes,
+**←** and **→** skip a part.
+
+The code: the transport calls live in `src/components/trade/TalkShowScene.jsx`
+under "PAUSE, RESUME AND SKIPPING", the arithmetic is in
+`src/lib/ltTv/episodeTimeline.mjs` and checked by
+`node scripts/lt-tv-transport.test.mjs`, and the controls themselves are in
+`LTTvBroadcastPanel.jsx` (desktop) and `MobileTalkShow.jsx` (phone).
+
+---
+
 ## Where is everything, from a terminal
 
 ```bash
@@ -277,6 +314,65 @@ through.
 
 Then upload and test — see the two sections below, which are the same for both
 shows.
+
+---
+
+## What is on screen during a news episode
+
+The news show has a full cable-news package over the set, and none of it is
+typed by hand: every word of it is copy the script pass already wrote.
+
+**The lower third** — the headline bar next to the spinning logo cube. It
+follows the running order. In the cold open it carries the episode's own
+headline; when the lead story starts it cuts to a plate naming the beat
+(`MACRO`, `CRYPTO`, `COLLECTIBLES`) and that story's headline; on the board it
+reads *The week in numbers*; on the sign-off it goes back to the episode
+headline.
+
+**The ticker** — the crawl underneath. It carries a few items about tonight's
+stories and then **the sidebar: headlines from the week's brief that the
+episode is not covering**, which is what makes it read like a real newscast
+rather than a repeat of the segment you are watching. It always ends with
+*Nothing on this ticker is a recommendation*, appended by the pipeline rather
+than written by the model, so it can never go missing.
+
+**The screen behind the hosts** — a card per chapter, drawn in type: the
+running order in the cold open, the beat and the story's one concrete fact
+while a story runs, the board's numbers listed out when the hosts read them.
+
+### Where the copy comes from, and how to change it
+
+| On screen | Comes from | Change it by |
+|---|---|---|
+| Episode headline | `rundown.headline` | `CHIRON:` in the screenplay, then `npm run lt:edit` |
+| A story's plate and headline | that story's `beat` and `headline` | editing the record, then re-staging |
+| The screen's story card | that story's `fact` | as above |
+| The board card | `rundown.board.lines` and `.market` | as above |
+| The ticker | `rundown.ticker` + `rundown.sidebar` | as above |
+
+The chapters that drive all of it are **derived at staging time** by
+`npm run lt:slate` from the production record's segments and rundown. They are
+anchored on a **line number**, never on a second, which is the point: every
+absolute time in an episode is rewritten when it is re-recorded, so a chapter
+holding a timestamp would silently drift out of step with the show it labels —
+and that reads on screen as a mistuned lead-in rather than as a graphics fault.
+
+### An episode recorded before any of this existed
+
+It picks the graphics up by being **re-staged**. That is step 6 on its own,
+and it is free — no model calls, no rendering, nothing overwritten:
+
+```
+npm run lt:slate -- news-01
+npm run lt:check
+```
+
+Its ticker will not gain the sidebar items, because nobody asked for them when
+the script was written. Everything else — the chapters, the screen cards, the
+plates — comes from segments and a rundown the record already has.
+
+If the check reports `graphics.chapters[n] starts on line N, which doesn't
+exist`, the slate record is older than the script it was made from: re-stage it.
 
 ---
 

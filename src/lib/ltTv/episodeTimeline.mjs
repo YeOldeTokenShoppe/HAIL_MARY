@@ -134,6 +134,93 @@ export function episodeSections(record) {
   ];
 }
 
+// ── SEEKING ───────────────────────────────────────────────────────────────
+//
+// WHAT SITEPAL CAN AND CANNOT DO, because it decides the shape of all of this.
+// The player has no "play from 3:20": its speech functions take a clip name
+// and start it at the beginning (docs/sitepal.md, Speech Functions), and the
+// only position it reports is `vh_audioProgress` as a percentage. So there is
+// no seeking INSIDE a clip, at any cost, and no amount of work on this page
+// changes that.
+//
+// What there is instead: an episode of any real length is already several
+// clips, because SitePal refuses one over 90 seconds. Starting a section is
+// something the set does at every join anyway, so the section boundaries are
+// real, free seek points — roughly a minute and a half apart. That is the
+// granularity, and these helpers are the arithmetic for it.
+//
+// Pausing is a separate mechanism and does not go through here: `freezeToggle`
+// holds speech where it is and resumes from that point, which is exact.
+
+// Pressing "back" in the first few seconds of a section means the section
+// before; later on it means "start this one again", the way every other
+// player behaves. Without the grace period, back is unusable — a section is
+// ~90 seconds, so anyone reaching for it a minute in gets thrown a minute and
+// a half further back than they meant.
+export const SECTION_RESTART_SECONDS = 3;
+
+/** Which section holds `seconds`. Before the first one, the first one. */
+export function sectionIndexAt(sections, seconds) {
+  if (!Array.isArray(sections) || sections.length === 0) return 0;
+  const at = Number.isFinite(seconds) ? seconds : 0;
+  let index = 0;
+  for (let i = 0; i < sections.length; i += 1) {
+    if ((sections[i].startsAt ?? 0) <= at) index = i;
+    else break;
+  }
+  return index;
+}
+
+/**
+ * How many reaction cues are already behind `seconds`.
+ *
+ * The frame loop walks the cue list forward and never looks back, which is
+ * right for a performance that only ever moves forward — and wrong the moment
+ * it can jump. Landing at 4:00 with the index still at zero fires every
+ * reaction of the first four minutes in one frame; landing at 0:30 with the
+ * index at the end plays the rest of the episode with nobody reacting. Both
+ * are silent failures, so the seat is computed rather than nudged.
+ */
+export function cueIndexAt(cues, seconds) {
+  if (!Array.isArray(cues)) return 0;
+  const at = Number.isFinite(seconds) ? seconds : 0;
+  let index = 0;
+  while (index < cues.length && cues[index].at <= at) index += 1;
+  return index;
+}
+
+/**
+ * Where skip-back / skip-forward land from `elapsed`.
+ *
+ * `step` is -1 or +1. Returns a section index, or null for "off the end of
+ * the episode" — which the caller ends the show on rather than clamping,
+ * because a skip past the last section means the viewer is done.
+ */
+export function stepSection(sections, elapsed, step) {
+  if (!Array.isArray(sections) || sections.length === 0) return null;
+  const here = sectionIndexAt(sections, elapsed);
+  if (step > 0) return here + 1 < sections.length ? here + 1 : null;
+  const startsAt = sections[here]?.startsAt ?? 0;
+  const at = Number.isFinite(elapsed) ? elapsed : 0;
+  if (here === 0 || at - startsAt > SECTION_RESTART_SECONDS) return here;
+  return here - 1;
+}
+
+/**
+ * The episode as a row of seekable blocks: where each section starts, where it
+ * ends, and how long it runs. The scrub bar draws these, and a click on it
+ * lands on the `startsAt` of whichever one was hit.
+ */
+export function sectionBounds(timeline) {
+  const sections = timeline?.sections || [];
+  const end = timeline?.dialogueEnd ?? 0;
+  return sections.map((section, index) => {
+    const startsAt = section.startsAt ?? 0;
+    const endsAt = sections[index + 1]?.startsAt ?? end;
+    return { index, startsAt, endsAt, seconds: Math.max(0, endsAt - startsAt) };
+  });
+}
+
 /**
  * Problems a producer should hear about before the set does. Returned rather
  * than thrown so one malformed record can't take the /trade page down; the
@@ -162,6 +249,17 @@ export function validateEpisode(record) {
   (record.cues || []).forEach((cue, i) => {
     if (cue.line >= lines || cue.line < 0) {
       problems.push(`cues[${i}] points at line ${cue.line}, which doesn't exist`);
+    }
+  });
+
+  // A chapter off the end of the script is silent about it: the chiron simply
+  // stops changing partway through the show, which reads as a design choice.
+  (record.graphics?.chapters || []).forEach((chapter, i) => {
+    if (!(chapter.line >= 0 && chapter.line < lines)) {
+      problems.push(
+        `graphics.chapters[${i}] starts on line ${chapter.line}, which doesn't exist — ` +
+          "re-stage the episode from its production record",
+      );
     }
   });
 
@@ -194,6 +292,25 @@ export function validateEpisode(record) {
     problems.push("two sections ask SitePal for the same clip name");
   }
   return problems;
+}
+
+/**
+ * The episode's chapters, resolved onto the clock.
+ *
+ * A chapter says which LINE it begins on, never which second — line numbers
+ * survive a re-record and absolute times do not (see scripts/lt-tv-chapters.mjs
+ * for why that matters). Turning one into the other is this function's whole
+ * job, and it is the same trick the reaction cues use.
+ *
+ * A chapter pointing at a line the record does not have is dropped rather than
+ * resolved to NaN: a graphics fault should cost the graphic, not the episode.
+ */
+export function episodeChapters(record) {
+  const lineStarts = record?.lineStarts || [];
+  return (record?.graphics?.chapters || [])
+    .filter((chapter) => Number.isFinite(lineStarts[chapter.line]))
+    .map((chapter) => ({ ...chapter, at: lineStarts[chapter.line] }))
+    .sort((a, b) => a.at - b.at);
 }
 
 /**
@@ -261,6 +378,7 @@ export function buildEpisodeTimeline(record, { reactionDurations = {} } = {}) {
     gazes,
     cues,
     shots,
+    chapters: episodeChapters(record),
   };
 }
 
@@ -304,4 +422,22 @@ export function shotSubjectAt(timeline, cue) {
     if (shots[i].at <= cue) return shots[i].subject;
   }
   return null;
+}
+
+/**
+ * Which chapter is on screen at `elapsed` — an index into `timeline.chapters`,
+ * or -1 for an episode with no chapters at all.
+ *
+ * Before the first line lands, and whenever playback is stopped, the show sits
+ * on its opening chapter: the chiron and the screen read as the top of the
+ * episode rather than as whatever was up when it was stopped.
+ */
+export function chapterIndexAt(timeline, elapsed, running) {
+  const chapters = timeline?.chapters || [];
+  if (!chapters.length) return -1;
+  if (!running) return 0;
+  for (let i = chapters.length - 1; i >= 0; i -= 1) {
+    if (chapters[i].at <= elapsed) return i;
+  }
+  return 0;
 }

@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import LTTvChiron from "@/components/trade/LTTvChiron";
 import useNewEpisodes from "@/components/trade/useNewEpisodes";
+import useTalkShowTransport, { clockTime } from "@/components/trade/useTalkShowTransport";
 import { SHOWS } from "@/content/lt-tv";
 
 // THE SLATE IS DATA. Both the shows and their episodes come from
@@ -28,6 +29,10 @@ export default function LTTvBroadcastPanel({
   onPlay,
   onStop,
   onRetry,
+  // Which part of the show is on air, from the set — it owns the clock. Null
+  // until an episode with chapters is playing; the chiron falls back to the
+  // episode's own headline.
+  chapter = null,
 }) {
   // Open on arrival; playback collapses the console to clear the set.
   const [collapsed, setCollapsed] = useState(false);
@@ -51,16 +56,56 @@ export default function LTTvBroadcastPanel({
   const canPlay = hasEpisode && selected.playable !== false;
   const loading = !audioReady && voiceStatus !== "failed";
 
+  // WHAT THE TRANSPORT CAN AND CANNOT OFFER, because the viewer should not be
+  // shown a control the player does not have. SitePal pauses exactly
+  // (freezeToggle holds speech and resumes from that point) but cannot start a
+  // clip anywhere but its beginning — and an episode over 90 seconds is
+  // already several clips, because SitePal refuses one longer than that. So
+  // the bar below is drawn as the parts it really is, and a click lands on the
+  // start of one. See the note in TalkShowScene where the calls are made.
+  const onAir = view === "set" && playing;
+  const { status, toggle, step, seek } = useTalkShowTransport(onAir);
+  const paused = status.paused;
+  const starts = status.sectionStarts?.length ? status.sectionStarts : [0];
+  const parts = starts.map((startsAt, index) => {
+    const endsAt = starts[index + 1] ?? Math.max(startsAt, status.duration);
+    return { index, startsAt, endsAt, seconds: Math.max(1, endsAt - startsAt) };
+  });
+  const partFill = (part) => {
+    if (status.elapsed >= part.endsAt) return 100;
+    if (status.elapsed <= part.startsAt) return 0;
+    return ((status.elapsed - part.startsAt) / (part.endsAt - part.startsAt)) * 100;
+  };
+
   useEffect(() => {
     const onKeyDown = (event) => {
       if (event.key === "Escape" && guideOpen) {
         setGuideOpen(false);
         guideButtonRef.current?.focus();
+        return;
+      }
+      // The keys a viewer reaches for without being told. Never while typing,
+      // and never with a modifier held — those belong to the browser.
+      if (!onAir || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target;
+      const tag = (target?.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) return;
+      // Space on a focused button is that button's own click. Handling it here
+      // as well would pause and resume in the same keystroke.
+      if ((event.key === " " || event.key === "k") && tag !== "button") {
+        event.preventDefault();
+        toggle();
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        step(-1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        step(1);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [guideOpen]);
+  }, [guideOpen, onAir, toggle, step]);
 
   useEffect(() => {
     if (!guideOpen) return;
@@ -118,8 +163,11 @@ export default function LTTvBroadcastPanel({
       onRetry?.();
       return;
     }
+    // PAUSE, NOT STOP. This control used to end the episode, and the next
+    // press started it again from the top — which is not what a ■ beside a
+    // playing show means to anyone. Stopping is its own button below.
     if (playing) {
-      onStop?.();
+      toggle();
       return;
     }
     onPlay?.();
@@ -129,19 +177,48 @@ export default function LTTvBroadcastPanel({
   // "watching TV" view. The full lower third is a news convention, so only a
   // news show gets it; otherwise it's just the channel's logo cube.
   const chironMode = view === "set" && show.graphics === "news" ? "news" : "logo";
-  const chiron = view === "set" && hasEpisode ? <LTTvChiron episode={selected} mode={chironMode} status="Replay" /> : null;
+  const chiron = view === "set" && hasEpisode ? <LTTvChiron episode={selected} mode={chironMode} status="Replay" chapter={chapter} /> : null;
+
+  // The three keys of any transport, as their own row so the collapsed strip
+  // and the open console show the same controls in the same order.
+  const skipBack = (
+    <button type="button" className="ltv-key" onClick={() => step(-1)}
+      aria-label="Back to the start of this part">
+      <span aria-hidden="true">⏮</span>
+    </button>
+  );
+  const playPause = (
+    <button type="button" className="ltv-key is-primary" onClick={toggle}
+      aria-label={paused ? "Resume episode" : "Pause episode"}>
+      <span aria-hidden="true">{paused ? "▶" : "❚❚"}</span>
+    </button>
+  );
+  const skipOn = (
+    <button type="button" className="ltv-key" onClick={() => step(1)}
+      aria-label="Skip to the next part">
+      <span aria-hidden="true">⏭</span>
+    </button>
+  );
 
   if (collapsed) {
     return (
       <>
       {chiron}
       <aside className="ltv-collapsed" aria-label="LT TV broadcast controls">
-        <button ref={expandButtonRef} type="button" onClick={() => { setCollapsed(false); requestAnimationFrame(() => primaryButtonRef.current?.focus()); }} aria-label="Expand LT TV controls">
+        <button ref={expandButtonRef} type="button" className="ltv-tab" onClick={() => { setCollapsed(false); requestAnimationFrame(() => primaryButtonRef.current?.focus()); }} aria-label="Expand LT TV controls">
           <span className={playing ? "is-live" : ""} />
           <b>LT TV</b>
           <small>EP {selected.number}</small>
           <i aria-hidden="true">›</i>
         </button>
+        {/* Pausing is the one thing you want without reopening the console:
+            the console collapses itself when an episode starts, so this is
+            where a viewer actually is while the show is on. */}
+        {onAir && (
+          <div className="ltv-keys" role="group" aria-label="Playback">
+            {skipBack}{playPause}{skipOn}
+          </div>
+        )}
         <style jsx>{styles}</style>
       </aside>
       </>
@@ -203,6 +280,46 @@ export default function LTTvBroadcastPanel({
 
         </div>
 
+        {/* THE EPISODE AS ITS PARTS, which is what it really is. SitePal will
+            not play a clip over 90 seconds, so anything longer goes up as
+            several — and since a clip can only be started at its beginning,
+            those joins are the only places a skip can land. Drawing the parts
+            rather than a continuous line means the bar promises exactly what
+            it can do. */}
+        {onAir && (
+          <div className="ltv-transport">
+            <div className="ltv-scrub" role="group" aria-label="Episode parts">
+              {parts.map((part) => (
+                <button
+                  key={part.index}
+                  type="button"
+                  className={`ltv-part${part.index === status.section ? " is-on" : ""}`}
+                  style={{ flexGrow: part.seconds }}
+                  aria-label={`Play part ${part.index + 1} of ${parts.length}, from ${clockTime(part.startsAt)}`}
+                  aria-current={part.index === status.section ? "true" : undefined}
+                  onClick={() => seek(part.startsAt)}
+                >
+                  <i style={{ width: `${partFill(part)}%` }} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+            <div className="ltv-keys" role="group" aria-label="Playback">
+              {skipBack}{playPause}{skipOn}
+              <span className="ltv-clock" aria-live="off">
+                {clockTime(status.elapsed)} / {clockTime(status.duration)}
+              </span>
+              <button type="button" className="ltv-key is-stop" onClick={() => onStop?.()}>
+                <span aria-hidden="true">■</span> Stop
+              </button>
+            </div>
+            {!status.exactPause && (
+              <p className="ltv-transport-note">
+                This player has no mid-line pause, so resuming starts this part again.
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="ltv-actions">
         {view === "lineup" ? (
           <button ref={primaryButtonRef} type="button" className="ltv-start" onClick={() => { setGuideOpen(false); onTuneIn?.(); }}>
@@ -218,12 +335,12 @@ export default function LTTvBroadcastPanel({
             onClick={handlePrimaryAction}
           >
             <span aria-hidden="true">
-              {playing ? "■" : voiceStatus === "failed" ? "↻" : "▶"}
+              {playing ? (paused ? "▶" : "❚❚") : voiceStatus === "failed" ? "↻" : "▶"}
             </span>
             {!hasEpisode ? "Episodes coming soon" : !canPlay ? "Not recorded yet" : loading
               ? "Preparing studio…"
               : playing
-                ? "Stop episode"
+                ? paused ? "Resume episode" : "Pause episode"
                 : voiceStatus === "failed"
                   ? "Retry signal"
                   : "Play episode"}
@@ -391,15 +508,19 @@ const styles = `
   .ltv-ep-copy small { color: #a29aaf; font-size: 11px; }
   .ltv-row-play { color: var(--magenta); font-size: 10px; }
   .ltv-collapsed {
-    --cyan: #20d7f2;
+    --cyan: #20d7f2; --magenta: #ef62dc;
     position: fixed;
     z-index: 10040;
     top: 50%;
     left: 13px;
     transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
   }
 
-  .ltv-collapsed button {
+  .ltv-collapsed .ltv-tab {
     width: 42px;
     min-height: 220px;
     display: flex;
@@ -417,7 +538,7 @@ const styles = `
     backdrop-filter: blur(12px);
   }
 
-  .ltv-collapsed button > span {
+  .ltv-collapsed .ltv-tab > span {
     width: 6px;
     height: 6px;
     border-radius: 50%;
@@ -425,11 +546,53 @@ const styles = `
     box-shadow: 0 0 7px rgba(51,242,138,.65);
   }
 
-  .ltv-collapsed button > span.is-live { background: #ff405b; }
+  .ltv-collapsed .ltv-tab > span.is-live { background: #ff405b; }
   .ltv-collapsed b { writing-mode: vertical-rl; transform: rotate(180deg); font: 800 9px "Orbitron", monospace; letter-spacing: .2em; }
   .ltv-collapsed small { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 11px; }
   .ltv-collapsed i { font-size: 20px; font-style: normal; }
 
+
+  /* ── TRANSPORT ─────────────────────────────────────────────────────
+     The same three keys in both places: a row under the open console, a
+     column beside the collapsed strip. */
+  .ltv-transport { pointer-events: auto; display: flex; flex-direction: column; gap: 11px; margin-top: 22px; }
+  .ltv-scrub { display: flex; align-items: stretch; gap: 3px; }
+  .ltv-part {
+    flex: 1 1 0; min-width: 10px; height: 16px; position: relative;
+    border: 0; padding: 0; background: transparent; cursor: pointer;
+  }
+  .ltv-part::before {
+    content: ""; position: absolute; inset: 5px 0; border-radius: 2px;
+    background: rgba(255,255,255,.17);
+  }
+  .ltv-part:hover::before { background: rgba(255,255,255,.34); }
+  .ltv-part.is-on::before { background: rgba(32,215,242,.26); }
+  .ltv-part > i {
+    position: absolute; left: 0; top: 5px; bottom: 5px; border-radius: 2px;
+    background: var(--magenta); box-shadow: 0 0 8px rgba(239,98,220,.5);
+  }
+  .ltv-keys { display: flex; align-items: center; gap: 7px; pointer-events: auto; }
+  .ltv-key {
+    min-width: 34px; min-height: 34px; display: inline-flex; align-items: center;
+    justify-content: center; gap: 7px; padding: 0 9px; border-radius: 5px;
+    border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.05);
+    color: #e6e3ec; font: 500 12px "Inter", sans-serif; cursor: pointer;
+  }
+  .ltv-key:hover { background: rgba(255,255,255,.15); color: #fff; }
+  .ltv-key > span { font-size: 11px; line-height: 1; }
+  .ltv-key.is-primary { border-color: rgba(32,215,242,.6); color: var(--cyan); }
+  .ltv-key.is-stop { color: #d8b2c4; }
+  .ltv-clock { margin-left: auto; color: #b9b6c2; font: 500 12px/1 "IBM Plex Mono", monospace; }
+  .ltv-transport-note { margin: 0; color: #96919f; font-size: 11px; line-height: 1.5; }
+  /* Beside the collapsed strip the keys stack, matching its width. */
+  .ltv-collapsed .ltv-keys {
+    flex-direction: column; gap: 0; width: 42px; padding: 4px 0;
+    border: 1px solid rgba(32,215,242,.37); border-left: 2px solid var(--cyan);
+    border-radius: 0 6px 6px 0; background: rgba(4,6,12,.88);
+    box-shadow: 0 0 17px rgba(32,215,242,.13); backdrop-filter: blur(12px);
+  }
+  .ltv-collapsed .ltv-key { width: 38px; min-height: 36px; border: 0; background: transparent; color: var(--cyan); }
+  .ltv-collapsed .ltv-key:hover { background: rgba(32,215,242,.16); }
 
   button:focus-visible { outline: 2px solid #8feeff; outline-offset: 3px; }
   @media (max-width: 1100px) {
