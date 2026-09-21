@@ -38,9 +38,6 @@ import {
   strandedWarning,
   PAUSE_MARK_MAX_SECONDS,
   revoice,
-  lineSpansFromAlignment,
-  shiftSpans,
-  episodeLineSpans,
   cacheReport,
   costReport,
   staleClipsAfterRecord,
@@ -531,93 +528,17 @@ console.log("\nThe voices are the show's, not the record's:");
     revoice(episode).changes, []);
 }
 
-// ── the exact line times ElevenLabs already knew ─────────────────────────────
-// Three bugs came from guessing where one voice stops and the next starts.
-// The response carried the answer all along, in `alignment`.
-{
-  // "Hi. Bye." — two lines, a space between them. Character times are one per
-  // character, so the indices below are literal positions in that string.
-  const characters = [..."Hi. Bye."];
-  const alignment = {
-    characters,
-    character_start_times_seconds: [0.0, 0.1, 0.2, 0.3, 1.0, 1.1, 1.2, 1.3],
-    character_end_times_seconds: [0.1, 0.2, 0.3, 1.0, 1.1, 1.2, 1.3, 1.4],
-  };
-  // End indices as ElevenLabs' own example writes them: the next line's start.
-  const exclusive = [
-    { character_start_index: 0, character_end_index: 4 },
-    { character_start_index: 4, character_end_index: 8 },
-  ];
-  check("a line's span runs from its first character to its last",
-    lineSpansFromAlignment(alignment, exclusive),
-    [{ start: 0, end: 0.3 }, { start: 1, end: 1.4 }]);
-
-  // THE POINT OF THE CLAMP. The docs never say which reading is right, so the
-  // same spans must come out when the end index is inclusive instead.
-  const inclusive = [
-    { character_start_index: 0, character_end_index: 3 },
-    { character_start_index: 4, character_end_index: 7 },
-  ];
-  check("and comes out the same whichever way the end index is meant",
-    lineSpansFromAlignment(alignment, inclusive),
-    lineSpansFromAlignment(alignment, exclusive));
-
-  // The space at index 3 belongs to neither line. Left in, it would stretch
-  // line one's end across the pause and leave nothing to cut in.
-  ok("the space between the lines belongs to neither",
-    lineSpansFromAlignment(alignment, exclusive)[0].end === 0.3);
-
-  check("no alignment means no spans, rather than a guess",
-    lineSpansFromAlignment(undefined, exclusive), null);
-  check("nor a truncated one", lineSpansFromAlignment({ ...alignment, characters: [] }, exclusive),
-    null);
-
-  check("a block's spans move to where the block plays",
-    shiftSpans([{ start: 0, end: 0.3 }], 10),
-    [{ start: 10, end: 10.3 }]);
-
-  const built = [
-    { id: "a", alignment, segments: exclusive },
-    { id: "b", alignment, segments: exclusive },
-  ];
-  const offsets = new Map([["a", 0], ["b", 5]]);
-  check("two blocks make one list on the episode's own clock",
-    episodeLineSpans(built, { offsets, expected: 4 }),
-    [
-      { start: 0, end: 0.3 },
-      { start: 1, end: 1.4 },
-      { start: 5, end: 5.3 },
-      { start: 6, end: 6.4 },
-    ]);
-
-  // Half an episode of exact spans is worse than none: the splitter would cut
-  // some lines exactly and guess at the rest with nothing saying which.
-  check("one block without an alignment voids the whole episode",
-    episodeLineSpans([built[0], { id: "b", segments: exclusive }], { offsets, expected: 4 }),
-    null);
-  check("and so does a count that disagrees with the lines",
-    episodeLineSpans(built, { offsets, expected: 5 }), null);
-  check("and a block with nowhere to play",
-    episodeLineSpans(built, { offsets: new Map([["a", 0]]), expected: 4 }), null);
-}
-
-
 // ── what recording again would actually cost ─────────────────────────────────
 // The studio's confirm says "this spends an ElevenLabs render" whether or not
 // it does, because a button cannot know. Michelle pushed back on exactly that.
 {
   const format = `pcm_${PCM.sampleRate}`;
   const fingerprint = "abc123";
-  const withTimes = {
-    lt_tv_output_format: format,
-    lt_tv_inputs: fingerprint,
-    alignment: { characters: ["a"], character_start_times_seconds: [0],
-      character_end_times_seconds: [0.1] },
-  };
+  const withTimes = { lt_tv_output_format: format, lt_tv_inputs: fingerprint };
 
   check("a matching block costs nothing",
     cacheReport(withTimes, { format, fingerprint }),
-    { reuse: true, why: null, alignment: true });
+    { reuse: true, why: null });
   check("nothing on disk is a render",
     cacheReport(null, { format, fingerprint }).reuse, false);
   ok("and says so in words rather than a flag",
@@ -625,29 +546,17 @@ console.log("\nThe voices are the show's, not the record's:");
   ok("different words cost a render",
     !cacheReport({ ...withTimes, lt_tv_inputs: "other" }, { format, fingerprint }).reuse);
 
-  // A reusable block can still be missing the exact line times, and that
-  // changes what the split will do — so it is reported separately from cost.
-  const noTimes = { lt_tv_output_format: format, lt_tv_inputs: fingerprint };
-  check("a reusable block with no alignment is still free",
-    cacheReport(noTimes, { format, fingerprint }).reuse, true);
-  check("but is reported as having no exact times",
-    cacheReport(noTimes, { format, fingerprint }).alignment, false);
-  ok("an empty alignment does not count as one",
-    !cacheReport({ ...noTimes, alignment: { characters: [] } }, { format, fingerprint }).alignment);
-
   const report = costReport([
-    { id: "block-1", reuse: true, why: null, alignment: true },
-    { id: "block-2", reuse: true, why: null, alignment: false },
-    { id: "block-3", reuse: false, why: "it has not been recorded yet", alignment: false },
+    { id: "block-1", reuse: true, why: null },
+    { id: "block-2", reuse: true, why: null },
+    { id: "block-3", reuse: false, why: "it has not been recorded yet" },
   ]);
   check("the count is what gets sent, not what exists", report.fresh, 1);
   check("and what costs nothing", report.reused, 2);
-  check("missing line times are counted only among the reused",
-    report.missingAlignment, 1);
   ok("a reused block says so plainly", report.lines[0].includes("reused free"));
   ok("a re-recorded one says why", report.lines[2].includes("because"));
 
-  const free = costReport([{ id: "block-1", reuse: true, why: null, alignment: true }]);
+  const free = costReport([{ id: "block-1", reuse: true, why: null }]);
   check("an episode entirely on disk sends nothing", free.fresh, 0);
 }
 

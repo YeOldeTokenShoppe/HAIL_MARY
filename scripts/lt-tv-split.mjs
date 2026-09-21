@@ -54,18 +54,18 @@ const PROCESSOR = "elevenlabs-dialogue-test/process_dialogue.py";
 /**
  * The command, built from an id alone, so the button and the terminal agree.
  *
- * `spans` says whether this master has ElevenLabs' own line times beside it.
- * The flag is only passed when the file is really there, so a missing one is
- * a visible fallback rather than an argument pointing at nothing.
+ * It does NOT pass --spans. ElevenLabs' per-character alignment puts every
+ * line boundary at the same instant it reports, by construction — see the
+ * note in lt-tv-audio.mjs. Cutting there is worse than measuring, so the
+ * measurement is the only path.
  */
-export function splitCommand(id, { report = false, spans = false } = {}) {
+export function splitCommand(id, { report = false } = {}) {
   const dir = join(AUDIO_DIR, id);
   return [
     "python3",
     [
       PROCESSOR,
       ...(report ? ["--report"] : []),
-      ...(spans ? ["--spans", join(dir, "line-spans.json")] : []),
       "--master", join(dir, "master-dialogue.wav"),
       "--segments", join(dir, "voice-segments.json"),
       "--show", id.startsWith("news") ? "news" : "roundtable",
@@ -293,16 +293,7 @@ async function main() {
   }
 
   const report = process.argv.includes("--report");
-  const spansPath = join(AUDIO_DIR, id, "line-spans.json");
-  const spans = existsSync(spansPath);
-  if (!spans) {
-    console.log(
-      "This master has no line-spans.json, so the cuts are measured from its own\n" +
-        "silence. That is the older way and a boundary can land a syllable out.\n" +
-        'Recording it again writes the file if ElevenLabs returns the timings.\n',
-    );
-  }
-  const [command, args] = splitCommand(id, { report, spans });
+  const [command, args] = splitCommand(id, { report });
   const code = await run(command, args);
   if (code !== 0) process.exit(code);
 

@@ -23,7 +23,6 @@ from process_dialogue import (  # noqa: E402
     find_gap,
     plan_windows,
     boundary_report,
-    MIN_LINE_WINDOW_SECONDS,
     START_GUARD_SECONDS,
     END_GUARD_SECONDS,
 )
@@ -187,63 +186,51 @@ ok("every junction falls back", not any(w["measured"] for w in none_planned[:-1]
 check("and an empty episode plans nothing", plan_windows([], SIL, 10.0), [])
 
 
-print("\nWhen ElevenLabs hands over its own line times:")
-# The same episode, but now with the alignment. Connor really speaks 0 - 9.61
-# and GR80 really starts at 10.02 — the numbers silencedetect had to go
-# looking for, stated outright.
-SPANS = [
-    {"start": 0.0, "end": 9.61},
-    {"start": 10.02, "end": 12.4},
-    {"start": 12.71, "end": 30.2},
-]
-exact = plan_windows(segments, [], 31.0, spans=SPANS)
-ok("the junction lands in the middle of the real quiet",
-   abs(exact[0]["end"] - (9.61 + 10.02) / 2) < 1e-9)
-ok("so GR80's window starts before he speaks", exact[1]["start"] < 10.02)
-ok("and Connor's ends after he has finished", exact[0]["end"] > 9.61)
-# The whole bug in one check: the reported instant was 10.4, and cutting there
-# put GR80's first words inside Connor's clip.
-ok("the cut is nowhere near the instant that caused the bleed",
-   exact[0]["end"] < 10.4)
-ok("every boundary is shared, so no audio is lost or doubled",
-   all(abs(exact[i]["end"] - exact[i + 1]["start"]) < 1e-9 for i in range(len(exact) - 1)))
-ok("the first line starts at the top of the master", exact[0]["start"] == 0.0)
-ok("the last runs to the end of it", abs(exact[-1]["end"] - 31.0) < 1e-9)
-ok("and none of it is reported as guesswork", all(w["exact"] for w in exact))
+print("\nWhy the per-character alignment cannot place a boundary:")
+# A whole fix was built on `alignment` on 2026-09-21 and had to be reverted.
+# This checks the reason against the archived response rather than trusting a
+# comment, because the next person to read those docs will have the same idea.
+import json  # noqa: E402
 
-# It must beat the measurement even where the measurement works, because the
-# measurement is a search with a radius and this is not.
-measured = plan_windows(segments, SIL, 31.0)
-ok("it agrees with a good measurement, without having to search",
-   abs(exact[0]["end"] - measured[0]["end"]) < 0.05)
+_response = Path(__file__).parent / "response.json"
+if not _response.exists():
+    print("  -- skipped, no archived response here")
+else:
+    _payload = json.loads(_response.read_text(encoding="utf-8"))
+    _a = _payload.get("alignment") or {}
+    _segs = _payload.get("voice_segments") or []
+    _starts = _a.get("character_start_times_seconds") or []
+    _ends = _a.get("character_end_times_seconds") or []
 
-print("\nAnd no span list can collapse a line to nothing:")
-# The bug of 2026-09-21: two junctions claiming one gap squeezed a short line
-# to 1ms and its audio fell into the next speaker's clip. Spans cannot do that
-# by construction, but a degenerate list must not be able to either.
-CRUSHED = [
-    {"start": 0.0, "end": 9.61},
-    {"start": 9.62, "end": 9.63},
-    {"start": 9.64, "end": 30.2},
-]
-tight = plan_windows(segments, [], 31.0, spans=CRUSHED)
-ok("every line keeps a window of its own",
-   all(w["end"] - w["start"] >= MIN_LINE_WINDOW_SECONDS - 1e-9 for w in tight))
-ok("and the junctions still only move forwards",
-   all(tight[i]["end"] <= tight[i + 1]["end"] + 1e-9 for i in range(len(tight) - 1)))
-
-print("\nA span list that does not fit the master is not used:")
-check("one span short falls back to measuring",
-      plan_windows(segments, SIL, 31.0, spans=SPANS[:2]),
-      plan_windows(segments, SIL, 31.0))
-check("and none at all is the old behaviour exactly",
-      plan_windows(segments, SIL, 31.0, spans=None),
-      plan_windows(segments, SIL, 31.0))
-
-rows, unmeasured = boundary_report(exact, {"connor": "Connor", "gr80": "Monk"})
-check("nothing is flagged unmeasured when every cut is exact", unmeasured, [])
-ok("and the report does not call an exact cut a measurement",
-   "measured" not in rows[1])
+    ok("the response really does carry an alignment", bool(_starts and _ends))
+    # 1. The alignment is continuous: no character is ever followed by a gap.
+    _breaks = sum(
+        1 for i in range(len(_starts) - 1) if abs(_ends[i] - _starts[i + 1]) > 1e-9
+    )
+    check("no gap anywhere between one character and the next", _breaks, 0)
+    # 2. Lines are adjacent in that character stream.
+    _apart = sum(
+        1
+        for i in range(len(_segs) - 1)
+        if int(_segs[i]["character_end_index"]) != int(_segs[i + 1]["character_start_index"])
+    )
+    check("and consecutive lines share a character index", _apart, 0)
+    # 1 + 2 => a line's last character ends exactly when the next line's first
+    # one begins. The "exact" boundary IS the reported boundary, always.
+    _same = all(
+        abs(_ends[int(_segs[i]["character_end_index"]) - 1]
+            - float(_segs[i + 1]["start_time_seconds"])) < 1e-3
+        for i in range(len(_segs) - 1)
+    )
+    ok("so every junction lands on the reported instant, with nothing to measure", _same)
+    # And the tell that the edges are synthetic: real speech does not stop in 1ms.
+    _instant = sum(
+        1
+        for s in _segs
+        if abs(_ends[int(s["character_end_index"]) - 1]
+               - _starts[int(s["character_end_index"]) - 1]) < 0.002
+    )
+    ok("with some line endings given an impossible 1ms final character", _instant > 0)
 
 print("" if failures else "\nAll checks passed.\n")
 if failures:

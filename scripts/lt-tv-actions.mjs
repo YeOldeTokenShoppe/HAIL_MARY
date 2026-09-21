@@ -119,7 +119,7 @@ export const ACTIONS = {
       ["scripts/lt-tv-audio.mjs", `content/lt-tv/episodes/${id}.json`, "--dry-run"],
     ],
     blurb:
-      "Says, block by block, what would be reused and what would be sent to ElevenLabs, and whether the recordings already carry the exact line times the split wants. Sends nothing and spends nothing.",
+      "Says, block by block, what would be reused and what would be sent to ElevenLabs. Sends nothing and spends nothing.",
   },
   split: {
     label: "Split it into the two tracks",

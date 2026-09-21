@@ -448,10 +448,7 @@ episode rather than reasoned about:
 A block is a run of segments, not a line, so "the one block holding it" is
 still a chunk of the episode — a third of it, on a three-block roundtable.
 
-The same check reports whether each recording carries the **exact line times**
-the split prefers. A recording made before those were kept is still free to
-reuse, but the split will fall back to measuring — see "Where one voice stops
-and the other starts".
+
 
 Like `# cut`, a pause mark changes no words: it needs no applying and works on
 an episode that is already written. Applying edits re-renders the screenplay
@@ -476,30 +473,25 @@ to about ten milliseconds. It is not. A boundary a few hundred milliseconds
 late puts the head of the next line inside the previous speaker's track, and
 clips it off their own.
 
-### The boundary is not guessed at all any more
+### The alignment does not help, and this has been tried
 
-The same response that carries the audio also carries an **alignment**: a start
-and an end time for *every character* of the script, and, per line, which slice
-of that text it is. That is the answer to "where does this line really stop",
-stated outright. It was being discarded.
+The response also carries an **alignment**: a start and an end for every
+character of the script. It reads like the exact answer to "where does this
+line really stop", a fix was built on it on 2026-09-21, and it had to be taken
+out again the same night. Measured against the archived July response:
 
-The record step now reads it and writes `line-spans.json` beside the master —
-one real start and end per line, on the episode's own clock. The split step cuts
-each junction at the middle of the quiet between two lines, both edges of which
-are known exactly. Nothing is searched for and nothing is inferred. Both
-speakers share the one boundary, so no audio is lost or duplicated.
+- the alignment is **continuous** — every character's end is the next
+  character's start, at all 825 of them;
+- consecutive lines are **adjacent** in that character stream — line k's end
+  index is line k+1's start index, at all 11 junctions.
 
-Recording says which happened:
+So the last character of a line ends at the exact instant the next line's
+first character begins. Every junction is zero-width and the "exact" boundary
+comes out identical to the reported one, to the millisecond. There is nothing
+to measure, and no recording in which there would be. `test_boundaries.py`
+checks all of this against the real response so the idea does not come back.
 
-- *"ElevenLabs returned exact timings for all N lines"* — the good path.
-- *"ElevenLabs did NOT return per-line timings"* — `alignment` is optional in
-  the API, so this is possible. The split then falls back to measuring, below.
-
-A `line-spans.json` that does not match the master it sits beside is **refused**
-rather than used, because a list off by one line puts every boundary after it in
-the wrong mouth.
-
-### The fallback, when there is no alignment
+### So the boundary is measured
 
 The split step runs `silencedetect` over the master and puts each junction in
 the middle of the real gap around the reported instant. Silence means neither
@@ -518,14 +510,19 @@ went** in the studio, or:
 
 ```bash
 python3 elevenlabs-dialogue-test/process_dialogue.py --report \
-  --spans content/lt-tv/audio/<id>/line-spans.json \
   --master content/lt-tv/audio/<id>/master-dialogue.wav \
   --segments content/lt-tv/audio/<id>/voice-segments.json \
   content/lt-tv/audio/<id>
 ```
 
-A line with no note beside it was cut exactly; `measured` means the gap was
-found by searching; `NO GAP MEASURED` means the two lines run together.
+`NO GAP MEASURED` beside a line means the two lines run together there.
+
+**This is a search with a radius, and it has a floor.** Where a speaker's line
+really ends a second or more after ElevenLabs says it does, the breaths inside
+their own sentence are nearer to the reported instant than the real pause is,
+and no choice of radius picks the right one. If that is what The Wealth Effect
+is doing, the split cannot fix it and rendering each character separately is
+the honest answer.
 
 The arithmetic is covered by `elevenlabs-dialogue-test/test_boundaries.py`,
 which runs as part of `npm run lt:test` and needs no ffmpeg.
