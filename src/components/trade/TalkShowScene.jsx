@@ -1590,6 +1590,39 @@ function TalkShowModel({
 
     let stopped = false;
     const ended = new Set();
+    const started = new Map();
+
+    /**
+     * HOW FAR APART THE TWO PORTALS REALLY START, measured rather than assumed.
+     *
+     * Both are told to play a section in the same tick, and the code below has
+     * always assumed the second is "milliseconds behind". Nobody had measured
+     * it. Michelle reported on 2026-09-21 that about one exchange in ten
+     * overlaps on the set while the master WAV is clean, which is what a
+     * constant skew of a few hundred ms looks like once per-line rendering
+     * lays lines out 0.45s apart instead of the second the old dialogue
+     * breathed: every other junction loses the skew and the tightest ones
+     * close up.
+     *
+     * This only WATCHES. It changes no timing, because the last thing this
+     * problem needs is another confident untested fix. The number lands in the
+     * console and in `window.__tsSkew` so there is something real to design
+     * against.
+     */
+    const recordStart = (key) => {
+      if (started.has(key)) return;
+      started.set(key, performance.now());
+      if (started.size !== Object.keys(portalsRef.current).length) return;
+      const times = [...started.values()];
+      const ms = Math.round(Math.max(...times) - Math.min(...times));
+      const section = (playbackRef.current.section ?? 0) + 1;
+      window.__tsSkew = window.__tsSkew || [];
+      window.__tsSkew.push({ section, ms });
+      console.info(
+        `[TalkShowScene] section ${section}: the two portals started ${ms}ms apart` +
+          " (window.__tsSkew holds every reading)",
+      );
+    };
 
     const resetPerformance = () => {
       playbackRef.current = idlePlayback();
@@ -1702,9 +1735,14 @@ function TalkShowModel({
       }
 
       if (event.data?.type === "sitepal-portal-talk-started") {
+        // Measured before anything returns: the re-stamp below acts on the
+        // FIRST portal to report and swallows the second, so the skew has to
+        // be taken here or it is never seen.
+        recordStart(key);
+
         // Only sections past the first re-stamp, and only on the first portal
         // to report — the two are told to start in the same tick, so the
-        // second is milliseconds behind and would only add jitter.
+        // second follows close behind and would only add jitter.
         const playback = playbackRef.current;
         if (!playback.running || playback.holdingAt === null) return;
         const sections = timelineRef.current?.sections || [];
@@ -1728,6 +1766,7 @@ function TalkShowModel({
         const next = playback.section + 1;
         if (playback.running && sections[next]) {
           ended.clear();
+          started.clear();
           playback.section = next;
           playback.holdingAt = sections[next].startsAt;
           playback.heldSince = performance.now();
@@ -1782,6 +1821,7 @@ function TalkShowModel({
         } catch (e) {}
       });
       ended.clear();
+      started.clear();
       resetPerformance();
       onPlaybackStateChange?.(false);
     };
@@ -1830,6 +1870,7 @@ function TalkShowModel({
       if (stopped) stopped = false;
       if (!Object.values(portalsRef.current).every((p) => p.ready)) return false;
       ended.clear();
+      started.clear();
 
       const ok = startSection(0) === Object.keys(portalsRef.current).length;
       if (ok) {
