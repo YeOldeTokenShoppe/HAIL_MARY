@@ -131,7 +131,8 @@ ok("splitting needs one", ACTIONS.split.needsScreenplay === true);
 ok("recording again needs one", ACTIONS.rerecord.needsScreenplay === true);
 check("and nothing else claims to",
   ACTION_NAMES.filter((n) => ACTIONS[n].needsScreenplay),
-  ["apply-edits", "apply-edits-rerecord", "rewrite-marked", "record", "rerecord", "split"]);
+  ["apply-edits", "apply-edits-rerecord", "rewrite-marked", "record", "rerecord", "split",
+   "split-report"]);
 ok("actionsFor carries the flag through to the page",
   actionsFor("on-air").find((a) => a.name === "apply-edits").needsScreenplay === true);
 
@@ -161,6 +162,14 @@ ok("not before there is a master", !actionsFor("written").some((a) => a.name ===
 ok("offered once there is one", actionsFor("recorded").some((a) => a.name === "split"));
 ok("and still offered after, for a re-record", actionsFor("on-air").some((a) => a.name === "split"));
 check("it costs nothing", ACTIONS.split.spends, null);
+// The diagnostic split: same run, plus the boundary table, for pasting back
+// when something sounds wrong.
+check("so does asking where the cuts went", ACTIONS["split-report"].spends, null);
+ok("which is offered wherever the plain split is",
+  actionsFor("recorded").some((a) => a.name === "split-report") &&
+  actionsFor("on-air").some((a) => a.name === "split-report"));
+ok("and not before there is a master",
+  !actionsFor("written").some((a) => a.name === "split-report"));
 check("and needs no key", ACTIONS.split.needs, []);
 {
   // The button runs the same wrapper `npm run lt:split` does, so the page and

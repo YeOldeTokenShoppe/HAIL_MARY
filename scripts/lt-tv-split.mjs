@@ -52,12 +52,13 @@ const EPISODE_DIR = "content/lt-tv/episodes";
 const PROCESSOR = "elevenlabs-dialogue-test/process_dialogue.py";
 
 /** The command, built from an id alone, so the button and the terminal agree. */
-export function splitCommand(id) {
+export function splitCommand(id, { report = false } = {}) {
   const dir = join(AUDIO_DIR, id);
   return [
     "python3",
     [
       PROCESSOR,
+      ...(report ? ["--report"] : []),
       "--master", join(dir, "master-dialogue.wav"),
       "--segments", join(dir, "voice-segments.json"),
       "--show", id.startsWith("news") ? "news" : "roundtable",
@@ -284,7 +285,8 @@ async function main() {
     }
   }
 
-  const [command, args] = splitCommand(id);
+  const report = process.argv.includes("--report");
+  const [command, args] = splitCommand(id, { report });
   const code = await run(command, args);
   if (code !== 0) process.exit(code);
 

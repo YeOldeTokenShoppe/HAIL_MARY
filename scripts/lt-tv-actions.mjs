@@ -116,6 +116,20 @@ export const ACTIONS = {
     argv: (id) => ["node", ["scripts/lt-tv-split.mjs", id]],
     blurb: "Cuts the master into the clips you upload to SitePal, one per character per section. To move a join, put `# cut` on its own line in the screenplay where you want it and split again. Needs ffmpeg. Free.",
   },
+  "split-report": {
+    label: "Show me where the cuts went",
+    spends: null,
+    needs: [],
+    needsScreenplay: true,
+    // The same split, with the boundary table printed. It exists as its own
+    // button because the table is 40 lines for a 40-line episode — too noisy
+    // to print every time, and the only way to see it from here otherwise was
+    // a terminal flag, which is not a thing Michelle is going to type.
+    stages: ["recorded", "on-air"],
+    argv: (id) => ["node", ["scripts/lt-tv-split.mjs", id, "--report"]],
+    blurb:
+      "Splits exactly as the button above does, and also prints every line: where ElevenLabs said the voice changed, where the cut actually went, and how far apart those are. Paste it to me when something sounds wrong. Free.",
+  },
   slate: {
     label: "Put it on the guide",
     spends: null,
