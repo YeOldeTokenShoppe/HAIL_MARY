@@ -73,3 +73,7 @@ content/lt-tv/episodes/*.txt
 content/lt-tv/briefs/
 content/lt-tv/plans/
 content/lt-tv/status.html
+
+# Python bytecode, regenerated on every run
+__pycache__/
+*.pyc
