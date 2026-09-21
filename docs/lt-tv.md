@@ -74,7 +74,7 @@ done by hand.
 
 ```bash
 npm run lt                        # every episode, both shows
-npm run lt -- roundtable-03       # one, in detail
+npm run lt -- morality-02       # one, in detail
 npm run lt -- --html              # a page to keep open in a tab
 ```
 
@@ -103,7 +103,7 @@ root — the path is relative to you, not to the repo.
 | `npm run lt:slate` | put a recorded episode on the guide |
 | `npm run lt:test` | run every check |
 
-Arguments go after `--`, as in `npm run lt:roundtable -- --topic roundtable-03`.
+Arguments go after `--`, as in `npm run lt:roundtable -- --topic morality-02`.
 
 The four stages are `planned` (named on the slate, unwritten), `written` (has a
 script), `recorded` (audio built) and `on air` (playable in the guide). Each one
@@ -131,18 +131,18 @@ src/content/lt-tv/index.js             the list; a record nobody imports never s
 an episode never edits it. If you find yourself editing a component to release
 an episode, something has gone wrong.
 
-Three shows share the set and the pipeline. They differ only in where the
+Two shows share the set and the pipeline. They differ only in where the
 script comes from:
 
-| | Weekly news | Roundtable | Markets & Morality |
-|---|---|---|---|
-| Starts from | a week of market signal | one idea | one idea |
-| Script from | `lt-news-brief.mjs` → `lt-news-script.mjs` | `lt-rt-script.mjs` | `lt-rt-script.mjs` |
-| Topics from | the feeds, verified against real articles | the slate's own running order, or `--theme` | the same |
-| Segments | 7, built around three stories | 6, built around one argument | the same 6 |
-| Chiron | yes | no | no |
-| Clip prefix | `lttv_news_ep<NN>_` | `lttv_rt_ep<NN>_` | `lttv_mm_ep<NN>_` |
-| Length | 5–10 min | 4–9 min | 4–9 min |
+| | LT Weekly News Recap | Markets & Morality |
+|---|---|---|
+| Starts from | a week of market signal | one idea |
+| Script from | `lt-news-brief.mjs` → `lt-news-script.mjs` | `lt-rt-script.mjs` |
+| Topics from | the feeds, verified against real articles | the slate's own running order, or `--theme` |
+| Segments | 7, built around three stories | 6, built around one argument |
+| Chiron | yes | no |
+| Clip prefix | `lttv_news_ep<NN>_` | `lttv_mm_ep<NN>_` |
+| Length | 5–10 min | 4–9 min |
 
 **Seeing the "New episode" badge.** An episode is badged in the guide for a
 week after its air date, which means the badge is invisible whenever nothing
@@ -150,16 +150,19 @@ recent is on the slate — and it is the one part of the guide you cannot check
 by looking. Add `?preview=new` to the /trade URL to turn it on for every listed
 episode. It is display-only, and nobody sees it without typing it.
 
-**Markets & Morality is the roundtable's format under its own banner.** Same
-two seats, same six segments, same generator — it exists as a separate show so
-the slate can sort the moral arguments out of the roundtable queue. Write one
-exactly as you would a roundtable: `npm run lt:roundtable -- --topic
-morality-01`. The show comes from the episode's own id, so nothing else
-changes. `--theme` has no id to read, so it takes `--show morality`.
+**Why the code still says "roundtable".** The roundtable is the FORMAT — two
+seats, six segments, one argument — and Markets & Morality is that format
+under its own banner. A third channel, The Liminal Terminal, carried the same
+format until Michelle took it off the guide on 2026-09-21; its episodes moved
+across to Markets & Morality. So `SHOW_FORMATS.roundtable` and
+`scripts/lt-rt-script.mjs` keep the name of the shape, while `shows.json`
+carries the two channels a viewer sees. Write an episode with `npm run
+lt:roundtable -- --topic morality-01`; the show comes from the episode's own
+id, and `--theme`, which has no id to read, defaults to Markets & Morality.
 
-Everything after the script is the same for all three: `lt-tv-edit.mjs` to
-revise, `lt-tv-audio.mjs` to record, `lt-tv-check.mjs` to verify. One
-`assemble()` builds every record, so a validation one show gains, all gain.
+Everything after the script is the same for both: `lt-tv-edit.mjs` to revise,
+`lt-tv-audio.mjs` to record, `lt-tv-check.mjs` to verify. One `assemble()`
+builds every record, so a validation one show gains, both gain.
 
 They all end the same way: two balanced WAVs uploaded to SitePal, a record on
 the slate, and a lead-in tuned by ear.
@@ -268,7 +271,7 @@ named on the slate.
 npm run lt:roundtable -- --list
 
 # 2. Write one. Two Claude calls: the argument, then the dialogue.
-npm run lt:roundtable -- --topic roundtable-03
+npm run lt:roundtable -- --topic morality-02
 ```
 
 An episode already on the slate **keeps the title and summary it was given** —
@@ -279,7 +282,7 @@ is not on the slate yet.
 Then read and revise exactly as you would a news episode:
 
 ```bash
-npm run lt:edit -- roundtable-03
+npm run lt:edit -- morality-02
 ```
 
 What to look for is specific to this show: **both of them have to be right
@@ -289,7 +292,7 @@ every exchange you have a sermon, and the fix is in the script, not the audio.
 
 ```bash
 # 3. Record it — the same audio build the news show uses.
-npm run lt:audio -- content/lt-tv/episodes/roundtable-03.json
+npm run lt:audio -- content/lt-tv/episodes/morality-02.json
 ```
 
 From here it is the same tail as the news show — steps 5 and 6 above, then the
@@ -298,12 +301,12 @@ shared sections below:
 ```bash
 # Cut the two tracks into the SitePal clips.
 # It ends by printing which file to upload under which clip name.
-npm run lt:split -- roundtable-03
+npm run lt:split -- morality-02
 
 # Then, once they are uploaded, put it on the guide. After the split, so the
 # section boundaries come with it.
-npm run lt:slate -- roundtable-03
-npm run lt:check -- roundtable-03
+npm run lt:slate -- morality-02
+npm run lt:check -- morality-02
 ```
 
 Then upload, tune the lead-in and test.
@@ -734,7 +737,7 @@ button to press, so the worst case costs a click instead of a render.
 
 **Ask for a new one.** Put a note under the line saying what is wrong with it,
 starting with `#`, then press **Rewrite the lines I marked** — or
-`node scripts/lt-tv-rewrite.mjs roundtable-03`:
+`node scripts/lt-tv-rewrite.mjs morality-02`:
 
 ```
  41    SAINT GR80 A rising number does not make you wealthy. It makes you willing.

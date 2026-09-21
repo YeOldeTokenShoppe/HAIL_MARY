@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // STEP 4 — CUT THE TRACKS INTO THE CLIPS SITEPAL PLAYS.
 //
-//   node scripts/lt-tv-split.mjs roundtable-03
+//   node scripts/lt-tv-split.mjs morality-02
 //
 // PER CHARACTER. SitePal plays one clip per avatar, each the full length of
 // the episode, carrying that character's lines and silence everywhere else.

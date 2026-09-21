@@ -52,8 +52,15 @@ const MODEL = process.env.LT_TV_MODEL || "claude-opus-5";
 const PIPELINE = "scripts/lt-rt-script.mjs";
 // The shows this generator writes, in slate order. Both resolve through
 // showFormat, so adding one here is adding it to SHOW_FORMATS and nothing else.
+//
+// "roundtable" stays here although The Liminal Terminal is no longer a channel
+// (Michelle's call, 2026-09-21): the FORMAT is what both shows are, and an old
+// roundtable record should still queue if one turns up. What changed is the
+// default — a --theme run with no --show now writes a Markets & Morality
+// episode, because an episode written for a show the guide does not list would
+// never appear on the site.
 const SHOWS = ["roundtable", "morality"];
-const DEFAULT_SHOW = "roundtable";
+const DEFAULT_SHOW = "morality";
 const EPISODE_DIR = "content/lt-tv/episodes";
 
 const KNOWN_FLAGS = ["topic", "theme", "show", "list", "draft", "plan-only", "number", "out", "max-tokens", "slate", "no-slate", "retitle"];

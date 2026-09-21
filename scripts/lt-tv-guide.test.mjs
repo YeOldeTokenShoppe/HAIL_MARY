@@ -95,8 +95,18 @@ ok("no two episodes of a show share a number",
 const wealth = records.find((r) => r.title === "The Wealth Effect");
 check("The Wealth Effect is on Markets & Morality", wealth?.showId, "morality");
 check("as its first episode", wealth?.id, "morality-01");
-ok("and Markets & Morality is a show the guide lists",
-  shows.some((s) => s.id === "morality" && s.title.includes("Morality")));
+
+// Her second decision the same day: two channels, news at the top. The order
+// here IS the order the guide draws, and the first show is what /trade opens
+// on, so it is worth pinning rather than leaving to whoever edits the file.
+check("the channel list is exactly two shows, news first",
+  shows.map((s) => s.id), ["news", "morality"]);
+ok("The Liminal Terminal is not among them",
+  !shows.some((s) => s.title.includes("Liminal Terminal")));
+// Removing a show without rehoming its episodes would leave records that are
+// imported, valid, and invisible — the failure this guards is silence.
+ok("and no record is left pointing at a show that is gone",
+  records.every((r) => shows.some((s) => s.id === r.showId)));
 
 // Nothing on the slate is badged today, and that is correct rather than
 // broken: the only recorded episode aired in July. This check exists so the

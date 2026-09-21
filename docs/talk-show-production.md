@@ -41,8 +41,8 @@ lead-in — is the same either way.
 
 ```bash
 node scripts/lt-rt-script.mjs --list                 # what is waiting
-node scripts/lt-rt-script.mjs --topic roundtable-03  # write it
-node scripts/lt-tv-edit.mjs roundtable-03            # revise it, free
+node scripts/lt-rt-script.mjs --topic morality-02  # write it
+node scripts/lt-tv-edit.mjs morality-02            # revise it, free
 ```
 
 It runs two Claude calls. The first writes **the argument**, not the dialogue:
@@ -392,7 +392,7 @@ is intentional. Reactions on different characters may overlap.
 
 ```bash
 node scripts/lt-tv-check.mjs                # the whole slate
-node scripts/lt-tv-check.mjs roundtable-03  # one episode, line by line
+node scripts/lt-tv-check.mjs morality-02  # one episode, line by line
 ```
 
 The checker reads every record, reports anything the set would choke on (a
