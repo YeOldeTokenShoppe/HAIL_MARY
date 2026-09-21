@@ -72,6 +72,47 @@ function rateFromEnv() {
   return rate;
 }
 
+/**
+ * A BEAT BETWEEN ACTS, because blocks were butted together with nothing.
+ *
+ * An episode is generated as several blocks, and `packBlocks` only ever breaks
+ * at an act boundary — so every join between two blocks is also a join between
+ * two acts of the show. They were concatenated with no gap at all, which is why
+ * "I had jokes prepared." ran straight into "Here is the part people flinch
+ * at.": two separate requests, laid end to end to the byte, across what should
+ * be the biggest pause in the episode.
+ *
+ * Silence here is exact and free. It is raw PCM, so a beat is a known number of
+ * zero bytes, and the same number places every line after it — no estimate and
+ * no ffmpeg. It also gives the section cutter real silence to land a join in,
+ * at the one place an audience already expects a break.
+ */
+export const ACT_BEAT_SECONDS = beatFromEnv();
+
+/** The configured beat, refusing a value that would read as a fault rather than a pause. */
+function beatFromEnv() {
+  const raw = process.env.LT_TV_ACT_BEAT;
+  if (raw === undefined) return 0.7;
+  const beat = Number(raw);
+  if (!Number.isFinite(beat) || beat < 0 || beat > 3) {
+    throw new Error(`LT_TV_ACT_BEAT=${raw} is not a number of seconds between 0 and 3.`);
+  }
+  return beat;
+}
+
+/**
+ * A beat as a whole number of samples.
+ *
+ * Bytes rather than seconds is the point: the audio and the timings are then
+ * derived from ONE integer and cannot disagree. A part-sample beat would put
+ * every later line a fraction out, which is the failure this file is built to
+ * avoid.
+ */
+export function beatBytes(seconds = ACT_BEAT_SECONDS) {
+  const frame = PCM.channels * PCM.bytesPerSample;
+  return Math.round((seconds * bytesPerSecond()) / frame) * frame;
+}
+
 /** Bytes of PCM per second at the configured rate. Read, never cached — the rate moves. */
 const bytesPerSecond = () => PCM.sampleRate * PCM.channels * PCM.bytesPerSample;
 
@@ -107,14 +148,18 @@ export function pcmLooksRight(byteLength, segments) {
  * checked without generating a single second of audio.
  *
  * @param blocks  [{ id, byteLength, segments }] in playing order
+ * @param gapBytes silence inserted BETWEEN blocks, in bytes — see beatBytes.
+ *                 The same number of bytes goes into the master, so the two
+ *                 cannot drift apart.
  * @returns { segments, durationSeconds, blocks: [{ id, offsetSeconds, durationSeconds }] }
  */
-export function mergeBlocks(blocks) {
+export function mergeBlocks(blocks, { gapBytes = 0 } = {}) {
   const segments = [];
   const placed = [];
   let offset = 0;
 
-  for (const block of blocks) {
+  for (const [index, block] of blocks.entries()) {
+    if (index > 0) offset += pcmSeconds(gapBytes);
     const duration = pcmSeconds(block.byteLength);
     for (const segment of block.segments) {
       segments.push({
@@ -385,10 +430,19 @@ async function main() {
     built.push({ id: block.id, audio, byteLength: audio.length, segments });
   }
 
-  const merged = mergeBlocks(built);
+  const gapBytes = built.length > 1 ? beatBytes() : 0;
+  if (gapBytes) {
+    console.log(
+      `  a ${ACT_BEAT_SECONDS}s beat between acts (${built.length - 1} of them) — ` +
+        "set LT_TV_ACT_BEAT to change it",
+    );
+  }
+  const merged = mergeBlocks(built, { gapBytes });
   const timing = timingFromSegments(episode, merged.segments);
 
-  const pcm = Buffer.concat(built.map((b) => b.audio));
+  // The same bytes the timings were computed from, in the same places.
+  const beat = Buffer.alloc(gapBytes);
+  const pcm = Buffer.concat(built.flatMap((b, i) => (i ? [beat, b.audio] : [b.audio])));
   const masterPath = join(outDir, "master-dialogue.wav");
   await writeFile(masterPath, Buffer.concat([wavHeader(pcm.length), pcm]));
   await writeFile(

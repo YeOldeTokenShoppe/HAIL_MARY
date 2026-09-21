@@ -86,7 +86,7 @@ Edit `elevenlabs-dialogue-test/dialogue.json`. Each item is one spoken turn:
     },
     {
       "text": "[dryly] Your opening monologue is already overleveraged.",
-      "voice_id": "fATgBRI8wg5KkDFg8vBd"
+      "voice_id": "Re5c3vCmpnygdZuSX2Wc"
     }
   ],
   "model_id": "eleven_v3",
@@ -98,7 +98,7 @@ Edit `elevenlabs-dialogue-test/dialogue.json`. Each item is one spoken turn:
 Current voices:
 
 - Connor: `IcFWazAaBzXNwLWpySgF`
-- Saint GR80: `fATgBRI8wg5KkDFg8vBd`
+- Saint GR80: `Re5c3vCmpnygdZuSX2Wc`
 
 Keep the total request under roughly 2,000 characters for reliable Text to
 Dialogue generation. For longer episodes, generate contiguous sections and
@@ -148,7 +148,7 @@ You can instead write a reaction as dialogue when you want precise syllables:
 ```json
 {
   "text": "Heh. Your confidence remains impressively unfunded.",
-  "voice_id": "fATgBRI8wg5KkDFg8vBd"
+  "voice_id": "Re5c3vCmpnygdZuSX2Wc"
 }
 ```
 
@@ -240,8 +240,9 @@ character's ElevenLabs voice has been changed since, reprocessing that response
 fails with *No dialogue segments were found for voice …* — the script names the
 ids the response actually carries, and `--voice <name>=<id>` reprocesses it
 without changing the voice future episodes use. The committed test episode is
-exactly this case: it was recorded with GR80 on `JBFqnCBsd6RMkjVDRZzb`, and the
-cast moved to `fATgBRI8wg5KkDFg8vBd` afterwards.
+exactly this case: it was recorded with GR80 on `JBFqnCBsd6RMkjVDRZzb`, the cast
+moved to `fATgBRI8wg5KkDFg8vBd` afterwards, and to `Re5c3vCmpnygdZuSX2Wc` on
+2026-09-21. Every archived response keeps whichever id it was recorded with.
 
 ```bash
 python3 process_dialogue.py response.json output --voice gr80=JBFqnCBsd6RMkjVDRZzb

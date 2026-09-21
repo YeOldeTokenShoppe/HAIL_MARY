@@ -124,7 +124,7 @@ One character answers to a different string in almost every file:
 | `actor` | Display | ElevenLabs voice | Python key | GLB node | Animation clips |
 |---|---|---|---|---|---|
 | `Connor` | Connor | `IcFWazAaBzXNwLWpySgF` | `john` | `Demon_Empty` | `barron_*` |
-| `Monk` | Saint GR80 | `fATgBRI8wg5KkDFg8vBd` | `gr80` | `Monk_Empty` | `monk_*` |
+| `Monk` | Saint GR80 | `Re5c3vCmpnygdZuSX2Wc` | `gr80` | `Monk_Empty` | `monk_*` |
 
 **The character is Connor**, and the runtime says so too: `CHARACTER_CLIPS` in
 `TalkShowScene.jsx` and `ACTOR_NAMES` in `process_dialogue.py` both resolve him
@@ -137,9 +137,10 @@ plumbing. `Demon_Empty` and the `barron_*` clips are baked into
 `scripts/lt-tv-format.mjs` is the one place this mapping is written down, and
 the pipeline uses `actor` and nothing else.
 
-> Note: the LT TV survey in the project files lists GR80's voice as
-> `JBFqnCBsd6RMkjVDRZzb`. That is wrong. The repo is internally consistent on
-> `fATgBRI8wg5KkDFg8vBd` — `dialogue.json`, `process_dialogue.py`,
+> Note: GR80 has had three voices. `JBFqnCBsd6RMkjVDRZzb` recorded the July
+> 2026 test episode, `fATgBRI8wg5KkDFg8vBd` followed it, and the cast moved to
+> `Re5c3vCmpnygdZuSX2Wc` on 2026-09-21. None of them is wrong; each is what some
+> recording was made with. `process_dialogue.py`,
 > `elevenlabs-dialogue-test/README.md` and `docs/talk-show-production.md` all
 > agree.
 

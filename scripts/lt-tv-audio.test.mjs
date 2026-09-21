@@ -30,6 +30,8 @@ import {
   tierRefusal,
   blockFingerprint,
   cacheIsUsable,
+  beatBytes,
+  ACT_BEAT_SECONDS,
 } from "./lt-tv-audio.mjs";
 import { renderScript } from "./lt-tv-episode.mjs";
 import { pendingEdits } from "./lt-tv-edit.mjs";
@@ -315,6 +317,46 @@ console.log("\nA kept block is only reused for the words it was recorded from:")
   const older = cacheIsUsable({ lt_tv_output_format: format }, { format, fingerprint });
   check("and nor is anything kept before fingerprints existed", older.ok, false);
   ok("which it explains rather than just refusing", older.why.includes("predates"));
+}
+
+console.log("\nActs are separated by a beat, not butted together:");
+{
+  // Blocks are only ever split at an act boundary, and they used to be laid
+  // end to end to the byte — so the biggest pause in the episode was no pause
+  // at all. Michelle heard it on 2026-09-21: "I had jokes prepared." ran
+  // straight into "Here is the part people flinch at."
+  const second = (n) => Math.round(n * PCM.sampleRate) * PCM.channels * PCM.bytesPerSample;
+  const blocks = [
+    { id: "block-1", byteLength: second(10), segments: [{ start_time_seconds: 0, end_time_seconds: 9 }] },
+    { id: "block-2", byteLength: second(20), segments: [{ start_time_seconds: 0, end_time_seconds: 19 }] },
+    { id: "block-3", byteLength: second(5), segments: [{ start_time_seconds: 0, end_time_seconds: 4 }] },
+  ];
+  const gapBytes = beatBytes(0.7);
+
+  ok("a beat is a whole number of samples",
+    gapBytes % (PCM.channels * PCM.bytesPerSample) === 0);
+  check("and is the length it says it is", pcmSeconds(gapBytes), 0.7);
+
+  const merged = mergeBlocks(blocks, { gapBytes });
+  check("the first act still starts at zero", merged.blocks[0].offsetSeconds, 0);
+  check("the second is pushed back by one beat", merged.blocks[1].offsetSeconds, 10.7);
+  check("and the third by two", merged.blocks[2].offsetSeconds, 31.4);
+  check("the episode is longer by the beats it gained", merged.durationSeconds, 36.4);
+
+  // The master is assembled from the same integer, which is the point: an
+  // episode whose audio and timings disagree drifts, and nothing says so.
+  const masterBytes = blocks.reduce((n, b) => n + b.byteLength, 0) + gapBytes * (blocks.length - 1);
+  check("and the master is exactly that many bytes", pcmSeconds(masterBytes), merged.durationSeconds);
+
+  const lines = merged.segments.map((s) => s.start_time_seconds);
+  check("every line after a beat moves with it", lines, [0, 10.7, 31.4]);
+
+  check("without a beat nothing moves", mergeBlocks(blocks).blocks.map((b) => b.offsetSeconds),
+    [0, 10, 30]);
+  ok("and a one-act episode has nowhere to put one",
+    mergeBlocks([blocks[0]], { gapBytes }).durationSeconds === 10);
+
+  ok("the default is a pause rather than a gulf", ACT_BEAT_SECONDS > 0 && ACT_BEAT_SECONDS <= 1.5);
 }
 
 console.log(failures ? `\n${failures} check(s) failed.\n` : "\nAll checks passed.\n");
