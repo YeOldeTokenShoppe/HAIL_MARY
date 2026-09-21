@@ -2,7 +2,7 @@
 // STEP 3 — BUILD THE AUDIO FOR AN EPISODE.
 //
 //   node scripts/lt-tv-audio.mjs content/lt-tv/episodes/news-01.json
-//   node scripts/lt-tv-audio.mjs content/lt-tv/episodes/roundtable-03.json --dry-run
+//   node scripts/lt-tv-audio.mjs content/lt-tv/episodes/morality-02.json --dry-run
 //
 // EVERY LINE IS RENDERED ON ITS OWN, IN ITS OWN VOICE. That is the whole
 // design, and it replaces one that rendered the conversation as blocks with

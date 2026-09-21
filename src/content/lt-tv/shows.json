@@ -1,11 +1,6 @@
 {
   "shows": [
     {
-      "id": "roundtable",
-      "title": "The Liminal Terminal",
-      "format": "Weekly roundtable"
-    },
-    {
       "id": "news",
       "title": "LT Weekly News Recap",
       "format": "News",
