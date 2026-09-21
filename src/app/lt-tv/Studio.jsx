@@ -33,6 +33,14 @@ export default function Studio() {
   const [openId, setOpenId] = useState(null);
   const [running, setRunning] = useState(null);
   const [log, setLog] = useState(null);
+  // Bumped when a step finishes. Several steps REWRITE the screenplay —
+  // applying edits renders it afresh from the record, which renumbers lines
+  // and drops `# cut` and `# pause` marks — and the box was only re-read when
+  // the stage changed. Applying to an episode that was already `written`
+  // leaves the stage alone, so the box went on showing the old text while the
+  // file said something else, and the next save pushed the stale text back
+  // over the applied one. Michelle hit this on 2026-09-21.
+  const [ran, setRan] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -62,6 +70,7 @@ export default function Studio() {
       });
       const data = await res.json();
       setLog({ action, id, ...data, output: data.output || data.error || '(no output)' });
+      setRan((n) => n + 1);
       await load();
     } catch (err) {
       setLog({ action, id, ok: false, output: err.message });
@@ -107,6 +116,7 @@ export default function Studio() {
                 key={e.id}
                 episode={e}
                 env={status.env}
+                ran={ran}
                 open={openId === e.id}
                 onToggle={() => setOpenId(openId === e.id ? null : e.id)}
                 onRun={run}
@@ -179,7 +189,7 @@ function Keys({ env }) {
   );
 }
 
-function Episode({ episode: e, env, open, onToggle, onRun, running }) {
+function Episode({ episode: e, env, ran, open, onToggle, onRun, running }) {
   const stage = STAGES[e.stage];
   // null until the screenplay has been looked for. The steps that read it are
   // offered only once it is there — see needsScreenplay in lt-tv-actions.mjs.
@@ -252,7 +262,7 @@ function Episode({ episode: e, env, open, onToggle, onRun, running }) {
             })}
           </div>
 
-          <Screenplay id={e.id} stage={e.stage} onPresence={setHasScreenplay}
+          <Screenplay id={e.id} stage={e.stage} ran={ran} onPresence={setHasScreenplay}
             onDirty={setUnsaved} saveRef={saveScreenplay} />
 
           <Files files={e.files} />
@@ -308,19 +318,29 @@ function Files({ files }) {
  * only the save a step needs in order to see your edits at all: see runAction
  * above.
  */
-function Screenplay({ id, stage, onPresence, onDirty, saveRef }) {
+function Screenplay({ id, stage, ran, onPresence, onDirty, saveRef }) {
   const [text, setText] = useState(null);
   const [saved, setSaved] = useState(true);
   const [note, setNote] = useState(null);
 
+  // `ran` re-reads the file after any step, because several of them rewrite
+  // it. Unsaved text in the box is never overwritten — a step that reads the
+  // file has already saved the box (see runAction), so after one there is
+  // nothing of yours to lose, and after an edit you are half way through this
+  // does not fire at all.
+  const dirty = !saved;
   useEffect(() => {
+    if (dirty) return undefined;
     let alive = true;
     fetch(`/api/lt-tv/script?id=${encodeURIComponent(id)}`, { cache: 'no-store' })
       .then((r) => r.json())
       .then((d) => { if (alive) { setText(d.text); setSaved(true); onPresence(d.text !== null); } })
       .catch(() => { if (alive) { setText(null); onPresence(false); } });
     return () => { alive = false; };
-  }, [id, stage, onPresence]);
+    // `dirty` gates this; re-running it when the box becomes clean again would
+    // undo nothing, but there is no reason to refetch on every save either.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, stage, ran, onPresence]);
 
   const save = async () => {
     const res = await fetch('/api/lt-tv/script', {
