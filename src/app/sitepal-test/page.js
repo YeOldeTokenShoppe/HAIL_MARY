@@ -25,10 +25,28 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// The scene this page was pinned to before it took query params. Kept as the
-// default so a bare /sitepal-test behaves exactly as it always did.
-const DEFAULT_SCENE = "2775208";
-const DEFAULT_HASH = "ems57rTHD1CA9qWccGFh3xItuvs1GN3o";
+// THE DEFAULT IS NOW CONNOR'S ACTUAL SCENE, and that is a change.
+//
+// This page used to default to scene 2775208, which was whatever it happened
+// to be pinned to when it was written. Michelle opened it on 2026-09-21 and
+// got "the resource is missing" with every button inert — a dead scene embeds
+// nothing, so no SitePal global is ever defined and `window.sayAudio?.()`
+// silently does nothing. A diagnostic page that fails that quietly is worse
+// than no page.
+//
+// It now defaults to the same scene the talk show gives Connor, because that
+// is the portal `window.__tsPlayed` measured as starting 662ms late, so the
+// experiment runs against the thing actually under suspicion rather than a
+// stand-in. Source of truth is SITEPAL_PROJECTION_CONFIG in
+// CyborgTempleScene.jsx; copied rather than imported because importing it
+// would pull the whole three.js temple into this route.
+//
+//   Connor (the Demon scene) 2774900  YnR4tCeRwrDH29TfMAxvtPb4anz6oa6n  ctx 1
+//   Monk / GR80              2774449  SfJwD81CkTeyemxPllatiMuMQDBGhBgZ  ctx 0
+//
+// Switch with ?scene=2774449&hash=SfJwD81CkTeyemxPllatiMuMQDBGhBgZ&ctx=0.
+const DEFAULT_SCENE = "2774900";
+const DEFAULT_HASH = "YnR4tCeRwrDH29TfMAxvtPb4anz6oa6n";
 const ACCOUNT = "9308752";
 
 function readParams() {
@@ -87,6 +105,27 @@ export default function SitePalTestPage() {
     issuedRef.current = performance.now();
     add(`▶ ${what}`);
   };
+  /**
+   * Call a SitePal global, and SAY SO when it isn't there.
+   *
+   * Every one of these used to be `window.sayAudio?.(…)`. When the embed
+   * fails — a dead scene id, a bad hash, the functions script blocked — none
+   * of the globals is ever defined, so the optional call evaluated to
+   * undefined and the button looked broken in exactly the same way a broken
+   * experiment would. Michelle hit that on 2026-09-21: "the resource is
+   * missing. Clicking the buttons did nothing." The page has to distinguish
+   * "SitePal did nothing" from "SitePal was never here".
+   */
+  const call = (name, ...args) => {
+    if (typeof window[name] !== "function") {
+      add(`❌ window.${name} is not defined — the embed never came up, so this button cannot work. ` +
+        "Fix the scene before reading anything else on this page.");
+      return false;
+    }
+    window[name](...args);
+    return true;
+  };
+
   const sinceIssued = (label, args) => {
     const ms = issuedRef.current ? Math.round(performance.now() - issuedRef.current) : null;
     const extra = args && args.length ? ` (${args.join(", ")})` : "";
@@ -205,7 +244,7 @@ export default function SitePalTestPage() {
         >
           2. Say TTS
         </button>
-        <button style={btn} onClick={() => { window.stopSpeech?.(); add("stopSpeech()"); }}>
+        <button style={btn} onClick={() => { if (call("stopSpeech")) add("stopSpeech()"); }}>
           Stop
         </button>
       </div>
@@ -234,7 +273,7 @@ export default function SitePalTestPage() {
           disabled={!cfg.clip}
           onClick={() => {
             issue(`sayAudio("${cfg.clip}") COLD — nothing preloaded`);
-            window.sayAudio?.(cfg.clip);
+            call("sayAudio", cfg.clip);
           }}
         >
           A1. Say clip cold
@@ -244,7 +283,7 @@ export default function SitePalTestPage() {
           disabled={!cfg.clip2}
           onClick={() => {
             add(`loadAudio("${cfg.clip2}") — now wait a few seconds, then press A3`);
-            window.loadAudio?.(cfg.clip2);
+            call("loadAudio", cfg.clip2);
           }}
         >
           A2. Preload the other clip
@@ -254,7 +293,7 @@ export default function SitePalTestPage() {
           disabled={!cfg.clip2}
           onClick={() => {
             issue(`sayAudio("${cfg.clip2}") WARM — preloaded by A2`);
-            window.sayAudio?.(cfg.clip2);
+            call("sayAudio", cfg.clip2);
           }}
         >
           A3. Say the preloaded one
@@ -264,10 +303,10 @@ export default function SitePalTestPage() {
           disabled={!cfg.clip || !cfg.clip2}
           onClick={() => {
             issue(`sayAudio("${cfg.clip}"), then loadAudio("${cfg.clip2}") in 2s`);
-            window.sayAudio?.(cfg.clip);
+            call("sayAudio", cfg.clip);
             setTimeout(() => {
               add(`loadAudio("${cfg.clip2}") WHILE SPEAKING — does the voice survive?`);
-              window.loadAudio?.(cfg.clip2);
+              call("loadAudio", cfg.clip2);
             }, 2000);
           }}
         >
