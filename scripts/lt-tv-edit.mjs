@@ -283,6 +283,21 @@ export const CUT_MARK_RE = /^\s*#\s*cut(\s+here)?\s*$/i;
 export const PAUSE_MARK_RE = /^\s*#\s*pause\s+([\d.]+)\s*s?\s*$/i;
 
 /**
+ * A take mark: `# take 2` alone on a line, meaning render the line below it
+ * again, and file that rendering separately from the first.
+ *
+ * A line is kept by its words, so the same words in the same voice are never
+ * sent twice — which is right until ElevenLabs puts a stray syllable at the
+ * head of a line (Michelle heard a "to" at 2:07 of The Wealth Effect,
+ * 2026-09-21) and the only ways to hear it again were to reword the line or
+ * delete a cache file by hand. The take number is part of the line's
+ * identity instead: take 2 is a new rendering, kept on its own, and
+ * recording again reuses it. Not happy with take 2 either: `# take 3`.
+ * Take 1, or no mark, is the line as first recorded.
+ */
+export const TAKE_MARK_RE = /^\s*#\s*take\s+(\d+)\s*$/i;
+
+/**
  * The pauses a screenplay asks for, as line number → seconds.
  *
  * Like a cut mark, this is read from the screenplay rather than stored in the
@@ -319,11 +334,31 @@ export function readPauseMarks(text) {
  *
  * A mark in front of line 0 is dropped — the first section starts there anyway.
  */
+/** The takes a screenplay asks for, as line number → take number (2 and up). */
+export function readTakeMarks(text) {
+  const marks = new Map();
+  let pending = null;
+  for (const raw of text.split(/\r?\n/)) {
+    const mark = raw.match(TAKE_MARK_RE);
+    if (mark) {
+      pending = Number(mark[1]);
+      continue;
+    }
+    const line = raw.match(LINE_RE);
+    if (!line) continue;
+    if (pending !== null) {
+      if (pending >= 2) marks.set(Number(line[1]), pending);
+      pending = null;
+    }
+  }
+  return marks;
+}
+
 export function readCutMarks(text) {
   const marks = [];
   let pending = false;
   for (const raw of text.split(/\r?\n/)) {
-    if (PAUSE_MARK_RE.test(raw)) continue;
+    if (PAUSE_MARK_RE.test(raw) || TAKE_MARK_RE.test(raw)) continue;
     if (CUT_MARK_RE.test(raw)) {
       pending = true;
       continue;

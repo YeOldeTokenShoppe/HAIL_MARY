@@ -432,6 +432,7 @@ What does and does not cost a render:
 | | |
 |---|---|
 | changing or adding a pause | free — silence is laid in, never rendered |
+| `# take 2` on a line | that one line |
 | changing `LT_TV_LINE_GAP` or `LT_TV_ACT_BEAT` | free |
 | rewording a line | that one line |
 | deleting or reordering lines | free — a recording is filed by its words, not its number |
@@ -582,6 +583,14 @@ the browser does not keep the old animation library.
 ## A line you don't like (both shows)
 
 Three things you can do with a bad line, in rising order of effort.
+
+**Have it read again.** When the words are right and the reading is not (a
+stray syllable at the head of a line, a flat delivery), write `# take 2` on
+its own line just above it and press **Record it again**. That one line is
+rendered afresh and kept as take 2; everything else is reused. Not happy with
+take 2 either, `# take 3`. Remove the mark and the first take comes back. It
+is a mark like `# pause`, so it needs no applying, and applying edits wipes
+it.
 
 **Rewrite it yourself.** Open the screenplay, change the words, then
 **Apply my edits**. Nothing is spent and nothing else in the episode moves.

@@ -44,6 +44,7 @@ import {
   timingFromLayout,
   strandedPauses,
   strandedWarning,
+  strandedTakes,
   revoice,
   staleClipsAfterRecord,
   staleClipWarning,
@@ -52,7 +53,7 @@ import { wavInfo, sliceWav, perLineRender, layoutLine } from "./lt-tv-split.mjs"
 import { planSections, TARGET_SECTION_SECONDS } from "./lt-tv-sections.mjs";
 import { CAST } from "./lt-tv-format.mjs";
 import { renderScript } from "./lt-tv-episode.mjs";
-import { pendingEdits, readPauseMarks } from "./lt-tv-edit.mjs";
+import { pendingEdits, readPauseMarks, readTakeMarks, readCutMarks } from "./lt-tv-edit.mjs";
 
 let failures = 0;
 const check = (label, actual, expected) => {
@@ -473,6 +474,57 @@ console.log("\nA pause the script asked for:");
   ok("an absurd pause is refused", refused !== null);
   ok("and the refusal names the line and the limit",
     refused.includes(String(inside)) && refused.includes(String(PAUSE_MARK_MAX_SECONDS)));
+}
+
+console.log("\nA take mark records one line again without rewording it:");
+{
+  // Michelle heard a stray "to" at the head of a Connor line (2:07 of The
+  // Wealth Effect, 2026-09-21). The words were right, so the cache would
+  // hand the same rendering back forever; the only outs were rewording the
+  // line or deleting a file by hand. `# take 2` is the third way.
+  const all = episodeLines(episode);
+  const target = all[3].n;
+  const other = all[4].n;
+  const takes = readTakeMarks(`# take 2\n${target}  CONNOR  Words.\n# take 1\n${other}  SAINT GR80  More.\n`);
+  check("the mark lands on the line below it", [...takes.entries()], [[target, 2]]);
+  ok("and take 1 is not a mark, it is the default", !takes.has(other));
+
+  const plan1 = linePlan(episode);
+  const plan2 = linePlan(episode, new Map(), { takes: new Map([[target, 2]]) });
+  check("every line has a take, 1 unless asked", plan1.every((u) => u.take === 1), true);
+  check("the marked line is take 2", plan2.find((u) => u.n === target).take, 2);
+  const fp1 = lineFingerprint(plan1.find((u) => u.n === target));
+  const fp2 = lineFingerprint(plan2.find((u) => u.n === target));
+  ok("take 2 is filed under a different fingerprint", fp1 !== fp2);
+  check("take 1 hashes exactly as a line with no take field, so nothing on disk goes stale",
+    lineFingerprint({ voiceId: "v", text: "t" }), lineFingerprint({ voiceId: "v", text: "t", take: 1 }));
+  ok("and every other line is untouched by the mark",
+    plan2.filter((u) => u.n !== target).every((u, i) =>
+      lineFingerprint(u) === lineFingerprint(plan1.filter((p) => p.n !== target)[i])));
+  check("a take mark is not a pause", plan2.find((u) => u.n === target).pauseBefore,
+    plan1.find((u) => u.n === target).pauseBefore);
+
+  // What it costs, said before it is spent: exactly that line.
+  const onDisk = new Set(plan1.map((u) => lineFingerprint(u)));
+  const report = lineCostReport(plan2, (u) => onDisk.has(lineFingerprint(u)));
+  check("a take costs one line", report.fresh, 1);
+  ok("and the report says why", report.lines.some((l) => l.includes(`line ${String(target).padStart(2)}`) && l.includes("take 2")));
+
+  // It is a mark, not an edit, and not a note about the line above.
+  const page = renderScript(episode)
+    .split("\n")
+    .flatMap((row) => {
+      const num = row.match(/^\s*(\d+)\s+/);
+      return num && Number(num[1]) === target ? ["# take 2", row] : [row];
+    })
+    .join("\n");
+  check("written on the page, it lands on the line it was written above",
+    [...readTakeMarks(page).entries()], [[target, 2]]);
+  ok("a take mark is not read as an edit", pendingEdits(episode, page + "\n") === null);
+  check("nor as a cut", readCutMarks(page), []);
+  check("nor as a pause", readPauseMarks(page).size, 0);
+  check("a mark on a line that does not exist is stranded, not dropped silently",
+    strandedTakes(episode, new Map([[99999, 2], [target, 2]])), [99999]);
 }
 
 console.log("\nThe voices are the show's, not the record's:");

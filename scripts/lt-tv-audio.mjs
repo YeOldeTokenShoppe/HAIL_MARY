@@ -45,7 +45,7 @@ import { createHash } from "node:crypto";
 
 import { uploadPlan } from "./lt-tv-split.mjs";
 import { CAST } from "./lt-tv-format.mjs";
-import { pendingEdits, summariseEdits, readPauseMarks } from "./lt-tv-edit.mjs";
+import { pendingEdits, summariseEdits, readPauseMarks, readTakeMarks } from "./lt-tv-edit.mjs";
 
 const ENDPOINT = "https://api.elevenlabs.io/v1/text-to-speech";
 export const MODEL_ID = "eleven_v3";
@@ -202,7 +202,7 @@ const lineNumbers = (episode) => episode.segments.flatMap((s) => s.lines.map((l)
 export function linePlan(
   episode,
   pauses = new Map(),
-  { beat = ACT_BEAT_SECONDS, gap = LINE_GAP_SECONDS } = {},
+  { beat = ACT_BEAT_SECONDS, gap = LINE_GAP_SECONDS, takes = new Map() } = {},
 ) {
   const lines = episodeLines(episode);
   if (!lines.length) throw new Error(`${episode.id} has no lines`);
@@ -228,8 +228,17 @@ export function linePlan(
       pauseBefore: seconds,
       bytes: beatBytes(seconds),
       asked: fromScript,
+      // `# take 2` in the screenplay. Part of the line's identity, so the
+      // second rendering is kept beside the first rather than over it.
+      take: takes.get(line.n) ?? 1,
     };
   });
+}
+
+/** Take marks on lines that do not exist, so the run can say so. */
+export function strandedTakes(episode, takes = new Map()) {
+  const known = new Set(lineNumbers(episode));
+  return [...takes.keys()].filter((n) => !known.has(n)).sort((a, b) => a - b);
 }
 
 /**
@@ -281,12 +290,17 @@ export function strandedWarning(stranded, episode) {
  *
  * Nothing about the neighbouring lines is part of it, so an edit costs what
  * it changed and nothing next to it.
+ *
+ * A `# take 2` mark IS part of it, so a line can be heard again without
+ * rewording it. Take 1 hashes exactly as before the marks existed, so every
+ * line already on disk stays valid.
  */
-export function lineFingerprint({ voiceId, text }, { format = `pcm_${PCM.sampleRate}`, model = MODEL_ID } = {}) {
-  return createHash("sha256")
-    .update(JSON.stringify([voiceId, text, model, format]))
-    .digest("hex")
-    .slice(0, 16);
+export function lineFingerprint(
+  { voiceId, text, take = 1 },
+  { format = `pcm_${PCM.sampleRate}`, model = MODEL_ID } = {},
+) {
+  const identity = take > 1 ? [voiceId, text, model, format, `take ${take}`] : [voiceId, text, model, format];
+  return createHash("sha256").update(JSON.stringify(identity)).digest("hex").slice(0, 16);
 }
 
 /**
@@ -537,7 +551,11 @@ export function lineCostReport(units, kept) {
       actor: unit.actor,
       chars: unit.text.length,
       reuse: have,
-      why: have ? null : "it has not been recorded with these words in this voice",
+      why: have
+        ? null
+        : unit.take > 1
+          ? `the script asks for take ${unit.take} and there is none yet`
+          : "it has not been recorded with these words in this voice",
     };
   });
   const reused = rows.filter((r) => r.reuse);
@@ -605,6 +623,7 @@ async function generateLine({ unit, key, outDir }) {
         text: unit.text,
         model_id: MODEL_ID,
         output_format: format,
+        take: unit.take ?? 1,
         seconds: round(pcmSeconds(pcm.length)),
         trimmed_seconds: round(pcmSeconds(raw.length - pcm.length)),
         recorded_at: new Date().toISOString(),
@@ -702,8 +721,10 @@ async function main() {
   // placed, or one written as a number that is not a pause, is heard about
   // while nothing has been spent.
   const pauses = scriptText === null ? new Map() : readPauseMarks(scriptText);
-  const units = linePlan(episode, pauses);
+  const takes = scriptText === null ? new Map() : readTakeMarks(scriptText);
+  const units = linePlan(episode, pauses, { takes });
   const stranded = strandedPauses(episode, pauses);
+  const strandedTakeMarks = strandedTakes(episode, takes);
 
   const outDir = resolve("content/lt-tv/audio", episode.id);
   const format = `pcm_${PCM.sampleRate}`;
@@ -749,8 +770,17 @@ async function main() {
   for (const unit of units.filter((u) => u.asked)) {
     console.log(`  ${unit.pauseBefore}s before line ${unit.n} — from the script`);
   }
+  for (const unit of units.filter((u) => u.take > 1)) {
+    console.log(`  line ${unit.n} as take ${unit.take} — from the script`);
+  }
   const warning = strandedWarning(stranded, episode);
   if (warning) console.log(`\n${warning}\n`);
+  if (strandedTakeMarks.length) {
+    console.log(
+      `\nThere is no line ${strandedTakeMarks.join(", ")} in this episode, so the take ` +
+        `${strandedTakeMarks.length === 1 ? "mark on it was" : "marks on them were"} ignored.\n`,
+    );
+  }
 
   const audio = new Map();
   let sent = 0;
@@ -761,7 +791,7 @@ async function main() {
     const who = (episode.cast?.[unit.actor]?.displayName ?? unit.actor).padEnd(10);
     console.log(
       `  line ${String(unit.n).padStart(2)}  ${who} ${pcmSeconds(pcm.length).toFixed(1).padStart(5)}s` +
-        `${reused ? "  (kept)" : ""}`,
+        `${unit.take > 1 ? `  take ${unit.take}` : ""}${reused ? "  (kept)" : ""}`,
     );
   }
 

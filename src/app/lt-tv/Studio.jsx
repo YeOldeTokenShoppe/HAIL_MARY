@@ -35,7 +35,7 @@ export default function Studio() {
   const [log, setLog] = useState(null);
   // Bumped when a step finishes. Several steps REWRITE the screenplay —
   // applying edits renders it afresh from the record, which renumbers lines
-  // and drops `# cut` and `# pause` marks — and the box was only re-read when
+  // and drops `# cut`, `# pause` and `# take` marks — and the box was only re-read when
   // the stage changed. Applying to an episode that was already `written`
   // leaves the stage alone, so the box went on showing the old text while the
   // file said something else, and the next save pushed the stale text back
