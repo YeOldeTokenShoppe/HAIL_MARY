@@ -142,6 +142,23 @@
   window.vh_talkStarted = function () { tell("sitepal-portal-talk-started"); };
   window.vh_talkEnded = function () { tell("sitepal-portal-talk-ended"); };
 
+  // `vh_audioLoaded` IS NOT IN SITEPAL'S DOCUMENTATION. It was found on
+  // 2026-09-21 by wiring six guessed callback names into /sitepal-test and
+  // seeing which one fired; this is the one, and it is what lets the parent
+  // wait for a clip instead of hoping. Michelle's log: a cold 88-second clip
+  // reported loaded 6939ms after it was asked for. Before this, the parent
+  // called loadAudio and sayAudio in consecutive statements, so whichever
+  // character's audio was still in flight began late — measured at 662ms,
+  // which is most of the gap between two lines.
+  //
+  // `name` is the clip when the load came from loadAudio and empty when it
+  // came from sayAudio, so the parent counts portals rather than matching
+  // names. Being undocumented, it may simply stop arriving one day: the
+  // parent starts the section anyway after a failsafe, and must keep doing so.
+  window.vh_audioLoaded = function (name, errCode) {
+    tell("sitepal-portal-audio-loaded", { name: name || "", errCode: errCode });
+  };
+
   function embedNow() {
     if (typeof window.AC_VHost_Embed !== "function") return;
     // (accountID, height, width, bgcolor, firstscene, controls, sceneId, sl,
