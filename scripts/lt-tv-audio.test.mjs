@@ -48,6 +48,8 @@ import {
   revoice,
   staleClipsAfterRecord,
   staleClipWarning,
+  lineListenPath,
+  BY_NUMBER_DIR,
 } from "./lt-tv-audio.mjs";
 import { wavInfo, sliceWav, perLineRender, layoutLine, clipChanges, clipChangesReport } from "./lt-tv-split.mjs";
 import { planSections, TARGET_SECTION_SECONDS } from "./lt-tv-sections.mjs";
@@ -525,6 +527,13 @@ console.log("\nA take mark records one line again without rewording it:");
   check("nor as a pause", readPauseMarks(page).size, 0);
   check("a mark on a line that does not exist is stranded, not dropped silently",
     strandedTakes(episode, new Map([[99999, 2], [target, 2]])), [99999]);
+}
+
+console.log("\nEvery line can be heard on its own, by its number on the page:");
+{
+  const path = lineListenPath("/out", { n: 10, actor: "Monk" }, "gr80");
+  ok("named by the page's line number and the character", path.endsWith(`/lines/${BY_NUMBER_DIR}/10-gr80.wav`));
+  ok("zero-padded so Finder sorts them in order", lineListenPath("/out", { n: 3 }, "connor").endsWith("/03-connor.wav"));
 }
 
 console.log("\nThe split says which clips it actually changed:");

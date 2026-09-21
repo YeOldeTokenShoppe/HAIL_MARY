@@ -38,7 +38,7 @@
 // of integers and cannot disagree. An mp3 frame carries encoder padding that
 // the timestamps know nothing about.
 
-import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, readdir, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve, join, basename } from "node:path";
 import { createHash } from "node:crypto";
@@ -536,6 +536,22 @@ export function linePaths(outDir, fingerprint) {
 }
 
 /**
+ * Where a line can be HEARD on its own: `lines/by-number/10-gr80.wav`.
+ *
+ * The cache files are raw PCM under a fingerprint, which nothing on a Mac
+ * will play. Michelle heard a stray "to" and the first guess at which line
+ * held it was wrong (2026-09-21): a take was spent on Connor's line 11 when
+ * the fragment was the tail of GR80's line 10. One file per line, named by
+ * the number on the page, means the next such question is answered by
+ * double-clicking rather than by guessing. Rewritten in full on every run,
+ * since the numbers are positions and move.
+ */
+export const BY_NUMBER_DIR = "by-number";
+export function lineListenPath(outDir, unit, processorKey) {
+  return join(outDir, "lines", BY_NUMBER_DIR, `${String(unit.n).padStart(2, "0")}-${processorKey}.wav`);
+}
+
+/**
  * What a kept line is worth to this run, WITHOUT spending anything.
  *
  * "Record it again" asks for confirmation with the words "this spends an
@@ -807,6 +823,19 @@ async function main() {
   const masterPath = join(outDir, "master-dialogue.wav");
   await writeFile(masterPath, Buffer.concat([wavHeader(master.length), master]));
 
+  // Every line as a playable file of its own, named by its number on the
+  // page, so "which line has the noise in it" is settled by listening.
+  const byNumber = join(outDir, "lines", BY_NUMBER_DIR);
+  await rm(byNumber, { recursive: true, force: true });
+  await mkdir(byNumber, { recursive: true });
+  for (const unit of units) {
+    const pcm = audio.get(unit.n);
+    await writeFile(
+      lineListenPath(outDir, unit, episode.cast[unit.actor].processorKey),
+      Buffer.concat([wavHeader(pcm.length), pcm]),
+    );
+  }
+
   // The per-line windows, in the shape the older split path and the stale
   // voice check read, so nothing downstream has to know how this was made.
   await writeFile(
@@ -869,6 +898,7 @@ async function main() {
       `${layout.lines.length} lines, ${sent} sent to ElevenLabs, ${units.length - sent} reused.`,
   );
   console.log(`Updated ${recordPath} with the real timing.`);
+  console.log(`Each line on its own, to check one by ear: ${byNumber}/`);
   const stale = staleClipWarning(staleClipsAfterRecord(await readdir(outDir)));
   if (stale) console.log(`\n${stale}`);
 
