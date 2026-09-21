@@ -516,6 +516,10 @@ help — so that idea does not come back.
 
 ## Changing a character's voice (both shows)
 
+This is which ElevenLabs voice speaks. For how the character is *written* —
+personality and tone — see [How a character talks](#how-a-character-talks--personality-and-tone-both-shows)
+further down.
+
 `CAST` in `scripts/lt-tv-format.mjs` is what gets rendered. (`SPEAKERS` in
 `elevenlabs-dialogue-test/process_dialogue.py` only matters for the older
 two-voice path, and must agree with it there.)
@@ -606,6 +610,44 @@ good; hundreds means something is refetching.
 
 When `talk_show.glb` is re-exported, bump the query version in `MODEL_URL` so
 the browser does not keep the old animation library.
+
+---
+
+## How a character talks — personality and tone (both shows)
+
+Two places set how Connor and GR80 sound, and they do different jobs.
+
+**The character descriptions — who they are.** Each show carries its own
+paragraph per character, in the writer's instructions:
+
+- News: `scripts/lt-news-script.mjs`, under `THE TWO HOSTS` (the `CONNOR` and
+  `SAINT GR80` paragraphs).
+- Roundtable: `scripts/lt-rt-script.mjs`, under the same heading.
+
+They are deliberately not shared, because the two shows want different men:
+the news Connor treats the story as content, the roundtable Connor has to make
+an argument a clever opponent would concede. Edit the paragraph for the show
+you mean; the other one does not change. It is plain prose in a long string —
+rewrite the sentences, keep the quotes and backticks around the block intact,
+and it takes effect on the next script you write. Nothing needs rebuilding.
+
+The same two files also hold the beat pattern (who speaks when, who gets the
+last word), which is as much of the tone as the adjectives are.
+
+**The house notes — standing corrections.** `docs/lt-tv-style-notes.md`. A
+bullet under **Rules** is added to the writer's instructions on both shows and
+both passes of each. Use this for a fault you keep seeing rather than a change
+of character: "nobody says at the end of the day". See
+[A line you don't like](#a-line-you-dont-like-both-shows) below.
+
+Rule of thumb: if it is who the character is, it goes in the show's paragraph.
+If it is a habit you want stopped, it goes in the house notes.
+
+**The delivery tags** each character is allowed to use — `[dryly]`,
+`[horrified]` and the rest — are a list in `scripts/lt-tv-format.mjs`
+(`DELIVERY_TAGS`), shared by both shows. Adding one there makes it available
+to the writer; ElevenLabs decides what it does with it, so a new tag is worth
+one test line before it goes in an episode.
 
 ---
 
