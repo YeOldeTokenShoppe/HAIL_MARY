@@ -14,7 +14,7 @@
 // appears on the first paint after mount, a frame later than the rest of the
 // guide and always right.
 import { useEffect, useMemo, useState } from "react";
-import { isNewEpisode } from "@/lib/ltTv/episodeTimeline.mjs";
+import { isNewEpisode, isBadgePreview } from "@/lib/ltTv/episodeTimeline.mjs";
 
 /**
  * `{ isNew(episode), showHasNew(show) }` — both false until mounted.
@@ -25,14 +25,32 @@ import { isNewEpisode } from "@/lib/ltTv/episodeTimeline.mjs";
  */
 export default function useNewEpisodes() {
   const [now, setNow] = useState(null);
+  // Read in the same effect as the clock, and for the same reason: the query
+  // string is not knowable while the server renders.
+  const [preview, setPreview] = useState(false);
 
-  useEffect(() => setNow(Date.now()), []);
+  useEffect(() => {
+    setNow(Date.now());
+    try {
+      setPreview(isBadgePreview(window.location.search));
+    } catch {
+      /* no window, or a search string that will not parse — no preview */
+    }
+  }, []);
 
   return useMemo(() => {
-    const isNew = (episode) => (now === null ? false : isNewEpisode(episode, now));
+    const isNew = (episode) => {
+      if (!episode) return false;
+      // ?preview=new badges everything listed, so the badge can be looked at
+      // on a slate that has nothing recent on it. See isBadgePreview.
+      if (preview) return true;
+      return now === null ? false : isNewEpisode(episode, now);
+    };
     return {
       isNew,
+      // A show with no episodes has nothing new even in preview: "Coming soon"
+      // and "New" on the same row would be a lie in both directions.
       showHasNew: (show) => (show?.episodes || []).some(isNew),
     };
-  }, [now]);
+  }, [now, preview]);
 }

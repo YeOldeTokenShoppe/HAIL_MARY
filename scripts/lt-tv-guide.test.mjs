@@ -16,7 +16,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { resolve, join } from "node:path";
 
-import { isNewEpisode, NEW_EPISODE_DAYS, episodeIsPlayable } from "../src/lib/ltTv/episodeTimeline.mjs";
+import { isNewEpisode, isBadgePreview, NEW_EPISODE_DAYS, episodeIsPlayable } from "../src/lib/ltTv/episodeTimeline.mjs";
 
 let failures = 0;
 const check = (label, actual, expected) => {
@@ -55,6 +55,18 @@ ok("a nonsense air date is not new either", !isNewEpisode(aired("last Tuesday"),
 // The components resolve the clock in an effect, so the first render passes
 // nothing. That must read as "not new" rather than throwing inside a render.
 ok("and no clock yet means no badge, not a crash", !isNewEpisode(aired("2026-09-21"), undefined));
+
+// The badge is only ever on when a recent episode is on the slate, so it is
+// the one part of the guide that cannot be checked by looking at it. The
+// preview switch exists for that, and must stay hard to turn on by accident.
+console.log("\nThe preview switch, for looking at a badge nothing qualifies for:");
+ok("?preview=new turns it on", isBadgePreview("?preview=new"));
+ok("beside other params too", isBadgePreview("?show=news&preview=new"));
+ok("a near miss does not", !isBadgePreview("?preview=newer"));
+ok("nor an empty value", !isBadgePreview("?preview="));
+ok("nor an unrelated query", !isBadgePreview("?utm_source=x"));
+ok("nor no query at all", !isBadgePreview(""));
+ok("and a non-string is not a URL", !isBadgePreview(undefined) && !isBadgePreview(null));
 
 console.log("\nThe slate itself, as the guide reads it:");
 const SLATE = "src/content/lt-tv/episodes";

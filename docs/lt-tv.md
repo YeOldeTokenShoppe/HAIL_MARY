@@ -144,6 +144,12 @@ script comes from:
 | Clip prefix | `lttv_news_ep<NN>_` | `lttv_rt_ep<NN>_` | `lttv_mm_ep<NN>_` |
 | Length | 5–10 min | 4–9 min | 4–9 min |
 
+**Seeing the "New episode" badge.** An episode is badged in the guide for a
+week after its air date, which means the badge is invisible whenever nothing
+recent is on the slate — and it is the one part of the guide you cannot check
+by looking. Add `?preview=new` to the /trade URL to turn it on for every listed
+episode. It is display-only, and nobody sees it without typing it.
+
 **Markets & Morality is the roundtable's format under its own banner.** Same
 two seats, same six segments, same generator — it exists as a separate show so
 the slate can sort the moral arguments out of the roundtable queue. Write one
