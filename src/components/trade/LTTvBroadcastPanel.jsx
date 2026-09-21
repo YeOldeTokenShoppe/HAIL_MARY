@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import LTTvChiron from "@/components/trade/LTTvChiron";
+import useNewEpisodes from "@/components/trade/useNewEpisodes";
 import { SHOWS } from "@/content/lt-tv";
 
 // THE SLATE IS DATA. Both the shows and their episodes come from
@@ -32,6 +33,8 @@ export default function LTTvBroadcastPanel({
   const [collapsed, setCollapsed] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(SHOWS[0].id);
+  const { isNew, showHasNew } = useNewEpisodes();
+  const somethingIsNew = SHOWS.some(showHasNew);
   const guideButtonRef = useRef(null);
   const guideRef = useRef(null);
   const episodesButtonRef = useRef(null);
@@ -158,11 +161,17 @@ export default function LTTvBroadcastPanel({
           ref={guideButtonRef}
           type="button"
           className={`ltv-guide-toggle${guideOpen ? " is-open" : ""}`}
+          aria-label={somethingIsNew ? "Browse programs — new episode" : undefined}
           onClick={toggleGuide}
           aria-expanded={guideOpen}
           aria-controls="ltv-guide"
         >
           Browse programs
+          {/* The whole point of the badge is to be visible WITHOUT opening the
+              guide, so the entry point carries a dot when anything inside it
+              is new. The label says so for a screen reader, which cannot see
+              a dot. */}
+          {somethingIsNew && <i className="ltv-new-dot" aria-hidden="true" />}
         </button>
       </div>
 
@@ -247,7 +256,10 @@ export default function LTTvBroadcastPanel({
                   aria-expanded={open}
                   onClick={() => setExpandedId(open ? null : s.id)}
                 >
-                  <span className="ltv-guide-name"><b>{s.title}</b><small>{s.format}</small></span>
+                  <span className="ltv-guide-name">
+                    <b>{s.title}{showHasNew(s) && <em className="ltv-new">New</em>}</b>
+                    <small>{s.format}</small>
+                  </span>
                   <span className="ltv-guide-tag">EP {latest.number}</span>
                 </button>
                 {open && (
@@ -264,7 +276,7 @@ export default function LTTvBroadcastPanel({
                         >
                           <span className="ltv-ep-number">{episode.number}</span>
                           <span className="ltv-ep-copy">
-                            <b>{episode.title}</b>
+                            <b>{episode.title}{isNew(episode) && <em className="ltv-new">New</em>}</b>
                             <small>{episode.runtime || "Not recorded yet"}</small>
                           </span>
                           {active && <span className="ltv-row-play" aria-hidden="true">▶</span>}
@@ -316,8 +328,17 @@ const styles = `
     min-height: 36px; padding: 0 10px; border: 1px solid rgba(255,255,255,.18);
     border-radius: 5px; background: rgba(255,255,255,.04); color: #dad8e0;
     font: 500 12px "Inter", sans-serif; cursor: pointer; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 7px;
   }
   .ltv-guide-toggle:hover, .ltv-guide-toggle.is-open { color: #fff; border-color: var(--cyan); }
+  .ltv-new-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--magenta); box-shadow: 0 0 7px rgba(239,98,220,.8); }
+  /* The badge rides inside the title so it wraps with it rather than pushing
+     the row's layout around. */
+  .ltv-new {
+    display: inline-block; margin-left: 8px; padding: 2px 6px; border-radius: 3px;
+    background: var(--magenta); color: #1b0716; vertical-align: 2px;
+    font: 700 9px/1.4 "Inter", sans-serif; font-style: normal; letter-spacing: .09em; text-transform: uppercase;
+  }
   .ltv-production { position: fixed; top: 112px; left: 32px; width: 340px; max-height: calc(100dvh - 210px); overflow-y: auto; }
   .ltv-production h2 { margin: 0; color: var(--cyan); font: 700 30px/1.22 "Orbitron", sans-serif; letter-spacing: -.035em; text-wrap: balance; }
   .ltv-format { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 10px; margin: 16px 0 28px; color: #b9b6c2; font-size: 12px; line-height: 1.5; }

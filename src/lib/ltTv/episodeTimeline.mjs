@@ -68,6 +68,36 @@ export function episodeIsPlayable(record) {
   );
 }
 
+// HOW LONG AN EPISODE IS "NEW" FOR. Both shows are weekly, so a week is the
+// honest window: the badge means "since you last had a reason to look", and
+// anything longer would leave last week's episode wearing it beside this
+// week's. Change this one number to change the whole guide.
+export const NEW_EPISODE_DAYS = 7;
+
+/**
+ * Is this episode new enough to badge in the guide?
+ *
+ * Only a playable record qualifies — a slate entry that has been named but not
+ * recorded already says "Not recorded yet", and badging it New would promise
+ * something to watch that isn't there.
+ *
+ * `airDate` is a plain YYYY-MM-DD, read as UTC midnight. A date in the FUTURE
+ * counts as new rather than as not-yet-new: `assemble()` stamps the date from
+ * the machine that wrote the episode, so an episode written on a Pacific
+ * evening is stamped tomorrow, and an episode that fails to be new on the day
+ * it goes up is worse than one that is new a few hours early.
+ *
+ * `now` is passed in rather than read here so the caller decides when it is
+ * read — a component that resolves it during render bakes the server's date
+ * into the HTML and disagrees with the browser on hydration.
+ */
+export function isNewEpisode(record, now) {
+  if (!episodeIsPlayable(record) || typeof record.airDate !== "string") return false;
+  const aired = Date.parse(`${record.airDate}T00:00:00Z`);
+  if (!Number.isFinite(aired) || !Number.isFinite(now)) return false;
+  return now - aired < NEW_EPISODE_DAYS * 24 * 60 * 60 * 1000;
+}
+
 /**
  * Where each clip begins on the episode timeline, and what to play there.
  *

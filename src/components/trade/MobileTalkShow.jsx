@@ -25,6 +25,7 @@ import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import TalkShowScene from "./TalkShowScene";
 import { SHOWS } from "@/content/lt-tv";
+import useNewEpisodes from "./useNewEpisodes";
 import usePerfHud from "./PerfHud";
 
 // Camera + aim carried over from the desktop talk-show pose (`talkShowPose` in
@@ -201,6 +202,7 @@ export default function MobileTalkShow({ onExit }) {
   // episode (or says it isn't recorded yet).
   const [episodeIndex, setEpisodeIndex] = useState(0);
   const [showId, setShowId] = useState(SHOWS[0].id);
+  const { isNew, showHasNew } = useNewEpisodes();
   const show = SHOWS.find((item) => item.id === showId) || SHOWS[0];
   const newsMode = show.id === "news";
   const hasEpisode = show.episodes.length > 0;
@@ -263,9 +265,14 @@ export default function MobileTalkShow({ onExit }) {
         <button type="button" onClick={exit} aria-label="Return to terminal">‹ <span>LT TV</span></button>
         <select className="mts-program-select" aria-label="Browse programs" value={showId}
           onChange={(event) => { stop(); setPlaying(false); setShowId(event.target.value); setEpisodeIndex(0); }}>
+          {/* A native <select> is the right control on a phone and cannot
+              carry a drawn badge, so here the badge is words. It still reads
+              at a glance, which is all the dot on desktop does. */}
           {SHOWS.map((program) => <option key={program.id} value={program.id}
             disabled={!program.episodes.length && program.id !== "news"}>
-            {program.title}{program.id === "news" ? " — Studio preview" : !program.episodes.length ? " — Coming soon" : ""}
+            {program.title}{program.id === "news" ? " — Studio preview"
+              : !program.episodes.length ? " — Coming soon"
+              : showHasNew(program) ? " — New episode" : ""}
           </option>)}
         </select>
       </header>
@@ -345,13 +352,16 @@ export default function MobileTalkShow({ onExit }) {
               key={ep.number}
               className={`mts-rack-item ${i === episodeIndex ? "is-on" : ""}`}
               aria-pressed={i === episodeIndex}
-              aria-label={`Episode ${ep.number}: ${ep.title}, ${ep.runtime || "not recorded yet"}`}
+              aria-label={`Episode ${ep.number}: ${ep.title}, ${ep.runtime || "not recorded yet"}${isNew(ep) ? ", new" : ""}`}
               onClick={() => {
                 if (playing) stop();
                 setEpisodeIndex(i);
               }}
             >
-              <span className="mts-rack-no">Episode {ep.number}</span>
+              <span className="mts-rack-no">
+                Episode {ep.number}
+                {isNew(ep) && <em className="mts-new" aria-hidden="true">New</em>}
+              </span>
               <span className="mts-rack-title">{ep.title}</span>
               <span className="mts-rack-run">{ep.runtime || "Not recorded yet"}</span>
             </button>
@@ -395,7 +405,8 @@ export default function MobileTalkShow({ onExit }) {
         .mts-rack { display: flex; gap: 10px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; padding: 3px 3px 12px; margin: 0 -3px; scrollbar-width: thin; scrollbar-color: #554659 transparent; }
         .mts-rack-item { flex: 0 0 156px; min-height: 108px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px; border: 1px solid rgba(255,255,255,.12); border-radius: 7px; background: #15121b; color: #f7f4fa; font: inherit; text-align: left; cursor: pointer; scroll-snap-align: start; }
         .mts-rack-item.is-on { border-color: #ef62dc; background: #28172c; }
-        .mts-rack-no { color: #a9a5b2; font-size: 11px; }
+        .mts-rack-no { display: flex; align-items: center; gap: 7px; color: #a9a5b2; font-size: 11px; }
+        .mts-new { padding: 2px 6px; border-radius: 3px; background: #ef62dc; color: #1b0716; font: 700 9px/1.4 "Inter", sans-serif; font-style: normal; letter-spacing: .09em; text-transform: uppercase; }
         .mts-rack-item.is-on .mts-rack-no { color: #ef62dc; }
         .mts-rack-title { font-size: 13px; font-weight: 600; line-height: 1.35; }
         .mts-rack-run { margin-top: auto; font-size: 11px; color: #a9a5b2; }

@@ -1,8 +1,8 @@
 {
   "synthetic": true,
-  "id": "roundtable-02",
-  "show": "roundtable",
-  "number": "02",
+  "id": "morality-01",
+  "show": "morality",
+  "number": "01",
   "title": "The Wealth Effect",
   "summary": "Paper gains, real confidence, and the stories a rising chart tells.",
   "airDate": "2026-09-20",
@@ -16,13 +16,13 @@
       "displayName": "Connor",
       "voiceId": "IcFWazAaBzXNwLWpySgF",
       "processorKey": "john",
-      "sitepalAudio": "lttv_rt_ep02_connor"
+      "sitepalAudio": "lttv_mm_ep01_connor"
     },
     "Monk": {
       "displayName": "Saint GR80",
       "voiceId": "Re5c3vCmpnygdZuSX2Wc",
       "processorKey": "gr80",
-      "sitepalAudio": "lttv_rt_ep02_gr80"
+      "sitepalAudio": "lttv_mm_ep01_gr80"
     }
   },
   "segments": [
@@ -534,7 +534,7 @@
     "flaw": "The question assumes those are different things, when for most of what people actually do with money they are the same thing.",
     "connorCase": "Confidence is not a delusion, it is a real input. A person who feels wealthy starts the business, hires the cousin, and takes the risk that the cautious version of them would not. The number on the screen does work in the world long before anyone sells anything.",
     "gr80Reframe": "The confidence is real and so is the bill. What the rising chart buys is permission to spend money that has not arrived, and the permission is issued to everyone at once, which is why it is withdrawn from everyone at once.",
-    "hardCase": "A man remortgages a house he has lived in for thirty years to fund his daughter's clinic. On paper he is wealthier than he has ever been. Connor's principle says let him \u2014 it is his risk and his daughter. GR80's principle says stop him, and stopping him means the clinic does not open and the people it would have treated are not in the room to be consulted either.",
+    "hardCase": "A man remortgages a house he has lived in for thirty years to fund his daughter's clinic. On paper he is wealthier than he has ever been. Connor's principle says let him — it is his risk and his daughter. GR80's principle says stop him, and stopping him means the clinic does not open and the people it would have treated are not in the room to be consulted either.",
     "concession": {
       "who": "Monk",
       "what": "He concedes that refusing the risk is also a decision made on someone else's behalf, and that he cannot claim to be the only one in the room who counts the cost."

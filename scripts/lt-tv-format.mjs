@@ -320,6 +320,22 @@ export const SHOW_FORMATS = {
     graphicsMode: null,
     dated: false,
   },
+  // MARKETS & MORALITY IS THE ROUNDTABLE'S FORMAT UNDER ITS OWN BANNER. Same
+  // two seats, same six-segment argument, same runtime window, same generator
+  // (`lt-rt-script.mjs` writes either show). It exists as a separate show
+  // because the slate sorts the moral arguments out of the roundtable queue,
+  // not because anything about the writing differs — so this shares
+  // ROUNDTABLE_SEGMENTS rather than copying them, and a check the roundtable
+  // gains, this gains.
+  morality: {
+    id: "morality",
+    title: "Markets & Morality",
+    segments: ROUNDTABLE_SEGMENTS,
+    optional: new Set(),
+    runtime: { min: 240, max: 540 },
+    graphicsMode: null,
+    dated: false,
+  },
 };
 
 export function showFormat(id) {

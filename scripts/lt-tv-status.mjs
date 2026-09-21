@@ -2,7 +2,7 @@
 // WHERE IS EVERY EPISODE, AND WHAT DO I RUN NEXT.
 //
 //   npm run lt                        # every episode, both shows
-//   npm run lt -- roundtable-02       # one episode, in detail
+//   npm run lt -- roundtable-03       # one episode, in detail
 //   npm run lt -- --html              # a page to keep open
 //
 // Given as `npm run` throughout because that starts in the repo root wherever
@@ -203,10 +203,14 @@ function nextStep({ id, stage, registered, slate, staging, hasWorkingCopy }) {
   const show = slate?.showId ?? staging?.show;
   return {
     why: "it is named on the slate and nobody has written it",
+    // Every show but the news show is an argument show, written from its own
+    // slate entry by lt:roundtable. Only the news show needs a brief pulled
+    // first, so that is the branch worth naming — a new argument show added to
+    // the slate gets the right advice without being listed here.
     run:
-      show === "roundtable"
-        ? `npm run lt:roundtable -- --topic ${id}`
-        : "npm run lt:brief, then npm run lt:news -- --brief <brief>",
+      show === "news"
+        ? "npm run lt:brief, then npm run lt:news -- --brief <brief>"
+        : `npm run lt:roundtable -- --topic ${id}`,
   };
 }
 

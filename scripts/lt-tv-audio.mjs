@@ -2,7 +2,7 @@
 // STEP 3 — BUILD THE AUDIO FOR AN EPISODE.
 //
 //   node scripts/lt-tv-audio.mjs content/lt-tv/episodes/news-01.json
-//   node scripts/lt-tv-audio.mjs content/lt-tv/episodes/roundtable-02.json --dry-run
+//   node scripts/lt-tv-audio.mjs content/lt-tv/episodes/roundtable-03.json --dry-run
 //
 // EVERY LINE IS RENDERED ON ITS OWN, IN ITS OWN VOICE. That is the whole
 // design, and it replaces one that rendered the conversation as blocks with
@@ -13,7 +13,7 @@
 // apart needs to know, to a tenth of a second, where one voice stops and the
 // other starts — and the only thing ElevenLabs reports about that is a set of
 // line times which are a division of the text, not a measurement of the
-// audio. On roundtable-02 they were a phrase out, in five different attempts
+// audio. On The Wealth Effect they were a phrase out, in five different attempts
 // to work around them, and every attempt put a fragment of Saint GR80 in
 // Connor's mouth. There is no boundary to find when there is no boundary:
 // a line rendered alone can only ever be in one track.
@@ -142,7 +142,7 @@ export const PAUSE_MARK_MAX_SECONDS = 10;
  * A record stores a `voiceId` on every line and in its `cast`, both frozen
  * when the episode was assembled. That is a copy of a fact that lives in
  * `CAST`, and a copy goes stale: Michelle changed the Monk's voice on
- * 2026-09-21 and then re-recorded roundtable-02 — which dutifully asked
+ * 2026-09-21 and then re-recorded The Wealth Effect — which dutifully asked
  * ElevenLabs for the OLD voice, because that is what the record still said.
  *
  * A voice is a property of the show, so the show wins, and the record is

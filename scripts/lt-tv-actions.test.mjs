@@ -20,7 +20,7 @@ import { STAGES } from "./lt-tv-status.mjs";
 import { IS_DEV, refuseOutsideDev } from "../src/lib/ltTv/devOnly.mjs";
 
 const SAMPLE = JSON.parse(
-  await readFile(resolve("content/lt-tv/samples/roundtable-02.sample.json"), "utf8"),
+  await readFile(resolve("content/lt-tv/samples/morality-01.sample.json"), "utf8"),
 );
 
 let failures = 0;
