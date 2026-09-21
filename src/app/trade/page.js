@@ -26,6 +26,7 @@ import VideoScreens from "@/components/VideoScreens";
 // import VideoScreensOptimized from "@/components/VideoScreensOptimized";
 import CouncilChatScreens from "@/components/CouncilChatScreens";
 import TalkShowScene, { preloadTalkShow, HouseAmbient } from "@/components/trade/TalkShowScene";
+import LTTvLightPanel from "@/components/trade/LTTvLightPanel";
 import LTTvBroadcastPanel from "@/components/trade/LTTvBroadcastPanel";
 import { SHOWS as LT_TV_SHOWS, findEpisode as findLtTvEpisode } from "@/content/lt-tv";
 import TickerDisplay3 from "@/components/TickerDisplay3";
@@ -3562,6 +3563,11 @@ export default function CyborgTemple() {
 
       {/* Dev camera-tuning panel — shows only when ?tune=1 is in URL */}
       <CameraTuningPanel />
+
+      {/* LT TV lighting board — shows only when ?tune=lights is in the URL.
+          Writes straight into STUDIO_LIGHTS / HOUSE_AMBIENT, which the set
+          re-reads every frame, and copies the numbers back out. */}
+      <LTTvLightPanel />
 
       {/* Dev SitePal crop tuning panel — shows only when ?tune=sitepal */}
       {/* <SitePalCropPanel /> */}

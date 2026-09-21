@@ -107,6 +107,45 @@ under "PAUSE, RESUME AND SKIPPING", the arithmetic is in
 
 ---
 
+## The lighting board
+
+The set's lights have two states: full while an episode is running, and down
+between episodes, so the studio comes up when a show starts and goes dark when
+it ends. Two things make that cue, and they move together:
+
+- the **room** — one flat light over the whole canvas, which is most of what
+  you see (`HOUSE_AMBIENT` in `TalkShowScene.jsx`)
+- the **rig** — the four fixtures on the overhead bar, their beams and their
+  lens glare (`STUDIO_LIGHTS`, same file)
+
+Dimming the rig on its own is invisible. It adds a lot of light to a small part
+of the set and the room lights everything, so if the cue ever stops reading,
+that is the first thing to check.
+
+**To dial it in, open `/trade?tune=lights` and go to an LT TV set.** A board
+appears on the right with:
+
+- **Off air / On air / Follow the show.** The first two hold the set in one
+  state so you can judge both without sitting through an episode. The third
+  hands it back to real playback. This is only for tuning; it resets on reload.
+- **Levels** — the room on air and off air, how far the rig drops off air, and
+  how fast the fade is.
+- **Fixture 1–4**, one at a time, with its swing, tilt, brightness, beam and
+  colour. Swing and tilt are degrees off the aim that was modelled in Blender,
+  so 0 is always the original and **Re-centre aim** is the way back.
+- **Beam, all four** — spread, softness, falloff, throw and the shaft.
+
+Everything applies as you drag and is remembered in your browser, so a reload
+does not lose an evening. Nothing is written to the repo: press **Copy values**
+and paste the block into the project thread, and the numbers become the
+defaults.
+
+Shaft thickness and length (`coneLength`, `radiusTop`) are baked into the beam
+geometry when the set loads, so they are not on the board — change them in
+`STUDIO_LIGHTS` and reload.
+
+---
+
 ## Where is everything, from a terminal
 
 ```bash

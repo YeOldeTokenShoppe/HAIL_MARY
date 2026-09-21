@@ -844,16 +844,33 @@ export const HOUSE_AMBIENT = {
   fadeLambda: 2.2,
 };
 
+// HOLDING THE STATE WHILE YOU TUNE IT. The two looks the rig has are "an
+// episode is running" and "one isn't", and reaching the first one honestly
+// means sitting through a show — useless when the thing being judged is the
+// lighting. `force` pins it: "on", "off", or null to follow the real show.
+//
+// One flag for both the rig and the room, deliberately. They are one cue, and
+// a preview that could hold them in different states would be a way to tune
+// against a picture the viewer never sees. Live from `window.__tsHouse`, and
+// the lighting panel (?tune=lights) is its UI.
+export const HOUSE_PREVIEW = { force: null };
+const showIsOn = (onAir) =>
+  HOUSE_PREVIEW.force === "on" ? true
+  : HOUSE_PREVIEW.force === "off" ? false
+  : onAir;
+
 export function HouseAmbient({ dimmed = false }) {
   const lightRef = useRef(null);
   const levelRef = useRef(dimmed ? HOUSE_AMBIENT.offAir : HOUSE_AMBIENT.onAir);
 
   useEffect(() => {
-    if (typeof window !== "undefined") window.__tsAmbient = HOUSE_AMBIENT;
+    if (typeof window === "undefined") return;
+    window.__tsAmbient = HOUSE_AMBIENT;
+    window.__tsHouse = HOUSE_PREVIEW;
   }, []);
 
   useFrame((state, delta) => {
-    const target = dimmed ? HOUSE_AMBIENT.offAir : HOUSE_AMBIENT.onAir;
+    const target = showIsOn(!dimmed) ? HOUSE_AMBIENT.onAir : HOUSE_AMBIENT.offAir;
     levelRef.current = THREE.MathUtils.damp(
       levelRef.current,
       target,
@@ -1073,7 +1090,7 @@ function StudioLights({ fixtures, onAir }) {
     // Ease toward the house level for whichever way the show is. Damping on
     // delta rather than a fixed step so the fade takes the same time whatever
     // the frame rate.
-    const target = onAir ? 1 : STUDIO_LIGHTS.offAir;
+    const target = showIsOn(onAir) ? 1 : STUDIO_LIGHTS.offAir;
     levelRef.current = THREE.MathUtils.damp(
       levelRef.current,
       target,
