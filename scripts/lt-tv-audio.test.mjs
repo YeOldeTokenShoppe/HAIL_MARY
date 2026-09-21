@@ -28,6 +28,8 @@ import {
   blockInputs,
   timingFromSegments,
   tierRefusal,
+  blockFingerprint,
+  cacheIsUsable,
 } from "./lt-tv-audio.mjs";
 import { renderScript } from "./lt-tv-episode.mjs";
 import { pendingEdits } from "./lt-tv-edit.mjs";
@@ -269,6 +271,50 @@ console.log("\nRecording refuses a screenplay that was never applied:");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+}
+
+console.log("\nA kept block is only reused for the words it was recorded from:");
+{
+  // COST MICHELLE A WHOLE EPISODE on 2026-09-21. `packBlocks` names blocks by
+  // POSITION — block-1, block-2 — and re-packs them whenever a segment's
+  // length changes, so after an edit `block-2` covers different lines than the
+  // block-2 already on disk. Keyed by id alone, the cache handed back the old
+  // words under the new block's name, and every later line was then laid out
+  // from the old block's duration and the old block's segment list. She heard
+  // both: the line she had rewritten read exactly as before, and lines that
+  // started in one voice and finished in the other.
+  const inputs = [
+    { text: "Paper gains are still gains.", voice_id: "connor-voice" },
+    { text: "They are still paper.", voice_id: "gr80-voice" },
+  ];
+  const format = "pcm_24000";
+  const fingerprint = blockFingerprint(inputs);
+
+  ok("a fingerprint is short enough to sit in a file", fingerprint.length === 16);
+  check("the same words give the same one", blockFingerprint(inputs), fingerprint);
+  ok("a reworded line gives a different one",
+    blockFingerprint([{ ...inputs[0], text: "Paper gains are not gains." }, inputs[1]]) !== fingerprint);
+  ok("and so does the same words in the other voice",
+    blockFingerprint([{ ...inputs[0], voice_id: "gr80-voice" }, inputs[1]]) !== fingerprint);
+  ok("and so does the same lines in the other order",
+    blockFingerprint([inputs[1], inputs[0]]) !== fingerprint);
+
+  const kept = { lt_tv_output_format: format, lt_tv_inputs: fingerprint };
+  ok("an unchanged block is reused", cacheIsUsable(kept, { format, fingerprint }).ok);
+
+  const edited = cacheIsUsable(kept, { format, fingerprint: blockFingerprint([inputs[0]]) });
+  check("a block whose words changed is not", edited.ok, false);
+  ok("and it says so in as many words", edited.why.includes("different words"));
+
+  const rate = cacheIsUsable(kept, { format: "pcm_44100", fingerprint });
+  check("nor one recorded at another rate", rate.ok, false);
+  ok("naming both rates", rate.why.includes("pcm_24000") && rate.why.includes("pcm_44100"));
+
+  // Everything cached before this check exists cannot be shown to match, and
+  // the cost of assuming wrongly is an episode that says the wrong thing.
+  const older = cacheIsUsable({ lt_tv_output_format: format }, { format, fingerprint });
+  check("and nor is anything kept before fingerprints existed", older.ok, false);
+  ok("which it explains rather than just refusing", older.why.includes("predates"));
 }
 
 console.log(failures ? `\n${failures} check(s) failed.\n` : "\nAll checks passed.\n");

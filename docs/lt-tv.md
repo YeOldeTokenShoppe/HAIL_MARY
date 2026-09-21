@@ -425,6 +425,14 @@ Three things you can do with a bad line, in rising order of effort.
 **Rewrite it yourself.** Open the screenplay, change the words, then
 **Apply my edits**. Nothing is spent and nothing else in the episode moves.
 
+A recorded block is kept so a failed run resumes instead of paying twice, and
+it is kept **by its words**, not by its number. Block names are positions —
+`block-1`, `block-2` — and they re-pack whenever a segment's length changes, so
+after an edit `block-2` may cover entirely different lines than the block-2 on
+disk. Keyed by name alone it handed back the old words under the new block's
+name. If the audio build says a block "was recorded from different words", that
+is this check doing its job.
+
 Saving is not applying. **Save** writes the screenplay file; **Apply my edits**
 is what reads it back into the episode, and recording renders the EPISODE. An
 edit that is saved but never applied used to be recorded as the old words,

@@ -31,6 +31,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve, dirname, join, basename } from "node:path";
+import { createHash } from "node:crypto";
 
 import { uploadPlan } from "./lt-tv-split.mjs";
 import { pendingEdits, summariseEdits } from "./lt-tv-edit.mjs";
@@ -217,6 +218,58 @@ export function tierRefusal(body) {
   ].join("\n");
 }
 
+/**
+ * What a block is made of, as one short string.
+ *
+ * A BLOCK ID IS A POSITION, NOT AN IDENTITY. `packBlocks` numbers blocks
+ * `block-1`, `block-2`, … by where they fall, and re-packs them whenever a
+ * segment's length changes — so after an edit, `block-2` covers different
+ * lines than the `block-2` on disk. Keeping blocks by id alone therefore
+ * reuses audio of the OLD words under the NEW block's name, and everything
+ * after it is laid out from the old block's duration and the old block's
+ * segment list.
+ *
+ * That is not a subtle failure. Michelle recorded roundtable-02 on
+ * 2026-09-21, after applying edits, and got the line she had rewritten read
+ * exactly as before, plus lines that started in one character's voice and
+ * finished in the other's — the stems being cut to segment spans that no
+ * longer described the audio.
+ *
+ * So a kept block is reusable only when it was recorded from these words, in
+ * this order, in these voices.
+ */
+export function blockFingerprint(inputs) {
+  return createHash("sha256")
+    .update(JSON.stringify(inputs.map(({ text, voice_id }) => [voice_id, text])))
+    .digest("hex")
+    .slice(0, 16);
+}
+
+/**
+ * Whether a kept block can be used again, and if not, why not in one phrase.
+ *
+ * Both reasons are about the audio no longer describing what the record now
+ * claims, and both are silent if not checked: one plays the wrong words, the
+ * other places every later line wrongly.
+ */
+export function cacheIsUsable(kept, { format, fingerprint }) {
+  if ((kept.lt_tv_output_format ?? "pcm_44100") !== format) {
+    return {
+      ok: false,
+      why: `the kept copy is ${kept.lt_tv_output_format ?? "pcm_44100"} and this run is ${format}`,
+    };
+  }
+  // A block kept before blocks were fingerprinted cannot be shown to match, and
+  // the cost of assuming wrongly is an episode that says the wrong thing.
+  if (!kept.lt_tv_inputs) {
+    return { ok: false, why: "the kept copy predates this check, so it cannot be shown to match" };
+  }
+  if (kept.lt_tv_inputs !== fingerprint) {
+    return { ok: false, why: "the kept copy was recorded from different words" };
+  }
+  return { ok: true };
+}
+
 async function generateBlock({ inputs, key, outDir, id }) {
   // Blocks cost money and a long episode is several of them, so a finished
   // block is kept. A run that dies on block four resumes at block four.
@@ -224,19 +277,19 @@ async function generateBlock({ inputs, key, outDir, id }) {
   // A kept block is only reusable at the rate it was recorded at: its length
   // in bytes is how every later line is placed, so mixing rates inside one
   // episode would desync it from the join onwards. Blocks kept before the
-  // rate was settable are all 44100.
+  // rate was settable are all 44100. And it must be the same WORDS — see
+  // blockFingerprint, which is the harder of the two to notice going wrong.
   const format = `pcm_${PCM.sampleRate}`;
+  const fingerprint = blockFingerprint(inputs);
   const cached = join(outDir, `${id}.json`);
   if (existsSync(cached)) {
     const kept = JSON.parse(await readFile(cached, "utf8"));
-    if ((kept.lt_tv_output_format ?? "pcm_44100") === format) {
+    const usable = cacheIsUsable(kept, { format, fingerprint });
+    if (usable.ok) {
       console.log(`  ${id}: using the copy already in ${basename(outDir)}/`);
       return kept;
     }
-    console.log(
-      `  ${id}: the kept copy is ${kept.lt_tv_output_format ?? "pcm_44100"} and this run is ` +
-        `${format}, so it is being recorded again.`,
-    );
+    console.log(`  ${id}: ${usable.why}, so it is being recorded again.`);
   }
 
   const res = await fetch(`${ENDPOINT}?output_format=${format}`, {
@@ -252,7 +305,10 @@ async function generateBlock({ inputs, key, outDir, id }) {
   if (!payload?.audio_base64) {
     throw new Error(`${id}: no audio came back — ${JSON.stringify(payload).slice(0, 300)}`);
   }
-  await writeFile(cached, JSON.stringify({ ...payload, lt_tv_output_format: format }));
+  await writeFile(
+    cached,
+    JSON.stringify({ ...payload, lt_tv_output_format: format, lt_tv_inputs: fingerprint }),
+  );
   return payload;
 }
 
