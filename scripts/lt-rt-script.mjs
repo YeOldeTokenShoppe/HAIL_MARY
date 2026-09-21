@@ -2,9 +2,15 @@
 //
 // lt-rt-script — the script step for "The Liminal Terminal", the roundtable.
 //
-//   node scripts/lt-rt-script.mjs --topic roundtable-02
+//   node scripts/lt-rt-script.mjs --topic roundtable-03
 //   node scripts/lt-rt-script.mjs --theme "what a bailout actually buys"
 //   node scripts/lt-rt-script.mjs --list          # what is on the slate, unwritten
+//
+// It writes BOTH argument shows: "The Liminal Terminal" and "Markets &
+// Morality". They are the same format — two seats, one argument, six segments
+// — under different banners, so the show comes from the topic's own id
+// (roundtable-03, morality-01) rather than from a second copy of this file.
+// `--theme` has no id to read, so it takes `--show` (default roundtable).
 //
 // The news show starts from a week of market signal. The roundtable does not
 // start from anything that happened — it is one argument about one idea, and
@@ -34,6 +40,7 @@ import {
   DELIVERY_TAGS,
   EVENT_TAGS,
   showFormat,
+  TITLE_RULES,
 } from "./lt-tv-format.mjs";
 import { assemble, renderScript } from "./lt-tv-episode.mjs";
 import { arg, rejectUnknownFlags } from "./lt-tv-cli.mjs";
@@ -43,10 +50,20 @@ import { toSlateRecord, writeSlateRecord, SLATE_DIR, SLATE_INDEX } from "./lt-tv
 
 const MODEL = process.env.LT_TV_MODEL || "claude-opus-5";
 const PIPELINE = "scripts/lt-rt-script.mjs";
-const FORMAT = showFormat("roundtable");
+// The shows this generator writes, in slate order. Both resolve through
+// showFormat, so adding one here is adding it to SHOW_FORMATS and nothing else.
+//
+// "roundtable" stays here although The Liminal Terminal is no longer a channel
+// (Michelle's call, 2026-09-21): the FORMAT is what both shows are, and an old
+// roundtable record should still queue if one turns up. What changed is the
+// default — a --theme run with no --show now writes a Markets & Morality
+// episode, because an episode written for a show the guide does not list would
+// never appear on the site.
+const SHOWS = ["roundtable", "morality"];
+const DEFAULT_SHOW = "morality";
 const EPISODE_DIR = "content/lt-tv/episodes";
 
-const KNOWN_FLAGS = ["topic", "theme", "list", "draft", "plan-only", "number", "out", "max-tokens", "slate", "no-slate", "retitle"];
+const KNOWN_FLAGS = ["topic", "theme", "show", "list", "draft", "plan-only", "number", "out", "max-tokens", "slate", "no-slate", "retitle"];
 const MAX_TOKENS = { plan: 6000, dialogue: 16000 };
 
 const claude = (opts) => callClaude({ ...opts, model: MODEL });
@@ -72,9 +89,12 @@ RULES:
 - No financial advice of any kind, and nothing that reads as a recommendation.
 - The concession must be real. Decide now which of them gives ground and on what, and make it cost him something.
 
+${TITLE_RULES}
+This show has no stories to name, so title it for the IDEA — "The Wealth Effect", "Why We Chase Tops" — and never for the question you wrote.
+
 Return ONLY a JSON object, no preamble and no code fences:
 {
-  "title": "episode title, 2-4 words, no colon",
+  "title": "the episode title, written to the title rules above",
   "summary": "one sentence for the programme guide",
   "question": "the question Connor opens with, as he would say it",
   "flaw": "what GR80 immediately finds wrong with how it was asked, one sentence",
@@ -127,17 +147,17 @@ Return ONLY a JSON object, no preamble and no code fences:
 }
 "cues" may be an empty array. Write every segment you are given, in order.`;
 
-function scriptUserMessage(plan) {
-  const skeleton = FORMAT.segments
+function scriptUserMessage(plan, format) {
+  const skeleton = format.segments
     .map((s) => `- ${s.id} ("${s.label}"), target ${s.targetWords} spoken words. ${s.intent}`)
     .join("\n");
 
-  const target = FORMAT.segments.reduce((n, s) => n + s.targetWords, 0);
+  const target = format.segments.reduce((n, s) => n + s.targetWords, 0);
 
   return `TONIGHT'S ARGUMENT
 ${JSON.stringify(plan, null, 2)}
 
-THE SEGMENTS, in order — write all ${FORMAT.segments.length}:
+THE SEGMENTS, in order — write all ${format.segments.length}:
 ${skeleton}
 
 Hit the word targets within about fifteen percent. They add up to roughly ${target} spoken words, and the episode has to land between four and nine minutes.`;
@@ -146,17 +166,37 @@ Hit the word targets within about fifteen percent. They add up to roughly ${targ
 // ── Where a topic comes from ──────────────────────────────────────────────
 
 /**
- * Slate episodes of this show that have a title but no script yet.
+ * Which show a slate record belongs to. The record says so; the id prefix is
+ * the fallback for a hand-written entry that forgot the field.
+ */
+function showId(record, id) {
+  const show = record.showId || String(id).replace(/-\d+$/, "");
+  if (!SHOWS.includes(show)) {
+    throw new Error(
+      `"${id}" belongs to the "${show}" show, which this pipeline does not write.\n` +
+        `It writes ${SHOWS.join(" and ")}. A news episode starts from npm run lt:brief.`,
+    );
+  }
+  return show;
+}
+
+/** Does this slate file belong to one of the shows this generator writes? */
+const belongsHere = (file) =>
+  SHOWS.some((show) => new RegExp(`^${show}-\\d+\\.json$`).test(file));
+
+/**
+ * Slate episodes of these shows that have a title but no script yet.
  *
  * The slate is the running order of the show, and five of its episodes were
  * named long before there was any way to write one. They are the topic queue,
  * so the generator reads them rather than asking for a theme that already
- * exists in the repo.
+ * exists in the repo. Both argument shows queue here, because both are written
+ * by this pipeline.
  */
 export async function unwrittenTopics(root = process.cwd()) {
   let files = [];
   try {
-    files = (await readdir(join(root, SLATE_DIR))).filter((f) => /^roundtable-\d+\.json$/.test(f));
+    files = (await readdir(join(root, SLATE_DIR))).filter(belongsHere);
   } catch {
     return [];
   }
@@ -186,6 +226,10 @@ async function resolveTopic() {
       );
     }
     return {
+      // THE SHOW COMES FROM THE RECORD, never from this file. Both argument
+      // shows are written here, and assuming "roundtable" would have written
+      // morality-01's script out as roundtable-01 — over The Halo Effect.
+      show: showId(record, topic),
       number: Number(record.number),
       theme: `${record.title} — ${record.summary}`,
       // Michelle named these episodes. The model is writing the argument, not
@@ -197,16 +241,23 @@ async function resolveTopic() {
   }
 
   if (theme && theme !== true) {
-    return { number: await nextNumber(), theme, keep: null, from: null };
+    // A theme is not on the slate, so there is no record to read the show off.
+    const show = arg("show");
+    const chosen = show && show !== true ? show : DEFAULT_SHOW;
+    if (!SHOWS.includes(chosen)) {
+      throw new Error(`--show expects one of ${SHOWS.join(", ")}, got "${chosen}".`);
+    }
+    return { show: chosen, number: await nextNumber(chosen), theme, keep: null, from: null };
   }
 
   throw new Error(
-    "Give it a topic: --topic roundtable-02 (one already on the slate), or\n" +
-      "--theme \"the idea you want them to argue about\". --list shows what is waiting.",
+    "Give it a topic: --topic roundtable-03 (one already on the slate), or\n" +
+      "--theme \"the idea you want them to argue about\" (add --show morality for\n" +
+      "Markets & Morality). --list shows what is waiting.",
   );
 }
 
-async function nextNumber() {
+async function nextNumber(show) {
   const flag = arg("number");
   if (flag && flag !== true) {
     const n = Number(flag);
@@ -214,7 +265,8 @@ async function nextNumber() {
     return n;
   }
   try {
-    const files = (await readdir(resolve(SLATE_DIR))).filter((f) => /^roundtable-\d+\.json$/.test(f));
+    const pattern = new RegExp(`^${show}-\\d+\\.json$`);
+    const files = (await readdir(resolve(SLATE_DIR))).filter((f) => pattern.test(f));
     return files.length + 1;
   } catch {
     return 1;
@@ -229,10 +281,10 @@ async function main() {
   if (arg("list")) {
     const waiting = await unwrittenTopics();
     if (!waiting.length) {
-      console.log("Every roundtable episode on the slate has a script.");
+      console.log("Every episode on the slate for these shows has a script.");
       return;
     }
-    console.log(`${waiting.length} roundtable episode(s) on the slate with no script yet:\n`);
+    console.log(`${waiting.length} episode(s) on the slate with no script yet:\n`);
     for (const r of waiting) console.log(`  ${r.id}  ${r.title}\n            ${r.summary}`);
     console.log(`\nWrite one with: node ${PIPELINE} --topic ${waiting[0].id}`);
     return;
@@ -247,7 +299,8 @@ async function main() {
     // A hand-written or hand-edited plan, assembled without calling the model.
     const draft = JSON.parse(await readFile(resolve(draftPath), "utf8"));
     ({ plan, segments } = draft);
-    topic = draft.topic ?? { number: await nextNumber(), keep: null, from: null };
+    topic = draft.topic ?? { show: DEFAULT_SHOW, number: await nextNumber(DEFAULT_SHOW), keep: null, from: null };
+    topic.show ??= DEFAULT_SHOW;
   } else {
     topic = await resolveTopic();
     // Standing corrections from docs/lt-tv-style-notes.md. Read once and sent
@@ -266,7 +319,7 @@ async function main() {
 
     if (arg("plan-only")) {
       const out = arg("out");
-      const path = typeof out === "string" ? out : `content/lt-tv/plans/roundtable-${String(topic.number).padStart(2, "0")}.json`;
+      const path = typeof out === "string" ? out : `content/lt-tv/plans/${topic.show}-${String(topic.number).padStart(2, "0")}.json`;
       await mkdir(dirname(resolve(path)), { recursive: true });
       await writeFile(resolve(path), JSON.stringify(plan, null, 2) + "\n");
       console.log(`Wrote ${path}`);
@@ -276,7 +329,7 @@ async function main() {
     console.log("Dialogue pass…");
     ({ segments } = await claude({
       system: withStyleNotes(SCRIPT_SYSTEM, houseNotes),
-      user: scriptUserMessage(plan),
+      user: scriptUserMessage(plan, showFormat(topic.show)),
       maxTokens: MAX_TOKENS.dialogue,
     }));
   }
@@ -289,7 +342,7 @@ async function main() {
     },
     segments,
     number: topic.number,
-    format: FORMAT,
+    format: showFormat(topic.show),
     producedBy: { model: draftPath ? null : MODEL, pipeline: PIPELINE },
   });
 

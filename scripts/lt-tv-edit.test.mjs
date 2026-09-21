@@ -153,6 +153,10 @@ ok("but it records that it was edited", Boolean(rebuilt.provenance.editedAt));
 console.log("\nThe title and the chiron are edited in the script too:");
 const retitled = applyScript(episode, parseScript(script.replace(episode.title, "A Different Title")));
 check("the title follows the script", retitled.title, "A Different Title");
+// The studio's title field writes into this same line, so an emptied line is
+// what a half-retyped title looks like — not a request for a nameless episode.
+const untitled = applyScript(episode, parseScript(script.replace(episode.title, "   ")));
+check("an emptied title line keeps the title it had", untitled.title, episode.title);
 const rechironed = applyScript(episode, parseScript(script.replace(episode.graphics.headline, "SOMETHING ELSE ENTIRELY")));
 check("so does the chiron", rechironed.graphics.headline, "SOMETHING ELSE ENTIRELY");
 check("and the ticker, which is not in the script, is left alone", rechironed.graphics.ticker, episode.graphics.ticker);

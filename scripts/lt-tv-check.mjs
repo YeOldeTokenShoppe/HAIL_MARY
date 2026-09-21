@@ -9,7 +9,7 @@
 // that plays the wrong thing:
 //
 //   node scripts/lt-tv-check.mjs
-//   node scripts/lt-tv-check.mjs roundtable-01   # one episode, in detail
+//   node scripts/lt-tv-check.mjs morality-01     # one episode, in detail
 //
 // Exits non-zero if any record has a problem, so it can gate a deploy.
 import fs from "fs";

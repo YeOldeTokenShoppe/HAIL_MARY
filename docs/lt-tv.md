@@ -27,7 +27,8 @@ running it.
 Every episode of both shows, what stage each one is at, and the next step as a
 button — write it, record it, record it again after changing a pause, cut
 the two tracks into the clips, apply your edits, rewrite a line you marked,
-check the slate. The news show also has two buttons under its own heading,
+check the slate. There is also a box for the episode title, so renaming one
+does not mean hunting through the script for its first line. The news show also has two buttons under its own heading,
 **Pull the week** and **Write this week's news**, because a news episode has
 to be made before there is one to open. The screenplay is editable in the page, with a Save button and
 a separate Apply, so a half-finished edit is never live.
@@ -73,7 +74,7 @@ done by hand.
 
 ```bash
 npm run lt                        # every episode, both shows
-npm run lt -- roundtable-02       # one, in detail
+npm run lt -- morality-02       # one, in detail
 npm run lt -- --html              # a page to keep open in a tab
 ```
 
@@ -100,9 +101,10 @@ root — the path is relative to you, not to the repo.
 | `npm run lt:audio` | record an episode |
 | `npm run lt:split` | cut the two tracks into the SitePal clips |
 | `npm run lt:slate` | put a recorded episode on the guide |
+| `npm run lt:rename` | move a staged episode to another show or number |
 | `npm run lt:test` | run every check |
 
-Arguments go after `--`, as in `npm run lt:roundtable -- --topic roundtable-02`.
+Arguments go after `--`, as in `npm run lt:roundtable -- --topic morality-02`.
 
 The four stages are `planned` (named on the slate, unwritten), `written` (has a
 script), `recorded` (audio built) and `on air` (playable in the guide). Each one
@@ -130,25 +132,63 @@ src/content/lt-tv/index.js             the list; a record nobody imports never s
 an episode never edits it. If you find yourself editing a component to release
 an episode, something has gone wrong.
 
-Two shows share the set and the pipeline. They differ only in where the script
-comes from:
+Two shows share the set and the pipeline. They differ only in where the
+script comes from:
 
-| | Weekly news | Roundtable |
+| | LT Weekly News Recap | Markets & Morality |
 |---|---|---|
 | Starts from | a week of market signal | one idea |
 | Script from | `lt-news-brief.mjs` → `lt-news-script.mjs` | `lt-rt-script.mjs` |
 | Topics from | the feeds, verified against real articles | the slate's own running order, or `--theme` |
 | Segments | 7, built around three stories | 6, built around one argument |
 | Chiron | yes | no |
-| Clip prefix | `lttv_news_ep<NN>_` | `lttv_rt_ep<NN>_` |
+| Clip prefix | `lttv_news_ep<NN>_` | `lttv_mm_ep<NN>_` |
 | Length | 5–10 min | 4–9 min |
+
+**Seeing the "New episode" badge.** An episode is badged in the guide for a
+week after its air date, which means the badge is invisible whenever nothing
+recent is on the slate — and it is the one part of the guide you cannot check
+by looking. Add `?preview=new` to the /trade URL to turn it on for every listed
+episode. It is display-only, and nobody sees it without typing it.
+
+**Why the code still says "roundtable".** The roundtable is the FORMAT — two
+seats, six segments, one argument — and Markets & Morality is that format
+under its own banner. A third channel, The Liminal Terminal, carried the same
+format until Michelle took it off the guide on 2026-09-21; its episodes moved
+across to Markets & Morality. So `SHOW_FORMATS.roundtable` and
+`scripts/lt-rt-script.mjs` keep the name of the shape, while `shows.json`
+carries the two channels a viewer sees. Write an episode with `npm run
+lt:roundtable -- --topic morality-01`; the show comes from the episode's own
+id, and `--theme`, which has no id to read, defaults to Markets & Morality.
 
 Everything after the script is the same for both: `lt-tv-edit.mjs` to revise,
 `lt-tv-audio.mjs` to record, `lt-tv-check.mjs` to verify. One `assemble()`
-builds both records, so a validation either show gains, both gain.
+builds every record, so a validation one show gains, both gain.
 
-Both end the same way: two balanced WAVs uploaded to SitePal, a record on the
-slate, and a lead-in tuned by ear.
+They all end the same way: two balanced WAVs uploaded to SitePal, a record on
+the slate, and a lead-in tuned by ear.
+
+**Moving an episode to another show, or renumbering it.** An episode's id is
+`<show>-<NN>` and it is not a label, it is the path: the working record is
+`content/lt-tv/episodes/<id>.json`, the screenplay is `<id>.txt`, and every WAV
+the audio build writes lands in `content/lt-tv/audio/<id>/`. Move one by hand
+and you will move some of them, which fails silently: the next Record or Split
+writes a SECOND episode under the old id, beside the one you meant to move. So:
+
+```
+npm run lt:rename -- roundtable-02 morality-01 --dry-run   # show what would move
+npm run lt:rename -- roundtable-02 morality-01
+```
+
+It moves everything or nothing, and refuses if anything already sits under the
+new id rather than merging the two. It does **not** rewrite the SitePal clip
+names in the record, which is deliberate: a record names whichever clips EXIST
+in the account library, and those were uploaded under the old id. The naming
+convention is for a new upload. The Wealth Effect is on air right now as
+`morality-01` playing `lttv_rt_ep02_*`, and that is correct.
+
+It also does not touch `src/content/lt-tv/` — the committed slate. That half is
+a git rename plus an edit to `index.js`, and it belongs in a commit.
 
 ---
 
@@ -254,7 +294,7 @@ named on the slate.
 npm run lt:roundtable -- --list
 
 # 2. Write one. Two Claude calls: the argument, then the dialogue.
-npm run lt:roundtable -- --topic roundtable-02
+npm run lt:roundtable -- --topic morality-02
 ```
 
 An episode already on the slate **keeps the title and summary it was given** —
@@ -265,7 +305,7 @@ is not on the slate yet.
 Then read and revise exactly as you would a news episode:
 
 ```bash
-npm run lt:edit -- roundtable-02
+npm run lt:edit -- morality-02
 ```
 
 What to look for is specific to this show: **both of them have to be right
@@ -275,7 +315,7 @@ every exchange you have a sermon, and the fix is in the script, not the audio.
 
 ```bash
 # 3. Record it — the same audio build the news show uses.
-npm run lt:audio -- content/lt-tv/episodes/roundtable-02.json
+npm run lt:audio -- content/lt-tv/episodes/morality-02.json
 ```
 
 From here it is the same tail as the news show — steps 5 and 6 above, then the
@@ -284,17 +324,17 @@ shared sections below:
 ```bash
 # Cut the two tracks into the SitePal clips.
 # It ends by printing which file to upload under which clip name.
-npm run lt:split -- roundtable-02
+npm run lt:split -- morality-02
 
 # Then, once they are uploaded, put it on the guide. After the split, so the
 # section boundaries come with it.
-npm run lt:slate -- roundtable-02
-npm run lt:check -- roundtable-02
+npm run lt:slate -- morality-02
+npm run lt:check -- morality-02
 ```
 
 Then upload, tune the lead-in and test.
 
-`content/lt-tv/samples/roundtable-02.draft.json` is a worked example, written by
+`content/lt-tv/samples/morality-01.draft.json` is a worked example, written by
 hand to show the format and the two voices. **Its argument is invented** and it
 is not a scheduled episode.
 
@@ -651,6 +691,44 @@ one test line before it goes in an episode.
 
 ---
 
+## The episode title (both shows)
+
+The writer names the episode, and the first generated news episode came back
+called **Hike Barrel Charizard** — one noun from each of its three stories in a
+row. That is what a model does when the only instruction is a word count, so
+the instruction is now the job: name ONE thing, the lead story or the mood of
+the week, the way a channel guide would print it. Two to six words, title case,
+no colon, and it has to read as English out loud. The rule lives in
+`TITLE_RULES` in `scripts/lt-tv-format.mjs` and both shows are written against
+it, so a title you dislike is a rule to change in one place.
+
+**To name an episode yourself**, open it in the studio and type in the
+**Episode title** box above the screenplay, then **Save** and **Apply my
+edits**. The box is the screenplay's first line — the same line you could edit
+by hand — so there is only ever one copy of the title, and applying is what
+puts it on the guide. Emptying the box keeps the title the episode already had,
+because a blank line there is a title half-retyped, not a nameless episode.
+
+The roundtable works the same way, except that its titles were written by you
+on the slate long before anything could generate one, so the generator keeps
+them; `--retitle` is what lets it write its own.
+
+## Acronyms — say what the letters stand for (both shows)
+
+Nobody is reading the show. The first news episode said **FRED** four times and
+never once said it is the Federal Reserve Economic Data database, which on air
+is just a name nobody can look up. So an acronym is expanded the first time it
+is spoken and used short after that, in the character's own voice and inside
+the line rather than as an aside.
+
+Both writers are told this, and because a prompt is a request rather than a
+guarantee, the build checks it: an acronym spoken before anything expands it
+becomes a warning naming the line, on writing and on every apply. The list of
+acronyms, and the short list taken as read because expanding them sounds like a
+lecture (the Fed, SEC, IRS, AI, FOMO), is `SPOKEN_ACRONYMS` and
+`ACRONYMS_TAKEN_AS_READ` in `scripts/lt-tv-format.mjs`. Add to either as the
+show runs into new ones.
+
 ## A line you don't like (both shows)
 
 Three things you can do with a bad line, in rising order of effort.
@@ -682,7 +760,7 @@ button to press, so the worst case costs a click instead of a render.
 
 **Ask for a new one.** Put a note under the line saying what is wrong with it,
 starting with `#`, then press **Rewrite the lines I marked** — or
-`node scripts/lt-tv-rewrite.mjs roundtable-02`:
+`node scripts/lt-tv-rewrite.mjs morality-02`:
 
 ```
  41    SAINT GR80 A rising number does not make you wealthy. It makes you willing.

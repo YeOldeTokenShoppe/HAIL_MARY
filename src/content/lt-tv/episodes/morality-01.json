@@ -1,0 +1,242 @@
+{
+  "id": "morality-01",
+  "showId": "morality",
+  "number": "01",
+  "title": "The Wealth Effect",
+  "summary": "Paper gains, real confidence, and the stories a rising chart tells.",
+  "airDate": "2026-09-20",
+  "leadIn": 2.5,
+  "speakers": [
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk"
+  ],
+  "audienceLines": [
+    0,
+    38,
+    39
+  ],
+  "cues": [
+    {
+      "line": 2,
+      "offset": 3.2,
+      "actor": "Monk",
+      "reaction": "headnodSubtle",
+      "duration": 4.33,
+      "note": "Not one share. So do you quit the job on Tuesday, say yes t…"
+    },
+    {
+      "line": 4,
+      "offset": 0.8,
+      "actor": "Connor",
+      "reaction": "shrug",
+      "duration": 4.33,
+      "note": "Terrific. Six minutes on who is standing inside a promise.…"
+    },
+    {
+      "line": 7,
+      "offset": 4,
+      "actor": "Monk",
+      "reaction": "headnodSubtle",
+      "duration": 4.33,
+      "note": "It is a tax word, not a fact about the universe. The world…"
+    },
+    {
+      "line": 11,
+      "offset": 5.5,
+      "actor": "Connor",
+      "reaction": "headnod",
+      "duration": 4.33,
+      "note": "Mostly the same guy. He funds it, he eats it if he is wrong…"
+    },
+    {
+      "line": 16,
+      "offset": 2,
+      "actor": "Connor",
+      "reaction": "headshakeDisappointment",
+      "duration": 4.33,
+      "note": "I want you to notice the asymmetry. You spend the mood. Oth…"
+    },
+    {
+      "line": 19,
+      "offset": 4.5,
+      "actor": "Monk",
+      "reaction": "headnodSubtle",
+      "duration": 4.33,
+      "note": "That is a good line. It is also a rule that would have buil…"
+    },
+    {
+      "line": 22,
+      "offset": 5,
+      "actor": "Monk",
+      "reaction": "prayCrosschest",
+      "duration": 3.87,
+      "note": "My rule does tell her that. And the bill for my patience is…"
+    },
+    {
+      "line": 27,
+      "offset": 3,
+      "actor": "Monk",
+      "reaction": "headnodSubtle",
+      "duration": 4.33,
+      "note": "I will say this once and then we move on.  I do not like th…"
+    },
+    {
+      "line": 32,
+      "offset": 3,
+      "actor": "Connor",
+      "reaction": "headnod",
+      "duration": 4.33,
+      "note": "And that is false. Caution is a position. It takes losses l…"
+    },
+    {
+      "line": 36,
+      "offset": 3.5,
+      "actor": "Monk",
+      "reaction": "headnodSubtle",
+      "duration": 4.33,
+      "note": "I am still spending it. I am just going to say that sentenc…"
+    },
+    {
+      "line": 39,
+      "offset": 1.5,
+      "actor": "Monk",
+      "reaction": "prayCrosschest",
+      "duration": 3.87,
+      "note": "The log is closed. Go carefully with other people's Tuesday…"
+    }
+  ],
+  "audio": {
+    "Connor": "lttv_rt_ep02_connor",
+    "Monk": "lttv_rt_ep02_gr80"
+  },
+  "lineStarts": [
+    0,
+    15.536,
+    17.638,
+    35.588,
+    54.648,
+    62.388,
+    80.738,
+    84.597,
+    100.547,
+    107.764,
+    121.599,
+    129.056,
+    141.916,
+    153.426,
+    164.495,
+    177.085,
+    185.674,
+    194.424,
+    196.854,
+    212.299,
+    226.119,
+    243.509,
+    253.219,
+    263.889,
+    266.079,
+    280.749,
+    285.499,
+    288.169,
+    299.719,
+    315.288,
+    319.612,
+    331.632,
+    332.88,
+    345.303,
+    358.613,
+    369.92,
+    380.27,
+    388.7,
+    397.887,
+    408.459
+  ],
+  "dialogueEnd": 414.609,
+  "sections": [
+    {
+      "startsAt": 0,
+      "audio": {
+        "Connor": "lttv_rt_ep02_connor",
+        "Monk": "lttv_rt_ep02_gr80"
+      }
+    },
+    {
+      "startsAt": 84.222,
+      "audio": {
+        "Connor": "lttv_rt_ep02_connor_s2",
+        "Monk": "lttv_rt_ep02_gr80_s2"
+      }
+    },
+    {
+      "startsAt": 164.12,
+      "audio": {
+        "Connor": "lttv_rt_ep02_connor_s3",
+        "Monk": "lttv_rt_ep02_gr80_s3"
+      }
+    },
+    {
+      "startsAt": 243.134,
+      "audio": {
+        "Connor": "lttv_rt_ep02_connor_s4",
+        "Monk": "lttv_rt_ep02_gr80_s4"
+      }
+    },
+    {
+      "startsAt": 319.237,
+      "audio": {
+        "Connor": "lttv_rt_ep02_connor_s5",
+        "Monk": "lttv_rt_ep02_gr80_s5"
+      }
+    },
+    {
+      "startsAt": 397.512,
+      "audio": {
+        "Connor": "lttv_rt_ep02_connor_s6",
+        "Monk": "lttv_rt_ep02_gr80_s6"
+      }
+    }
+  ],
+  "producedFrom": {
+    "record": "content/lt-tv/episodes/roundtable-02.json",
+    "pipeline": "scripts/lt-rt-script.mjs",
+    "generatedAt": "2026-09-20T19:12:12.068Z"
+  }
+}

@@ -31,7 +31,7 @@ const check = (label, actual, expected) => {
 const ok = (label, cond) => check(label, Boolean(cond), true);
 
 const EPISODE = JSON.parse(
-  await readFile(resolve("content/lt-tv/samples/roundtable-02.sample.json"), "utf8"),
+  await readFile(resolve("content/lt-tv/samples/morality-01.sample.json"), "utf8"),
 );
 const FORMAT = showFormat(EPISODE.show);
 const SCRIPT = renderScript(EPISODE);

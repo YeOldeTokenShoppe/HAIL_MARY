@@ -1,0 +1,319 @@
+{
+  "id": "news-01",
+  "showId": "news",
+  "number": "01",
+  "title": "Hike Barrel Charizard",
+  "summary": "The Fed raises rates for the first time since 2023 while the ten-year clears 5% and crude runs to $107, and Pokemon's 30th anniversary set turns a reprint into a $160 asset on day one.",
+  "airDate": "2026-09-21",
+  "week": "2026-W39",
+  "leadIn": 2.5,
+  "speakers": [
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk"
+  ],
+  "audienceLines": [
+    0,
+    4,
+    14,
+    15,
+    18,
+    23,
+    24,
+    26,
+    31,
+    32,
+    33,
+    34,
+    35,
+    37,
+    38,
+    40
+  ],
+  "cues": [
+    {
+      "line": 0,
+      "offset": 3,
+      "actor": "Monk",
+      "reaction": "headnodSubtle",
+      "duration": 4.33,
+      "note": "Good evening from the Liminal Terminal. Tonight: the Fed hi…"
+    },
+    {
+      "line": 6,
+      "offset": 1.2,
+      "actor": "Monk",
+      "reaction": "headshakeDisappointment",
+      "duration": 4.33,
+      "note": "Or everyone read the same wire I did. Markets had it better…"
+    },
+    {
+      "line": 10,
+      "offset": 1.8,
+      "actor": "Monk",
+      "reaction": "prayCrosschest",
+      "duration": 3.87,
+      "note": "I read for the exit and I am still employed. Twelve to noth…"
+    },
+    {
+      "line": 13,
+      "offset": 3,
+      "actor": "Connor",
+      "reaction": "shrug",
+      "duration": 4.33,
+      "note": "Dissent is the cheapest forecast a committee owns, and this…"
+    },
+    {
+      "line": 15,
+      "offset": 1.5,
+      "actor": "Connor",
+      "reaction": "headnodSubtle",
+      "duration": 4.33,
+      "note": "A barrel that moves thirteen point six percent in a week is…"
+    },
+    {
+      "line": 21,
+      "offset": 2,
+      "actor": "Connor",
+      "reaction": "headnod",
+      "duration": 4.33,
+      "note": "FRED says thirteen point six through Monday. Bloomberg read…"
+    },
+    {
+      "line": 25,
+      "offset": 2.2,
+      "actor": "Monk",
+      "reaction": "headshake",
+      "duration": 4.33,
+      "note": "It's a printing press with a mascot, and I mean that admiri…"
+    },
+    {
+      "line": 29,
+      "offset": 1.5,
+      "actor": "Monk",
+      "reaction": "headnodSubtle",
+      "duration": 4.33,
+      "note": "Fine. Same lizard, different decade, five to one. Although…"
+    },
+    {
+      "line": 34,
+      "offset": 2,
+      "actor": "Connor",
+      "reaction": "shrug",
+      "duration": 4.33,
+      "note": "Crypto Fear and Greed: fifty-seven Monday, fifty on Fed Thu…"
+    },
+    {
+      "line": 40,
+      "offset": 1.8,
+      "actor": "Connor",
+      "reaction": "headnodSubtle",
+      "duration": 4.33,
+      "note": "Go in peace, and price your own risk. The logs are closed u…"
+    }
+  ],
+  "audio": {
+    "Connor": "lttv_news_ep01_connor",
+    "Monk": "lttv_news_ep01_gr80"
+  },
+  "lineStarts": [
+    0,
+    18.75,
+    24.7,
+    29.834,
+    34.476,
+    48.157,
+    58.659,
+    70.289,
+    77.439,
+    90.589,
+    99.819,
+    109.581,
+    112.331,
+    116.121,
+    127.6,
+    143.15,
+    153.58,
+    164.01,
+    175.4,
+    187.162,
+    190.854,
+    203.497,
+    216.407,
+    224.766,
+    243.498,
+    255.979,
+    272.961,
+    277.769,
+    286.279,
+    290.864,
+    299.584,
+    309.224,
+    326.604,
+    335.354,
+    345.064,
+    356.363,
+    364.633,
+    376.613,
+    392.643,
+    396.821,
+    403.891
+  ],
+  "dialogueEnd": 411.266,
+  "sections": [
+    {
+      "startsAt": 0,
+      "audio": {
+        "Connor": "lttv_news_ep01_connor",
+        "Monk": "lttv_news_ep01_gr80"
+      }
+    },
+    {
+      "startsAt": 77.064,
+      "audio": {
+        "Connor": "lttv_news_ep01_connor_s2",
+        "Monk": "lttv_news_ep01_gr80_s2"
+      }
+    },
+    {
+      "startsAt": 153.205,
+      "audio": {
+        "Connor": "lttv_news_ep01_connor_s3",
+        "Monk": "lttv_news_ep01_gr80_s3"
+      }
+    },
+    {
+      "startsAt": 224.416,
+      "audio": {
+        "Connor": "lttv_news_ep01_connor_s4",
+        "Monk": "lttv_news_ep01_gr80_s4"
+      }
+    },
+    {
+      "startsAt": 299.209,
+      "audio": {
+        "Connor": "lttv_news_ep01_connor_s5",
+        "Monk": "lttv_news_ep01_gr80_s5"
+      }
+    },
+    {
+      "startsAt": 364.258,
+      "audio": {
+        "Connor": "lttv_news_ep01_connor_s6",
+        "Monk": "lttv_news_ep01_gr80_s6"
+      }
+    }
+  ],
+  "graphics": {
+    "mode": "news",
+    "headline": "WARSH HIKES, CRUDE BURNS, CHARIZARD PRINTS",
+    "ticker": [
+      "FED HIKES 25BP TO 3.75-4% — FIRST HIKE SINCE 2023, ON A 12-0 VOTE",
+      "10-YEAR TOPS 5% FOR FIRST TIME IN ALMOST THREE YEARS",
+      "WTI $107.02 ON SEPT 15, UP 13.6% WEEK OVER WEEK (FRED)",
+      "DOW -1.69% ON THE WEEK, NASDAQ +0.72% — SPLIT TAPE",
+      "POLYMARKET: 54% ON ANOTHER 25BP HIKE IN OCTOBER",
+      "POKEMON 30TH CELEBRATION CHARIZARD REPRINT $160 ON DAY ONE"
+    ]
+  },
+  "sources": [
+    {
+      "title": "Federal Reserve issues FOMC statement",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+      "outlet": "Federal Reserve"
+    },
+    {
+      "title": "Fed rate decision September 2026: Rates rise to 3.75%-4%",
+      "url": "https://www.cnbc.com/2026/09/16/fed-rate-decision-september-2026.html",
+      "outlet": "CNBC"
+    },
+    {
+      "title": "Fed meeting recap: Warsh says inflation is still too high as Fed hikes for the first time since 2023",
+      "url": "https://www.cnbc.com/2026/09/16/fed-meeting-today-live-updates.html",
+      "outlet": "CNBC"
+    },
+    {
+      "title": "Crude Oil Prices: West Texas Intermediate (WTI) - Cushing, Oklahoma (DCOILWTICO)",
+      "url": "https://fred.stlouisfed.org/series/DCOILWTICO",
+      "outlet": "FRED, St. Louis Fed"
+    },
+    {
+      "title": "Latest Oil Market News and Analysis for Sept. 18",
+      "url": "https://www.bloomberg.com/news/articles/2026-09-17/latest-oil-market-news-and-analysis-for-sept-18",
+      "outlet": "Bloomberg"
+    },
+    {
+      "title": "Brent crude tops $100 as U.S.-Iran tit-for-tat strikes stoke oil supply worries",
+      "url": "https://www.cnbc.com/2026/09/09/oil-prices-today-wti-brent-us-iran-hormuz-attacks.html",
+      "outlet": "CNBC"
+    },
+    {
+      "title": "Day 1 Price Changes from Pokemon TCG: 30th Celebration",
+      "url": "https://www.tcgplayer.com/content/article/Day-1-Price-Changes-from-Pok%C3%A9mon-TCG-30th-Celebration/91f613b3-45ac-4576-b0bc-370eeb2380dd/",
+      "outlet": "TCGplayer"
+    },
+    {
+      "title": "Collector's Guide to Pokemon TCG: 30th Celebration",
+      "url": "https://www.tcgplayer.com/content/article/Collector-s-Guide-to-Pok%C3%A9mon-TCG-30th-Celebration/bac99231-4293-4373-af64-6f5ed0d5735d/",
+      "outlet": "TCGplayer"
+    },
+    {
+      "title": "Fed Decision in October? Trading Odds & Predictions 2026",
+      "url": "https://polymarket.com/event/fed-decision-in-october-20260617190323537",
+      "outlet": "Polymarket"
+    },
+    {
+      "title": "Bond Rout's Silver Lining Emerges With Chance to Grab 5% Yields",
+      "url": "https://www.bloomberg.com/news/articles/2026-09-18/bond-rout-s-silver-lining-emerges-with-chance-to-grab-5-yields",
+      "outlet": "Bloomberg"
+    },
+    {
+      "title": "Crude Oil Prices: West Texas Intermediate (WTI) - Cushing, Oklahoma (DCOILWTICO)",
+      "url": "https://fred.stlouisfed.org/series/DCOILWTICO",
+      "outlet": "FRED, St. Louis Fed"
+    }
+  ],
+  "producedFrom": {
+    "record": "content/lt-tv/episodes/news-01.json",
+    "pipeline": "scripts/lt-news-script.mjs",
+    "generatedAt": "2026-09-21T14:59:53.318Z"
+  }
+}

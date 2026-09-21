@@ -162,7 +162,7 @@ console.log("\nRefusing to guess from nothing:");
 
 console.log("\nThe clip names follow the convention, section by section:");
 const SAMPLE = JSON.parse(
-  await readFile(resolve("content/lt-tv/samples/roundtable-02.sample.json"), "utf8"),
+  await readFile(resolve("content/lt-tv/samples/morality-01.sample.json"), "utf8"),
 );
 {
   const e = episodeOf(44);
@@ -170,9 +170,9 @@ const SAMPLE = JSON.parse(
   const named = sectionsForRecord(SAMPLE, plan);
 
   check("one entry per section", named.length, plan.length);
-  check("section one takes no suffix", named[0].audio.Connor, "lttv_rt_ep02_connor");
-  check("and section two takes _s2", named[1].audio.Connor, "lttv_rt_ep02_connor_s2");
-  check("the monk is named for the monk", named[1].audio.Monk, "lttv_rt_ep02_gr80_s2");
+  check("section one takes no suffix", named[0].audio.Connor, "lttv_mm_ep01_connor");
+  check("and section two takes _s2", named[1].audio.Connor, "lttv_mm_ep01_connor_s2");
+  check("the monk is named for the monk", named[1].audio.Monk, "lttv_mm_ep01_gr80_s2");
   ok("every section names every character",
     named.every((s) => Object.keys(s.audio).length === Object.keys(SAMPLE.cast).length));
   const all = named.flatMap((s) => Object.values(s.audio));
@@ -185,8 +185,8 @@ console.log("\nA record with sections reads back the way the set expects:");
   const e = episodeOf(44);
   const plan = planSections(e.lineStarts, e.lineEnds, e.dialogueEnd);
   const record = {
-    id: "roundtable-02",
-    audio: { Connor: "lttv_rt_ep02_connor", Monk: "lttv_rt_ep02_gr80" },
+    id: "morality-01",
+    audio: { Connor: "lttv_mm_ep01_connor", Monk: "lttv_mm_ep01_gr80" },
     sections: sectionsForRecord(SAMPLE, plan),
     lineStarts: e.lineStarts,
     dialogueEnd: e.dialogueEnd,
@@ -491,23 +491,23 @@ console.log("\nA re-split clears out the clips it no longer wants:");
   // overwrites what it writes and leaves the rest, so a stale `_s5` sits in
   // the folder looking exactly like a real clip and gets uploaded beside them.
   // This deletes files, so it is checked rather than trusted.
-  const plan = uploadPlan(SAMPLE, "roundtable-02", [{ startsAt: 0 }, { startsAt: 80 }]);
+  const plan = uploadPlan(SAMPLE, "morality-01", [{ startsAt: 0 }, { startsAt: 80 }]);
   const folder = [
     "master-dialogue.wav",
     "john-sitepal-balanced.wav",
     "gr80-sitepal-balanced.wav",
     "voice-segments.json",
-    "lttv_rt_ep02_connor.wav",
-    "lttv_rt_ep02_connor_s2.wav",
-    "lttv_rt_ep02_connor_s3.wav",
-    "lttv_rt_ep02_gr80.wav",
-    "lttv_rt_ep02_gr80_s2.wav",
-    "lttv_rt_ep02_gr80_s3.wav",
+    "lttv_mm_ep01_connor.wav",
+    "lttv_mm_ep01_connor_s2.wav",
+    "lttv_mm_ep01_connor_s3.wav",
+    "lttv_mm_ep01_gr80.wav",
+    "lttv_mm_ep01_gr80_s2.wav",
+    "lttv_mm_ep01_gr80_s3.wav",
     "my notes.wav",
   ];
 
   check("only the sections this cut does not want",
-    staleClips(folder, plan), ["lttv_rt_ep02_connor_s3.wav", "lttv_rt_ep02_gr80_s3.wav"]);
+    staleClips(folder, plan), ["lttv_mm_ep01_connor_s3.wav", "lttv_mm_ep01_gr80_s3.wav"]);
   const removed = new Set(staleClips(folder, plan));
   ok("never the master", !removed.has("master-dialogue.wav"));
   ok("never a balanced track", !removed.has("john-sitepal-balanced.wav"));
@@ -539,13 +539,13 @@ console.log("\nA master recorded in a voice the show has since changed:");
   check("one recorded in the old voice is caught",
     stale.map((v) => v.actor), ["Monk"]);
 
-  const refusal = staleVoiceRefusal(stale, "roundtable-02");
+  const refusal = staleVoiceRefusal(stale, "morality-01");
   ok("the refusal names the character, not the id", refusal.includes("Saint GR80"));
   ok("and points at the button rather than a flag",
     refusal.includes("Record it again") && !refusal.includes("--voice"));
   ok("and says the recording itself is fine", /Nothing is wrong/.test(refusal));
   check("nothing to refuse when the voices match",
-    staleVoiceRefusal([], "roundtable-02"), null);
+    staleVoiceRefusal([], "morality-01"), null);
 
   // An empty or unreadable segment list must not be read as "every voice is
   // stale" — that would refuse every split.

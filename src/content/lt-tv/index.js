@@ -16,22 +16,22 @@
 // and cannot be played, which is how a slate entry announces a show that has
 // not been recorded yet instead of quietly replaying another episode.
 import showsFile from "./shows.json";
-import roundtable01 from "./episodes/roundtable-01.json";
-import roundtable02 from "./episodes/roundtable-02.json";
-import roundtable03 from "./episodes/roundtable-03.json";
-import roundtable04 from "./episodes/roundtable-04.json";
-import roundtable05 from "./episodes/roundtable-05.json";
-import roundtable06 from "./episodes/roundtable-06.json";
+import news01 from "./episodes/news-01.json";
+import morality01 from "./episodes/morality-01.json";
+import morality02 from "./episodes/morality-02.json";
+import morality03 from "./episodes/morality-03.json";
+import morality04 from "./episodes/morality-04.json";
+import morality05 from "./episodes/morality-05.json";
 
 import { formatRuntime, episodeIsPlayable } from "@/lib/ltTv/episodeTimeline.mjs";
 
 const EPISODE_RECORDS = [
-  roundtable01,
-  roundtable02,
-  roundtable03,
-  roundtable04,
-  roundtable05,
-  roundtable06,
+  news01,
+  morality01,
+  morality02,
+  morality03,
+  morality04,
+  morality05,
 ];
 
 // Runtime is DERIVED, not typed: it's the end of the dialogue the record

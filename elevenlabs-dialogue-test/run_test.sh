@@ -29,7 +29,7 @@ curl --silent --show-error --fail-with-body \
 echo "Creating the master and character tracks..."
 # Any extra arguments go to the processor, which is how an episode names
 # itself in the starter record it writes:
-#   ./run_test.sh --episode-id roundtable-02 --title "The Wealth Effect"
+#   ./run_test.sh --episode-id morality-01 --title "The Wealth Effect"
 python3 "$SCRIPT_DIR/process_dialogue.py" "$RESPONSE_FILE" "$OUTPUT_DIR" "$@"
 
 echo

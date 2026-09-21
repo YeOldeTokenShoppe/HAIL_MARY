@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // REWRITE THE LINES YOU MARKED.
 //
-//   node scripts/lt-tv-rewrite.mjs roundtable-02
+//   node scripts/lt-tv-rewrite.mjs roundtable-03
 //
 // Deleting a bad line leaves a hole; rewriting the whole episode throws away
 // the good lines to fix one. This does the third thing: you say what is wrong

@@ -2,7 +2,7 @@
 // WHERE IS EVERY EPISODE, AND WHAT DO I RUN NEXT.
 //
 //   npm run lt                        # every episode, both shows
-//   npm run lt -- roundtable-02       # one episode, in detail
+//   npm run lt -- roundtable-03       # one episode, in detail
 //   npm run lt -- --html              # a page to keep open
 //
 // Given as `npm run` throughout because that starts in the repo root wherever
@@ -65,6 +65,22 @@ export function findRoot(from = process.cwd()) {
 }
 
 const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));
+
+/**
+ * The show ids the site's channel list carries, in its own order.
+ *
+ * Empty when there is no shows.json to read — a temporary repo in a test, or a
+ * checkout mid-rename — and the caller then falls back to every known format,
+ * which is the old behaviour and cannot hide anything.
+ */
+async function readChannelShows(root) {
+  try {
+    const file = await readJson(join(root, "src/content/lt-tv/shows.json"));
+    return (file.shows || []).map((s) => s.id).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
 
 /**
  * Everything that is true about one episode, read from disk.
@@ -203,10 +219,14 @@ function nextStep({ id, stage, registered, slate, staging, hasWorkingCopy }) {
   const show = slate?.showId ?? staging?.show;
   return {
     why: "it is named on the slate and nobody has written it",
+    // Every show but the news show is an argument show, written from its own
+    // slate entry by lt:roundtable. Only the news show needs a brief pulled
+    // first, so that is the branch worth naming — a new argument show added to
+    // the slate gets the right advice without being listed here.
     run:
-      show === "roundtable"
-        ? `npm run lt:roundtable -- --topic ${id}`
-        : "npm run lt:brief, then npm run lt:news -- --brief <brief>",
+      show === "news"
+        ? "npm run lt:brief, then npm run lt:news -- --brief <brief>"
+        : `npm run lt:roundtable -- --topic ${id}`,
   };
 }
 
@@ -249,11 +269,25 @@ export async function readStatus(root = process.cwd()) {
     ),
   );
 
-  const shows = Object.values(SHOW_FORMATS).map((f) => ({
-    id: f.id,
-    title: f.title,
-    episodes: episodes.filter((e) => e.show === f.id),
-  }));
+  // THE CHANNEL LIST DECIDES WHAT IS A SHOW, not the format table. They are
+  // not the same thing: a format is the shape of an episode, and more than one
+  // show can share one. When The Liminal Terminal came off the channel list
+  // its format stayed (Markets & Morality is that format), and listing every
+  // format here printed a show with nothing on it that nobody could reach.
+  //
+  // A format that is off the list but still holds episodes is listed anyway —
+  // otherwise leaving a channel would hide the very records that need moving.
+  const channel = await readChannelShows(root);
+  const listed = channel.length ? channel : Object.keys(SHOW_FORMATS);
+  const order = [...listed, ...Object.keys(SHOW_FORMATS).filter((id) => !listed.includes(id))];
+  const shows = order
+    .filter((id) => SHOW_FORMATS[id])
+    .map((id) => ({
+      id,
+      title: SHOW_FORMATS[id].title,
+      episodes: episodes.filter((e) => e.show === id),
+    }))
+    .filter((show) => listed.includes(show.id) || show.episodes.length > 0);
   const orphans = episodes.filter((e) => !SHOW_FORMATS[e.show]);
 
   return { shows, orphans, episodes };
