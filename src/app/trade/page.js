@@ -4160,7 +4160,14 @@ export default function CyborgTemple() {
             
             {/* TALK SHOW swap: talk_show.glb set replaces the RL80 temple
                 model while the tab is active. Same transform so it lands in
-                the same volume. */}
+                the same volume.
+
+                The tripod camera stands on BOTH shows — it is the prop that
+                says "studio" — and it only earns the middle of the frame when
+                its flip-out monitor is live, so `enableMonitorFeed` follows it
+                on rather than being switched per show. The lineup is the one
+                place it comes down: off air the neon frame is carrying the
+                channel and the prop would stand in front of it. */}
             {talkShowMode && (
               <TalkShowScene
                 episode={ltTvEpisode}
@@ -4170,8 +4177,8 @@ export default function CyborgTemple() {
                 projectCharacter={talkShowProject}
                 castHidden={ltTvView === 'lineup'}
                 newsMode={ltTvView === 'set' && ltTvSelection.showId === 'news'}
-                hideCameraRig={ltTvView === 'lineup' || ltTvSelection.showId === 'news'}
-                enableMonitorFeed={ltTvView === 'set' && ltTvSelection.showId !== 'news'}
+                hideCameraRig={ltTvView === 'lineup'}
+                enableMonitorFeed={ltTvView === 'set'}
                 channelCards={ltTvView === 'lineup' || ltTvSelection.showId === 'news' ? ltTvChannelCards : null}
                 onPlaybackReady={handleTalkShowPlaybackReady}
                 onPlaybackStateChange={handleTalkShowPlaybackState}
