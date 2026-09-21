@@ -43,6 +43,11 @@ function readParams() {
     lang: Number(q.get("lang") || 1),
     engine: Number(q.get("engine") || 3),
     text: q.get("text") || "Testing, one two three. Oh, hello!",
+    // Two RECORDED clip names from the account's Audio Manager, for the
+    // loading experiments below. Two different ones, so a preload of the
+    // second cannot be confused with the first already being warm.
+    clip: q.get("clip") || "",
+    clip2: q.get("clip2") || "",
     /**
      * THE 10th POSITIONAL, and the reason this page could lie to you.
      *
@@ -74,14 +79,64 @@ export default function SitePalTestPage() {
   const add = (m) =>
     setLog((l) => [...l, `${new Date().toISOString().slice(11, 19)}  ${m}`]);
 
+  // The instant the last button issued a call, so every callback can say how
+  // long it took to arrive. "How long" is the whole question here: a clip that
+  // has to be fetched answers late, and a warm one answers at once.
+  const issuedRef = useRef(0);
+  const issue = (what) => {
+    issuedRef.current = performance.now();
+    add(`▶ ${what}`);
+  };
+  const sinceIssued = (label, args) => {
+    const ms = issuedRef.current ? Math.round(performance.now() - issuedRef.current) : null;
+    const extra = args && args.length ? ` (${args.join(", ")})` : "";
+    return ms === null ? `${label}${extra}` : `${label}${extra} — ${ms}ms after the call`;
+  };
+
   useEffect(() => {
-    // SitePal lifecycle callbacks
-    window.vh_sceneLoaded = () => add("✅ vh_sceneLoaded — scene is up");
-    window.vh_talkStarted = () => add("🗣 vh_talkStarted");
-    window.vh_talkEnded = () => add("🔇 vh_talkEnded");
-    window.vh_audioStarted = () => add("🔊 vh_audioStarted");
-    window.vh_audioEnded = () => add("🔊 vh_audioEnded");
-    window.vh_ttsLoaded = () => add("💬 vh_ttsLoaded — TTS audio ready");
+    // SitePal lifecycle callbacks.
+    //
+    // WIRED WIDER THAN THE DOCUMENTED LIST ON PURPOSE. The question this page
+    // is now here to answer is whether SitePal ever says "this recorded clip
+    // has finished loading" — the LT TV set needs that to stop two avatars
+    // starting a section a few hundred ms apart, and on 2026-09-21 neither
+    // the API reference (blocked at this environment's proxy) nor the support
+    // forum could settle it. Defining a name SitePal never calls costs
+    // nothing, so the speculative ones are defined too: if one of them fires,
+    // that IS the answer, and it is marked in the log so it cannot be missed.
+    const known = {
+      vh_sceneLoaded: "✅ vh_sceneLoaded — scene is up",
+      vh_talkStarted: "🗣 vh_talkStarted",
+      vh_talkEnded: "🔇 vh_talkEnded",
+      vh_audioStarted: "🔊 vh_audioStarted",
+      vh_audioEnded: "🔊 vh_audioEnded",
+      vh_audioStopped: "🔊 vh_audioStopped",
+      vh_ttsLoaded: "💬 vh_ttsLoaded — TTS audio ready",
+    };
+    // Names nobody has confirmed exist. A line here is a discovery.
+    const guesses = [
+      "vh_audioLoaded",
+      "vh_audioReady",
+      "vh_audioPreloaded",
+      "vh_audioProgress",
+      "vh_loadComplete",
+      "vh_playerLoaded",
+    ];
+    const wired = [];
+    for (const [name, label] of Object.entries(known)) {
+      window[name] = (...args) => add(sinceIssued(label, args));
+      wired.push(name);
+    }
+    for (const name of guesses) {
+      window[name] = (...args) =>
+        add(sinceIssued(`⭐ ${name} FIRED — undocumented, this is the answer`, args));
+      wired.push(name);
+    }
+    // Errors carry an audID, which is the hint that the player tracks audios
+    // one by one — worth seeing in full.
+    window.vh_audioError = (audID, portal, errCode, errMsg) =>
+      add(`❌ vh_audioError audID=${audID} code=${errCode} ${errMsg || ""}`);
+    wired.push("vh_audioError");
 
     const s = document.createElement("script");
     s.src = "//vhss-d.oddcast.com/vhost_embed_functions_v4.php?acc=9308752&js=0";
@@ -99,12 +154,7 @@ export default function SitePalTestPage() {
 
     return () => {
       s.remove();
-      delete window.vh_sceneLoaded;
-      delete window.vh_talkStarted;
-      delete window.vh_talkEnded;
-      delete window.vh_audioStarted;
-      delete window.vh_audioEnded;
-      delete window.vh_ttsLoaded;
+      for (const name of wired) delete window[name];
     };
   }, []);
 
@@ -157,6 +207,71 @@ export default function SitePalTestPage() {
         </button>
         <button style={btn} onClick={() => { window.stopSpeech?.(); add("stopSpeech()"); }}>
           Stop
+        </button>
+      </div>
+
+      {/*
+        THE TWO QUESTIONS THE LT TV SET IS STUCK ON, as buttons.
+
+        On /trade the two avatars are told to play a section in the same tick
+        and do not start together, which puts one character's whole track a few
+        hundred ms out and makes some exchanges overlap. It only happens on a
+        FIRST play, so it looks like the clips are being fetched cold. Fixing
+        that needs two facts nobody has:
+
+          A. Does preloading a clip make it start sooner? (Is loadAudio even
+             doing anything ahead of time?)
+          B. Does loadAudio interrupt a clip that is already playing? If it
+             does not, the set can fetch the next section during the current
+             one and the problem goes away.
+
+        Pass two recorded clip names to use these:
+          /sitepal-test?clip=lttv_rt_ep02_connor&clip2=lttv_rt_ep02_gr80
+      */}
+      <div style={{ display: "flex", gap: 8, margin: "12px 0", flexWrap: "wrap" }}>
+        <button
+          style={btn}
+          disabled={!cfg.clip}
+          onClick={() => {
+            issue(`sayAudio("${cfg.clip}") COLD — nothing preloaded`);
+            window.sayAudio?.(cfg.clip);
+          }}
+        >
+          A1. Say clip cold
+        </button>
+        <button
+          style={btn}
+          disabled={!cfg.clip2}
+          onClick={() => {
+            add(`loadAudio("${cfg.clip2}") — now wait a few seconds, then press A3`);
+            window.loadAudio?.(cfg.clip2);
+          }}
+        >
+          A2. Preload the other clip
+        </button>
+        <button
+          style={btn}
+          disabled={!cfg.clip2}
+          onClick={() => {
+            issue(`sayAudio("${cfg.clip2}") WARM — preloaded by A2`);
+            window.sayAudio?.(cfg.clip2);
+          }}
+        >
+          A3. Say the preloaded one
+        </button>
+        <button
+          style={btn}
+          disabled={!cfg.clip || !cfg.clip2}
+          onClick={() => {
+            issue(`sayAudio("${cfg.clip}"), then loadAudio("${cfg.clip2}") in 2s`);
+            window.sayAudio?.(cfg.clip);
+            setTimeout(() => {
+              add(`loadAudio("${cfg.clip2}") WHILE SPEAKING — does the voice survive?`);
+              window.loadAudio?.(cfg.clip2);
+            }, 2000);
+          }}
+        >
+          B. Preload mid-speech
         </button>
         <button
           style={btn}
