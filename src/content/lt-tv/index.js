@@ -22,6 +22,7 @@ import roundtable03 from "./episodes/roundtable-03.json";
 import roundtable04 from "./episodes/roundtable-04.json";
 import roundtable05 from "./episodes/roundtable-05.json";
 import roundtable06 from "./episodes/roundtable-06.json";
+import news01 from "./episodes/news-01.json";
 
 import { formatRuntime, episodeIsPlayable } from "@/lib/ltTv/episodeTimeline.mjs";
 
@@ -32,6 +33,7 @@ const EPISODE_RECORDS = [
   roundtable04,
   roundtable05,
   roundtable06,
+  news01,
 ];
 
 // Runtime is DERIVED, not typed: it's the end of the dialogue the record
