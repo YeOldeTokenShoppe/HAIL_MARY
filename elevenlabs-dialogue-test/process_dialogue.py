@@ -51,9 +51,22 @@ SILENCE_DB = -40
 SILENCE_MIN_SECONDS = 0.08
 
 # How far from the reported instant a gap may be and still be believed to be
-# that junction. A reported end has been seen 1.1s short of where the speech
-# stopped, on the 2026-07-31 render.
-BOUNDARY_SEARCH_SECONDS = 1.5
+# that junction.
+#
+# THIS IS NOT THE SECTION CUTTER'S TOLERANCE, and copying that one (1.5s) here
+# was a mistake that cost Michelle a round on 2026-09-21. A section cut that
+# lands a second away is harmless: both characters' tracks are cut at the same
+# instant, so nothing moves relative to anything else. A STEM boundary a second
+# away is a disaster — it falls inside a line, and a whole clause of one
+# character ends up in the other character's clip. She heard GR80's "...you
+# cannot", the tail of his line, in Connor's first clip, because the junction
+# snapped 1.2s backwards onto a breath in the middle of GR80's own sentence.
+#
+# A gap that SPANS the reported instant is taken at any distance, because it
+# contains the boundary by definition. Anything else is a guess, and a guess
+# further away than this is worse than the guarded fallback — which is only
+# ever wrong by the reporting error, a syllable at most.
+BOUNDARY_SEARCH_SECONDS = 0.5
 
 # The least a line may be squeezed to. A window shorter than this is not a line
 # at all, and the audio it should have held goes to whoever is next — which is

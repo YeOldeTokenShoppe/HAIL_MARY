@@ -134,6 +134,39 @@ ok("a volley of short lines still moves forwards only",
 ok("and none of them is squeezed out",
    all(w["end"] > w["start"] for w in fast))
 
+print("\nA breath in the middle of a long line is not a junction:")
+# Michelle, 2026-09-21: "i hear gr80 interject in the first connor recording
+# when it says 'You cannot'." That is the END of GR80's line 3 — "...who is
+# standing inside the promises you cannot." His line is long and breathes in
+# the middle, and the junction snapped 1.2s BACKWARDS onto that breath, so the
+# last clause of his line sat inside Connor's window.
+#
+# The cause was the search radius: 1.5s, copied from the section cutter, where
+# being a second out is harmless because both tracks cut identically. For a
+# stem boundary it is a whole clause in the wrong mouth.
+long_line = [
+    {"start_time_seconds": 20.0, "end_time_seconds": 40.2, "voice_id": "gr80"},
+    {"start_time_seconds": 40.2, "end_time_seconds": 48.0, "voice_id": "connor"},
+]
+breath = (38.9, 39.1)
+real = (40.0, 40.6)
+
+both = plan_windows(long_line, [breath, real], 50.0)
+ok("the real gap between the lines is used when it was measured",
+   real[0] <= both[0]["end"] <= real[1])
+ok("so nothing of GR80 is left in Connor's window", both[1]["start"] >= 40.0)
+
+only_breath = plan_windows(long_line, [breath], 50.0)
+ok("a breath 1.2s away is NOT mistaken for the junction",
+   only_breath[0]["end"] > 39.5)
+ok("it falls back to the reported instant instead",
+   abs(only_breath[0]["end"] - 40.2) < 0.2)
+ok("and says it could not measure that one", not only_breath[0]["end_measured"])
+# The fallback is wrong by the reporting error — a syllable — where the breath
+# would have been wrong by a clause. That is the whole trade.
+ok("the fallback is far closer to the truth than the breath was",
+   abs(only_breath[1]["start"] - 40.3) < abs(39.0 - 40.3))
+
 print("\nWhen the lines really do run together:")
 # No gap anywhere near the junction at 10.4.
 bare = plan_windows(segments, [(30.0, 30.5)], 31.0)
