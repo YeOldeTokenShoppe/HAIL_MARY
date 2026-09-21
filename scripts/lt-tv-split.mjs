@@ -207,6 +207,46 @@ export function staleVoiceRefusal(stale, id) {
  *
  * @param sections  from planSections; one entry means no `_s` suffix anywhere
  */
+/**
+ * Which clips this split actually changed, against the files it overwrote.
+ *
+ * After `# take 2` on one line Michelle asked which of twelve clips to upload
+ * again (2026-09-21). The answer is knowable: every clip is cut from the same
+ * bytes by the same arithmetic, so a clip whose bytes match the file already
+ * in the folder is the clip already in SitePal — PROVIDED the last split was
+ * uploaded, which only she knows, so the report says "if".
+ */
+export function clipChanges(clips, before, after) {
+  const changed = [];
+  const same = [];
+  const fresh = [];
+  for (const clip of clips) {
+    const was = before.get(clip);
+    const now = after.get(clip);
+    if (!was) fresh.push(clip);
+    else if (now && was.equals(now)) same.push(clip);
+    else changed.push(clip);
+  }
+  return { changed, same, fresh };
+}
+
+/** What to say about it, or nothing when there was nothing to compare. */
+export function clipChangesReport({ changed, same, fresh }) {
+  if (!same.length && !changed.length) return null;
+  const lines = [];
+  if (changed.length) {
+    lines.push(`Changed since the last split, so upload again: ${changed.join(", ")}.`);
+  }
+  if (same.length) {
+    lines.push(
+      `Byte-identical to the last split: ${same.join(", ")}.` +
+        " If those were uploaded after that split, SitePal already has them.",
+    );
+  }
+  if (fresh.length) lines.push(`New this time: ${fresh.join(", ")}.`);
+  return lines.join("\n");
+}
+
 export function uploadPlan(episode, id, sections = [{ startsAt: 0 }]) {
   return Object.entries(episode.cast ?? {}).flatMap(([actor, member]) =>
     sections.map((section, i) => {
@@ -479,16 +519,22 @@ async function main() {
   // The older path used ffmpeg here; the WAVs this pipeline writes are plain
   // PCM and need nothing but arithmetic.
   const sources = new Map();
+  const before = new Map();
+  const after = new Map();
   for (const row of plan) {
     const section = sections[row.section - 1];
     if (!sources.has(row.source)) sources.set(row.source, await readFile(row.source));
     try {
-      await writeFile(row.file, sliceWav(sources.get(row.source), section.startsAt, section.endsAt));
+      if (existsSync(row.file)) before.set(row.clip, await readFile(row.file));
+      const clip = sliceWav(sources.get(row.source), section.startsAt, section.endsAt);
+      after.set(row.clip, clip);
+      await writeFile(row.file, clip);
     } catch (err) {
       console.error(`Could not cut ${row.file}: ${err.message}`);
       process.exit(1);
     }
   }
+  const changes = clipChanges(plan.map((r) => r.clip), before, after);
 
   // The record learns the cut points, so the set knows when to move on. Written
   // here rather than guessed there: the boundaries are a property of the audio
@@ -511,6 +557,8 @@ async function main() {
     console.log("Upload all of them. The set plays each character's sections in order, and a");
     console.log("missing one stops the episode where it should have carried on.\n");
   }
+  const said = clipChangesReport(changes);
+  if (said) console.log(`${said}\n`);
   // The end of the chain, so it hands over the last step. Re-running the script
   // step, which this used to say, rebuilds the episode from scratch and throws
   // away both the edits and the timing — including the section cuts just

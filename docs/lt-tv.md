@@ -590,7 +590,8 @@ its own line just above it and press **Record it again**. That one line is
 rendered afresh and kept as take 2; everything else is reused. Not happy with
 take 2 either, `# take 3`. Remove the mark and the first take comes back. It
 is a mark like `# pause`, so it needs no applying, and applying edits wipes
-it.
+it. **Split** then compares every clip with the one it overwrote and says
+which changed, so after one take you upload those and not all twelve.
 
 **Rewrite it yourself.** Open the screenplay, change the words, then
 **Apply my edits**. Nothing is spent and nothing else in the episode moves.

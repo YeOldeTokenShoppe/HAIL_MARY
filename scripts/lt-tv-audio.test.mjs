@@ -49,7 +49,7 @@ import {
   staleClipsAfterRecord,
   staleClipWarning,
 } from "./lt-tv-audio.mjs";
-import { wavInfo, sliceWav, perLineRender, layoutLine } from "./lt-tv-split.mjs";
+import { wavInfo, sliceWav, perLineRender, layoutLine, clipChanges, clipChangesReport } from "./lt-tv-split.mjs";
 import { planSections, TARGET_SECTION_SECONDS } from "./lt-tv-sections.mjs";
 import { CAST } from "./lt-tv-format.mjs";
 import { renderScript } from "./lt-tv-episode.mjs";
@@ -525,6 +525,28 @@ console.log("\nA take mark records one line again without rewording it:");
   check("nor as a pause", readPauseMarks(page).size, 0);
   check("a mark on a line that does not exist is stranded, not dropped silently",
     strandedTakes(episode, new Map([[99999, 2], [target, 2]])), [99999]);
+}
+
+console.log("\nThe split says which clips it actually changed:");
+{
+  // Twelve clips, one line re-taken: which to upload again? Every clip is
+  // cut from the same bytes by the same arithmetic, so a clip whose bytes
+  // match the file it overwrote is the one SitePal already has.
+  const a = Buffer.from("aaaa");
+  const b = Buffer.from("bbbb");
+  const clips = ["c_s1", "c_s2", "g_s1", "g_s2", "c_s3"];
+  const before = new Map([["c_s1", a], ["c_s2", a], ["g_s1", a], ["g_s2", b]]);
+  const after = new Map([["c_s1", Buffer.from("aaaa")], ["c_s2", b], ["g_s1", a], ["g_s2", a], ["c_s3", a]]);
+  const changes = clipChanges(clips, before, after);
+  check("a clip whose bytes match the old file is the same", changes.same, ["c_s1", "g_s1"]);
+  check("one whose bytes differ is changed", changes.changed, ["c_s2", "g_s2"]);
+  check("one with no old file is new", changes.fresh, ["c_s3"]);
+  const said = clipChangesReport(changes);
+  ok("the report says which to upload again", said.includes("upload again: c_s2, g_s2"));
+  ok("and which SitePal already has, with the condition that makes it true",
+    said.includes("c_s1, g_s1") && /If those were uploaded/.test(said));
+  check("a first split, with nothing to compare, says nothing",
+    clipChangesReport(clipChanges(["x"], new Map(), new Map([["x", a]]))), null);
 }
 
 console.log("\nThe voices are the show's, not the record's:");
