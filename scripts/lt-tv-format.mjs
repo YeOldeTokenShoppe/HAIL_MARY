@@ -127,15 +127,14 @@ export const NEWS_SOURCE_DOMAINS = [
   "fred.stlouisfed.org",
   "stlouisfed.org",
 
-  // General business and economics desks.
-  "reuters.com",
-  "apnews.com",
+  // General business and economics desks. Six obvious names are missing on
+  // purpose: reuters.com, apnews.com, wsj.com, ft.com, marketwatch.com and
+  // barrons.com block Anthropic's crawler, and the web search tool rejects the
+  // whole request with a 400 ("not accessible to our user agent") if any one of
+  // them is on the allowlist. Seen live on 2026-09-21. Before adding an
+  // outlet, check that it does not appear in that error.
   "cnbc.com",
-  "marketwatch.com",
   "bloomberg.com",
-  "wsj.com",
-  "ft.com",
-  "barrons.com",
 
   // Crypto desks.
   "coindesk.com",
