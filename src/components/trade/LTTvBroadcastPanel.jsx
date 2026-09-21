@@ -73,11 +73,24 @@ export default function LTTvBroadcastPanel({
     return () => document.removeEventListener("pointerdown", dismissOutside, true);
   }, [guideOpen]);
 
+  // Playback collapses the console to clear the set; the end of the show puts
+  // it back, because what a viewer wants the moment the credits stop is the
+  // guide — not a collapsed tab to find first. Only on the TRANSITION out of
+  // playing, so a console the viewer collapsed by hand while nothing was on
+  // stays collapsed.
+  const wasPlayingRef = useRef(false);
   useEffect(() => {
     if (playing) {
       setGuideOpen(false);
       setCollapsed(true);
+    } else if (wasPlayingRef.current) {
+      setCollapsed(false);
+      // The expand tab is what had focus while the show ran, and it is about
+      // to unmount — hand focus to the control that replaces it rather than
+      // dropping it on the body.
+      requestAnimationFrame(() => primaryButtonRef.current?.focus());
     }
+    wasPlayingRef.current = playing;
   }, [playing]);
 
   useEffect(() => {
