@@ -29,7 +29,7 @@ import {
   TARGET_SECTION_SECONDS,
 } from "./lt-tv-sections.mjs";
 import { readCutMarks } from "./lt-tv-edit.mjs";
-import { sectionLine, pauseLine, cutHint } from "./lt-tv-split.mjs";
+import { sectionLine, pauseLine, cutHint, staleClips, uploadPlan } from "./lt-tv-split.mjs";
 import { episodeSections, validateEpisode } from "../src/lib/ltTv/episodeTimeline.mjs";
 
 let failures = 0;
@@ -475,6 +475,37 @@ console.log("\nWith the real pauses measured, the joins land in them:");
     silences: [{ start: 3, end: 4.2, width: 1.2 }],
   });
   ok("a pause far from any junction is not used", faraway.slice(0, -1).every((s) => s.forcedJoin));
+}
+
+console.log("\nA re-split clears out the clips it no longer wants:");
+{
+  // The hazard is a run that makes FEWER sections than the last one: ffmpeg
+  // overwrites what it writes and leaves the rest, so a stale `_s5` sits in
+  // the folder looking exactly like a real clip and gets uploaded beside them.
+  // This deletes files, so it is checked rather than trusted.
+  const plan = uploadPlan(SAMPLE, "roundtable-02", [{ startsAt: 0 }, { startsAt: 80 }]);
+  const folder = [
+    "master-dialogue.wav",
+    "john-sitepal-balanced.wav",
+    "gr80-sitepal-balanced.wav",
+    "voice-segments.json",
+    "lttv_rt_ep02_connor.wav",
+    "lttv_rt_ep02_connor_s2.wav",
+    "lttv_rt_ep02_connor_s3.wav",
+    "lttv_rt_ep02_gr80.wav",
+    "lttv_rt_ep02_gr80_s2.wav",
+    "lttv_rt_ep02_gr80_s3.wav",
+    "my notes.wav",
+  ];
+
+  check("only the sections this cut does not want",
+    staleClips(folder, plan), ["lttv_rt_ep02_connor_s3.wav", "lttv_rt_ep02_gr80_s3.wav"]);
+  const removed = new Set(staleClips(folder, plan));
+  ok("never the master", !removed.has("master-dialogue.wav"));
+  ok("never a balanced track", !removed.has("john-sitepal-balanced.wav"));
+  ok("never the timings", !removed.has("voice-segments.json"));
+  ok("and never a file a person put there", !removed.has("my notes.wav"));
+  check("a first run has nothing to clear", staleClips(["master-dialogue.wav"], plan), []);
 }
 
 function range(from, to) {

@@ -28,7 +28,7 @@
 // Each section is written under the NAME IT WILL HAVE IN SITEPAL, so uploading
 // is a matter of dragging files in and not of reading a table.
 
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, readdir, unlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { resolve, join } from "node:path";
@@ -159,6 +159,21 @@ export function cutHint(cuts) {
 }
 
 /**
+ * Clip files in the episode's folder that this cut does not want.
+ *
+ * ffmpeg overwrites the files it writes, so the danger is the ones it does
+ * NOT: a run that produces fewer sections than the last leaves a stale `_s5`
+ * in the folder, looking exactly like the others, waiting to be uploaded
+ * beside them. This deletes files, so it is deliberately narrow — only names
+ * that this pipeline generates, never the master, the balanced tracks, the
+ * timings, or anything a person put there.
+ */
+export function staleClips(existing, plan) {
+  const keep = new Set(plan.map((row) => `${row.clip}.wav`));
+  return existing.filter((name) => /^lttv_[a-z0-9_]+\.wav$/.test(name) && !keep.has(name));
+}
+
+/**
  * Run a command and resolve what it wrote to stderr.
  *
  * silencedetect reports there rather than on stdout, and ffmpeg's exit code
@@ -252,7 +267,15 @@ async function main() {
     process.exit(1);
   }
 
+  // Clear out the last run's section files first — see staleClips.
   const plan = uploadPlan(episode, id, sections);
+  const stale = staleClips(await readdir(resolve(AUDIO_DIR, id)), plan);
+  for (const name of stale) await unlink(resolve(AUDIO_DIR, id, name));
+  if (stale.length) {
+    console.log(`\nRemoved ${stale.length} clip file(s) from a previous split: ${stale.join(", ")}`);
+    console.log("They are not part of this cut. Delete them in SitePal too if you uploaded them.");
+  }
+
   const length = (s) => s.endsAt - s.startsAt;
 
   console.log(
