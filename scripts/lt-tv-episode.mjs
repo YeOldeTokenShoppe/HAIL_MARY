@@ -468,6 +468,12 @@ export function renderScript(episode) {
     "# Start the note #! to also keep it as a standing rule for future",
     "# episodes, in docs/lt-tv-style-notes.md. If only one sentence of a",
     "# long line is wrong, break the line there and note it there.",
+    "#",
+    "# To talk it over instead of marking it up — when you know something is",
+    "# wrong but not which line — open this episode at /lt-tv and use the",
+    "# writers' room under the script, or:",
+    `#     node scripts/lt-tv-room.mjs ${episode.id}`,
+    "# It proposes changes and writes none of them until you agree.",
     "",
   ];
   for (const segment of episode.segments) {

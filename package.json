@@ -16,6 +16,7 @@
     "lt:check": "node scripts/lt-tv-check.mjs",
     "lt:edit": "node scripts/lt-tv-edit.mjs",
     "lt:rewrite": "node scripts/lt-tv-rewrite.mjs",
+    "lt:room": "node scripts/lt-tv-room.mjs",
     "lt:audio": "node scripts/lt-tv-audio.mjs",
     "lt:split": "node scripts/lt-tv-split.mjs",
     "lt:slate": "node scripts/lt-tv-slate-record.mjs",

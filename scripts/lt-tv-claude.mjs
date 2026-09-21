@@ -11,11 +11,15 @@
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
-export async function claude({ system, user, model, maxTokens = 8000, tools = null }) {
+export async function claude({ system, user, messages: turns = null, model, maxTokens = 8000, tools = null }) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("ANTHROPIC_API_KEY is not set (or use --draft to skip the model).");
 
-  const messages = [{ role: "user", content: user }];
+  // One instruction is the usual shape here — a generator says what it wants
+  // and gets an episode back. The writer's room is a CONVERSATION, so it hands
+  // over the turns instead; copied rather than used in place, because the
+  // pause_turn loop below appends to this list.
+  const messages = turns ? [...turns] : [{ role: "user", content: user }];
   const searchNotes = [];
   let data;
 

@@ -181,6 +181,7 @@ root — the path is relative to you, not to the repo.
 | `npm run lt:roundtable` | write a roundtable episode |
 | `npm run lt:edit` | apply your edits to a screenplay |
 | `npm run lt:rewrite` | rewrite the lines you marked with a `#` note |
+| `npm run lt:room` | the writers' room: talk an episode over, line by line |
 | `npm run lt:audio` | record an episode |
 | `npm run lt:split` | cut the two tracks into the SitePal clips |
 | `npm run lt:slate` | put a recorded episode on the guide |
@@ -873,7 +874,8 @@ show runs into new ones.
 
 ## A line you don't like (both shows)
 
-Three things you can do with a bad line, in rising order of effort.
+Four things you can do with a bad line, in rising order of effort. The fourth,
+the writers' room, is the one for when you cannot name the line yet.
 
 **Have it read again.** When the words are right and the reading is not (a
 stray syllable at the head of a line, a flat delivery), write `# take 2` on
@@ -948,6 +950,72 @@ that file; only the bullets under **Rules** are sent, so the rest of the page
 explains itself without the explanation reaching the model.
 
 A script run prints `House notes: 3 in force.` when it is using them.
+
+---
+
+## The writers' room (both shows)
+
+Everything above needs you to know which line is wrong before you can say
+anything. Often you don't — the middle of story two drags, GR80 concedes too
+early, the ending is soft. That is a conversation, so have one: open the
+episode at `/lt-tv` and there is a **writers' room** under the screenplay.
+
+```
+you     the middle of story two drags and I can't see why
+writer  It's the third beat — Connor makes the same point twice, once with
+        the number and once without it. Cut line 19 and let GR80 land on 18.
+        Want me to?
+you     yes, and give Connor the last word in that segment
+```
+
+The writer has the whole screenplay in front of it, numbered exactly as you
+see it, and it is the same writer: the character notes and the show's rules
+come from the generator that wrote this show (`SCRIPT_BIBLE`, shared out of
+`scripts/lt-news-script.mjs` and `scripts/lt-rt-script.mjs`), plus the house
+notes in `docs/lt-tv-style-notes.md`. It cannot describe Connor differently
+from the writer that wrote him, because it is reading the same paragraph.
+
+**Nothing is written until you say so.** When the two of you agree on
+something, it offers the changes — each new line next to the line it replaces
+— and **Put it in the script** writes them. **Leave it** turns them down and
+the writer is told you did, so it stops offering the same three lines. What it
+can offer:
+
+| | |
+|---|---|
+| reword a line | the new words, with the old ones struck through under them |
+| add a line | who says it, and whether they say it at the other host |
+| cut a line | the line goes, and its animation beats with it |
+| `# pause 1.5s` | a measured beat before a line; 0 takes one out |
+| `# cut` | a section boundary, where SitePal can be skipped to |
+| the title | what the channel guide prints |
+| a house note | a standing rule for every future episode of both shows |
+
+The last two rows are the point of the marks being here rather than replaced:
+the room speaks the screenplay's own language, so a beat you talk your way to
+is the same `# pause 1.5s` you would have typed, read by the recording in the
+same way. A house note is for when you are telling it about the characters
+rather than about this line — "Connor never explains his own joke" — and it
+goes into `docs/lt-tv-style-notes.md` beside the ones you wrote with `#!`.
+
+**It writes the `.txt` only.** The record is rebuilt by **Apply my edits**, the
+same explicit step as any other change, so a conversation that went nowhere is
+thrown away by not applying it. A change that would make the screenplay
+unreadable is refused when it arrives rather than when you apply it, and if the
+file will not parse afterwards the room says so immediately.
+
+The conversation is kept beside the episode, in
+`content/lt-tv/episodes/<id>.room.json`, so closing the tab does not lose it.
+Staging is gitignored, so it is yours and it is not committed. The same room
+from a terminal:
+
+```
+npm run lt:room -- morality-02
+```
+
+Each message is one Anthropic call, and a turn that only talks costs the same
+as one that changes something — so it is cheap next to writing an episode and
+not free.
 
 ---
 
