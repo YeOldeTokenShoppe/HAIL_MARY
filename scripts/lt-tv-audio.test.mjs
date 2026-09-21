@@ -110,10 +110,6 @@ ok("a line that opens an act follows the beat",
   plan.filter((u) => u.opensAct).every((u) => u.pauseBefore === ACT_BEAT_SECONDS));
 check("there is one act break per segment boundary",
   plan.filter((u) => u.opensAct).length, episode.segments.length - 1);
-ok("each line knows what came before it, for the model to perform against",
-  plan.slice(1).every((u, i) => u.previousText === plan[i].text));
-ok("and what comes next", plan.slice(0, -1).every((u, i) => u.nextText === plan[i + 1].text));
-check("the first line has nothing before it", plan[0].previousText, null);
 ok("the default gap is a breath, not a gulf", LINE_GAP_SECONDS > 0.2 && LINE_GAP_SECONDS < 1);
 ok("and the act beat is longer than it", ACT_BEAT_SECONDS > LINE_GAP_SECONDS);
 
@@ -122,12 +118,11 @@ console.log("\nWhat is sent for one line:");
   const body = lineRequest(plan[1]);
   check("the words", body.text, plan[1].text);
   check("the dialogue model, tags and all", body.model_id, MODEL_ID);
-  check("the previous line as context", body.previous_text, plan[0].text);
-  check("and the next", body.next_text, plan[2].text);
-  check("with context off, only the words and the model",
-    Object.keys(lineRequest(plan[1], { context: false })), ["text", "model_id"]);
-  ok("the first line sends no previous_text", !("previous_text" in lineRequest(plan[0])));
-  ok("the last line sends no next_text", !("next_text" in lineRequest(plan[plan.length - 1])));
+  // ElevenLabs answers 400 unsupported_model to previous_text / next_text on
+  // eleven_v3. Michelle's first real run died on line 0 with exactly that, so
+  // the body is the words and the model and nothing else.
+  check("and nothing else: v3 refuses the context fields",
+    Object.keys(body), ["text", "model_id"]);
 }
 
 console.log("\nA kept line is filed under what was sent, not where it sits:");
@@ -144,8 +139,6 @@ console.log("\nA kept line is filed under what was sent, not where it sits:");
   ok("reworded, a different one", lineFingerprint({ ...a, text: "Paper gains are not gains." }) !== fp);
   ok("the same words in the other voice, a different one", lineFingerprint({ ...a, voiceId: "gr80-voice" }) !== fp);
   ok("and at another rate, a different one", lineFingerprint(a, { format: "pcm_44100" }) !== lineFingerprint(a, { format: "pcm_24000" }));
-  ok("but context is not part of it, so an edit costs one line, not three",
-    lineFingerprint({ ...a, previousText: "x" }) === lineFingerprint({ ...a, previousText: "y" }));
 
   const kept = new Set([lineFingerprint(plan[0]), lineFingerprint(plan[2])]);
   const report = lineCostReport(plan, (u) => kept.has(lineFingerprint(u)));

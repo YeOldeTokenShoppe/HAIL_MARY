@@ -27,10 +27,11 @@
 //
 // WHAT IT COSTS. The model no longer hears the other character's line while
 // performing a reply, so the delivery leans more on the [tags] in the script.
-// The neighbouring lines' text is passed as context (`previous_text` and
-// `next_text`), which the API accepts; whether v3 makes much of it is not
-// something this file can promise. Michelle chose this trade on 2026-09-21
-// after hearing the alternative fail five times.
+// Each line is sent cold: the API's `previous_text` / `next_text` context
+// fields are refused outright for eleven_v3 ("not yet supported", a 400 on
+// Michelle's first real run, 2026-09-21), and v3 is the model that performs
+// the tags, so there is no context to send. Michelle chose this trade on
+// 2026-09-21 after hearing the alternative fail five times.
 //
 // WHY PCM AND NOT MP3. Raw PCM concatenates by appending bytes and a buffer's
 // duration is its byte count, so the audio and the timings come from ONE set
@@ -227,9 +228,6 @@ export function linePlan(
       pauseBefore: seconds,
       bytes: beatBytes(seconds),
       asked: fromScript,
-      // The neighbouring lines, as text, for the model to perform against.
-      previousText: i > 0 ? lines[i - 1].text : null,
-      nextText: i + 1 < lines.length ? lines[i + 1].text : null,
     };
   });
 }
@@ -281,10 +279,8 @@ export function strandedWarning(stranded, episode) {
  * the format — and reused only when all four match. Reordering lines costs
  * nothing; rewording one costs that one.
  *
- * The context (`previous_text`) is deliberately NOT part of it: including it
- * would re-render every neighbour of an edited line for a difference nobody
- * has shown they can hear, and the point of caching is that an edit costs
- * what it changed.
+ * Nothing about the neighbouring lines is part of it, so an edit costs what
+ * it changed and nothing next to it.
  */
 export function lineFingerprint({ voiceId, text }, { format = `pcm_${PCM.sampleRate}`, model = MODEL_ID } = {}) {
   return createHash("sha256")
@@ -559,17 +555,17 @@ export function lineCostReport(units, kept) {
   };
 }
 
-/** The request body for one line: its words, and the neighbours as context. */
-export function lineRequest(unit, { context = true } = {}) {
-  const body = { text: unit.text, model_id: MODEL_ID };
-  if (context) {
-    if (unit.previousText) body.previous_text = unit.previousText;
-    if (unit.nextText) body.next_text = unit.nextText;
-  }
-  return body;
+/**
+ * The request body for one line: its words and the model, nothing else.
+ * Not `previous_text` / `next_text`: ElevenLabs refuses them for eleven_v3
+ * with a 400 `unsupported_model`, and the first real recording died on line 0
+ * for exactly that.
+ */
+export function lineRequest(unit) {
+  return { text: unit.text, model_id: MODEL_ID };
 }
 
-async function generateLine({ unit, key, outDir, context }) {
+async function generateLine({ unit, key, outDir }) {
   // Lines cost money, so a finished line is kept, filed under what was sent.
   // A run that dies on line thirty resumes at line thirty; a re-record after
   // an edit sends the lines that changed and nothing else.
@@ -583,7 +579,7 @@ async function generateLine({ unit, key, outDir, context }) {
   const res = await fetch(`${ENDPOINT}/${unit.voiceId}?output_format=${format}`, {
     method: "POST",
     headers: { "xi-api-key": key, "content-type": "application/json", accept: "audio/*" },
-    body: JSON.stringify(lineRequest(unit, { context })),
+    body: JSON.stringify(lineRequest(unit)),
   });
   if (!res.ok) {
     const body = await res.text();
@@ -609,7 +605,6 @@ async function generateLine({ unit, key, outDir, context }) {
         text: unit.text,
         model_id: MODEL_ID,
         output_format: format,
-        context: context ? { previous_text: unit.previousText, next_text: unit.nextText } : null,
         seconds: round(pcmSeconds(pcm.length)),
         trimmed_seconds: round(pcmSeconds(raw.length - pcm.length)),
         recorded_at: new Date().toISOString(),
@@ -670,10 +665,6 @@ async function main() {
     console.error("ELEVENLABS_API_KEY is not set.");
     process.exit(2);
   }
-  // Context on by default; LT_TV_LINE_CONTEXT=0 renders every line cold, which
-  // is the way to hear whether the context is doing anything at all.
-  const context = process.env.LT_TV_LINE_CONTEXT !== "0";
-
   const loaded = JSON.parse(await readFile(resolve(recordPath), "utf8"));
   const { episode, changes: revoiced } = revoice(loaded);
   if (episode.synthetic) {
@@ -753,8 +744,7 @@ async function main() {
       `${fresh} to record, ${units.length - fresh} already on disk.`,
   );
   console.log(
-    `  ${LINE_GAP_SECONDS}s between lines, ${ACT_BEAT_SECONDS}s between acts` +
-      `${context ? ", each line performed with its neighbours as context" : ", no context"}.`,
+    `  ${LINE_GAP_SECONDS}s between lines, ${ACT_BEAT_SECONDS}s between acts.`,
   );
   for (const unit of units.filter((u) => u.asked)) {
     console.log(`  ${unit.pauseBefore}s before line ${unit.n} — from the script`);
@@ -765,7 +755,7 @@ async function main() {
   const audio = new Map();
   let sent = 0;
   for (const unit of units) {
-    const { pcm, reused } = await generateLine({ unit, key, outDir, context });
+    const { pcm, reused } = await generateLine({ unit, key, outDir });
     if (!reused) sent += 1;
     audio.set(unit.n, pcm);
     const who = (episode.cast?.[unit.actor]?.displayName ?? unit.actor).padEnd(10);
@@ -813,7 +803,6 @@ async function main() {
         mode: "lines",
         sampleRate: PCM.sampleRate,
         model: MODEL_ID,
-        context,
         lineGapSeconds: LINE_GAP_SECONDS,
         actBeatSeconds: ACT_BEAT_SECONDS,
         durationSeconds: layout.durationSeconds,

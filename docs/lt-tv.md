@@ -476,11 +476,10 @@ bug is gone rather than patched.
 
 **What it costs.** The model no longer hears the other character's line while
 performing a reply, so an exchange leans more on the `[tags]` in the script —
-put one on most replies, not a few. The neighbouring lines' text is sent as
-context (`previous_text` / `next_text`), which the API accepts; whether v3
-makes much of it is unproven, and `LT_TV_LINE_CONTEXT=0` in `.env.local`
-renders every line cold so the two can be compared. Michelle chose this trade
-on 2026-09-21.
+put one on most replies, not a few. Each line is sent cold: ElevenLabs has
+context fields for the neighbouring lines, but refuses them for the v3 model
+("not yet supported"), and v3 is the model that performs the tags. Michelle
+chose this trade on 2026-09-21.
 
 **What it gives.** A pause anywhere, exact. Section cuts that always land in a
 gap. Re-recording an edited line costs that line. And the whole recording step
