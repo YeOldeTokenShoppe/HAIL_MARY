@@ -108,8 +108,11 @@ export default function Studio() {
           <div className={s.showHead}>
             <h2 className={s.showTitle}>{show.title}</h2>
           </div>
+          {show.actions?.length > 0 && (
+            <ShowActions show={show} env={status.env} onRun={run} running={running} />
+          )}
           {show.episodes.length === 0 ? (
-            <p className={s.empty}>Nothing on the slate yet.</p>
+            <p className={s.empty}>{show.actions?.length ? 'Nothing on the slate yet. Start above.' : 'Nothing on the slate yet.'}</p>
           ) : (
             show.episodes.map((e) => (
               <Episode
@@ -185,6 +188,36 @@ function Keys({ env }) {
         Put them in <code>.env.local</code> and restart <code>npm run dev</code>.
         Steps that need one will fail until then.
       </p>
+    </div>
+  );
+}
+
+// The buttons that make a news episode exist. The week is pulled and the
+// script written before there is an episode to open, so they sit under the
+// show's heading rather than inside one. Same table, same runner, no id.
+function ShowActions({ show, env, onRun, running }) {
+  return (
+    <div className={`${s.actions} ${s.showActions}`}>
+      {show.actions.map((a, i) => {
+        const missingKey = a.needs.find((k) =>
+          (k === 'ANTHROPIC_API_KEY' && !env.anthropic) || (k === 'ELEVENLABS_API_KEY' && !env.elevenlabs));
+        const why = missingKey ? `${missingKey} is not set` : null;
+        const busy = running === `${a.name}:`;
+        return (
+          <div key={a.name} className={s.action}>
+            <button
+              title={why || undefined}
+              disabled={Boolean(why) || Boolean(running)}
+              onClick={() => onRun(a.name, undefined, a.spends)}
+              className={`${s.btn} ${i === 0 && !why ? s.btnPrimary : ''}`}
+            >
+              {busy ? 'Running…' : a.label}
+              {a.spends && <span className={s.cost}>{a.spends.replace(/^an? /, '')}</span>}
+            </button>
+            <span className={s.actionBlurb}>{why || a.blurb}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }

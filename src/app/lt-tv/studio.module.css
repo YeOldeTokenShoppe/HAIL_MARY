@@ -637,3 +637,8 @@
     transition: none !important;
   }
 }
+
+/* Show-level buttons sit between the heading and the episode list. */
+.showActions {
+  margin: 0 0 14px;
+}

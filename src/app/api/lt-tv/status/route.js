@@ -1,5 +1,5 @@
 import { readStatus } from '../../../../../scripts/lt-tv-status.mjs';
-import { actionsFor } from '../../../../../scripts/lt-tv-actions.mjs';
+import { actionsFor, showActionsFor } from '../../../../../scripts/lt-tv-actions.mjs';
 import { refuseOutsideDev } from '@/lib/ltTv/devOnly.mjs';
 
 // Reads the working tree, so it can never be cached or prerendered.
@@ -19,6 +19,8 @@ export async function GET() {
       // button that the server would then refuse.
       shows: status.shows.map((show) => ({
         ...show,
+        // A show's own buttons: the ones that make an episode exist.
+        actions: showActionsFor(show.id),
         episodes: show.episodes.map((e) => ({ ...e, actions: actionsFor(e.stage) })),
       })),
       orphans: status.orphans.map((e) => ({ ...e, actions: actionsFor(e.stage) })),

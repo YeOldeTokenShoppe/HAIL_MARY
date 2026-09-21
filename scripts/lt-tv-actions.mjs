@@ -20,8 +20,44 @@
 // none of this exists in a deployed build. That is the second lock, not the
 // first; this table is written to be safe on its own.
 
-/** Actions, each one a function from a validated id to an argv array. */
+import { isoWeek } from "./lt-news-brief.mjs";
+
+/**
+ * Actions, each one a function from a validated id to an argv array.
+ *
+ * Two kinds. An EPISODE action takes the id of an episode on the slate and is
+ * offered by stage. A SHOW action (`scope: "show"`) takes no id at all, because
+ * it is how a news episode comes to exist: the week is pulled and the script
+ * written before there is anything on the slate to point at. Those are offered
+ * under the show's heading instead, by `showActionsFor`.
+ */
 export const ACTIONS = {
+  "pull-week": {
+    label: "Pull the week",
+    scope: "show",
+    show: "news",
+    // Public feeds and FRED. No key, no model, no audio.
+    spends: null,
+    needs: [],
+    stages: [],
+    argv: () => ["node", ["scripts/lt-news-brief.mjs"]],
+    blurb:
+      "Collects this week's market signal into a brief: the Fed, the curve, oil, crypto headlines, collectibles, prediction markets. Free. Read the Degraded line in the output; anything named there answered badly.",
+  },
+  "write-news": {
+    label: "Write this week's news",
+    scope: "show",
+    show: "news",
+    // Two Claude calls: the editorial pass, then the dialogue.
+    spends: "an Anthropic call",
+    needs: ["ANTHROPIC_API_KEY"],
+    stages: [],
+    // This week's brief, by the same ISO-week rule the pull uses to name it.
+    // Fixed here rather than sent by the browser, like every other argument.
+    argv: () => ["node", ["scripts/lt-news-script.mjs", "--brief", `content/lt-tv/briefs/news-${isoWeek()}.json`]],
+    blurb:
+      "Writes the rundown and the dialogue from this week's brief, verifying every number against its source, and puts the episode on the slate as Not recorded yet. Pull the week first. Two Claude calls.",
+  },
   "write-roundtable": {
     label: "Write this episode",
     // Two Claude calls. The button says so and asks first.
@@ -172,7 +208,8 @@ export function resolveAction(action, id, knownIds) {
   }
   const spec = ACTIONS[action];
 
-  // `check` is the one action that is about the whole slate, so it takes no id.
+  // `check` is about the whole slate and the show actions are about a show
+  // that may have nothing on it yet, so those take no id.
   if (spec.argv.length === 0) {
     const [command, args] = spec.argv();
     return { ok: true, command, args };
@@ -193,4 +230,11 @@ export function actionsFor(stage) {
     ...ACTIONS[name],
     argv: undefined,
   }));
+}
+
+/** The actions offered under a show's heading, which need no episode. */
+export function showActionsFor(showId) {
+  return ACTION_NAMES.filter(
+    (name) => ACTIONS[name].scope === "show" && ACTIONS[name].show === showId,
+  ).map((name) => ({ name, ...ACTIONS[name], argv: undefined }));
 }

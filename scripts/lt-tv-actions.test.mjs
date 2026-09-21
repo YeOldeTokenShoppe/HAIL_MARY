@@ -13,7 +13,8 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { ACTIONS, ACTION_NAMES, resolveAction, actionsFor } from "./lt-tv-actions.mjs";
+import { ACTIONS, ACTION_NAMES, resolveAction, actionsFor, showActionsFor } from "./lt-tv-actions.mjs";
+import { isoWeek } from "./lt-news-brief.mjs";
 import { splitCommand, uploadPlan } from "./lt-tv-split.mjs";
 import { STAGES } from "./lt-tv-status.mjs";
 import { IS_DEV, refuseOutsideDev } from "../src/lib/ltTv/devOnly.mjs";
@@ -96,12 +97,33 @@ const check_ = resolveAction("check", undefined, []);
 ok("it resolves with no id at all", check_.ok);
 check("to the checker", check_.args, ["scripts/lt-tv-check.mjs"]);
 
+console.log("\nThe news show starts from its heading, with no episode to point at:");
+{
+  const pull = resolveAction("pull-week", undefined, []);
+  ok("pulling the week resolves with nothing on the slate", pull.ok);
+  check("to the brief collector, for this week", pull.args, ["scripts/lt-news-brief.mjs"]);
+  check("and it is free", ACTIONS["pull-week"].spends, null);
+  const write = resolveAction("write-news", undefined, []);
+  ok("writing the news resolves with nothing on the slate", write.ok);
+  check("on this week's brief, named by the same rule the pull names it", write.args,
+    ["scripts/lt-news-script.mjs", "--brief", `content/lt-tv/briefs/news-${isoWeek()}.json`]);
+  ok("and it says it spends a model call", ACTIONS["write-news"].spends && ACTIONS["write-news"].needs.includes("ANTHROPIC_API_KEY"));
+  ok("an id sent along is simply ignored", resolveAction("pull-week", "rm -rf /", []).ok
+    && resolveAction("pull-week", "rm -rf /", []).args.length === 1);
+  check("they are offered under the news show", showActionsFor("news").map((a) => a.name), ["pull-week", "write-news"]);
+  check("and not under the roundtable", showActionsFor("roundtable"), []);
+  ok("and never as an episode button",
+    ["planned", "written", "recorded", "on-air"].every((st) => !actionsFor(st).some((a) => a.scope === "show")));
+  ok("the page never sees the argv builder", showActionsFor("news").every((a) => a.argv === undefined));
+}
+
 console.log("\nEvery action in the table is well formed:");
 for (const name of ACTION_NAMES) {
   const a = ACTIONS[name];
   ok(`${name} has a label`, typeof a.label === "string" && a.label.length > 0);
   ok(`${name} explains itself`, typeof a.blurb === "string" && a.blurb.length > 0);
-  ok(`${name} says which stages it suits`, Array.isArray(a.stages) && a.stages.length > 0);
+  ok(`${name} says which stages it suits`,
+    Array.isArray(a.stages) && (a.stages.length > 0 || a.scope === "show"));
   ok(`${name} only names real stages`, a.stages.every((s) => STAGES.some((st) => st.id === s)));
   ok(`${name} declares what it spends`, a.spends === null || typeof a.spends === "string");
   ok(`${name} declares the keys it needs`, Array.isArray(a.needs));

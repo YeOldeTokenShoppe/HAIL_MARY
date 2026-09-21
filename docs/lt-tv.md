@@ -27,7 +27,9 @@ running it.
 Every episode of both shows, what stage each one is at, and the next step as a
 button — write it, record it, record it again after changing a pause, cut
 the two tracks into the clips, apply your edits, rewrite a line you marked,
-check the slate. The screenplay is editable in the page, with a Save button and
+check the slate. The news show also has two buttons under its own heading,
+**Pull the week** and **Write this week's news**, because a news episode has
+to be made before there is one to open. The screenplay is editable in the page, with a Save button and
 a separate Apply, so a half-finished edit is never live.
 
 It runs **on your machine only.** What this pipeline produces is source code:
@@ -153,6 +155,11 @@ slate, and a lead-in tuned by ear.
 ## Making a news episode
 
 Full detail: `docs/lt-weekly-news-workflow.md`.
+
+On the studio page, steps 1 and 2 are the two buttons under the show's
+heading, **Pull the week** and **Write this week's news**. From there the
+episode appears on the slate and every later step is a button on it, exactly
+as for the roundtable. From a terminal:
 
 ```bash
 # 1. Pull the week. Check `degraded` in the output is empty or harmless.
