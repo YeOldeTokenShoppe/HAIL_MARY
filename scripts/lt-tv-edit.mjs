@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // EDIT AN EPISODE BY EDITING ITS SCRIPT.
 //
-//   node scripts/lt-tv-edit.mjs news-2026-W38
+//   node scripts/lt-tv-edit.mjs news-01
 //
 // Step 2 writes two files side by side: the episode record, which is JSON and
 // which everything downstream reads, and the screenplay, which is the only
@@ -438,7 +438,7 @@ async function main() {
   const argument = process.argv[2];
   if (!argument) {
     console.error("Usage: node scripts/lt-tv-edit.mjs <episode id or record path>");
-    console.error("  e.g. node scripts/lt-tv-edit.mjs news-2026-W38");
+    console.error("  e.g. node scripts/lt-tv-edit.mjs news-01");
     process.exit(2);
   }
 

@@ -25,7 +25,8 @@
 // Env: ANTHROPIC_API_KEY (required unless --draft)
 //      LT_NEWS_MODEL     (default claude-opus-5)
 
-import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, readdir, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import {
@@ -392,8 +393,24 @@ async function main() {
   }
   console.log(`\nWrote ${jsonPath}`);
   console.log(`Wrote ${txtPath}`);
+  await retireWeekNamedCopy(week, episode.id);
 
   await emitSlateRecord(episode, { fromDraft: Boolean(arg("draft")) });
+}
+
+/**
+ * Until 2026-09-21 a news episode was staged under its week (news-2026-W39)
+ * while the slate called it news-01, and nothing downstream could find it. A
+ * week written under the old name is superseded by the numbered record this
+ * run just wrote for the same week, so the old pair is removed rather than
+ * left to show up in the studio as a second, unrecordable episode.
+ */
+async function retireWeekNamedCopy(week, id) {
+  const stale = resolve(`content/lt-tv/episodes/news-${week}.json`);
+  if (`news-${week}` === id || !existsSync(stale)) return;
+  await rm(stale);
+  await rm(stale.replace(/\.json$/, ".txt"), { force: true });
+  console.log(`Removed the older copy news-${week}.json — this week is ${id} now.`);
 }
 
 /**

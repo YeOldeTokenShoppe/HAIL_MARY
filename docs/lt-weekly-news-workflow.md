@@ -39,10 +39,10 @@ record's contents rather than typing them.
            │                       ↖ content/lt-tv/rl80-spots.md (you edit this)
            │  scripts/lt-news-script.mjs         ← step 2, two Claude calls
            ▼
-  content/lt-tv/episodes/news-2026-W38.json     ← THE EPISODE RECORD (staging)
+  content/lt-tv/episodes/news-01.json     ← THE EPISODE RECORD (staging)
            ▲           └── .txt  ← you read and edit this
            └───────────────┘  scripts/lt-tv-edit.mjs, no API calls
-  content/lt-tv/episodes/news-2026-W38.txt      ← the read-through, for review
+  content/lt-tv/episodes/news-01.txt      ← the read-through, for review
            │
            │  scripts/lt-tv-slate-record.mjs    ← step 4, the join
            ▼
@@ -285,12 +285,12 @@ checklist:
 ### Reviewing and revising
 
 Step 2 writes two files side by side: the record, which is JSON and which
-everything downstream reads, and `news-2026-W38.txt`, the screenplay. **Read
+everything downstream reads, and `news-01.txt`, the screenplay. **Read
 and edit the screenplay.** It is the source, not a printout — change the words
 in it and apply them back with:
 
 ```bash
-node scripts/lt-tv-edit.mjs news-2026-W38
+node scripts/lt-tv-edit.mjs news-01
 ```
 
 Reword lines, add them, delete them, reorder them. They renumber themselves and
@@ -394,7 +394,7 @@ appending bytes, so a join is exact to the sample and a block's duration is a
 byte count rather than a measurement. It also means this step needs no ffmpeg.
 
 ```bash
-node scripts/lt-tv-audio.mjs content/lt-tv/episodes/news-2026-W38.json
+node scripts/lt-tv-audio.mjs content/lt-tv/episodes/news-01.json
 ```
 
 That generates each block, cross-checks the decoded length against the
@@ -424,7 +424,7 @@ Finally refresh the slate record, so it picks up the timing and the episode
 becomes playable rather than a slate entry:
 
 ```bash
-node scripts/lt-tv-slate-record.mjs news-2026-W38
+node scripts/lt-tv-slate-record.mjs news-01
 ```
 
 **Not** by re-running `scripts/lt-news-script.mjs`. That is what this step used
@@ -480,7 +480,7 @@ site never shows, and bundlers cannot glob a directory at build time.
 
 ```bash
 node scripts/lt-news-script.mjs --brief content/lt-tv/briefs/news-2026-W38.json
-# → content/lt-tv/episodes/news-2026-W38.json   the production record
+# → content/lt-tv/episodes/news-01.json   the production record
 # → src/content/lt-tv/episodes/news-01.json     the slate record, on the guide
 node scripts/lt-tv-check.mjs
 ```

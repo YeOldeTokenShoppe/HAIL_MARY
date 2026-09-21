@@ -1,11 +1,11 @@
 LT WEEKLY NEWS RECAP — Patience, Clarity and Cardboard
 2026-W38   ·   05:50 estimated   ·   845 words
-episode: news-2026-W38
+episode: news-01
 
 CHIRON: FED HOLDS — AND CALLS IT PATIENCE
 
 # Edit this file, then apply it with:
-#     node scripts/lt-tv-edit.mjs news-2026-W38
+#     node scripts/lt-tv-edit.mjs news-01
 #
 # Reword any line. Add lines, delete lines, reorder them — they renumber
 # themselves and the counts above are recomputed, so do not keep them

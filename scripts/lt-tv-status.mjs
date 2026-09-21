@@ -223,11 +223,12 @@ export async function readStatus(root = process.cwd()) {
   try {
     for (const f of await readdir(join(root, STAGING_DIR))) {
       if (!f.endsWith(".json")) continue;
-      const record = await readJson(join(root, STAGING_DIR, f));
-      // A staging record is named for its week; the slate names it by number.
-      // The slate id is the one a producer sees, so it is the one used here.
-      const id = record.show && record.number ? `${record.show}-${record.number}` : f.replace(/\.json$/, "");
-      staging.set(id, record);
+      // Named by id, the same id the slate uses, so the file name is the key.
+      // It used to be derived from show + number so that a week-named news
+      // record (news-2026-W39) could pair with its slate entry; that pairing
+      // hid the fact that no step could find the file. Deriving it here would
+      // also let a stale week-named copy shadow the real one.
+      staging.set(f.replace(/\.json$/, ""), await readJson(join(root, STAGING_DIR, f)));
     }
   } catch { /* nothing generated here */ }
 

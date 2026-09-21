@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // STEP 3 — BUILD THE AUDIO FOR AN EPISODE.
 //
-//   node scripts/lt-tv-audio.mjs content/lt-tv/episodes/news-2026-W38.json
+//   node scripts/lt-tv-audio.mjs content/lt-tv/episodes/news-01.json
 //   node scripts/lt-tv-audio.mjs content/lt-tv/episodes/roundtable-02.json --dry-run
 //
 // EVERY LINE IS RENDERED ON ITS OWN, IN ITS OWN VOICE. That is the whole

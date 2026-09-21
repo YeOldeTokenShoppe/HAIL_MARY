@@ -43,6 +43,7 @@ const record = toSlateRecord(episode);
 console.log("\nThe mapping:");
 check("id follows the slate's <show>-<NN>", record.id, "news-01");
 check("id and slateId agree", record.id, slateId(episode));
+check("the staging record already carries the slate id, so every step finds it by name", episode.id, record.id);
 check("showId is one shows.json knows", record.showId, "news");
 check("one speaker per line", record.speakers.length, lines.length);
 check("speakers are in line order", record.speakers.slice(0, 4), [

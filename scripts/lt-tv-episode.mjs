@@ -211,11 +211,14 @@ function assemble({
   const padded = String(number).padStart(2, "0");
 
   return {
-    // A news episode is named for the week it covers, because that is what
-    // identifies it and two weeks never collide. A roundtable has no week — it
-    // is about an idea — so it is named by its number, which is also what the
-    // slate and both SitePal uploads use.
-    id: format.dated ? `${format.id}-${week}` : `${format.id}-${padded}`,
+    // Both shows are named by number: <show>-<NN>, the same id the slate, the
+    // studio and both SitePal uploads use. A news episode used to be named for
+    // its week instead (news-2026-W39), and that one difference broke the
+    // studio the first time a real week was written: the page listed it as
+    // news-01, looked for news-01.txt, found nothing, and greyed out Record.
+    // The week a news episode covers is still recorded, in `week`; it is just
+    // not the file name.
+    id: `${format.id}-${padded}`,
     show: format.id,
     ...(format.dated ? { week } : {}),
     number: padded,

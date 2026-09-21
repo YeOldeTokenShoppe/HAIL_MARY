@@ -1,7 +1,7 @@
 {
   "_WARNING": "SAMPLE ONLY — THE TOPICS ARE REAL, THE NUMBERS ARE INVENTED. Built from content/lt-tv/samples/news-2026-W38.draft.json to show the record format, the show's full beat and the two voices. Not built from live data; do not record or quote it.",
   "synthetic": true,
-  "id": "news-2026-W38",
+  "id": "news-01",
   "show": "news",
   "week": "2026-W38",
   "number": "01",

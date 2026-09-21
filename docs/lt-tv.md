@@ -179,7 +179,7 @@ add them, delete them, change who a line is aimed at, then apply what you
 wrote. No model call and no audio call, so revise here until it reads.
 
 ```bash
-npm run lt:edit -- news-2026-W38
+npm run lt:edit -- news-01
 ```
 
 The format explains itself at the top of the file; `docs/lt-weekly-news-workflow.md`
@@ -192,15 +192,15 @@ npm run lt:check
 # 4. Build the audio: every line rendered on its own, in its own voice, and
 #    both character tracks laid out on one timeline. Then listen to
 #    master-dialogue.wav, which is the two tracks played together.
-npm run lt:audio -- content/lt-tv/episodes/news-2026-W38.json
+npm run lt:audio -- content/lt-tv/episodes/news-01.json
 
 # 5. Cut the two tracks into the clips SitePal will accept (it stops at 90s).
 #    The studio's "Split it into the two tracks" button runs exactly this.
-npm run lt:split -- news-2026-W38
+npm run lt:split -- news-01
 
 # 6. Put it on the guide. Run this AFTER the split, which is what works out
 #    the section boundaries the guide needs.
-npm run lt:slate -- news-2026-W38
+npm run lt:slate -- news-01
 npm run lt:check   # should now report a runtime
 ```
 
@@ -737,7 +737,7 @@ Editing the screenplay of an episode that already has audio is refused — the
 clips would still be saying the old words. To go ahead anyway:
 
 ```bash
-npm run lt:edit -- news-2026-W38 --rerecord
+npm run lt:edit -- news-01 --rerecord
 ```
 
 That clears the timing and returns the episode to *Not recorded yet* on the
