@@ -41,8 +41,8 @@ lead-in — is the same either way.
 
 ```bash
 node scripts/lt-rt-script.mjs --list                 # what is waiting
-node scripts/lt-rt-script.mjs --topic roundtable-02  # write it
-node scripts/lt-tv-edit.mjs roundtable-02            # revise it, free
+node scripts/lt-rt-script.mjs --topic morality-02  # write it
+node scripts/lt-tv-edit.mjs morality-02            # revise it, free
 ```
 
 It runs two Claude calls. The first writes **the argument**, not the dialogue:
@@ -70,7 +70,7 @@ in the editor.
 An episode already on the slate keeps the title and summary it was given. The
 generator writes the argument; it does not rename the running order.
 
-`content/lt-tv/samples/roundtable-02.draft.json` is a worked example, written by
+`content/lt-tv/samples/morality-01.draft.json` is a worked example, written by
 hand. **Its argument is invented** and it is not a scheduled episode.
 
 ### Writing the turns by hand
@@ -311,7 +311,7 @@ the speakers and the dialogue length filled in from the generation. Name the
 episode while you generate it and the record arrives named too:
 
 ```bash
-./run_test.sh --episode-id roundtable-02 --title "The Wealth Effect"
+./run_test.sh --episode-id morality-01 --title "The Wealth Effect"
 ```
 
 What is left to fill in is what only you know:
@@ -392,7 +392,7 @@ is intentional. Reactions on different characters may overlap.
 
 ```bash
 node scripts/lt-tv-check.mjs                # the whole slate
-node scripts/lt-tv-check.mjs roundtable-02  # one episode, line by line
+node scripts/lt-tv-check.mjs morality-02  # one episode, line by line
 ```
 
 The checker reads every record, reports anything the set would choke on (a

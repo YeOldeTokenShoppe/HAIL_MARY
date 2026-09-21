@@ -737,6 +737,19 @@ export const STUDIO_LIGHTS = {
   enabled: true,
   // Beams off leaves the illumination but hides the visible shafts.
   beams: true,
+  // HOUSE LIGHTS. The rig is at full only while an episode is actually
+  // running; off air it sits at this fraction of the plot, so tuning in and
+  // pressing play brings the studio up and the end of the show takes it back
+  // down. Everything the fixture contributes rides it together — the
+  // illumination, the visible shaft and the lens glare — because a dimmed lamp
+  // with its lens still blazing reads as a bug rather than a cue.
+  //
+  // Not zero: off air is the lineup and the pre-show set, which still have to
+  // be lit enough to see. Tune by eye from the console like every other knob.
+  offAir: 0.3,
+  // Fade rate, per second, for that transition. Around this figure the change
+  // lands in roughly a second — a lighting board, not a switch.
+  fadeLambda: 2.2,
   angle: 0.24,
   penumbra: 0.75,
   // Real inverse-square (2) drops ~18:1 between the guests and the floor and
@@ -929,10 +942,16 @@ function aimFixture(fixture, yawDeg, pitchDeg, scratch, light, sprite) {
   }
 }
 
-function StudioLights({ fixtures }) {
+// `playbackRef` is the set's own playback ref, read (never subscribed to) so
+// the house lights can follow the show without re-rendering anything.
+function StudioLights({ fixtures, playbackRef }) {
   const lightsRef = useRef([]);
   const spritesRef = useRef([]);
   const colorsRef = useRef([]);
+  // Where the rig is between `offAir` and full. Starts off air, so the first
+  // episode of a visit brings the lights up rather than starting at full and
+  // having nowhere to go.
+  const levelRef = useRef(STUDIO_LIGHTS.offAir);
   const aimScratch = useMemo(
     () => ({
       direction: new THREE.Vector3(),
@@ -973,8 +992,19 @@ function StudioLights({ fixtures }) {
 
   // Push the live config every tick. Cheap (four lights), and it means the
   // console knobs work without re-rendering a component that owns the whole set.
-  useFrame(() => {
+  useFrame((state, delta) => {
     const on = STUDIO_LIGHTS.enabled;
+    // Ease toward the house level for whichever way the show is. Damping on
+    // delta rather than a fixed step so the fade takes the same time whatever
+    // the frame rate.
+    const target = playbackRef?.current?.running ? 1 : STUDIO_LIGHTS.offAir;
+    levelRef.current = THREE.MathUtils.damp(
+      levelRef.current,
+      target,
+      STUDIO_LIGHTS.fadeLambda,
+      delta,
+    );
+    const level = levelRef.current;
     fixtures.forEach((fixture, i) => {
       const light = lightsRef.current[i];
       if (!light) return;
@@ -990,7 +1020,7 @@ function StudioLights({ fixtures }) {
         aimFixture(fixture, yaw, pitch, aimScratch, light, spritesRef.current[i]);
       }
 
-      light.intensity = on ? plot.intensity : 0;
+      light.intensity = on ? plot.intensity * level : 0;
       light.angle = STUDIO_LIGHTS.angle;
       light.penumbra = STUDIO_LIGHTS.penumbra;
       light.distance = STUDIO_LIGHTS.range;
@@ -1003,7 +1033,7 @@ function StudioLights({ fixtures }) {
         lenses.materials[i]?.color.set(plot.color);
       }
       lenses.materials[i].opacity =
-        on && STUDIO_LIGHTS.lens.enabled ? STUDIO_LIGHTS.lens.opacity : 0;
+        on && STUDIO_LIGHTS.lens.enabled ? STUDIO_LIGHTS.lens.opacity * level : 0;
       spritesRef.current[i]?.scale.setScalar(STUDIO_LIGHTS.lens.size);
 
       const cone = light.children.find(
@@ -1014,7 +1044,7 @@ function StudioLights({ fixtures }) {
       const u = cone.material.uniforms;
       u.attenuation.value = STUDIO_LIGHTS.beamLength;
       u.anglePower.value = STUDIO_LIGHTS.anglePower;
-      u.opacity.value = plot.opacity;
+      u.opacity.value = plot.opacity * level;
       u.lightColor.value.set(plot.color);
     });
   });
@@ -1168,8 +1198,9 @@ function TalkShowModel({
   // The tripod camera prop earns its place on desktop: its flip-out monitor
   // carries the live lens feed and the head is draggable. With the feed off it
   // is set dressing standing dead centre between the guests, blocking the neon
-  // frame — so the mobile mount strikes it. Toggled (not culled at clone time)
-  // so flipping the prop back on doesn't need a re-clone.
+  // frame — so the mobile mount strikes it, and so does LT TV's lineup, where
+  // the frame is carrying the channel. Toggled (not culled at clone time) so
+  // flipping the prop back on doesn't need a re-clone.
   // Node names may carry GLTFLoader's collision suffix, hence the pattern.
   useEffect(() => {
     const rig = MONITOR_HIDDEN_NODES.map(
@@ -2566,7 +2597,9 @@ function TalkShowModel({
       <primitive object={cloned} />
       {/* Siblings, not children of the set: readLightFixtures returns model
           coordinates in `cloned`'s parent space, which is exactly here. */}
-      {lightFixtures.length > 0 && <StudioLights fixtures={lightFixtures} />}
+      {lightFixtures.length > 0 && (
+        <StudioLights fixtures={lightFixtures} playbackRef={playbackRef} />
+      )}
     </group>
   );
 }

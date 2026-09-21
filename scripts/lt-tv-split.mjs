@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // STEP 4 — CUT THE TRACKS INTO THE CLIPS SITEPAL PLAYS.
 //
-//   node scripts/lt-tv-split.mjs roundtable-02
+//   node scripts/lt-tv-split.mjs morality-02
 //
 // PER CHARACTER. SitePal plays one clip per avatar, each the full length of
 // the episode, carrying that character's lines and silence everywhere else.
@@ -46,7 +46,7 @@ import {
   SILENCE_DB,
   TARGET_SECTION_SECONDS,
 } from "./lt-tv-sections.mjs";
-import { sitepalClipName } from "./lt-tv-format.mjs";
+import { sitepalClipName, SHOW_CLIP_SLUGS } from "./lt-tv-format.mjs";
 import { readCutMarks } from "./lt-tv-edit.mjs";
 
 const AUDIO_DIR = "content/lt-tv/audio";
@@ -142,6 +142,11 @@ export function layoutLine(line, index) {
  * alignment puts every line boundary at the same instant it reports, by
  * construction, so the measurement is the only path that file has.
  */
+const showOf = (id) => {
+  const prefix = String(id).replace(/-.*$/, "");
+  return SHOW_CLIP_SLUGS[prefix] ? prefix : "roundtable";
+};
+
 export function splitCommand(id, { report = false } = {}) {
   const dir = join(AUDIO_DIR, id);
   return [
@@ -151,7 +156,10 @@ export function splitCommand(id, { report = false } = {}) {
       ...(report ? ["--report"] : []),
       "--master", join(dir, "master-dialogue.wav"),
       "--segments", join(dir, "voice-segments.json"),
-      "--show", id.startsWith("news") ? "news" : "roundtable",
+      // The show is the id's own prefix (news-01, roundtable-03, morality-01);
+      // it decides the clip prefix the processor writes into the record, so a
+      // hardcoded "roundtable" would name a Markets & Morality upload lttv_rt_.
+      "--show", showOf(id),
       "--episode-id", id,
       dir,
     ],
@@ -169,7 +177,7 @@ export function splitCommand(id, { report = false } = {}) {
  * record it again in the voice it is supposed to have.
  *
  * Michelle hit this on 2026-09-21 between changing the Monk's voice and
- * splitting roundtable-02.
+ * splitting The Wealth Effect.
  *
  * @param recorded the voice ids in the master's own voice-segments.json
  */

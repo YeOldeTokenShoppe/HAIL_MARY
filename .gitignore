@@ -73,6 +73,11 @@ content/lt-tv/episodes/*.txt
 content/lt-tv/briefs/
 content/lt-tv/plans/
 content/lt-tv/status.html
+# The old pipeline writes its masters and its starter record here (see
+# docs/talk-show-production.md). Same rule as content/lt-tv/audio/ above:
+# recorded audio is regenerated, it lives in SitePal once uploaded, and a
+# 5MB WAV per character per run does not belong in the repo.
+elevenlabs-dialogue-test/output/
 
 # Python bytecode, regenerated on every run
 __pycache__/

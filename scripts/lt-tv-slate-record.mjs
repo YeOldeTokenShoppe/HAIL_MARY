@@ -240,7 +240,7 @@ export function registerEpisode(source, id) {
 
 // ── running it ────────────────────────────────────────────────────────────
 //
-//   node scripts/lt-tv-slate-record.mjs roundtable-02
+//   node scripts/lt-tv-slate-record.mjs morality-02
 //
 // The generators call this module as a library on their way past, so a freshly
 // written episode reaches the slate without anyone running this. The case it
@@ -258,7 +258,7 @@ async function main() {
   const argument = process.argv[2];
   if (!argument) {
     console.error("Usage: node scripts/lt-tv-slate-record.mjs <episode id or record path>");
-    console.error("  e.g. node scripts/lt-tv-slate-record.mjs roundtable-02");
+    console.error("  e.g. node scripts/lt-tv-slate-record.mjs morality-02");
     process.exit(2);
   }
 

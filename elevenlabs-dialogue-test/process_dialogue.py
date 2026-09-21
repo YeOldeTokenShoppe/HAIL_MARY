@@ -533,7 +533,7 @@ def main():
     parser.add_argument(
         "--episode-id",
         default="",
-        help="Episode id for the starter record, e.g. roundtable-02 "
+        help="Episode id for the starter record, e.g. roundtable-03 "
         "(default: derived from --show)",
     )
     parser.add_argument(
