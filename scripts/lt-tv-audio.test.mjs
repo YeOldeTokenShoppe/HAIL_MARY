@@ -43,6 +43,8 @@ import {
   episodeLineSpans,
   cacheReport,
   costReport,
+  staleClipsAfterRecord,
+  staleClipWarning,
 } from "./lt-tv-audio.mjs";
 import { CAST } from "./lt-tv-format.mjs";
 import { renderScript } from "./lt-tv-episode.mjs";
@@ -647,6 +649,40 @@ console.log("\nThe voices are the show's, not the record's:");
 
   const free = costReport([{ id: "block-1", reuse: true, why: null, alignment: true }]);
   check("an episode entirely on disk sends nothing", free.fresh, 0);
+}
+
+
+// ── the clips are not written by recording ───────────────────────────────────
+// Michelle re-recorded, played lttv_rt_ep02_connor.wav, and heard the fault
+// she had just had fixed. The file had not been touched: recording writes the
+// master, the SPLIT cuts the clips.
+{
+  const folder = [
+    "master-dialogue.wav", "voice-segments.json", "line-spans.json", "block-1.json",
+    "lttv_rt_ep02_connor.wav", "lttv_rt_ep02_gr80.wav", "lttv_rt_ep02_connor_s2.wav",
+    "connor-sitepal-balanced.wav",
+  ];
+  check("only the upload clips are called stale",
+    staleClipsAfterRecord(folder),
+    ["lttv_rt_ep02_connor.wav", "lttv_rt_ep02_connor_s2.wav", "lttv_rt_ep02_gr80.wav"]);
+  ok("the master is not one of them",
+    !staleClipsAfterRecord(folder).includes("master-dialogue.wav"));
+  ok("nor the intermediate balanced track, which the split rewrites anyway",
+    !staleClipsAfterRecord(folder).includes("connor-sitepal-balanced.wav"));
+  check("a fresh folder has nothing stale in it",
+    staleClipsAfterRecord(["master-dialogue.wav"]), []);
+
+  const warning = staleClipWarning(staleClipsAfterRecord(folder));
+  ok("the warning names the files", warning.includes("lttv_rt_ep02_connor.wav"));
+  ok("and says the split is what cuts them", warning.includes("split"));
+  ok("and warns before SitePal, not after", warning.includes("SitePal"));
+  check("nothing stale means no warning", staleClipWarning([]), null);
+
+  // A sectioned episode has twelve of these and listing all of them buries
+  // the sentence that matters.
+  const many = Array.from({ length: 12 }, (_, i) => `lttv_rt_ep02_connor_s${i + 1}.wav`);
+  ok("a long list is summarised", staleClipWarning(many).includes("and 8 more"));
+  ok("but still says how many there are", staleClipWarning(many).includes("12 clip file"));
 }
 
 

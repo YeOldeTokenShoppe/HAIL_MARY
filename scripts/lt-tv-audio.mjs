@@ -28,7 +28,7 @@
 // already proven, and needs ffmpeg. This writes the master and the merged
 // segment list it expects and then hands off.
 
-import { readFile, writeFile, mkdir, rm } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rm, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve, dirname, join, basename } from "node:path";
 import { createHash } from "node:crypto";
@@ -641,6 +641,39 @@ export function costReport(rows) {
     missingAlignment: reused.filter((r) => !r.alignment).length };
 }
 
+/**
+ * THE CLIP FILES ARE NOT WRITTEN BY THIS STEP, AND AFTER IT THEY ARE WRONG.
+ *
+ * Recording writes the master, the timings and the block cache. The per
+ * character `lttv_*.wav` files that actually get uploaded are cut by the SPLIT
+ * step, from that master. So after a re-record the clips sitting in the folder
+ * are the previous cut of a master that no longer exists — same names, same
+ * place, stale contents.
+ *
+ * Michelle hit this on 2026-09-21: she re-recorded, played
+ * `lttv_rt_ep02_connor.wav`, heard the fault she had just had fixed, and
+ * reasonably concluded the fix had failed. The file had not been touched.
+ *
+ * They are named rather than deleted. Deleting what someone may be mid-upload
+ * with is not this step's call, and the split overwrites them anyway.
+ */
+export function staleClipsAfterRecord(existing) {
+  return existing.filter((name) => /^lttv_[a-z0-9_]+\.wav$/.test(name)).sort();
+}
+
+export function staleClipWarning(stale) {
+  if (!stale.length) return null;
+  const list = stale.length > 4 ? `${stale.slice(0, 4).join(", ")} and ${stale.length - 4} more`
+    : stale.join(", ");
+  return (
+    `The ${stale.length} clip file(s) in this folder are from the PREVIOUS split and are\n` +
+    `now out of date: ${list}.\n\n` +
+    "Recording writes the master; the split is what cuts the clips. Playing one of\n" +
+    "them before splitting plays the old episode. Split before you listen, and\n" +
+    "before you upload anything to SitePal."
+  );
+}
+
 async function generateBlock({ inputs, key, outDir, id }) {
   // Blocks cost money and a long episode is several of them, so a finished
   // block is kept. A run that dies on block four resumes at block four.
@@ -900,6 +933,9 @@ async function main() {
   // Naming the clips here rather than pointing at the record: "the names the
   // record prescribes in `cast`" is a true sentence that leaves you opening a
   // JSON file to find two strings, and a wrong one plays nothing.
+  const stale = staleClipWarning(staleClipsAfterRecord(await readdir(outDir)));
+  if (stale) console.log(`\n${stale}`);
+
   const plan = uploadPlan(episode, episode.id);
   console.log(
     `\nNext, split it into the two tracks SitePal plays (this part needs ffmpeg):\n` +
