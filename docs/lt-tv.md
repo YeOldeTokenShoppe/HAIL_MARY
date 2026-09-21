@@ -27,7 +27,8 @@ running it.
 Every episode of both shows, what stage each one is at, and the next step as a
 button — write it, record it, record it again after changing a pause, cut
 the two tracks into the clips, apply your edits, rewrite a line you marked,
-check the slate. The news show also has two buttons under its own heading,
+check the slate. There is also a box for the episode title, so renaming one
+does not mean hunting through the script for its first line. The news show also has two buttons under its own heading,
 **Pull the week** and **Write this week's news**, because a news episode has
 to be made before there is one to open. The screenplay is editable in the page, with a Save button and
 a separate Apply, so a half-finished edit is never live.
@@ -650,6 +651,44 @@ to the writer; ElevenLabs decides what it does with it, so a new tag is worth
 one test line before it goes in an episode.
 
 ---
+
+## The episode title (both shows)
+
+The writer names the episode, and the first generated news episode came back
+called **Hike Barrel Charizard** — one noun from each of its three stories in a
+row. That is what a model does when the only instruction is a word count, so
+the instruction is now the job: name ONE thing, the lead story or the mood of
+the week, the way a channel guide would print it. Two to six words, title case,
+no colon, and it has to read as English out loud. The rule lives in
+`TITLE_RULES` in `scripts/lt-tv-format.mjs` and both shows are written against
+it, so a title you dislike is a rule to change in one place.
+
+**To name an episode yourself**, open it in the studio and type in the
+**Episode title** box above the screenplay, then **Save** and **Apply my
+edits**. The box is the screenplay's first line — the same line you could edit
+by hand — so there is only ever one copy of the title, and applying is what
+puts it on the guide. Emptying the box keeps the title the episode already had,
+because a blank line there is a title half-retyped, not a nameless episode.
+
+The roundtable works the same way, except that its titles were written by you
+on the slate long before anything could generate one, so the generator keeps
+them; `--retitle` is what lets it write its own.
+
+## Acronyms — say what the letters stand for (both shows)
+
+Nobody is reading the show. The first news episode said **FRED** four times and
+never once said it is the Federal Reserve Economic Data database, which on air
+is just a name nobody can look up. So an acronym is expanded the first time it
+is spoken and used short after that, in the character's own voice and inside
+the line rather than as an aside.
+
+Both writers are told this, and because a prompt is a request rather than a
+guarantee, the build checks it: an acronym spoken before anything expands it
+becomes a warning naming the line, on writing and on every apply. The list of
+acronyms, and the short list taken as read because expanding them sounds like a
+lecture (the Fed, SEC, IRS, AI, FOMO), is `SPOKEN_ACRONYMS` and
+`ACRONYMS_TAKEN_AS_READ` in `scripts/lt-tv-format.mjs`. Add to either as the
+show runs into new ones.
 
 ## A line you don't like (both shows)
 

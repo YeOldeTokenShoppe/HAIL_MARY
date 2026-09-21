@@ -46,6 +46,9 @@ import {
   RUNTIME_BOUNDS_SECONDS,
   DELIVERY_TAGS,
   EVENT_TAGS,
+  TITLE_RULES,
+  SPOKEN_ACRONYMS,
+  ACRONYMS_TAKEN_AS_READ,
   countWords,
   estimateSeconds,
   formatRuntime,
@@ -125,9 +128,11 @@ If the web search tool is unavailable to you, work from the brief alone, put "un
 
 Invent nothing, ever. No number, date, name or quote may come from your own memory — only from the brief or from something you searched and read. Your training data is older than this week.
 
+${TITLE_RULES}
+
 Return ONLY a JSON object, no preamble and no code fences:
 {
-  "title": "episode title, 2-5 words, no colon",
+  "title": "the episode title, written to the title rules above",
   "summary": "one sentence for the programme guide",
   "headline": "the chiron headline bar, under 60 characters, upper-case-friendly",
   "ticker": ["4 to 6 short ticker items, each under 80 characters"],
@@ -189,6 +194,8 @@ HARD RULES:
 - Alternate speakers. Never give the same host two turns in a row — the camera cuts on who is speaking, so a double turn holds on one face while the other sits idle. If a host needs two thoughts, put them in one line.
 - Never say "as an AI", never mention a model, never break the frame.
 - Write numbers as they are spoken: "six hundred million dollars", not "$600M". The voice model reads the text literally.
+
+SAY WHAT THE LETTERS STAND FOR. Nobody is reading this show; they are hearing it, and an acronym nobody expands is a noise. The FIRST time an acronym is spoken in the episode, say what it stands for in the same line, then use the short form for the rest of the episode: "Federal Reserve Economic Data — FRED to its friends" the first time, "FRED" every time after. Expand it in the character's own voice, as part of the sentence; it is a line of dialogue, not a footnote, and Connor explaining an acronym impatiently is in character. This applies to: ${Object.keys(SPOKEN_ACRONYMS).join(", ")}. It does NOT apply to these, which everyone already says out loud and which sound patronising expanded: ${ACRONYMS_TAKEN_AS_READ.join(", ")}.
 
 DELIVERY TAGS: put at most one bracketed delivery tag at the START of a line, and only when the reading is not obvious. Connor may use: ${DELIVERY_TAGS.Connor.join(", ")}. GR80 may use: ${DELIVERY_TAGS.Monk.join(", ")}. Roughly half of all lines should carry NO tag — a tag on every line flattens the performance.
 

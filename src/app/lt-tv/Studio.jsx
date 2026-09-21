@@ -340,6 +340,28 @@ function Files({ files }) {
   );
 }
 
+// The screenplay's first line is the show and the episode title, and
+// lt-tv-edit.mjs reads the title back out of exactly that line. So the title
+// field below edits THAT LINE rather than keeping a second copy of the title
+// anywhere: what you type is in the file in front of you, saved by the same
+// Save and applied by the same Apply my edits as any other change. A separate
+// title box with its own route would be a second way for the title to be
+// right, which is how the old episode metadata drifted in the first place.
+const TITLE_LINE = /^([^\n]*?\s+—\s+)(.*)$/;
+
+function readTitle(text) {
+  const match = TITLE_LINE.exec(String(text ?? '').split('\n')[0] ?? '');
+  return match ? match[2].trim() : null;
+}
+
+function withTitle(text, title) {
+  const lines = String(text ?? '').split('\n');
+  const match = TITLE_LINE.exec(lines[0] ?? '');
+  if (!match) return text;
+  lines[0] = `${match[1]}${title}`;
+  return lines.join('\n');
+}
+
 /**
  * The screenplay, editable in place.
  *
@@ -401,9 +423,31 @@ function Screenplay({ id, stage, ran, onPresence, onDirty, saveRef }) {
     );
   }
 
+  const title = readTitle(text);
+
   return (
     <>
       <h3 className={s.label}>Screenplay — edit it here</h3>
+      {title !== null && (
+        <div className={s.titleRow}>
+          <label htmlFor={`title-${id}`} className={s.titleLabel}>Episode title</label>
+          <input
+            id={`title-${id}`}
+            value={title}
+            onChange={(e) => {
+              setText(withTitle(text, e.target.value));
+              setSaved(false);
+              setNote(null);
+            }}
+            spellCheck={false}
+            className={s.titleInput}
+          />
+          <span className={s.titleHint}>
+            What the guide prints. It is the first line of the script below — change it in either
+            place, then Save and Apply my edits.
+          </span>
+        </div>
+      )}
       <textarea
         value={text}
         onChange={(e) => { setText(e.target.value); setSaved(false); setNote(null); }}
