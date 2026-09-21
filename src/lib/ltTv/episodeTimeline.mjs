@@ -98,6 +98,23 @@ export function isNewEpisode(record, now) {
   return now - aired < NEW_EPISODE_DAYS * 24 * 60 * 60 * 1000;
 }
 
+// A WAY TO SEE THE BADGE WHEN NOTHING QUALIFIES FOR ONE.
+//
+// The badge is only ever on when a recent episode is on the slate, which makes
+// it the one piece of the guide you cannot check by looking. `?preview=new` on
+// /trade turns it on for every listed episode so the placement and the styling
+// can be looked at; it is display-only, and without it in the URL nothing here
+// changes. It is not a way to publish a badge: nobody reaches the page with
+// that query string unless they typed it.
+export function isBadgePreview(search) {
+  if (typeof search !== "string") return false;
+  try {
+    return new URLSearchParams(search).get("preview") === "new";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Where each clip begins on the episode timeline, and what to play there.
  *
