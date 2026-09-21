@@ -94,8 +94,21 @@ export default function SitePalTestPage() {
   const [cfg] = useState(readParams);
   const cfgRef = useRef(cfg);
   cfgRef.current = cfg;
-  const add = (m) =>
-    setLog((l) => [...l, `${new Date().toISOString().slice(11, 19)}  ${m}`]);
+  /**
+   * One line of the report, ON THE PAGE AND IN THE CONSOLE BOTH.
+   *
+   * It used to go only to the on-screen log. Twice this page was handed over
+   * with "press the buttons and paste the log", and on 2026-09-21 Michelle
+   * reasonably read that as the browser console and pasted several hundred
+   * lines of wallet-extension noise with nothing of this page in it. Where a
+   * diagnostic writes its output is not a detail the person running it should
+   * have to know, so it now writes to both and either answer is the right one.
+   */
+  const add = (m) => {
+    const line = `${new Date().toISOString().slice(11, 19)}  ${m}`;
+    setLog((l) => [...l, line]);
+    console.info(`[sitepal-test] ${line}`);
+  };
 
   // The instant the last button issued a call, so every callback can say how
   // long it took to arrive. "How long" is the whole question here: a clip that
