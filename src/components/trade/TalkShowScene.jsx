@@ -29,8 +29,11 @@ import { SITEPAL_PROJECTION_CONFIG } from "@/components/CyborgTempleScene";
 import { useChannelScreen } from "@/components/trade/ltTvChannelScreen";
 import {
   buildEpisodeTimeline,
+  cueIndexAt,
+  sectionIndexAt,
   shotSubjectAt,
   speakerAt,
+  stepSection,
   validateEpisode,
 } from "@/lib/ltTv/episodeTimeline.mjs";
 import { findEpisode } from "@/content/lt-tv";
@@ -163,6 +166,14 @@ const HOLD_FAILSAFE_MS = ARM_FAILSAFE_MS + 3000;
 // Nothing playing. `section` is which clip of the episode is up; `holdingAt`
 // is the second of the episode to freeze the picture on while the next one
 // starts, and null the rest of the time.
+//
+// `pausedAt` is the page clock at the instant the viewer paused, and null
+// whenever the episode is running. Everything on the performance clock is
+// derived from `performance.now()`, which does not stop for a pause — so the
+// frame loop reads `pausedAt` INSTEAD of the live clock while it is set, and
+// the resume adds the whole paused interval back onto `startedAt`. A pause is
+// therefore invisible to the picture: the same second is on screen when it
+// comes back as when it went away.
 const idlePlayback = () => ({
   running: false,
   startedAt: 0,
@@ -170,6 +181,15 @@ const idlePlayback = () => ({
   section: 0,
   holdingAt: null,
   heldSince: 0,
+  pausedAt: null,
+  // Set when the pause had to be done with stopSpeech because this build of
+  // the player has no freezeToggle: the resume then restarts the section the
+  // viewer was in rather than picking up mid-line.
+  resumesFromSectionStart: false,
+  // The last second of the episode the frame loop drew. Read by the transport
+  // controls, which need to know where playback is without running a clock of
+  // their own (and the only clock that survives a pause is this one).
+  elapsed: 0,
 });
 
 // Procedural listener gaze is applied after the animation mixer, so it layers
@@ -1753,8 +1773,11 @@ function TalkShowModel({
       );
     };
 
-    const resetPerformance = () => {
-      playbackRef.current = idlePlayback();
+    // Put both actors back on their idle loop, dropping any reaction that was
+    // mid-gesture. Split out of resetPerformance because a SEEK needs exactly
+    // this and must NOT have the rest of it: the show is still running, and
+    // resetting the playback state would take it off air.
+    const resetReactions = () => {
       Object.values(actionsRef.current).forEach((bank) => {
         if (!bank) return;
         Object.values(bank.reactions || {}).forEach((action) => {
@@ -1772,6 +1795,11 @@ function TalkShowModel({
           bank.base.play();
         }
       });
+    };
+
+    const resetPerformance = () => {
+      playbackRef.current = idlePlayback();
+      resetReactions();
     };
 
     const timers = {};
@@ -1910,6 +1938,9 @@ function TalkShowModel({
         portal.ready = true;
         portal.exhausted = false;
         portal.source = null;
+        // A scene that has just loaded is in a fresh document, whatever this
+        // portal was doing before the reload.
+        portal.frozen = false;
         clearTimeout(timers[key]);
         try {
           portal.frame.contentWindow.setPlayerVolume?.(0);
@@ -1960,6 +1991,10 @@ function TalkShowModel({
           `[TalkShowScene] section ${section}: the voices began ${ms}ms apart ` +
             `(${late} second; window.__tsStart holds every reading)`,
         );
+        // A pause pressed while this section's clips were still loading. Both
+        // voices are now genuinely playing, which is the first moment there is
+        // anything to freeze.
+        if (pausePending) applyPause();
         return;
       }
 
@@ -1990,42 +2025,25 @@ function TalkShowModel({
         // A portal this phase never saw start cannot have finished: that is a
         // leftover from the muted load, and counting it would advance the
         // episode a section early.
-        if (phase !== "playing" || !started.has(key)) return;
+        if (!started.has(key)) return;
+        // A section that runs out WHILE THE SET IS PAUSED is counted but not
+        // acted on: the join happens on the resume instead. freezeToggle is
+        // documented to hold speech, so this should not arrive — but if a
+        // player ever lets the audio run on under a freeze, dropping the end
+        // outright would leave the episode stuck at that section forever, and
+        // the viewer with no way out but Stop.
+        if (phase === "paused") {
+          ended.add(key);
+          return;
+        }
+        if (phase !== "playing") return;
         ended.add(key);
         // Before the early return below, for the same reason recordStart sits
         // at the top of talk-started: the second portal to report is the one
         // that carries the skew, and everything after this line discards it.
         recordEnd(key);
         if (ended.size !== Object.keys(portalsRef.current).length) return;
-
-        // Both tracks have run out. On a sectioned episode that is a join, not
-        // the end: the next clip goes in and the picture holds where the cut
-        // was until it is actually heard to start.
-        const playback = playbackRef.current;
-        const sections = timelineRef.current?.sections || [];
-        const next = playback.section + 1;
-        if (playback.running && sections[next]) {
-          ended.clear();
-          started.clear();
-          finished.clear();
-          audioStarted.clear();
-          playback.section = next;
-          playback.holdingAt = sections[next].startsAt;
-          playback.heldSince = performance.now();
-          if (startSection(next) === 0) {
-            console.warn(`[TalkShowScene] section ${next + 1} would not start`);
-            phase = "idle";
-            resetPerformance();
-            onPlaybackStateChange?.(false);
-            resumePreloads();
-          }
-          return;
-        }
-
-        phase = "idle";
-        resetPerformance();
-        onPlaybackStateChange?.(false);
-        resumePreloads();
+        finishSection();
       }
     };
 
@@ -2051,6 +2069,8 @@ function TalkShowModel({
         attempt: 0,
         exhausted: false,
         loads: 0,
+        // Whether this portal is currently frozen for a pause. See setFrozen.
+        frozen: false,
       };
       portalsRef.current[key] = portal;
       frame.src = portalSrc(key, portal);
@@ -2060,6 +2080,12 @@ function TalkShowModel({
 
     const stopShow = () => {
       stopped = true;
+      // A stop while the set is paused has to leave the players ready to
+      // speak: a frozen character stays frozen through the next sayAudio, so
+      // the following episode would come up as two silent faces.
+      clearTimeout(pausePendingTimer);
+      pausePending = false;
+      setFrozen(false);
       Object.values(portalsRef.current).forEach((portal) => {
         try {
           portal.frame?.contentWindow?.stopSpeech?.();
@@ -2111,6 +2137,10 @@ function TalkShowModel({
       clearTimeout(armTimer);
       armed.clear();
       armingClips.clear();
+      // Nothing loads or speaks into a frozen player. Anything that starts a
+      // section — play, a join, a seek, the fallback resume — comes through
+      // here, so this one line is where the freeze can never be left on.
+      setFrozen(false);
       phase = "arming";
       arming = index;
       const gen = ++armGen;
@@ -2256,6 +2286,8 @@ function TalkShowModel({
       started.clear();
       finished.clear();
 
+      clearTimeout(pausePendingTimer);
+      pausePending = false;
       const ok = startSection(0) === Object.keys(portalsRef.current).length;
       if (ok) {
         resetPerformance();
@@ -2272,10 +2304,314 @@ function TalkShowModel({
       return ok;
     };
 
+    /**
+     * BOTH TRACKS HAVE RUN OUT. On a sectioned episode that is a join, not the
+     * end: the next clip goes in and the picture holds where the cut was until
+     * it is actually heard to start. Called from talk-ended, and from a resume
+     * that finds the section ended while the set was paused.
+     */
+    const finishSection = () => {
+      const playback = playbackRef.current;
+      const sections = timelineRef.current?.sections || [];
+      const next = playback.section + 1;
+      if (playback.running && sections[next]) {
+        ended.clear();
+        started.clear();
+        finished.clear();
+        audioStarted.clear();
+        playback.section = next;
+        playback.holdingAt = sections[next].startsAt;
+        playback.heldSince = performance.now();
+        if (startSection(next) === 0) {
+          console.warn(`[TalkShowScene] section ${next + 1} would not start`);
+          phase = "idle";
+          resetPerformance();
+          onPlaybackStateChange?.(false);
+          resumePreloads();
+        }
+        return;
+      }
+
+      phase = "idle";
+      resetPerformance();
+      onPlaybackStateChange?.(false);
+      resumePreloads();
+    };
+
+    /* ── PAUSE, RESUME AND SKIPPING ───────────────────────────────────────
+     *
+     * WHAT THE PLAYER GIVES US, from docs/sitepal.md rather than from guessing
+     * (the night of 2026-09-21 was spent guessing at callback names that were
+     * documented in that file all along):
+     *
+     *   freezeToggle()  "If the character is speaking, speech is paused... If
+     *                   the character was previously paused in mid-speech,
+     *                   speech resumes from that point."  An exact pause, to
+     *                   the sample, and the only one there is.
+     *   sayAudio(clip)  starts a clip AT THE BEGINNING. There is no argument
+     *                   for a position and no function that sets one.
+     *
+     * So pausing is exact and seeking is not possible inside a clip — not with
+     * more effort, not at all. What IS possible: an episode over 90 seconds is
+     * already several clips, because SitePal refuses one longer than that, and
+     * starting a clip is what the set does at every section join anyway. The
+     * section boundaries are therefore free, real seek points, about a minute
+     * and a half apart, and skipping runs through the same arm/release path a
+     * join already uses rather than a second one written for seeking.
+     *
+     * THE PICTURE HAS TO MOVE WITH THE VOICES. Every camera cut, head turn and
+     * reaction hangs off `startedAt` through `performance.now()`, which does
+     * not stop for a pause and knows nothing about a jump. A pause therefore
+     * freezes the clock by reading `pausedAt` in its place, and the resume
+     * adds the whole paused interval back on; a jump re-seats the clock, the
+     * cue index and the reactions together, then holds the picture on the cut
+     * until SitePal is heard to start — the same hold the joins use.
+     *
+     * AND IT MUST NOT COST THE OVERLAP FIX. The two avatars start together
+     * because a section arms both clips and releases them in one tick (PRs #19
+     * and #20). Nothing here touches that sequence: a jump calls the same
+     * `startSection`, and a pause freezes two players that are already in step
+     * and lets them both go in the same tick. `window.__tsPlayed` still
+     * measures the result at the end of every section, so a pause that pulled
+     * them apart would show up there as a spread — see `recordEnd`.
+     */
+
+    // freezeToggle() takes no argument and reports no state, so each portal's
+    // frozen state is tracked on the portal itself (`portal.frozen`) and only
+    // toggled when it is genuinely changing. Per portal rather than for the
+    // pair because a portal that reloads comes back in a FRESH document, which
+    // is never frozen — a single flag for both would then be wrong about one
+    // of them, and the next toggle would freeze the one that just came back.
+    // A pause pressed while a section's clips are still loading. There is
+    // nothing to freeze yet, so it is held and applied the moment the audio is
+    // heard to start.
+    let pausePending = false;
+    let pausePendingTimer = 0;
+
+    const portalWindows = () =>
+      Object.values(portalsRef.current)
+        .map((portal) => {
+          try {
+            return portal?.frame?.contentWindow || null;
+          } catch (e) {
+            return null;
+          }
+        })
+        .filter(Boolean);
+
+    // Whether this player build actually has the freeze. It is documented, but
+    // so much of what this file relies on turned out to be revocable that the
+    // transport asks rather than assumes — and falls back to a pause that
+    // resumes at the top of the current section, which is coarse but never
+    // sends the viewer back to the start of the episode.
+    const canFreeze = () => {
+      const windows = portalWindows();
+      return (
+        windows.length === Object.keys(portalsRef.current).length &&
+        windows.length > 0 &&
+        windows.every((w) => typeof w.freezeToggle === "function")
+      );
+    };
+
+    const setFrozen = (next) => {
+      Object.values(portalsRef.current).forEach((portal) => {
+        if (!portal || Boolean(portal.frozen) === next) return;
+        try {
+          const w = portal.frame?.contentWindow;
+          if (typeof w?.freezeToggle !== "function") return;
+          w.freezeToggle();
+          portal.frozen = next;
+        } catch (e) {}
+      });
+      return next;
+    };
+
+    const silencePortals = () => {
+      portalWindows().forEach((w) => {
+        try {
+          w.stopSpeech?.();
+          w.setPlayerVolume?.(0);
+        } catch (e) {}
+      });
+    };
+
+    /** Freeze the set where it stands. Returns whether it is now paused. */
+    const applyPause = () => {
+      const playback = playbackRef.current;
+      if (!playback.running || playback.pausedAt !== null) return false;
+      clearTimeout(pausePendingTimer);
+      pausePending = false;
+      // EVERY talk callback is guarded on `phase === "playing"`, so moving the
+      // phase off it is what stops a pause from being read as the end of a
+      // section — which would advance the episode while the viewer is away.
+      phase = "paused";
+      playback.pausedAt = performance.now();
+      playback.resumesFromSectionStart = !canFreeze();
+      if (playback.resumesFromSectionStart) silencePortals();
+      else setFrozen(true);
+      return true;
+    };
+
+    const pauseShow = () => {
+      const playback = playbackRef.current;
+      if (!playback.running) return false;
+      if (playback.pausedAt !== null || pausePending) return true;
+      if (phase === "arming" || phase === "seeking") {
+        // Held until the clips land. The failsafe is only there so a viewer
+        // cannot be left looking at a Pause button that never took.
+        pausePending = true;
+        clearTimeout(pausePendingTimer);
+        pausePendingTimer = setTimeout(() => {
+          if (pausePending && playbackRef.current.running) applyPause();
+        }, ARM_FAILSAFE_MS);
+        return true;
+      }
+      if (phase !== "playing") return false;
+      return applyPause();
+    };
+
+    const resumeShow = () => {
+      const playback = playbackRef.current;
+      clearTimeout(pausePendingTimer);
+      if (pausePending && playback.pausedAt === null) {
+        // It never took effect — the clips were still loading and the viewer
+        // changed their mind. Nothing to undo.
+        pausePending = false;
+        return true;
+      }
+      if (!playback.running || playback.pausedAt === null) return false;
+      if (playback.resumesFromSectionStart) return jumpToSection(playback.section);
+
+      const held = performance.now() - playback.pausedAt;
+      // The performance clock, and with it every cut, turn and reaction.
+      playback.startedAt += held;
+      if (playback.heldSince) playback.heldSince += held;
+      // The SKEW INSTRUMENTS are stamped off the same page clock, and they are
+      // the only honest read on whether the two avatars are still in step. A
+      // pause that was not added back here would show up in `window.__tsPlayed`
+      // as a portal that "played" minutes longer than its clip, and the next
+      // person reading it would be chasing a bug that is a paused viewer.
+      if (issuedAt) issuedAt += held;
+      for (const [key, at] of started) started.set(key, at + held);
+      for (const [key, at] of audioStarted) audioStarted.set(key, at + held);
+      playback.pausedAt = null;
+      phase = "playing";
+      setFrozen(false);
+      window.__tsPause = window.__tsPause || [];
+      window.__tsPause.push({
+        section: playback.section + 1,
+        at: Math.round(playback.elapsed),
+        heldMs: Math.round(held),
+      });
+      // See the talk-ended handler: a section that ran out under the pause is
+      // joined here rather than lost.
+      if (ended.size >= Object.keys(portalsRef.current).length) finishSection();
+      return true;
+    };
+
+    /**
+     * Start the episode again at the top of a section: the only seek SitePal
+     * allows. Always plays from there — a clip cannot be started into a paused
+     * state, so landing somewhere and staying frozen is not something the
+     * player can do.
+     */
+    const jumpToSection = (index) => {
+      const active = timelineRef.current;
+      const sections = active?.sections || [];
+      const section = sections[index];
+      const playback = playbackRef.current;
+      if (!section || !playback.running) return false;
+      clearTimeout(pausePendingTimer);
+      pausePending = false;
+      // Same trick as the pause: off "playing" first, so the talk-ended that
+      // stopSpeech may raise cannot be read as this section finishing.
+      phase = "seeking";
+      setFrozen(false);
+      silencePortals();
+      ended.clear();
+      started.clear();
+      finished.clear();
+      audioStarted.clear();
+      // A reaction caught mid-gesture belongs to a moment the show is leaving.
+      resetReactions();
+      playback.pausedAt = null;
+      playback.resumesFromSectionStart = false;
+      playback.section = index;
+      // The picture holds on the cut until SitePal is heard to start, exactly
+      // as it does at a join, so a seek lands the way a section change already
+      // does rather than running ahead of silence.
+      playback.holdingAt = section.startsAt;
+      playback.heldSince = performance.now();
+      playback.elapsed = section.startsAt;
+      // Cues are walked forward and never revisited, so the index is computed
+      // for the new position instead of left where the last one was.
+      playback.cueIndex = cueIndexAt(active?.cues, section.startsAt);
+      if (startSection(index) === 0) {
+        console.warn(`[TalkShowScene] section ${index + 1} would not start on a seek`);
+        stopShow();
+        return false;
+      }
+      return true;
+    };
+
+    /** Seek to a second of the episode; lands on the section that holds it. */
+    const seekShow = (seconds) => {
+      const sections = timelineRef.current?.sections || [];
+      if (!sections.length || !playbackRef.current.running) return null;
+      const index = sectionIndexAt(sections, seconds);
+      return jumpToSection(index) ? sections[index].startsAt ?? 0 : null;
+    };
+
+    /** Skip a section back (-1) or forward (+1). Past the end ends the show. */
+    const stepShow = (step) => {
+      const sections = timelineRef.current?.sections || [];
+      const playback = playbackRef.current;
+      if (!sections.length || !playback.running) return null;
+      const target = stepSection(sections, playback.elapsed, step);
+      if (target === null) {
+        stopShow();
+        return null;
+      }
+      return jumpToSection(target) ? sections[target].startsAt ?? 0 : null;
+    };
+
+    /**
+     * Where playback is, for the transport controls. They poll this rather
+     * than being pushed to: the clock moves every frame and nothing on the
+     * page should re-render at that rate.
+     */
+    const talkShowStatus = () => {
+      const active = timelineRef.current;
+      const playback = playbackRef.current;
+      const sections = active?.sections || [];
+      return {
+        running: playback.running,
+        paused: playback.pausedAt !== null || pausePending,
+        // A section is loading: there is a moment at the start and at each
+        // join where the transport can be pressed but nothing has begun.
+        settling: phase === "arming" || phase === "seeking",
+        elapsed: playback.running ? Math.max(0, playback.elapsed) : 0,
+        duration: active?.dialogueEnd ?? 0,
+        section: playback.section,
+        sectionCount: sections.length,
+        sectionStart: sections[playback.section]?.startsAt ?? 0,
+        // Where the seekable blocks begin. The transport draws one per
+        // section, which is the honest picture of what can be skipped to.
+        sectionStarts: sections.map((section) => section.startsAt ?? 0),
+        // Whether pause is the real thing or the section-start fallback.
+        exactPause: canFreeze(),
+      };
+    };
+
     stopShowRef.current = stopShow;
     window.__talkShowPlay = playShow;
     window.__talkShowStop = stopShow;
     window.__talkShowRetryPortals = retryPortals;
+    window.__talkShowPause = pauseShow;
+    window.__talkShowResume = resumeShow;
+    window.__talkShowSeek = seekShow;
+    window.__talkShowStep = stepShow;
+    window.__talkShowStatus = talkShowStatus;
 
     return () => {
       stopShow();
@@ -2285,15 +2621,21 @@ function TalkShowModel({
       onPlaybackReady?.(false, "loading");
       window.removeEventListener("message", onMessage);
       clearTimeout(armTimer);
+      clearTimeout(pausePendingTimer);
       if (window.__talkShowPlay === playShow) delete window.__talkShowPlay;
       if (window.__talkShowStop === stopShow) delete window.__talkShowStop;
+      if (window.__talkShowPause === pauseShow) delete window.__talkShowPause;
+      if (window.__talkShowResume === resumeShow) delete window.__talkShowResume;
+      if (window.__talkShowSeek === seekShow) delete window.__talkShowSeek;
+      if (window.__talkShowStep === stepShow) delete window.__talkShowStep;
+      if (window.__talkShowStatus === talkShowStatus) delete window.__talkShowStatus;
       if (window.__talkShowRetryPortals === retryPortals) {
         delete window.__talkShowRetryPortals;
       }
       host.remove();
       portalsRef.current = {
-        Monk: { frame: null, ready: false, source: null, attempt: 0, exhausted: false, loads: 0 },
-        Connor: { frame: null, ready: false, source: null, attempt: 0, exhausted: false, loads: 0 },
+        Monk: { frame: null, ready: false, source: null, attempt: 0, exhausted: false, loads: 0, frozen: false },
+        Connor: { frame: null, ready: false, source: null, attempt: 0, exhausted: false, loads: 0, frozen: false },
       };
     };
   }, [onPlaybackReady, onPlaybackStateChange, compactPortalHost]);
@@ -2312,7 +2654,10 @@ function TalkShowModel({
         // Unless the start never comes. A portal that drops its talk-started
         // would otherwise freeze the show at a join forever, which is a worse
         // failure than a join that lands a little late.
-        if (performance.now() - playback.heldSince > HOLD_FAILSAFE_MS) {
+        if (
+          playback.pausedAt === null &&
+          performance.now() - playback.heldSince > HOLD_FAILSAFE_MS
+        ) {
           playback.startedAt =
             performance.now() -
             (playback.holdingAt + TALK_SHOW_TIMING.leadIn + TALK_SHOW_TIMING.sectionLeadIn) * 1000;
@@ -2320,10 +2665,17 @@ function TalkShowModel({
           playback.heldSince = 0;
         }
       } else {
-        elapsed =
-          (performance.now() - playback.startedAt) / 1000 -
-          TALK_SHOW_TIMING.leadIn;
+        // PAUSED READS THE CLOCK IT STOPPED AT. Everything on the timeline is
+        // derived from this one subtraction, so holding `now` still is the
+        // whole pause as far as the picture is concerned — no cut, turn or
+        // reaction advances, and the resume adds the interval back onto
+        // `startedAt` so the show carries on from the same second.
+        const now = playback.pausedAt ?? performance.now();
+        elapsed = (now - playback.startedAt) / 1000 - TALK_SHOW_TIMING.leadIn;
       }
+      // What the transport controls read. Kept here, where it is already
+      // worked out, rather than derived a second time somewhere else.
+      playback.elapsed = elapsed;
 
       // Finish reactions at their authored gesture length instead of allowing
       // the pose-2 clip's trailing breathing idle to run to frame 129.
@@ -2372,7 +2724,12 @@ function TalkShowModel({
     Object.entries(headBones).forEach(([actor, head]) => {
       head.quaternion.copy(animatedHeadQuaternions[actor]);
     });
-    Object.values(mixers).forEach((m) => m.update(delta));
+    // A paused set holds its pose. The faces are frozen by SitePal itself, so
+    // letting the bodies carry on breathing would leave two still faces on two
+    // moving characters, which reads as a fault rather than as a pause.
+    Object.values(mixers).forEach((m) =>
+      m.update(playback.pausedAt === null ? delta : 0),
+    );
     Object.entries(headBones).forEach(([actor, head]) => {
       animatedHeadQuaternions[actor].copy(head.quaternion);
     });
