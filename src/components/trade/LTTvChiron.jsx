@@ -8,9 +8,11 @@ import css from "styled-jsx/css";
 // set. Structure after Jon Kantner's "Fox News TV Display" pen (MIT,
 // codepen.io/jkantner/pen/mPzpEa), rebranded — no network marks ship here.
 //
-// The headline is the selected episode, the quote box is the live RL80 price
-// (hidden rather than faked when it fails to load), and the cube's clock face
-// is the viewer's local time. The ticker copy is a placeholder.
+// The headline bar and the ticker read the episode's own graphics when the
+// record carries them (`graphics.headline`, `graphics.ticker` — the news
+// pipeline writes both), the quote box is the live RL80 price (hidden rather
+// than faked when it fails to load), and the cube's clock face is the viewer's
+// local time.
 //
 // `mode`: "news" is the full package; "logo" keeps only the spinning cube, like
 // a channel's corner logo, for non-news shows and the lineup. The cube holds
@@ -19,9 +21,18 @@ import css from "styled-jsx/css";
 const TICKER_PX_PER_SEC = 80;
 const QUOTE_REFRESH_MS = 60_000;
 
-// Placeholder — the source pen's copy — until the ticker's content is decided.
-const TICKER_COPY =
-  "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.";
+// What scrolls when the record carries no ticker items: the episode's own
+// summary, so an older or hand-made record still reads as this show rather
+// than as filler. Items are joined with a wide dot, as a cable ticker does.
+const TICKER_SEPARATOR = "   \u2022   ";
+function tickerCopy(episode) {
+  const items = Array.isArray(episode?.graphics?.ticker)
+    ? episode.graphics.ticker.map((t) => String(t).trim()).filter(Boolean)
+    : [];
+  if (items.length) return items.join(TICKER_SEPARATOR) + TICKER_SEPARATOR;
+  const fallback = episode?.summary || episode?.title || "";
+  return fallback ? fallback + TICKER_SEPARATOR : "";
+}
 
 // Scientific notation below a cent — RL80 trades around 1e-8, where the
 // fixed-point form is mostly leading zeros. Plain dollars above.
@@ -97,6 +108,8 @@ export default function LTTvChiron({ episode, mode = "news", status = "Replay" }
   const clock = useClock();
   const rl80 = useRl80Price(news);
   const rl80Price = Number.isFinite(rl80?.price) ? rl80.price : null;
+  const headline = episode?.graphics?.headline || episode.title;
+  const ticker = tickerCopy(episode);
   // The source's box is always green; keep that, but don't show green on a
   // day RL80 is actually down.
   const rl80Down = Number.isFinite(rl80?.priceChange24h) && rl80.priceChange24h < -0.005;
@@ -175,7 +188,7 @@ export default function LTTvChiron({ episode, mode = "news", status = "Replay" }
           <div className="ltc-hilite" />
           <div className="ltc-glow" />
           <div className="ltc-rule" />
-          <p key={episode.number}>{episode.title}</p>
+          <p key={episode.number}>{headline}</p>
         </div>
       </div>
 
@@ -185,8 +198,8 @@ export default function LTTvChiron({ episode, mode = "news", status = "Replay" }
           className="ltc-track"
           style={{ animationDuration: `${tickerSeconds}s` }}
         >
-          <span className="ltc-run">{TICKER_COPY}</span>
-          <span className="ltc-run" aria-hidden="true">{TICKER_COPY}</span>
+          <span className="ltc-run">{ticker}</span>
+          <span className="ltc-run" aria-hidden="true">{ticker}</span>
         </div>
         {rl80Price != null && (
           <div className={`ltc-quote${rl80Down ? " is-down" : ""}`}>
