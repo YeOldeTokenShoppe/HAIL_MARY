@@ -148,10 +148,17 @@ export const TALK_SHOW_TIMING = {
   sectionLeadIn: 0,
 };
 
-// How long to wait at a section join for SitePal to say it has started before
-// carrying on regardless. Generous — a join is normally well under a second —
-// because this only exists so a dropped message cannot stall an episode.
-const HOLD_FAILSAFE_MS = 6000;
+// How long to wait for BOTH clips of a section to report themselves loaded
+// before starting anyway. A cold 88-second clip took 6939ms to load on
+// Michelle's machine (measured 2026-09-21), so this is a backstop against a
+// callback that never comes, not a schedule anything is expected to hit.
+const ARM_FAILSAFE_MS = 12000;
+
+// How long to hold the picture at a section join before running on regardless.
+// It must outlast ARM_FAILSAFE_MS: the audio now waits for both clips to land,
+// and a picture that gave up first would run the next section's opening over
+// silence — the exact desync this file spends so much effort avoiding.
+const HOLD_FAILSAFE_MS = ARM_FAILSAFE_MS + 3000;
 
 // Nothing playing. `section` is which clip of the episode is up; `holdingAt`
 // is the second of the episode to freeze the picture on while the next one
@@ -1593,6 +1600,20 @@ function TalkShowModel({
     const started = new Map();
     const finished = new Map();
     let issuedAt = 0;
+    // The arm/release handshake. `phase` is "idle" until a section is being
+    // loaded, "arming" while its clips are in flight, "playing" once both have
+    // been told to speak — and the talk callbacks only count in "playing", so
+    // the muted load cannot be mistaken for the performance.
+    const armed = new Set();
+    let phase = "idle";
+    let arming = null;
+    let armTimer = 0;
+    let armedExpected = 0;
+    let releaseArmed = null;
+    // Which arming this is. Pressing play twice would otherwise let a stale
+    // release fire with the previous attempt's clips, because two attempts at
+    // the same section share an index but not a set of buffers.
+    let armGen = 0;
 
     /**
      * HOW FAR APART THE TWO PORTALS REALLY START, measured rather than assumed.
@@ -1812,7 +1833,19 @@ function TalkShowModel({
         notifyReady();
       }
 
+      if (event.data?.type === "sitepal-portal-audio-loaded") {
+        // `vh_audioLoaded` — undocumented, and the whole reason a section can
+        // now wait for its audio instead of hoping for it.
+        if (phase !== "arming") return;
+        armed.add(key);
+        if (armed.size >= armedExpected) releaseArmed?.("both clips landed");
+        return;
+      }
+
       if (event.data?.type === "sitepal-portal-talk-started") {
+        // The muted load speaks too, so only a started that belongs to the
+        // performance counts. Everything below this line assumes playback.
+        if (phase !== "playing") return;
         // Measured before anything returns: the re-stamp below acts on the
         // FIRST portal to report and swallows the second, so the skew has to
         // be taken here or it is never seen.
@@ -1833,6 +1866,10 @@ function TalkShowModel({
       }
 
       if (event.data?.type === "sitepal-portal-talk-ended") {
+        // A portal this phase never saw start cannot have finished: that is a
+        // leftover from the muted load, and counting it would advance the
+        // episode a section early.
+        if (phase !== "playing" || !started.has(key)) return;
         ended.add(key);
         // Before the early return below, for the same reason recordStart sits
         // at the top of talk-started: the second portal to report is the one
@@ -1855,12 +1892,14 @@ function TalkShowModel({
           playback.heldSince = performance.now();
           if (startSection(next) === 0) {
             console.warn(`[TalkShowScene] section ${next + 1} would not start`);
+            phase = "idle";
             resetPerformance();
             onPlaybackStateChange?.(false);
           }
           return;
         }
 
+        phase = "idle";
         resetPerformance();
         onPlaybackStateChange?.(false);
       }
@@ -1903,6 +1942,10 @@ function TalkShowModel({
           portal.frame?.contentWindow?.setPlayerVolume?.(0);
         } catch (e) {}
       });
+      clearTimeout(armTimer);
+      arming = null;
+      armed.clear();
+      phase = "idle";
       ended.clear();
       started.clear();
       finished.clear();
@@ -1911,21 +1954,41 @@ function TalkShowModel({
     };
 
     /**
-     * Tell both portals to play section `index`, and say how many took it.
+     * ARM A SECTION: load both clips, and DO NOT SPEAK UNTIL BOTH HAVE LANDED.
      *
-     * Every section is the same length in both tracks and was cut at the same
-     * instant, so telling both at once is all the synchronising there is: they
-     * are one timeline twice over, not two things to line up.
+     * This used to say that telling both portals at once was all the
+     * synchronising there is, because the two tracks are one timeline twice
+     * over. The tracks are — the playback was not. Measured on 2026-09-21:
+     * the two portals began a section 662ms apart, which is most of the 750ms
+     * gap between lines, so Connor's tail landed on top of the Monk's next
+     * line about one exchange in ten. Every file in the pipeline was correct.
+     *
+     * The cause is that `loadAudio` was called and then `sayAudio` in the very
+     * next statement, which asks a clip to play whether or not it has arrived.
+     * A cold clip is not quick: on Michelle's machine an 88-second WAV took
+     * 6939ms to load. Whichever portal was still fetching started late by
+     * however long it had left.
+     *
+     * So a section is now armed and then released. `vh_audioLoaded` — which is
+     * UNDOCUMENTED, and was found on 2026-09-21 by wiring up guessed callback
+     * names until one fired — says when a clip is genuinely ready. Both
+     * portals load muted, both report, and only then does either speak.
+     *
+     * Returns how many portals took the load, so the callers that check for
+     * "none of them would start" keep working unchanged.
      */
     const startSection = (index) => {
       const active = timelineRef.current;
       const section = active?.sections?.[index];
       if (!section) return 0;
-      // The instant both portals were told to play, so recordStart can say how
-      // long each one took to answer rather than only how far apart they were.
-      issuedAt = performance.now();
 
-      let started = 0;
+      clearTimeout(armTimer);
+      armed.clear();
+      phase = "arming";
+      arming = index;
+      const gen = ++armGen;
+
+      const clips = new Map();
       Object.entries(portalsRef.current).forEach(([key, portal]) => {
         const clip = section.audio?.[key];
         if (!clip) {
@@ -1937,16 +2000,80 @@ function TalkShowModel({
         try {
           const w = portal.frame.contentWindow;
           w.stopSpeech?.();
-          w.saySilent?.(0);
-          w.setPlayerVolume?.(7);
+          // Muted while it loads: `loadAudio` PLAYS, which is why the portals
+          // are silenced before they are preloaded anywhere else in this file.
+          w.setPlayerVolume?.(0);
           w.loadAudio?.(clip);
-          w.sayAudio?.(clip);
-          started += 1;
+          clips.set(key, clip);
         } catch (e) {
-          console.warn(`[TalkShowScene] could not start ${key} audio`, e);
+          console.warn(`[TalkShowScene] could not load ${key} audio`, e);
         }
       });
-      return started;
+
+      if (clips.size === 0) {
+        phase = "idle";
+        arming = null;
+        return 0;
+      }
+
+      const armedAt = performance.now();
+
+      /** Both clips are in (or we have waited long enough). Speak, together. */
+      const release = (why) => {
+        if (armGen !== gen || arming === null) return;
+        clearTimeout(armTimer);
+        arming = null;
+        ended.clear();
+        started.clear();
+        finished.clear();
+        // Set before the calls below, so a talk-started that follows one of
+        // them is recorded rather than dropped. A stray event left over from
+        // the muted load cannot be mistaken for playback: `ended` only counts
+        // a portal that this phase already saw start.
+        phase = "playing";
+        issuedAt = performance.now();
+        for (const [key, clip] of clips) {
+          try {
+            const w = portalsRef.current[key]?.frame?.contentWindow;
+            w?.saySilent?.(0);
+            w?.setPlayerVolume?.(7);
+            w?.sayAudio?.(clip);
+          } catch (e) {
+            console.warn(`[TalkShowScene] could not start ${key} audio`, e);
+          }
+        }
+        // SECTION ONE'S CLOCK MOVES TO HERE, and it has to.
+        //
+        // `playShow` stamps it at the instant the button is pressed, because
+        // until now that was also the instant the audio was asked for. Arming
+        // breaks that: the clips may take seconds to land, and a picture
+        // stamped at press time would run that far ahead of the voices — the
+        // same desync from the other direction. Later sections already
+        // re-stamp on talk-started and are unaffected.
+        const playback = playbackRef.current;
+        if (index === 0 && playback.running && playback.holdingAt === null) {
+          playback.startedAt = performance.now();
+        }
+        console.info(
+          `[TalkShowScene] section ${index + 1} released after ${why} ` +
+            `(${Math.round(performance.now() - armedAt)}ms arming)`,
+        );
+      };
+
+      releaseArmed = release;
+      armedExpected = clips.size;
+      // Never let a missing callback freeze the show. Generous, because a cold
+      // clip legitimately takes seconds — this is a backstop, not a schedule.
+      armTimer = setTimeout(() => {
+        console.warn(
+          `[TalkShowScene] section ${index + 1}: only ${armed.size} of ` +
+            `${clips.size} clips reported loaded in ${ARM_FAILSAFE_MS}ms — ` +
+            "starting anyway rather than stalling",
+        );
+        release("the failsafe");
+      }, ARM_FAILSAFE_MS);
+
+      return clips.size;
     };
 
     const playShow = () => {
@@ -1986,6 +2113,7 @@ function TalkShowModel({
       Object.values(timers).forEach(clearTimeout);
       onPlaybackReady?.(false, "loading");
       window.removeEventListener("message", onMessage);
+      clearTimeout(armTimer);
       if (window.__talkShowPlay === playShow) delete window.__talkShowPlay;
       if (window.__talkShowStop === stopShow) delete window.__talkShowStop;
       if (window.__talkShowRetryPortals === retryPortals) {
