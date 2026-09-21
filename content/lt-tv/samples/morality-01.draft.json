@@ -1,6 +1,6 @@
 {
   "_note": "A WORKED SAMPLE, written by hand to show the roundtable's format and the two voices. It calls no model. Its argument is invented, which is fine — this show argues from reasoning rather than evidence — but it is a demonstration, not a scheduled episode.",
-  "topic": { "number": 2, "keep": { "title": "The Wealth Effect", "summary": "Paper gains, real confidence, and the stories a rising chart tells." }, "from": "roundtable-02" },
+  "topic": { "show": "morality", "number": 1, "keep": { "title": "The Wealth Effect", "summary": "Paper gains, real confidence, and the stories a rising chart tells." }, "from": "morality-01" },
   "plan": {
     "title": "The Wealth Effect",
     "summary": "Paper gains, real confidence, and the stories a rising chart tells.",

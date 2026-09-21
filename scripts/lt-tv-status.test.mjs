@@ -121,7 +121,11 @@ const many = await readStatus(await fixture({
   [slatePath("orphan-01")]: { id: "orphan-01", showId: "gardening", number: "01", title: "Compost" },
   "src/content/lt-tv/index.js": indexFor(["roundtable-02", "news-01"]),
 }));
-check("each show gets its own episodes", many.shows.map((s) => `${s.id}:${s.episodes.length}`), ["news:1", "roundtable:1"]);
+// Every show on the slate is listed, including one with nothing on it yet:
+// a show that vanishes until it has an episode is a show nobody can see they
+// need to write for.
+check("each show gets its own episodes", many.shows.map((s) => `${s.id}:${s.episodes.length}`),
+  ["news:1", "roundtable:1", "morality:0"]);
 check("an episode of no known show is not dropped", many.orphans.map((e) => e.id), ["orphan-01"]);
 const p2 = renderStatusPage(many);
 ok("the page lists both shows", p2.includes("LT Weekly News Recap") && p2.includes("The Liminal Terminal"));
@@ -145,7 +149,7 @@ ok("ampersands too", p3.includes("a &amp; b"));
 console.log("\nAn empty repo says so rather than failing:");
 const empty = await readStatus(await fixture({ "src/content/lt-tv/index.js": "" }));
 check("no episodes", empty.episodes.length, 0);
-ok("both shows still appear", empty.shows.length === 2);
+ok("every show still appears", empty.shows.length === 3);
 ok("and the page renders", renderStatusPage(empty).includes("Nothing on the slate yet"));
 
 console.log("\nThe commands it prints are the ones that work from anywhere:");

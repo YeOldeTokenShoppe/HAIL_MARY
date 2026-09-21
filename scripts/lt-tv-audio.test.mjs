@@ -360,7 +360,7 @@ console.log("\nRecording refuses a screenplay that was never applied:");
   // for, and never mentioned. It is invisible until you play it back.
   const run = promisify(execFile);
   const sample = JSON.parse(
-    await readFile(resolve("content/lt-tv/samples/roundtable-02.sample.json"), "utf8"),
+    await readFile(resolve("content/lt-tv/samples/morality-01.sample.json"), "utf8"),
   );
   delete sample.synthetic; // the sample is refused on its own account
 
@@ -380,14 +380,14 @@ console.log("\nRecording refuses a screenplay that was never applied:");
   try {
     await mkdir(join(dir, "content/lt-tv/episodes"), { recursive: true });
     await writeFile(
-      join(dir, "content/lt-tv/episodes/roundtable-02.json"),
+      join(dir, "content/lt-tv/episodes/morality-01.json"),
       JSON.stringify(sample, null, 2) + "\n",
     );
-    await writeFile(join(dir, "content/lt-tv/episodes/roundtable-02.txt"), edited + "\n");
+    await writeFile(join(dir, "content/lt-tv/episodes/morality-01.txt"), edited + "\n");
 
     let failed = null;
     try {
-      await run("node", [resolve("scripts/lt-tv-audio.mjs"), "content/lt-tv/episodes/roundtable-02.json"], {
+      await run("node", [resolve("scripts/lt-tv-audio.mjs"), "content/lt-tv/episodes/morality-01.json"], {
         cwd: dir,
         env: { ...process.env, ELEVENLABS_API_KEY: "not-used-because-it-refuses-first" },
       });
@@ -399,12 +399,12 @@ console.log("\nRecording refuses a screenplay that was never applied:");
     const said = failed?.stderr ?? "";
     ok("saying the screenplay is ahead of the record", said.includes("not in the record yet"));
     ok("naming the button that fixes it", said.includes("Apply my edits"));
-    ok("and the command, for a terminal", said.includes("npm run lt:edit -- roundtable-02"));
+    ok("and the command, for a terminal", said.includes("npm run lt:edit -- morality-01"));
     ok("and that no money went", said.includes("Nothing has been spent"));
 
     // The dry run, on the applied record, reads files and sends nothing.
-    await writeFile(join(dir, "content/lt-tv/episodes/roundtable-02.txt"), renderScript(sample) + "\n");
-    const dry = await run("node", [resolve("scripts/lt-tv-audio.mjs"), "content/lt-tv/episodes/roundtable-02.json", "--dry-run"], {
+    await writeFile(join(dir, "content/lt-tv/episodes/morality-01.txt"), renderScript(sample) + "\n");
+    const dry = await run("node", [resolve("scripts/lt-tv-audio.mjs"), "content/lt-tv/episodes/morality-01.json", "--dry-run"], {
       cwd: dir,
       env: { ...process.env, ELEVENLABS_API_KEY: "" },
     });

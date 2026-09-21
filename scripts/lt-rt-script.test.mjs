@@ -44,7 +44,7 @@ const threw = (label, fn, fragment) => {
 };
 
 const draft = JSON.parse(
-  await readFile(resolve("content/lt-tv/samples/roundtable-02.draft.json"), "utf8"),
+  await readFile(resolve("content/lt-tv/samples/morality-01.draft.json"), "utf8"),
 );
 const format = showFormat("roundtable");
 const episode = assemble({
@@ -66,6 +66,28 @@ ok("it has no chiron, because the set has never had one", !episode.graphics);
 check("the uploads use the roundtable's clip prefix", episode.cast.Connor.sitepalAudio, "lttv_rt_ep02_connor");
 check("both of them", episode.cast.Monk.sitepalAudio, sitepalClipName("roundtable", 2, "Monk"));
 ok("the news show still names its clips its own way", sitepalClipName("news", 2, "Connor") === "lttv_news_ep02_connor");
+
+// MARKETS & MORALITY IS THE SAME FORMAT UNDER ITS OWN BANNER, written by this
+// same generator. What it must NOT share is the id and the clip prefix: both
+// shows number from 01, so a morality episode assembled as a roundtable would
+// overwrite the roundtable's record of that number and ask SitePal for clips
+// another show already owns.
+console.log("\nMarkets & Morality shares the argument format and nothing else:");
+const morality = assemble({
+  rundown: { ...draft.plan, title: draft.topic.keep.title, summary: draft.topic.keep.summary },
+  segments: draft.segments,
+  number: 1,
+  format: showFormat("morality"),
+  producedBy: { model: null, pipeline: "scripts/lt-rt-script.mjs" },
+});
+check("the same six segments, not a second copy of them",
+  morality.segments.map((s) => s.id), episode.segments.map((s) => s.id));
+check("under its own show", morality.show, "morality");
+check("with its own id", morality.id, "morality-01");
+ok("which is not the roundtable's episode 1", morality.id !== "roundtable-01");
+check("and its own clip prefix", morality.cast.Connor.sitepalAudio, "lttv_mm_ep01_connor");
+ok("it has no chiron either", !morality.graphics);
+check("it reaches the guide under Markets & Morality", toSlateRecord(morality).showId, "morality");
 
 console.log("\nEverything downstream is shared, and must stay shared:");
 ok("lines are numbered across the whole episode", lines(episode).every((l, i) => l.n === i));
@@ -120,7 +142,12 @@ threw("an unknown show is refused by name", () => showFormat("gardening"), "Unkn
 console.log("\nThe topic queue is the slate itself:");
 const waiting = await unwrittenTopics();
 ok("there are episodes waiting to be written", waiting.length > 0);
-ok("every one of them is a roundtable", waiting.every((r) => r.showId === "roundtable"));
+// Both argument shows queue here, and the news show must not: it starts from
+// a brief, and offering it as a topic would write it with no stories in it.
+ok("every one of them is an argument show",
+  waiting.every((r) => r.showId === "roundtable" || r.showId === "morality"));
+ok("and Markets & Morality is in the queue", waiting.some((r) => r.showId === "morality"));
+ok("the news show is not", waiting.every((r) => r.showId !== "news"));
 ok("none of them is already recorded", waiting.every((r) => !r.lineStarts?.length));
 ok("each carries the title it was named with", waiting.every((r) => r.title && r.summary));
 
