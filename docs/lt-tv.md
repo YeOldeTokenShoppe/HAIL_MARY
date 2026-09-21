@@ -449,7 +449,6 @@ A block is a run of segments, not a line, so "the one block holding it" is
 still a chunk of the episode — a third of it, on a three-block roundtable.
 
 
-
 Like `# cut`, a pause mark changes no words: it needs no applying and works on
 an episode that is already written. Applying edits re-renders the screenplay
 and clears both kinds of mark, so mark them once the words are settled. A mark
@@ -495,10 +494,10 @@ checks all of this against the real response so the idea does not come back.
 
 The split step runs `silencedetect` over the master and puts each junction in
 the middle of the real gap around the reported instant. Silence means neither
-voice is speaking, which is the condition a boundary needs. It works, but it is
-a search with a radius: three separate bugs came out of it — a junction inside a
-word, two junctions claiming one gap, a junction snapping onto a breath
-mid-sentence.
+voice is speaking, which is the condition a boundary needs. It works, but
+placing a cut this way is delicate: three separate bugs came out of it — a
+junction inside a word, two junctions claiming one gap, a junction snapping
+onto a breath mid-sentence.
 
 It prints how many gaps it found. Where a junction has no measurable gap it
 falls back to the reported time and **says which lines** — those two lines
