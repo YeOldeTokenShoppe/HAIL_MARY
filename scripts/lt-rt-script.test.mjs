@@ -10,8 +10,9 @@
 // Nothing here calls a model. The worked sample was written by hand, which is
 // what makes the assembly path testable at all.
 
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { readFile, mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { resolve, join } from "node:path";
 import {
   SHOW_FORMATS,
   showFormat,
@@ -140,15 +141,34 @@ ok("the news show has exactly one", SHOW_FORMATS.news.optional.size === 1);
 threw("an unknown show is refused by name", () => showFormat("gardening"), "Unknown show");
 
 console.log("\nThe topic queue is the slate itself:");
-const waiting = await unwrittenTopics();
-ok("there are episodes waiting to be written", waiting.length > 0);
-// Both argument shows queue here, and the news show must not: it starts from
-// a brief, and offering it as a topic would write it with no stories in it.
-ok("every one of them is an argument show",
-  waiting.every((r) => r.showId === "roundtable" || r.showId === "morality"));
-ok("and Markets & Morality is in the queue", waiting.some((r) => r.showId === "morality"));
-ok("the news show is not", waiting.every((r) => r.showId !== "news"));
-ok("none of them is already recorded", waiting.every((r) => !r.lineStarts?.length));
+// AGAINST A FIXTURE, NOT THE REAL SLATE. An earlier version of this asked the
+// live slate whether a Markets & Morality episode was waiting, which passed
+// only while that show's one episode happened to be unwritten — it broke the
+// hour it was recorded. What is worth pinning is which shows the queue draws
+// from, and that does not change when an episode does.
+const queueRoot = await mkdtemp(join(tmpdir(), "lt-rt-queue-"));
+await mkdir(join(queueRoot, "src/content/lt-tv/episodes"), { recursive: true });
+const putRecord = (record) =>
+  writeFile(
+    join(queueRoot, "src/content/lt-tv/episodes", `${record.id}.json`),
+    JSON.stringify(record),
+  );
+await Promise.all([
+  putRecord({ id: "roundtable-03", showId: "roundtable", number: "03", title: "A", summary: "a" }),
+  putRecord({ id: "morality-01", showId: "morality", number: "01", title: "B", summary: "b" }),
+  putRecord({ id: "news-01", showId: "news", number: "01", title: "C", summary: "c" }),
+  // Recorded, so written: offering it would overwrite audio that already says
+  // something else.
+  putRecord({ id: "morality-02", showId: "morality", number: "02", title: "D", summary: "d",
+    lineStarts: [0, 4] }),
+]);
+const waiting = await unwrittenTopics(queueRoot);
+check("both argument shows queue, in slate order",
+  waiting.map((r) => r.id), ["morality-01", "roundtable-03"]);
+// The news show starts from a brief; offering it as a topic would write it
+// with no stories in it.
+ok("the news show is not in the queue", waiting.every((r) => r.showId !== "news"));
+ok("nor is an episode that is already recorded", waiting.every((r) => !r.lineStarts?.length));
 ok("each carries the title it was named with", waiting.every((r) => r.title && r.summary));
 
 console.log(failures ? `\n${failures} check(s) failed.\n` : "\nAll checks passed.\n");
