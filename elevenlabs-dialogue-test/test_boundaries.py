@@ -93,6 +93,47 @@ ok("each line begins where the one before it ended",
    all(planned[i]["start"] == planned[i - 1]["end"] for i in range(1, len(planned))))
 ok("no window is inverted", all(w["end"] > w["start"] for w in planned))
 
+print("\nA short line between two junctions that want the same gap:")
+# Michelle, 2026-09-21: "the correct voices say their own lines in the
+# master-dialogue.wav but in the animation, the wrong characters lip synch some
+# of the lines." The audio was right and the WINDOWS were wrong. "You sold
+# nothing." is about a second and a half long, and the only measurable gap is
+# the one in front of it — so the junction before it and the junction after it
+# both snapped to that one gap, its window collapsed to a millisecond, and its
+# audio fell inside the next speaker's window. That speaker's avatar then
+# lip-synced a line it was never given.
+short = [
+    {"start_time_seconds": 0.0, "end_time_seconds": 10.0, "voice_id": "connor"},
+    {"start_time_seconds": 10.0, "end_time_seconds": 11.4, "voice_id": "gr80"},
+    {"start_time_seconds": 11.4, "end_time_seconds": 25.0, "voice_id": "connor"},
+]
+squeezed = plan_windows(short, [(9.6, 10.0), (24.0, 24.4)], 26.0)
+
+ok("the short line keeps a window of its own",
+   squeezed[1]["end"] - squeezed[1]["start"] > 1.0)
+ok("which actually covers where it is spoken",
+   squeezed[1]["start"] <= 10.0 and squeezed[1]["end"] >= 11.3)
+ok("and the next speaker does not start before it has finished",
+   squeezed[2]["start"] >= 11.4)
+ok("no two junctions take the same gap",
+   squeezed[0]["end"] != squeezed[1]["end"])
+ok("every window is a real length", all(w["end"] - w["start"] > 0.05 for w in squeezed))
+ok("the junction that could not be measured says so", not squeezed[1]["end_measured"])
+
+# The same must hold when there is no measurable gap anywhere near a run of
+# short lines — the windows must still tile forwards, never backwards.
+rapid = [
+    {"start_time_seconds": 0.0, "end_time_seconds": 2.0, "voice_id": "connor"},
+    {"start_time_seconds": 2.0, "end_time_seconds": 3.0, "voice_id": "gr80"},
+    {"start_time_seconds": 3.0, "end_time_seconds": 4.0, "voice_id": "connor"},
+    {"start_time_seconds": 4.0, "end_time_seconds": 5.0, "voice_id": "gr80"},
+]
+fast = plan_windows(rapid, [(1.9, 2.1)], 6.0)
+ok("a volley of short lines still moves forwards only",
+   all(fast[i]["start"] >= fast[i - 1]["start"] for i in range(1, len(fast))))
+ok("and none of them is squeezed out",
+   all(w["end"] > w["start"] for w in fast))
+
 print("\nWhen the lines really do run together:")
 # No gap anywhere near the junction at 10.4.
 bare = plan_windows(segments, [(30.0, 30.5)], 31.0)

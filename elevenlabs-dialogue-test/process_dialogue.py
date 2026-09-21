@@ -55,6 +55,12 @@ SILENCE_MIN_SECONDS = 0.08
 # stopped, on the 2026-07-31 render.
 BOUNDARY_SEARCH_SECONDS = 1.5
 
+# The least a line may be squeezed to. A window shorter than this is not a line
+# at all, and the audio it should have held goes to whoever is next — which is
+# how the wrong character came to lip-sync a line whose audio was perfectly
+# correct in the master.
+MIN_LINE_WINDOW_SECONDS = 0.05
+
 
 def media_duration(path):
     command = [
@@ -120,23 +126,45 @@ def detect_silences(master):
     return parse_silences(result.stderr)
 
 
-def find_gap(instant, silences):
+def find_gap(instant, silences, lower=None, upper=None, used=()):
     """The measured gap at this reported junction, or None.
 
     Preferred: a window the instant falls inside. Otherwise the nearest one
     within BOUNDARY_SEARCH_SECONDS, because the reported instant can sit a
     little before or after the real gap.
+
+    `lower`, `upper` and `used` keep two junctions from claiming the SAME gap.
+    Without them a short line — "You sold nothing." — could have the junction
+    before it and the junction after it both snap to the one measurable gap in
+    front of it. Its window then collapsed to nothing and the line fell inside
+    the NEXT speaker's window, so the wrong character lip-synced it. Michelle
+    heard exactly that on 2026-09-21: the master was correct and the animation
+    was not.
     """
-    for start, end in silences:
-        if start <= instant <= end:
-            return (start, end)
+
+    def allowed(window):
+        if window in used:
+            return False
+        middle = (window[0] + window[1]) / 2
+        if lower is not None and middle <= lower:
+            return False
+        if upper is not None and middle >= upper:
+            return False
+        return True
+
+    for window in silences:
+        if window[0] <= instant <= window[1] and allowed(window):
+            return window
     nearest = None
     best = BOUNDARY_SEARCH_SECONDS
-    for start, end in silences:
+    for window in silences:
+        if not allowed(window):
+            continue
+        start, end = window
         away = start - instant if start > instant else instant - end if end < instant else 0
         if away <= best:
             best = away
-            nearest = (start, end)
+            nearest = window
     return nearest
 
 
@@ -153,17 +181,36 @@ def plan_windows(segments, silences, total_duration):
     if not segments:
         return []
 
+    # EVERY LINE MUST KEEP A WINDOW OF ITS OWN. Junctions are chosen in order,
+    # each one after the last, each one inside the pair of lines it separates,
+    # and no gap is used twice — otherwise a short line between two junctions
+    # that both snap to the same gap is squeezed to nothing, and its audio ends
+    # up inside the next speaker's window.
     junctions = []
+    used = []
+    previous = 0.0
     for index in range(1, len(segments)):
         reported = float(segments[index]["start_time_seconds"])
-        gap = find_gap(reported, silences)
+        # It may not move back past the junction before it, nor forward past
+        # where the NEXT junction is reported to be — that one needs room too.
+        lower = previous + MIN_LINE_WINDOW_SECONDS
+        upper = (
+            float(segments[index + 1]["start_time_seconds"]) - MIN_LINE_WINDOW_SECONDS
+            if index + 1 < len(segments)
+            else total_duration
+        )
+        gap = find_gap(reported, silences, lower=lower, upper=upper, used=used) if upper > lower else None
         if gap:
-            junctions.append({"at": (gap[0] + gap[1]) / 2, "measured": True, "reported": reported})
+            at = (gap[0] + gap[1]) / 2
+            used.append(gap)
+            junctions.append({"at": at, "measured": True, "reported": reported})
+            previous = at
         else:
-            # Nothing measured: fall back to the old guarded instant. The two
-            # lines are treated as running straight into each other, which is
-            # what the absence of a gap means.
+            # Nothing usable measured: fall back to the old guarded instant. The
+            # two lines are treated as running straight into each other, which
+            # is what the absence of a gap means.
             junctions.append({"at": None, "measured": False, "reported": reported})
+            previous = max(previous, reported)
 
     planned = []
     for index, segment in enumerate(segments):
