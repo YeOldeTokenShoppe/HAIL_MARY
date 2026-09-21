@@ -85,7 +85,7 @@ export const ACTIONS = {
     needsScreenplay: true,
     stages: ["written"],
     argv: (id) => ["node", ["scripts/lt-tv-audio.mjs", `content/lt-tv/episodes/${id}.json`]],
-    blurb: "Generates every block and joins them into one master.",
+    blurb: "Renders every line on its own, in its own voice, and lays the two character tracks out on one timeline. A line already recorded with the same words is reused free.",
   },
   rerecord: {
     label: "Record it again",
@@ -94,7 +94,7 @@ export const ACTIONS = {
     needsScreenplay: true,
     // The same run as `record`. It exists as its own button because some of
     // what the recording does is steered from the screenplay rather than from
-    // the record — `# pause 1.5s` is silence cut into the master, so it can
+    // the record — `# pause 1.5s` is silence laid into the tracks, so it can
     // only take effect by recording again. Without this the only route back
     // through the audio step was "Apply my edits and clear the audio", which
     // refuses outright when no WORDS changed, and re-renders the screenplay,
@@ -119,7 +119,7 @@ export const ACTIONS = {
       ["scripts/lt-tv-audio.mjs", `content/lt-tv/episodes/${id}.json`, "--dry-run"],
     ],
     blurb:
-      "Says, block by block, what would be reused and what would be sent to ElevenLabs. Sends nothing and spends nothing.",
+      "Says, line by line, what would be reused and what would be sent to ElevenLabs. Sends nothing and spends nothing.",
   },
   split: {
     label: "Split it into the two tracks",
@@ -131,7 +131,7 @@ export const ACTIONS = {
     // It reads `# cut` marks out of the screenplay, so the box is saved first.
     needsScreenplay: true,
     argv: (id) => ["node", ["scripts/lt-tv-split.mjs", id]],
-    blurb: "Cuts the master into the clips you upload to SitePal, one per character per section. To move a join, put `# cut` on its own line in the screenplay where you want it and split again. Needs ffmpeg. Free.",
+    blurb: "Cuts the two tracks into the clips you upload to SitePal, one per character per section. To move a join, put `# cut` on its own line in the screenplay where you want it and split again. Free.",
   },
   "split-report": {
     label: "Show me where the cuts went",
@@ -145,7 +145,7 @@ export const ACTIONS = {
     stages: ["recorded", "on-air"],
     argv: (id) => ["node", ["scripts/lt-tv-split.mjs", id, "--report"]],
     blurb:
-      "Splits exactly as the button above does, and also prints every line: where ElevenLabs said the voice changed, where the cut actually went, and how far apart those are. Paste it to me when something sounds wrong. Free.",
+      "Splits exactly as the button above does, and also prints every line: who says it, where it sits on the timeline, and the pause in front of it. Paste it to me when something sounds wrong. Free.",
   },
   slate: {
     label: "Put it on the guide",

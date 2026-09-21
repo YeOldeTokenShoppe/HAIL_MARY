@@ -340,6 +340,14 @@ not be recorded or quoted.
 
 ## Step 3 — Build the audio *(built; unproven against a real render)*
 
+> **Changed on 2026-09-21.** The audio step now renders **every line on its
+> own, in its own voice**, and lays both character tracks out by bytes; the
+> block-based text-to-dialogue design described below is the older path and
+> is kept for reprocessing archived recordings only. What survives from it:
+> raw PCM, byte-exact placement, one upload pair per episode, and the block
+> packing in the record (which now only groups lines). The reasons and the
+> trade are in *How the audio is made* in `docs/lt-tv.md`.
+
 This is the part that makes a 5–10 minute episode possible at all, and it is
 worth stating plainly because it is not obvious.
 
@@ -533,10 +541,10 @@ pointing the component at it is a one-line change nobody has made yet.
 - [ ] Check `rundown.stories[].gaps` — anything non-empty is unsourced
 - [ ] Spot-check every number in the script against `sources`
 - [ ] `node scripts/lt-tv-check.mjs` — the new record is on the slate and consistent
-- [ ] `node scripts/lt-tv-audio.mjs <record>` — then listen to the master end to end
-- [ ] Check each block join for a seam, and the last block for drift against the picture
-- [ ] `process_dialogue.py --master ... --segments ...` for the two balanced tracks
-- [ ] Upload two WAVs under the names the record prescribes
+- [ ] `node scripts/lt-tv-audio.mjs <record>` — every line rendered on its own; then listen to the master end to end
+- [ ] Listen for the gap between lines (`LT_TV_LINE_GAP`) and for replies whose energy needs a `[tag]`
+- [ ] `node scripts/lt-tv-split.mjs <id>` — cuts the two tracks into the SitePal clips
+- [ ] Upload the WAVs under the names the split prints
 - [ ] `node scripts/lt-tv-check.mjs` again — it should now report a runtime, not "not recorded yet"
 - [ ] Tune `leadIn` by ear — 2.5 is a placeholder, and it is a property of the
       upload, not the script (`docs/talk-show-production.md`)

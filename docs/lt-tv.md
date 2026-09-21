@@ -25,8 +25,8 @@ an editor that has claimed `.command` will open it for reading instead of
 running it.
 
 Every episode of both shows, what stage each one is at, and the next step as a
-button — write it, record it, record it again after changing a pause, split
-the master into the two tracks, apply your edits, rewrite a line you marked,
+button — write it, record it, record it again after changing a pause, cut
+the two tracks into the clips, apply your edits, rewrite a line you marked,
 check the slate. The screenplay is editable in the page, with a Save button and
 a separate Apply, so a half-finished edit is never live.
 
@@ -96,7 +96,7 @@ root — the path is relative to you, not to the repo.
 | `npm run lt:edit` | apply your edits to a screenplay |
 | `npm run lt:rewrite` | rewrite the lines you marked with a `#` note |
 | `npm run lt:audio` | record an episode |
-| `npm run lt:split` | split the master into the two SitePal tracks |
+| `npm run lt:split` | cut the two tracks into the SitePal clips |
 | `npm run lt:slate` | put a recorded episode on the guide |
 | `npm run lt:test` | run every check |
 
@@ -182,10 +182,12 @@ has the detail.
 # 3. Confirm it landed on the slate cleanly (it will say "not recorded yet").
 npm run lt:check
 
-# 4. Build the audio, then listen to the master end to end.
+# 4. Build the audio: every line rendered on its own, in its own voice, and
+#    both character tracks laid out on one timeline. Then listen to
+#    master-dialogue.wav, which is the two tracks played together.
 npm run lt:audio -- content/lt-tv/episodes/news-2026-W38.json
 
-# 5. Split the master into the two balanced tracks. Needs ffmpeg.
+# 5. Cut the two tracks into the clips SitePal will accept (it stops at 90s).
 #    The studio's "Split it into the two tracks" button runs exactly this.
 npm run lt:split -- news-2026-W38
 
@@ -203,15 +205,17 @@ overwrites the screenplay you edited, and clears the timing you just paid to
 record — leaving the guide saying *Not recorded yet* over perfectly good
 audio. It would also throw away the section cuts step 5 just worked out.
 
-Because a news episode is generated in blocks laid end to end, check **each
-block join for a seam** and the **last block for drift** against the picture.
-Drift looks exactly like a mistuned lead-in, so rule the audio out first.
+Every line is a separate render, so what to listen for is the **gap between
+lines** — the recording places it, and `LT_TV_LINE_GAP` in `.env.local` tunes
+it — and whether a reply lands with the right energy, which now comes from the
+`[tags]` on the line rather than from the model having heard the line before.
+See *How the audio is made* below.
 
 **If ElevenLabs refuses the format** — `Output format 'pcm_44100' is only
 available on the Pro tier` — that is the plan, not a fault. 44.1kHz PCM is the
 only part of this that needs Pro. Every lower rate is allowed on every plan and
-the pipeline works identically at one, because the joins are exact at any rate
-and a block's length is still a byte count. Put this in `.env.local` and
+the pipeline works identically at one, because the layout is exact at any rate
+and a line's length is still a byte count. Put this in `.env.local` and
 restart:
 
 ```
@@ -219,7 +223,7 @@ LT_TV_PCM_RATE=24000
 ```
 
 24kHz carries 12kHz of bandwidth, which is more than a speaking voice uses, and
-SitePal re-encodes the upload anyway. Blocks already recorded at another rate
+SitePal re-encodes the upload anyway. Lines already recorded at another rate
 are re-recorded rather than reused, because reusing them would place every
 later line wrong — so change the rate before starting an episode, not part way
 through.
@@ -271,7 +275,7 @@ From here it is the same tail as the news show — steps 5 and 6 above, then the
 shared sections below:
 
 ```bash
-# Split the master into the two SitePal tracks. Needs ffmpeg.
+# Cut the two tracks into the SitePal clips.
 # It ends by printing which file to upload under which clip name.
 npm run lt:split -- roundtable-02
 
@@ -293,13 +297,16 @@ is not a scheduled episode.
 made: write the turns into `dialogue.json` by hand, generate in one call, and
 finish `output/episode-record.json` yourself. It is the right tool for a one-off
 that does not belong on the slate. For an episode of the show, prefer the
-generator — it numbers the lines, packs the blocks, validates the cues and puts
-the record on the guide, all of which that path leaves to you.
+generator — it numbers the lines, validates the cues and puts the record on the
+guide, all of which that path leaves to you.
 
-It asks for `mp3_44100_128`, which every plan allows, and `process_dialogue.py`
-decodes it to WAV with ffmpeg. That is why it never hit the tier limit above.
-It gets away with mp3 because it makes one call — with nothing to join, there
-are no joins to be wrong.
+It renders both voices in ONE call, with text-to-dialogue, and then cuts the
+result apart by character with `process_dialogue.py`, which needs ffmpeg. That
+cut is placed from ElevenLabs' reported line times, and on The Wealth Effect
+those were a phrase out, which is why the show no longer records this way — see
+*How the audio is made* below. It is still the only way to reprocess an
+archived response, and `npm run lt:split` still runs it for a folder that holds
+a two-voice master and no `render.json`.
 
 ---
 
@@ -327,26 +334,22 @@ the arithmetic runs out. That matters more than it sounds: a join is always a
 pause, because SitePal has to stop one clip and start the next, so a boundary
 inside a sentence is heard as a fault.
 
-**The pauses are measured from the master, not read off the line times.** This
-is the part that is easy to get wrong, and we did: ElevenLabs reports a start
-and an end for every line, and they tile — line 12's start IS line 11's end, to
-the millisecond. Measured on roundtable-02, the median reported gap was 0.00s
-and 37 of 39 were under a quarter second. The episode is not gapless; the
-timings simply carry no gaps. So the split step runs ffmpeg's `silencedetect`
-over the master, where silence means neither voice is speaking, and cuts in
-what that finds:
+**The pauses are the ones the recording placed.** Every line is rendered on
+its own and the gap in front of it is silence this pipeline put there, so the
+cutter knows exactly where every pause is without measuring anything, and a
+join always lands in the middle of one:
 
 ```
-  section 1  0:00 – 1:10  (70s, lines 0–7)  cut in 0.70s of silence
-  section 2  1:10 – 2:20  (70s, lines 8–15)  cut in 0.70s of silence
+  section 1  0:00 – 1:15  (76s, lines 0–13)  cut in 0.70s of silence
+  section 2  1:15 – 2:39  (83s, lines 14–29)  cut in 0.45s of silence
+  section 3  2:39 – 3:52  (74s, lines 30–43)
 
-  Pauses in the audio: 19 found, median 0.70s, shortest 0.35s, longest 2.48s.
-  19 are wide enough to cut in (0.25s or more).
+  Pauses in the audio: 43 found, median 0.45s, shortest 0.45s, longest 1.50s.
+  43 are wide enough to cut in (0.25s or more).
 ```
 
-If that summary says few pauses are wide enough, the answer is in the writing
-rather than in the cutting: the lines run straight into each other and there is
-nowhere good to join.
+The cut itself is byte arithmetic on the WAV, the same instant for both
+characters. Nothing here needs ffmpeg.
 
 **To put a join somewhere else, write `# cut` on its own line in the
 screenplay** where you want it, and split again. The line numbers in the report
@@ -385,68 +388,59 @@ the voices and faces in sync.
 it should come before, then record.** That is exact silence, the same length
 every run. Anything from `0` to `10s`.
 
-ElevenLabs cannot do this for us. Its pause tag, `<break time="1.5s" />`, is
-real and works on most of their models — but not on the one we use. The
-episodes are made with **text-to-dialogue**, which is how both voices come out
-of a single request on a single timeline, and that runs on `eleven_v3`.
-ElevenLabs' own note: ["All of our models, with the exception of Eleven v3,
-support SSML break
-tags."](https://elevenlabs.io/docs/help-center/technical/do-pauses-and-ssml-phoneme-tags-work-with-the-api)
-Giving up text-to-dialogue to get the tag would mean rendering each character
-separately, and the two tracks staying in step is the whole reason this
-pipeline works.
+ElevenLabs cannot do this for us: its `<break>` tag does not work on
+`eleven_v3`, the model that performs the `[tags]`. It does not need to. Every
+line is rendered on its own, so every gap between lines is silence this
+pipeline lays in, and a `# pause` simply sets the length of one of them. It
+can go in front of **any line**, it has no three-second ceiling, and it cannot
+change how a line is read.
 
-So the pause is ours instead, and it is better than the tag in two ways: no
-three-second ceiling, and it cannot affect how a line is read. **What it costs:
-the recording ends at the pause and a new one starts after it**, so the
-delivery either side of a pause can shift a little — the half after it is
-generated without the half before it in context. Every act break already works
-this way.
+Without a mark, the gap in front of a line is `LT_TV_LINE_GAP` (default
+`0.45s`) inside an act and `LT_TV_ACT_BEAT` (default `0.7s`) between acts.
+Both are settings in `.env.local`, and the line gap is the one to tune by ear:
+shorter reads as interruption, longer as a beat. Changing either is free — no
+line is re-rendered for it.
 
 For a beat that just needs to *sound* like a beat, v3 has its own tags —
 `[pause]`, `[short pause]`, `[long pause]` — and an ellipsis inside a line adds
-weight. Those cost nothing, keep the whole act in one take, and are not a
-measured length. Use them for reading; use `# pause` when the silence itself is
-the joke.
-
-The gap between two acts is `0.7s` unless a mark says otherwise, and
-`LT_TV_ACT_BEAT` in `.env.local` changes the default.
+weight. Those are part of the performance and are not a measured length. Use
+them for reading; use `# pause` when the silence itself is the joke.
 
 **On an episode that is already recorded, add the mark and press "Record it
-again".** A pause is silence cut into the master, so it only exists once the
-episode has been through the recording step. Split, upload and put it on the
-guide again afterwards, as usual. ("Apply my edits and clear the audio" is the
-wrong button here — it refuses when no words changed, and it rewrites the
-screenplay, which wipes the marks.)
+again".** A pause is silence laid into the tracks, so it only exists once the
+episode has been through the recording step — which reuses every line already
+on disk, so it costs nothing. Split, upload and put it on the guide again
+afterwards, as usual. ("Apply my edits and clear the audio" is the wrong button
+here — it refuses when no words changed, and it rewrites the screenplay, which
+wipes the marks.)
 
 ### What that actually costs
 
 **"Record it again" always warns that it spends an ElevenLabs render, because
-the button cannot know whether it will.** What gets sent depends on which
-blocks are already on disk and whether their words still match, and that is a
+the button cannot know whether it will.** What gets sent depends on which lines
+are already on disk with the same words in the same voice, and that is a
 question about files, not about the button.
 
 So ask, with **"What would recording again cost?"** — or
 `npm run lt:audio -- content/lt-tv/episodes/<id>.json --dry-run`. It reads the
-same plan the real run would, block by block, and prints what would be reused,
-what would be sent and why. It contacts nothing, needs no API key and ends with
-"Nothing has been spent". Often the answer is that the whole episode is on disk
-and recording again is free.
+same plan the real run would, line by line, and prints what would be reused,
+what would be sent and how many characters that is. It contacts nothing, needs
+no API key and ends with "Nothing has been spent".
 
-What does and does not cost a render, checked against a real three-block
-episode rather than reasoned about:
+What does and does not cost a render:
 
 | | |
 |---|---|
-| changing a pause's **length** | free — the silence is cut in at the join, never rendered |
-| **adding** a pause | both halves of the one block it splits |
-| rewording a line | the one block holding it |
-| deleting a line | the one block holding it |
-| changing a character's voice | every block they speak in, so in practice all of them |
+| changing or adding a pause | free — silence is laid in, never rendered |
+| changing `LT_TV_LINE_GAP` or `LT_TV_ACT_BEAT` | free |
+| rewording a line | that one line |
+| deleting or reordering lines | free — a recording is filed by its words, not its number |
+| adding a line | that one line |
+| changing a character's voice | every line that character speaks |
 | changing `LT_TV_PCM_RATE` | everything, at the new rate |
 
-A block is a run of segments, not a line, so "the one block holding it" is
-still a chunk of the episode — a third of it, on a three-block roundtable.
+ElevenLabs bills by the character, so an episode costs the same whether it is
+sent as forty lines or four blocks; what changes is that a fix costs a line.
 
 
 Like `# cut`, a pause mark changes no words: it needs no applying and works on
@@ -457,83 +451,67 @@ front of the very first line — is named in the output rather than ignored.
 
 ---
 
-## Where one voice stops and the other starts (both shows)
+## How the audio is made (both shows)
 
-**Symptom:** a line comes out clipped — "old nothing" instead of "you sold
-nothing" — or a character's voice appears briefly in the other character's
-track. Michelle heard both on 2026-09-21.
+**Every line is rendered on its own, in its own voice, and the two character
+tracks are laid out by arithmetic.** `lt-tv-audio.mjs` sends one
+text-to-speech request per line (`eleven_v3`, so the `[tags]` still perform),
+trims the silence ElevenLabs pads each render with, and places the lines end to
+end with the gaps described under *Pauses*. Each character's track is silence
+the length of the episode with that character's lines copied in; the master is
+both tracks summed. No ffmpeg, no silence detection, nothing measured.
 
-It is the same root cause as the section cuts: **ElevenLabs' reported line
-times tile and are approximate.** Line 12's start IS line 11's end, to the
-millisecond, and that instant is not where the voice actually changes. The
-splitter used to cut each speaker's audio at that instant, guarded by 120ms at
-the start and 10ms at the end — which assumes the reported boundary is accurate
-to about ten milliseconds. It is not. A boundary a few hundred milliseconds
-late puts the head of the next line inside the previous speaker's track, and
-clips it off their own.
+**Why.** Each SitePal avatar lip-syncs whatever is in its own clip, so a track
+must hold one voice and nothing else. Until 2026-09-21 the episodes were
+rendered as blocks of conversation with both voices in one file, using
+text-to-dialogue, and then cut apart by character at the line times ElevenLabs
+reports. Those times are a division of the text, not a measurement of the
+audio — they tile, and the per-character *alignment* the response also carries
+tiles the same way and lands on the same instants. On The Halo Effect they
+happened to be right to a tenth of a second. On The Wealth Effect they were a
+phrase out at the ends of Saint GR80's lines, five different ways of searching
+around them all failed, and every one put a fragment of his voice in Connor's
+mouth. A line rendered alone can only ever be in one track, so the class of
+bug is gone rather than patched.
 
-### The alignment does not help, and this has been tried
+**What it costs.** The model no longer hears the other character's line while
+performing a reply, so an exchange leans more on the `[tags]` in the script —
+put one on most replies, not a few. The neighbouring lines' text is sent as
+context (`previous_text` / `next_text`), which the API accepts; whether v3
+makes much of it is unproven, and `LT_TV_LINE_CONTEXT=0` in `.env.local`
+renders every line cold so the two can be compared. Michelle chose this trade
+on 2026-09-21.
 
-The response also carries an **alignment**: a start and an end for every
-character of the script. It reads like the exact answer to "where does this
-line really stop", a fix was built on it on 2026-09-21, and it had to be taken
-out again the same night. Measured against the archived July response:
+**What it gives.** A pause anywhere, exact. Section cuts that always land in a
+gap. Re-recording an edited line costs that line. And the whole recording step
+is arithmetic that `scripts/lt-tv-audio.test.mjs` checks byte by byte — the
+tracks never overlap and always sum to the master, by construction.
 
-- the alignment is **continuous** — every character's end is the next
-  character's start, at all 825 of them;
-- consecutive lines are **adjacent** in that character stream — line k's end
-  index is line k+1's start index, at all 11 junctions.
+**Show me where the cuts went** in the studio prints every line with who says
+it, where it sits, and the pause in front of it.
 
-So the last character of a line ends at the exact instant the next line's
-first character begins. Every junction is zero-width and the "exact" boundary
-comes out identical to the reported one, to the millisecond. There is nothing
-to measure, and no recording in which there would be. `test_boundaries.py`
-checks all of this against the real response so the idea does not come back.
+The kept renders live in `content/lt-tv/audio/<id>/lines/`, one `.pcm` and one
+`.json` per line, filed by a fingerprint of the voice, the words, the model and
+the rate. `render.json` beside the tracks records the layout; it is what tells
+the split step there is nothing to cut apart.
 
-### So the boundary is measured
+### The older two-voice path
 
-The split step runs `silencedetect` over the master and puts each junction in
-the middle of the real gap around the reported instant. Silence means neither
-voice is speaking, which is the condition a boundary needs. It works, but
-placing a cut this way is delicate: three separate bugs came out of it — a
-junction inside a word, two junctions claiming one gap, a junction snapping
-onto a breath mid-sentence.
-
-It prints how many gaps it found. Where a junction has no measurable gap it
-falls back to the reported time and **says which lines** — those two lines
-genuinely run into each other in the recording, and no boundary placement fixes
-that. If one is audible, the fix is in the writing.
-
-To see every boundary and how far it moved, press **Show me where the cuts
-went** in the studio, or:
-
-```bash
-python3 elevenlabs-dialogue-test/process_dialogue.py --report \
-  --master content/lt-tv/audio/<id>/master-dialogue.wav \
-  --segments content/lt-tv/audio/<id>/voice-segments.json \
-  content/lt-tv/audio/<id>
-```
-
-`NO GAP MEASURED` beside a line means the two lines run together there.
-
-**This is a search with a radius, and it has a floor.** Where a speaker's line
-really ends a second or more after ElevenLabs says it does, the breaths inside
-their own sentence are nearer to the reported instant than the real pause is,
-and no choice of radius picks the right one. If that is what The Wealth Effect
-is doing, the split cannot fix it and rendering each character separately is
-the honest answer.
-
-The arithmetic is covered by `elevenlabs-dialogue-test/test_boundaries.py`,
-which runs as part of `npm run lt:test` and needs no ffmpeg.
+`elevenlabs-dialogue-test/process_dialogue.py` still exists for archived
+recordings made the old way: it splits a two-voice master by measuring the
+silence around each reported line time, and `npm run lt:split` runs it for a
+folder that holds a master and no `render.json`. It needs ffmpeg. Its boundary
+arithmetic is covered by `elevenlabs-dialogue-test/test_boundaries.py`, which
+also pins down, against the archived July response, why the alignment cannot
+help — so that idea does not come back.
 
 ---
 
 ## Changing a character's voice (both shows)
 
-Two files must agree, or the split fails outright: `CAST` in
-`scripts/lt-tv-format.mjs`, which is what gets rendered, and `SPEAKERS` in
-`elevenlabs-dialogue-test/process_dialogue.py`, which is what matches each
-voice back to a character afterwards.
+`CAST` in `scripts/lt-tv-format.mjs` is what gets rendered. (`SPEAKERS` in
+`elevenlabs-dialogue-test/process_dialogue.py` only matters for the older
+two-voice path, and must agree with it there.)
 
 An episode's record also carries a copy of the voice id on every line, frozen
 when the episode was written. **The recording step ignores that copy and uses
@@ -545,13 +523,13 @@ Saint GR80 has a different voice now, so the record's fATgBRI8wg5KkDFg8vBd is be
 recorded as Re5c3vCmpnygdZuSX2Wc. Anything already recorded in the old voice is redone.
 ```
 
-That costs a full re-render of the episode, which is unavoidable: half an
-episode in each voice is worse.
+That re-renders every line that character speaks, which is unavoidable: half
+an episode in each voice is worse. The other character's lines are reused.
 
-**A master recorded before the change cannot be split afterwards.** The split
-step now says so and names "Record it again". If you instead want to keep an
-old recording exactly as it is — an archived response from months ago — process
-it with the voice it was actually made with:
+**Tracks recorded before the change cannot be cut afterwards.** The split step
+says so and names "Record it again". If you instead want to keep an old
+two-voice recording exactly as it is — an archived response from months ago —
+process it with the voice it was actually made with:
 
 ```bash
 python3 process_dialogue.py response.json output --voice gr80=<the old id>
@@ -609,13 +587,12 @@ Three things you can do with a bad line, in rising order of effort.
 **Rewrite it yourself.** Open the screenplay, change the words, then
 **Apply my edits**. Nothing is spent and nothing else in the episode moves.
 
-A recorded block is kept so a failed run resumes instead of paying twice, and
-it is kept **by its words**, not by its number. Block names are positions —
-`block-1`, `block-2` — and they re-pack whenever a segment's length changes, so
-after an edit `block-2` may cover entirely different lines than the block-2 on
-disk. Keyed by name alone it handed back the old words under the new block's
-name. If the audio build says a block "was recorded from different words", that
-is this check doing its job.
+A recorded line is kept so a failed run resumes instead of paying twice, and
+it is kept **by its words**, not by its number. Line numbers are positions —
+they shift whenever a line is added or removed above them — so a recording is
+filed under a fingerprint of the voice and the words, and a re-record after an
+edit sends exactly the lines whose words changed. "What would recording again
+cost?" shows which.
 
 Saving is not applying. **Save** writes the screenplay file; **Apply my edits**
 is what reads it back into the episode, and recording renders the EPISODE. An

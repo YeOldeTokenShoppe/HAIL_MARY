@@ -193,10 +193,18 @@ with live speech later.
 
 ### Why the balanced WAV files stay clean
 
-Do not split the conversation into separately generated lines. Text to Dialogue
-generates the performance as one continuous piece, preserving conversational
-timing. `process_dialogue.py` uses ElevenLabs' reported `voice_segments` to
-construct one full-length track per character:
+> **Superseded on 2026-09-21.** The show now renders **every line on its own,
+> in its own voice**, and lays the two tracks out by bytes — see *How the
+> audio is made* in `docs/lt-tv.md`. The paragraph below describes the older
+> two-voice path, which is kept only for reprocessing archived recordings. It
+> was abandoned because the reported `voice_segments` were a phrase out on The
+> Wealth Effect and put one character's voice in the other's track; the
+> conversational timing it preserved was real, and was the price.
+
+The older path did not split the conversation into separately generated
+lines. Text to Dialogue generated the performance as one continuous piece,
+preserving conversational timing, and `process_dialogue.py` used ElevenLabs'
+reported `voice_segments` to construct one full-length track per character:
 
 - complete digital silence under the other character;
 - a 120 ms start guard after speaker handoffs, where the short blips occurred;

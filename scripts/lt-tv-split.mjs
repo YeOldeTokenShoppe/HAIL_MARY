@@ -1,29 +1,31 @@
 #!/usr/bin/env node
-// STEP 4 — SPLIT THE MASTER INTO THE CLIPS SITEPAL PLAYS.
+// STEP 4 — CUT THE TRACKS INTO THE CLIPS SITEPAL PLAYS.
 //
 //   node scripts/lt-tv-split.mjs roundtable-02
 //
-// Recording produces ONE file with both voices on it. This turns it into the
-// clips the set actually plays, and there are two reasons there is more than
-// one.
+// PER CHARACTER. SitePal plays one clip per avatar, each the full length of
+// the episode, carrying that character's lines and silence everywhere else.
+// That is what keeps them in sync: they are the same timeline twice, not two
+// halves to be lined up. Since 2026-09-21 the recording step writes those two
+// tracks itself — every line is rendered alone, in its own voice, and laid out
+// by bytes — so there is nothing here to cut apart, and this step reads
+// `render.json` to know that. A master recorded the older way, with both
+// voices in one file, is still split by `elevenlabs-dialogue-test/
+// process_dialogue.py`, which needs ffmpeg; that path exists for archived
+// recordings and is not how new episodes are made.
 //
-// PER CHARACTER. SitePal plays one clip per avatar, so the master becomes two
-// tracks, each the full length of the episode, carrying that character's lines
-// and silence everywhere else. That is what keeps them in sync: they are the
-// same timeline twice, not two halves to be lined up. That work is
-// `elevenlabs-dialogue-test/process_dialogue.py`, which already existed and is
-// already proven, and is the one step here that needs ffmpeg.
-//
-// PER SECTION. SitePal will not play a clip longer than 90 seconds, so each of
-// those tracks is then cut into sections at the same instants, in the pauses
-// between lines rather than inside them. See lt-tv-sections.mjs for how a cut
-// point is chosen and why it is chosen rather than computed. An episode short
-// enough to be one clip is cut into one section and comes out exactly as it did
-// before any of this existed.
+// PER SECTION. SitePal will not play a clip longer than 90 seconds, so each
+// track is cut into sections at the same instants, in the pauses between
+// lines rather than inside them. See lt-tv-sections.mjs for how a cut point is
+// chosen. For a per-line render every pause is one the recording step placed,
+// so the cutter is handed those rather than measuring anything, and the cut
+// itself is byte arithmetic on the WAV. An episode short enough to be one clip
+// is cut into one section and comes out exactly as it did before any of this
+// existed.
 //
 // This step also reports what each cut had to land in, because a join is heard
 // and a file list is not, and it honours `# cut` marks from the screenplay:
-// the person who listened to the episode outranks the reported line times.
+// the person who listened to the episode outranks the timings.
 //
 // Each section is written under the NAME IT WILL HAVE IN SITEPAL, so uploading
 // is a matter of dragging files in and not of reading a table.
@@ -50,14 +52,95 @@ import { readCutMarks } from "./lt-tv-edit.mjs";
 const AUDIO_DIR = "content/lt-tv/audio";
 const EPISODE_DIR = "content/lt-tv/episodes";
 const PROCESSOR = "elevenlabs-dialogue-test/process_dialogue.py";
+// Written by lt-tv-audio.mjs beside the tracks it rendered line by line. Its
+// name is spelled here rather than imported, because that file imports this
+// one and a cycle is a worse smell than a repeated string.
+const RENDER_FILE = "render.json";
 
 /**
- * The command, built from an id alone, so the button and the terminal agree.
+ * What a folder's render.json says about how its tracks were made, or null.
  *
- * It does NOT pass --spans. ElevenLabs' per-character alignment puts every
- * line boundary at the same instant it reports, by construction — see the
- * note in lt-tv-audio.mjs. Cutting there is worse than measuring, so the
- * measurement is the only path.
+ * `mode: "lines"` means each track already holds one voice and the gaps
+ * between lines are listed, so nothing is split apart and nothing measured.
+ * Anything else — or no file — is a two-voice master for the older path.
+ */
+export function perLineRender(parsed) {
+  if (!parsed || parsed.mode !== "lines") return null;
+  if (!Array.isArray(parsed.lines) || !Array.isArray(parsed.silences)) return null;
+  return parsed;
+}
+
+/**
+ * The header of a WAV this pipeline wrote, read back.
+ *
+ * Only what the cut needs: where the samples start, how many bytes they run
+ * for, and how many bytes a second is. A file that is not the plain PCM WAV
+ * `wavHeader` writes is refused rather than sliced at a guess.
+ */
+export function wavInfo(buffer) {
+  if (buffer.length < 44 || buffer.toString("ascii", 0, 4) !== "RIFF" || buffer.toString("ascii", 8, 12) !== "WAVE") {
+    throw new Error("Not a WAV file.");
+  }
+  let at = 12;
+  let fmt = null;
+  while (at + 8 <= buffer.length) {
+    const id = buffer.toString("ascii", at, at + 4);
+    const size = buffer.readUInt32LE(at + 4);
+    if (id === "fmt ") {
+      fmt = {
+        format: buffer.readUInt16LE(at + 8),
+        channels: buffer.readUInt16LE(at + 10),
+        sampleRate: buffer.readUInt32LE(at + 12),
+        byteRate: buffer.readUInt32LE(at + 16),
+        blockAlign: buffer.readUInt16LE(at + 20),
+        bitsPerSample: buffer.readUInt16LE(at + 22),
+      };
+    } else if (id === "data") {
+      if (!fmt) throw new Error("WAV data before its format chunk.");
+      if (fmt.format !== 1) throw new Error("Not a PCM WAV.");
+      return { ...fmt, dataOffset: at + 8, dataBytes: Math.min(size, buffer.length - at - 8) };
+    }
+    at += 8 + size + (size % 2);
+  }
+  throw new Error("WAV file has no data chunk.");
+}
+
+/**
+ * The samples between two instants of a WAV, as a new WAV.
+ *
+ * Whole frames, so a cut can never land between the bytes of one sample, and
+ * the SAME arithmetic for every character, so the two tracks are cut at the
+ * identical sample — which is what keeps them together across a join.
+ */
+export function sliceWav(buffer, startsAt, endsAt) {
+  const info = wavInfo(buffer);
+  const frame = info.blockAlign;
+  const from = Math.min(info.dataBytes, Math.round(startsAt * info.sampleRate) * frame);
+  const to = Math.min(info.dataBytes, Math.round(endsAt * info.sampleRate) * frame);
+  if (to <= from) throw new Error(`A section from ${startsAt}s to ${endsAt}s holds no audio.`);
+  const data = buffer.subarray(info.dataOffset + from, info.dataOffset + to);
+  const header = Buffer.from(buffer.subarray(0, 44));
+  header.writeUInt32LE(36 + data.length, 4);
+  header.writeUInt32LE(data.length, 40);
+  return Buffer.concat([header, data]);
+}
+
+/** One row per line of the layout report, as printed by --report. */
+export function layoutLine(line, index) {
+  const gap = index === 0 ? "" : `  ${line.pauseBefore.toFixed(2)}s before it`;
+  return (
+    `  ${String(line.n).padStart(3)}  ${line.actor.padEnd(7)} ` +
+    `${line.start.toFixed(2).padStart(7)}s – ${line.end.toFixed(2).padStart(7)}s${gap}`
+  );
+}
+
+/**
+ * The command that splits a two-voice MASTER, built from an id alone.
+ *
+ * Only run for a folder with no per-line render.json — an archived recording
+ * made the older way. It does NOT pass --spans: ElevenLabs' per-character
+ * alignment puts every line boundary at the same instant it reports, by
+ * construction, so the measurement is the only path that file has.
  */
 export function splitCommand(id, { report = false } = {}) {
   const dir = join(AUDIO_DIR, id);
@@ -268,10 +351,14 @@ async function main() {
   }
   const master = resolve(AUDIO_DIR, id, "master-dialogue.wav");
   if (!existsSync(master)) {
-    console.error(`${id} has no master yet — record it first.`);
+    console.error(`${id} has no recording yet — record it first.`);
     console.error(`  Looked for ${master}`);
     process.exit(1);
   }
+  const renderPath = resolve(AUDIO_DIR, id, RENDER_FILE);
+  const render = existsSync(renderPath)
+    ? perLineRender(JSON.parse(await readFile(renderPath, "utf8")))
+    : null;
 
   const episode = JSON.parse(await readFile(recordPath, "utf8"));
   const timing = episode.timing ?? {};
@@ -293,9 +380,41 @@ async function main() {
   }
 
   const report = process.argv.includes("--report");
-  const [command, args] = splitCommand(id, { report });
-  const code = await run(command, args);
-  if (code !== 0) process.exit(code);
+  let silences;
+  if (render) {
+    // Each track already holds one voice: the recording step rendered every
+    // line alone and laid the tracks out by bytes. Nothing to cut apart, and
+    // every pause between lines is one it placed, so those are the silences.
+    if (render.lines.length !== timing.lineStarts.length) {
+      console.error(
+        `${id}'s tracks hold ${render.lines.length} lines but the record has ` +
+          `${timing.lineStarts.length}. They are not the same recording. Record it again.`,
+      );
+      process.exit(2);
+    }
+    console.log(
+      `Each track already holds one voice — every line was rendered on its own —\n` +
+        `so there is nothing to cut apart. ${render.lines.length} lines, ` +
+        `${render.silences.length} pauses placed by the recording.`,
+    );
+    if (report) {
+      console.log("\nline  speaker  where it sits:");
+      for (const [i, line] of render.lines.entries()) console.log(layoutLine(line, i));
+    }
+    silences = render.silences;
+  } else {
+    // A two-voice master from the older recording path. Split it with the
+    // processor, which needs ffmpeg, then measure where it is quiet.
+    console.log(
+      "This is a two-voice master (no render.json), so it is being split apart by\n" +
+        "voice first. That is the older path and needs ffmpeg.\n",
+    );
+    const [command, args] = splitCommand(id, { report });
+    const code = await run(command, args);
+    if (code !== 0) process.exit(code);
+    const [silenceCmd, silenceArgs] = silenceCommand(master);
+    silences = parseSilences(await capture(silenceCmd, silenceArgs));
+  }
 
   // ── into sections ────────────────────────────────────────────────────────
   // The screenplay gets the last word on where a join goes. Read here rather
@@ -303,13 +422,6 @@ async function main() {
   // about the words, so applying it would be refused on a recorded episode.
   const scriptPath = resolve(EPISODE_DIR, `${id}.txt`);
   const cuts = existsSync(scriptPath) ? readCutMarks(await readFile(scriptPath, "utf8")) : [];
-
-  // WHERE IT IS ACTUALLY QUIET. The reported line times tile — one line's end
-  // is the next one's start — so they say nothing about where the pauses are.
-  // Silence in the MASTER means neither voice is speaking, which is the
-  // condition a join needs, so that is what the cut points are chosen from.
-  const [silenceCmd, silenceArgs] = silenceCommand(master);
-  const silences = parseSilences(await capture(silenceCmd, silenceArgs));
 
   const sections = planSections(
     timing.lineStarts,
@@ -363,19 +475,18 @@ async function main() {
     console.log(`${cutHint(cuts)}\n`);
   }
 
+  // The cut is bytes: whole samples, the same instants for every character.
+  // The older path used ffmpeg here; the WAVs this pipeline writes are plain
+  // PCM and need nothing but arithmetic.
+  const sources = new Map();
   for (const row of plan) {
     const section = sections[row.section - 1];
-    const cut = await run("ffmpeg", [
-      "-y", "-hide_banner", "-loglevel", "error",
-      "-i", row.source,
-      "-ss", String(section.startsAt),
-      "-to", String(section.endsAt),
-      "-c:a", "pcm_s16le",
-      row.file,
-    ]);
-    if (cut !== 0) {
-      console.error(`Could not cut ${row.file}.`);
-      process.exit(cut);
+    if (!sources.has(row.source)) sources.set(row.source, await readFile(row.source));
+    try {
+      await writeFile(row.file, sliceWav(sources.get(row.source), section.startsAt, section.endsAt));
+    } catch (err) {
+      console.error(`Could not cut ${row.file}: ${err.message}`);
+      process.exit(1);
     }
   }
 
