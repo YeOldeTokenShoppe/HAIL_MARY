@@ -101,6 +101,7 @@ root — the path is relative to you, not to the repo.
 | `npm run lt:audio` | record an episode |
 | `npm run lt:split` | cut the two tracks into the SitePal clips |
 | `npm run lt:slate` | put a recorded episode on the guide |
+| `npm run lt:rename` | move a staged episode to another show or number |
 | `npm run lt:test` | run every check |
 
 Arguments go after `--`, as in `npm run lt:roundtable -- --topic morality-02`.
@@ -166,6 +167,28 @@ builds every record, so a validation one show gains, both gain.
 
 They all end the same way: two balanced WAVs uploaded to SitePal, a record on
 the slate, and a lead-in tuned by ear.
+
+**Moving an episode to another show, or renumbering it.** An episode's id is
+`<show>-<NN>` and it is not a label, it is the path: the working record is
+`content/lt-tv/episodes/<id>.json`, the screenplay is `<id>.txt`, and every WAV
+the audio build writes lands in `content/lt-tv/audio/<id>/`. Move one by hand
+and you will move some of them, which fails silently: the next Record or Split
+writes a SECOND episode under the old id, beside the one you meant to move. So:
+
+```
+npm run lt:rename -- roundtable-02 morality-01 --dry-run   # show what would move
+npm run lt:rename -- roundtable-02 morality-01
+```
+
+It moves everything or nothing, and refuses if anything already sits under the
+new id rather than merging the two. It does **not** rewrite the SitePal clip
+names in the record, which is deliberate: a record names whichever clips EXIST
+in the account library, and those were uploaded under the old id. The naming
+convention is for a new upload. The Wealth Effect is on air right now as
+`morality-01` playing `lttv_rt_ep02_*`, and that is correct.
+
+It also does not touch `src/content/lt-tv/` — the committed slate. That half is
+a git rename plus an edit to `index.js`, and it belongs in a commit.
 
 ---
 
