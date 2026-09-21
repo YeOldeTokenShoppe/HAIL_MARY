@@ -445,25 +445,56 @@ to about ten milliseconds. It is not. A boundary a few hundred milliseconds
 late puts the head of the next line inside the previous speaker's track, and
 clips it off their own.
 
-**So the boundary is measured, not reported.** The split step runs
-`silencedetect` over the master, and each junction goes in the middle of the
-real gap around the reported instant. Silence means neither voice is speaking,
-which is exactly the condition a boundary needs. Both speakers share the one
-boundary, so no audio is lost and nothing is duplicated.
+### The boundary is not guessed at all any more
 
-The split prints how many gaps it found. Where a junction has no measurable gap
-it falls back to the reported time and **says which lines** — those two lines
+The same response that carries the audio also carries an **alignment**: a start
+and an end time for *every character* of the script, and, per line, which slice
+of that text it is. That is the answer to "where does this line really stop",
+stated outright. It was being discarded.
+
+The record step now reads it and writes `line-spans.json` beside the master —
+one real start and end per line, on the episode's own clock. The split step cuts
+each junction at the middle of the quiet between two lines, both edges of which
+are known exactly. Nothing is searched for and nothing is inferred. Both
+speakers share the one boundary, so no audio is lost or duplicated.
+
+Recording says which happened:
+
+- *"ElevenLabs returned exact timings for all N lines"* — the good path.
+- *"ElevenLabs did NOT return per-line timings"* — `alignment` is optional in
+  the API, so this is possible. The split then falls back to measuring, below.
+
+A `line-spans.json` that does not match the master it sits beside is **refused**
+rather than used, because a list off by one line puts every boundary after it in
+the wrong mouth.
+
+### The fallback, when there is no alignment
+
+The split step runs `silencedetect` over the master and puts each junction in
+the middle of the real gap around the reported instant. Silence means neither
+voice is speaking, which is the condition a boundary needs. It works, but it is
+a search with a radius: three separate bugs came out of it — a junction inside a
+word, two junctions claiming one gap, a junction snapping onto a breath
+mid-sentence.
+
+It prints how many gaps it found. Where a junction has no measurable gap it
+falls back to the reported time and **says which lines** — those two lines
 genuinely run into each other in the recording, and no boundary placement fixes
 that. If one is audible, the fix is in the writing.
 
-To see every boundary and how far it moved:
+To see every boundary and how far it moved, press **Show me where the cuts
+went** in the studio, or:
 
 ```bash
 python3 elevenlabs-dialogue-test/process_dialogue.py --report \
+  --spans content/lt-tv/audio/<id>/line-spans.json \
   --master content/lt-tv/audio/<id>/master-dialogue.wav \
   --segments content/lt-tv/audio/<id>/voice-segments.json \
   content/lt-tv/audio/<id>
 ```
+
+A line with no note beside it was cut exactly; `measured` means the gap was
+found by searching; `NO GAP MEASURED` means the two lines run together.
 
 The arithmetic is covered by `elevenlabs-dialogue-test/test_boundaries.py`,
 which runs as part of `npm run lt:test` and needs no ffmpeg.

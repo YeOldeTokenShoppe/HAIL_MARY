@@ -28,7 +28,7 @@
 // already proven, and needs ffmpeg. This writes the master and the merged
 // segment list it expects and then hands off.
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve, dirname, join, basename } from "node:path";
 import { createHash } from "node:crypto";
@@ -354,6 +354,112 @@ export function mergeBlocks(blocks, { gapBytes = 0, gaps = [] } = {}) {
   return { segments, durationSeconds: round(offset), blocks: placed };
 }
 
+/**
+ * WHERE EACH LINE'S SPEECH REALLY STARTS AND STOPS.
+ *
+ * `voice_segments` gives a start and an end per line, and they TILE: line k's
+ * start IS line k-1's end, to the millisecond. That is not a measurement of
+ * anything — it is a partition — and three separate bugs came from treating it
+ * as one. Boundaries were guessed from silence instead, and the guessing went
+ * wrong in a new way each time: a junction inside a word, two junctions
+ * claiming one gap, a junction snapping onto a breath mid-sentence.
+ *
+ * The response already carries the answer. `alignment` holds a start and an
+ * end for EVERY CHARACTER of the script, and each segment says which slice of
+ * that text it is (`character_start_index` / `character_end_index`). So a
+ * line's real speech span is the start of its first non-space character and
+ * the end of its last one. Nothing is inferred.
+ *
+ * Returns null when the response carries no alignment — the field is optional
+ * in the API, so the run must be able to say it is missing rather than assume.
+ */
+export function lineSpansFromAlignment(alignment, segments) {
+  const times = alignment?.character_start_times_seconds;
+  const ends = alignment?.character_end_times_seconds;
+  const characters = alignment?.characters;
+  if (!Array.isArray(times) || !Array.isArray(ends) || !Array.isArray(characters)) return null;
+  if (times.length !== characters.length || ends.length !== characters.length) return null;
+  if (!segments.length) return null;
+
+  const spans = [];
+  for (const [index, segment] of segments.entries()) {
+    const from = Number(segment.character_start_index);
+    let to = Number(segment.character_end_index);
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0) return null;
+
+    // THE DOCS DO NOT SAY WHETHER character_end_index IS INCLUSIVE, and their
+    // own example ("0-5", then "5-7") only makes sense if it is exclusive.
+    // Rather than bet on it, the end is clamped to just before the next line
+    // starts: if the index is exclusive that clamp IS the last character, and
+    // if it is inclusive the clamp changes nothing. Both readings come out
+    // right, and no character is ever claimed by two lines.
+    const next = segments[index + 1];
+    const nextFrom = next === undefined ? characters.length : Number(next.character_start_index);
+    if (Number.isInteger(nextFrom)) to = Math.min(to, nextFrom - 1);
+    to = Math.min(to, characters.length - 1);
+    if (to < from) return null;
+
+    // Leading and trailing whitespace is "spoken" as the pause around the
+    // line, so the span is taken from the first and last character that is
+    // actually a character.
+    let first = from;
+    while (first <= to && !characters[first].trim()) first += 1;
+    let last = to;
+    while (last >= first && !characters[last].trim()) last -= 1;
+    if (last < first) return null;
+
+    const start = Number(times[first]);
+    const end = Number(ends[last]);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+    spans.push({ start: round(start), end: round(end) });
+  }
+  return spans;
+}
+
+/**
+ * A block's line spans, shifted onto the episode's timeline.
+ *
+ * Same arithmetic as the segments, for the same reason: a block is generated
+ * from zero and plays at the summed duration of everything before it. Shifting
+ * the SPANS rather than merging the raw alignments keeps each block's character
+ * indices local to the block they came from, so nothing has to be re-based.
+ */
+export function shiftSpans(spans, offsetSeconds) {
+  return spans.map(({ start, end }) => ({
+    start: round(start + offsetSeconds),
+    end: round(end + offsetSeconds),
+  }));
+}
+
+/**
+ * Every line's real speech span across the whole episode, or null.
+ *
+ * Null when ANY block came back without usable alignment: a half-known episode
+ * would have the splitter reading exact boundaries for some lines and guessing
+ * at others, with nothing saying which. Better to say the whole thing is
+ * unavailable and fall back consistently.
+ */
+export function episodeLineSpans(built, { offsets, expected } = {}) {
+  const all = [];
+  for (const block of built) {
+    const offset = offsets ? offsets.get(block.id) : block.offsetSeconds;
+    if (!Number.isFinite(offset)) return null;
+    const spans = lineSpansFromAlignment(block.alignment, block.segments);
+    if (!spans) return null;
+    all.push(...shiftSpans(spans, offset));
+  }
+  // One span per line or nothing. A count that disagrees with the segments
+  // means the two are not describing the same episode, and handing the
+  // splitter a shifted list would put every boundary in the wrong place.
+  if (expected !== undefined && all.length !== expected) return null;
+  // Spans must run forwards. They always should — but this file exists
+  // because "should" was assumed three times already.
+  for (let i = 1; i < all.length; i += 1) {
+    if (all[i].start < all[i - 1].start) return null;
+  }
+  return all;
+}
+
 const round = (n) => Number(n.toFixed(3));
 
 /** A canonical 44-byte WAV header for a PCM payload of this many bytes. */
@@ -633,7 +739,16 @@ async function main() {
       );
     }
     console.log(`  ${unit.id}: ${sanity.seconds.toFixed(1)}s, ${segments.length} line(s)`);
-    built.push({ id: unit.id, audio, byteLength: audio.length, segments });
+    // The alignment is what lets the splitter cut at the real edge of a line
+    // rather than guess from silence. It rides along with the block, cached
+    // and all, so re-recording is not needed to start using it.
+    built.push({
+      id: unit.id,
+      audio,
+      byteLength: audio.length,
+      segments,
+      alignment: payload.alignment,
+    });
   }
 
   const gaps = units.slice(1).map((unit) => unit.bytes);
@@ -650,6 +765,29 @@ async function main() {
     join(outDir, "voice-segments.json"),
     JSON.stringify(merged.segments, null, 2) + "\n",
   );
+
+  // EXACT LINE EDGES, WHEN ELEVENLABS GIVES THEM.
+  //
+  // `alignment` is optional in the API, so this is written when it comes back
+  // and deleted when it does not — a stale file from an earlier run would have
+  // the splitter cutting this master at another master's boundaries.
+  const spansPath = join(outDir, "line-spans.json");
+  const offsets = new Map(merged.blocks.map((b) => [b.id, b.offsetSeconds]));
+  const spans = episodeLineSpans(built, { offsets, expected: merged.segments.length });
+  if (spans) {
+    await writeFile(spansPath, JSON.stringify(spans, null, 2) + "\n");
+    console.log(
+      `\nElevenLabs returned exact timings for all ${spans.length} lines, so the split\n` +
+        "will cut where each line really ends instead of hunting for a silence.",
+    );
+  } else {
+    if (existsSync(spansPath)) await rm(spansPath);
+    console.log(
+      "\nElevenLabs did NOT return per-line timings for this recording, so the split\n" +
+        "falls back to measuring the gaps itself. That is the old behaviour and it\n" +
+        "works, but a boundary can land a syllable out. Say so if a line sounds cut.",
+    );
+  }
 
   // The production record learns its own timing, so the slate record the join
   // writes next is playable rather than a slate entry.

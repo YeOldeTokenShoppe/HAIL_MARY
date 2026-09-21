@@ -51,14 +51,21 @@ const AUDIO_DIR = "content/lt-tv/audio";
 const EPISODE_DIR = "content/lt-tv/episodes";
 const PROCESSOR = "elevenlabs-dialogue-test/process_dialogue.py";
 
-/** The command, built from an id alone, so the button and the terminal agree. */
-export function splitCommand(id, { report = false } = {}) {
+/**
+ * The command, built from an id alone, so the button and the terminal agree.
+ *
+ * `spans` says whether this master has ElevenLabs' own line times beside it.
+ * The flag is only passed when the file is really there, so a missing one is
+ * a visible fallback rather than an argument pointing at nothing.
+ */
+export function splitCommand(id, { report = false, spans = false } = {}) {
   const dir = join(AUDIO_DIR, id);
   return [
     "python3",
     [
       PROCESSOR,
       ...(report ? ["--report"] : []),
+      ...(spans ? ["--spans", join(dir, "line-spans.json")] : []),
       "--master", join(dir, "master-dialogue.wav"),
       "--segments", join(dir, "voice-segments.json"),
       "--show", id.startsWith("news") ? "news" : "roundtable",
@@ -286,7 +293,16 @@ async function main() {
   }
 
   const report = process.argv.includes("--report");
-  const [command, args] = splitCommand(id, { report });
+  const spansPath = join(AUDIO_DIR, id, "line-spans.json");
+  const spans = existsSync(spansPath);
+  if (!spans) {
+    console.log(
+      "This master has no line-spans.json, so the cuts are measured from its own\n" +
+        "silence. That is the older way and a boundary can land a syllable out.\n" +
+        'Recording it again writes the file if ElevenLabs returns the timings.\n',
+    );
+  }
+  const [command, args] = splitCommand(id, { report, spans });
   const code = await run(command, args);
   if (code !== 0) process.exit(code);
 

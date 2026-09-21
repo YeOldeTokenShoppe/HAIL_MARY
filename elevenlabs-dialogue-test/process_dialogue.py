@@ -181,7 +181,35 @@ def find_gap(instant, silences, lower=None, upper=None, used=()):
     return nearest
 
 
-def plan_windows(segments, silences, total_duration):
+def junctions_from_spans(segments, spans, total_duration):
+    """Junctions taken from ElevenLabs' own per-character alignment.
+
+    THIS IS THE ONLY PLACE A BOUNDARY IS KNOWN RATHER THAN GUESSED. `spans`
+    holds, per line, the time its first real character starts and its last one
+    ends — derived upstream from the `alignment` block of the response, which
+    times every character of the script. The boundary between two lines is the
+    middle of the quiet between them, and that quiet is bounded exactly.
+
+    Everything else in this file searches for silence because that information
+    was being thrown away. Three separate bugs came out of that search. When
+    spans are present, none of it runs.
+    """
+    junctions = []
+    previous = 0.0
+    for index in range(1, len(segments)):
+        reported = float(segments[index]["start_time_seconds"])
+        at = (float(spans[index - 1]["end"]) + float(spans[index]["start"])) / 2
+        # Forward-only, and never so close to the junction before it that the
+        # line between them has no window. The same guarantee the measured
+        # path makes, for the same reason.
+        at = max(at, previous + MIN_LINE_WINDOW_SECONDS)
+        at = min(at, total_duration)
+        junctions.append({"at": at, "measured": True, "exact": True, "reported": reported})
+        previous = at
+    return junctions
+
+
+def plan_windows(segments, silences, total_duration, spans=None):
     """The span of the master each line owns, per segment, in order.
 
     Returns one dict per segment: the window to cut, whether its edges were
@@ -190,9 +218,18 @@ def plan_windows(segments, silences, total_duration):
     Every junction is shared — one line ends exactly where the next begins —
     so no audio is lost and nothing is counted twice. The first line starts at
     the top of the master and the last runs to the end of it.
+
+    `spans` are ElevenLabs' own line timings. When they are there the
+    boundaries are read straight off them; when they are not, the junctions
+    are measured out of the master's silence, which is the older and shakier
+    path kept as a fallback.
     """
     if not segments:
         return []
+
+    if spans and len(spans) == len(segments):
+        junctions = junctions_from_spans(segments, spans, total_duration)
+        return _windows(segments, junctions, total_duration)
 
     # EVERY LINE MUST KEEP A WINDOW OF ITS OWN. Junctions are chosen in order,
     # each one after the last, each one inside the pair of lines it separates,
@@ -225,6 +262,11 @@ def plan_windows(segments, silences, total_duration):
             junctions.append({"at": None, "measured": False, "reported": reported})
             previous = max(previous, reported)
 
+    return _windows(segments, junctions, total_duration)
+
+
+def _windows(segments, junctions, total_duration):
+    """Junctions to one window per line. Shared by both paths above."""
     planned = []
     for index, segment in enumerate(segments):
         before = junctions[index - 1] if index > 0 else None
@@ -259,6 +301,7 @@ def plan_windows(segments, silences, total_duration):
                 "end_measured": end_measured,
                 "reported_start": float(segment["start_time_seconds"]),
                 "reported_end": float(segment["end_time_seconds"]),
+                "exact": bool(before and before.get("exact")) or index == 0,
                 "voice_id": segment.get("voice_id"),
             }
         )
@@ -278,10 +321,15 @@ def boundary_report(planned, names_by_voice):
     for index, window in enumerate(planned):
         who = names_by_voice.get(window["voice_id"], "?")
         moved = window["start"] - window["reported_start"]
+        if window.get("exact"):
+            note = ""
+        elif window["start_measured"]:
+            note = "   measured"
+        else:
+            note = "   NO GAP MEASURED"
         rows.append(
             f"  {index:>3}  {who:<7} reported {window['reported_start']:7.2f}s  "
-            f"cut at {window['start']:7.2f}s  {moved:+.2f}s"
-            + ("" if window["start_measured"] else "   NO GAP MEASURED")
+            f"cut at {window['start']:7.2f}s  {moved:+.2f}s" + note
         )
         # Line 0 has no junction in front of it, so it is never counted.
         if index > 0 and not window["start_measured"]:
@@ -545,6 +593,13 @@ def main():
     )
     parser.add_argument("--show", default="roundtable", help="Show id the episode belongs to")
     parser.add_argument("--title", default="", help="Episode title for the starter record")
+    parser.add_argument(
+        "--spans",
+        type=Path,
+        help="line-spans.json: ElevenLabs' own per-line start and end times, "
+        "written by the record step when the response carried an alignment. "
+        "With it the cuts are exact; without it they are measured from silence.",
+    )
     args = parser.parse_args()
     speakers = resolve_speakers(args.voice)
 
@@ -593,15 +648,43 @@ def main():
 
     total_duration = media_duration(master)
 
-    # WHERE THE VOICE ACTUALLY CHANGES, measured rather than taken from the
-    # reported instants. See the note by START_GUARD_SECONDS.
-    silences = detect_silences(master)
-    planned = plan_windows(segments, silences, total_duration)
+    # ELEVENLABS' OWN LINE TIMES, WHEN WE HAVE THEM. A file that is there but
+    # does not describe this master is refused rather than used: a spans list
+    # off by one line puts every boundary after it in the wrong mouth, which
+    # is the exact failure this whole path exists to end.
+    spans = None
+    if args.spans:
+        try:
+            loaded = json.loads(args.spans.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SystemExit(f"Could not read {args.spans}: {exc}") from exc
+        if not isinstance(loaded, list) or len(loaded) != len(segments):
+            raise SystemExit(
+                f"{args.spans} holds {len(loaded) if isinstance(loaded, list) else '?'} line "
+                f"time(s) but the master has {len(segments)} lines. They are not the same "
+                "recording. Record it again, or delete that file to cut by measurement."
+            )
+        spans = loaded
+
+    if spans:
+        silences = []
+        planned = plan_windows(segments, silences, total_duration, spans=spans)
+    else:
+        # WHERE THE VOICE ACTUALLY CHANGES, measured rather than taken from the
+        # reported instants. See the note by START_GUARD_SECONDS.
+        silences = detect_silences(master)
+        planned = plan_windows(segments, silences, total_duration)
     rate = media_sample_rate(master)
 
     names_by_voice = {voice_id: name for name, voice_id in speakers.items()}
     rows, unmeasured = boundary_report(planned, names_by_voice)
-    print(f"\n{len(silences)} gaps measured in the master.")
+    if spans:
+        print(
+            f"\nCut at ElevenLabs' own line times — all {len(segments)} lines, exact.\n"
+            "No boundary was guessed."
+        )
+    else:
+        print(f"\n{len(silences)} gaps measured in the master.")
     if args.report:
         print("\nline  speaker  where the cut goes:")
         for row in rows:
