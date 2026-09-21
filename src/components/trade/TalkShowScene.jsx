@@ -1590,6 +1590,54 @@ function TalkShowModel({
 
     let stopped = false;
     const ended = new Set();
+    const started = new Map();
+    let issuedAt = 0;
+
+    /**
+     * HOW FAR APART THE TWO PORTALS REALLY START, measured rather than assumed.
+     *
+     * Both are told to play a section in the same tick, and the code below has
+     * always assumed the second is "milliseconds behind". Nobody had measured
+     * it. Michelle reported on 2026-09-21 that about one exchange in ten
+     * overlaps on the set while the master WAV is clean, which is what a
+     * constant skew of a few hundred ms looks like once per-line rendering
+     * lays lines out 0.45s apart instead of the second the old dialogue
+     * breathed: every other junction loses the skew and the tightest ones
+     * close up.
+     *
+     * It records the skew AND how long each portal took to answer, because
+     * those answer different questions. Michelle played the same episode twice
+     * on 2026-09-21 and the second play had no overlap at all, which says the
+     * skew is not a fixed offset to subtract but the difference between two
+     * cold fetches. If that is right, the per-portal times are large and
+     * unequal on a first play and small on a second, and a fix has to be about
+     * having the audio in hand before either portal is told to speak. The
+     * numbers say whether that story is true.
+     *
+     * This only WATCHES. It changes no timing, because the last thing this
+     * problem needs is another confident untested fix. Everything lands in the
+     * console and in `window.__tsSkew` so there is something real to design
+     * against.
+     */
+    const recordStart = (key) => {
+      if (started.has(key)) return;
+      started.set(key, performance.now());
+      if (started.size !== Object.keys(portalsRef.current).length) return;
+      const times = [...started.values()];
+      const ms = Math.round(Math.max(...times) - Math.min(...times));
+      const section = (playbackRef.current.section ?? 0) + 1;
+      // How long each portal took from being told to play to actually
+      // speaking. A cold fetch shows up here and nowhere else.
+      const took = {};
+      for (const [who, at] of started) took[who] = Math.round(at - issuedAt);
+      window.__tsSkew = window.__tsSkew || [];
+      window.__tsSkew.push({ section, ms, took });
+      console.info(
+        `[TalkShowScene] section ${section}: the two portals started ${ms}ms apart ` +
+          `(${Object.entries(took).map(([w, t]) => `${w} ${t}ms`).join(", ")} ` +
+          "from being told to play; window.__tsSkew holds every reading)",
+      );
+    };
 
     const resetPerformance = () => {
       playbackRef.current = idlePlayback();
@@ -1702,9 +1750,14 @@ function TalkShowModel({
       }
 
       if (event.data?.type === "sitepal-portal-talk-started") {
+        // Measured before anything returns: the re-stamp below acts on the
+        // FIRST portal to report and swallows the second, so the skew has to
+        // be taken here or it is never seen.
+        recordStart(key);
+
         // Only sections past the first re-stamp, and only on the first portal
         // to report — the two are told to start in the same tick, so the
-        // second is milliseconds behind and would only add jitter.
+        // second follows close behind and would only add jitter.
         const playback = playbackRef.current;
         if (!playback.running || playback.holdingAt === null) return;
         const sections = timelineRef.current?.sections || [];
@@ -1728,6 +1781,7 @@ function TalkShowModel({
         const next = playback.section + 1;
         if (playback.running && sections[next]) {
           ended.clear();
+          started.clear();
           playback.section = next;
           playback.holdingAt = sections[next].startsAt;
           playback.heldSince = performance.now();
@@ -1782,6 +1836,7 @@ function TalkShowModel({
         } catch (e) {}
       });
       ended.clear();
+      started.clear();
       resetPerformance();
       onPlaybackStateChange?.(false);
     };
@@ -1797,6 +1852,9 @@ function TalkShowModel({
       const active = timelineRef.current;
       const section = active?.sections?.[index];
       if (!section) return 0;
+      // The instant both portals were told to play, so recordStart can say how
+      // long each one took to answer rather than only how far apart they were.
+      issuedAt = performance.now();
 
       let started = 0;
       Object.entries(portalsRef.current).forEach(([key, portal]) => {
@@ -1830,6 +1888,7 @@ function TalkShowModel({
       if (stopped) stopped = false;
       if (!Object.values(portalsRef.current).every((p) => p.ready)) return false;
       ended.clear();
+      started.clear();
 
       const ok = startSection(0) === Object.keys(portalsRef.current).length;
       if (ok) {
