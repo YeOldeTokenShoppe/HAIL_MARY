@@ -25,8 +25,9 @@ an editor that has claimed `.command` will open it for reading instead of
 running it.
 
 Every episode of both shows, what stage each one is at, and the next step as a
-button — write it, record it, split the master into the two tracks, apply your
-edits, rewrite a line you marked, check the slate. The screenplay is editable in the page, with a Save button and
+button — write it, record it, record it again after changing a pause, split
+the master into the two tracks, apply your edits, rewrite a line you marked,
+check the slate. The screenplay is editable in the page, with a Save button and
 a separate Apply, so a half-finished edit is never live.
 
 It runs **on your machine only.** What this pipeline produces is source code:
@@ -375,6 +376,57 @@ work.
 Do not trim the leading silence or shift either file independently. The set
 starts both full-length tracks together, and that shared timeline is what keeps
 the voices and faces in sync.
+
+---
+
+## Pauses (both shows)
+
+**Write `# pause 1.5s` on its own line in the screenplay, just above the line
+it should come before, then record.** That is exact silence, the same length
+every run. Anything from `0` to `10s`.
+
+ElevenLabs cannot do this for us. Its pause tag, `<break time="1.5s" />`, is
+real and works on most of their models — but not on the one we use. The
+episodes are made with **text-to-dialogue**, which is how both voices come out
+of a single request on a single timeline, and that runs on `eleven_v3`.
+ElevenLabs' own note: ["All of our models, with the exception of Eleven v3,
+support SSML break
+tags."](https://elevenlabs.io/docs/help-center/technical/do-pauses-and-ssml-phoneme-tags-work-with-the-api)
+Giving up text-to-dialogue to get the tag would mean rendering each character
+separately, and the two tracks staying in step is the whole reason this
+pipeline works.
+
+So the pause is ours instead, and it is better than the tag in two ways: no
+three-second ceiling, and it cannot affect how a line is read. **What it costs:
+the recording ends at the pause and a new one starts after it**, so the
+delivery either side of a pause can shift a little — the half after it is
+generated without the half before it in context. Every act break already works
+this way.
+
+For a beat that just needs to *sound* like a beat, v3 has its own tags —
+`[pause]`, `[short pause]`, `[long pause]` — and an ellipsis inside a line adds
+weight. Those cost nothing, keep the whole act in one take, and are not a
+measured length. Use them for reading; use `# pause` when the silence itself is
+the joke.
+
+The gap between two acts is `0.7s` unless a mark says otherwise, and
+`LT_TV_ACT_BEAT` in `.env.local` changes the default.
+
+**On an episode that is already recorded, add the mark and press "Record it
+again".** A pause is silence cut into the master, so it only exists once the
+episode has been through the recording step. That button costs a fraction of
+the first recording: every part of the episode whose words are unchanged is
+reused from what is already on disk, and only the two halves either side of the
+new pause are rendered. Split, upload and put it on the guide again afterwards,
+as usual. ("Apply my edits and clear the audio" is the wrong button here — it
+refuses when no words changed, and it rewrites the screenplay, which wipes the
+marks.)
+
+Like `# cut`, a pause mark changes no words: it needs no applying and works on
+an episode that is already written. Applying edits re-renders the screenplay
+and clears both kinds of mark, so mark them once the words are settled. A mark
+the recording cannot place — a line number that isn't in the episode, or one in
+front of the very first line — is named in the output rather than ignored.
 
 ---
 

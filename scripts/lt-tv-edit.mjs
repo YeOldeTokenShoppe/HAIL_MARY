@@ -267,6 +267,48 @@ export function applyScript(episode, parsed) {
 export const CUT_MARK_RE = /^\s*#\s*cut(\s+here)?\s*$/i;
 
 /**
+ * A pause mark: `# pause 1.2s` alone on a line, meaning wait that long here.
+ *
+ * WHY THIS IS OURS AND NOT ELEVENLABS'. Text-to-dialogue runs on eleven_v3,
+ * and v3 does not support SSML break tags — the `<break time="1.5s" />` that
+ * works on Multilingual v2 and the Flash models is simply not available here.
+ * What v3 offers instead is ellipses, dashes and audio tags, which colour the
+ * DELIVERY rather than insert a measured silence, and their own docs warn that
+ * leaning on breaks causes the model to speed up or add artefacts.
+ *
+ * We can do better than the thing we cannot have: the master is assembled here
+ * from raw PCM, so a pause we insert ourselves is an exact number of silent
+ * samples, identical every run, with no effect on how a line is read.
+ */
+export const PAUSE_MARK_RE = /^\s*#\s*pause\s+([\d.]+)\s*s?\s*$/i;
+
+/**
+ * The pauses a screenplay asks for, as line number → seconds.
+ *
+ * Like a cut mark, this is read from the screenplay rather than stored in the
+ * record, because it changes no words: it needs no applying and it works on an
+ * episode that is already written. A pause belongs to the line it precedes.
+ */
+export function readPauseMarks(text) {
+  const marks = new Map();
+  let pending = null;
+  for (const raw of text.split(/\r?\n/)) {
+    const mark = raw.match(PAUSE_MARK_RE);
+    if (mark) {
+      pending = Number(mark[1]);
+      continue;
+    }
+    const line = raw.match(LINE_RE);
+    if (!line) continue;
+    if (pending !== null) {
+      marks.set(Number(line[1]), pending);
+      pending = null;
+    }
+  }
+  return marks;
+}
+
+/**
  * The line numbers a screenplay asks to be cut in FRONT of.
  *
  * Where an episode is cut for SitePal is chosen from the reported line times,
@@ -281,6 +323,7 @@ export function readCutMarks(text) {
   const marks = [];
   let pending = false;
   for (const raw of text.split(/\r?\n/)) {
+    if (PAUSE_MARK_RE.test(raw)) continue;
     if (CUT_MARK_RE.test(raw)) {
       pending = true;
       continue;

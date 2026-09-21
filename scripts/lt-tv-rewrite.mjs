@@ -33,7 +33,7 @@ import { existsSync } from "node:fs";
 import { resolve, basename } from "node:path";
 
 import { claude } from "./lt-tv-claude.mjs";
-import { LINE_RE, CUE_RE, SEGMENT_RE, CUT_MARK_RE, parseScript } from "./lt-tv-edit.mjs";
+import { LINE_RE, CUE_RE, SEGMENT_RE, CUT_MARK_RE, PAUSE_MARK_RE, parseScript } from "./lt-tv-edit.mjs";
 import { showFormat } from "./lt-tv-format.mjs";
 import { readStyleNotes, withStyleNotes, rememberStyleNote, STYLE_NOTES_PATH } from "./lt-tv-style-notes.mjs";
 
@@ -106,7 +106,7 @@ export function findMarks(text) {
     // `# cut` is a section boundary, not a note about the line above it. It
     // reads as one, so it would otherwise be sent to the model as a complaint
     // and the line would come back rewritten for no reason.
-    if (CUT_MARK_RE.test(line)) return;
+    if (CUT_MARK_RE.test(line) || PAUSE_MARK_RE.test(line)) return;
 
     const note = line.match(NOTE_RE);
     if (note) {

@@ -127,9 +127,11 @@ ok("rewriting a marked line needs one", ACTIONS["rewrite-marked"].needsScreenpla
 // what is in the box, so both save it first.
 ok("recording needs one", ACTIONS.record.needsScreenplay === true);
 ok("splitting needs one", ACTIONS.split.needsScreenplay === true);
+// Recording again is for a changed `# pause` mark, which is read off the page.
+ok("recording again needs one", ACTIONS.rerecord.needsScreenplay === true);
 check("and nothing else claims to",
   ACTION_NAMES.filter((n) => ACTIONS[n].needsScreenplay),
-  ["apply-edits", "apply-edits-rerecord", "rewrite-marked", "record", "split"]);
+  ["apply-edits", "apply-edits-rerecord", "rewrite-marked", "record", "rerecord", "split"]);
 ok("actionsFor carries the flag through to the page",
   actionsFor("on-air").find((a) => a.name === "apply-edits").needsScreenplay === true);
 
@@ -137,7 +139,16 @@ console.log("\nThe buttons offered match the stage:");
 check("a planned episode is offered writing, not recording",
   actionsFor("planned").map((a) => a.name), ["write-roundtable", "plan-roundtable", "check"]);
 ok("a written one is offered recording", actionsFor("written").some((a) => a.name === "record"));
-ok("a recorded one is not offered recording again", !actionsFor("recorded").some((a) => a.name === "record"));
+ok("a recorded one is not offered a first recording", !actionsFor("recorded").some((a) => a.name === "record"));
+// A pause mark only takes effect by recording, and the edit step refuses when
+// no words changed — so without this there was no way back through the audio
+// step to act on one.
+ok("but it is offered recording again, for a changed pause",
+  actionsFor("recorded").some((a) => a.name === "rerecord"));
+ok("and so is one already on air", actionsFor("on-air").some((a) => a.name === "rerecord"));
+ok("which runs the same audio step the first recording did",
+  resolveAction("rerecord", "roundtable-02", KNOWN).args.join(" ") ===
+    resolveAction("record", "roundtable-02", KNOWN).args.join(" "));
 ok("a recorded one can still be edited, with the re-record warning",
   actionsFor("recorded").some((a) => a.name === "apply-edits-rerecord"));
 ok("an on-air one is never offered a plain write",

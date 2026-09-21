@@ -32,9 +32,14 @@ import {
   cacheIsUsable,
   beatBytes,
   ACT_BEAT_SECONDS,
+  renderPlan,
+  unitInputs,
+  strandedPauses,
+  strandedWarning,
+  PAUSE_MARK_MAX_SECONDS,
 } from "./lt-tv-audio.mjs";
 import { renderScript } from "./lt-tv-episode.mjs";
-import { pendingEdits } from "./lt-tv-edit.mjs";
+import { pendingEdits, readPauseMarks } from "./lt-tv-edit.mjs";
 
 let failures = 0;
 const check = (label, actual, expected) => {
@@ -357,6 +362,116 @@ console.log("\nActs are separated by a beat, not butted together:");
     mergeBlocks([blocks[0]], { gapBytes }).durationSeconds === 10);
 
   ok("the default is a pause rather than a gulf", ACT_BEAT_SECONDS > 0 && ACT_BEAT_SECONDS <= 1.5);
+}
+
+console.log("\nA pause the script asked for:");
+{
+  // Michelle: "i don't always want the same pause" and "sometimes awkward
+  // pauses might be funny too". ElevenLabs cannot give us a measured one —
+  // text-to-dialogue is eleven_v3 and v3 has no break tag — so a pause ENDS a
+  // request and the silence goes in the seam, where it is exact.
+  const lines = (episode) => episode.segments.flatMap((s) => s.lines);
+  const all = lines(episode);
+  const firstN = all[0].n;
+  const insideSecondBlock = episode.blocks[1].firstLine + 1;
+
+  const plain = renderPlan(episode, new Map());
+  check("with no marks there is one recording per block", plain.length, episode.blocks.length);
+  check("and the acts are still separated by the beat",
+    plain.slice(1).map((u) => u.pauseBefore),
+    plain.slice(1).map(() => ACT_BEAT_SECONDS));
+  check("nothing is pushed in front of the first line", plain[0].pauseBefore, 0);
+
+  const marked = renderPlan(episode, new Map([[insideSecondBlock, 1.5]]));
+  check("a mark inside a block splits that block in two",
+    marked.length, episode.blocks.length + 1);
+  const split = marked.find((u) => u.firstLine === insideSecondBlock);
+  ok("the new recording starts at the marked line", Boolean(split));
+  check("and carries the pause that was asked for", split.pauseBefore, 1.5);
+  ok("which is marked as coming from the script", split.asked);
+  check("its silence is a whole number of samples and the length it says",
+    pcmSeconds(split.bytes), 1.5);
+  check("the parts of a split block are named apart",
+    marked.filter((u) => u.block === episode.blocks[1].id).map((u) => u.id),
+    [`${episode.blocks[1].id}a`, `${episode.blocks[1].id}b`]);
+
+  // The whole point of splitting rather than cutting: no line is lost, moved
+  // between recordings, or sent twice.
+  check("every line is still sent exactly once, in order",
+    marked.flatMap((u) => unitInputs(u)).map((i) => i.text).join("|"),
+    all.map((l) => l.text).join("|"));
+  ok("every input still carries a voice",
+    marked.flatMap((u) => unitInputs(u)).every((i) => i.voice_id && i.text));
+
+  // A mark on a block's own first line changes that act's beat rather than
+  // splitting anything.
+  const atJoin = renderPlan(episode, new Map([[episode.blocks[1].firstLine, 2.4]]));
+  check("a mark on an act break just lengthens that beat", atJoin.length, plain.length);
+  check("to exactly what was asked", atJoin[1].pauseBefore, 2.4);
+
+  // The timeline the record is written from, and the master, come from the
+  // same integers — this is the arithmetic that desyncs silently if wrong.
+  const second = (n) => Math.round(n * PCM.sampleRate) * PCM.channels * PCM.bytesPerSample;
+  const built = marked.map((u, i) => ({
+    id: u.id,
+    byteLength: second(10),
+    segments: u.lines.map((_, k) => ({ start_time_seconds: k, end_time_seconds: k + 0.9 })),
+  }));
+  const gaps = marked.slice(1).map((u) => u.bytes);
+  const merged = mergeBlocks(built, { gaps });
+  const masterBytes = built.reduce((n, b) => n + b.byteLength, 0) + gaps.reduce((n, g) => n + g, 0);
+  check("the master is exactly as long as the timeline says",
+    pcmSeconds(masterBytes), merged.durationSeconds);
+  check("each recording begins after the pause in front of it",
+    merged.blocks.map((b) => b.offsetSeconds),
+    marked.reduce((acc, u, i) => {
+      acc.push(i === 0 ? 0 : Number((acc[i - 1] + 10 + u.pauseBefore).toFixed(3)));
+      return acc;
+    }, []));
+
+  // A pause that cannot be placed is said, not dropped.
+  const stray = new Map([[99999, 1], [firstN, 1]]);
+  check("a mark on a line that does not exist is stranded",
+    strandedPauses(episode, stray).includes(99999), true);
+  check("so is one in front of the very first line",
+    strandedPauses(episode, stray).includes(firstN), true);
+  check("a mark inside a block is not",
+    strandedPauses(episode, new Map([[insideSecondBlock, 1]])), []);
+  const warning = strandedWarning(strandedPauses(episode, stray), episode);
+  ok("and the warning names the line number", warning.includes("99999"));
+  ok("and says the first-line one is about the start", /starts/.test(warning));
+  check("nothing to warn about when nothing is stranded", strandedWarning([], episode), null);
+
+  // THE NUMBERING CONTRACT. The mark is read off the screenplay by the number
+  // printed beside the line; the plan splits on the record's `n`. If those two
+  // ever stop meaning the same thing, a pause silently lands somewhere else —
+  // so the round trip is checked against a real rendered screenplay rather
+  // than a hand-made map.
+  const page = renderScript(episode)
+    .split("\n")
+    .flatMap((row) => {
+      const num = row.match(/^\s*(\d+)\s+/);
+      return num && Number(num[1]) === insideSecondBlock ? ["# pause 1.8s", row] : [row];
+    })
+    .join("\n");
+  const fromPage = renderPlan(episode, readPauseMarks(page));
+  const asked = fromPage.find((u) => u.pauseBefore === 1.8);
+  ok("a mark written on the page lands on the line it was written above",
+    asked && asked.firstLine === insideSecondBlock);
+  ok("and a pause mark is not read as an edit",
+    pendingEdits(episode, page + "\n") === null);
+
+  // A typo here is dead air in a finished episode, so it stops the run before
+  // anything is spent rather than after.
+  let refused = null;
+  try {
+    renderPlan(episode, new Map([[insideSecondBlock, 45]]));
+  } catch (err) {
+    refused = err.message;
+  }
+  ok("an absurd pause is refused", refused !== null);
+  ok("and the refusal names the line and the limit",
+    refused.includes(String(insideSecondBlock)) && refused.includes(String(PAUSE_MARK_MAX_SECONDS)));
 }
 
 console.log(failures ? `\n${failures} check(s) failed.\n` : "\nAll checks passed.\n");

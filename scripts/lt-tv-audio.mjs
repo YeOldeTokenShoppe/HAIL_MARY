@@ -34,7 +34,7 @@ import { resolve, dirname, join, basename } from "node:path";
 import { createHash } from "node:crypto";
 
 import { uploadPlan } from "./lt-tv-split.mjs";
-import { pendingEdits, summariseEdits } from "./lt-tv-edit.mjs";
+import { pendingEdits, summariseEdits, readPauseMarks } from "./lt-tv-edit.mjs";
 
 const ENDPOINT = "https://api.elevenlabs.io/v1/text-to-dialogue/with-timestamps";
 
@@ -113,6 +113,127 @@ export function beatBytes(seconds = ACT_BEAT_SECONDS) {
   return Math.round((seconds * bytesPerSecond()) / frame) * frame;
 }
 
+/**
+ * How long the longest pause anyone means may be. A `# pause 30s` is a typo,
+ * and a typo here is half a minute of dead air in a recorded episode.
+ */
+export const PAUSE_MARK_MAX_SECONDS = 10;
+
+/** The lines a recording block covers, in running order. */
+export function blockLines(episode, block) {
+  return episode.segments.filter((s) => block.segments.includes(s.id)).flatMap((s) => s.lines);
+}
+
+/** Every line number in the episode, in order. */
+const lineNumbers = (episode) => episode.segments.flatMap((s) => s.lines.map((l) => l.n));
+
+/**
+ * What to actually ask ElevenLabs for, and how much silence to put between.
+ *
+ * WHY A PAUSE IS A SEAM AND NOT AN INSERT. Michelle asked for pauses she can
+ * vary, including awkward ones played for a laugh, and ElevenLabs cannot give
+ * her a measured one: text-to-dialogue runs on eleven_v3, and v3 does not
+ * support the `<break time="1.5s" />` tag (that is real, but it belongs to the
+ * older single-voice models — see PAUSE_MARK_RE in lt-tv-edit.mjs).
+ *
+ * We can, exactly, but only where we hold the seam. A block is one unbroken
+ * render, so putting silence inside one would mean cutting it at a line
+ * boundary ElevenLabs reported — and those reported boundaries are the open
+ * suspect for lines that start in one voice and finish in the other. So
+ * instead of cutting a render, a pause mark ENDS one: the block is recorded
+ * as two requests, and the silence goes between them, where it is exact to
+ * the sample and costs nothing.
+ *
+ * The price is honest and worth saying out loud: the half after the pause is
+ * rendered without the half before it in context, so the delivery either side
+ * of a pause can shift. That is the trade for an exact pause anywhere.
+ */
+export function renderPlan(episode, pauses = new Map(), { beat = ACT_BEAT_SECONDS } = {}) {
+  const units = [];
+
+  for (const block of episode.blocks) {
+    const lines = blockLines(episode, block);
+    if (!lines.length) throw new Error(`${block.id} has no lines`);
+
+    // Split this block wherever the screenplay asks for a pause.
+    const pieces = [];
+    for (const line of lines) {
+      const asked = pauses.get(line.n);
+      if (asked !== undefined && !(asked >= 0 && asked <= PAUSE_MARK_MAX_SECONDS)) {
+        throw new Error(
+          `"# pause ${asked}s" in front of line ${line.n} is not a pause between 0 and ` +
+            `${PAUSE_MARK_MAX_SECONDS} seconds.`,
+        );
+      }
+      if (!pieces.length || asked !== undefined) pieces.push({ lines: [], asked, seconds: asked });
+      pieces[pieces.length - 1].lines.push(line);
+    }
+
+    for (const [k, piece] of pieces.entries()) {
+      const isFirstOfAll = units.length === 0;
+      const asked = !isFirstOfAll && piece.asked !== undefined;
+      const seconds = isFirstOfAll ? 0 : asked ? piece.seconds : beat;
+      units.push({
+        id: pieces.length === 1 ? block.id : `${block.id}${partSuffix(k)}`,
+        block: block.id,
+        parts: pieces.length,
+        lines: piece.lines,
+        firstLine: piece.lines[0].n,
+        lastLine: piece.lines[piece.lines.length - 1].n,
+        pauseBefore: seconds,
+        bytes: beatBytes(seconds),
+        asked,
+      });
+    }
+  }
+
+  return units;
+}
+
+/** a, b, c … for the parts of a split block, and a plain number past z. */
+const partSuffix = (k) => (k < 26 ? String.fromCharCode(97 + k) : `-part${k + 1}`);
+
+/** The request body for one render: its lines, in order, with voices. */
+export function unitInputs(unit) {
+  return unit.lines.map((line) => ({ text: line.text, voice_id: line.voiceId }));
+}
+
+/**
+ * Pause marks with nowhere to go, so the run can say so rather than drop them.
+ *
+ * Silently ignoring one would be the same shape of fault as edits that were
+ * saved but never applied: the page says one thing, the recording does
+ * another, and nothing tells you until you play it.
+ */
+export function strandedPauses(episode, pauses = new Map()) {
+  const ns = lineNumbers(episode);
+  const known = new Set(ns);
+  const first = ns[0];
+  return [...pauses.keys()].filter((n) => !known.has(n) || n === first).sort((a, b) => a - b);
+}
+
+/** What to say about them, in terms of the page rather than of blocks. */
+export function strandedWarning(stranded, episode) {
+  if (!stranded.length) return null;
+  const ns = lineNumbers(episode);
+  const known = new Set(ns);
+  const said = [];
+  const missing = stranded.filter((n) => !known.has(n));
+  if (missing.length) {
+    said.push(
+      `There is no line ${missing.join(", ")} in this episode, so the pause ` +
+        `${missing.length === 1 ? "mark in front of it was" : "marks in front of them were"} ignored.`,
+    );
+  }
+  if (stranded.includes(ns[0])) {
+    said.push(
+      `A pause in front of line ${ns[0]} is silence before the episode starts, which the ` +
+        "lead-in already handles, so it was ignored.",
+    );
+  }
+  return said.join("\n");
+}
+
 /** Bytes of PCM per second at the configured rate. Read, never cached — the rate moves. */
 const bytesPerSecond = () => PCM.sampleRate * PCM.channels * PCM.bytesPerSample;
 
@@ -151,15 +272,18 @@ export function pcmLooksRight(byteLength, segments) {
  * @param gapBytes silence inserted BETWEEN blocks, in bytes — see beatBytes.
  *                 The same number of bytes goes into the master, so the two
  *                 cannot drift apart.
+ * @param gaps     per-join byte counts, when the joins differ — see renderPlan.
+ *                 One entry per join, so `gaps[0]` is the pause between the
+ *                 first block and the second. Falls back to gapBytes.
  * @returns { segments, durationSeconds, blocks: [{ id, offsetSeconds, durationSeconds }] }
  */
-export function mergeBlocks(blocks, { gapBytes = 0 } = {}) {
+export function mergeBlocks(blocks, { gapBytes = 0, gaps = [] } = {}) {
   const segments = [];
   const placed = [];
   let offset = 0;
 
   for (const [index, block] of blocks.entries()) {
-    if (index > 0) offset += pcmSeconds(gapBytes);
+    if (index > 0) offset += pcmSeconds(gaps[index - 1] ?? gapBytes);
     const duration = pcmSeconds(block.byteLength);
     for (const segment of block.segments) {
       segments.push({
@@ -202,13 +326,17 @@ export function wavHeader(dataBytes) {
   return h;
 }
 
-/** The request body for one block: the conversation, in order, with voices. */
+/**
+ * The request body for a whole block, with no pause splitting it.
+ *
+ * The run itself asks by render unit (see renderPlan), because a pause mark
+ * can end a request part way through a block. This is the same thing for the
+ * ordinary case, and is what the block packing is checked against.
+ */
 export function blockInputs(episode, block) {
-  const lines = episode.segments
-    .filter((s) => block.segments.includes(s.id))
-    .flatMap((s) => s.lines);
+  const lines = blockLines(episode, block);
   if (!lines.length) throw new Error(`${block.id} has no lines`);
-  return lines.map((line) => ({ text: line.text, voice_id: line.voiceId }));
+  return unitInputs({ lines });
 }
 
 /**
@@ -383,8 +511,9 @@ async function main() {
   // the second one's output, so this used to render the old words, pay for
   // them, and say nothing. Michelle lost a full episode to it on 2026-09-20.
   const scriptPath = resolve(recordPath).replace(/\.json$/, ".txt");
-  if (existsSync(scriptPath)) {
-    const pending = pendingEdits(episode, await readFile(scriptPath, "utf8"), {
+  const scriptText = existsSync(scriptPath) ? await readFile(scriptPath, "utf8") : null;
+  if (scriptText !== null) {
+    const pending = pendingEdits(episode, scriptText, {
       scriptName: basename(scriptPath),
       recordName: basename(recordPath),
     });
@@ -400,20 +529,38 @@ async function main() {
     }
   }
 
+  // Planned BEFORE a single block is generated, so a pause that cannot be
+  // placed, or one written as a number that is not a pause, is heard about
+  // while nothing has been spent.
+  const pauses = scriptText === null ? new Map() : readPauseMarks(scriptText);
+  const units = renderPlan(episode, pauses);
+  const stranded = strandedPauses(episode, pauses);
+
   const outDir = resolve("content/lt-tv/audio", episode.id);
   await mkdir(outDir, { recursive: true });
 
+  const split = units.length - episode.blocks.length;
   console.log(
-    `${episode.title} — ${episode.blocks.length} block(s), pcm_${PCM.sampleRate}` +
-      `${PCM.sampleRate === 44100 ? "" : " (set by LT_TV_PCM_RATE)"}`,
+    `${episode.title} — ${units.length} recording(s), pcm_${PCM.sampleRate}` +
+      `${PCM.sampleRate === 44100 ? "" : " (set by LT_TV_PCM_RATE)"}` +
+      (split > 0 ? `, ${split} of them split out by a pause you asked for` : ""),
   );
+  for (const unit of units.slice(1)) {
+    console.log(
+      `  ${unit.pauseBefore}s before line ${unit.firstLine}` +
+        (unit.asked ? " — from the script" : " — the beat between acts, LT_TV_ACT_BEAT"),
+    );
+  }
+  const warning = strandedWarning(stranded, episode);
+  if (warning) console.log(`\n${warning}\n`);
+
   const built = [];
-  for (const block of episode.blocks) {
+  for (const unit of units) {
     const payload = await generateBlock({
-      inputs: blockInputs(episode, block),
+      inputs: unitInputs(unit),
       key,
       outDir,
-      id: block.id,
+      id: unit.id,
     });
     const audio = Buffer.from(payload.audio_base64, "base64");
     const segments = payload.voice_segments || [];
@@ -421,28 +568,23 @@ async function main() {
     const sanity = pcmLooksRight(audio.length, segments);
     if (!sanity.ok) {
       throw new Error(
-        `${block.id}: decoded ${sanity.seconds.toFixed(1)}s of audio but the last word ends at ` +
+        `${unit.id}: decoded ${sanity.seconds.toFixed(1)}s of audio but the last word ends at ` +
           `${sanity.lastEnd.toFixed(1)}s. The PCM format assumption ` +
           `(${PCM.sampleRate}Hz, ${PCM.channels}ch, ${PCM.bytesPerSample * 8}-bit) is probably wrong.`,
       );
     }
-    console.log(`  ${block.id}: ${sanity.seconds.toFixed(1)}s, ${segments.length} line(s)`);
-    built.push({ id: block.id, audio, byteLength: audio.length, segments });
+    console.log(`  ${unit.id}: ${sanity.seconds.toFixed(1)}s, ${segments.length} line(s)`);
+    built.push({ id: unit.id, audio, byteLength: audio.length, segments });
   }
 
-  const gapBytes = built.length > 1 ? beatBytes() : 0;
-  if (gapBytes) {
-    console.log(
-      `  a ${ACT_BEAT_SECONDS}s beat between acts (${built.length - 1} of them) — ` +
-        "set LT_TV_ACT_BEAT to change it",
-    );
-  }
-  const merged = mergeBlocks(built, { gapBytes });
+  const gaps = units.slice(1).map((unit) => unit.bytes);
+  const merged = mergeBlocks(built, { gaps });
   const timing = timingFromSegments(episode, merged.segments);
 
   // The same bytes the timings were computed from, in the same places.
-  const beat = Buffer.alloc(gapBytes);
-  const pcm = Buffer.concat(built.flatMap((b, i) => (i ? [beat, b.audio] : [b.audio])));
+  const pcm = Buffer.concat(
+    built.flatMap((b, i) => (i ? [Buffer.alloc(gaps[i - 1]), b.audio] : [b.audio])),
+  );
   const masterPath = join(outDir, "master-dialogue.wav");
   await writeFile(masterPath, Buffer.concat([wavHeader(pcm.length), pcm]));
   await writeFile(
@@ -458,9 +600,18 @@ async function main() {
     lineEnds: timing.lineEnds,
     durationSeconds: merged.durationSeconds,
   };
+  // A block that was split still reports as ONE block, spanning its parts and
+  // the pause between them, because that is what the record has always meant
+  // by a block and nothing downstream needs to know how it was requested.
+  const blockOf = new Map(units.map((u) => [u.id, u.block]));
   episode.blocks = episode.blocks.map((b) => {
-    const placed = merged.blocks.find((p) => p.id === b.id);
-    return { ...b, offsetSeconds: placed.offsetSeconds, durationSeconds: placed.durationSeconds };
+    const mine = merged.blocks.filter((p) => blockOf.get(p.id) === b.id);
+    const last = mine[mine.length - 1];
+    return {
+      ...b,
+      offsetSeconds: mine[0].offsetSeconds,
+      durationSeconds: round(last.offsetSeconds + last.durationSeconds - mine[0].offsetSeconds),
+    };
   });
   await writeFile(resolve(recordPath), JSON.stringify(episode, null, 2) + "\n");
 

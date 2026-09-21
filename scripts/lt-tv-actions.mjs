@@ -87,6 +87,23 @@ export const ACTIONS = {
     argv: (id) => ["node", ["scripts/lt-tv-audio.mjs", `content/lt-tv/episodes/${id}.json`]],
     blurb: "Generates every block and joins them into one master.",
   },
+  rerecord: {
+    label: "Record it again",
+    spends: "an ElevenLabs render",
+    needs: ["ELEVENLABS_API_KEY"],
+    needsScreenplay: true,
+    // The same run as `record`. It exists as its own button because some of
+    // what the recording does is steered from the screenplay rather than from
+    // the record — `# pause 1.5s` is silence cut into the master, so it can
+    // only take effect by recording again. Without this the only route back
+    // through the audio step was "Apply my edits and clear the audio", which
+    // refuses outright when no WORDS changed, and re-renders the screenplay,
+    // wiping the marks that were the whole reason for pressing it.
+    stages: ["recorded", "on-air"],
+    argv: (id) => ["node", ["scripts/lt-tv-audio.mjs", `content/lt-tv/episodes/${id}.json`]],
+    blurb:
+      "For after you add or change a `# pause 1.5s` mark. Only the parts of the episode either side of a changed pause are rendered again; everything else is reused, so it costs a fraction of the first recording. Split and upload again afterwards.",
+  },
   split: {
     label: "Split it into the two tracks",
     spends: null,
