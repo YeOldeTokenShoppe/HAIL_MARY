@@ -20,9 +20,40 @@ ACTOR_NAMES = {
     "gr80": "Monk",
 }
 
+# WHERE ONE SPEAKER STOPS AND THE NEXT BEGINS.
+#
+# ElevenLabs reports a start and an end per line, and they TILE: line k's start
+# IS line k-1's end, to the millisecond. That instant is not where the voice
+# actually changes — the reported times are approximate, and a line's reported
+# end has been seen over a second short of where the speech really stops. The
+# guards below assumed it was accurate to about ten milliseconds, so a boundary
+# that was off by a few hundred put the head of one speaker's line inside the
+# other's stem, and clipped it off their own. Michelle heard it on 2026-09-21:
+# "GR80 interjects with 'old nothing' instead of 'you sold nothing'."
+#
+# So the boundary is MEASURED, the same way section cuts are: silence in the
+# master means neither voice is speaking, which is exactly the condition a
+# boundary needs. The junction goes in the middle of the silence around the
+# reported instant, and then no guard is needed — the cut is already in a gap.
+#
+# The guards remain for junctions where nothing was measured. That case means
+# the two lines really do run together with no gap, and it is reported rather
+# than hidden, because no boundary fixes it.
 START_GUARD_SECONDS = 0.12
 END_GUARD_SECONDS = 0.01
 BOUNDARY_FADE_SECONDS = 0.02
+
+# silencedetect settings for finding those gaps. The minimum is well under the
+# 0.15s used for section cuts: a breath between two lines is shorter than a
+# pause you can join two clips in, and here we only need to know where the gap
+# is, not whether it is wide enough to cut a clip at.
+SILENCE_DB = -40
+SILENCE_MIN_SECONDS = 0.08
+
+# How far from the reported instant a gap may be and still be believed to be
+# that junction. A reported end has been seen 1.1s short of where the speech
+# stopped, on the 2026-07-31 render.
+BOUNDARY_SEARCH_SECONDS = 1.5
 
 
 def media_duration(path):
@@ -45,7 +76,188 @@ def media_duration(path):
     return float(result.stdout.strip())
 
 
-def create_stem(master, destination, segments, keep_voice, total_duration):
+def parse_silences(text):
+    """The (start, end) windows ffmpeg's silencedetect reported.
+
+    Pure, so it can be tested without ffmpeg. An unclosed window — silence that
+    runs to the end of the file — is dropped: it has no end to take a midpoint
+    of, and the closing line runs to the end of the master anyway.
+    """
+    windows = []
+    start = None
+    for line in text.splitlines():
+        if "silence_start:" in line:
+            try:
+                start = float(line.rsplit("silence_start:", 1)[1].split()[0])
+            except (IndexError, ValueError):
+                start = None
+        elif "silence_end:" in line and start is not None:
+            try:
+                end = float(line.rsplit("silence_end:", 1)[1].split()[0])
+            except (IndexError, ValueError):
+                continue
+            if end > start:
+                windows.append((start, end))
+            start = None
+    return windows
+
+
+def detect_silences(master):
+    """Where nobody is speaking, measured from the master itself."""
+    command = [
+        "ffmpeg",
+        "-hide_banner",
+        "-nostats",
+        "-i",
+        str(master),
+        "-af",
+        f"silencedetect=noise={SILENCE_DB}dB:d={SILENCE_MIN_SECONDS}",
+        "-f",
+        "null",
+        "-",
+    ]
+    result = subprocess.run(command, capture_output=True, text=True)
+    return parse_silences(result.stderr)
+
+
+def find_gap(instant, silences):
+    """The measured gap at this reported junction, or None.
+
+    Preferred: a window the instant falls inside. Otherwise the nearest one
+    within BOUNDARY_SEARCH_SECONDS, because the reported instant can sit a
+    little before or after the real gap.
+    """
+    for start, end in silences:
+        if start <= instant <= end:
+            return (start, end)
+    nearest = None
+    best = BOUNDARY_SEARCH_SECONDS
+    for start, end in silences:
+        away = start - instant if start > instant else instant - end if end < instant else 0
+        if away <= best:
+            best = away
+            nearest = (start, end)
+    return nearest
+
+
+def plan_windows(segments, silences, total_duration):
+    """The span of the master each line owns, per segment, in order.
+
+    Returns one dict per segment: the window to cut, whether its edges were
+    measured, and what was reported, so the run can show its working.
+
+    Every junction is shared — one line ends exactly where the next begins —
+    so no audio is lost and nothing is counted twice. The first line starts at
+    the top of the master and the last runs to the end of it.
+    """
+    if not segments:
+        return []
+
+    junctions = []
+    for index in range(1, len(segments)):
+        reported = float(segments[index]["start_time_seconds"])
+        gap = find_gap(reported, silences)
+        if gap:
+            junctions.append({"at": (gap[0] + gap[1]) / 2, "measured": True, "reported": reported})
+        else:
+            # Nothing measured: fall back to the old guarded instant. The two
+            # lines are treated as running straight into each other, which is
+            # what the absence of a gap means.
+            junctions.append({"at": None, "measured": False, "reported": reported})
+
+    planned = []
+    for index, segment in enumerate(segments):
+        before = junctions[index - 1] if index > 0 else None
+        after = junctions[index] if index < len(junctions) else None
+
+        if before is None:
+            start = 0.0
+            start_measured = True
+        elif before["measured"]:
+            start = before["at"]
+            start_measured = True
+        else:
+            start = before["reported"] + START_GUARD_SECONDS
+            start_measured = False
+
+        if after is None:
+            end = max(float(segment["end_time_seconds"]), total_duration)
+            end_measured = True
+        elif after["measured"]:
+            end = after["at"]
+            end_measured = True
+        else:
+            end = after["reported"] - END_GUARD_SECONDS
+            end_measured = False
+
+        planned.append(
+            {
+                "start": start,
+                "end": max(start + 0.001, end),
+                "measured": start_measured and end_measured,
+                "start_measured": start_measured,
+                "end_measured": end_measured,
+                "reported_start": float(segment["start_time_seconds"]),
+                "reported_end": float(segment["end_time_seconds"]),
+                "voice_id": segment.get("voice_id"),
+            }
+        )
+    return planned
+
+
+def boundary_report(planned, names_by_voice):
+    """What moved and what did not, as lines to print.
+
+    The second return names the lines whose boundary IN FRONT of them could not
+    be measured — one entry per bad junction, rather than one per line touching
+    one, which would name almost every line in a bad episode and say nothing
+    about where to look.
+    """
+    rows = []
+    unmeasured = []
+    for index, window in enumerate(planned):
+        who = names_by_voice.get(window["voice_id"], "?")
+        moved = window["start"] - window["reported_start"]
+        rows.append(
+            f"  {index:>3}  {who:<7} reported {window['reported_start']:7.2f}s  "
+            f"cut at {window['start']:7.2f}s  {moved:+.2f}s"
+            + ("" if window["start_measured"] else "   NO GAP MEASURED")
+        )
+        # Line 0 has no junction in front of it, so it is never counted.
+        if index > 0 and not window["start_measured"]:
+            unmeasured.append(index)
+    return rows, unmeasured
+
+
+def media_sample_rate(path, fallback=44100):
+    """The master's own sample rate. Episodes are recorded at whatever
+    LT_TV_PCM_RATE says, so this is not always 44100."""
+    command = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-select_streams",
+        "a:0",
+        "-show_entries",
+        "stream=sample_rate",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        str(path),
+    ]
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+        return int(result.stdout.strip())
+    except (subprocess.CalledProcessError, ValueError):
+        return fallback
+
+
+def create_stem(master, destination, segments, keep_voice, total_duration,
+                planned=None, sample_rate=44100):
+    kept = [
+        (window, segment)
+        for window, segment in zip(planned, segments)
+        if segment.get("voice_id") == keep_voice
+    ] if planned else []
     kept_segments = [
         segment for segment in segments if segment.get("voice_id") == keep_voice
     ]
@@ -73,24 +285,40 @@ def create_stem(master, destination, segments, keep_voice, total_duration):
     # runs to the end of the master.
     closing_segment = segments[-1] if segments else None
 
+    # The silence bed must be the master's own rate. It was hardcoded to 44100
+    # while episodes are recorded at whatever LT_TV_PCM_RATE says — 24000 on a
+    # plan below Pro — which left ffmpeg resampling a bed that had no reason to
+    # differ.
     filters = [
         (
-            f"anullsrc=r=44100:cl=mono,"
+            f"anullsrc=r={sample_rate}:cl=mono,"
             f"atrim=duration={total_duration:.6f},"
             "asetpts=PTS-STARTPTS[silence]"
         )
     ]
     mix_inputs = ["[silence]"]
 
+    windows = (
+        [window for window, _ in kept]
+        if kept
+        else [None] * len(kept_segments)
+    )
+
     for index, segment in enumerate(kept_segments):
-        reported_start = float(segment["start_time_seconds"])
-        reported_end = float(segment["end_time_seconds"])
-        start = reported_start + START_GUARD_SECONDS
-        end = reported_end - END_GUARD_SECONDS
-        if reported_start == 0:
-            start = 0
-        if segment is closing_segment:
-            end = max(end, total_duration)
+        window = windows[index]
+        if window is not None:
+            start = window["start"]
+            end = window["end"]
+        else:
+            # No plan (nothing measured at all): the original guarded instants.
+            reported_start = float(segment["start_time_seconds"])
+            reported_end = float(segment["end_time_seconds"])
+            start = reported_start + START_GUARD_SECONDS
+            end = reported_end - END_GUARD_SECONDS
+            if reported_start == 0:
+                start = 0
+            if segment is closing_segment:
+                end = max(end, total_duration)
         duration = max(0.001, end - start)
         fade = min(BOUNDARY_FADE_SECONDS, duration / 4)
         fade_out_start = max(0, duration - fade)
@@ -130,7 +358,7 @@ def create_stem(master, destination, segments, keep_voice, total_duration):
         "-codec:a",
         "pcm_s16le",
         "-ar",
-        "44100",
+        str(sample_rate),
         "-ac",
         "1",
         str(destination),
@@ -249,6 +477,12 @@ def main():
         "older response.json that was recorded before the cast changed a voice; "
         "it does not change the voice future episodes are generated with.",
     )
+    parser.add_argument(
+        "--report",
+        action="store_true",
+        help="Print where each line's boundary was placed, and how far that moved it "
+             "from the time ElevenLabs reported.",
+    )
     parser.add_argument("--show", default="roundtable", help="Show id the episode belongs to")
     parser.add_argument("--title", default="", help="Episode title for the starter record")
     args = parser.parse_args()
@@ -298,9 +532,45 @@ def main():
             raise SystemExit(f"Could not decode the returned audio: {exc}") from exc
 
     total_duration = media_duration(master)
+
+    # WHERE THE VOICE ACTUALLY CHANGES, measured rather than taken from the
+    # reported instants. See the note by START_GUARD_SECONDS.
+    silences = detect_silences(master)
+    planned = plan_windows(segments, silences, total_duration)
+    rate = media_sample_rate(master)
+
+    names_by_voice = {voice_id: name for name, voice_id in speakers.items()}
+    rows, unmeasured = boundary_report(planned, names_by_voice)
+    print(f"\n{len(silences)} gaps measured in the master.")
+    if args.report:
+        print("\nline  speaker  where the cut goes:")
+        for row in rows:
+            print(row)
+    elif unmeasured:
+        # Shown without being asked for, because these are the boundaries that
+        # can still be heard — the rest have been placed in real silence.
+        print("\nThe boundaries that could not be measured:")
+        for index in unmeasured:
+            print(rows[index])
+    if unmeasured:
+        print(
+            f"\n{len(unmeasured)} boundary(s) had no measurable gap, so they fall back to the\n"
+            "time ElevenLabs reported. Those two lines run straight into each other in\n"
+            "the recording, so no boundary is clean there. If one is audible, the fix is\n"
+            "in the writing rather than the cutting."
+        )
+
     for name, voice_id in speakers.items():
         destination = args.output_dir / f"{name}-sitepal-balanced.wav"
-        create_stem(master, destination, segments, voice_id, total_duration)
+        create_stem(
+            master,
+            destination,
+            segments,
+            voice_id,
+            total_duration,
+            planned=planned,
+            sample_rate=rate,
+        )
 
     timing_path = args.output_dir / "voice-segments.json"
     timing_path.write_text(

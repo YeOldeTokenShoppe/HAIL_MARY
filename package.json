@@ -23,7 +23,7 @@
     "lt:brief": "node scripts/lt-news-brief.mjs",
     "lt:news": "node scripts/lt-news-script.mjs",
     "lt:roundtable": "node scripts/lt-rt-script.mjs",
-    "lt:test": "for f in scripts/*.test.mjs; do echo \"\\n$f\"; node \"$f\" || exit 1; done"
+    "lt:test": "for f in scripts/*.test.mjs; do echo \"\\n$f\"; node \"$f\" || exit 1; done && echo \"\\nelevenlabs-dialogue-test/test_boundaries.py\" && python3 elevenlabs-dialogue-test/test_boundaries.py"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.31.1",

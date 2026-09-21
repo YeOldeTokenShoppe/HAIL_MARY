@@ -430,6 +430,46 @@ front of the very first line — is named in the output rather than ignored.
 
 ---
 
+## Where one voice stops and the other starts (both shows)
+
+**Symptom:** a line comes out clipped — "old nothing" instead of "you sold
+nothing" — or a character's voice appears briefly in the other character's
+track. Michelle heard both on 2026-09-21.
+
+It is the same root cause as the section cuts: **ElevenLabs' reported line
+times tile and are approximate.** Line 12's start IS line 11's end, to the
+millisecond, and that instant is not where the voice actually changes. The
+splitter used to cut each speaker's audio at that instant, guarded by 120ms at
+the start and 10ms at the end — which assumes the reported boundary is accurate
+to about ten milliseconds. It is not. A boundary a few hundred milliseconds
+late puts the head of the next line inside the previous speaker's track, and
+clips it off their own.
+
+**So the boundary is measured, not reported.** The split step runs
+`silencedetect` over the master, and each junction goes in the middle of the
+real gap around the reported instant. Silence means neither voice is speaking,
+which is exactly the condition a boundary needs. Both speakers share the one
+boundary, so no audio is lost and nothing is duplicated.
+
+The split prints how many gaps it found. Where a junction has no measurable gap
+it falls back to the reported time and **says which lines** — those two lines
+genuinely run into each other in the recording, and no boundary placement fixes
+that. If one is audible, the fix is in the writing.
+
+To see every boundary and how far it moved:
+
+```bash
+python3 elevenlabs-dialogue-test/process_dialogue.py --report \
+  --master content/lt-tv/audio/<id>/master-dialogue.wav \
+  --segments content/lt-tv/audio/<id>/voice-segments.json \
+  content/lt-tv/audio/<id>
+```
+
+The arithmetic is covered by `elevenlabs-dialogue-test/test_boundaries.py`,
+which runs as part of `npm run lt:test` and needs no ffmpeg.
+
+---
+
 ## Changing a character's voice (both shows)
 
 Two files must agree, or the split fails outright: `CAST` in
