@@ -41,6 +41,8 @@ import {
   lineSpansFromAlignment,
   shiftSpans,
   episodeLineSpans,
+  cacheReport,
+  costReport,
 } from "./lt-tv-audio.mjs";
 import { CAST } from "./lt-tv-format.mjs";
 import { renderScript } from "./lt-tv-episode.mjs";
@@ -595,6 +597,56 @@ console.log("\nThe voices are the show's, not the record's:");
     episodeLineSpans(built, { offsets, expected: 5 }), null);
   check("and a block with nowhere to play",
     episodeLineSpans(built, { offsets: new Map([["a", 0]]), expected: 4 }), null);
+}
+
+
+// ── what recording again would actually cost ─────────────────────────────────
+// The studio's confirm says "this spends an ElevenLabs render" whether or not
+// it does, because a button cannot know. Michelle pushed back on exactly that.
+{
+  const format = `pcm_${PCM.sampleRate}`;
+  const fingerprint = "abc123";
+  const withTimes = {
+    lt_tv_output_format: format,
+    lt_tv_inputs: fingerprint,
+    alignment: { characters: ["a"], character_start_times_seconds: [0],
+      character_end_times_seconds: [0.1] },
+  };
+
+  check("a matching block costs nothing",
+    cacheReport(withTimes, { format, fingerprint }),
+    { reuse: true, why: null, alignment: true });
+  check("nothing on disk is a render",
+    cacheReport(null, { format, fingerprint }).reuse, false);
+  ok("and says so in words rather than a flag",
+    cacheReport(null, { format, fingerprint }).why.includes("not been recorded"));
+  ok("different words cost a render",
+    !cacheReport({ ...withTimes, lt_tv_inputs: "other" }, { format, fingerprint }).reuse);
+
+  // A reusable block can still be missing the exact line times, and that
+  // changes what the split will do — so it is reported separately from cost.
+  const noTimes = { lt_tv_output_format: format, lt_tv_inputs: fingerprint };
+  check("a reusable block with no alignment is still free",
+    cacheReport(noTimes, { format, fingerprint }).reuse, true);
+  check("but is reported as having no exact times",
+    cacheReport(noTimes, { format, fingerprint }).alignment, false);
+  ok("an empty alignment does not count as one",
+    !cacheReport({ ...noTimes, alignment: { characters: [] } }, { format, fingerprint }).alignment);
+
+  const report = costReport([
+    { id: "block-1", reuse: true, why: null, alignment: true },
+    { id: "block-2", reuse: true, why: null, alignment: false },
+    { id: "block-3", reuse: false, why: "it has not been recorded yet", alignment: false },
+  ]);
+  check("the count is what gets sent, not what exists", report.fresh, 1);
+  check("and what costs nothing", report.reused, 2);
+  check("missing line times are counted only among the reused",
+    report.missingAlignment, 1);
+  ok("a reused block says so plainly", report.lines[0].includes("reused free"));
+  ok("a re-recorded one says why", report.lines[2].includes("because"));
+
+  const free = costReport([{ id: "block-1", reuse: true, why: null, alignment: true }]);
+  check("an episode entirely on disk sends nothing", free.fresh, 0);
 }
 
 

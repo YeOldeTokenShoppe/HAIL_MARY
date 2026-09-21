@@ -102,7 +102,24 @@ export const ACTIONS = {
     stages: ["recorded", "on-air"],
     argv: (id) => ["node", ["scripts/lt-tv-audio.mjs", `content/lt-tv/episodes/${id}.json`]],
     blurb:
-      "For after you add or change a `# pause 1.5s` mark. Only the parts of the episode either side of a changed pause are rendered again; everything else is reused, so it costs a fraction of the first recording. Split and upload again afterwards.",
+      "For after you add or change a `# pause 1.5s` mark. Anything unchanged is reused free, so this often costs nothing at all — press \u201cWhat would recording again cost?\u201d first to find out, rather than taking this button\u2019s word for it. Split and upload again afterwards.",
+  },
+  "record-cost": {
+    label: "What would recording again cost?",
+    // Free, and it exists because the confirm on "Record it again" says "this
+    // spends an ElevenLabs render" whether or not it does. The button cannot
+    // know: it depends on which blocks are on disk and whether their words
+    // still match. This answers it by reading those files and sending nothing.
+    spends: null,
+    needs: [],
+    needsScreenplay: true,
+    stages: ["written", "recorded", "on-air"],
+    argv: (id) => [
+      "node",
+      ["scripts/lt-tv-audio.mjs", `content/lt-tv/episodes/${id}.json`, "--dry-run"],
+    ],
+    blurb:
+      "Says, block by block, what would be reused and what would be sent to ElevenLabs, and whether the recordings already carry the exact line times the split wants. Sends nothing and spends nothing.",
   },
   split: {
     label: "Split it into the two tracks",

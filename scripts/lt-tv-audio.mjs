@@ -600,6 +600,47 @@ export function cacheIsUsable(kept, { format, fingerprint }) {
   return { ok: true };
 }
 
+/**
+ * What a kept block is worth to this run, WITHOUT spending anything.
+ *
+ * "Record it again" asks for confirmation with the words "this spends an
+ * ElevenLabs render", because the button cannot know. Usually most of the
+ * episode is reused and the confirmation overstates it; sometimes nothing is
+ * reusable and it understates the size. Either way, guessing is not good
+ * enough — Michelle has paid twice for an answer that was on disk.
+ *
+ * `alignment` is reported alongside because the same question comes up for it:
+ * whether a recording already carries exact line times, or has to be made
+ * again to get them ([[lt-tv-alignment-is-the-answer]]).
+ */
+export function cacheReport(kept, { format, fingerprint }) {
+  if (kept === null) {
+    return { reuse: false, why: "it has not been recorded yet", alignment: false };
+  }
+  const usable = cacheIsUsable(kept, { format, fingerprint });
+  return {
+    reuse: usable.ok,
+    why: usable.ok ? null : usable.why,
+    alignment: Boolean(kept.alignment?.characters?.length),
+  };
+}
+
+/**
+ * The whole episode's answer, as lines to print and a count of what it costs.
+ */
+export function costReport(rows) {
+  const reused = rows.filter((r) => r.reuse);
+  const fresh = rows.filter((r) => !r.reuse);
+  const lines = rows.map((r) =>
+    r.reuse
+      ? `  ${r.id}: already recorded, reused free` +
+        (r.alignment ? "" : " — but with no exact line times in it")
+      : `  ${r.id}: recorded again, because ${r.why}`,
+  );
+  return { lines, reused: reused.length, fresh: fresh.length,
+    missingAlignment: reused.filter((r) => !r.alignment).length };
+}
+
 async function generateBlock({ inputs, key, outDir, id }) {
   // Blocks cost money and a long episode is several of them, so a finished
   // block is kept. A run that dies on block four resumes at block four.
@@ -648,8 +689,10 @@ async function main() {
     console.error("Usage: node scripts/lt-tv-audio.mjs <episode record.json>");
     process.exit(2);
   }
+  // A dry run reads files and spends nothing, so it must not need a key.
+  const dryRun = process.argv.includes("--dry-run");
   const key = process.env.ELEVENLABS_API_KEY;
-  if (!key) {
+  if (!key && !dryRun) {
     console.error("ELEVENLABS_API_KEY is not set.");
     process.exit(2);
   }
@@ -695,7 +738,42 @@ async function main() {
   const stranded = strandedPauses(episode, pauses);
 
   const outDir = resolve("content/lt-tv/audio", episode.id);
-  await mkdir(outDir, { recursive: true });
+  if (!dryRun) await mkdir(outDir, { recursive: true });
+
+  if (dryRun) {
+    const format = `pcm_${PCM.sampleRate}`;
+    const rows = [];
+    for (const unit of units) {
+      const cached = join(outDir, `${unit.id}.json`);
+      const kept = existsSync(cached) ? JSON.parse(await readFile(cached, "utf8")) : null;
+      rows.push({
+        id: unit.id,
+        ...cacheReport(kept, { format, fingerprint: blockFingerprint(unitInputs(unit)) }),
+      });
+    }
+    const { lines, reused, fresh, missingAlignment } = costReport(rows);
+    console.log(`${episode.title} — what recording again would do:\n`);
+    for (const line of lines) console.log(line);
+    console.log(
+      `\n${fresh} of ${rows.length} would be sent to ElevenLabs. ` +
+        `${reused} cost nothing.`,
+    );
+    if (fresh === 0) {
+      console.log(
+        "\nSo this is free. The studio still asks before it runs, because the button\n" +
+          "cannot know that until this has been checked.",
+      );
+    }
+    if (missingAlignment) {
+      console.log(
+        `\n${missingAlignment} of the reused recording(s) has no exact line times in it,\n` +
+          "so the split would fall back to measuring for the whole episode. Those were\n" +
+          "made before we started keeping them, or ElevenLabs did not return any.",
+      );
+    }
+    console.log("\nNothing has been spent.");
+    return;
+  }
 
   for (const change of revoiced) {
     console.log(

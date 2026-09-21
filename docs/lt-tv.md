@@ -414,13 +414,44 @@ The gap between two acts is `0.7s` unless a mark says otherwise, and
 
 **On an episode that is already recorded, add the mark and press "Record it
 again".** A pause is silence cut into the master, so it only exists once the
-episode has been through the recording step. That button costs a fraction of
-the first recording: every part of the episode whose words are unchanged is
-reused from what is already on disk, and only the two halves either side of the
-new pause are rendered. Split, upload and put it on the guide again afterwards,
-as usual. ("Apply my edits and clear the audio" is the wrong button here — it
-refuses when no words changed, and it rewrites the screenplay, which wipes the
-marks.)
+episode has been through the recording step. Split, upload and put it on the
+guide again afterwards, as usual. ("Apply my edits and clear the audio" is the
+wrong button here — it refuses when no words changed, and it rewrites the
+screenplay, which wipes the marks.)
+
+### What that actually costs
+
+**"Record it again" always warns that it spends an ElevenLabs render, because
+the button cannot know whether it will.** What gets sent depends on which
+blocks are already on disk and whether their words still match, and that is a
+question about files, not about the button.
+
+So ask, with **"What would recording again cost?"** — or
+`npm run lt:audio -- content/lt-tv/episodes/<id>.json --dry-run`. It reads the
+same plan the real run would, block by block, and prints what would be reused,
+what would be sent and why. It contacts nothing, needs no API key and ends with
+"Nothing has been spent". Often the answer is that the whole episode is on disk
+and recording again is free.
+
+What does and does not cost a render, checked against a real three-block
+episode rather than reasoned about:
+
+| | |
+|---|---|
+| changing a pause's **length** | free — the silence is cut in at the join, never rendered |
+| **adding** a pause | both halves of the one block it splits |
+| rewording a line | the one block holding it |
+| deleting a line | the one block holding it |
+| changing a character's voice | every block they speak in, so in practice all of them |
+| changing `LT_TV_PCM_RATE` | everything, at the new rate |
+
+A block is a run of segments, not a line, so "the one block holding it" is
+still a chunk of the episode — a third of it, on a three-block roundtable.
+
+The same check reports whether each recording carries the **exact line times**
+the split prefers. A recording made before those were kept is still free to
+reuse, but the split will fall back to measuring — see "Where one voice stops
+and the other starts".
 
 Like `# cut`, a pause mark changes no words: it needs no applying and works on
 an episode that is already written. Applying edits re-renders the screenplay
