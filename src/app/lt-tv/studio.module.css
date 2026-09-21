@@ -642,3 +642,42 @@
 .showActions {
   margin: 0 0 14px;
 }
+
+/* ------------------------------------------------------------ episode title */
+/* The title the guide prints, pulled out of the script's first line so it is
+   editable without hunting for it — and written straight back into that line,
+   which is the only copy. */
+
+.titleRow {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 11.2px;
+  margin-bottom: 9.6px;
+}
+.titleLabel {
+  font-size: 11.2px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.titleInput {
+  width: 100%;
+  padding: 7.2px 11.2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--well);
+  color: #e7ecf2;
+  font-family: inherit;
+  font-size: 14.4px;
+}
+.titleInput:focus {
+  outline: none;
+  border-color: var(--amber);
+}
+.titleHint {
+  grid-column: 2;
+  font-size: 12px;
+  color: var(--muted);
+}

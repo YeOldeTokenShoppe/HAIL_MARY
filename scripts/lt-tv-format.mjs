@@ -453,3 +453,98 @@ export function formatRuntime(seconds) {
 export function segmentById(id) {
   return SEGMENTS.find((s) => s.id === id) ?? null;
 }
+
+// ── Titles ────────────────────────────────────────────────────────────────
+//
+// The first generated news episode came back titled "Hike Barrel Charizard" —
+// one noun from each of its three stories, jammed together. It is what a model
+// does when the only instruction is a word count: it tries to cover the whole
+// episode in four words and produces a keyword list instead of a title.
+//
+// So the rule is stated as the job it actually is — name ONE thing the way a
+// programme guide would — and it is shared by both shows, because both shows
+// title episodes and neither wants a keyword list.
+export const TITLE_RULES = `THE TITLE — this is what the channel guide prints under the thumbnail, so write it as a title and not as a summary of the episode:
+- Name ONE thing. Usually the lead story, or the mood the week had. An episode does not need a title that covers all three stories, and trying to write one is how you get a list of nouns.
+- It has to read as English out loud. Say it to yourself. "Hike Barrel Charizard" is three story keywords in a row, not a title, and it is the exact failure to avoid.
+- Two to six words. Title case. No colon, no slash, no ampersand, no dash joining two ideas.
+- No episode number, no week number, no date, and no bare ticker or number — the guide already shows those.
+- Do not reuse the chiron headline word for word. The headline reports; the title characterises.
+- A little wit is welcome, a pun is fine, jargon is not.
+Titles of the right shape: "The Cut That Wasn't", "Everyone Is a Bond Trader Now", "Cardboard Gold Rush", "Nobody Told the Oil Market", "A Very Expensive Shrug".`;
+
+// ── Acronyms ──────────────────────────────────────────────────────────────
+//
+// The audience is LISTENING. An acronym nobody expands is a sound, not a word:
+// the first news episode said "FRED" four times and never once said what FRED
+// is. So an acronym is expanded on first mention and used short after that,
+// and `assemble()` warns when a script does not.
+//
+// Keys are spoken exactly as written. `expansion` is what has to appear in the
+// same line or an earlier one; `also` lists other wordings that count as having
+// expanded it, so a line that says "the Fed's economic data service" is not
+// nagged into saying the official name twice.
+export const SPOKEN_ACRONYMS = {
+  FRED: { expansion: "Federal Reserve Economic Data", also: ["Federal Reserve's economic data"] },
+  FOMC: { expansion: "Federal Open Market Committee", also: [] },
+  CPI: { expansion: "Consumer Price Index", also: ["consumer prices"] },
+  PCE: { expansion: "Personal Consumption Expenditures", also: [] },
+  PPI: { expansion: "Producer Price Index", also: ["producer prices"] },
+  BLS: { expansion: "Bureau of Labor Statistics", also: [] },
+  GDP: { expansion: "gross domestic product", also: [] },
+  ETF: { expansion: "exchange-traded fund", also: ["exchange traded fund"] },
+  ISM: { expansion: "Institute for Supply Management", also: [] },
+  PMI: { expansion: "Purchasing Managers Index", also: ["purchasing managers"] },
+  IPO: { expansion: "initial public offering", also: [] },
+  NFT: { expansion: "non-fungible token", also: ["nonfungible token"] },
+  AUM: { expansion: "assets under management", also: [] },
+  APY: { expansion: "annual percentage yield", also: [] },
+  APR: { expansion: "annual percentage rate", also: [] },
+  QT: { expansion: "quantitative tightening", also: [] },
+  QE: { expansion: "quantitative easing", also: [] },
+};
+
+// Said out loud every day by people who do not know what they stand for, and
+// expanding them on air sounds like a lecture. Listed rather than merely
+// omitted so the next person knows the omission was a decision.
+export const ACRONYMS_TAKEN_AS_READ = ["the Fed", "SEC", "IRS", "CEO", "CFO", "US", "AI", "ATM", "TV", "FOMO", "OK"];
+
+/**
+ * Acronyms spoken before anything says what they stand for.
+ *
+ * Reads the episode in spoken order and reports the FIRST offending mention of
+ * each acronym only — a second warning about the same word tells a producer
+ * nothing new and buries the ones that matter.
+ *
+ * @param lines — [{ n, text }] in spoken order.
+ * @returns [{ n, acronym, expansion }]
+ */
+export function unexpandedAcronyms(lines) {
+  const found = [];
+  const expanded = new Set();
+
+  for (const line of lines) {
+    const text = String(line.text || "");
+    const lower = text.toLowerCase();
+
+    for (const [acronym, { expansion, also }] of Object.entries(SPOKEN_ACRONYMS)) {
+      const spelled = [expansion, ...(also || [])].some((form) => lower.includes(form.toLowerCase()));
+      // Checked BEFORE the mention test, so a line that expands and abbreviates
+      // in one breath — "Federal Reserve Economic Data, FRED for short" — is
+      // exactly right rather than a warning.
+      if (spelled) expanded.add(acronym);
+      if (expanded.has(acronym)) continue;
+
+      // Plural and possessive count as a mention; a longer word that merely
+      // contains the letters does not.
+      if (new RegExp(`\\b${acronym}(?:s|'s|s')?\\b`).test(text)) {
+        found.push({ n: line.n, acronym, expansion });
+        // Reported once. After this the script is wrong in a way the producer
+        // has been told about, and repeating it per mention only adds noise.
+        expanded.add(acronym);
+      }
+    }
+  }
+
+  return found;
+}

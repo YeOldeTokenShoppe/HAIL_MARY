@@ -40,6 +40,7 @@ import {
   DELIVERY_TAGS,
   EVENT_TAGS,
   showFormat,
+  TITLE_RULES,
 } from "./lt-tv-format.mjs";
 import { assemble, renderScript } from "./lt-tv-episode.mjs";
 import { arg, rejectUnknownFlags } from "./lt-tv-cli.mjs";
@@ -81,9 +82,12 @@ RULES:
 - No financial advice of any kind, and nothing that reads as a recommendation.
 - The concession must be real. Decide now which of them gives ground and on what, and make it cost him something.
 
+${TITLE_RULES}
+This show has no stories to name, so title it for the IDEA — "The Wealth Effect", "Why We Chase Tops" — and never for the question you wrote.
+
 Return ONLY a JSON object, no preamble and no code fences:
 {
-  "title": "episode title, 2-4 words, no colon",
+  "title": "the episode title, written to the title rules above",
   "summary": "one sentence for the programme guide",
   "question": "the question Connor opens with, as he would say it",
   "flaw": "what GR80 immediately finds wrong with how it was asked, one sentence",

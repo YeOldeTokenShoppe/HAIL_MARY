@@ -227,8 +227,12 @@ export function applyScript(episode, parsed) {
   const rebuilt = assemble({
     rundown: {
       ...episode.rundown,
-      // The chiron and the title live in the script, so the script wins.
-      title: parsed.title ?? episode.title,
+      // The chiron and the title live in the script, so the script wins —
+      // except when the title line has been emptied, which is a title being
+      // retyped rather than a decision to have no title. The guide has no
+      // sensible way to print a nameless episode, so the record keeps the
+      // name it had.
+      title: parsed.title?.trim() || episode.title,
       headline: parsed.chiron ?? episode.graphics?.headline,
       ticker: episode.graphics?.ticker,
     },

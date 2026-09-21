@@ -29,6 +29,7 @@ import {
   countWords,
   estimateSeconds,
   formatRuntime,
+  unexpandedAcronyms,
 } from "./lt-tv-format.mjs";
 
 // ── Assembly ──────────────────────────────────────────────────────────────
@@ -193,6 +194,19 @@ function assemble({
   if (seconds < format.runtime.min || seconds > format.runtime.max) {
     warnings.push(
       `Estimated runtime ${formatRuntime(seconds)} falls outside the ${formatRuntime(format.runtime.min)}–${formatRuntime(format.runtime.max)} window.`,
+    );
+  }
+
+  // An acronym the audience hears before anyone says what it stands for is a
+  // sound, not a word — the first news episode said "FRED" and never expanded
+  // it. Warned rather than rewritten: the fix is a few words inside a line,
+  // which is a writer's choice, and the prompts now ask for it.
+  for (const { n: lineNo, acronym, expansion } of unexpandedAcronyms(
+    outSegments.flatMap((s) => s.lines),
+  )) {
+    warnings.push(
+      `Line ${lineNo}: says "${acronym}" before anything says what it stands for — ` +
+        `expand it on first mention ("${expansion}"), then use the short form.`,
     );
   }
 
