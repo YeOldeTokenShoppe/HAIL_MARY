@@ -430,6 +430,40 @@ front of the very first line — is named in the output rather than ignored.
 
 ---
 
+## Changing a character's voice (both shows)
+
+Two files must agree, or the split fails outright: `CAST` in
+`scripts/lt-tv-format.mjs`, which is what gets rendered, and `SPEAKERS` in
+`elevenlabs-dialogue-test/process_dialogue.py`, which is what matches each
+voice back to a character afterwards.
+
+An episode's record also carries a copy of the voice id on every line, frozen
+when the episode was written. **The recording step ignores that copy and uses
+the cast's current voice**, then corrects the record to match — a voice belongs
+to the show, not to one episode. It says so when it does:
+
+```
+Saint GR80 has a different voice now, so the record's fATgBRI8wg5KkDFg8vBd is being
+recorded as Re5c3vCmpnygdZuSX2Wc. Anything already recorded in the old voice is redone.
+```
+
+That costs a full re-render of the episode, which is unavoidable: half an
+episode in each voice is worse.
+
+**A master recorded before the change cannot be split afterwards.** The split
+step now says so and names "Record it again". If you instead want to keep an
+old recording exactly as it is — an archived response from months ago — process
+it with the voice it was actually made with:
+
+```bash
+python3 process_dialogue.py response.json output --voice gr80=<the old id>
+```
+
+No id in this history is wrong. Each is what some recording was actually made
+with.
+
+---
+
 ## Tuning the lead-in (both shows) — the trap worth knowing
 
 `leadIn` is the seconds of dead air at the head of the uploaded tracks. The

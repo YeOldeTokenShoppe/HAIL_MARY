@@ -37,7 +37,9 @@ import {
   strandedPauses,
   strandedWarning,
   PAUSE_MARK_MAX_SECONDS,
+  revoice,
 } from "./lt-tv-audio.mjs";
+import { CAST } from "./lt-tv-format.mjs";
 import { renderScript } from "./lt-tv-episode.mjs";
 import { pendingEdits, readPauseMarks } from "./lt-tv-edit.mjs";
 
@@ -472,6 +474,54 @@ console.log("\nA pause the script asked for:");
   ok("an absurd pause is refused", refused !== null);
   ok("and the refusal names the line and the limit",
     refused.includes(String(insideSecondBlock)) && refused.includes(String(PAUSE_MARK_MAX_SECONDS)));
+}
+
+console.log("\nThe voices are the show's, not the record's:");
+{
+  // Michelle changed the Monk's voice, re-recorded roundtable-02, and it was
+  // rendered in the OLD voice — the record stores a voiceId per line, frozen
+  // when the episode was written, and nothing compares it to the cast. It
+  // surfaced one step later as the split refusing with "No dialogue segments
+  // were found for voice ...", which reads like a corrupt recording.
+  const STALE = "fATgBRI8wg5KkDFg8vBd";
+  const stale = {
+    ...episode,
+    segments: episode.segments.map((seg) => ({
+      ...seg,
+      lines: seg.lines.map((l) => (l.actor === "Monk" ? { ...l, voiceId: STALE } : l)),
+    })),
+    cast: { ...episode.cast, Monk: { ...episode.cast.Monk, voiceId: STALE } },
+  };
+  ok("the fixture really is stale", JSON.stringify(stale).includes(STALE));
+
+  const { episode: fixed, changes } = revoice(stale);
+  check("the change is noticed once, for the character it affects",
+    changes.map((c) => [c.actor, c.was, c.now]),
+    [["Monk", STALE, CAST.Monk.voiceId]]);
+  ok("no line is left on the old voice", !JSON.stringify(fixed).includes(STALE));
+  ok("every line now carries the cast's voice",
+    fixed.segments.flatMap((s) => s.lines).every((l) => l.voiceId === CAST[l.actor].voiceId));
+  check("and so does the cast block", fixed.cast.Monk.voiceId, CAST.Monk.voiceId);
+  ok("the other character is untouched", fixed.cast.Connor.voiceId === episode.cast.Connor.voiceId);
+
+  // What actually goes to ElevenLabs is the thing that was wrong.
+  const sent = renderPlan(fixed, new Map()).flatMap((u) => unitInputs(u));
+  ok("the request asks for the current voice", sent.every((i) => i.voice_id !== STALE));
+
+  // The words are untouched, so nothing here looks like an edit — which is
+  // exactly why this went unnoticed until the split failed.
+  check("nothing else about the episode moves",
+    JSON.stringify(fixed.segments.flatMap((s) => s.lines).map((l) => l.text)),
+    JSON.stringify(episode.segments.flatMap((s) => s.lines).map((l) => l.text)));
+
+  // A stale voice must not be reusable from cache, or half the episode would
+  // be in one voice and half in the other.
+  const before = blockFingerprint(unitInputs({ lines: stale.segments[0].lines }));
+  const after = blockFingerprint(unitInputs({ lines: fixed.segments[0].lines }));
+  ok("and the cached audio cannot survive the change", before !== after);
+
+  check("an episode already on the current voices reports no change",
+    revoice(episode).changes, []);
 }
 
 console.log(failures ? `\n${failures} check(s) failed.\n` : "\nAll checks passed.\n");

@@ -68,6 +68,43 @@ export function splitCommand(id) {
 }
 
 /**
+ * Was this master recorded in a voice the show has since changed?
+ *
+ * The processor matches speakers by voice id, so a master made before a voice
+ * change cannot be split by a cast that has moved on. It fails with "No
+ * dialogue segments were found for voice ...", which reads like the recording
+ * is corrupt — and its advice, to name the old voice with `--voice`, is right
+ * for an ARCHIVED response and wrong here: the fix for THIS episode is to
+ * record it again in the voice it is supposed to have.
+ *
+ * Michelle hit this on 2026-09-21 between changing the Monk's voice and
+ * splitting roundtable-02.
+ *
+ * @param recorded the voice ids in the master's own voice-segments.json
+ */
+export function staleVoices(episode, recorded) {
+  const sung = new Set(recorded);
+  if (!sung.size) return [];
+  return Object.entries(episode.cast ?? {})
+    .filter(([, who]) => who.voiceId && !sung.has(who.voiceId))
+    .map(([actor, who]) => ({ actor, name: who.displayName, expected: who.voiceId }));
+}
+
+/** What to say about it, in terms of the button rather than the flag. */
+export function staleVoiceRefusal(stale, id) {
+  if (!stale.length) return null;
+  const who = stale.map((v) => v.name).join(" and ");
+  return (
+    `${id} was recorded before ${who} changed ${stale.length === 1 ? "voice" : "voices"}, so the\n` +
+    "master cannot be split by the cast it has now.\n\n" +
+    'Press "Record it again", then split. From a terminal:\n' +
+    `  npm run lt:audio -- content/lt-tv/episodes/${id}.json\n\n` +
+    "Nothing is wrong with the recording itself — it is simply in the old\n" +
+    `${stale.length === 1 ? "voice" : "voices"}.`
+  );
+}
+
+/**
  * Which file goes to which character, under which SitePal clip name.
  *
  * The record knows both halves of this: `processorKey` is what the processor
@@ -233,6 +270,18 @@ async function main() {
   if (!Array.isArray(timing.lineStarts) || !timing.lineStarts.length) {
     console.error(`${id} has a master but no timing. Record it again.`);
     process.exit(1);
+  }
+
+  // Checked BEFORE the processor runs, so a voice change is reported as a
+  // voice change rather than as a file that appears to contain nothing.
+  const segmentsPath = join(AUDIO_DIR, id, "voice-segments.json");
+  if (existsSync(segmentsPath)) {
+    const recorded = JSON.parse(await readFile(segmentsPath, "utf8")).map((seg) => seg.voice_id);
+    const refusal = staleVoiceRefusal(staleVoices(episode, recorded), id);
+    if (refusal) {
+      console.error(refusal);
+      process.exit(2);
+    }
   }
 
   const [command, args] = splitCommand(id);

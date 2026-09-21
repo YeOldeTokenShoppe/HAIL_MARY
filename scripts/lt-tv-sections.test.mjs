@@ -29,7 +29,15 @@ import {
   TARGET_SECTION_SECONDS,
 } from "./lt-tv-sections.mjs";
 import { readCutMarks } from "./lt-tv-edit.mjs";
-import { sectionLine, pauseLine, cutHint, staleClips, uploadPlan } from "./lt-tv-split.mjs";
+import {
+  sectionLine,
+  pauseLine,
+  cutHint,
+  staleClips,
+  uploadPlan,
+  staleVoices,
+  staleVoiceRefusal,
+} from "./lt-tv-split.mjs";
 import { episodeSections, validateEpisode } from "../src/lib/ltTv/episodeTimeline.mjs";
 
 let failures = 0;
@@ -510,6 +518,38 @@ console.log("\nA re-split clears out the clips it no longer wants:");
 
 function range(from, to) {
   return Array.from({ length: to - from + 1 }, (_, i) => from + i);
+}
+
+console.log("\nA master recorded in a voice the show has since changed:");
+{
+  // The processor matches speakers by voice id, so this fails deep inside
+  // python with "No dialogue segments were found for voice ...", which reads
+  // like the recording is corrupt. It is not: it is simply in the old voice,
+  // and the fix is to record again, not to pass the old id back in.
+  const cast = {
+    Connor: { displayName: "Connor", voiceId: "connor-voice" },
+    Monk: { displayName: "Saint GR80", voiceId: "monk-new" },
+  };
+  const episode = { cast };
+
+  check("a master in the current voices splits",
+    staleVoices(episode, ["connor-voice", "monk-new", "connor-voice"]), []);
+
+  const stale = staleVoices(episode, ["connor-voice", "monk-old"]);
+  check("one recorded in the old voice is caught",
+    stale.map((v) => v.actor), ["Monk"]);
+
+  const refusal = staleVoiceRefusal(stale, "roundtable-02");
+  ok("the refusal names the character, not the id", refusal.includes("Saint GR80"));
+  ok("and points at the button rather than a flag",
+    refusal.includes("Record it again") && !refusal.includes("--voice"));
+  ok("and says the recording itself is fine", /Nothing is wrong/.test(refusal));
+  check("nothing to refuse when the voices match",
+    staleVoiceRefusal([], "roundtable-02"), null);
+
+  // An empty or unreadable segment list must not be read as "every voice is
+  // stale" — that would refuse every split.
+  check("no segments means no opinion", staleVoices(episode, []), []);
 }
 
 console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} failed.\n`);

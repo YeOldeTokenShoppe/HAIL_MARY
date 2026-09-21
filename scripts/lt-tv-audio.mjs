@@ -34,6 +34,7 @@ import { resolve, dirname, join, basename } from "node:path";
 import { createHash } from "node:crypto";
 
 import { uploadPlan } from "./lt-tv-split.mjs";
+import { CAST } from "./lt-tv-format.mjs";
 import { pendingEdits, summariseEdits, readPauseMarks } from "./lt-tv-edit.mjs";
 
 const ENDPOINT = "https://api.elevenlabs.io/v1/text-to-dialogue/with-timestamps";
@@ -118,6 +119,56 @@ export function beatBytes(seconds = ACT_BEAT_SECONDS) {
  * and a typo here is half a minute of dead air in a recorded episode.
  */
 export const PAUSE_MARK_MAX_SECONDS = 10;
+
+/**
+ * Render this episode in the voices the show has NOW, not the ones it was
+ * written with.
+ *
+ * A record stores a `voiceId` on every line and in its `cast`, both frozen
+ * when the episode was assembled. That is a copy of a fact that lives in
+ * `CAST`, and a copy goes stale: Michelle changed the Monk's voice on
+ * 2026-09-21 and then re-recorded roundtable-02 — which dutifully asked
+ * ElevenLabs for the OLD voice, because that is what the record still said.
+ * Nothing caught it, because applying edits compares words and the words had
+ * not changed.
+ *
+ * It surfaced one step later and looked like a different bug entirely: the
+ * split refused with "No dialogue segments were found for voice ...", since
+ * the processor matches speakers by the id the cast has today against a
+ * recording made with yesterday's.
+ *
+ * A voice is a property of the show, so the show wins, and the record is
+ * corrected to say what was actually rendered. The block fingerprint covers
+ * voice ids, so anything cached under the old voice is re-recorded rather
+ * than mixed in.
+ */
+export function revoice(episode) {
+  const changes = [];
+  const now = (actor, was) => {
+    const voice = CAST[actor]?.voiceId;
+    if (!voice || voice === was) return was ?? voice;
+    if (!changes.some((c) => c.actor === actor)) {
+      changes.push({ actor, was, now: voice, name: CAST[actor].displayName });
+    }
+    return voice;
+  };
+
+  const revoiced = {
+    ...episode,
+    segments: episode.segments.map((segment) => ({
+      ...segment,
+      lines: segment.lines.map((line) => ({ ...line, voiceId: now(line.actor, line.voiceId) })),
+    })),
+    cast: Object.fromEntries(
+      Object.entries(episode.cast ?? {}).map(([actor, who]) => [
+        actor,
+        { ...who, voiceId: now(actor, who.voiceId) },
+      ]),
+    ),
+  };
+
+  return { episode: revoiced, changes };
+}
 
 /** The lines a recording block covers, in running order. */
 export function blockLines(episode, block) {
@@ -497,7 +548,8 @@ async function main() {
     process.exit(2);
   }
 
-  const episode = JSON.parse(await readFile(resolve(recordPath), "utf8"));
+  const loaded = JSON.parse(await readFile(resolve(recordPath), "utf8"));
+  const { episode, changes: revoiced } = revoice(loaded);
   if (episode.synthetic) {
     console.error(
       "This record is marked synthetic — its numbers are invented and it must not be recorded.",
@@ -538,6 +590,13 @@ async function main() {
 
   const outDir = resolve("content/lt-tv/audio", episode.id);
   await mkdir(outDir, { recursive: true });
+
+  for (const change of revoiced) {
+    console.log(
+      `${change.name} has a different voice now, so the record's ${change.was} is being\n` +
+        `recorded as ${change.now}. Anything already recorded in the old voice is redone.`,
+    );
+  }
 
   const split = units.length - episode.blocks.length;
   console.log(
