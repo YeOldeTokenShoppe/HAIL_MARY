@@ -174,7 +174,7 @@ switched off until someone sets a key.
 trending; Fear & Greed across eight days so the show can read the *arc* rather
 than today's number; Reddit's weekly top from r/bitcoin, r/ethereum and
 r/cryptocurrency if Reddit credentials are set; and CoinMarketCap if
-`CMC_PRO_API_KEY` is set.
+`COINMARKETCAP_API_KEY` is set (the same key the site's price routes use).
 
 **Collectibles** — Google News queries for the card and collectibles beats,
 plus the collector subreddits when Reddit is switched on. There is no free

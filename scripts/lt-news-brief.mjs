@@ -36,7 +36,8 @@
 //   node scripts/lt-news-brief.mjs --out some/path.json
 //   node scripts/lt-news-brief.mjs --check-sources  # ping every source, write nothing
 //
-// Optional env: CMC_PRO_API_KEY (adds CoinMarketCap global metrics)
+// Optional env: COINMARKETCAP_API_KEY (adds CoinMarketCap global metrics; the
+//   name the rest of the site already uses. CMC_PRO_API_KEY is read as well.)
 
 import { writeFile, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -528,7 +529,7 @@ async function fearGreedWeek() {
 }
 
 async function cmcContext(key) {
-  if (!key) return skip("no CMC_PRO_API_KEY");
+  if (!key) return skip("no COINMARKETCAP_API_KEY");
   const headers = { "X-CMC_PRO_API_KEY": key };
   const [global, quotes] = await Promise.all([
     getJson("https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest", { headers }),
@@ -665,7 +666,9 @@ function sourceTable() {
     ["crypto", "news", cryptoNews()],
     ["crypto", "trending", coinGeckoTrending()],
     ["crypto", "fearGreed", fearGreedWeek()],
-    ["crypto", "coinmarketcap", cmcContext(process.env.CMC_PRO_API_KEY)],
+    // The site's own routes read COINMARKETCAP_API_KEY, so that is the name
+    // Michelle's .env.local has. The older name still works.
+    ["crypto", "coinmarketcap", cmcContext(process.env.COINMARKETCAP_API_KEY || process.env.CMC_PRO_API_KEY)],
     ["collectibles", "chatter", collectiblesChatter()],
     ["predictions", "polymarket", polymarket()],
     ["predictions", "kalshi", kalshi()],

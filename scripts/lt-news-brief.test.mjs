@@ -144,6 +144,7 @@ const bare = await runBrief({
   REDDIT_CLIENT_ID: undefined,
   REDDIT_CLIENT_SECRET: undefined,
   CMC_PRO_API_KEY: undefined,
+  COINMARKETCAP_API_KEY: undefined,
 });
 
 const t = bare.signals.macro.treasuryYields;
@@ -182,6 +183,7 @@ const withReddit = await runBrief({
   REDDIT_CLIENT_ID: "id",
   REDDIT_CLIENT_SECRET: "secret",
   CMC_PRO_API_KEY: undefined,
+  COINMARKETCAP_API_KEY: undefined,
 });
 
 check(
