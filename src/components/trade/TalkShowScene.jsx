@@ -863,7 +863,7 @@ export const HOUSE_AMBIENT = {
 // Live from `window.__tsFaces`, and on the lighting board under Faces.
 export const FACE_LIGHTING = {
   onAir: 1,
-  offAir: 0.55,
+  offAir: 0.25,
   fadeLambda: 2.2,
 };
 
