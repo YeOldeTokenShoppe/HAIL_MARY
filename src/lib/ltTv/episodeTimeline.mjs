@@ -252,6 +252,17 @@ export function validateEpisode(record) {
     }
   });
 
+  // A chapter off the end of the script is silent about it: the chiron simply
+  // stops changing partway through the show, which reads as a design choice.
+  (record.graphics?.chapters || []).forEach((chapter, i) => {
+    if (!(chapter.line >= 0 && chapter.line < lines)) {
+      problems.push(
+        `graphics.chapters[${i}] starts on line ${chapter.line}, which doesn't exist — ` +
+          "re-stage the episode from its production record",
+      );
+    }
+  });
+
   // A section that is wrong is silent about it: the set plays a clip SitePal
   // refuses, or resumes at the wrong second, and neither looks like a record
   // problem when you are watching it.
@@ -281,6 +292,25 @@ export function validateEpisode(record) {
     problems.push("two sections ask SitePal for the same clip name");
   }
   return problems;
+}
+
+/**
+ * The episode's chapters, resolved onto the clock.
+ *
+ * A chapter says which LINE it begins on, never which second — line numbers
+ * survive a re-record and absolute times do not (see scripts/lt-tv-chapters.mjs
+ * for why that matters). Turning one into the other is this function's whole
+ * job, and it is the same trick the reaction cues use.
+ *
+ * A chapter pointing at a line the record does not have is dropped rather than
+ * resolved to NaN: a graphics fault should cost the graphic, not the episode.
+ */
+export function episodeChapters(record) {
+  const lineStarts = record?.lineStarts || [];
+  return (record?.graphics?.chapters || [])
+    .filter((chapter) => Number.isFinite(lineStarts[chapter.line]))
+    .map((chapter) => ({ ...chapter, at: lineStarts[chapter.line] }))
+    .sort((a, b) => a.at - b.at);
 }
 
 /**
@@ -348,6 +378,7 @@ export function buildEpisodeTimeline(record, { reactionDurations = {} } = {}) {
     gazes,
     cues,
     shots,
+    chapters: episodeChapters(record),
   };
 }
 
@@ -391,4 +422,22 @@ export function shotSubjectAt(timeline, cue) {
     if (shots[i].at <= cue) return shots[i].subject;
   }
   return null;
+}
+
+/**
+ * Which chapter is on screen at `elapsed` — an index into `timeline.chapters`,
+ * or -1 for an episode with no chapters at all.
+ *
+ * Before the first line lands, and whenever playback is stopped, the show sits
+ * on its opening chapter: the chiron and the screen read as the top of the
+ * episode rather than as whatever was up when it was stopped.
+ */
+export function chapterIndexAt(timeline, elapsed, running) {
+  const chapters = timeline?.chapters || [];
+  if (!chapters.length) return -1;
+  if (!running) return 0;
+  for (let i = chapters.length - 1; i >= 0; i -= 1) {
+    if (chapters[i].at <= elapsed) return i;
+  }
+  return 0;
 }

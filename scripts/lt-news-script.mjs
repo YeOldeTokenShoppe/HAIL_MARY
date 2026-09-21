@@ -113,6 +113,8 @@ WHAT TO REJECT:
 - Stories whose only source is a single anonymous social post with no corroborating headline.
 - Two stories that are the same story wearing different hats.
 
+Also pick THE SIDEBAR: four to six headlines from the brief that you are NOT covering tonight, which crawl along the ticker under the show. This is what makes the ticker read like a real newscast rather than a repeat of the segment you are watching — a ticker restating the story being spoken aloud is dead screen. Pick the near-misses: the stories that were real news this week and simply did not make a three-story show. They must be things the brief actually nominated; do not reach for anything outside it, and do not put a covered story on the sidebar in different words. Each one is a headline, not a sentence: under 80 characters, no full stop, and no number you did not get from the brief.
+
 Also pick THE BOARD: the three or four numbers that actually moved this week, read as a board. Candidates are the ten-year Treasury yield and its direction, the Fear & Greed arc across the week (the arc, not today's reading), oil or gold if either moved meaningfully, and the indices. Plus ONE prediction-market line from Polymarket or Kalshi worth quoting, with its odds. Do not recite every number you were given — pick what moved.
 
 HOW TO SOURCE A STORY — the brief nominates, the web confirms:
@@ -135,7 +137,13 @@ Return ONLY a JSON object, no preamble and no code fences:
   "title": "the episode title, written to the title rules above",
   "summary": "one sentence for the programme guide",
   "headline": "the chiron headline bar, under 60 characters, upper-case-friendly",
-  "ticker": ["4 to 6 short ticker items, each under 80 characters"],
+  "ticker": ["2 to 3 short ticker items about TONIGHT'S stories, each under 80 characters"],
+  "sidebar": [
+    {
+      "text": "a headline the show is NOT covering, under 80 characters",
+      "source": "the brief headline or item this came from, quoted closely enough to find it"
+    }
+  ],
   "stories": [
     {
       "slot": "story-1" | "story-2" | "story-3",

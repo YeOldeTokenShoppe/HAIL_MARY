@@ -4,6 +4,14 @@
 // between cards. Drawn into a canvas, so the lineup costs no downloads and a
 // new show appears as soon as it's in SHOWS.
 //
+// ON THE NEWS SET IT IS THE STUDIO SCREEN, carrying a card per chapter of the
+// episode — the running order in the cold open, the beat and the story's one
+// concrete fact while that story runs, the numbers listed as a board when the
+// hosts read the board. The deck is the same canvas and the same inks, so the
+// accompanying graphics cost no art and no downloads either: a card is the
+// copy the script already wrote, set in type. Which card is up is not this
+// module's decision — the set owns the clock, and passes `indexRef`.
+//
 // The screen is a portrait quad (~0.69:1) whose UVs cover a centred sub-rect
 // of 0–1, authored glTF-style (v = 0 at the image top). The texture is fitted
 // to that sub-rect from the geometry itself, so a re-export can't stretch it.
@@ -36,7 +44,13 @@ const INK = {
   format: "#ef62dc",
   latest: "#8effc4",
   soon: "#ffcb74",
+  body: "#efe7f7",
+  note: "#ffc096",
 };
+
+function clampIndex(index, length) {
+  return Math.min(Math.max(Math.trunc(index) || 0, 0), Math.max(length - 1, 0));
+}
 
 function uvBounds(geometry) {
   const uv = geometry.attributes.uv;
@@ -66,6 +80,170 @@ function fitTitle(ctx, text, maxWidth, maxLines, maxSize = 68) {
     }
   }
   return { size: 30, lines: [text] };
+}
+
+// Greedy word wrap at a fixed size, for body copy that may run to several
+// lines. Unlike fitTitle this never shrinks the type — a studio screen read
+// from a chair across the set has a floor below which copy is decoration.
+function wrap(ctx, text, maxWidth) {
+  const lines = [];
+  let line = "";
+  String(text).split(" ").forEach((word) => {
+    const next = line ? `${line} ${word}` : word;
+    if (ctx.measureText(next).width <= maxWidth || !line) line = next;
+    else { lines.push(line); line = word; }
+  });
+  if (line) lines.push(line);
+  return lines;
+}
+
+// The body copy's type size, chosen so that ALL of it fits between the
+// headline and the note.
+//
+// This shrinks rather than truncates, and that is the whole point of it. The
+// board card is a list of the week's numbers, and the first version of this
+// laid it out at a fixed size and stopped drawing when it ran out of room —
+// which quietly dropped the last number off a card whose entire job is to
+// show the numbers. A viewer cannot tell a dropped line from a line the show
+// never had. Small type is a worse card; a missing number is a wrong one.
+const BODY_MAX = 25;
+const BODY_MIN = 16;
+
+function fitBody(ctx, entries, maxWidth, maxHeight) {
+  const clean = (entries || []).map((entry) => String(entry).trim()).filter(Boolean);
+  let attempt = { size: BODY_MIN, lineHeight: 22, gap: 10, blocks: [] };
+  for (let size = BODY_MAX; size >= BODY_MIN; size -= 1) {
+    ctx.font = `500 ${size}px Orbitron, sans-serif`;
+    const lineHeight = Math.round(size * 1.36);
+    const gap = Math.round(size * 0.64);
+    const blocks = clean.map((entry) => wrap(ctx, entry, maxWidth));
+    const height =
+      blocks.reduce((sum, block) => sum + block.length * lineHeight, 0) +
+      gap * Math.max(blocks.length - 1, 0);
+    attempt = { size, lineHeight, gap, blocks };
+    if (height <= maxHeight) break;
+  }
+  return attempt;
+}
+
+// A chapter of the episode, as the studio screen behind the hosts shows it:
+// the beat on a plate, that chapter's headline, and whatever the script
+// already wrote down underneath — the running order in the cold open, the
+// story's one concrete fact while a story runs, the board's numbers listed
+// out when the hosts read the board.
+//
+// EVERYTHING HERE IS COPY THE EPISODE ALREADY CARRIES. Nothing is invented at
+// draw time and nothing is fetched, which is what makes these graphics free:
+// the same rule the show's own verification pass runs on applies to the thing
+// on screen behind it.
+function drawChapterCard(ctx, card) {
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, INK.bgTop);
+  bg.addColorStop(1, INK.bgBottom);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  ctx.save();
+  ctx.font = '700 28px Orbitron, "Arial Black", sans-serif';
+  if ("letterSpacing" in ctx) ctx.letterSpacing = "10px";
+  ctx.fillStyle = INK.channel;
+  ctx.shadowColor = INK.channelGlow;
+  ctx.shadowBlur = 14;
+  ctx.fillText("LT TV", W / 2 + 5, 74);
+  ctx.restore();
+
+  ctx.fillStyle = INK.rule;
+  ctx.fillRect(W / 2 - 70, 106, 140, 3);
+
+  // The beat plate, filled in the same hot ink as the chiron's, so the screen
+  // and the lower third read as one package rather than two graphics.
+  let y = 170;
+  const kicker = String(card.kicker || "").trim();
+  if (kicker) {
+    ctx.save();
+    ctx.font = '700 22px Orbitron, "Arial Black", sans-serif';
+    if ("letterSpacing" in ctx) ctx.letterSpacing = "6px";
+    const label = kicker.toUpperCase();
+    const plateW = Math.min(W - 120, ctx.measureText(label).width + 48);
+    ctx.fillStyle = INK.format;
+    ctx.shadowColor = INK.format;
+    ctx.shadowBlur = 12;
+    ctx.fillRect(W / 2 - plateW / 2, y - 22, plateW, 44);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#12040f";
+    ctx.fillText(label, W / 2 + 3, y + 1);
+    ctx.restore();
+    y += 76;
+  }
+
+  const { size, lines } = fitTitle(ctx, String(card.headline || "").toUpperCase(), W - 130, 4, 52);
+  const lineHeight = size * 1.14;
+  ctx.save();
+  ctx.fillStyle = INK.title;
+  ctx.shadowColor = INK.titleGlow;
+  ctx.shadowBlur = 10;
+  lines.forEach((line, i) => ctx.fillText(line, W / 2, y + i * lineHeight));
+  ctx.restore();
+  y += (lines.length - 1) * lineHeight + size * 0.6 + 54;
+
+  // The note is pinned to the bottom, so it is measured BEFORE the body: it is
+  // what decides how much room the body has to fit in.
+  const NOTE_LINE = 29;
+  ctx.font = '500 21px Orbitron, sans-serif';
+  const noteLines = card.note ? wrap(ctx, String(card.note), W - 130).slice(0, 3) : [];
+  const noteTop = noteLines.length ? H - 76 - (noteLines.length - 1) * NOTE_LINE : H - 56;
+
+  const body = fitBody(ctx, card.lines, W - 130, noteTop - 28 - y);
+  ctx.save();
+  ctx.font = `500 ${body.size}px Orbitron, sans-serif`;
+  ctx.fillStyle = INK.body;
+  // Each entry is its own paragraph — a board line and a story's fact are both
+  // one sentence, and running them together would read as prose.
+  for (const block of body.blocks) {
+    for (const line of block) {
+      if (y > noteTop - 28) {
+        // Only reachable when even BODY_MIN could not fit the copy, which
+        // means a card carrying far more than a card should. Say so on screen
+        // rather than ending mid-thought.
+        ctx.fillText("…", W / 2, y);
+        y = Infinity;
+        break;
+      }
+      ctx.fillText(line, W / 2, y);
+      y += body.lineHeight;
+    }
+    if (!Number.isFinite(y)) break;
+    y += body.gap;
+  }
+  ctx.restore();
+
+  if (noteLines.length) {
+    ctx.save();
+    ctx.font = '500 21px Orbitron, sans-serif';
+    ctx.fillStyle = INK.note;
+    noteLines.forEach((line, i) => ctx.fillText(line, W / 2, noteTop + i * NOTE_LINE));
+    ctx.restore();
+  }
+
+  ctx.fillStyle = "rgba(255,255,255,0.035)";
+  for (let scan = 0; scan < H; scan += 4) ctx.fillRect(0, scan, W, 1);
+  const vignette = ctx.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.75);
+  vignette.addColorStop(0, "rgba(0,0,0,0)");
+  vignette.addColorStop(1, "rgba(0,0,0,0.55)");
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, W, H);
+}
+
+/**
+ * One deck, two kinds of card: the lineup's shows and an episode's chapters.
+ * Exported as the single way to draw one, so a preview draws exactly what the
+ * screen does rather than a second copy of the layout that drifts from it.
+ */
+export function drawScreenCard(ctx, card) {
+  if (card?.kind === "chapter") drawChapterCard(ctx, card);
+  else drawCard(ctx, card);
 }
 
 function drawCard(ctx, card) {
@@ -165,9 +343,21 @@ function drawStatic(ctx, noise, noiseCtx, t) {
 
 /**
  * Drives `Content_Screen` under `root` while `cards` is non-null; hides it
- * (as the set ships) when `cards` is null. Cards: { title, format, latest }.
+ * (as the set ships) when `cards` is null.
+ *
+ * Two decks, told apart by the cards themselves: the lineup's shows
+ * ({ title, format, latest }) and an episode's chapters
+ * ({ kind: "chapter", kicker, headline, lines, note }).
+ *
+ * `indexRef` is how the set drives the deck. Given one, the screen shows
+ * whatever card that ref points at and cuts to the next through the same burst
+ * of static; without one it cycles on a timer, which is what the lineup wants.
+ * A REF AND NOT A PROP ON PURPOSE: the index changes from inside the frame
+ * loop as the episode moves from chapter to chapter, and routing that through
+ * React state would re-render the whole set several times an episode to change
+ * a texture this hook owns anyway.
  */
-export function useChannelScreen(root, cards) {
+export function useChannelScreen(root, cards, { indexRef = null } = {}) {
   const stateRef = useRef(null);
 
   useEffect(() => {
@@ -200,16 +390,17 @@ export function useChannelScreen(root, cards) {
     screen.material = material;
     screen.visible = true;
 
-    const state = { ctx, noise, noiseCtx, texture, cards, index: 0, phase: "card", phaseStart: 0, frame: 0 };
+    const start = clampIndex(indexRef?.current ?? 0, cards.length);
+    const state = { ctx, noise, noiseCtx, texture, cards, indexRef, index: start, phase: "card", phaseStart: 0, frame: 0 };
     stateRef.current = state;
-    drawCard(ctx, cards[0]);
+    drawScreenCard(ctx, cards[start]);
     texture.needsUpdate = true;
 
     // Canvas text falls back until Orbitron is ready; repaint the card once it is.
     let alive = true;
     document.fonts?.load('800 64px Orbitron').then(() => {
       if (!alive || state.phase !== "card") return;
-      drawCard(ctx, cards[state.index]);
+      drawScreenCard(ctx, cards[state.index]);
       texture.needsUpdate = true;
     }).catch(() => {});
 
@@ -221,32 +412,43 @@ export function useChannelScreen(root, cards) {
       material.dispose();
       texture.dispose();
     };
-  }, [root, cards]);
+  }, [root, cards, indexRef]);
 
   useFrame(({ clock }) => {
     const s = stateRef.current;
-    if (!s || s.cards.length < 2) return;
+    if (!s) return;
     const t = clock.elapsedTime;
     if (!s.phaseStart) s.phaseStart = t;
     const age = t - s.phaseStart;
-    if (s.phase === "card" && age >= CARD_SECONDS) {
+    // A driven deck cuts when the set says so; an undriven one cuts on a timer
+    // and a single card never cuts at all.
+    const driven = Boolean(s.indexRef);
+    const wanted = driven ? clampIndex(s.indexRef.current ?? 0, s.cards.length) : -1;
+
+    if (s.phase === "card") {
+      const due = driven ? wanted !== s.index : s.cards.length > 1 && age >= CARD_SECONDS;
+      if (!due) return;
       s.phase = "static";
       s.phaseStart = t;
-    } else if (s.phase === "static" && age >= STATIC_SECONDS) {
+      return;
+    }
+
+    if (age >= STATIC_SECONDS) {
       s.phase = "card";
       s.phaseStart = t;
-      s.index = (s.index + 1) % s.cards.length;
-      drawCard(s.ctx, s.cards[s.index]);
+      // Read the wanted card on the way OUT of the burst, not on the way in:
+      // a chapter that turns over during the static (a very short segment)
+      // lands on the one that is actually on air rather than the one that was.
+      s.index = driven ? clampIndex(s.indexRef.current ?? 0, s.cards.length) : (s.index + 1) % s.cards.length;
+      drawScreenCard(s.ctx, s.cards[s.index]);
       s.texture.needsUpdate = true;
       return;
     }
     // Static repaints every other frame; a card is drawn once per phase.
-    if (s.phase === "static") {
-      s.frame = (s.frame + 1) % 2;
-      if (s.frame === 0) {
-        drawStatic(s.ctx, s.noise, s.noiseCtx, age);
-        s.texture.needsUpdate = true;
-      }
+    s.frame = (s.frame + 1) % 2;
+    if (s.frame === 0) {
+      drawStatic(s.ctx, s.noise, s.noiseCtx, age);
+      s.texture.needsUpdate = true;
     }
   });
 }

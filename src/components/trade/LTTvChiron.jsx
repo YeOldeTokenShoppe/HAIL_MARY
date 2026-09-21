@@ -14,6 +14,13 @@ import css from "styled-jsx/css";
 // than faked when it fails to load), and the cube's clock face is the viewer's
 // local time.
 //
+// `chapter` is the part of the show that is on air now, passed down from the
+// set (which owns the clock). A newscast's lower third changes with the
+// running order, so the bar carries a beat plate and that chapter's headline
+// and wipes to the next one as the show moves on. A record with no chapters —
+// anything staged before they existed — sits on `graphics.headline` for the
+// whole episode, which is what the bar did before.
+//
 // `mode`: "news" is the full package; "logo" keeps only the spinning cube, like
 // a channel's corner logo, for non-news shows and the lineup. The cube holds
 // its place in both, so news slides its bar and ticker in beside it.
@@ -100,15 +107,21 @@ const LOGO_FACE = (
   </div>
 );
 
-export default function LTTvChiron({ episode, mode = "news", status = "Replay" }) {
+export default function LTTvChiron({ episode, mode = "news", status = "Replay", chapter = null }) {
   const news = mode === "news";
   const trackRef = useRef(null);
+  const headlineRef = useRef(null);
   const [navHeight, setNavHeight] = useState(64);
   const [tickerSeconds, setTickerSeconds] = useState(60);
   const clock = useClock();
   const rl80 = useRl80Price(news);
   const rl80Price = Number.isFinite(rl80?.price) ? rl80.price : null;
-  const headline = episode?.graphics?.headline || episode.title;
+  const headline = chapter?.headline || episode?.graphics?.headline || episode.title;
+  const kicker = chapter?.kicker || "";
+  // Re-runs the wipe whenever the bar's copy changes, and only then — keyed on
+  // the copy itself rather than on a chapter index, so an episode with no
+  // chapters wipes once on arrival exactly as it used to.
+  const wipeKey = `${episode.id ?? episode.number}:${kicker}:${headline}`;
   const ticker = tickerCopy(episode);
   // The source's box is always green; keep that, but don't show green on a
   // day RL80 is actually down.
@@ -149,6 +162,40 @@ export default function LTTvChiron({ episode, mode = "news", status = "Replay" }
     return () => observer.disconnect();
   }, []);
 
+  // Keep the headline inside the bar. It was one fixed string per episode when
+  // the size was chosen; it is now a different story every chapter, and a beat
+  // plate sits in front of it, so a long one would run under the clipped edge
+  // and simply lose its last few words with nothing to show it had. Shrink to
+  // fit instead, down to a floor — past that the bar is the wrong shape for
+  // the copy and a producer should shorten the headline.
+  useLayoutEffect(() => {
+    const line = headlineRef.current;
+    const bar = line?.parentElement;
+    if (!line || !bar) return undefined;
+    let alive = true;
+    const fit = () => {
+      if (!alive) return;
+      line.style.fontSize = "";
+      const available = bar.clientWidth;
+      const needed = line.scrollWidth;
+      if (!available || needed <= available) return;
+      const base = parseFloat(getComputedStyle(line).fontSize);
+      if (!base) return;
+      line.style.fontSize = `${Math.max(base * 0.55, (base * available) / needed)}px`;
+    };
+    fit();
+    // Bebas Neue swaps in after first paint and is much narrower than the
+    // fallback, so a measurement taken before it lands shrinks copy that would
+    // have fitted.
+    document.fonts?.ready.then(fit).catch(() => {});
+    const observer = new ResizeObserver(fit);
+    observer.observe(bar);
+    return () => {
+      alive = false;
+      observer.disconnect();
+    };
+  }, [wipeKey]);
+
   return (
     <div
       className={`ltc${news ? "" : " is-logo"}`}
@@ -188,7 +235,10 @@ export default function LTTvChiron({ episode, mode = "news", status = "Replay" }
           <div className="ltc-hilite" />
           <div className="ltc-glow" />
           <div className="ltc-rule" />
-          <p key={episode.number}>{headline}</p>
+          <p ref={headlineRef} key={wipeKey}>
+            {kicker && <b className="ltc-kicker">{kicker}</b>}
+            {headline}
+          </p>
         </div>
       </div>
 
@@ -390,6 +440,23 @@ const styles = css.global`
     height: 0.4em;
     background: linear-gradient(90deg, transparent, var(--ltc-bar-rule));
     box-shadow: 0 0 2px var(--ltc-bar) inset;
+  }
+
+  /* The beat plate, in the bar's hot ink — the "MACRO" / "CRYPTO" tag a
+     newscast puts in front of the story it is on. Baseline-aligned rather than
+     vertically centred, so it sits on the headline's line rather than floating
+     against the bar's much taller cap height. */
+  .ltc-kicker {
+    display: inline-block;
+    margin-right: 0.5em;
+    padding: 0.14em 0.42em 0.06em;
+    background: var(--ltc-bar-hot);
+    box-shadow: 0 0 0.6em var(--ltc-bar-hot);
+    font-family: Arial, "Helvetica Neue", sans-serif;
+    font-size: 0.42em;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    vertical-align: 0.42em;
   }
 
   .ltc-event p {

@@ -29,6 +29,7 @@ import { SITEPAL_PROJECTION_CONFIG } from "@/components/CyborgTempleScene";
 import { useChannelScreen } from "@/components/trade/ltTvChannelScreen";
 import {
   buildEpisodeTimeline,
+  chapterIndexAt,
   cueIndexAt,
   sectionIndexAt,
   shotSubjectAt,
@@ -181,6 +182,10 @@ const idlePlayback = () => ({
   section: 0,
   holdingAt: null,
   heldSince: 0,
+  // Which chapter the graphics are showing. -1 is "nothing published yet", so
+  // stopping the show re-publishes the opening chapter rather than leaving the
+  // chiron on whatever story it was cut off in the middle of.
+  chapterIndex: -1,
   pausedAt: null,
   // Set when the pause had to be done with stopSpeech because this build of
   // the player has no freezeToggle: the resume then restarts the section the
@@ -1102,6 +1107,21 @@ function StudioLights({ fixtures, playbackRef }) {
   ));
 }
 
+// The episode's chapters as a deck for the set's frame screen. A chapter with
+// no headline is dropped rather than drawn blank — the deck is what the show
+// has, not a slot per segment.
+function chapterCards(timeline) {
+  return (timeline?.chapters || [])
+    .map((chapter) => ({
+      kind: "chapter",
+      kicker: chapter.screen?.kicker ?? chapter.kicker ?? "",
+      headline: chapter.screen?.headline ?? chapter.headline ?? "",
+      lines: chapter.screen?.lines ?? [],
+      note: chapter.screen?.note ?? "",
+    }))
+    .filter((card) => card.headline);
+}
+
 function TalkShowModel({
   episode,
   anchorY,
@@ -1115,6 +1135,7 @@ function TalkShowModel({
   channelCards,
   onPlaybackReady,
   onPlaybackStateChange,
+  onChapterChange,
 }) {
   const { scene, animations } = useGLTF(MODEL_URL, DRACO_PATH);
   const raisedSet = castHidden || newsMode;
@@ -1123,6 +1144,11 @@ function TalkShowModel({
     Connor: { frame: null, ready: false, source: null },
   });
   const playbackRef = useRef(idlePlayback());
+  // The chiron lives outside the canvas, so chapter changes leave the set
+  // through a callback. Held in a ref for the same reason the timeline is: the
+  // frame loop should not care that a parent re-rendered.
+  const onChapterChangeRef = useRef(onChapterChange);
+  onChapterChangeRef.current = onChapterChange;
   // Frame counter for solo mode's listener-repaint throttle.
   const solotickRef = useRef(0);
 
@@ -1325,7 +1351,17 @@ function TalkShowModel({
     });
   }, [cloned]);
 
-  useChannelScreen(cloned, channelCards);
+  // THE FRAME'S SCREEN. On the lineup it is the channel display, cycling a
+  // card per show. On the news set it is the studio screen, and it carries the
+  // episode's own chapters — so it follows the show rather than sitting on the
+  // channel card for six minutes. `castHidden` is the lineup (empty chairs),
+  // which keeps the channel deck.
+  const episodeDeck = useMemo(() => chapterCards(timeline), [timeline]);
+  const chapterIndexRef = useRef(0);
+  const onSet = !castHidden && episodeDeck.length > 0;
+  useChannelScreen(cloned, onSet ? episodeDeck : channelCards, {
+    indexRef: onSet ? chapterIndexRef : null,
+  });
 
   // Camera-monitor feed. Built on the first frame (it needs the viewer camera)
   // and torn down with the model it was built against; `undefined` means "not
@@ -2721,6 +2757,19 @@ function TalkShowModel({
       }
     }
 
+    // WHICH PART OF THE SHOW IS ON AIR. The set owns the clock, so it is the
+    // only thing that can say — the chiron and the frame's screen both read
+    // it from here. Published only when it CHANGES: that is a handful of
+    // updates across an episode rather than one a frame, which is the
+    // difference between a lower third that follows the running order and a
+    // set that re-renders sixty times a second to no effect.
+    const chapterIndex = chapterIndexAt(timeline, elapsed, playback.running);
+    if (chapterIndex !== playback.chapterIndex) {
+      playback.chapterIndex = chapterIndex;
+      chapterIndexRef.current = Math.max(chapterIndex, 0);
+      onChapterChangeRef.current?.(timeline?.chapters?.[chapterIndex] ?? null);
+    }
+
     Object.entries(headBones).forEach(([actor, head]) => {
       head.quaternion.copy(animatedHeadQuaternions[actor]);
     });
@@ -2947,6 +2996,7 @@ export default function TalkShowScene({
   channelCards = null,
   onPlaybackReady,
   onPlaybackStateChange,
+  onChapterChange,
 }) {
   return (
     <group position={position} scale={scale} rotation={rotation}>
@@ -2964,6 +3014,7 @@ export default function TalkShowScene({
           channelCards={channelCards}
           onPlaybackReady={onPlaybackReady}
           onPlaybackStateChange={onPlaybackStateChange}
+          onChapterChange={onChapterChange}
         />
       </Suspense>
     </group>

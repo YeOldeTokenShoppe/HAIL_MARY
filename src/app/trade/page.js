@@ -1382,6 +1382,14 @@ export default function CyborgTemple() {
   // player retries itself a few times and then reports 'failed', so the START
   // control can offer a retry instead of sitting on "Loading voices…" forever.
   const [talkShowVoiceStatus, setTalkShowVoiceStatus] = useState('loading');
+  // Which part of the episode is on air, published by the set as the show
+  // moves from chapter to chapter. The chiron's headline bar reads it; a
+  // record with no chapters leaves it null and the bar sits on the episode's
+  // own headline, as it did before.
+  const [ltTvChapter, setLtTvChapter] = useState(null);
+  const handleTalkShowChapter = useCallback((chapter) => {
+    setLtTvChapter(chapter);
+  }, []);
   const handleTalkShowPlaybackReady = useCallback((ready, status) => {
     setTalkShowAudioReady(ready);
     setTalkShowVoiceStatus(status || (ready ? 'ready' : 'loading'));
@@ -4182,6 +4190,7 @@ export default function CyborgTemple() {
                 channelCards={ltTvView === 'lineup' || ltTvSelection.showId === 'news' ? ltTvChannelCards : null}
                 onPlaybackReady={handleTalkShowPlaybackReady}
                 onPlaybackStateChange={handleTalkShowPlaybackState}
+                onChapterChange={handleTalkShowChapter}
               />
             )}
 
@@ -4706,6 +4715,7 @@ export default function CyborgTemple() {
             audioReady={talkShowAudioReady}
             playing={talkShowPlaying}
             voiceStatus={talkShowVoiceStatus}
+            chapter={ltTvChapter}
             onRetry={() => {
               setTalkShowVoiceStatus('loading');
               try { window.__talkShowRetryPortals?.(); } catch (e) {}
