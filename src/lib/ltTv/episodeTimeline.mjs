@@ -134,6 +134,93 @@ export function episodeSections(record) {
   ];
 }
 
+// ── SEEKING ───────────────────────────────────────────────────────────────
+//
+// WHAT SITEPAL CAN AND CANNOT DO, because it decides the shape of all of this.
+// The player has no "play from 3:20": its speech functions take a clip name
+// and start it at the beginning (docs/sitepal.md, Speech Functions), and the
+// only position it reports is `vh_audioProgress` as a percentage. So there is
+// no seeking INSIDE a clip, at any cost, and no amount of work on this page
+// changes that.
+//
+// What there is instead: an episode of any real length is already several
+// clips, because SitePal refuses one over 90 seconds. Starting a section is
+// something the set does at every join anyway, so the section boundaries are
+// real, free seek points — roughly a minute and a half apart. That is the
+// granularity, and these helpers are the arithmetic for it.
+//
+// Pausing is a separate mechanism and does not go through here: `freezeToggle`
+// holds speech where it is and resumes from that point, which is exact.
+
+// Pressing "back" in the first few seconds of a section means the section
+// before; later on it means "start this one again", the way every other
+// player behaves. Without the grace period, back is unusable — a section is
+// ~90 seconds, so anyone reaching for it a minute in gets thrown a minute and
+// a half further back than they meant.
+export const SECTION_RESTART_SECONDS = 3;
+
+/** Which section holds `seconds`. Before the first one, the first one. */
+export function sectionIndexAt(sections, seconds) {
+  if (!Array.isArray(sections) || sections.length === 0) return 0;
+  const at = Number.isFinite(seconds) ? seconds : 0;
+  let index = 0;
+  for (let i = 0; i < sections.length; i += 1) {
+    if ((sections[i].startsAt ?? 0) <= at) index = i;
+    else break;
+  }
+  return index;
+}
+
+/**
+ * How many reaction cues are already behind `seconds`.
+ *
+ * The frame loop walks the cue list forward and never looks back, which is
+ * right for a performance that only ever moves forward — and wrong the moment
+ * it can jump. Landing at 4:00 with the index still at zero fires every
+ * reaction of the first four minutes in one frame; landing at 0:30 with the
+ * index at the end plays the rest of the episode with nobody reacting. Both
+ * are silent failures, so the seat is computed rather than nudged.
+ */
+export function cueIndexAt(cues, seconds) {
+  if (!Array.isArray(cues)) return 0;
+  const at = Number.isFinite(seconds) ? seconds : 0;
+  let index = 0;
+  while (index < cues.length && cues[index].at <= at) index += 1;
+  return index;
+}
+
+/**
+ * Where skip-back / skip-forward land from `elapsed`.
+ *
+ * `step` is -1 or +1. Returns a section index, or null for "off the end of
+ * the episode" — which the caller ends the show on rather than clamping,
+ * because a skip past the last section means the viewer is done.
+ */
+export function stepSection(sections, elapsed, step) {
+  if (!Array.isArray(sections) || sections.length === 0) return null;
+  const here = sectionIndexAt(sections, elapsed);
+  if (step > 0) return here + 1 < sections.length ? here + 1 : null;
+  const startsAt = sections[here]?.startsAt ?? 0;
+  const at = Number.isFinite(elapsed) ? elapsed : 0;
+  if (here === 0 || at - startsAt > SECTION_RESTART_SECONDS) return here;
+  return here - 1;
+}
+
+/**
+ * The episode as a row of seekable blocks: where each section starts, where it
+ * ends, and how long it runs. The scrub bar draws these, and a click on it
+ * lands on the `startsAt` of whichever one was hit.
+ */
+export function sectionBounds(timeline) {
+  const sections = timeline?.sections || [];
+  const end = timeline?.dialogueEnd ?? 0;
+  return sections.map((section, index) => {
+    const startsAt = section.startsAt ?? 0;
+    const endsAt = sections[index + 1]?.startsAt ?? end;
+    return { index, startsAt, endsAt, seconds: Math.max(0, endsAt - startsAt) };
+  });
+}
+
 /**
  * Problems a producer should hear about before the set does. Returned rather
  * than thrown so one malformed record can't take the /trade page down; the
