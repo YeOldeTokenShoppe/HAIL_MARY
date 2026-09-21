@@ -741,7 +741,13 @@ export const STUDIO_LIGHTS = {
   //
   // Not zero: off air is the lineup and the pre-show set, which still have to
   // be lit enough to see. Tune by eye from the console like every other knob.
-  offAir: 0.3,
+  //
+  // THIS NUMBER ALONE IS NOT THE CUE, and 0.3 of it was invisible on the news
+  // set — see HOUSE_AMBIENT. The page lights the whole canvas with a flat
+  // ambient several times brighter than anything these four fixtures add, so
+  // dimming only the rig moves a fraction of what is on screen. Both ride the
+  // same signal now.
+  offAir: 0.22,
   // Fade rate, per second, for that transition. Around this figure the change
   // lands in roughly a second — a lighting board, not a switch.
   fadeLambda: 2.2,
@@ -788,6 +794,52 @@ export const STUDIO_LIGHTS = {
     { intensity: 8, color: "#ffe6c4", opacity: 0.13, yaw: 0, pitch: 0 },
   ],
 };
+
+// ── House ambient ─────────────────────────────────────────────────────────
+// THE FLAT AMBIENT IS MOST OF THE LIGHT IN THE ROOM, which is why dimming the
+// overhead rig on its own did nothing a viewer could see. /trade lights the
+// whole canvas with one `ambientLight` at 1.5, and the four spots add 8 and 4
+// over a small part of the set — so taking the rig to a fraction of its plot
+// still left every surface flatly lit and the cue read as "nothing happened".
+//
+// `HouseAmbient` is that same ambient light with its intensity eased on the
+// same signal. Off air the surfaces go down and the set's own neon — the
+// frame, the desk edge, the programme screen, the lens sprites — stays where
+// it is, because none of it is lit by this light. That is the studio going
+// dark around the sign, which is the cue asked for.
+//
+// It is mounted for the WHOLE page, so `dimmed` must only ever be true while
+// the talk show tab is on. Outside it, the value is the 1.5 the page has
+// always had. Live-tunable from `window.__tsAmbient`.
+export const HOUSE_AMBIENT = {
+  onAir: 1.5,
+  offAir: 0.5,
+  // Matches STUDIO_LIGHTS.fadeLambda so the room and the rig move together;
+  // two different rates read as two separate faults.
+  fadeLambda: 2.2,
+};
+
+export function HouseAmbient({ dimmed = false }) {
+  const lightRef = useRef(null);
+  const levelRef = useRef(dimmed ? HOUSE_AMBIENT.offAir : HOUSE_AMBIENT.onAir);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") window.__tsAmbient = HOUSE_AMBIENT;
+  }, []);
+
+  useFrame((state, delta) => {
+    const target = dimmed ? HOUSE_AMBIENT.offAir : HOUSE_AMBIENT.onAir;
+    levelRef.current = THREE.MathUtils.damp(
+      levelRef.current,
+      target,
+      HOUSE_AMBIENT.fadeLambda,
+      delta,
+    );
+    if (lightRef.current) lightRef.current.intensity = levelRef.current;
+  });
+
+  return <ambientLight ref={lightRef} intensity={levelRef.current} />;
+}
 
 // How far down the beam the SpotLight's target is parked. Direction-only, so
 // the value just has to be comfortably clear of the light itself.
@@ -937,9 +989,13 @@ function aimFixture(fixture, yawDeg, pitchDeg, scratch, light, sprite) {
   }
 }
 
-// `playbackRef` is the set's own playback ref, read (never subscribed to) so
-// the house lights can follow the show without re-rendering anything.
-function StudioLights({ fixtures, playbackRef }) {
+// `onAir` is true while an episode is actually running. It comes down as a
+// prop from the page's own playback state rather than being read off the set's
+// playback ref: that ref and the page state are set on the same line at every
+// end-of-show, but the page state is the one whose value is visible on screen
+// (it is what collapses and reopens the console), so a cue that disagrees with
+// it would be a cue nobody could explain.
+function StudioLights({ fixtures, onAir }) {
   const lightsRef = useRef([]);
   const spritesRef = useRef([]);
   const colorsRef = useRef([]);
@@ -992,7 +1048,7 @@ function StudioLights({ fixtures, playbackRef }) {
     // Ease toward the house level for whichever way the show is. Damping on
     // delta rather than a fixed step so the fade takes the same time whatever
     // the frame rate.
-    const target = playbackRef?.current?.running ? 1 : STUDIO_LIGHTS.offAir;
+    const target = onAir ? 1 : STUDIO_LIGHTS.offAir;
     levelRef.current = THREE.MathUtils.damp(
       levelRef.current,
       target,
@@ -1092,6 +1148,7 @@ function TalkShowModel({
   hideCameraRig,
   castHidden,
   newsMode,
+  onAir,
   channelCards,
   onPlaybackReady,
   onPlaybackStateChange,
@@ -2549,7 +2606,7 @@ function TalkShowModel({
       {/* Siblings, not children of the set: readLightFixtures returns model
           coordinates in `cloned`'s parent space, which is exactly here. */}
       {lightFixtures.length > 0 && (
-        <StudioLights fixtures={lightFixtures} playbackRef={playbackRef} />
+        <StudioLights fixtures={lightFixtures} onAir={onAir} />
       )}
     </group>
   );
@@ -2571,6 +2628,11 @@ function TalkShowModel({
 // LT TV's lineup view uses the same set off air: `castHidden` empties the chairs
 // (and skips painting the hidden faces), and `channelCards` puts the channel on
 // the frame's screen — see ltTvChannelScreen.
+//
+// `onAir` is true only while an episode is actually running, and is what the
+// overhead rig follows. A caller that dims the page's ambient with
+// `HouseAmbient` must drive both off the same value, or the room and the rig
+// disagree about whether the show is on.
 export default function TalkShowScene({
   // WHICH EPISODE IS ON. A record from src/content/lt-tv — the guide's
   // selection, handed straight to the set. Defaults to the slate's first
@@ -2587,6 +2649,7 @@ export default function TalkShowScene({
   hideCameraRig = false,
   castHidden = false,
   newsMode = false,
+  onAir = false,
   channelCards = null,
   onPlaybackReady,
   onPlaybackStateChange,
@@ -2604,6 +2667,7 @@ export default function TalkShowScene({
           hideCameraRig={hideCameraRig}
           castHidden={castHidden}
           newsMode={newsMode}
+          onAir={onAir}
           channelCards={channelCards}
           onPlaybackReady={onPlaybackReady}
           onPlaybackStateChange={onPlaybackStateChange}

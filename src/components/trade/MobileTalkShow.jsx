@@ -23,7 +23,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import TalkShowScene from "./TalkShowScene";
+import TalkShowScene, { HouseAmbient } from "./TalkShowScene";
 import { SHOWS } from "@/content/lt-tv";
 import useNewEpisodes from "./useNewEpisodes";
 import usePerfHud from "./PerfHud";
@@ -297,10 +297,13 @@ export default function MobileTalkShow({ onExit }) {
           style={{ width: "100%", height: "100%", background: "#000" }}
         >
           <StageCamera newsMode={newsMode} />
-          <ambientLight intensity={1.5} />
+          {/* Same house-lights cue as the desktop set: the room goes down
+              between episodes and comes up when one starts. */}
+          <HouseAmbient dimmed={!playing} />
           <TalkShowScene
             episode={selectedEpisode}
             newsMode={newsMode}
+            onAir={playing}
             channelCards={channelCards}
             soloProjection
             enableMonitorFeed={false}

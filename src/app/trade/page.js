@@ -25,7 +25,7 @@ import CyborgTempleScene, {
 import VideoScreens from "@/components/VideoScreens";
 // import VideoScreensOptimized from "@/components/VideoScreensOptimized";
 import CouncilChatScreens from "@/components/CouncilChatScreens";
-import TalkShowScene, { preloadTalkShow } from "@/components/trade/TalkShowScene";
+import TalkShowScene, { preloadTalkShow, HouseAmbient } from "@/components/trade/TalkShowScene";
 import LTTvBroadcastPanel from "@/components/trade/LTTvBroadcastPanel";
 import { SHOWS as LT_TV_SHOWS, findEpisode as findLtTvEpisode } from "@/content/lt-tv";
 import TickerDisplay3 from "@/components/TickerDisplay3";
@@ -3962,7 +3962,11 @@ export default function CyborgTemple() {
         >
           <fog attach="fog" args={context80sMode ? ['#1a0033', 50, 300] : ['#000000', 20, 200]} />
           <Suspense fallback={null}>
-            <ambientLight intensity={1.5} />
+            {/* The page's flat ambient, which is most of the light on the
+                canvas. It eases down between LT TV episodes so the studio
+                going dark at the end of a show is something you can see;
+                everywhere else it is the 1.5 it has always been. */}
+            <HouseAmbient dimmed={talkShowMode && !talkShowPlaying} />
             <GpuMemoryProbe />
             <PrecompileScene ready={modelLoaded} epoch={templeEpoch} />
             <TempleWatch onChange={setTempleShowing} />
@@ -4177,6 +4181,7 @@ export default function CyborgTemple() {
                 projectCharacter={talkShowProject}
                 castHidden={ltTvView === 'lineup'}
                 newsMode={ltTvView === 'set' && ltTvSelection.showId === 'news'}
+                onAir={talkShowPlaying}
                 hideCameraRig={ltTvView === 'lineup'}
                 enableMonitorFeed={ltTvView === 'set'}
                 channelCards={ltTvView === 'lineup' || ltTvSelection.showId === 'news' ? ltTvChannelCards : null}
