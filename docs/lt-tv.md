@@ -186,6 +186,7 @@ root — the path is relative to you, not to the repo.
 | `npm run lt:split` | cut the two tracks into the SitePal clips |
 | `npm run lt:slate` | put a recorded episode on the guide |
 | `npm run lt:rename` | move a staged episode to another show or number |
+| `npm run lt:remove` | take an episode off the guide, or delete it |
 | `npm run lt:test` | run every check |
 
 Arguments go after `--`, as in `npm run lt:roundtable -- --topic morality-02`.
@@ -273,6 +274,41 @@ convention is for a new upload. The Wealth Effect is on air right now as
 
 It also does not touch `src/content/lt-tv/` — the committed slate. That half is
 a git rename plus an edit to `index.js`, and it belongs in a commit.
+
+**The same episode showing up twice.** That is what the half-done move looks
+like: the guide has it under the new id and a working copy is still sitting
+there under the old one, with the same title on it. The studio says so on the
+stray row and offers **Move it to `<id>`**, which is the rename above. It only
+offers it when exactly one episode on the guide can be meant — two candidates,
+or none, and it says nothing rather than moving a recording to the wrong name.
+
+**Taking an episode down.** Two strengths, because they are two decisions:
+
+```
+npm run lt:remove -- morality-01 --from-guide    # unlist it, keep the files
+npm run lt:remove -- morality-01 --everything    # and delete them
+npm run lt:remove -- morality-01 --everything --dry-run
+```
+
+`--from-guide` removes the record the guide reads and its import from
+`index.js`, and leaves the script, the recording and the pitch alone — so
+**Put it on the guide** puts it back. That is the one to use while you
+re-record an episode. `--everything` is that, and then the working record, the
+screenplay, the recorded audio, the pitch and the writers'-room conversation;
+none of it is in git, so it cannot be undone by a checkout. Both are in the
+studio at the bottom of an open episode, under **Taking it down**, and both ask
+first.
+
+Neither touches SitePal — the clips stay in the Audio Manager — and neither
+touches `shows.json`: removing a CHANNEL is a different act from removing an
+episode. `--from-guide` and `--everything` both change files git tracks, so the
+run says which, and that checkout then differs from `main` until the same
+removal is made there.
+
+**Re-recording an episode** needs none of this. Open it and press **Record it
+again**; every line already on disk with the same words is reused, so it often
+costs nothing. Take it off the guide first only if you do not want it playing
+on /trade while you work.
 
 ---
 

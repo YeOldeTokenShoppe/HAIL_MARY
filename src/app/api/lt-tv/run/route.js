@@ -24,8 +24,12 @@ export async function POST(request) {
   // The browser sends an action NAME and an episode id. resolveAction turns
   // those into a fixed argv array or refuses; nothing from the request is ever
   // concatenated into a command. See scripts/lt-tv-actions.mjs.
-  const { episodes } = await readStatus(process.cwd());
-  const resolved = resolveAction(body?.action, body?.id, episodes.map((e) => e.id));
+  // The episodes rather than their ids: an action whose destination is part
+  // of the episode (where a stray working copy belongs) reads it from what was
+  // inspected here, so the request still carries nothing but a name and an id.
+  const { episodes, orphans } = await readStatus(process.cwd());
+  const known = [...episodes, ...orphans.filter((o) => !episodes.some((e) => e.id === o.id))];
+  const resolved = resolveAction(body?.action, body?.id, known);
   if (!resolved.ok) {
     return Response.json({ error: resolved.error }, { status: resolved.status });
   }

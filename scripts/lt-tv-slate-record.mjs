@@ -238,6 +238,39 @@ export function registerEpisode(source, id) {
   return replaced;
 }
 
+/**
+ * Take an episode's import and its EPISODE_RECORDS entry back out of index.js.
+ *
+ * The mirror of `registerEpisode`, and it lives beside it because the two have
+ * to agree about the shape of that file. Same three answers: the new source,
+ * the source unchanged when the episode was never registered, or null when the
+ * file does not look the way this expects.
+ *
+ * Removing the import matters more than removing the record: an index that
+ * imports a JSON file which is no longer there does not degrade, it fails the
+ * build.
+ */
+export function unregisterEpisode(source, id) {
+  if (!source.includes(`./episodes/${id}.json`)) return source; // never registered
+
+  const importLine = importLineFor(id);
+  const entry = varNameFor(id);
+  const withoutImport = source.replace(new RegExp(`^${escapeForRegExp(importLine)}\\n`, "m"), "");
+  const withoutEntry = withoutImport.replace(new RegExp(`^[ \\t]*${entry},[ \\t]*\\n`, "m"), "");
+
+  // Both edits, or neither, and judged by the RECORD rather than by the lines
+  // this expected to find: an index that imports the JSON under some other
+  // name is one this does not understand, and a half-edit to it is a build
+  // that fails. The path is what the bundler resolves, so the path is the
+  // test.
+  if (withoutEntry.includes(`./episodes/${id}.json`) || new RegExp(`^\\s*${entry},$`, "m").test(withoutEntry)) {
+    return null;
+  }
+  return withoutEntry;
+}
+
+const escapeForRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 // ── running it ────────────────────────────────────────────────────────────
 //
 //   node scripts/lt-tv-slate-record.mjs morality-02

@@ -227,6 +227,46 @@ export const ACTIONS = {
     argv: (id) => ["node", ["scripts/lt-tv-slate-record.mjs", id]],
     blurb: "Carries the recorded timing into the slate record, so the guide plays the episode instead of listing it as not recorded. Do this after the two clips are uploaded. Free.",
   },
+  rehome: {
+    // The label is written where the destination is known — see rehomeActionFor.
+    label: "Move it to where the guide has it",
+    spends: null,
+    needs: [],
+    // Never offered by stage: this is about a stray working copy, and the row
+    // it belongs on is the one under "Not attached to any show".
+    stages: [],
+    scope: "stray",
+    confirm: "This renames the working copy, its screenplay and its recording. Go ahead?",
+    // The destination is read from the episode the SERVER inspected, never
+    // from the request — the browser still sends nothing but a name and an id.
+    target: (episode) => episode?.rehome ?? null,
+    targetError: (id) => `Nothing on the guide says where ${id} should go.`,
+    argv: (id, to) => ["node", ["scripts/lt-tv-rename.mjs", id, to]],
+    blurb:
+      "The same episode is here twice: once on the guide, and once as a working copy still under its old name. This moves the working copy onto the name the guide uses, so the buttons act on the episode you can see. The SitePal clips keep the names they were uploaded under, which is correct.",
+  },
+  unslate: {
+    label: "Take it off the guide",
+    spends: null,
+    needs: [],
+    stages: [],
+    scope: "remove",
+    confirm: "Take it off the guide? The script and the recording stay on disk.",
+    argv: (id) => ["node", ["scripts/lt-tv-remove.mjs", id, "--from-guide"]],
+    blurb:
+      "Stops it being listed on /trade and stops it playing. Everything it is made of stays, so Put it on the guide puts it back — this is the one to use while you re-record.",
+  },
+  "delete-episode": {
+    label: "Delete it and everything it is made of",
+    spends: null,
+    needs: [],
+    stages: [],
+    scope: "remove",
+    confirm: "Delete the record, the script, the recording and the pitch? Nothing here is in git, so this cannot be undone.",
+    argv: (id) => ["node", ["scripts/lt-tv-remove.mjs", id, "--everything"]],
+    blurb:
+      "The guide entry, the working record, the screenplay, the recorded audio and the pitch. The clips already uploaded to SitePal are not touched — nothing here can reach them.",
+  },
   check: {
     label: "Check the slate",
     spends: null,
@@ -250,11 +290,17 @@ export const ACTION_NAMES = Object.keys(ACTIONS);
  * @returns {{ ok: true, command: string, args: string[] }
  *          |{ ok: false, status: number, error: string }}
  */
-export function resolveAction(action, id, knownIds) {
+export function resolveAction(action, id, known) {
   if (typeof action !== "string" || !Object.hasOwn(ACTIONS, action)) {
     return { ok: false, status: 400, error: `Not an action: ${String(action).slice(0, 40)}` };
   }
   const spec = ACTIONS[action];
+
+  // `known` is either the ids or the episodes they came from. An action that
+  // needs to know something ABOUT an episode — where a stray one belongs —
+  // reads it here, from what the server inspected, so the browser still sends
+  // nothing but an action name and an id.
+  const episodes = (Array.isArray(known) ? known : []).map((e) => (typeof e === "string" ? { id: e } : e));
 
   // `check` is about the whole slate and the show actions are about a show
   // that may have nothing on it yet, so those take no id.
@@ -263,8 +309,20 @@ export function resolveAction(action, id, knownIds) {
     return { ok: true, command, args };
   }
 
-  if (typeof id !== "string" || !knownIds.includes(id)) {
+  const episode = typeof id === "string" ? episodes.find((e) => e?.id === id) : undefined;
+  if (!episode) {
     return { ok: false, status: 400, error: `Not an episode on the slate: ${String(id).slice(0, 40)}` };
+  }
+
+  if (spec.target) {
+    const to = spec.target(episode);
+    // Refused rather than guessed. The status reader answers this only when
+    // exactly one episode on the guide can be meant; anything else lands here.
+    if (typeof to !== "string" || !to) {
+      return { ok: false, status: 400, error: spec.targetError(id) };
+    }
+    const [command, args] = spec.argv(id, to);
+    return { ok: true, command, args };
   }
 
   const [command, args] = spec.argv(id);
@@ -278,6 +336,34 @@ export function actionsFor(stage) {
     ...ACTIONS[name],
     argv: undefined,
   }));
+}
+
+/**
+ * The move offered on a stray working copy, with its destination in the label.
+ *
+ * Returned as a whole action rather than a flag, because the destination is
+ * the only useful thing a person can be told here and it is known only on this
+ * side. Null when nothing on the guide can be meant.
+ */
+export function rehomeActionFor(episode) {
+  const to = ACTIONS.rehome.target(episode);
+  if (!to) return null;
+  return { name: "rehome", ...ACTIONS.rehome, label: `Move it to ${to}`, target: undefined, argv: undefined };
+}
+
+/**
+ * Taking an episode down, offered on every episode and kept apart from the
+ * rest.
+ *
+ * These are not steps in making an episode, they are the opposite of one, so
+ * they are not in `actionsFor` — a row's Next list stays the things that move
+ * it forwards. Unlisting is offered only for an episode that is actually on
+ * the guide, because for any other it would do nothing and say so.
+ */
+export function removeActionsFor(episode) {
+  return ACTION_NAMES.filter((name) => ACTIONS[name].scope === "remove")
+    .filter((name) => name !== "unslate" || episode?.slated)
+    .map((name) => ({ name, ...ACTIONS[name], argv: undefined }));
 }
 
 /** The actions offered under a show's heading, which need no episode. */

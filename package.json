@@ -21,6 +21,7 @@
     "lt:split": "node scripts/lt-tv-split.mjs",
     "lt:slate": "node scripts/lt-tv-slate-record.mjs",
     "lt:rename": "node scripts/lt-tv-rename.mjs",
+    "lt:remove": "node scripts/lt-tv-remove.mjs",
     "lt:brief": "node scripts/lt-news-brief.mjs",
     "lt:news": "node scripts/lt-news-script.mjs",
     "lt:roundtable": "node scripts/lt-rt-script.mjs",

@@ -13,7 +13,15 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { ACTIONS, ACTION_NAMES, resolveAction, actionsFor, showActionsFor } from "./lt-tv-actions.mjs";
+import {
+  ACTIONS,
+  ACTION_NAMES,
+  resolveAction,
+  actionsFor,
+  showActionsFor,
+  rehomeActionFor,
+  removeActionsFor,
+} from "./lt-tv-actions.mjs";
 import { isoWeek } from "./lt-news-brief.mjs";
 import { splitCommand, uploadPlan } from "./lt-tv-split.mjs";
 import { STAGES } from "./lt-tv-status.mjs";
@@ -133,12 +141,17 @@ for (const name of ACTION_NAMES) {
   const a = ACTIONS[name];
   ok(`${name} has a label`, typeof a.label === "string" && a.label.length > 0);
   ok(`${name} explains itself`, typeof a.blurb === "string" && a.blurb.length > 0);
-  ok(`${name} says which stages it suits`,
-    Array.isArray(a.stages) && (a.stages.length > 0 || a.scope === "show"));
+  // An action with no stages is offered from somewhere other than an
+  // episode's Next list, and has to say where: a show's heading, a stray
+  // working copy, or the taking-down block.
+  ok(`${name} says where it is offered`,
+    Array.isArray(a.stages) && (a.stages.length > 0 || ["show", "stray", "remove"].includes(a.scope)));
   ok(`${name} only names real stages`, a.stages.every((s) => STAGES.some((st) => st.id === s)));
   ok(`${name} declares what it spends`, a.spends === null || typeof a.spends === "string");
   ok(`${name} declares the keys it needs`, Array.isArray(a.needs));
-  const [cmd, args] = a.argv("roundtable-02");
+  // The second argument is the destination, which only `rehome` reads; the
+  // rest take an id and ignore it.
+  const [cmd, args] = a.argv("roundtable-02", "morality-01");
   ok(`${name} runs a bare executable`, /^[a-z0-9]+$/.test(cmd));
   ok(`${name} passes arguments as a list`, Array.isArray(args) && args.every((x) => typeof x === "string"));
   ok(`${name} puts no shell metacharacter in its arguments`, args.every((x) => !/[;&|`$><\n]/.test(x)));
@@ -247,6 +260,77 @@ console.log("\nWhat to upload, and under what name, comes from the record:");
 }
 ok("every stage is offered something", STAGES.every((s) => actionsFor(s.id).length > 0));
 ok("no offered action leaks the argv builder", actionsFor("planned").every((a) => a.argv === undefined));
+
+console.log("\nMoving a stray working copy onto the name the guide uses:");
+{
+  // The DESTINATION never comes from the request. It is read off the episode
+  // the server inspected, which is the same rule as the ids: the browser sends
+  // a name and an id, and everything else is looked up here.
+  const stray = { id: "roundtable-02", rehome: "morality-01" };
+  const known = [stray, { id: "morality-01", slated: true }];
+
+  const move = resolveAction("rehome", "roundtable-02", known);
+  ok("it resolves", move.ok);
+  check("to the rename tool, with both ids", move.args, [
+    "scripts/lt-tv-rename.mjs",
+    "roundtable-02",
+    "morality-01",
+  ]);
+
+  // The status reader answers only when exactly one episode on the guide can
+  // be meant, so "no answer" reaches here and has to refuse rather than run a
+  // rename with an undefined destination.
+  const nowhere = resolveAction("rehome", "morality-01", known);
+  ok("an episode with nowhere to go is refused", !nowhere.ok);
+  ok("and told why", nowhere.error.includes("where morality-01 should go"));
+  ok("an id that is not here is still refused first", !resolveAction("rehome", "news-09", known).ok);
+
+  check("the label carries the destination", rehomeActionFor(stray).label, "Move it to morality-01");
+  check("and there is no button when there is nowhere to go", rehomeActionFor({ id: "x" }), null);
+  ok("the offered action leaks neither builder",
+    rehomeActionFor(stray).argv === undefined && rehomeActionFor(stray).target === undefined);
+}
+
+console.log("\nTaking an episode down:");
+{
+  const known = [{ id: "morality-01", slated: true }, { id: "morality-02" }];
+  check("off the guide keeps the files", resolveAction("unslate", "morality-01", known).args, [
+    "scripts/lt-tv-remove.mjs",
+    "morality-01",
+    "--from-guide",
+  ]);
+  check("deleting it does not", resolveAction("delete-episode", "morality-01", known).args, [
+    "scripts/lt-tv-remove.mjs",
+    "morality-01",
+    "--everything",
+  ]);
+  ok("an id that is not an episode is refused, as everywhere else",
+    !resolveAction("delete-episode", "../../etc/passwd", known).ok);
+
+  // Both are irreversible in a way nothing else on the page is, so both ask
+  // first — and in their own words, because "this spends nothing" is not the
+  // question a delete raises.
+  ok("both ask before they run",
+    ACTIONS.unslate.confirm && ACTIONS["delete-episode"].confirm);
+  ok("unlisting is offered only for an episode that is on the guide",
+    removeActionsFor({ id: "morality-01", slated: true }).some((a) => a.name === "unslate")
+      && !removeActionsFor({ id: "morality-02" }).some((a) => a.name === "unslate"));
+  ok("deleting is offered either way",
+    removeActionsFor({ id: "morality-02" }).some((a) => a.name === "delete-episode"));
+  // They are the opposite of a step, so a row's Next list must never end in
+  // Delete.
+  ok("and neither is ever offered as a next step",
+    STAGES.every((st) => !actionsFor(st.id).some((a) => a.scope === "remove")));
+  ok("nor leaks the argv builder", removeActionsFor({ id: "x" }).every((a) => a.argv === undefined));
+}
+
+console.log("\nThe ids may arrive as episodes rather than as strings:");
+{
+  // The run route hands over what it inspected; older callers hand over ids.
+  ok("a bare list of ids still works", resolveAction("record", "roundtable-02", ["roundtable-02"]).ok);
+  ok("and so does a list of episodes", resolveAction("record", "roundtable-02", [{ id: "roundtable-02" }]).ok);
+  ok("an id not in either is refused", !resolveAction("record", "news-09", [{ id: "roundtable-02" }]).ok);
+}
 
 console.log("\nNone of this exists outside development:");
 // The studio reads this checkout and runs steps on this machine, so on a

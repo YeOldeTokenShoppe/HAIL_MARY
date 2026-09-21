@@ -202,6 +202,59 @@ check("an episode of no show at all says nothing of the kind",
 ok("the page surfaces them", renderStatusPage(retired).includes("Not attached to any show"));
 ok("and no longer draws the retired show", !renderStatusPage(retired).includes("The Liminal Terminal<"));
 
+console.log("\nThe same episode under two names:");
+// An episode that changes show changes its id, and the id is the path. Only
+// the committed record moves, because content/ is gitignored and lives on one
+// machine — so the guide has The Wealth Effect as morality-01 while a working
+// copy of it sits there as roundtable-02, and the studio, reading both, shows
+// the title twice. This is that, and the answer is a rename nobody should
+// have to type.
+const twice = await readStatus(await fixture({
+  "src/content/lt-tv/shows.json": { shows: [{ id: "morality", title: "Markets & Morality" }] },
+  [slatePath("morality-01")]: { id: "morality-01", showId: "morality", number: "01", title: "The Wealth Effect" },
+  [stagePath("roundtable-02")]: { id: "roundtable-02", show: "roundtable", number: "02", title: "The Wealth Effect" },
+  "src/content/lt-tv/index.js": indexFor(["morality-01"]),
+}));
+check("the stray is the one that is not on the guide", twice.orphans.map((e) => e.id), ["roundtable-02"]);
+check("and it says where it belongs", twice.orphans[0].rehome, "morality-01");
+ok("the episode on the guide is left where it is",
+  twice.shows.find((s) => s.id === "morality").episodes.map((e) => e.id).join() === "morality-01");
+// The runner looks an episode up in `episodes` to build the rename, so the
+// answer has to be on that list too and not only on the orphan copy.
+check("and the episode list carries the same answer",
+  twice.episodes.find((e) => e.id === "roundtable-02").rehome, "morality-01");
+
+// Renaming moves a recording on somebody's disk, so no answer is better than
+// a confident wrong one. Each of these is a case where the title does not
+// settle it.
+const ambiguous = await readStatus(await fixture({
+  "src/content/lt-tv/shows.json": { shows: [{ id: "morality", title: "Markets & Morality" }] },
+  [slatePath("morality-01")]: { id: "morality-01", showId: "morality", number: "01", title: "The Wealth Effect" },
+  [slatePath("morality-02")]: { id: "morality-02", showId: "morality", number: "02", title: "The Wealth Effect" },
+  [stagePath("roundtable-02")]: { id: "roundtable-02", show: "roundtable", number: "02", title: "The Wealth Effect" },
+  "src/content/lt-tv/index.js": indexFor(["morality-01", "morality-02"]),
+}));
+check("two episodes it could mean is no answer", ambiguous.orphans[0].rehome, null);
+
+const unmatched = await readStatus(await fixture({
+  "src/content/lt-tv/shows.json": { shows: [{ id: "morality", title: "Markets & Morality" }] },
+  [stagePath("roundtable-02")]: { id: "roundtable-02", show: "roundtable", number: "02", title: "Something Else" },
+  "src/content/lt-tv/index.js": indexFor([]),
+}));
+check("and nothing on the guide by that name is no answer either", unmatched.orphans[0].rehome, null);
+
+// A record the guide reads is an episode in its own right, however it is
+// filed. Offering to rename one onto another id would delete an episode by
+// merging it into a stranger.
+const bothOnGuide = await readStatus(await fixture({
+  "src/content/lt-tv/shows.json": { shows: [{ id: "morality", title: "Markets & Morality" }] },
+  [slatePath("morality-01")]: { id: "morality-01", showId: "morality", number: "01", title: "The Wealth Effect" },
+  [slatePath("roundtable-02")]: { id: "roundtable-02", showId: "roundtable", number: "02", title: "The Wealth Effect" },
+  "src/content/lt-tv/index.js": indexFor(["morality-01", "roundtable-02"]),
+}));
+check("an episode the guide reads is never offered the move",
+  bothOnGuide.orphans.find((e) => e.id === "roundtable-02").rehome, null);
+
 console.log("\nA pitch is listed under its show before it is an episode:");
 const pitched = await readStatus(await fixture({
   "src/content/lt-tv/shows.json": { shows: [{ id: "news", title: "LT Weekly News Recap" }] },

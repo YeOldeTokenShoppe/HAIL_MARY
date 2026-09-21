@@ -163,6 +163,10 @@ async function inspect(id, { root, slate, staging, registered }) {
     // it is written. It outlives the writing, so it is here at every stage —
     // an episode on air still answers "why did we cover that".
     pitch: existsSync(join(root, PLAN_DIR, `${id}.json`)),
+    // Whether the guide has a record of its own for this id. It is what tells
+    // a leftover working copy apart from an episode: a leftover has a
+    // screenplay and audio and nothing the site reads.
+    slated: Boolean(slate),
     show: slate?.showId ?? staging?.show ?? null,
     number: slate?.number ?? staging?.number ?? null,
     title: slate?.title ?? staging?.title ?? "(untitled)",
@@ -349,11 +353,44 @@ export async function readStatus(root = process.cwd()) {
   const off = shows.filter((s) => !listed.includes(s.id));
   const stranded = off.flatMap((s) => s.episodes.map((e) => ({ ...e, strandedFrom: SHOW_FORMATS[s.id].title })));
 
+  // Where each stray belongs, worked out once and carried by BOTH lists. The
+  // runner looks an episode up in `episodes` to build the rename, and a
+  // `rehome` that existed only on the orphan copy would be missing exactly
+  // where it is acted on.
+  const rehomes = new Map([...orphans, ...stranded].map((e) => [e.id, rehomeFor(e, episodes, listed)]));
+  const withRehome = (e) => (rehomes.has(e.id) ? { ...e, rehome: rehomes.get(e.id) } : e);
+
   return {
     shows: shows.filter((s) => listed.includes(s.id)),
-    orphans: [...orphans, ...stranded],
-    episodes,
+    orphans: [...orphans, ...stranded].map(withRehome),
+    episodes: episodes.map(withRehome),
   };
+}
+
+/**
+ * Where a stray working copy belongs, when that can be said without guessing.
+ *
+ * An episode that changes show or number changes its ID, and the id is the
+ * path — but only the committed record moves, because everything under
+ * content/ is gitignored and lives on one machine. So The Wealth Effect is on
+ * the guide as morality-01 while a working copy of the same episode sits there
+ * as roundtable-02, and the studio, reading both, shows the title twice.
+ *
+ * The title is what links them, and it is only trustworthy when it is
+ * unambiguous: this answers only when the stray has no record of its own and
+ * exactly ONE episode on the guide is called the same thing. Two matches, or a
+ * stray that is on the guide in its own right, get no answer rather than a
+ * confident wrong one — renaming moves a recording on somebody's disk.
+ */
+function rehomeFor(stray, episodes, listed) {
+  if (stray.slated) return null;
+  const name = String(stray.title || "").trim().toLowerCase();
+  if (!name || name === "(untitled)") return null;
+
+  const twins = episodes.filter(
+    (e) => e.id !== stray.id && e.slated && listed.includes(e.show) && String(e.title || "").trim().toLowerCase() === name,
+  );
+  return twins.length === 1 ? twins[0].id : null;
 }
 
 // ── the terminal view ─────────────────────────────────────────────────────
@@ -431,6 +468,14 @@ function printAll({ shows, orphans }) {
     for (const e of orphans) {
       const why = e.strandedFrom ? C.dim(`  — filed under ${e.strandedFrom}, which is not on the guide`) : "";
       console.log(`  ${C.dim(e.id.padEnd(15))} ${e.title}${why}`);
+      // The same episode under two names is the one case here that is worth
+      // acting on rather than reading past, so it gets the command.
+      if (e.rehome) {
+        console.log(
+          C.dim(`                  the guide already has this one as ${e.rehome} — `) +
+            `npm run lt:rename -- ${e.id} ${e.rehome}`,
+        );
+      }
     }
   }
 

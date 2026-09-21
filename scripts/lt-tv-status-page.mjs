@@ -47,6 +47,17 @@ function episodeCard(e) {
          <ul class="plain">${e.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>`
     : "";
 
+  // A working copy left behind under an old name sits beside the episode it
+  // belongs to, with the same title on it. Saying so is the whole difference
+  // between "why is this here twice" and one command.
+  const stray = e.strandedFrom
+    ? `<div class="block warn"><h4>Filed under ${esc(e.strandedFrom)}, which is not on the guide</h4>
+         ${e.rehome
+           ? `<p class="then">The guide has this episode as <code>${esc(e.rehome)}</code> — this is the working copy, under its old name.</p>
+              <pre>npm run lt:rename -- ${esc(e.id)} ${esc(e.rehome)}</pre>`
+           : `<p class="then">Nothing on the guide matches it.</p>`}</div>`
+    : "";
+
   const next = e.next.run
     ? `<div class="block next"><h4>Next — ${esc(e.next.why)}</h4>
          <pre>${esc(e.next.run)}</pre>
@@ -62,6 +73,7 @@ function episodeCard(e) {
       }</div>
     </header>
     ${e.summary ? `<p class="summary">${esc(e.summary)}</p>` : ""}
+    ${stray}
     ${next}
     <div class="block"><h4>Files</h4><ul class="files">${files}</ul></div>
     ${clips}

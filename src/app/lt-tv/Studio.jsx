@@ -56,9 +56,14 @@ export default function Studio() {
 
   useEffect(() => { load(); }, [load]);
 
-  const run = useCallback(async (action, id, spends) => {
+  const run = useCallback(async (action, id, spends, confirm) => {
     // A step that spends money asks first. The ones that do not, do not — a
     // confirm on a free action teaches you to click through confirms.
+    //
+    // A step that TAKES SOMETHING AWAY asks too, in its own words rather than
+    // in the cost's: deleting a recording costs nothing and is the one thing
+    // on this page that cannot be undone by pressing something else.
+    if (confirm && !window.confirm(confirm)) return;
     if (spends && !window.confirm(`This spends ${spends}. Go ahead?`)) return;
     setRunning(`${action}:${id ?? ''}`);
     setLog({ action, id, output: 'Running…', pending: true });
@@ -222,7 +227,7 @@ function ShowActions({ show, env, onRun, running }) {
             <button
               title={why || undefined}
               disabled={Boolean(why) || Boolean(running)}
-              onClick={() => onRun(a.name, undefined, a.spends)}
+              onClick={() => onRun(a.name, undefined, a.spends, a.confirm)}
               className={`${s.btn} ${i === 0 && !why ? s.btnPrimary : ''}`}
             >
               {busy ? 'Running…' : a.label}
@@ -253,7 +258,7 @@ function Episode({ episode: e, env, ran, onScriptChanged, open, onToggle, onRun,
     if (a.needsScreenplay && unsaved && saveScreenplay.current) {
       if (!(await saveScreenplay.current())) return; // it said why; do not spend anything
     }
-    onRun(a.name, e.id, a.spends);
+    onRun(a.name, e.id, a.spends, a.confirm);
   };
 
   return (
@@ -261,7 +266,14 @@ function Episode({ episode: e, env, ran, onScriptChanged, open, onToggle, onRun,
       <button onClick={onToggle} className={s.episodeHead} aria-expanded={open}>
         <span className={`${s.dot} ${stage.dot}`} aria-hidden />
         <span className={s.episodeTitles}>
-          <span className={s.episodeTitle}>{e.title}</span>
+          <span className={s.episodeTitle}>
+            {e.title}
+            {/* The id, but only where it settles something. Two episodes can
+                carry the same title — a working copy left behind under an old
+                name is exactly that — and then the title alone identifies
+                neither of them. */}
+            {e.strandedFrom && <span className={s.episodeId}>{e.id}</span>}
+          </span>
           <span className={s.episodeMeta}>
             <span className={stage.word}>{stage.label}</span> · {stage.hint}
             {e.lines ? ` · ${e.lines} lines` : ''}
@@ -274,6 +286,15 @@ function Episode({ episode: e, env, ran, onScriptChanged, open, onToggle, onRun,
       {open && (
         <div className={s.episodeBody}>
           {e.summary && <p className={s.summary}>{e.summary}</p>}
+
+          {e.strandedFrom && (
+            <p className={s.stranded}>
+              Filed under {e.strandedFrom}, which is not on the guide any more.
+              {e.rehome
+                ? ` The guide has this episode as ${e.rehome} — this is the working copy, left behind under its old name.`
+                : ' Nothing on the guide matches it, so it is here rather than under a show.'}
+            </p>
+          )}
 
           <h3 className={s.label}>Next — {e.next.why}</h3>
           <div className={s.actions}>
@@ -361,6 +382,27 @@ function Episode({ episode: e, env, ran, onScriptChanged, open, onToggle, onRun,
                 {e.warnings.map((w) => <li key={w} className={s.warn}>{w}</li>)}
               </ul>
             </>
+          )}
+
+          {/* TAKING IT DOWN, at the bottom and on its own. These are not steps
+              in making an episode, so they are not in Next — a list you read
+              top to bottom should not end in Delete. */}
+          {e.removals?.length > 0 && (
+            <div className={s.removals}>
+              <h3 className={`${s.label} ${s.labelRemove}`}>Taking it down</h3>
+              {e.removals.map((a) => (
+                <div key={a.name} className={s.action}>
+                  <button
+                    disabled={Boolean(running)}
+                    onClick={() => runAction(a)}
+                    className={`${s.btn} ${s.btnRemove}`}
+                  >
+                    {running === `${a.name}:${e.id}` ? 'Running…' : a.label}
+                  </button>
+                  <span className={s.actionBlurb}>{a.blurb}</span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

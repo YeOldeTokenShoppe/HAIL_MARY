@@ -1,5 +1,10 @@
 import { readStatus } from '../../../../../scripts/lt-tv-status.mjs';
-import { actionsFor, showActionsFor } from '../../../../../scripts/lt-tv-actions.mjs';
+import {
+  actionsFor,
+  showActionsFor,
+  rehomeActionFor,
+  removeActionsFor,
+} from '../../../../../scripts/lt-tv-actions.mjs';
 import { refuseOutsideDev } from '@/lib/ltTv/devOnly.mjs';
 
 // Reads the working tree, so it can never be cached or prerendered.
@@ -21,9 +26,20 @@ export async function GET() {
         ...show,
         // A show's own buttons: the ones that make an episode exist.
         actions: showActionsFor(show.id),
-        episodes: show.episodes.map((e) => ({ ...e, actions: actionsFor(e.stage) })),
+        episodes: show.episodes.map((e) => ({
+          ...e,
+          actions: actionsFor(e.stage),
+          // Taking it down, kept apart from the steps that move it forwards.
+          removals: removeActionsFor(e),
+        })),
       })),
-      orphans: status.orphans.map((e) => ({ ...e, actions: actionsFor(e.stage) })),
+      orphans: status.orphans.map((e) => ({
+        ...e,
+        // A stray working copy is offered the move FIRST, because every other
+        // step on it acts on an episode the guide does not have.
+        actions: [rehomeActionFor(e), ...actionsFor(e.stage)].filter(Boolean),
+        removals: removeActionsFor(e),
+      })),
       env: {
         anthropic: Boolean(process.env.ANTHROPIC_API_KEY),
         elevenlabs: Boolean(process.env.ELEVENLABS_API_KEY),
