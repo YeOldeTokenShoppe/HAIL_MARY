@@ -240,6 +240,65 @@ shows.
 
 ---
 
+## What is on screen during a news episode
+
+The news show has a full cable-news package over the set, and none of it is
+typed by hand: every word of it is copy the script pass already wrote.
+
+**The lower third** — the headline bar next to the spinning logo cube. It
+follows the running order. In the cold open it carries the episode's own
+headline; when the lead story starts it cuts to a plate naming the beat
+(`MACRO`, `CRYPTO`, `COLLECTIBLES`) and that story's headline; on the board it
+reads *The week in numbers*; on the sign-off it goes back to the episode
+headline.
+
+**The ticker** — the crawl underneath. It carries a few items about tonight's
+stories and then **the sidebar: headlines from the week's brief that the
+episode is not covering**, which is what makes it read like a real newscast
+rather than a repeat of the segment you are watching. It always ends with
+*Nothing on this ticker is a recommendation*, appended by the pipeline rather
+than written by the model, so it can never go missing.
+
+**The screen behind the hosts** — a card per chapter, drawn in type: the
+running order in the cold open, the beat and the story's one concrete fact
+while a story runs, the board's numbers listed out when the hosts read them.
+
+### Where the copy comes from, and how to change it
+
+| On screen | Comes from | Change it by |
+|---|---|---|
+| Episode headline | `rundown.headline` | `CHIRON:` in the screenplay, then `npm run lt:edit` |
+| A story's plate and headline | that story's `beat` and `headline` | editing the record, then re-staging |
+| The screen's story card | that story's `fact` | as above |
+| The board card | `rundown.board.lines` and `.market` | as above |
+| The ticker | `rundown.ticker` + `rundown.sidebar` | as above |
+
+The chapters that drive all of it are **derived at staging time** by
+`npm run lt:slate` from the production record's segments and rundown. They are
+anchored on a **line number**, never on a second, which is the point: every
+absolute time in an episode is rewritten when it is re-recorded, so a chapter
+holding a timestamp would silently drift out of step with the show it labels —
+and that reads on screen as a mistuned lead-in rather than as a graphics fault.
+
+### An episode recorded before any of this existed
+
+It picks the graphics up by being **re-staged**. That is step 6 on its own,
+and it is free — no model calls, no rendering, nothing overwritten:
+
+```
+npm run lt:slate -- news-01
+npm run lt:check
+```
+
+Its ticker will not gain the sidebar items, because nobody asked for them when
+the script was written. Everything else — the chapters, the screen cards, the
+plates — comes from segments and a rundown the record already has.
+
+If the check reports `graphics.chapters[n] starts on line N, which doesn't
+exist`, the slate record is older than the script it was made from: re-stage it.
+
+---
+
 ## Making a roundtable episode
 
 Full detail: `docs/talk-show-production.md`.

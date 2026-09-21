@@ -29,6 +29,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { sectionsForRecord } from "./lt-tv-sections.mjs";
+import { buildChapters } from "./lt-tv-chapters.mjs";
 
 export const SLATE_DIR = "src/content/lt-tv/episodes";
 export const SLATE_INDEX = "src/content/lt-tv/index.js";
@@ -127,9 +128,18 @@ export function toSlateRecord(episode) {
     record.estimatedRuntime = episode.slate?.runtime ?? null;
   }
 
-  // The chiron's copy, ready for whoever wires LTTvChiron's TICKER_COPY to the
-  // record. Carried now so the wiring is a one-line change later.
-  if (episode.graphics) record.graphics = episode.graphics;
+  // The chiron's copy, which LTTvChiron reads straight off the record, plus
+  // the chapters that make it follow the running order. Chapters are DERIVED
+  // HERE rather than stored upstream: they are a join of the segments and the
+  // rundown, and the production record already holds both, so computing them
+  // at staging time means an episode written before chapters existed picks
+  // them up by being re-staged — no rewriting, no re-recording, no API calls.
+  if (episode.graphics) {
+    const chapters = buildChapters(episode);
+    record.graphics = chapters.length
+      ? { ...episode.graphics, chapters }
+      : episode.graphics;
+  }
 
   // Where every number in this episode came from. The show reads figures out
   // loud; the record should be able to say why it believed each one.

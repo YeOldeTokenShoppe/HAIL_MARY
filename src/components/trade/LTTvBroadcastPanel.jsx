@@ -27,6 +27,10 @@ export default function LTTvBroadcastPanel({
   onPlay,
   onStop,
   onRetry,
+  // Which part of the show is on air, from the set — it owns the clock. Null
+  // until an episode with chapters is playing; the chiron falls back to the
+  // episode's own headline.
+  chapter = null,
 }) {
   // Open on arrival; playback collapses the console to clear the set.
   const [collapsed, setCollapsed] = useState(false);
@@ -113,7 +117,7 @@ export default function LTTvBroadcastPanel({
   // "watching TV" view. The full lower third is a news convention, so only a
   // news show gets it; otherwise it's just the channel's logo cube.
   const chironMode = view === "set" && show.graphics === "news" ? "news" : "logo";
-  const chiron = view === "set" && hasEpisode ? <LTTvChiron episode={selected} mode={chironMode} status="Replay" /> : null;
+  const chiron = view === "set" && hasEpisode ? <LTTvChiron episode={selected} mode={chironMode} status="Replay" chapter={chapter} /> : null;
 
   if (collapsed) {
     return (
