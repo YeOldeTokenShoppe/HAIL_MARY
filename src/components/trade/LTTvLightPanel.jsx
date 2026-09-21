@@ -4,6 +4,7 @@ import {
   STUDIO_LIGHTS,
   HOUSE_AMBIENT,
   HOUSE_PREVIEW,
+  FACE_LIGHTING,
 } from "@/components/trade/TalkShowScene";
 
 /**
@@ -88,6 +89,21 @@ const LEVEL_FIELDS = [
   },
 ];
 
+// The SitePal faces are painted on an unlit material and no light in the
+// scene reaches them, so they need their own pair of levels — see
+// FACE_LIGHTING in TalkShowScene. Their range goes past 1 because the
+// underlying crop can be dark and the dimmer is also the only way to lift it.
+const FACE_FIELDS = [
+  {
+    key: "faceOn", label: "Faces, on air", min: 0, max: 2, step: 0.05,
+    get: () => FACE_LIGHTING.onAir, set: (v) => { FACE_LIGHTING.onAir = v; },
+  },
+  {
+    key: "faceOff", label: "Faces, off air", min: 0, max: 2, step: 0.05,
+    get: () => FACE_LIGHTING.offAir, set: (v) => { FACE_LIGHTING.offAir = v; },
+  },
+];
+
 const round = (n, places = 3) => Number(n.toFixed(places));
 
 export default function LTTvLightPanel() {
@@ -118,6 +134,7 @@ export default function LTTvLightPanel() {
         }
         if (saved.lights) Object.assign(STUDIO_LIGHTS, saved.lights);
         if (saved.ambient) Object.assign(HOUSE_AMBIENT, saved.ambient);
+        if (saved.faces) Object.assign(FACE_LIGHTING, saved.faces);
       } catch (error) {
         console.warn("[LTTvLightPanel] saved lighting didn't apply", error);
       }
@@ -146,6 +163,7 @@ export default function LTTvLightPanel() {
           lens: { ...STUDIO_LIGHTS.lens },
         },
         ambient: { ...HOUSE_AMBIENT },
+        faces: { ...FACE_LIGHTING },
       }));
     } catch (error) {
       console.warn("[LTTvLightPanel] couldn't save lighting", error);
@@ -185,6 +203,11 @@ export default function LTTvLightPanel() {
       `  onAir: ${round(HOUSE_AMBIENT.onAir)},`,
       `  offAir: ${round(HOUSE_AMBIENT.offAir)},`,
       `  fadeLambda: ${round(HOUSE_AMBIENT.fadeLambda)},`,
+      "",
+      "// FACE_LIGHTING, same file",
+      `  onAir: ${round(FACE_LIGHTING.onAir)},`,
+      `  offAir: ${round(FACE_LIGHTING.offAir)},`,
+      `  fadeLambda: ${round(FACE_LIGHTING.fadeLambda)},`,
     ].join("\n");
   };
 
@@ -259,6 +282,26 @@ export default function LTTvLightPanel() {
             onChange={(v) => write(() => field.set(v))}
           />
         ))}
+      </div>
+
+      <div style={S.group}>
+        <div style={S.groupLabel}>Faces</div>
+        {FACE_FIELDS.map((field) => (
+          <Slider
+            key={field.key}
+            label={field.label}
+            value={field.get()}
+            min={field.min}
+            max={field.max}
+            step={field.step}
+            onChange={(v) => write(() => field.set(v))}
+          />
+        ))}
+        <div style={S.fine}>
+          The faces are a picture SitePal already lit, so no lamp on this set
+          touches them. These two dim them by hand. Only live once both
+          characters are actually speaking on the set.
+        </div>
       </div>
 
       <div style={S.group}>

@@ -133,6 +133,13 @@ appears on the right with:
 - **Fixture 1–4**, one at a time, with its swing, tilt, brightness, beam and
   colour. Swing and tilt are degrees off the aim that was modelled in Blender,
   so 0 is always the original and **Re-centre aim** is the way back.
+- **Faces** — the two characters' faces on air and off air. They need their own
+  pair because **no light on this set reaches them**: what is on a face is a
+  crop of SitePal's own render, already lit where it was drawn, so it is
+  painted on an unlit material that ignores every lamp in the scene. Those two
+  numbers multiply it by hand. They only do anything once both characters are
+  actually speaking, since until then you are looking at the static faces,
+  which are lit normally.
 - **Beam, all four** — spread, softness, falloff, throw and the shaft.
 
 Everything applies as you drag and is remembered in your browser, so a reload

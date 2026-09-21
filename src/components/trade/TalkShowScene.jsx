@@ -776,8 +776,8 @@ export const STUDIO_LIGHTS = {
   // Fade rate, per second, for that transition. Around this figure the change
   // lands in roughly a second — a lighting board, not a switch.
   fadeLambda: 2.2,
-  angle: 0.24,
-  penumbra: 0.75,
+  angle: 0.31,
+  penumbra: 0.45,
   // Real inverse-square (2) drops ~18:1 between the guests and the floor and
   // loses the pools on the carpet entirely. This is the flattering-studio-rig
   // cheat, not physics.
@@ -799,7 +799,7 @@ export const STUDIO_LIGHTS = {
   // lens mesh to make emissive — this is an additive sprite parked in each
   // aperture instead. Bloom (desktop only, and this tab is desktop only) turns
   // it into the glare that sells the fixture as switched on.
-  lens: { enabled: true, size: 0.11, opacity: 0.5 },
+  lens: { enabled: true, size: 0.11, opacity: 0.41 },
   // Per fixture, in LAMP_HEAD_NODES order. `opacity` is the shaft's, and it
   // stacks where cones overlap — the same trap the curtain-call spotlights hit
   // on 2026-07-26, so judge brightness from a few camera angles.
@@ -808,15 +808,19 @@ export const STUDIO_LIGHTS = {
   // is always whatever Blender authored. Positive yaw swings the beam toward
   // Connor (−x), positive pitch lifts it. The lamp head itself turns with the
   // beam, so a re-aim still looks like it is coming out of the fixture.
+  //
+  // DIALLED IN BY MICHELLE on the lighting board (?tune=lights), 2026-09-21.
+  // Every yaw and pitch here was set by eye against the news desk, so a
+  // re-export that moves the fixtures invalidates the aim, not the plot.
   plot: [
     // key — lands on GR80
-    { intensity: 8, color: "#ffe6c4", opacity: 0.13, yaw: 0, pitch: 0 },
+    { intensity: 9.5, color: "#ffe6c4", opacity: 0.125, yaw: 22, pitch: -8 },
     // fill — centre right
-    { intensity: 4, color: "#ffd9b0", opacity: 0.085, yaw: 0, pitch: 0 },
+    { intensity: 8, color: "#ffd9b0", opacity: 0.1, yaw: 19, pitch: -17 },
     // fill — neon frame
-    { intensity: 4, color: "#ffd9b0", opacity: 0.085, yaw: 0, pitch: 0 },
+    { intensity: 8, color: "#ffd9b0", opacity: 0.06, yaw: -14, pitch: -18 },
     // key — lands on Connor
-    { intensity: 8, color: "#ffe6c4", opacity: 0.13, yaw: 0, pitch: 0 },
+    { intensity: 12, color: "#ffe6c4", opacity: 0.11, yaw: -10, pitch: -9 },
   ],
 };
 
@@ -837,10 +841,29 @@ export const STUDIO_LIGHTS = {
 // the talk show tab is on. Outside it, the value is the 1.5 the page has
 // always had. Live-tunable from `window.__tsAmbient`.
 export const HOUSE_AMBIENT = {
-  onAir: 1.5,
+  onAir: 1.35,
   offAir: 0.5,
   // Matches STUDIO_LIGHTS.fadeLambda so the room and the rig move together;
   // two different rates read as two separate faults.
+  fadeLambda: 2.2,
+};
+
+// ── The projected faces ───────────────────────────────────────────────────
+// THE SITEPAL FACES ARE NOT LIT BY ANYTHING, and cannot be. What is painted
+// onto Face2 is a crop of SitePal's own render — a face that was already lit
+// where it was drawn — so it goes on as a `MeshBasicMaterial`, which ignores
+// every light in the scene by design. Take the room to nothing and the two
+// faces still blaze, which is the one thing left on the set that does not
+// follow the house cue.
+//
+// A basic material's `color` multiplies its map, so that is the dimmer. It
+// rides the same signal as the room and the rig, with its own pair of levels
+// because a face is not a wall: taken down as far as the room it reads as
+// unlit rather than dim, and the whole point of the shot is the two of them.
+// Live from `window.__tsFaces`, and on the lighting board under Faces.
+export const FACE_LIGHTING = {
+  onAir: 1,
+  offAir: 0.55,
   fadeLambda: 2.2,
 };
 
@@ -1225,6 +1248,8 @@ function TalkShowModel({
   onChapterChangeRef.current = onChapterChange;
   // Frame counter for solo mode's listener-repaint throttle.
   const solotickRef = useRef(0);
+  // Where the projected faces are between their off-air and on-air levels.
+  const faceLevelRef = useRef(FACE_LIGHTING.offAir);
 
   // THE EPISODE, AS A PERFORMANCE. The record is data; this is the resolved
   // timeline the frame loop reads — absolute cue times, listener turns, camera
@@ -1446,6 +1471,7 @@ function TalkShowModel({
       window.__tsMonitor = MONITOR_FEED;
       window.__tsTiming = TALK_SHOW_TIMING;
       window.__tsLights = STUDIO_LIGHTS;
+      window.__tsFaces = FACE_LIGHTING;
     }
     return () => {
       const feed = monitorRef.current;
@@ -2968,6 +2994,16 @@ function TalkShowModel({
       : null;
     solotickRef.current = (solotickRef.current + 1) % SOLO_LISTENER_EVERY_NTH;
 
+    // The faces are unlit, so the house cue has to be multiplied into them by
+    // hand — see FACE_LIGHTING. Eased on the same clock as the room and the
+    // rig so the three arrive together.
+    faceLevelRef.current = THREE.MathUtils.damp(
+      faceLevelRef.current,
+      showIsOn(onAir) ? FACE_LIGHTING.onAir : FACE_LIGHTING.offAir,
+      FACE_LIGHTING.fadeLambda,
+      delta,
+    );
+
     Object.entries(TALKSHOW_PROJECTION_CONFIG).forEach(([key, cfg]) => {
       const st = projRef.current[key];
       // No one in the chairs, nothing to paint.
@@ -2991,6 +3027,11 @@ function TalkShowModel({
       if (st.face1) st.face1.visible = !show;
       if (st.face2) st.face2.visible = show;
       st.hideExtra.forEach((m) => { m.visible = !show; });
+
+      // Written every frame, not only on a repaint: the listener's face is
+      // repainted one frame in several, and a dimmer that only moved with the
+      // paint would step down in visible jumps.
+      if (st.material) st.material.color.setScalar(faceLevelRef.current);
 
       const isListener = soloKey && soloKey !== key;
       const repaint = show && (!isListener || solotickRef.current === 0);
