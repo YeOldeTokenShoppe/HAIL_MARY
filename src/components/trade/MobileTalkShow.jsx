@@ -27,6 +27,7 @@ import TalkShowScene from "./TalkShowScene";
 import { SHOWS } from "@/content/lt-tv";
 import useNewEpisodes from "./useNewEpisodes";
 import usePerfHud from "./PerfHud";
+import useTalkShowTransport, { clockTime } from "./useTalkShowTransport";
 
 // Camera + aim carried over from the desktop talk-show pose (`talkShowPose` in
 // app/trade/page.js), pushed in for phone-sized real estate: the desktop shot is
@@ -235,6 +236,21 @@ export default function MobileTalkShow({ onExit }) {
     try { window.__talkShowStop?.(); } catch (e) {}
   }, []);
 
+  // Pause, resume and part-skipping, on the same window handles the desktop
+  // console uses. What SitePal allows and why the bar is drawn in parts is
+  // explained where the calls are made, in TalkShowScene.
+  const { status, toggle, step, seek } = useTalkShowTransport(playing);
+  const starts = status.sectionStarts?.length ? status.sectionStarts : [0];
+  const parts = starts.map((startsAt, index) => {
+    const endsAt = starts[index + 1] ?? Math.max(startsAt, status.duration);
+    return { index, startsAt, endsAt, seconds: Math.max(1, endsAt - startsAt) };
+  });
+  const partFill = (part) => {
+    if (status.elapsed >= part.endsAt) return 100;
+    if (status.elapsed <= part.startsAt) return 0;
+    return ((status.elapsed - part.startsAt) / (part.endsAt - part.startsAt)) * 100;
+  };
+
   const play = () => {
     if (!canPlay) return;
     try {
@@ -338,11 +354,36 @@ export default function MobileTalkShow({ onExit }) {
           <p className="mts-ep-sum">{episode.summary}</p>
         </div>
         <div className="mts-controls">
-          <button type="button" className="mts-play" onClick={voiceStatus === "failed" ? retry : playing ? stop : play}
+          {/* Pause holds the line where it is; a skip lands on the start of a
+              part, because a SitePal clip can only be started at its
+              beginning and a long episode is already several clips. */}
+          {playing && (
+            <div className="mts-scrub" role="group" aria-label="Episode parts">
+              {parts.map((part) => (
+                <button key={part.index} type="button"
+                  className={`mts-part${part.index === status.section ? " is-on" : ""}`}
+                  style={{ flexGrow: part.seconds }}
+                  aria-label={`Play part ${part.index + 1} of ${parts.length}, from ${clockTime(part.startsAt)}`}
+                  onClick={() => seek(part.startsAt)}>
+                  <i style={{ width: `${partFill(part)}%` }} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          )}
+          <button type="button" className="mts-play" onClick={voiceStatus === "failed" ? retry : playing ? toggle : play}
             disabled={!canPlay || (!audioReady && voiceStatus !== "failed")}>
-            <span aria-hidden="true">{playing ? "■" : voiceStatus === "failed" ? "↻" : "▶"}</span>
-            {!hasEpisode ? "Episodes coming soon" : !canPlay ? "Not recorded yet" : voiceStatus === "failed" ? "Retry audio" : !audioReady ? "Preparing studio…" : playing ? "Stop episode" : "Play episode"}
+            <span aria-hidden="true">{playing ? (status.paused ? "▶" : "❚❚") : voiceStatus === "failed" ? "↻" : "▶"}</span>
+            {!hasEpisode ? "Episodes coming soon" : !canPlay ? "Not recorded yet" : voiceStatus === "failed" ? "Retry audio" : !audioReady ? "Preparing studio…"
+              : playing ? (status.paused ? "Resume episode" : "Pause episode") : "Play episode"}
           </button>
+          {playing && (
+            <div className="mts-keys" role="group" aria-label="Playback">
+              <button type="button" onClick={() => step(-1)} aria-label="Back to the start of this part">⏮</button>
+              <button type="button" onClick={() => step(1)} aria-label="Skip to the next part">⏭</button>
+              <span className="mts-clock">{clockTime(status.elapsed)} / {clockTime(status.duration)}</span>
+              <button type="button" onClick={stop} className="mts-stop">Stop</button>
+            </div>
+          )}
           <div className="mts-rotate-hint">Rotate your phone for full-screen viewing</div>
         </div>
         {hasEpisode && <h3 className="mts-episodes-heading">Episodes</h3>}
@@ -398,6 +439,15 @@ export default function MobileTalkShow({ onExit }) {
         .mts-controls { margin: 20px 0 26px; }
         .mts-play { width: 100%; min-height: 48px; border: 0; border-radius: 5px; padding: 12px 18px; display: flex; align-items: center; justify-content: center; gap: 10px; background: #f7f4fa; color: #131019; font: 650 15px/1.3 "Inter", sans-serif; cursor: pointer; }
         .mts-play span { font-size: 12px; }
+        .mts-scrub { display: flex; align-items: stretch; gap: 3px; margin-bottom: 12px; }
+        .mts-part { flex: 1 1 0; min-width: 12px; height: 26px; position: relative; border: 0; padding: 0; background: transparent; cursor: pointer; }
+        .mts-part::before { content: ""; position: absolute; inset: 10px 0; border-radius: 2px; background: rgba(255,255,255,.17); }
+        .mts-part.is-on::before { background: rgba(32,215,242,.26); }
+        .mts-part > i { position: absolute; left: 0; top: 10px; bottom: 10px; border-radius: 2px; background: #ef62dc; }
+        .mts-keys { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+        .mts-keys button { min-width: 44px; min-height: 44px; border: 1px solid #302a38; border-radius: 5px; background: #15121b; color: #f7f4fa; font-size: 13px; cursor: pointer; }
+        .mts-keys .mts-stop { margin-left: auto; padding: 0 14px; color: #d8b2c4; }
+        .mts-clock { color: #b9b6c2; font: 500 12px/1 "IBM Plex Mono", monospace; }
         .mts-play:hover:not(:disabled) { background: #dfdce5; }
         .mts-play:disabled { opacity: .5; cursor: default; }
         .mts-rotate-hint { text-align: center; color: #96919f; font-size: 11px; line-height: 1.5; margin-top: 10px; }

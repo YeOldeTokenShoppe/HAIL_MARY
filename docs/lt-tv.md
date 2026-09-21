@@ -70,6 +70,43 @@ done by hand.
 
 ---
 
+## Watching an episode — pause and skipping
+
+On the set (`/trade`, and the LT TV screen on a phone) the controls are pause
+and resume, skip back, skip forward, and a bar of blocks you can click.
+
+**Pause is exact.** It holds the line where it is and picks it up on the same
+syllable — SitePal's `freezeToggle` does that, and the picture (camera cuts,
+head turns, reactions) is held on the same second so nothing drifts while you
+are away. The old ■ button ENDED the episode, which is why pressing play again
+started it from the top.
+
+**Skipping lands on the start of a part, and cannot be finer than that.**
+SitePal has no seek: its speech functions take a clip name and start it at the
+beginning, and there is no call that sets a position. What there is instead:
+an episode over 90 seconds is already several clips, because SitePal refuses
+one longer than that, and starting a clip is what the set does at every join.
+So those joins are the seek points — about every 75 to 90 seconds, six of them
+in a seven-minute episode — and the bar is drawn as those blocks rather than as
+a continuous line, so it promises exactly what it can do. Skip back inside the
+first three seconds of a part goes to the part before; later it starts the part
+you are in again.
+
+If you want finer landing points on a particular episode, cut it into more
+parts: a `# cut` mark in the screenplay puts a join on a line of your choosing
+(see **Pauses**), and every join is a place a viewer can jump to.
+
+Keyboard, while an episode is on: **space** (or **k**) pauses and resumes,
+**←** and **→** skip a part.
+
+The code: the transport calls live in `src/components/trade/TalkShowScene.jsx`
+under "PAUSE, RESUME AND SKIPPING", the arithmetic is in
+`src/lib/ltTv/episodeTimeline.mjs` and checked by
+`node scripts/lt-tv-transport.test.mjs`, and the controls themselves are in
+`LTTvBroadcastPanel.jsx` (desktop) and `MobileTalkShow.jsx` (phone).
+
+---
+
 ## Where is everything, from a terminal
 
 ```bash
