@@ -575,6 +575,28 @@ fault.** Check this before you go back and re-render anything.
 5. Switch to another episode and back. It should not return to
    **Preparing studio…**.
 
+**Never test the set with the browser cache off.** DevTools' "Disable cache"
+box (Network tab) and private windows defeat SitePal's preload by design: each
+player fetches its clip again the moment it is told to speak, and the two
+fetches race, so the characters start a section seconds apart and talk over
+each other. That is what the roundtable 02 "overlap" was on the night of
+2026-09-20: every file was correct, and it played perfectly the moment the
+cache was on. If you have DevTools open, make sure that box is unticked. A
+real visitor never has it ticked.
+
+A hold of two or three seconds at each section change is normal. It is
+SitePal's own start-up time for a clip that is already loaded, and both
+characters wait for it together.
+
+If you want numbers, after a section has played paste this in the console:
+
+```js
+JSON.stringify(window.__tsPlayed)
+```
+
+`spread` is how far apart the two voices began, in milliseconds. Under 100 is
+good; hundreds means something is refetching.
+
 When `talk_show.glb` is re-exported, bump the query version in `MODEL_URL` so
 the browser does not keep the old animation library.
 
