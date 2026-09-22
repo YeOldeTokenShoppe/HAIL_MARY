@@ -205,13 +205,44 @@ function checkCharacter(actor, character) {
   }
 }
 
+/**
+ * Which candidate file is actually the set: the first one that carries the
+ * props. Before the split that is the old combined file; after it, the new
+ * export. Returns what it looked at either way, so a missing set is reported
+ * as a missing set rather than as a set full of holes.
+ */
+export function resolveSet(candidates = SET_MODEL.candidates) {
+  const seen = [];
+  for (const file of candidates) {
+    const gltf = readGlb(resolve(file));
+    if (!gltf) {
+      seen.push({ file, present: false, isSet: false });
+      continue;
+    }
+    const names = nodeNames(gltf);
+    const isSet = SET_MODEL.requires.every((name) => names.has(name));
+    seen.push({ file, present: true, isSet, gltf });
+    if (isSet) return { file, gltf, seen };
+  }
+  const present = seen.find((c) => c.present);
+  return { file: present?.file ?? candidates[0], gltf: present?.gltf ?? null, seen };
+}
+
 function checkSet() {
-  say(`\nThe set — ${SET_MODEL.file}`);
-  const gltf = readGlb(resolve(SET_MODEL.file));
+  const resolved = resolveSet();
+  say(`\nThe set — ${resolved.file}`);
+  const gltf = resolved.gltf;
   if (!gltf) {
-    problems.push(`the set file ${SET_MODEL.file} is not in the repo`);
-    say(`  ✗ not in the repo`);
+    problems.push(`no set file found (looked for ${SET_MODEL.candidates.join(", ")})`);
+    say(`  ✗ none of the candidates is in the repo: ${SET_MODEL.candidates.join(", ")}`);
     return;
+  }
+  const others = resolved.seen.filter((c) => c.isSet && c.file !== resolved.file);
+  if (others.length) {
+    warnings.push(
+      `more than one file looks like the set (${[resolved.file, ...others.map((o) => o.file)].join(", ")}) — ` +
+        "the code loads one, so retire the other",
+    );
   }
   const names = nodeNames(gltf);
   const clips = clipNames(gltf);
@@ -224,6 +255,7 @@ function checkSet() {
   }
 
   const stowaways = SET_MODEL.forbids.filter((name) => names.has(name));
+  say(`  · ${clips.length === 0 && stowaways.length === 0 ? "post-split set" : "pre-split set"}`);
   if (stowaways.length === 0) {
     say(`  ✓ no characters in the set`);
   } else {

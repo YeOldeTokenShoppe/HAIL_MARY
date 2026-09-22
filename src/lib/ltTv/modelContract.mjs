@@ -17,9 +17,24 @@
 // family even though the character is called Connor now. Anything added later
 // uses the current name, which is why his intermission is `connor_*`.
 
-/** The set: furniture, desk, camera, lights. No characters, no animations. */
+/**
+ * The set: furniture, desk, camera, lights. No characters, no animations.
+ *
+ * TWO CANDIDATES, because the split happens in one push and the checker has to
+ * give a straight answer on either side of it. `newsDesk.glb` is Michelle's
+ * 2026-09-22 re-export and is the WHOLE SET minus the characters, despite a
+ * name that used to mean the desk props on their own; `talk_show3-textures.glb`
+ * is the single file that carried the set AND both characters before the split.
+ *
+ * Whichever candidate actually looks like a set (by carrying `requires`) is the
+ * one checked, so running this before the new export lands reports on the old
+ * file rather than raising a false alarm about a set that has not arrived yet.
+ */
 export const SET_MODEL = {
-  file: "public/models/talk_show3-textures.glb",
+  candidates: [
+    "public/models/newsDesk.glb",
+    "public/models/talk_show3-textures.glb",
+  ],
   // Props the code reaches for by name. A missing one is a visible hole in the
   // set rather than a silent failure, but it is cheaper to catch here.
   requires: [

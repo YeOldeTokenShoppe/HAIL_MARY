@@ -21,6 +21,7 @@ import {
   nodeByName,
   hasRig,
   seatDrift,
+  resolveSet,
 } from "./lt-tv-models.mjs";
 import {
   SET_MODEL,
@@ -40,8 +41,27 @@ const check = (label, actual, expected) => {
 };
 const ok = (label, cond) => check(label, Boolean(cond), true);
 
-const set = readGlb(resolve(SET_MODEL.file));
-ok("the set file is readable as a GLB", set !== null);
+const resolved = resolveSet();
+const set = resolved.gltf;
+ok("a set file is found among the candidates", set !== null);
+console.log(`      (resolved to ${resolved.file})`);
+
+// ── Resolving which file is the set ────────────────────────────────────────
+//
+// The split lands in one push, so the checker has to answer correctly on both
+// sides of it. Getting this wrong in the "before" direction is worse than
+// useless: it reports a set full of holes that has simply not arrived yet.
+console.log("\nThe set is found by what it contains, not by its name:");
+ok("the resolved set carries every required prop",
+  SET_MODEL.requires.every((name) => nodeNames(set).has(name)));
+// The repo's newsDesk.glb is the OLD props-only export until Michelle pushes
+// hers, and it must not be mistaken for the set on the strength of its name.
+const propsOnly = resolved.seen.find((c) => c.file.endsWith("newsDesk.glb"));
+if (propsOnly?.present) {
+  ok("a props-only newsDesk.glb is not accepted as the set", !propsOnly.isSet);
+}
+check("a candidate list with nothing in it resolves to no set",
+  resolveSet(["public/models/NoSuchSet.glb"]).gltf, null);
 
 // ── The positive path, against the characters still inside the set ─────────
 //
