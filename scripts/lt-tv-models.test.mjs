@@ -54,12 +54,13 @@ console.log(`      (resolved to ${resolved.file})`);
 console.log("\nThe set is found by what it contains, not by its name:");
 ok("the resolved set carries every required prop",
   SET_MODEL.requires.every((name) => nodeNames(set).has(name)));
-// The repo's newsDesk.glb is the OLD props-only export until Michelle pushes
-// hers, and it must not be mistaken for the set on the strength of its name.
-const propsOnly = resolved.seen.find((c) => c.file.endsWith("newsDesk.glb"));
-if (propsOnly?.present) {
-  ok("a props-only newsDesk.glb is not accepted as the set", !propsOnly.isSet);
-}
+// newsDesk.glb is the old props-only export and is not offered as a candidate
+// at all, but the content check is what actually protects us, so prove it would
+// reject that file even if it were.
+ok("the props-only newsDesk.glb would be rejected as the set",
+  !resolveSet(["public/models/newsDesk.glb"]).seen.find((c) => c.file.endsWith("newsDesk.glb"))?.isSet);
+check("and it is not in the candidate list",
+  SET_MODEL.candidates.filter((f) => f.endsWith("newsDesk.glb")), []);
 check("a candidate list with nothing in it resolves to no set",
   resolveSet(["public/models/NoSuchSet.glb"]).gltf, null);
 

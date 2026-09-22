@@ -991,7 +991,9 @@ this is checked at load time: a renamed node or an action left behind in the set
 gives you a character who loads, stands in its bind pose and never moves, with
 nothing in the console. The names below are what it checks.
 
-`src/lib/ltTv/modelContract.mjs` is the contract it checks against, and it is
+`src/lib/ltTv/modelContract.mjs` is the contract it checks against (the set is
+`LTTV_Set.glb`; `newsDesk.glb` is the older desk-props-only export and is not
+the set), and it is
 the file to edit when a character gains a clip or a seat moves. A test pins it
 against the scene, so the two cannot disagree without the suite failing.
 

@@ -21,18 +21,23 @@
  * The set: furniture, desk, camera, lights. No characters, no animations.
  *
  * TWO CANDIDATES, because the split happens in one push and the checker has to
- * give a straight answer on either side of it. `newsDesk.glb` is Michelle's
- * 2026-09-22 re-export and is the WHOLE SET minus the characters, despite a
- * name that used to mean the desk props on their own; `talk_show3-textures.glb`
- * is the single file that carried the set AND both characters before the split.
+ * give a straight answer on either side of it. `LTTV_Set.glb` is the 2026-09-22
+ * re-export: the whole set, characters taken out. `talk_show3-textures.glb` is
+ * the single file that carried the set AND both characters before the split,
+ * and is what the scene still loads until the per-character loading is wired.
  *
  * Whichever candidate actually looks like a set (by carrying `requires`) is the
  * one checked, so running this before the new export lands reports on the old
  * file rather than raising a false alarm about a set that has not arrived yet.
+ *
+ * `newsDesk.glb` is deliberately NOT a candidate. It is the old desk-props-only
+ * export, it is still in the repo, and the set was briefly given that name
+ * before being renamed to LTTV_Set.glb — so listing it would imply the props
+ * file might be the set. It would fail the content check anyway.
  */
 export const SET_MODEL = {
   candidates: [
-    "public/models/newsDesk.glb",
+    "public/models/LTTV_Set.glb",
     "public/models/talk_show3-textures.glb",
   ],
   // Props the code reaches for by name. A missing one is a visible hole in the
