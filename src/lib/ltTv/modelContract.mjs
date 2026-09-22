@@ -293,12 +293,12 @@ export function optionalClips(character) {
  *
  * BUMP THIS WHENEVER A MODEL IS RE-EXPORTED. It is hand-maintained and it has
  * already been missed: `LTTV_HoloGirl.glb` was re-exported three times on
- * 2026-09-22 and all three shipped under `split-1`, so anyone who had loaded
- * the set that day could keep being served the first one. That failure is
+ * 2026-09-22 and three of them shipped under `split-1`, so anyone who had
+ * loaded the set that day could keep being served the first one. That failure is
  * invisible — the character just goes on doing what the old file said, which
  * reads as the fix not working.
  */
-export const MODEL_VERSION = "split-2";
+export const MODEL_VERSION = "split-3";
 export function modelUrl(file) {
   return `${String(file).replace(/^public/, "")}?v=${MODEL_VERSION}`;
 }
