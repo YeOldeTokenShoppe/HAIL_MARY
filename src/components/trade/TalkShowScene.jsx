@@ -31,6 +31,7 @@ import {
   buildEpisodeTimeline,
   chapterIndexAt,
   cueIndexAt,
+  episodeCast,
   sectionIndexAt,
   shotSubjectAt,
   speakerAt,
@@ -46,6 +47,12 @@ const MODEL_URL = "/models/talk_show3-textures.glb?v=news-desk-hierarchy-1";
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const SITEPAL_ACCOUNT = "9308752";
 const TALK_SHOW_PORTAL_HOST_ID = "talk-show-sitepal-portals";
+// Each portal paints at its native size; the host has to be wide enough to
+// hold the whole row, because a portal outside the visual viewport is the one
+// WebKit throttles to ~0.1fps (audio plays on, face freezes). Counted, so
+// adding a seat cannot leave it parked outside the box.
+const PORTAL_WIDTH = 600;
+const PORTAL_HEIGHT = 800;
 
 // A portal occasionally comes up with no player at all — SitePal's embed runs
 // (window.__portal is set) but never builds its canvas, so that character never
@@ -254,6 +261,9 @@ export const TALKSHOW_PROJECTION_CONFIG = {
     hideExtra: ["Demon_Brows"],
   },
 };
+
+// One 600×800 portal per seat the set registers, in a row.
+const PORTAL_HOST_WIDTH = PORTAL_WIDTH * Object.keys(TALKSHOW_PROJECTION_CONFIG).length;
 
 // Warm the GLB fetch before the tab is opened (page.js calls this on mount).
 export function preloadTalkShow() {
@@ -1236,10 +1246,17 @@ function TalkShowModel({
 }) {
   const { scene, animations } = useGLTF(MODEL_URL, DRACO_PATH);
   const raisedSet = castHidden || newsMode;
-  const portalsRef = useRef({
-    Monk: { frame: null, ready: false, source: null },
-    Connor: { frame: null, ready: false, source: null },
-  });
+  // One entry per character the SET can seat, built from the registry rather
+  // than listed, so a cast member is one entry in TALKSHOW_PROJECTION_CONFIG.
+  // Who is on air THIS WEEK is a different question — see castKeys() below.
+  const portalsRef = useRef(
+    Object.fromEntries(
+      Object.keys(TALKSHOW_PROJECTION_CONFIG).map((key) => [
+        key,
+        { frame: null, ready: false, source: null },
+      ]),
+    ),
+  );
   const playbackRef = useRef(idlePlayback());
   // The chiron lives outside the canvas, so chapter changes leave the set
   // through a callback. Held in a ref for the same reason the timeline is: the
@@ -1268,6 +1285,11 @@ function TalkShowModel({
   // Set by the portal effect below: preloads every section of the mounted
   // episode into one portal. The timeline effect calls it on an episode swap.
   const preloadRef = useRef(null);
+  // Also set by the portal effect: re-reports whether the set can go to air.
+  // Readiness is judged against THIS episode's cast, so an episode swap has to
+  // ask again — a week that seats a character the previous one did not is the
+  // case where the answer legitimately changes without a portal doing anything.
+  const notifyReadyRef = useRef(null);
 
   // SWITCHING EPISODES. The portals stay up — rebuilding them costs ~18s of
   // "Loading voices…" — so changing episode takes the set off air and swaps
@@ -1278,6 +1300,7 @@ function TalkShowModel({
       if (!portal?.ready) return;
       preloadRef.current?.(key);
     });
+    notifyReadyRef.current?.();
   }, [timeline]);
 
   useEffect(() => {
@@ -1660,7 +1683,9 @@ function TalkShowModel({
     () => Object.fromEntries(Object.entries(headBones).map(([actor, head]) => [actor, head.quaternion.clone()])),
     [headBones],
   );
-  const listenerGazeRef = useRef({ Connor: 0, Monk: 0 });
+  const listenerGazeRef = useRef(
+    Object.fromEntries(Object.keys(TALKSHOW_PROJECTION_CONFIG).map((key) => [key, 0])),
+  );
   const listenerGazeQuatRef = useRef(new THREE.Quaternion());
   const listenerGazeAxisRef = useRef(new THREE.Vector3(0, 1, 0));
   const cameraAimRef = useRef({
@@ -1750,20 +1775,22 @@ function TalkShowModel({
       position: "fixed",
       left: "0",
       top: "0",
-      // Wide enough for BOTH portals side by side. They used to stack
+      // Wide enough for EVERY portal side by side. They used to stack
       // vertically inside a 600×800 box with overflow:hidden, which clipped
       // the second one out of the layout — the same "not really onscreen"
-      // hazard by a different route. `display:flex` keeps them in a row.
+      // hazard by a different route. `display:flex` keeps them in a row, and
+      // the width is counted from the registry rather than written down, so a
+      // third seat is not silently parked outside the box.
       display: "flex",
-      width: "1200px",
-      height: "800px",
+      width: `${PORTAL_HOST_WIDTH}px`,
+      height: `${PORTAL_HEIGHT}px`,
       overflow: "hidden",
       opacity: "0.01",
       pointerEvents: "none",
       zIndex: "-1",
     });
-    // PHONES: 1200px of portals does not fit beside a 390px viewport, and the
-    // SECOND one lands entirely outside it — which is the exact off-screen
+    // PHONES: a row of portals does not fit beside a 390px viewport, and the
+    // ones past the first land entirely outside it — which is the exact off-screen
     // subframe WebKit throttles to ~0.1fps (audio keeps playing, face freezes).
     // Scale the host down so both stay within the visual viewport. The iframes
     // still paint at their native 600×800, so the crop source keeps full res —
@@ -1771,13 +1798,36 @@ function TalkShowModel({
     if (compactPortalHost) {
       const fit = Math.min(
         1,
-        (window.innerWidth || 1200) / 1200,
-        (window.innerHeight || 800) / 800,
+        (window.innerWidth || PORTAL_HOST_WIDTH) / PORTAL_HOST_WIDTH,
+        (window.innerHeight || PORTAL_HEIGHT) / PORTAL_HEIGHT,
       );
       host.style.transformOrigin = "0 0";
       host.style.transform = `scale(${fit})`;
     }
     document.body.appendChild(host);
+
+    // WHO IS ON AIR THIS WEEK, not who the set can seat.
+    //
+    // Every tally below — the arm, the two skew measurements, audio-started,
+    // talk-ended — used to count against the registered portals, which was the
+    // same number while the set had exactly two seats and both of them spoke
+    // every episode. It stops being the same number the moment the cast
+    // rotates or a guest sits in: a portal the episode gives no clip loads
+    // nothing, starts nothing and ends nothing, so a tally expecting it waits
+    // for a report that cannot come. On talk-ended that is not a cosmetic
+    // wait — finishSection() would never run, and the episode would sit on
+    // section one until someone pressed Stop.
+    //
+    // So the count comes off the record: the cast the episode names,
+    // intersected with the seats this set actually has. An episode naming
+    // nobody the set can seat falls back to the set, which keeps the
+    // no-episode-mounted case behaving as it always did.
+    const castKeys = () => {
+      const seats = Object.keys(portalsRef.current);
+      const cast = episodeCast(timelineRef.current).filter((key) => seats.includes(key));
+      return cast.length ? cast : seats;
+    };
+    const castSize = () => castKeys().length;
 
     let stopped = false;
     const ended = new Set();
@@ -1830,7 +1880,7 @@ function TalkShowModel({
     const recordStart = (key) => {
       if (started.has(key)) return;
       started.set(key, performance.now());
-      if (started.size !== Object.keys(portalsRef.current).length) return;
+      if (started.size !== castSize()) return;
       const times = [...started.values()];
       const ms = Math.round(Math.max(...times) - Math.min(...times));
       window.__tsSkew = window.__tsSkew || [];
@@ -1887,7 +1937,7 @@ function TalkShowModel({
     const recordEnd = (key) => {
       if (finished.has(key)) return;
       finished.set(key, performance.now());
-      const count = Object.keys(portalsRef.current).length;
+      const count = castSize();
       if (finished.size !== count || started.size !== count) return;
       // A preload reports talk-started too, and may report an end. Same guard as
       // recordStart: nothing has been told to play, so there is no playback
@@ -1953,12 +2003,17 @@ function TalkShowModel({
       );
     };
 
+    // Whether the set can go to air, judged against the CAST — a seat this
+    // episode never fills has nothing to be ready for, and holding the play
+    // button until its scene loads would let a character who is not in the
+    // show keep the show off air.
     const notifyReady = () => {
-      const portals = Object.values(portalsRef.current);
-      const ready = portals.every((p) => p.ready);
-      const failed = portals.some((p) => !p.ready && p.exhausted);
+      const portals = castKeys().map((key) => portalsRef.current[key]);
+      const ready = portals.every((p) => p?.ready);
+      const failed = portals.some((p) => p && !p.ready && p.exhausted);
       onPlaybackReady?.(ready, ready ? "ready" : failed ? "failed" : "loading");
     };
+    notifyReadyRef.current = notifyReady;
 
     // One watchdog per portal, re-armed (longer each time) on every attempt.
     const armWatchdog = (key) => {
@@ -2116,7 +2171,7 @@ function TalkShowModel({
         // no timing. `window.__tsStart` holds every reading.
         if (phase !== "playing" || audioStarted.has(key)) return;
         audioStarted.set(key, performance.now());
-        if (audioStarted.size !== Object.keys(portalsRef.current).length) return;
+        if (audioStarted.size !== castSize()) return;
         const times = [...audioStarted.values()];
         const ms = Math.round(Math.max(...times) - Math.min(...times));
         const section = (playbackRef.current.section ?? 0) + 1;
@@ -2178,7 +2233,7 @@ function TalkShowModel({
         // at the top of talk-started: the second portal to report is the one
         // that carries the skew, and everything after this line discards it.
         recordEnd(key);
-        if (ended.size !== Object.keys(portalsRef.current).length) return;
+        if (ended.size !== castSize()) return;
         finishSection();
       }
     };
@@ -2188,16 +2243,16 @@ function TalkShowModel({
     Object.entries(TALKSHOW_PROJECTION_CONFIG).forEach(([key, cfg]) => {
       const frame = document.createElement("iframe");
       frame.title = `Talk show SitePal portal: ${key}`;
-      frame.width = "600";
-      frame.height = "800";
+      frame.width = String(PORTAL_WIDTH);
+      frame.height = String(PORTAL_HEIGHT);
       frame.setAttribute("aria-hidden", "true");
       frame.tabIndex = -1;
       frame.style.border = "0";
-      frame.style.width = "600px";
-      frame.style.height = "800px";
-      // Don't let a narrow viewport shrink either portal to nothing — the
-      // canvas we sample every frame is the one this iframe paints.
-      frame.style.flex = "0 0 600px";
+      frame.style.width = `${PORTAL_WIDTH}px`;
+      frame.style.height = `${PORTAL_HEIGHT}px`;
+      // Don't let a narrow viewport shrink any portal to nothing — the canvas
+      // we sample every frame is the one this iframe paints.
+      frame.style.flex = `0 0 ${PORTAL_WIDTH}px`;
       const portal = {
         frame,
         ready: false,
@@ -2292,9 +2347,16 @@ function TalkShowModel({
       });
 
       const clips = new Map();
-      Object.entries(portalsRef.current).forEach(([key, portal]) => {
+      // The CAST's portals, not every seat: a character this episode does not
+      // use has no clip in any section, which is a rotation and not a fault.
+      castKeys().forEach((key) => {
+        const portal = portalsRef.current[key];
         const clip = section.audio?.[key];
         if (!clip) {
+          // In the cast (the record's top-level `audio` names them) but absent
+          // from this section, which IS a fault — the set would play a section
+          // with one voice missing. validateEpisode catches it in the studio;
+          // this is the same thing said out loud on air.
           console.warn(
             `[TalkShowScene] episode "${active.id}" section ${index + 1} has no ${key} clip`,
           );
@@ -2417,14 +2479,14 @@ function TalkShowModel({
       const active = timelineRef.current;
       if (!active) return false;
       if (stopped) stopped = false;
-      if (!Object.values(portalsRef.current).every((p) => p.ready)) return false;
+      if (!castKeys().every((key) => portalsRef.current[key]?.ready)) return false;
       ended.clear();
       started.clear();
       finished.clear();
 
       clearTimeout(pausePendingTimer);
       pausePending = false;
-      const ok = startSection(0) === Object.keys(portalsRef.current).length;
+      const ok = startSection(0) === castSize();
       if (ok) {
         resetPerformance();
         playbackRef.current = {
@@ -2641,7 +2703,7 @@ function TalkShowModel({
       });
       // See the talk-ended handler: a section that ran out under the pause is
       // joined here rather than lost.
-      if (ended.size >= Object.keys(portalsRef.current).length) finishSection();
+      if (ended.size >= castSize()) finishSection();
       return true;
     };
 
@@ -2754,6 +2816,7 @@ function TalkShowModel({
       Object.values(timers).forEach(clearTimeout);
       Object.values(preloads).forEach((q) => clearTimeout(q.timer));
       if (preloadRef.current === preloadEpisode) preloadRef.current = null;
+      if (notifyReadyRef.current === notifyReady) notifyReadyRef.current = null;
       onPlaybackReady?.(false, "loading");
       window.removeEventListener("message", onMessage);
       clearTimeout(armTimer);
@@ -2769,10 +2832,12 @@ function TalkShowModel({
         delete window.__talkShowRetryPortals;
       }
       host.remove();
-      portalsRef.current = {
-        Monk: { frame: null, ready: false, source: null, attempt: 0, exhausted: false, loads: 0, frozen: false },
-        Connor: { frame: null, ready: false, source: null, attempt: 0, exhausted: false, loads: 0, frozen: false },
-      };
+      portalsRef.current = Object.fromEntries(
+        Object.keys(TALKSHOW_PROJECTION_CONFIG).map((key) => [
+          key,
+          { frame: null, ready: false, source: null, attempt: 0, exhausted: false, loads: 0, frozen: false },
+        ]),
+      );
     };
   }, [onPlaybackReady, onPlaybackStateChange, compactPortalHost]);
 

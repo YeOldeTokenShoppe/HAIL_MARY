@@ -20,7 +20,10 @@ import {
   SEGMENTS,
   sitepalClipName,
   estimateSeconds,
+  ACTORS,
 } from "./lt-tv-format.mjs";
+import { episodeCast } from "../src/lib/ltTv/episodeTimeline.mjs";
+import { sectionsForRecord } from "./lt-tv-sections.mjs";
 import { assemble, renderScript } from "./lt-tv-episode.mjs";
 import { parseScript, applyScript } from "./lt-tv-edit.mjs";
 import { toSlateRecord } from "./lt-tv-slate-record.mjs";
@@ -170,6 +173,51 @@ check("both argument shows queue, in slate order",
 ok("the news show is not in the queue", waiting.every((r) => r.showId !== "news"));
 ok("nor is an episode that is already recorded", waiting.every((r) => !r.lineStarts?.length));
 ok("each carries the title it was named with", waiting.every((r) => r.title && r.summary));
+
+// ── A CAST THAT CHANGES ───────────────────────────────────────────────────
+//
+// The set has two seats today and both of them speak every week, which made
+// "the cast" and "the roster" the same list — and every count in the pipeline
+// and on the set was written against whichever was nearer to hand. They stop
+// being the same list the moment a character is rotated out or a guest sits
+// in for one episode, and the failures that follow are all silent: a track
+// rendered for someone with nothing to say, an upload asked for that should
+// not exist, and a clip name in the record that the set then waits on at
+// every section join. So the record names who SPOKE.
+console.log("\nThe record's cast is who is in the episode, not the roster:");
+const soloSegments = draft.segments.map((segment) => ({
+  ...segment,
+  lines: (segment.lines || []).filter((line) => line.actor === "Connor"),
+}));
+const solo = assemble({
+  rundown: { ...draft.plan, title: draft.topic.keep.title, summary: draft.topic.keep.summary },
+  segments: soloSegments,
+  number: 9,
+  format,
+  producedBy: { model: null, pipeline: "scripts/lt-rt-script.mjs" },
+});
+check("an episode only one of them speaks in casts only them",
+  Object.keys(solo.cast), ["Connor"]);
+ok("so nothing asks for a silent upload", !solo.cast.Monk);
+check("while both speaking casts both", Object.keys(episode.cast), ["Connor", "Monk"]);
+check("and the key order is the cast list's, not who spoke first",
+  Object.keys(episode.cast), ACTORS.filter((a) => Object.keys(episode.cast).includes(a)));
+
+// The set reads the same fact from the other end: the record's `audio` block.
+// It is what decides how many portals have to report a clip loaded, started
+// and ended before a section joins — count a seat the episode never filled and
+// the join never happens.
+console.log("\nThe set counts the same cast off the record:");
+check("a two-hander record casts two", episodeCast({ audio: { Connor: "a", Monk: "b" } }), ["Connor", "Monk"]);
+check("a record with a guest casts three",
+  episodeCast({ audio: { Connor: "a", Monk: "b", Guest: "c" } }), ["Connor", "Monk", "Guest"]);
+check("a slate entry with no audio casts nobody", episodeCast({}), []);
+check("and the sections agree with it",
+  sectionsForRecord({ show: "roundtable", number: 9, cast: solo.cast }, [{ startsAt: 0 }, { startsAt: 60 }]),
+  [
+    { startsAt: 0, audio: { Connor: "lttv_rt_ep09_connor" } },
+    { startsAt: 60, audio: { Connor: "lttv_rt_ep09_connor_s2" } },
+  ]);
 
 console.log(failures ? `\n${failures} check(s) failed.\n` : "\nAll checks passed.\n");
 process.exit(failures ? 1 : 0);

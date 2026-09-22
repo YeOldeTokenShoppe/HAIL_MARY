@@ -54,6 +54,22 @@ export function formatRuntime(seconds) {
 }
 
 /**
+ * WHO THIS EPISODE CASTS — which is not the same as who the set can seat.
+ *
+ * The record's `audio` block names one clip per character who speaks, so its
+ * keys ARE the cast: an episode that rotates a character out, or sits a guest
+ * down for one week, simply names a different set. Everything that counts
+ * characters has to count these and not the set's registered seats, because a
+ * seat with nothing to play never loads, never starts and never ends — and a
+ * tally that expects it waits for a report that cannot come.
+ *
+ * Takes a record or a built timeline; both carry `audio`.
+ */
+export function episodeCast(recordOrTimeline) {
+  return Object.keys(recordOrTimeline?.audio ?? {});
+}
+
+/**
  * Can this record actually go to air? It needs a clip name per character and a
  * line start per line. A record without them is a slate entry — listed in the
  * guide, not playable — rather than something that plays another episode.
@@ -267,7 +283,7 @@ export function validateEpisode(record) {
   // refuses, or resumes at the wrong second, and neither looks like a record
   // problem when you are watching it.
   const sections = episodeSections(record);
-  const cast = Object.keys(record.audio);
+  const cast = episodeCast(record);
   sections.forEach((section, i) => {
     if (i > 0 && section.startsAt <= sections[i - 1].startsAt) {
       problems.push(`sections[${i}] starts at or before the one before it`);
@@ -330,9 +346,12 @@ export function buildEpisodeTimeline(record, { reactionDurations = {} } = {}) {
     record.dialogueEnd ?? lineStarts[lineStarts.length - 1];
   const speakers = record.speakers || [];
   const audienceLines = new Set(record.audienceLines || []);
-  const cast = Object.keys(record.audio);
-  // Two-hander: the listener is simply the other chair. Kept as a lookup so a
-  // record that one day seats three can name its own listener per line.
+  const cast = episodeCast(record);
+  // With two in the room the listener is simply the other chair, so a record
+  // need not say. WITH THREE IT HAS TO: `opposite` would pick whichever of the
+  // other two comes first in the cast, and everyone would turn the same way all
+  // night. A record names `listeners` per line and that wins here — so a
+  // three-hander is a record that carries it, not a change to this file.
   const opposite = {};
   cast.forEach((actor) => {
     opposite[actor] = cast.find((other) => other !== actor) || null;

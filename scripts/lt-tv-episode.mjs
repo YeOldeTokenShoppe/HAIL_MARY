@@ -293,6 +293,13 @@ function assemble({
     };
   });
 
+  const spoken = new Set(outSegments.flatMap((s) => s.lines.map((l) => l.actor)));
+  // An episode with no lines at all is a caller fault, not a cast of nobody —
+  // fall back to the roster so the record is shaped as it always was and the
+  // warnings above are what says something is wrong.
+  const withLines = ACTORS.filter((a) => spoken.has(a));
+  const castActors = withLines.length ? withLines : ACTORS;
+
   const words = outSegments.reduce((sum, s) => sum + s.words, 0);
   const seconds = estimateSeconds(words);
   if (seconds < format.runtime.min || seconds > format.runtime.max) {
@@ -367,8 +374,18 @@ function assemble({
         }
       : {}),
 
+    // WHO IS ACTUALLY IN THIS EPISODE, not the whole roster. This block was
+    // the whole of ACTORS, which was the same thing while the set had two
+    // seats and both spoke every week. It stops being the same thing the
+    // moment the cast rotates or a guest sits in for one episode: every step
+    // downstream reads this block — the render, the upload plan, the section
+    // clip names, the slate — so naming a character with no lines renders a
+    // silent track, asks for an upload that should not exist, and puts a clip
+    // name in the record that the set then waits on at every section join.
+    // Ordered by ACTORS so the key order is the cast list's, not whoever
+    // happened to speak first.
     cast: Object.fromEntries(
-      ACTORS.map((a) => [
+      castActors.map((a) => [
         a,
         {
           displayName: CAST[a].displayName,

@@ -754,6 +754,137 @@ help — so that idea does not come back.
 
 ---
 
+## Adding a character, rotating the cast, or a guest (both shows)
+
+**Short answer to the model question: a separate GLB, one file per character —
+not inside `newsDesk.glb`, and not baked into the set.**
+
+`public/models/newsDesk.glb` is props only: the desk body, two neon strips, and
+two each of coffee cup, microphone and laptop. No armature, no animation, and
+**nothing in the code loads it**. The desk on air is the `NewsDesk` node inside
+`public/models/talk_show3-textures.glb`, which is the one model the set loads. A
+character added to `newsDesk.glb` would never appear.
+
+So the real choice is *re-export the set model* or *ship the character on its
+own*. Ship it on its own:
+
+- **The set model is reached into by name, everywhere.** `Demon_Empty`,
+  `Monk_Empty`, `Armature`, `Armature001`, `Face1`/`Face2`,
+  `FaceDemon1`/`FaceDemon2`, `Brows`, `Demon_Brows`, all 31 baked clip names,
+  `NewsDesk`, `Camera`, `Tripod`, `Camera_Screen`, `Content_Screen`, the
+  spotlight bar, `Chair1_Color_1_0`, `Frame_Color_1_0`, `Floor`. Every
+  re-export of that file puts all of it at risk for a change that has nothing
+  to do with any of it.
+- **It is 4.5 MB and everyone downloads it.** A character baked into the set
+  is fetched on /trade whether this week's episode uses them or not.
+- **A guest is then one file, not a new version of the set.** Ship it, cast
+  them, and the set model never moves.
+
+What that costs, once: the scene calls `useGLTF` on exactly one file today and
+builds a mixer per actor empty out of that file's single `animations` array
+(`TalkShowScene.jsx`, the mixers and action-bank effects). A per-character file
+needs a second `useGLTF`, a mixer rooted at the new character's own root, and
+the action lookup reading that character's own clips. One bounded change in one
+file, and then every cast member after it is free.
+
+**Where they sit is already code, not model.** The news desk poses are numbers
+in `TalkShowScene.jsx` — the `newsMode` effect, positions and quaternions
+converted out of Blender Z-up. A third seat is a third entry there. What is NOT
+code is the furniture: the set has exactly two `DeskChair` nodes and the desk is
+two wide. A third chair, mic, cup and laptop can be another separate prop GLB
+placed the same way, or a re-export of the desk — but the desk is the only part
+of this that genuinely needs Blender.
+
+### What a character is, as a list of entries
+
+| Where | What |
+|---|---|
+| `CAST`, `scripts/lt-tv-format.mjs` | actor, display name, ElevenLabs voice id, processor key, clip key, role |
+| `REACTIONS`, same file | which reaction clips the rig actually has — a cue naming one it doesn't T-poses |
+| `DELIVERY_TAGS`, same file | the bracketed tags that read well in that voice |
+| `CHARACTER_CLIPS`, `TalkShowScene.jsx` | the empty's name, its armature root, the base idle, the reaction clip names |
+| `EMPTY_FOR_ACTOR`, `REACTION_DURATIONS`, `LISTENER_GAZE_YAW` | one entry each |
+| `TALKSHOW_PROJECTION_CONFIG` | the SitePal scene id, the Face1/Face2 mesh names, a crop and a filter (fit live with `?tune=sitepal`) |
+| SitePal account | **a scene of their own.** The two we have reuse the temple's Monk and Demon scenes; a third character needs a third scene. Account work, not code. |
+| `SPEAKERS`, `process_dialogue.py` | only if you ever use the older two-voice path |
+| The writers' prompts | see below — this is the part that is writing, not configuration |
+
+### Rotating the regulars
+
+**Nothing to configure per episode: an episode casts whoever has lines.** Leave
+every character in `CAST`, write an episode that only two of them speak in, and
+the record names those two. The set counts the record's cast, plays two clips a
+section, and the third character's portal sits idle.
+
+That is true as of 2026-09-21 and it was not true before, in a way that would
+have looked like a hang rather than a bug: every tally on the set counted the
+*registered seats*, so a character in the cast list with nothing to say left
+the arm, the audio-started and the talk-ended counts one report short — and
+`finishSection()` never ran. The episode would have sat on section one until
+someone pressed Stop. The record's `cast` block was the whole roster too, so
+rotating someone out would have rendered a silent track, asked for an upload
+that should not exist, and put a clip name in the record the set then waited on.
+Both now come off who actually spoke (`episodeCast` in
+`src/lib/ltTv/episodeTimeline.mjs`; `scripts/lt-rt-script.test.mjs` pins it).
+
+One residual cost: a character who is in `CAST` but not in this episode still
+gets a SitePal portal built at set load, which costs a renderer and its share of
+the one-off "Loading voices…". Making the portals follow the episode's cast
+instead would save that, and would cost an ~18s portal rebuild on every episode
+swap — which is why the portals currently outlive an episode change. Not worth
+it for a cast of three; worth revisiting at five.
+
+### A guest, or a new anchor
+
+**A new anchor replacing Connor is much cheaper than a third seat.** Same two
+chairs, same two poses, same desk: a `CAST` entry, a SitePal scene, and a
+character GLB or a re-skin of an existing one. No Blender work on the set at
+all.
+
+**A guest for one episode** is the same list, and the face is what carries
+identity — the face is a SitePal scene projected onto a mesh, not a sculpt. So
+the cheapest producible guest is an existing body with a new SitePal scene on
+it.
+
+### The three things a third seat still needs
+
+1. **Who turns to whom.** With two in the room the listener is simply the other
+   chair, and `LISTENER_GAZE_YAW` is one fixed angle per character. With three
+   the angle depends on *which* of the other two, so that table becomes
+   per pair. The record format is already ready for it:
+   `buildEpisodeTimeline` honours a `listeners` entry per line when the record
+   carries one, and only falls back to "the other chair" when it doesn't. The
+   writers don't emit `listeners` yet.
+2. **The writers' prompts.** `scripts/lt-news-script.mjs` and
+   `scripts/lt-rt-script.mjs` say "two characters" in prose, carry one
+   personality paragraph each for Connor and GR80, and set a beat pattern that
+   is a two-way volley (*Connor states the number → GR80 reframes it → Connor
+   pushes back → GR80 lands the button*). A third voice needs a paragraph of
+   their own and a beat pattern that gives them something to do, or they will
+   be written as decoration. This is the real cost of a third character and it
+   is writing, not plumbing. The paragraphs belong in `CAST` as data so a
+   character is one entry rather than an edit in two files — deliberately not
+   done yet, because moving them changes the prompt the approved voice came out
+   of.
+3. **The phone, which is untested.** Two SitePal renderers plus two per-frame
+   canvas crops is the load that crashed iOS Safari on this page before, which
+   is why mobile paints one face per frame (`SOLO_LISTENER_EVERY_NTH`). A third
+   renderer is a real risk and there is no way to know from a desktop. The
+   hidden portal row's width is now counted from the cast rather than written
+   down as 1200px, so a third portal is at least inside the viewport — a portal
+   outside it is what WebKit throttles to ~0.1fps, which reads as a frozen face
+   over playing audio.
+
+The camera needs nothing: it aims at whoever's head the shot names, and the
+shot list is built per speaker. Only the two-shot's framing (`wideFov` 50, fitted
+to hold two guests and the neon frame) wants a pass with three in it.
+
+**Recording cost** is per line, not per episode, so a third character costs only
+their own lines. Uploads are one clip per character per section: three
+characters over a six-minute news episode is 18 clips instead of 12.
+
+---
+
 ## Changing a character's voice (both shows)
 
 This is which ElevenLabs voice speaks. For how the character is *written* —

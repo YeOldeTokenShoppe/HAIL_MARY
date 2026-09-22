@@ -8,9 +8,17 @@
 
 // ── The cast ──────────────────────────────────────────────────────────────
 //
-// The set has exactly TWO seats. TalkShowScene's CHARACTER_CLIPS registers
-// Demon_Empty (actor "Connor") and Monk_Empty (actor "Monk") and nothing else,
-// so a news desk with a third voice is not producible on this set today.
+// THE ROSTER, not the cast of any one episode. An episode casts whoever has
+// lines in it: the record's `cast` block is built from who actually spoke, and
+// the set counts that rather than the seats it can fill — so a character can
+// be rotated out of a week, or sat down for one, without touching this file.
+//
+// What a third seat costs, place by place, is written up under "Adding a
+// character, rotating the cast, or a guest" in docs/lt-tv.md. The short of it:
+// the set model holds two rigged bodies (Demon_Empty and Monk_Empty) and the
+// desk has two chairs, so a third one is Blender work plus a SitePal scene of
+// its own — and a personality paragraph in both writers, which is the part
+// that is writing rather than plumbing.
 //
 // The character is CONNOR, and the runtime agrees: CHARACTER_CLIPS and
 // process_dialogue.py's ACTOR_NAMES both say "Connor" now. What is left is
