@@ -23,6 +23,7 @@ import {
   seatDrift,
   clipDuration,
   clipTargets,
+  loopGap,
   resolveSet,
   collisions,
 } from "./lt-tv-models.mjs";
@@ -293,27 +294,71 @@ const hollyGesture = clipTargets(files.Holly, reactionClips(CHARACTERS.Holly).he
 const hollyJoints = new Set((files.Holly.skins || []).flatMap((sk) => sk.joints || [])).size;
 ok(`her gesture clip animates most of her rig (${hollyGesture.bones} of ${hollyJoints})`,
   hollyGesture.bones / hollyJoints > 0.5);
-// And the mechanism, without needing to read a single keyframe: the base clip
-// does not touch the bones her gestures move, so whatever her rest pose is,
-// the base cannot put them anywhere. That is why a boneless base shows as her
-// rest pose rather than as nothing happening.
-const hollyBaseNames = new Set(clipTargets(files.Holly, CHARACTERS.Holly.base).names);
-const untouched = hollyGesture.names.filter((n) => !hollyBaseNames.has(n));
-ok(`her base clip leaves ${untouched.length} of the nodes her gestures pose untouched`,
-  untouched.length > 40);
-
-// The ones already on air are fine, which is what makes the check useful
-// rather than just loud. Measured as a SHARE of each rig, because the rigs are
-// different sizes — Connor's has 65 bones and GR80's 33, so any fixed number
-// is either wrong for one of them or too weak to mean anything.
-for (const actor of ["Connor", "Monk"]) {
+// EVERY base clip must pose its rig, which is the invariant the co-anchor's
+// first export broke: hers animated three channels on her empty and not one
+// bone, so she played her rest pose for a whole episode. She was re-exported
+// off the armature on 2026-09-22 (`4ae5a2ff`) and now sits with the others,
+// which is why this is one loop over all three rather than a carve-out for
+// her. Measured as a SHARE of each rig, because the rigs are different sizes —
+// Connor's has 41 joints and GR80's 33, so any fixed number is either wrong
+// for one of them or too weak to mean anything.
+for (const actor of ["Connor", "Monk", "Holly"]) {
   const t = clipTargets(files[actor], CHARACTERS[actor].base);
   const joints = new Set((files[actor].skins || []).flatMap((sk) => sk.joints || [])).size;
-  ok(`${actor}'s base clip animates most of his rig (${t.bones} of ${joints})`,
+  ok(`${actor}'s base clip animates most of their rig (${t.bones} of ${joints})`,
     t.bones / joints > 0.5);
 }
 check("a clip that is not there reports nothing rather than zero",
   clipTargets(files.Holly, "no_such_clip"), null);
+
+// ── A LOOPING CLIP MUST END WHERE IT STARTS ───────────────────────────────
+//
+// The base idle and the news intermission both play on LoopRepeat, and THREE
+// wraps them hard: at the end of the cycle it jumps to time zero. A gap
+// between the last keyframe and the first is therefore a snap the viewer sees
+// once per cycle, for as long as the clip is up. It was found by hand on the
+// co-anchor's first good idle (7.24° at her shoulder, every 19 seconds) and
+// this is that measurement moved into the checker.
+//
+// Built rather than measured, because the point is that the checker reports a
+// gap it is GIVEN — a quaternion 10° off its start, which reads as only 0.087
+// on one component and is exactly the reason this is reported as an angle.
+const quaternionGap = (degrees) => {
+  const half = (degrees / 2) * (Math.PI / 180);
+  return [0, 0, 0, 1, 0, Math.sin(half), 0, Math.cos(half)];
+};
+const looping = (values) => {
+  const bin = Buffer.from(new Float32Array(values).buffer);
+  const gltf = {
+    nodes: [{ name: "Shoulder" }],
+    accessors: [{ bufferView: 0, componentType: 5126, type: "VEC4", count: values.length / 4 }],
+    bufferViews: [{ byteOffset: 0 }],
+    animations: [{
+      name: "spin",
+      channels: [{ sampler: 0, target: { node: 0, path: "rotation" } }],
+      samplers: [{ input: 0, output: 0 }],
+    }],
+  };
+  Object.defineProperty(gltf, "bin", { value: bin, enumerable: false });
+  return gltf;
+};
+const tenDegrees = loopGap(looping(quaternionGap(10)), "spin");
+ok(`a clip ending 10° from its start reports ${tenDegrees.degrees.toFixed(2)}°`,
+  Math.abs(tenDegrees.degrees - 10) < 0.01);
+check("and names the bone that moved", tenDegrees.node, "Shoulder");
+check("a clip that closes its own loop reports 0°", loopGap(looping(quaternionGap(0)), "spin").degrees, 0);
+check("a clip that is not there reports nothing", loopGap(files.Holly, "no_such_clip"), null);
+
+// The two already on air close cleanly, which is what makes the threshold
+// meaningful — 1° is well above export noise and well below a real gap.
+for (const [actor, clip] of [
+  ["Connor", CHARACTERS.Connor.base],
+  ["Monk", CHARACTERS.Monk.base],
+  ["Connor", CHARACTERS.Connor.outro],
+]) {
+  const gap = loopGap(files[actor], clip);
+  ok(`${clip} closes its own loop (${gap.degrees.toFixed(2)}°)`, gap.degrees < 1);
+}
 
 // ── ONE COPY OF THE REACTION TABLE ────────────────────────────────────────
 //

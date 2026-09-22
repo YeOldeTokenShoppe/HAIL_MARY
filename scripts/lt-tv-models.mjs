@@ -26,6 +26,7 @@ import {
 
 const GLB_MAGIC = 0x46546c67;
 const CHUNK_JSON = 0x4e4f534a;
+const CHUNK_BIN = 0x004e4942;
 
 /** The glTF manifest out of a .glb, or null when the file isn't there. */
 export function readGlb(path) {
@@ -35,15 +36,23 @@ export function readGlb(path) {
     throw new Error(`${path} is not a .glb (bad magic) — was it saved as .gltf?`);
   }
   let offset = 12;
+  let json = null;
+  let bin = null;
   while (offset + 8 <= buf.length) {
     const length = buf.readUInt32LE(offset);
     const type = buf.readUInt32LE(offset + 4);
-    if (type === CHUNK_JSON) {
-      return JSON.parse(buf.slice(offset + 8, offset + 8 + length).toString("utf8"));
-    }
+    const chunk = buf.slice(offset + 8, offset + 8 + length);
+    if (type === CHUNK_JSON) json = JSON.parse(chunk.toString("utf8"));
+    if (type === CHUNK_BIN) bin = chunk;
     offset += 8 + length;
   }
-  throw new Error(`${path} has no JSON chunk`);
+  if (!json) throw new Error(`${path} has no JSON chunk`);
+  // The manifest answers almost everything, but keyframe VALUES live in the
+  // binary chunk, and `loopGap` needs them. Hung off the manifest rather than
+  // returned beside it so every existing caller keeps working, and
+  // non-enumerable so it never turns up in a dump of the manifest.
+  Object.defineProperty(json, "bin", { value: bin, enumerable: false });
+  return json;
 }
 
 export const nodeNames = (gltf) => new Set((gltf.nodes || []).map((n) => n.name).filter(Boolean));
@@ -131,6 +140,69 @@ export function clipTargets(gltf, name) {
   };
 }
 
+/**
+ * HOW FAR A CLIP MOVES BETWEEN ITS LAST FRAME AND ITS FIRST.
+ *
+ * Two clips per character play on LOOP — the base idle, which runs for the
+ * whole episode, and the news intermission. THREE wraps a `LoopRepeat` action
+ * hard: at the end of the cycle it jumps back to time zero. So any gap between
+ * the last keyframe and the first is a snap the viewer sees, once per cycle,
+ * forever.
+ *
+ * Reported as the real ANGLE between the two orientations. A quaternion
+ * component delta is not a rotation and reads far smaller than the thing it
+ * describes — the co-anchor's idle showed 0.05 on one component, which is
+ * 7.24° at her shoulder.
+ *
+ * Returns null when the clip is absent or the file carries no binary chunk.
+ */
+const NUMBER_READER = { 5126: ["getFloat32", 4], 5123: ["getUint16", 2], 5125: ["getUint32", 4] };
+const COMPONENTS = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 };
+
+function accessorRows(gltf, index) {
+  const accessor = (gltf.accessors || [])[index];
+  const view = (gltf.bufferViews || [])[accessor?.bufferView];
+  const reader = NUMBER_READER[accessor?.componentType];
+  const width = COMPONENTS[accessor?.type];
+  if (!accessor || !view || !reader || !width || !gltf.bin) return null;
+  const [fn, size] = reader;
+  const dv = new DataView(
+    gltf.bin.buffer,
+    gltf.bin.byteOffset + (view.byteOffset || 0) + (accessor.byteOffset || 0),
+  );
+  const rows = [];
+  for (let i = 0; i < accessor.count; i += 1) {
+    const row = [];
+    for (let c = 0; c < width; c += 1) row.push(dv[fn](i * width * size + c * size, true));
+    rows.push(row);
+  }
+  return rows;
+}
+
+export function loopGap(gltf, name) {
+  const animation = (gltf.animations || []).find((a) => a.name === name);
+  if (!animation || !gltf.bin) return null;
+  let worst = { degrees: 0, node: null };
+  let metres = 0;
+  for (const channel of animation.channels || []) {
+    const sampler = (animation.samplers || [])[channel.sampler];
+    const rows = sampler ? accessorRows(gltf, sampler.output) : null;
+    if (!rows || rows.length < 2) continue;
+    const first = rows[0];
+    const last = rows[rows.length - 1];
+    if (channel.target?.path === "rotation") {
+      const dot = Math.abs(first.reduce((sum, x, i) => sum + x * last[i], 0));
+      const degrees = (2 * Math.acos(Math.min(1, dot)) * 180) / Math.PI;
+      if (degrees > worst.degrees) {
+        worst = { degrees, node: (gltf.nodes || [])[channel.target.node]?.name || null };
+      }
+    } else if (channel.target?.path === "translation") {
+      metres = Math.max(metres, Math.hypot(...first.map((x, i) => x - last[i])));
+    }
+  }
+  return { ...worst, metres };
+}
+
 /** Distance between an exported position and where the seat was authored. */
 export function seatDrift(node, seat) {
   const at = node.translation || [0, 0, 0];
@@ -188,6 +260,31 @@ function checkCharacter(actor, character) {
     return d ? ` — ${d.toFixed(2)}s` : "";
   };
 
+  /* A CLIP THAT PLAYS ON LOOP MUST END WHERE IT STARTS.
+   *
+   * THREE wraps a repeating action hard — at the end of the cycle it jumps to
+   * time zero — so a gap between the last frame and the first is a snap the
+   * viewer sees every cycle. A warning rather than a failure: the character
+   * plays, and whether a few degrees reads on screen depends on the shot and
+   * on what the desk hides, which is a judgement for the person watching.
+   *
+   * The threshold is set from the clips already on air. Connor's idle closes
+   * to 0.06° and GR80's to 0.05°, so anything past 1° is a deliberate gap
+   * rather than export noise. The co-anchor's first good idle came in at
+   * 7.24° on her shoulder, which is what this exists to have caught.
+   */
+  const checkLoop = (name, why) => {
+    const gap = loopGap(gltf, name);
+    if (!gap || gap.degrees <= 1) return;
+    warnings.push(
+      `${actor}: "${name}" ends ${gap.degrees.toFixed(2)}° away from where it starts ` +
+        `(${gap.node}), and ${why}. THREE jumps straight back to the first frame, so that ` +
+        `is a visible snap once per cycle. Fix in Blender by copying the first frame's keys ` +
+        `onto the last.`,
+    );
+    say(`  ! it ends ${gap.degrees.toFixed(2)}° from where it starts (${gap.node}) — snaps on loop`);
+  };
+
   // The base idle is the one clip that plays for the whole episode, so a base
   // that animates no bones is a character who never moves at all.
   const baseTargets = clipTargets(gltf, character.base);
@@ -213,15 +310,17 @@ function checkCharacter(actor, character) {
         );
         say(`  ! and only ${d.toFixed(2)}s, so it holds a pose rather than breathing`);
       }
+      checkLoop(character.base, "the base idle, so this repeats all episode");
     }
   }
 
   for (const name of optionalClips(character)) {
-    say(
-      clips.includes(name)
-        ? `  ✓ ${name} (optional)${secs(name)}`
-        : `  · ${name} not in this export — optional, nothing breaks`,
-    );
+    if (!clips.includes(name)) {
+      say(`  · ${name} not in this export — optional, nothing breaks`);
+      continue;
+    }
+    say(`  ✓ ${name} (optional)${secs(name)}`);
+    checkLoop(name, "it loops as the news set's resting state");
   }
 
   const extra = clips.filter((name) => !required.includes(name) && !optionalClips(character).includes(name));
