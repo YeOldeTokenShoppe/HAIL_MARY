@@ -902,7 +902,7 @@ to the show, not to one episode. It says so when it does:
 
 ```
 Saint GR80 has a different voice now, so the record's fATgBRI8wg5KkDFg8vBd is being
-recorded as Re5c3vCmpnygdZuSX2Wc. Anything already recorded in the old voice is redone.
+recorded as bZ2WrEjNzHgFHfLLaFKQ. Anything already recorded in the old voice is redone.
 ```
 
 That re-renders every line that character speaks, which is unavoidable: half

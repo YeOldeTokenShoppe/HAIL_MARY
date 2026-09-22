@@ -38,7 +38,7 @@ export const CAST = {
   Monk: {
     actor: "Monk",
     displayName: "Saint GR80",
-    voiceId: "Re5c3vCmpnygdZuSX2Wc",
+    voiceId: "bZ2WrEjNzHgFHfLLaFKQ",
     processorKey: "gr80", // → gr80-sitepal-balanced.wav
     clipKey: "gr80",
     role: "co-anchor",

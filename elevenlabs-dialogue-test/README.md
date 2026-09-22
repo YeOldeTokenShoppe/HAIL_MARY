@@ -39,7 +39,7 @@ animation; use the master dialogue file for the audible soundtrack.
 ## Voice assignment
 
 - Connor: `IcFWazAaBzXNwLWpySgF`
-- Saint GR80: `Re5c3vCmpnygdZuSX2Wc`
+- Saint GR80: `bZ2WrEjNzHgFHfLLaFKQ`
 
 To change a voice, update its ID in both `dialogue.json` and the `SPEAKERS`
 mapping near the top of `process_dialogue.py`.

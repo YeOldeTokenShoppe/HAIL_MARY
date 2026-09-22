@@ -33,7 +33,7 @@
     },
     "Monk": {
       "displayName": "Saint GR80",
-      "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+      "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
       "processorKey": "gr80",
       "sitepalAudio": "lttv_news_ep01_gr80"
     }
@@ -63,7 +63,7 @@
         {
           "n": 1,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[dryly] Good evening. The ledger is open.",
           "directAddress": false,
           "cues": []
@@ -79,7 +79,7 @@
         {
           "n": 3,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[calmly] One of those sentences is going to age badly.",
           "directAddress": true,
           "cues": []
@@ -102,7 +102,7 @@
         {
           "n": 5,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[dryly] Then let us begin.",
           "directAddress": false,
           "cues": []
@@ -126,7 +126,7 @@
         {
           "n": 7,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[patiently] Patience. A committee has discovered a virtue it does not have to fund.",
           "directAddress": false,
           "cues": []
@@ -142,7 +142,7 @@
         {
           "n": 9,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[dryly] So nothing happened, and the price of nothing happening changed.",
           "directAddress": true,
           "cues": [
@@ -165,7 +165,7 @@
         {
           "n": 11,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[calmly] Then explain the adjective to me. What does patience cost a household on a variable rate?",
           "directAddress": true,
           "cues": []
@@ -181,7 +181,7 @@
         {
           "n": 13,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[with quiet disapproval] Yes.",
           "directAddress": true,
           "cues": [
@@ -204,7 +204,7 @@
         {
           "n": 15,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "I am doing the thing where a number has a person underneath it. You are the one who files that under digression.",
           "directAddress": true,
           "cues": []
@@ -220,7 +220,7 @@
         {
           "n": 17,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[patiently] Very little that matters does.",
           "directAddress": true,
           "cues": [
@@ -243,7 +243,7 @@
         {
           "n": 19,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[amused] We agree.",
           "directAddress": true,
           "cues": []
@@ -275,7 +275,7 @@
         {
           "n": 22,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[dryly] How many years.",
           "directAddress": true,
           "cues": []
@@ -291,7 +291,7 @@
         {
           "n": 24,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[calmly] So the industry has been about to receive clarity for roughly as long as it has existed.",
           "directAddress": true,
           "cues": [
@@ -314,7 +314,7 @@
         {
           "n": 26,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[patiently] What does the bill actually decide?",
           "directAddress": true,
           "cues": []
@@ -330,7 +330,7 @@
         {
           "n": 28,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[with quiet disapproval] And the industry's position is that it would like to know.",
           "directAddress": true,
           "cues": []
@@ -346,7 +346,7 @@
         {
           "n": 30,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[amused] There it is.",
           "directAddress": true,
           "cues": [
@@ -369,7 +369,7 @@
         {
           "n": 32,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[calmly] I am noting that a rule you only want when it favours you is not a rule. It is a preference with lobbyists.",
           "directAddress": true,
           "cues": []
@@ -385,7 +385,7 @@
         {
           "n": 34,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[dryly] I write everything down.",
           "directAddress": true,
           "cues": [
@@ -416,7 +416,7 @@
         {
           "n": 36,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[calmly] The shrine makes no claim about outcomes. Candles do not move markets.",
           "directAddress": false,
           "cues": []
@@ -439,7 +439,7 @@
         {
           "n": 38,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[dryly] I read the honest part of an advertisement.",
           "directAddress": true,
           "cues": []
@@ -470,7 +470,7 @@
         {
           "n": 40,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[dryly] How overnight.",
           "directAddress": true,
           "cues": []
@@ -486,7 +486,7 @@
         {
           "n": 42,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[calmly] For a card depicting a small electric animal.",
           "directAddress": true,
           "cues": []
@@ -502,7 +502,7 @@
         {
           "n": 44,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[with quiet disapproval] So it is a lottery ticket with better artwork.",
           "directAddress": true,
           "cues": [
@@ -525,7 +525,7 @@
         {
           "n": 46,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[patiently] And people are calling this an investment.",
           "directAddress": true,
           "cues": []
@@ -541,7 +541,7 @@
         {
           "n": 48,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[dryly] I am on television.",
           "directAddress": true,
           "cues": []
@@ -564,7 +564,7 @@
         {
           "n": 50,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[calmly] I am. A thing becomes an asset the moment enough people agree to be serious about it, and stops being one the moment they remember it is cardboard.",
           "directAddress": true,
           "cues": []
@@ -580,7 +580,7 @@
         {
           "n": 52,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[amused] To all of it.",
           "directAddress": true,
           "cues": []
@@ -619,7 +619,7 @@
         {
           "n": 55,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[calmly] Money became slightly more expensive, and nobody announced it.",
           "directAddress": false,
           "cues": []
@@ -635,7 +635,7 @@
         {
           "n": 57,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[dryly] Gold is always smug. It has nothing else to do.",
           "directAddress": true,
           "cues": [
@@ -658,7 +658,7 @@
         {
           "n": 59,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[patiently] And the crowd?",
           "directAddress": true,
           "cues": []
@@ -674,7 +674,7 @@
         {
           "n": 61,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[calmly] So the crowd revised itself eight cents toward honesty.",
           "directAddress": true,
           "cues": []
@@ -690,7 +690,7 @@
         {
           "n": 63,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[patiently] That is the most theologically sound thing you have said on this programme.",
           "directAddress": true,
           "cues": []
@@ -706,7 +706,7 @@
         {
           "n": 65,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[amused] Noted. And logged.",
           "directAddress": true,
           "cues": [
@@ -737,7 +737,7 @@
         {
           "n": 67,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[calmly] The ledger closes. Nothing on it was a recommendation.",
           "directAddress": false,
           "cues": []
@@ -753,7 +753,7 @@
         {
           "n": 69,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[dryly] Go in peace. Size your positions accordingly. And light a candle for the cardboard.",
           "directAddress": false,
           "cues": [
