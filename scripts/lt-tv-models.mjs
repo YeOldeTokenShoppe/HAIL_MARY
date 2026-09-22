@@ -398,6 +398,43 @@ function checkSet() {
     say(`  ✗ none of the candidates is in the repo: ${SET_MODEL.candidates.join(", ")}`);
     return;
   }
+  // WHY A SKIPPED CANDIDATE HAS TO BE SAID OUT LOUD.
+  //
+  // resolveSet walks the candidates newest first and takes the first one that
+  // carries every required prop. So a set file that is ABSENT and one that is
+  // PRESENT BUT SHORT A PROP both fall through to the pre-split file, and the
+  // report used to be character-for-character identical in either case: a
+  // header naming the old file and not one word about the new one.
+  //
+  // That matters because the scene does not resolve anything — it always
+  // loads SET_MODEL.file (`modelUrl(SET_MODEL.file)` in TalkShowScene.jsx).
+  // When this check falls back, every line under the header describes a file
+  // the browser never opens, and the pre-split file's stowaway characters and
+  // leftover clips read as brand-new failures in the re-export.
+  //
+  // Cost Michelle a round on 2026-09-22: she re-exported the set, ran this,
+  // and got four "problem(s) that would show up on air" that were all just
+  // what talk_show3-textures.glb has always contained.
+  const skipped = [];
+  for (const candidate of resolved.seen) {
+    if (candidate.file === resolved.file) break;
+    if (!candidate.present) {
+      say(`  ✗ ${candidate.file} is not in the repo — is it saved in the right folder?`);
+      skipped.push(`${candidate.file} is not there`);
+    } else {
+      const short = SET_MODEL.requires.filter((name) => !nodeNames(candidate.gltf).has(name));
+      say(`  ✗ ${candidate.file} is here but does not read as a set — missing: ${short.join(", ")}`);
+      skipped.push(`${candidate.file} is missing ${short.join(", ")}`);
+    }
+  }
+  if (resolved.file !== SET_MODEL.file) {
+    problems.push(
+      `the scene loads ${SET_MODEL.file}, but ${skipped.join("; ")} — so this run checked ` +
+        `${resolved.file} instead, and nothing it says describes what the browser opens`,
+    );
+    say(`  ✗ the scene loads ${SET_MODEL.file}, so everything below is about the WRONG FILE`);
+  }
+
   const others = resolved.seen.filter((c) => c.isSet && c.file !== resolved.file);
   if (others.length) {
     warnings.push(
