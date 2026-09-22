@@ -342,17 +342,19 @@ export const TALKSHOW_MONK_CROP = { cropX: 249, cropY: 150, cropW: 160, cropH: 2
 export const TALKSHOW_MONK_FILTER = { saturate: 99, contrast: 99, brightness: 93, hueRotate: -27, sepia: 0 };
 export const TALKSHOW_CONNOR_CROP = { cropX: 180, cropY: 118, cropW: 145, cropH: 195, rotateZ: 0, rotateX: 0 };
 export const TALKSHOW_CONNOR_FILTER = { saturate: 106, contrast: 102, brightness: 73, hueRotate: 0, sepia: 20 };
-// HOLLY'S ARE COPIED FROM HER OWN FITTED VALUES, not seeded from the Monk's:
+// HOLLY'S ARE MICHELLE'S OWN, fitted on the set 2026-09-22 and pasted back.
+// They started as a copy of PROMOS_SITEPAL_CROP in src/lib/vendorSitePal.js —
 // she is also the promotions hologram at the prize wheel, on the same SitePal
-// avatar and the same voice, and PROMOS_SITEPAL_CROP in src/lib/vendorSitePal.js
-// was tuned on that face. Two things carried over with it that would have taken
-// a while to find by eye: her crop box is much TIGHTER than the others'
-// (cropH 154 against their ~205), and she gets NO SEPIA, because she is a
-// projection and a warm cast reads as grime on a screen that should look
-// backlit. Still worth a look on the panel — the talk-show mesh is a different
-// export with its own UVs — but this starts close rather than nowhere.
-export const TALKSHOW_HOLLY_CROP = { cropX: 202, cropY: 124, cropW: 151, cropH: 154, rotateZ: 4, rotateX: 0 };
-export const TALKSHOW_HOLLY_FILTER = { saturate: 110, contrast: 103, brightness: 115, hueRotate: 0, sepia: 0 };
+// avatar — and the seed was close but not right, which is worth knowing before
+// copying a vendor config for the next character. What moved: the box grew
+// (151x154 to 168x169) and shifted down and right, so the borrowed crop was
+// cutting into her face; and brightness came DOWN from 115 to 92 while
+// saturation and contrast went up, because the prize wheel is a lit booth and
+// this is a dim studio. What survived the fit: the tighter box than the other
+// two (169 against their ~205) and NO SEPIA, since a warm cast reads as grime
+// on a screen that should look backlit.
+export const TALKSHOW_HOLLY_CROP = { cropX: 216, cropY: 130, cropW: 168, cropH: 169, rotateZ: 4, rotateX: 0 };
+export const TALKSHOW_HOLLY_FILTER = { saturate: 126, contrast: 117, brightness: 92, hueRotate: 0, sepia: 0 };
 
 // Projection registry. sceneId reuses the temple's SitePal scenes (Monk =
 // GR80, Connor = the Demon/H80Z scene). face1 = static face to hide, face2 =
