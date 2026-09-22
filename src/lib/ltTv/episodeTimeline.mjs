@@ -30,7 +30,10 @@ const GAZE_RELEASE = 0.18;
 // question about the script and not about the set.
 //
 //   establish  the whole set. Top of the show, and every new story.
-//   two        the pair at the desk. The breather between runs of singles.
+//   two        the pair at the desk. The breather between runs of singles, and
+//              the only shot that shows one host REACTING to the other — so
+//              runs of tight shots are kept short enough to keep coming back
+//              to it, and a long speech pulls out to it halfway through.
 //   direct     a clean single straight down the lens, for a line read TO the
 //              viewer. This is the one piece of news grammar the old shot list
 //              had backwards: it went WIDE when a host addressed the room,
@@ -56,7 +59,10 @@ const SHOT_MID_LINE = {
   two: "single",
   direct: "close",
   single: "close",
-  close: "single",
+  // A close-up held through a long line pulls out to the PAIR, not back to a
+  // looser single: halfway through a long speech the interesting thing on the
+  // set is the other host's face, and a single can't show it.
+  close: "two",
 };
 // An operator reacts to a line instead of anticipating it, and won't whip off
 // a shot they only just landed — short lines play out as reaction shots on
@@ -446,14 +452,20 @@ function buildShots(lineStarts, speakers, audienceLines, chapterLines = new Set(
     const speaker = speakers[line];
     // A chapter start is an editorial cut, so it goes wide whoever is talking.
     const opensChapter = chapterLines.has(line);
-    const wide = opensChapter || !speaker || singles >= SHOT_MAX_SINGLES;
+    // A line read TO THE VIEWER is a single down the lens whatever else is
+    // going on, which is why it survives the pull-back below: an anchor turning
+    // to camera is never covered by a two-shot.
+    const toRoom = Boolean(speaker) && audienceLines.has(line);
+    const wide = opensChapter || !speaker || (singles >= SHOT_MAX_SINGLES && !toRoom);
     const subject = wide ? null : speaker;
-    // A line read TO THE VIEWER is a single down the lens, but it isn't part of
-    // the cross-talk run — it interrupts it, the way an anchor turning to
-    // camera does. So it doesn't count toward the pull-back-to-pair or the
-    // punch-in, and it resets the run.
-    const toRoom = !wide && audienceLines.has(line);
-    singles = wide || toRoom ? 0 : singles + 1;
+    // It DOES count toward the run, though. The pull-back exists to stop the
+    // show living in tight shots, and a line read to the room is just as tight
+    // as a cross single — so it earns the breather the same way. (It still
+    // doesn't count toward the PUNCH-IN: see trailingSingles.) Letting it reset
+    // the run instead is what starved the news show of two-shots, because its
+    // to-camera lines are frequent enough that the pull-back almost never
+    // came round.
+    singles = wide ? 0 : singles + 1;
     let framing;
     if (wide) framing = opensChapter ? "establish" : "two";
     else if (toRoom) framing = "direct";

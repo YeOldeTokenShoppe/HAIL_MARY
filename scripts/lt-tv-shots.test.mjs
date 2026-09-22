@@ -50,10 +50,16 @@ const ok = (label, cond) => check(label, Boolean(cond), true);
 const RECORD = {
   id: "unit",
   audio: { Connor: "c1", Monk: "m1" },
-  speakers: ["Connor", "Monk", "Connor", "Monk", "Connor", "Monk", "Connor", "Monk", "Connor", "Monk"],
+  speakers: [
+    "Connor", "Monk", "Connor", "Monk", "Connor", "Monk", "Connor",
+    "Monk", "Connor", "Monk", "Connor", "Monk", "Connor", "Monk",
+  ],
   audienceLines: [0, 8],
-  lineStarts: [0, 6, 12, 18, 24, 30, 36, 42, 48, 54],
-  dialogueEnd: 60,
+  // The last line but one runs 20 seconds, which is what exercises the
+  // mid-line cut. Everything else is an even six, so the arithmetic in the
+  // assertions below is readable.
+  lineStarts: [0, 6, 12, 18, 24, 30, 36, 42, 48, 54, 60, 66, 72, 92],
+  dialogueEnd: 98,
   graphics: { chapters: [{ line: 5, kicker: "NEXT" }] },
 };
 
@@ -66,9 +72,25 @@ const framings = new Set(t.shots.map((s) => s.framing));
 ok("uses the pair between runs of singles", framings.has("two"));
 ok("punches in to a close on a long run of singles", framings.has("close"));
 
+// THE PAIR IS THE REACTION SHOT — it is the only framing that shows one host
+// taking the other one in, so an episode that almost never cuts to it is an
+// episode of talking heads. The news show was the starved case (5 pair shots
+// in 47) because its to-camera lines reset the run that triggers the
+// pull-back. What is pinned is the floor, not the exact count: the plot is
+// Michelle's to set, and a lens angle can move without touching the grammar.
+const pairShare = t.shots.filter((s) => s.framing === "two").length / t.shots.length;
+ok("cuts back to the pair often enough to carry reactions", pairShare > 0.12);
+ok("but doesn't live there — the show is still mostly singles", pairShare < 0.4);
+
 // A line read to the viewer is a single down the lens, not a retreat to wide.
 const directShot = t.shots.find((s) => s.framing === "direct");
 ok("a to-room line cuts to a direct single", Boolean(directShot));
+
+// A long speech held in close-up pulls out to the PAIR partway through, so the
+// second half of it is the other host's reaction rather than more of the same
+// face. Line 12 is the 20-second one, cut into at 55% of its length.
+const longLine = t.shots.find((s) => Math.abs(s.at - (72 + 20 * 0.55)) < 0.01);
+ok("a long close-up pulls out to the pair partway through", longLine?.framing === "two");
 
 // A chapter start is an editorial cut — it goes wide whoever is talking.
 const chapterShot = t.shots.find((s) => Math.abs(s.at - (30 + 0.3)) < 0.01);
@@ -139,6 +161,9 @@ for (const file of files) {
   const avg = g.reduce((a, b) => a + b, 0) / (g.length || 1);
   ok(`${id}: cuts often enough to feel operated (avg < 20s)`, avg < 20);
   ok(`${id}: doesn't whip around (avg > 4s)`, avg > 4);
+  // Same floor on the real slate, where the starvation actually showed up.
+  const pair = timeline.shots.filter((s) => s.framing === "two").length / timeline.shots.length;
+  ok(`${id}: cuts back to the pair for reactions (>12% of shots)`, pair > 0.12);
 }
 
 console.log(failures ? `\n${failures} check(s) failed.` : "\nAll checks passed.");

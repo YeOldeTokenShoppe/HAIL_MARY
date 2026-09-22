@@ -156,16 +156,18 @@ geometry when the set loads, so they are not on the board — change them in
 ## The camera work — a camera operator for the set
 
 While an episode plays, the camera you watch through is not locked off. It cuts
-between four shots the way an operator would, following the same shot list the
+between five shots the way an operator would, following the same shot list the
 record already implies — who is speaking, who a line is aimed at, and where the
 chapters start. Nothing new has to be authored per episode; the shots fall out
 of the script.
 
-The four cameras:
+The five cameras:
 
 - **Establish** — the whole set. Top of the show, and every new story (a
   chapter start).
-- **Two-shot** — the pair at the desk. The breather between runs of singles.
+- **Two-shot** — the pair at the desk. The breather between runs of singles,
+  and the only shot that shows one host *reacting* to the other, which is why
+  the grammar keeps coming back to it (see "Reaction coverage" below).
 - **Single** — the speaker, angled across the desk toward the other chair, for
   a line aimed at the other host. The listener is turned toward them, so the
   angle has something to be about.
@@ -176,13 +178,55 @@ The four cameras:
   naming: the set used to go *wide* when a host addressed the viewer, which is
   exactly the moment television punches in.
 
+### Reaction coverage, and the tripod
+
+Two things about the two-shot were fixed on 2026-09-22, both off Michelle's
+notes from watching an episode.
+
+**It was cut too rarely, and the news show had it worst** — 5 of its 47 shots,
+against 8 of 43 on Markets & Morality. The cause was in the grammar rather than
+the framing: a line read to camera used to *reset* the run of tight shots that
+triggers the pull-back to the pair, and the news show reads to camera often
+enough that the pull-back almost never came round. A to-camera line now counts
+toward that run (it is just as tight a shot as a cross single, so it earns the
+breather the same way) while still being framed as `direct`. Separately, a
+long speech held in close-up now pulls out to the pair halfway through instead
+of back to a looser single, because halfway through a speech the interesting
+thing on the set is the other host's face. Together: the pair is on screen for
+about 28% of Markets & Morality and 19% of the news show, up from 18% and 14%,
+and Markets & Morality's worst single held shot drops from 27 s to 14 s.
+`scripts/lt-tv-shots.test.mjs` pins a floor of 12% of shots so this can't
+quietly regress again.
+
+**The tripod camera prop stood in the middle of the two-shot.** Measured off
+the GLB, with the news set's seats pinned the way the scene pins them: the prop
+sits at `x = 0.00, z = 1.92`, and the old two-shot's lens landed only 0.12 m
+off its axis with the prop between it and the desk — inside the frame at every
+window size, so the prop was in the picture every time the shot was cut.
+Swinging the shot the other way (azimuth `+5` → `-12`) puts the lens 0.45 m to
+the side and roughly level with the prop, which clears it.
+
+**It clears at a normal window, not at every window.** The two-shot is
+authored as a width of desk, so a *narrower* window makes the lens retreat to
+hold that width — 2.16 m at 2560×1270, 2.45 m at 16:9, 3.11 m at 1280×915 —
+while the prop stays put. Past about 16:9 the lens is behind the prop again and
+it creeps back toward frame centre. No fixed angle fixes that, because the
+distance moves and the prop doesn't. If the prop ever reappears in the
+two-shot, a tall narrow browser window is the reason. The robust fix, if it
+becomes worth it, is to strike the rig nodes (`MONITOR_HIDDEN_NODES`) for the
+shots where the prop is geometrically between the lens and the desk and leave
+it standing for the rest — it is deliberately visible on set, so hiding it
+outright would be wrong.
+
 **When each shot is live is decided in `src/lib/ltTv/episodeTimeline.mjs`**
 (the shot list, next to the listener turns), because it is a question about the
 script. **Where the lens goes for a shot is solved in
 `src/lib/ltTv/shotFraming.mjs`** from the live head positions and the window's
-aspect — a shot is authored as what it should *contain* ("2.6 m of desk
-across", "the head fills 21% of frame height"), so it stays composed at any
-window size rather than being a camera position that was right once.
+aspect — a shot is authored as what it should *contain* ("3 m of desk across",
+"the head fills 43% of frame height"), so it stays composed at any window size
+rather than being a camera position that was right once. The cost of that is
+in the tripod note above: a shot that holds its framing at every window size
+is a shot whose lens *moves* with the window.
 
 **To dial it in, open `/trade?tune=shots` and go to an LT TV set.** A board
 appears on the left (the lighting board is on the right, so both can be open):

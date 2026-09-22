@@ -96,10 +96,17 @@ export const SHOT_FRAMING = {
   // 21% and 20%). That is past what the SitePal crop has to give —
   // `faceScreenPixels` puts the cross single at ~2.4x its source on a wide
   // screen — so those two shots are trading sharpness for size on purpose.
-  // `close` and `two` she left alone.
+  // `close` she left alone; `two` she came back to the next day, to get the
+  // tripod prop out of the picture — see the note on it below.
   shots: {
     establish: { coverage: 5.9, fov: 45, azimuth: 8, height: 0.85, lookLift: -0.55 },
-    two: { coverage: 3.2, fov: 34, azimuth: 5, height: 0.3, lookLift: -0.22 },
+    // The pair at the desk. Her azimuth is NEGATIVE on purpose: the tripod
+    // camera prop stands at x=0.006, z=1.922, and a two-shot swung to screen
+    // right put the lens 0.13m off the prop's axis with the prop between it and
+    // the desk — the prop stood in the middle of the picture at every window
+    // size measured. Swinging the other way takes the lens 0.56m to the side
+    // and level with the prop, which clears it. See docs/lt-tv.md.
+    two: { coverage: 3, fov: 38, azimuth: -12, height: 0.3, lookLift: -0.22 },
     // The shot for a line read to the viewer. It started square to the lens
     // (azimuth 0, an anchor addressing the audience) and she angled it to 14°,
     // so it is now a mild cross-shot — still much squarer than `single` below,
