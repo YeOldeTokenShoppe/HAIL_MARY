@@ -4,6 +4,8 @@ import React, { useEffect, useRef, useState } from "react";
 import LTTvChiron from "@/components/trade/LTTvChiron";
 import useNewEpisodes from "@/components/trade/useNewEpisodes";
 import useTalkShowTransport, { clockTime } from "@/components/trade/useTalkShowTransport";
+import LTTvReactions, { useEpisodeReactions } from "@/components/trade/LTTvReactions";
+import { ratingSummary } from "@/lib/ltTv/reactions.mjs";
 import { SHOWS } from "@/content/lt-tv";
 
 // THE SLATE IS DATA. Both the shows and their episodes come from
@@ -37,12 +39,18 @@ export default function LTTvBroadcastPanel({
   // Open on arrival; playback collapses the console to clear the set.
   const [collapsed, setCollapsed] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  // The second sheet: what viewers made of the episode. Only one sheet is open
+  // at a time — they come out of the same corner and would sit on top of each
+  // other otherwise.
+  const [reactionsOpen, setReactionsOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(SHOWS[0].id);
   const { isNew, showHasNew } = useNewEpisodes();
   const somethingIsNew = SHOWS.some(showHasNew);
   const guideButtonRef = useRef(null);
   const guideRef = useRef(null);
   const episodesButtonRef = useRef(null);
+  const reactionsRef = useRef(null);
+  const reactionsButtonRef = useRef(null);
   const expandButtonRef = useRef(null);
   const primaryButtonRef = useRef(null);
   const show = SHOWS.find((s) => s.id === showId) || SHOWS[0];
@@ -54,6 +62,11 @@ export default function LTTvBroadcastPanel({
   // `playable` comes off the record: a slate entry with no recording yet says
   // so instead of quietly replaying whichever episode the set had loaded.
   const canPlay = hasEpisode && selected.playable !== false;
+  // Fetched here rather than inside the panel, so the button can say what the
+  // crowd thinks before anyone opens it — and so the panel, when it does open,
+  // uses the same numbers instead of asking for them again.
+  const reactions = useEpisodeReactions(selected.id);
+  const tallySummary = ratingSummary(reactions.stats);
   const loading = !audioReady && voiceStatus !== "failed";
 
   // WHAT THE TRANSPORT CAN AND CANNOT OFFER, because the viewer should not be
@@ -79,6 +92,11 @@ export default function LTTvBroadcastPanel({
 
   useEffect(() => {
     const onKeyDown = (event) => {
+      if (event.key === "Escape" && reactionsOpen) {
+        setReactionsOpen(false);
+        reactionsButtonRef.current?.focus();
+        return;
+      }
       if (event.key === "Escape" && guideOpen) {
         setGuideOpen(false);
         guideButtonRef.current?.focus();
@@ -105,7 +123,7 @@ export default function LTTvBroadcastPanel({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [guideOpen, onAir, toggle, step]);
+  }, [guideOpen, reactionsOpen, onAir, toggle, step]);
 
   useEffect(() => {
     if (!guideOpen) return;
@@ -118,6 +136,19 @@ export default function LTTvBroadcastPanel({
     return () => document.removeEventListener("pointerdown", dismissOutside, true);
   }, [guideOpen]);
 
+  useEffect(() => {
+    if (!reactionsOpen) return;
+    const dismissOutside = (event) => {
+      if (reactionsRef.current?.contains(event.target) || reactionsButtonRef.current?.contains(event.target)) return;
+      // A Clerk sign-in modal renders outside this tree; closing the sheet
+      // under it would throw away the comment they signed in to leave.
+      if (event.target?.closest?.(".cl-modalBackdrop, .cl-rootBox, [data-clerk-modal]")) return;
+      setReactionsOpen(false);
+    };
+    document.addEventListener("pointerdown", dismissOutside, true);
+    return () => document.removeEventListener("pointerdown", dismissOutside, true);
+  }, [reactionsOpen]);
+
   // Playback collapses the console to clear the set; the end of the show puts
   // it back, because what a viewer wants the moment the credits stop is the
   // guide — not a collapsed tab to find first. Only on the TRANSITION out of
@@ -127,6 +158,7 @@ export default function LTTvBroadcastPanel({
   useEffect(() => {
     if (playing) {
       setGuideOpen(false);
+      setReactionsOpen(false);
       setCollapsed(true);
     } else if (wasPlayingRef.current) {
       setCollapsed(false);
@@ -145,13 +177,20 @@ export default function LTTvBroadcastPanel({
   const toggleGuide = () => {
     // Open on the show that's on now.
     if (!guideOpen) setExpandedId(showId);
+    setReactionsOpen(false);
     setGuideOpen((open) => !open);
+  };
+
+  const toggleReactions = () => {
+    setGuideOpen(false);
+    setReactionsOpen((open) => !open);
   };
 
   const selectEpisode = (id, index) => {
     if (playing) onStop?.();
     onSelectEpisode?.(id, index);
     setGuideOpen(false);
+    setReactionsOpen(false);
     // Preview the selection before the explicit studio-entry action.
     guideButtonRef.current?.focus();
   };
@@ -278,6 +317,27 @@ export default function LTTvBroadcastPanel({
           <h3>{selected.title}</h3>
           <p>{selected.summary}</p>
 
+          {/* The rating lives where the episode is described, the way it does
+              under a video — not behind the program guide, which is for
+              choosing what to watch rather than for saying what you thought. */}
+          {hasEpisode && selected.id && (
+            <button
+              ref={reactionsButtonRef}
+              type="button"
+              className={`ltv-reactions-toggle${reactionsOpen ? " is-open" : ""}`}
+              onClick={toggleReactions}
+              aria-expanded={reactionsOpen}
+              aria-controls="ltv-reactions"
+              aria-label={`Ratings and comments — ${tallySummary.label}`}
+            >
+              <span className="ltv-stars" aria-hidden="true">
+                {"★★★★★".slice(0, Math.round(tallySummary.average))}
+                <i>{"★★★★★".slice(0, 5 - Math.round(tallySummary.average))}</i>
+              </span>
+              <span>{tallySummary.count ? `${tallySummary.display} (${tallySummary.count})` : "Rate this episode"}</span>
+              <span className="ltv-comment-count">{reactions.stats.commentCount || 0} 💬</span>
+            </button>
+          )}
         </div>
 
         {/* THE EPISODE AS ITS PARTS, which is what it really is. SitePal will
@@ -353,6 +413,15 @@ export default function LTTvBroadcastPanel({
         </div>
         {view === "lineup" && <p className="ltv-entry-note">Explore the set, then start the show.</p>}
       </section>
+
+      {reactionsOpen && hasEpisode && selected.id && (
+        <section ref={reactionsRef} id="ltv-reactions" className="ltv-reactions" aria-label="Ratings and comments">
+          <h3>Ratings &amp; comments</h3>
+          <div className="ltv-reactions-body">
+            <LTTvReactions episodeId={selected.id} episodeTitle={selected.title} reactions={reactions} />
+          </div>
+        </section>
+      )}
 
       {guideOpen && (
         <section ref={guideRef} id="ltv-guide" className="ltv-guide" aria-label="Program guide">
@@ -441,7 +510,7 @@ const styles = `
     width: min(590px, 48vw); pointer-events: none;
     background: linear-gradient(90deg, rgba(0,0,4,.95), rgba(0,0,4,.78) 54%, rgba(0,0,4,.24) 80%, transparent);
   }
-  .ltv-masthead, .ltv-production, .ltv-guide { pointer-events: auto; }
+  .ltv-masthead, .ltv-production, .ltv-guide, .ltv-reactions { pointer-events: auto; }
   .ltv-masthead {
     position: fixed; top: 28px; left: 32px; width: 340px;
     display: flex; align-items: center; justify-content: space-between; gap: 14px;
@@ -487,6 +556,14 @@ const styles = `
   .ltv-episodes { background: rgba(255,255,255,.13); color: #f7f4fa; }
   .ltv-episodes:hover, .ltv-episodes[aria-expanded="true"] { background: rgba(255,255,255,.23); }
   .ltv-entry-note { margin: 12px 0 0; color: #96919f; font-size: 12px; line-height: 1.5; }
+  .ltv-reactions-toggle { display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 12px; padding: 8px 10px; border: 1px solid rgba(255,255,255,.15); border-radius: 8px; background: rgba(255,255,255,.04); color: #ccc7d6; font: 600 12px/1.3 "Inter", sans-serif; cursor: pointer; }
+  .ltv-reactions-toggle:hover, .ltv-reactions-toggle.is-open { color: #fff; border-color: var(--cyan); }
+  .ltv-stars { color: #ffc93c; letter-spacing: 1px; }
+  .ltv-stars i { color: rgba(247,244,250,.25); font-style: normal; }
+  .ltv-comment-count { margin-left: auto; color: #aba6b7; }
+  .ltv-reactions { position: fixed; top: 100px; left: 396px; width: 360px; padding: 20px 16px 14px; border: 1px solid rgba(255,255,255,.15); border-radius: 10px; background: rgba(13,12,19,.97); box-shadow: 0 18px 60px rgba(0,0,0,.55); }
+  .ltv-reactions > h3 { margin: 0 0 16px; color: #fff; font-size: 18px; font-weight: 650; }
+  .ltv-reactions-body { max-height: calc(100dvh - 230px); overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
   .ltv-guide { position: fixed; top: 100px; left: 396px; width: 340px; padding: 20px 16px 14px; border: 1px solid rgba(255,255,255,.15); border-radius: 10px; background: rgba(13,12,19,.97); box-shadow: 0 18px 60px rgba(0,0,0,.55); }
   .ltv-guide > h3 { margin: 0 8px 16px; color: #fff; font-size: 18px; font-weight: 650; }
   .ltv-guide-list { max-height: calc(100dvh - 230px); overflow-y: auto; overscroll-behavior: contain; }
@@ -599,9 +676,11 @@ const styles = `
     .ltv-masthead, .ltv-production { left: 24px; width: 310px; }
     .ltv-production h2 { font-size: 27px; }
     .ltv-guide { left: 354px; width: 310px; }
+    .ltv-reactions { left: 354px; width: 330px; }
   }
   @media (max-width: 900px) {
     .ltv-guide { left: 24px; top: 78px; width: min(340px, calc(100vw - 48px)); }
+    .ltv-reactions { left: 24px; top: 78px; width: min(360px, calc(100vw - 48px)); }
     .ltv-vignette { width: 380px; max-width: 80vw; }
   }
   @media (max-width: 380px) {
@@ -612,5 +691,6 @@ const styles = `
     .ltv-production { top: 82px; max-height: calc(100dvh - 170px); }
     .ltv-format { margin-bottom: 18px; }
     .ltv-guide { top: 74px; }
+    .ltv-reactions { top: 74px; }
   }
 `;

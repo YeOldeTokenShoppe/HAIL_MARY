@@ -565,6 +565,46 @@
       match /xPost/{d}            { allow read: if true; allow write: if false; }
       match /test/{d}             { allow read: if true; allow write: if false; }
 
+      // =========================================================================
+      // LT TV — EPISODE RATINGS AND COMMENTS
+      // =========================================================================
+      //
+      // SERVER-ONLY, BOTH WAYS. The browser neither reads nor writes these:
+      // /api/lt-tv/ratings and /api/lt-tv/comments verify the viewer's Clerk
+      // session token and then read and write with the admin SDK, which is not
+      // subject to these rules.
+      //
+      // Writes could not have been direct in any case — viewers sign in with
+      // CLERK, not with Firebase Auth, so `request.auth` is null for them and
+      // a rule here could only ever say "anybody may write", which is not a
+      // rule. Reads could have been direct and live, and deliberately are not:
+      // granting public read would mean this file has to be DEPLOYED before
+      // the comments section works on the site, and a feature that waits on a
+      // command somebody has to remember is a feature that looks broken.
+      //
+      // The catch-all at the bottom already denies all of this. These blocks
+      // are written out anyway so that the next person to read this file knows
+      // the collections exist and that being unreachable from a browser is the
+      // design rather than an oversight.
+
+      match /ltTvEpisodes/{episodeId} {
+        allow read, write: if false; // /api/lt-tv/ratings, /api/lt-tv/comments
+
+        match /comments/{commentId} {
+          allow read, write: if false;
+        }
+        // One doc per viewer, keyed by their Clerk user id. Who gave what is
+        // nobody else's business; the tally above is the public number.
+        match /ratings/{userId} {
+          allow read, write: if false;
+        }
+      }
+
+      // Per-viewer comment counters, written by /api/lt-tv/comments.
+      match /ltTvCommentRateLimits/{userId} {
+        allow read, write: if false;
+      }
+
       // Default rules — DENY by default. Firestore ORs all matching rules, so a
       // permissive catch-all here would override every explicit `read: if false`
       // above. Anything not explicitly granted read access is private.

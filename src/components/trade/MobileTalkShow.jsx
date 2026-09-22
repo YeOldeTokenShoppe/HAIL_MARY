@@ -26,6 +26,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import TalkShowScene, { HouseAmbient } from "./TalkShowScene";
 import { SHOWS } from "@/content/lt-tv";
 import useNewEpisodes from "./useNewEpisodes";
+import LTTvReactions from "./LTTvReactions";
 import usePerfHud from "./PerfHud";
 import useTalkShowTransport, { clockTime } from "./useTalkShowTransport";
 
@@ -412,6 +413,15 @@ export default function MobileTalkShow({ onExit }) {
           ))}
         </div>
 
+        {/* Ratings and comments sit UNDER the episode list, the way they sit
+            under a video: the phone screen scrolls, so they need no sheet of
+            their own the way the desktop console does. */}
+        {selectedEpisode?.id && (
+          <div className="mts-reactions">
+            <LTTvReactions episodeId={selectedEpisode.id} episodeTitle={selectedEpisode.title} compact />
+          </div>
+        )}
+
       </div>
 
       <style>{`
@@ -469,7 +479,8 @@ export default function MobileTalkShow({ onExit }) {
         .mts-wide .mts-stage-shell { flex: 1 1 auto; min-height: 0; aspect-ratio: auto; }
         .mts-wide .mts-stage { height: 100%; aspect-ratio: auto; }
         .mts-wide .mts-below { display: contents; }
-        .mts-wide .mts-now, .mts-wide .mts-rack, .mts-wide .mts-episodes-heading, .mts-wide .mts-rotate-hint { display: none; }
+        .mts-reactions { padding: 4px 20px 32px; }
+        .mts-wide .mts-now, .mts-wide .mts-rack, .mts-wide .mts-episodes-heading, .mts-wide .mts-rotate-hint, .mts-wide .mts-reactions { display: none; }
         .mts-wide .mts-controls { position: absolute; inset: auto 0 0; z-index: 3; margin: 0; padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 12px); display: flex; justify-content: center; background: linear-gradient(transparent, #050408dd); }
         .mts-wide .mts-play { width: auto; min-width: 160px; }
         @media (max-width: 360px) { .mts-below { padding-left: 16px; padding-right: 16px; } .mts-show-title { font-size: 23px; } }

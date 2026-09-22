@@ -107,6 +107,73 @@ under "PAUSE, RESUME AND SKIPPING", the arithmetic is in
 
 ---
 
+## Ratings and comments
+
+Every episode carries a five-star rating and a comment thread, the way a video
+does. **Reading them is open to anyone; rating or commenting needs a sign-in**
+through the site's existing Clerk sign-in, which opens as a modal so the 3D set
+does not get torn down and reloaded just to say "good episode".
+
+On the desktop console the rating sits under the episode summary — a row of
+stars and the average, which opens the comments as a sheet beside the program
+guide. On a phone they are stacked under the episode list, because that screen
+scrolls and needs no sheet.
+
+Clicking the star you already gave takes your rating back.
+
+**Where it is kept.** Firestore, under the episode's own id:
+
+    ltTvEpisodes/{episodeId}                  the tally: count, sum, average, commentCount
+    ltTvEpisodes/{episodeId}/ratings/{userId} one doc per viewer
+    ltTvEpisodes/{episodeId}/comments/{id}    the comments
+
+Subcollections rather than one flat collection, so that "this episode's
+comments, newest first" needs only Firestore's automatic index. **Nothing has
+to be set up in the Firebase console, and no security rules have to be
+deployed, for this to work.**
+
+**The browser never touches Firestore here — not to write, and not to read.**
+Everything goes through `/api/lt-tv/ratings` and `/api/lt-tv/comments`, which
+verify the Clerk session token where one is needed and then use the admin SDK,
+which security rules do not apply to.
+
+Writes had to work that way: viewers sign in with Clerk, not with Firebase
+Auth, so `request.auth` in a rule is null for them and a rule could only ever
+have said "anybody may write". Reads *could* have been direct, and would then
+have been live — a second viewer's comment appearing as it was typed. They are
+not, because direct reads need a rule granting public read, and a rule only
+takes effect when somebody runs a deploy for it. The comments would have looked
+broken on the site until that command was run. The cost of the choice is that a
+new comment appears on the next refresh, which is how comments under a video
+behave anyway; posting, editing, deleting or rating refreshes the thread on the
+spot.
+
+It is the same shape as `/api/testimonials`, and deliberately not the shape of
+the old `/admin` page, which checks a password in the browser.
+
+Those two routes are **public**, unlike the other routes in
+`src/app/api/lt-tv/` — the studio ones (`run`, `script`, `pitch`, `room`,
+`status`) 404 outside development. If you add a route to that folder, decide
+which of the two kinds it is.
+
+A comment is limited to 600 characters, no links, and five an hour or thirty a
+day per viewer. It runs through the same OpenAI moderation call the shrine
+testimonials use; with no `OPENAI_API_KEY` set, moderation is skipped and the
+word and link guards still apply. You can edit or delete your own comment and
+nobody else's — checked on the server against the id on the verified token.
+
+An episode id is checked against the episodes that **exist**, not against a
+pattern, so nothing can leave a rating on an episode that is not on the slate.
+
+The code: `src/lib/ltTv/reactions.mjs` (the rules, pure and tested by
+`node scripts/lt-tv-reactions.test.mjs`), `src/lib/ltTv/reactionsServer.js` and
+the two routes, `src/lib/ltTvReactions.js` (the browser half), and
+`src/components/trade/LTTvReactions.jsx`, which is the one panel both screens
+use. `firestore.rules` denies the browser all three collections outright and
+says why.
+
+---
+
 ## The lighting board
 
 The set's lights have two states: full while an episode is running, and down
