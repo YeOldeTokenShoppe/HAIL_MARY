@@ -17,8 +17,9 @@
 //     push in far enough and the face is being upscaled past its source
 //     (`faceScreenPixels` below is the honest readout for that), and swing far
 //     enough off-axis and you are looking at a frontal photograph edge-on.
-//     Both are why the angles here are modest and why the tuner shows the
-//     pixel count while you drag.
+//     Both are why the tuner shows the pixel count while you drag. Note that
+//     the fitted plot below deliberately spends past the first limit on its two
+//     singles: the readout is there to make that a choice, not a rule.
 //
 //   • FRAMING IS SOLVED, NOT TYPED. A shot is authored as what it should
 //     CONTAIN — "2.5 metres of desk across the frame", "the head fills 13% of
@@ -70,9 +71,12 @@ export const SHOT_FRAMING = {
   // this fraction of its distance per second, capped, and resets on the cut.
   drift: 0.012,
   driftMax: 0.08,
-  // Seconds after the viewer lets go of the camera before the director takes
-  // it back. Dragging the set around mid-episode should not be a fight.
-  handBackAfter: 5,
+  // Seconds after the viewer lets go of the camera before the director takes it
+  // back. The whole point of it: a locked-off show you can orbit and a directed
+  // show you cannot are both worse than one that yields while you are holding
+  // it. Raise it to be left alone for longer; `enabled: false` turns the
+  // operator off altogether and gives the orbit back permanently.
+  handBackAfter: 8,
   // Never dolly closer than this, whatever the arithmetic says — inside it the
   // near plane starts clipping the desk.
   minDistance: 0.85,
@@ -82,16 +86,31 @@ export const SHOT_FRAMING = {
   hold: "auto",
   // Read-only, written every frame: which shot is live, for the board's readout.
   current: null,
+  // MICHELLE'S PLOT, fitted on the real set 2026-09-22 and pasted back off the
+  // board. Do not "tidy" these toward rounder numbers: they were judged by eye
+  // on the actual faces, which is the only place this can be judged.
+  //
+  // What she changed from the first guess, and what it costs, so the next
+  // person doesn't rediscover it: the two singles are much tighter than the
+  // opening defaults (the head fills 43% and 33% of frame height rather than
+  // 21% and 20%). That is past what the SitePal crop has to give —
+  // `faceScreenPixels` puts the cross single at ~2.4x its source on a wide
+  // screen — so those two shots are trading sharpness for size on purpose.
+  // `close` and `two` she left alone.
   shots: {
-    establish: { coverage: 5.2, fov: 42, azimuth: -13, height: 0.85, lookLift: -0.55 },
+    establish: { coverage: 5.9, fov: 45, azimuth: 8, height: 0.85, lookLift: -0.55 },
     two: { coverage: 3.2, fov: 34, azimuth: 5, height: 0.3, lookLift: -0.22 },
-    // Straight down the lens — a line read to the viewer. `directToCamera`
-    // squares the shot up: the azimuth (which the singles use to angle across
-    // the desk) is dropped so the host faces the audience, the way an anchor
-    // does. Kept a touch wider than the angled single so it doesn't read as an
-    // accidental jump.
-    direct: { headShare: 0.2, fov: 30, azimuth: 0, height: 0.06, lookLift: -0.03, directToCamera: true },
-    single: { headShare: 0.21, fov: 30, azimuth: 15, height: 0.1, lookLift: -0.05 },
+    // The shot for a line read to the viewer. It started square to the lens
+    // (azimuth 0, an anchor addressing the audience) and she angled it to 14°,
+    // so it is now a mild cross-shot — still much squarer than `single` below,
+    // which is what keeps the two readable as different shots. A 49° lens a
+    // metre off the head is a deliberately wide, close look.
+    direct: { headShare: 0.33, fov: 49, azimuth: 14, height: 0.06, lookLift: 0.02 },
+    // The cross single: a long lens (24°) swung well round toward the other
+    // chair. At 35° this lens lands about 1.6m out and fairly central, near
+    // where the tripod camera prop stands — if the prop ever clips into frame
+    // on one of the two singles, that is why.
+    single: { headShare: 0.43, fov: 24, azimuth: 35, height: 0.1, lookLift: 0.06 },
     close: { headShare: 0.28, fov: 26, azimuth: 11, height: 0.07, lookLift: -0.02 },
   },
 };

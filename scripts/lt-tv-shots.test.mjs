@@ -98,9 +98,16 @@ const cMonk = solveShot({ framing: "single", subject: "Monk", heads, front, aspe
 ok("Connor's single shoots from screen right", cConnor.eye.x > 0);
 ok("Monk's single shoots from screen left", cMonk.eye.x < 0);
 
-// The direct shot is square to the set — no cross-desk angle.
+// The to-viewer shot and the cross single have to stay readable as DIFFERENT
+// shots, and the way they differ is how far round they are swung. The exact
+// angles are Michelle's to set on the board (she took `direct` off square to
+// 14° on 2026-09-22), so what is pinned here is the ordering, not the numbers.
 const direct = solveShot({ framing: "direct", subject: "Connor", heads, front, aspect: 1.78 });
-ok("the direct single is square to camera", Math.abs(direct.eye.x - heads.Connor.x) < 0.05);
+ok(
+  "the to-viewer shot is squarer to the set than the cross single",
+  Math.abs(SHOT_FRAMING.shots.direct.azimuth) < Math.abs(SHOT_FRAMING.shots.single.azimuth),
+);
+ok("and is still a single on its subject, not a wide", isSingleShot("direct") && direct.eye.z > 0);
 
 console.log("\nHow close the camera can push before the face softens:");
 // The SitePal face is ~195 source pixels tall. A shot whose face lands well

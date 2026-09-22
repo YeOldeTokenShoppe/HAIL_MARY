@@ -14,12 +14,20 @@ import { SHOT_FRAMING, SHOT_NAMES, isSingleShot } from "@/lib/ltTv/shotFraming.m
  *
  * HOLD IS THE POINT. In "Follow the show" the director cuts through the shot
  * list as the episode plays, which is no way to fit a shot. Pin one shot with
- * the Hold buttons and dial it in with the episode paused or stopped; "Follow
- * the show" hands it back.
+ * the Hold buttons and dial it in; "Follow the show" hands it back.
+ *
+ * FIT THE SINGLES WITH AN EPISODE RUNNING, not stopped. Hold works either way,
+ * but off air the faces are dimmed to a quarter (FACE_LIGHTING.offAir), and a
+ * dark face is the hardest thing to judge sharpness on — which is the one thing
+ * that actually limits how tight a single can go.
  *
  * THE FACE READOUT is the honest limit on pushing in. Each face is a crop of
  * SitePal's own render, about 195 source pixels tall — past 1.0× the shot is
  * upscaling the face and it softens while everything around it stays sharp.
+ *
+ * "On air" reads `viewer` whenever a hand is on the camera: the director lets
+ * go the moment anyone drags the set and takes it back after "Yield after a
+ * drag" seconds, so the orbit never stops working mid-episode.
  */
 
 const STORAGE_KEY = "lt_tv_shot_panel_v1";
@@ -39,7 +47,7 @@ function readSaved() {
 const SHOT_LABELS = {
   establish: "Establish · the whole set",
   two: "Two-shot · the pair at the desk",
-  direct: "Direct · down the lens, to the viewer",
+  direct: "Direct · the line read to the viewer",
   single: "Single · the speaker, across the desk",
   close: "Close · punched in on the speaker",
 };
@@ -63,6 +71,7 @@ const GLOBAL_FIELDS = [
   { key: "easeLambda", label: "Swing speed", min: 0.6, max: 8, step: 0.1 },
   { key: "drift", label: "Creep per second", min: 0, max: 0.05, step: 0.002 },
   { key: "driftMax", label: "Creep limit", min: 0, max: 0.2, step: 0.01, pct: true },
+  { key: "handBackAfter", label: "Yield after a drag", min: 0, max: 60, step: 1, unit: "s" },
 ];
 
 const round = (n, places = 3) => Number(Number(n).toFixed(places));
@@ -93,9 +102,14 @@ export default function LTTvShotPanel() {
             if (SHOT_FRAMING.shots[name]) Object.assign(SHOT_FRAMING.shots[name], values);
           });
         }
-        ["easeLambda", "drift", "driftMax", "cut", "minDistance", "maxDistance"].forEach((k) => {
-          if (saved[k] !== undefined) SHOT_FRAMING[k] = saved[k];
-        });
+        // `enabled` is deliberately NOT restored: a reload that came back with
+        // the operator switched off would be indistinguishable from the camera
+        // work having broken. Same reason the lighting board never persists its
+        // on-air/off-air pin.
+        ["easeLambda", "drift", "driftMax", "cut", "handBackAfter", "minDistance", "maxDistance"]
+          .forEach((k) => {
+            if (saved[k] !== undefined) SHOT_FRAMING[k] = saved[k];
+          });
       } catch (error) {
         console.warn("[LTTvShotPanel] saved framing didn't apply", error);
       }
@@ -111,6 +125,7 @@ export default function LTTvShotPanel() {
     return () => {
       clearInterval(poll);
       SHOT_FRAMING.hold = "auto";
+      SHOT_FRAMING.enabled = true;
     };
   }, []);
 
@@ -128,6 +143,7 @@ export default function LTTvShotPanel() {
         drift: SHOT_FRAMING.drift,
         driftMax: SHOT_FRAMING.driftMax,
         cut: SHOT_FRAMING.cut,
+        handBackAfter: SHOT_FRAMING.handBackAfter,
         minDistance: SHOT_FRAMING.minDistance,
         maxDistance: SHOT_FRAMING.maxDistance,
       }));
@@ -146,13 +162,13 @@ export default function LTTvShotPanel() {
       const size = isSingleShot(name)
         ? `headShare: ${round(s.headShare)}`
         : `coverage: ${round(s.coverage)}`;
-      const extra = name === "direct" ? ", directToCamera: true" : "";
       return `    ${name}: { ${size}, fov: ${round(s.fov)}, azimuth: ${round(s.azimuth)}, ` +
-        `height: ${round(s.height)}, lookLift: ${round(s.lookLift)}${extra} },`;
+        `height: ${round(s.height)}, lookLift: ${round(s.lookLift)} },`;
     }).join("\n");
     return [
       "// SHOT_FRAMING, in src/lib/ltTv/shotFraming.mjs",
       `  cut: ${SHOT_FRAMING.cut},`,
+      `  handBackAfter: ${round(SHOT_FRAMING.handBackAfter)},`,
       `  easeLambda: ${round(SHOT_FRAMING.easeLambda)},`,
       `  drift: ${round(SHOT_FRAMING.drift)},`,
       `  driftMax: ${round(SHOT_FRAMING.driftMax)},`,
@@ -268,6 +284,18 @@ export default function LTTvShotPanel() {
         <div style={S.groupLabel}>Motion, all shots</div>
         <div style={S.row}>
           <Check
+            label="Camera operator on"
+            checked={SHOT_FRAMING.enabled}
+            onChange={(v) => write(() => { SHOT_FRAMING.enabled = v; })}
+          />
+        </div>
+        <div style={S.fine}>
+          Off gives the viewer the old single fixed shot and the orbit back for
+          good. On, the operator still lets go the moment anyone drags the set,
+          and takes it back after the delay below.
+        </div>
+        <div style={S.row}>
+          <Check
             label="Hard cuts"
             checked={SHOT_FRAMING.cut}
             onChange={(v) => write(() => { SHOT_FRAMING.cut = v; })}
@@ -291,7 +319,11 @@ export default function LTTvShotPanel() {
       <div style={S.footer}>
         <button type="button" style={S.primary} onClick={copy}>Copy values</button>
         {copied && <span style={S.sub}>{copied}</span>}
-        <div style={S.fine}>Saved in this browser as you go.</div>
+        <div style={S.fine}>
+          Saved in this browser as you go — except the operator on/off, which
+          comes back on after a reload so a switched-off camera can never be
+          mistaken for a broken one.
+        </div>
       </div>
     </div>
   );
