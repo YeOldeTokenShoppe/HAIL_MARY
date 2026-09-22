@@ -183,9 +183,9 @@ for (const actor of ["Connor", "Monk"]) {
 // The co-anchor is not in that file, and still collides on two names — because
 // the names she shares are GR80's Face1/Face2, and his copy is in there. Which
 // is the point: a name is dangerous because of where it ends up, not whose it is.
-const holo = clashing.withSet.find((c) => c.actor === "HoloGirl");
+const holly = clashing.withSet.find((c) => c.actor === "Holly");
 check("and a character not in the set is still caught on the names she shares",
-  holo?.names.sort(), ["Face1", "Face2"]);
+  holly?.names.sort(), ["Face1", "Face2"]);
 
 // Two entries pointed at the same file is the shared-empty case, and the one
 // that would leave the scoped lookups with nothing to scope by.
@@ -289,16 +289,16 @@ check("two channels on one node count as one node", clipTargets(boneless, "empty
 // Against her real file, the part that stays true after the re-export: the
 // gesture clips animate the rig, so the difference between a clip that poses
 // her and one that does not is visible in the data.
-const holoGesture = clipTargets(files.HoloGirl, reactionClips(CHARACTERS.HoloGirl).headnod);
-const holoJoints = new Set((files.HoloGirl.skins || []).flatMap((sk) => sk.joints || [])).size;
-ok(`her gesture clip animates most of her rig (${holoGesture.bones} of ${holoJoints})`,
-  holoGesture.bones / holoJoints > 0.5);
+const hollyGesture = clipTargets(files.Holly, reactionClips(CHARACTERS.Holly).headnod);
+const hollyJoints = new Set((files.Holly.skins || []).flatMap((sk) => sk.joints || [])).size;
+ok(`her gesture clip animates most of her rig (${hollyGesture.bones} of ${hollyJoints})`,
+  hollyGesture.bones / hollyJoints > 0.5);
 // And the mechanism, without needing to read a single keyframe: the base clip
 // does not touch the bones her gestures move, so whatever her rest pose is,
 // the base cannot put them anywhere. That is why a boneless base shows as her
 // rest pose rather than as nothing happening.
-const holoBaseNames = new Set(clipTargets(files.HoloGirl, CHARACTERS.HoloGirl.base).names);
-const untouched = holoGesture.names.filter((n) => !holoBaseNames.has(n));
+const hollyBaseNames = new Set(clipTargets(files.Holly, CHARACTERS.Holly.base).names);
+const untouched = hollyGesture.names.filter((n) => !hollyBaseNames.has(n));
 ok(`her base clip leaves ${untouched.length} of the nodes her gestures pose untouched`,
   untouched.length > 40);
 
@@ -313,7 +313,7 @@ for (const actor of ["Connor", "Monk"]) {
     t.bones / joints > 0.5);
 }
 check("a clip that is not there reports nothing rather than zero",
-  clipTargets(files.HoloGirl, "no_such_clip"), null);
+  clipTargets(files.Holly, "no_such_clip"), null);
 
 // ── ONE COPY OF THE REACTION TABLE ────────────────────────────────────────
 //
@@ -340,16 +340,16 @@ check("GR80's durations are unchanged", reactionDurations(CHARACTERS.Monk), {
   lookAround: 7.6, shrug: 4.33, prayCrosschest: 3.87,
 });
 ok("the co-anchor is offered only the two gestures she has",
-  Object.keys(REACTIONS.HoloGirl).length === 2);
+  Object.keys(REACTIONS.Holly).length === 2);
 
 // ── A SEAT PER SET, AND THE CAST SPLIT IT EXPRESSES ───────────────────────
 console.log("\nWho has a chair on which set is the cast split:");
 const seatedOn = (set) =>
   Object.entries(CHARACTERS).filter(([, c]) => c.seat[set]).map(([a]) => a).sort();
 check("the lounge seats Connor and GR80", seatedOn("lounge"), ["Connor", "Monk"]);
-check("the news desk seats Connor, GR80 and the co-anchor", seatedOn("news"), ["Connor", "HoloGirl", "Monk"]);
+check("the news desk seats Connor, GR80 and the co-anchor", seatedOn("news"), ["Connor", "Holly", "Monk"]);
 ok("she has no lounge seat, which is what keeps her out of the roundtable",
-  !CHARACTERS.HoloGirl.seat.lounge);
+  !CHARACTERS.Holly.seat.lounge);
 // GR80 keeps a news seat on purpose: news-01 is on air and casts him. It is
 // the episode's cast, not the seat, that takes a character off a set.
 ok("GR80 still has a news seat, because the episode on air casts him",
@@ -369,7 +369,23 @@ for (const actor of ACTORS) {
   ok(`${actor} has a voice id`, /^[A-Za-z0-9]{16,}$/.test(CAST[actor].voiceId));
   ok(`${actor}'s voice id is his or her own`,
     ACTORS.filter((a) => CAST[a].voiceId === CAST[actor].voiceId).length === 1);
+  // A SCREENPLAY IS PARSED BY THE SPEAKER CUE, which is the display name
+  // uppercased (lt-tv-edit.mjs, lt-tv-room.mjs). Two characters sharing one
+  // would collapse into whichever the Map saw last, silently reassigning
+  // somebody's lines — so the cue has to be unique, and has to survive being
+  // uppercased and matched.
+  const cue = CAST[actor].displayName.toUpperCase();
+  ok(`${actor}'s speaker cue "${cue}" is unique`,
+    ACTORS.filter((a) => CAST[a].displayName.toUpperCase() === cue).length === 1);
+  ok(`and it is a cue a screenplay can carry`, /^[A-Z0-9][A-Z0-9 ]*$/.test(cue));
+  // Nor may one cue be a prefix of another, which is what would make
+  // "HOLLY" and "HOLLY JONES" ambiguous to read.
+  ok(`and no other cue starts with it`,
+    !ACTORS.some((a) => a !== actor && CAST[a].displayName.toUpperCase().startsWith(`${cue} `)));
 }
+// Her name, since it is the thing that was a placeholder for an hour.
+check("the co-anchor is Holly Jones", CAST.Holly.displayName, "Holly Jones");
+check("and her clips will be named for her", CAST.Holly.clipKey, "holly");
 
 // ── The play-out clip ─────────────────────────────────────────────────────
 console.log("\nConnor's news intermission is optional and really is there:");
@@ -382,12 +398,12 @@ ok(`it is long enough to be a play-out rather than a reaction (${outroLength?.to
 ok("GR80 has no play-out, so nothing optional is expected of him", optionalClips(CHARACTERS.Monk).length === 0);
 // She has one too, and hers is nearly a clean loop where Connor's is exact.
 console.log("\nThe co-anchor's play-out:");
-check("it is declared", optionalClips(CHARACTERS.HoloGirl), ["hologirl_news_intermission"]);
-ok("it is in her file", clipNames(files.HoloGirl).includes(CHARACTERS.HoloGirl.outro));
-const holoOutro = clipDuration(files.HoloGirl, CHARACTERS.HoloGirl.outro);
-ok(`it is a play-out rather than a gesture (${holoOutro?.toFixed(2)}s)`, holoOutro > 20);
+check("it is declared", optionalClips(CHARACTERS.Holly), ["hologirl_news_intermission"]);
+ok("it is in her file", clipNames(files.Holly).includes(CHARACTERS.Holly.outro));
+const hollyOutro = clipDuration(files.Holly, CHARACTERS.Holly.outro);
+ok(`it is a play-out rather than a gesture (${hollyOutro?.toFixed(2)}s)`, hollyOutro > 20);
 ok("and it animates her rig, unlike her base clip",
-  clipTargets(files.HoloGirl, CHARACTERS.HoloGirl.outro).bones > 40);
+  clipTargets(files.Holly, CHARACTERS.Holly.outro).bones > 40);
 
 console.log(failures ? `\n${failures} check(s) failed.\n` : "\nAll checks passed.\n");
 process.exit(failures ? 1 : 0);

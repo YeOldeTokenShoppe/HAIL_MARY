@@ -316,7 +316,7 @@ const idlePlayback = () => ({
 export const LISTENER_GAZE_DEGREES = {
   Connor: 30,
   Monk: -23,
-  HoloGirl: -8,
+  Holly: -8,
 };
 const listenerGazeYaw = (actor) =>
   THREE.MathUtils.degToRad(LISTENER_GAZE_DEGREES[actor] ?? 0);
@@ -345,8 +345,8 @@ export const TALKSHOW_CONNOR_FILTER = { saturate: 106, contrast: 102, brightness
 // NOT FITTED YET. Seeded from the Monk's, which is only a starting point: Face3
 // is her own mesh with its own UVs, so the crop will be wrong until it is
 // fitted on the panel. That is what the panel is for and it takes a minute.
-export const TALKSHOW_HOLOGIRL_CROP = { cropX: 249, cropY: 150, cropW: 160, cropH: 205, rotateZ: 0, rotateX: 0 };
-export const TALKSHOW_HOLOGIRL_FILTER = { saturate: 99, contrast: 99, brightness: 93, hueRotate: 0, sepia: 0 };
+export const TALKSHOW_HOLLY_CROP = { cropX: 249, cropY: 150, cropW: 160, cropH: 205, rotateZ: 0, rotateX: 0 };
+export const TALKSHOW_HOLLY_FILTER = { saturate: 99, contrast: 99, brightness: 93, hueRotate: 0, sepia: 0 };
 
 // Projection registry. sceneId reuses the temple's SitePal scenes (Monk =
 // GR80, Connor = the Demon/H80Z scene). face1 = static face to hide, face2 =
@@ -391,17 +391,17 @@ export const TALKSHOW_PROJECTION_CONFIG = {
    * projection arrives. The names are resolved WITHIN her own empty, which
    * matters because Face1 and Face2 are GR80's names too.
    */
-  HoloGirl: {
-    label: "TS HoloGirl",
+  Holly: {
+    label: "TS Holly",
     sceneId: 2775585,
     hash: "u2gpwL8UxKKa2eKLsXI3BVUPNHUdFxFT",
-    face1: CHARACTERS.HoloGirl.faces.face1,
-    face2: CHARACTERS.HoloGirl.faces.face2,
-    crop: TALKSHOW_HOLOGIRL_CROP,
-    filter: TALKSHOW_HOLOGIRL_FILTER,
+    face1: CHARACTERS.Holly.faces.face1,
+    face2: CHARACTERS.Holly.faces.face2,
+    crop: TALKSHOW_HOLLY_CROP,
+    filter: TALKSHOW_HOLLY_FILTER,
     // Her eyes are separate meshes, where the other two have brows. Same job:
     // keep them from floating over the projected face.
-    hideExtra: CHARACTERS.HoloGirl.faces.hide,
+    hideExtra: CHARACTERS.Holly.faces.hide,
   },
 };
 

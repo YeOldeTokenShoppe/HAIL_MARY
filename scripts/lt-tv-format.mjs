@@ -51,18 +51,24 @@ export const CAST = {
     clipKey: "gr80",
     role: "co-anchor",
   },
-  // THE NEWS CO-ANCHOR, added 2026-09-22. `displayName` is a placeholder and
-  // the only thing here that is not settled: Michelle has not named her yet,
-  // and the writers have no paragraph on who she is against Connor, so nothing
-  // writes her lines until both exist. The actor key follows her model and
-  // clips (`hologirl_*`) and is not a decision about her name — changing the
-  // display name costs nothing and changes no file.
-  HoloGirl: {
-    actor: "HoloGirl",
-    displayName: "HoloGirl",
+  // THE NEWS CO-ANCHOR, named by Michelle on 2026-09-22. `HOLLY JONES` is the
+  // speaker cue in a screenplay; a two-word cue already works, since GR80's is
+  // `SAINT GR80`.
+  //
+  // `clipKey` is what her SitePal clips will be called
+  // (lttv_news_ep01_holly). Chosen now because she has not recorded one yet,
+  // and a clip name is whatever was typed at upload — so this is the only
+  // moment it is free to pick.
+  //
+  // WHAT IS STILL MISSING is a paragraph on who she is against Connor, in both
+  // writers' prompts. Until it exists the news writer does not know she is the
+  // one in that seat, and would go on writing GR80 into the news.
+  Holly: {
+    actor: "Holly",
+    displayName: "Holly Jones",
     voiceId: "wRBnwLc9kmVUe7Iim1Qo",
-    processorKey: "hologirl",
-    clipKey: "hologirl",
+    processorKey: "holly",
+    clipKey: "holly",
     role: "co-anchor",
   },
 };

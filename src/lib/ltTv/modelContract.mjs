@@ -166,13 +166,22 @@ export const CHARACTERS = {
    * off her export with `npm run lt:models -- public/models/LTTV_HoloGirl.glb`
    * rather than assumed, and three of them would have been wrong if assumed.
    *
-   * `HoloGirl` is the actor key because her clips are `hologirl_*` and her file
-   * is LTTV_HoloGirl.glb, so it is the one name already baked into things a
-   * re-export would have to change. Her DISPLAY name — what the writers call
-   * her and what a viewer hears — is a separate field in CAST and costs nothing
-   * to change, so this key is not a decision about who she is.
+   * SHE IS HOLLY JONES, Michelle's name for her (2026-09-22), and `Holly` is
+   * the actor key: what a record's cast says, what a screenplay's speaker cue
+   * says, and what the writers are told to write. `HoloGirl` was the
+   * placeholder for the hour between her model landing and her being named,
+   * and it was renamed the moment there was a real name — no record casts her
+   * yet, so it cost nothing then and would not have stayed cheap. This repo
+   * has twice paid for an identifier that outlived the name it came from
+   * (`barron_*`, `john`), and there is already a different HoloGirl in it: the
+   * commercial strip's vendor, `Vendor_HoloGirl.glb`.
+   *
+   * What does NOT change is anything inside the model: `Hologirl_Empty`,
+   * `hologirl_*` and the filename are strings in her GLB, and renaming them in
+   * code just breaks the lookup. Same arrangement as Connor, whose empty is
+   * still `Demon_Empty`.
    */
-  HoloGirl: {
+  Holly: {
     file: "public/models/LTTV_HoloGirl.glb",
     // Lowercase "g", while the FILE has a capital one. Both exactly as exported.
     empty: "Hologirl_Empty",

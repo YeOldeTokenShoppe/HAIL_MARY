@@ -1154,7 +1154,16 @@ the one thing in the old contract you can stop worrying about.
 
 ### Adding one, as it actually went
 
-The news co-anchor was added on 2026-09-22 and is the worked example. **Every
+**Holly Jones**, the news co-anchor, was added on 2026-09-22 and is the worked
+example. Her actor key is `Holly`; her model's own names are `Hologirl_Empty`
+and `hologirl_*`, which is the same arrangement as Connor's `Demon_Empty` —
+those are strings inside a GLB and renaming them in code only breaks the
+lookup. `HoloGirl` was her placeholder key for the hour between her model
+landing and her being named, and was renamed the moment she had a name, while
+no record cast her and it was still free. (There is also a *different* HoloGirl
+in this repo: `Vendor_HoloGirl.glb`, the commercial strip's vendor.)
+
+**Every
 name and number in her entry was read off the export, and three of them would
 have been wrong if assumed:**
 
@@ -1225,7 +1234,7 @@ copies, each with a comment asking the next person to keep them in step — and 
 third character was about to be added to all three. A list that disagrees with
 the rig is a cue that does nothing on screen.
 
-It matters immediately: the co-anchor has **two** gestures (`headnod` →
+It matters immediately: Holly has **two** gestures (`headnod` →
 `hologirl_agreement`, `headshake` → `hologirl_disagreement`) where the other two
 have six and seven, so the writers' prompt has to be built from this rather than
 from prose about what a character can do.
