@@ -100,10 +100,13 @@ export const CHARACTERS = {
       shrug: "connor_shrug_pose2",
       mockCrying: "connor_mockcrying_pose2",
     },
-    // Played once the news show has finished rather than the seated idle, so
-    // the desk does not sit in a breathing loop through the outro. 46.7s, which
-    // is why it is an outro and not a reaction cue. Optional: a file without it
-    // still plays every episode and simply holds the idle afterwards.
+    // The news set's RESTING STATE once the show has finished, in place of the
+    // seated idle: Connor turns away from the camera and sits out the
+    // intermission. 46.70s and it loops, Michelle's call 2026-09-22 — and it
+    // loops cleanly, measured off this file: every one of the 126 channels
+    // ends where it started (rotation drift 0.00000, translation 0.00001), so
+    // there is no snap at the join. Optional: a file without it still plays
+    // every episode and simply holds the idle instead.
     outro: "connor_news_intermission_head_turn",
     faces: { face1: "FaceDemon1", face2: "FaceDemon2", hide: ["Demon_Brows"] },
     // HE WAS EXPORTED AT THE NEWS DESK, so his own file no longer carries the

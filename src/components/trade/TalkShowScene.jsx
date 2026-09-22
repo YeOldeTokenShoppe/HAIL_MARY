@@ -2066,7 +2066,6 @@ function TalkShowModel({
   const actionsRef = useRef({});
   useEffect(() => {
     const started = [];
-    const listeners = [];
     const out = {};
     // Each character's clips come out of their OWN file. A name that is not
     // there is a real problem — a missing base is a character who never moves
@@ -2122,31 +2121,21 @@ function TalkShowModel({
         active: null,
       };
       if (outro && base) {
-        outro.setLoop(THREE.LoopOnce, 1);
-        // Hold the last authored frame rather than snapping to the bind pose
-        // while the return to the idle crossfades — the same reason the
-        // reactions clamp.
-        outro.clampWhenFinished = true;
+        // IT LOOPS, Michelle's call 2026-09-22 after seeing it. The
+        // intermission is the set's resting state between shows rather than a
+        // 46-second play-out that hands back to the breathing idle, so it runs
+        // until something else happens: pressing play, or leaving the set.
+        // Which means nothing has to end it, and there is no `finished` to
+        // listen for — resetReactions() is what takes it off.
+        outro.setLoop(THREE.LoopRepeat, Infinity);
         outro.enabled = true;
         outro.setEffectiveWeight(0);
-        // It runs for 46s off air with nothing else driving the clock, so the
-        // settle back to the idle comes from the mixer rather than from the
-        // performance loop, which has stopped by then.
-        const settle = (event) => {
-          if (event.action !== outro) return;
-          base.enabled = true;
-          base.play();
-          outro.crossFadeTo(base, 0.8, false);
-        };
-        mixer.addEventListener("finished", settle);
-        listeners.push(() => mixer.removeEventListener("finished", settle));
       }
       out[emptyName] = bank;
     });
     actionsRef.current = out;
     return () => {
       playbackRef.current = idlePlayback();
-      listeners.forEach((off) => off());
       Object.values(out).forEach((bank) => {
         Object.values(bank.reactions).forEach((action) => action.stop());
         bank.outro?.stop();
@@ -2376,10 +2365,10 @@ function TalkShowModel({
           action.setEffectiveWeight(0);
         });
         bank.active = null;
-        // The play-out runs OFF AIR and for 46 seconds, so it is the one clip
-        // that can still be going when the next thing happens. Dropped here
-        // too, or starting an episode during the intermission would run it
-        // against the idle at full weight.
+        // The play-out runs OFF AIR and loops, so it is the one clip that is
+        // still going when the next thing happens — and the only way it ever
+        // stops. Dropped here, or starting an episode during the intermission
+        // would run it against the idle at full weight.
         if (bank.outro) {
           bank.outro.stop();
           bank.outro.stopFading();
@@ -2408,9 +2397,8 @@ function TalkShowModel({
      *
      * Only at the genuine end of a news episode — not on a section join, not
      * on Stop, and not on Markets & Morality, which has no intermission clip.
-     * It plays once and settles back into the seated idle (the `finished`
-     * listener in the action-bank effect), so the set is left where a viewer
-     * who comes back to the tab expects it.
+     * It LOOPS, so the intermission is where the news set rests until someone
+     * presses play again; resetReactions() is what takes it off.
      */
     const playOutro = () => {
       if (!newsModeRef.current) return;

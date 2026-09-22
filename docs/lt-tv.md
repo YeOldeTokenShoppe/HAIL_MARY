@@ -1006,12 +1006,20 @@ check.
 only a re-export could change them was right; this was that re-export. Durations
 are unchanged, so they are the same actions under the current name.
 
-**The news play-out.** `connor_news_intermission_head_turn` (46.7 s) plays once
-when a news episode finishes, instead of the seated idle, then settles back into
-it — so the desk reads as a studio between shows rather than as two people
-frozen mid-breath. It is declared as `outro` in the contract and is optional: an
-export without it just holds the idle, which is what every episode did before.
-Only the news show has one, and it does not play on Stop or at a section join.
+**The news intermission.** `connor_news_intermission_head_turn` (46.70 s) is
+the news set's resting state once an episode finishes, in place of the seated
+idle: Connor turns away from the camera and sits it out, so the desk reads as a
+studio between shows rather than as two people frozen mid-breath. **It loops**,
+and it loops cleanly — measured off the file, all 126 channels end where they
+started (rotation drift 0.00000, translation 0.00001), so there is no snap at
+the join. Nothing has to end it; pressing play does, through `resetReactions`.
+
+Declared as `outro` in the contract and **optional**: an export without one just
+holds the idle, which is what every episode did before. Only the news show has
+one, and it does not play on Stop or at a section join. Adding one for another
+character is a single `outro` entry — and if a future clip does *not* end where
+it starts, it wants `LoopOnce` instead, which is one line in the action-bank
+effect.
 
 **Check the export before you upload anything:**
 
