@@ -146,6 +146,14 @@ ANIMATION CUES: attach reactions to lines to give the LISTENER something to do w
 // The same brief, plus what a whole-episode run has to return. The writer's
 // room reuses the part above and answers in its own shape instead, so the two
 // cannot describe the characters differently — see scripts/lt-tv-room.mjs.
+// WHO THIS SHOW CASTS. Connor and GR80; the news co-anchor is not on this
+// programme. Interpolated rather than typed, because the names in this one
+// string are what the writer emits into a record — a stale one here would
+// produce lines for somebody who is not on the set, which reads as a cast
+// decision nobody made.
+export const MORALITY_ACTORS = ["Connor", "Monk"];
+const ACTOR_UNION = MORALITY_ACTORS.map((a) => `"${a}"`).join(" | ");
+
 const scriptSystem = (show) => `${scriptBible(show)}
 Return ONLY a JSON object, no preamble and no code fences:
 {
@@ -153,8 +161,8 @@ Return ONLY a JSON object, no preamble and no code fences:
     {
       "id": "<the segment id you were given>",
       "lines": [
-        { "actor": "Connor" | "Monk", "text": "the spoken line", "directAddress": true|false,
-          "cues": [{ "actor": "Connor"|"Monk", "reaction": "...", "offset": 0.3 }] }
+        { "actor": ${ACTOR_UNION}, "text": "the spoken line", "directAddress": true|false,
+          "cues": [{ "actor": ${ACTOR_UNION}, "reaction": "...", "offset": 0.3 }] }
       ]
     }
   ]

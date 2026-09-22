@@ -209,12 +209,25 @@ export const CHARACTERS = {
       headshake: { clip: "hologirl_disagreement", duration: 3.0 },
     },
     outro: "hologirl_news_intermission",
-    // Face3 is the projection target, Michelle's answer 2026-09-22: "Face1 is
-    // the mesh before the projection arrives." Face2 is hers and stays as she
-    // left it. The eyes are separate meshes and go with the swap, the way the
-    // other two hide their brows — if the projected face turns out not to cover
-    // them, this is the line to change.
-    faces: { face1: "Face1", face2: "Face3", hide: ["Eye_L", "Eye_R"] },
+    /* SHE HAS THREE FACE LAYERS AND TWO EYE PLANES, and the same character is
+     * already configured elsewhere in this repo — she is the promotions
+     * hologram at the prize wheel in `src/lib/vendorSitePal.js`, on the same
+     * ElevenLabs voice. That config is fitted and working, and it says:
+     *
+     *     projFace: "Face2", regularFaces: ["Face1", "Face3", "Eye_L", "Eye_R"]
+     *
+     * Michelle said Face3 for the talk show. Following the vendor instead, for
+     * two reasons. Face3 is the SAME MESH in both files (132 vertices in each,
+     * where Face1 and Face2 differ slightly between exports), so whatever is
+     * true of it there is true of it here. And whichever layer the projection
+     * lands on, the other two have to be hidden or she wears two faces at
+     * once — "Face1 is the one before the projection arrives" is right and is
+     * not the whole list.
+     *
+     * If she did mean Face3 for this show, swap face2 and the first hide
+     * entry; it is one line either way.
+     */
+    faces: { face1: "Face1", face2: "Face2", hide: ["Face3", "Eye_L", "Eye_R"] },
     /*
      * NEWS ONLY, which is the cast split: GR80 does Markets & Morality and she
      * does the news. A character with no seat on a set is not on that set —

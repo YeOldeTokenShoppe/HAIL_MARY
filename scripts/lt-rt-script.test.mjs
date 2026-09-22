@@ -27,7 +27,9 @@ import { sectionsForRecord } from "./lt-tv-sections.mjs";
 import { assemble, renderScript } from "./lt-tv-episode.mjs";
 import { parseScript, applyScript } from "./lt-tv-edit.mjs";
 import { toSlateRecord } from "./lt-tv-slate-record.mjs";
-import { unwrittenTopics } from "./lt-rt-script.mjs";
+import { unwrittenTopics, scriptBible as moralityBible, MORALITY_ACTORS } from "./lt-rt-script.mjs";
+import { scriptBible as newsBible, NEWS_ACTORS } from "./lt-news-script.mjs";
+import { CAST, REACTIONS, DELIVERY_TAGS } from "./lt-tv-format.mjs";
 
 let failures = 0;
 const check = (label, actual, expected) => {
@@ -218,6 +220,61 @@ check("and the sections agree with it",
     { startsAt: 0, audio: { Connor: "lttv_rt_ep09_connor" } },
     { startsAt: 60, audio: { Connor: "lttv_rt_ep09_connor_s2" } },
   ]);
+
+// ── EACH SHOW CASTS ITS OWN TWO PEOPLE ────────────────────────────────────
+//
+// The cast split — Connor on both shows, GR80 on Markets & Morality, Holly
+// Jones on the news — lives in the writers' prompts as much as in the set,
+// and the prompt is the part with no type checking. What the writer emits is
+// an actor NAME in a record, so a name left behind in one string produces
+// lines for a character who is not on that set. GR80 was named all through the
+// news writer until 2026-09-22, which would have gone on casting him into
+// exactly the seat he had been taken out of.
+console.log("\nEach show's writer casts that show's characters:");
+const news = newsBible();
+const moralityPrompt = moralityBible("morality");
+
+// The names the writer is told to emit, which are the ones that matter: they
+// land in a record as `actor`, and the set looks up a seat, a rig and a voice
+// by them.
+check("the news show casts Connor and Holly", NEWS_ACTORS, ["Connor", "Holly"]);
+check("Markets & Morality casts Connor and GR80", MORALITY_ACTORS, ["Connor", "Monk"]);
+ok("every name each show emits is a real character",
+  [...NEWS_ACTORS, ...MORALITY_ACTORS].every((a) => CAST[a]));
+ok("the news writer does not offer Monk as a speaker", !/"Monk"/.test(news));
+ok("the morality writer does not offer Holly as a speaker", !/"Holly"/.test(moralityPrompt));
+
+// And she has to be DESCRIBED, not just permitted: a writer given a name and
+// no character writes a second Connor.
+ok("the news writer describes Holly by name", news.includes("HOLLY JONES"));
+ok("and names her as the co-anchor", /HOLLY JONES \(the co-anchor\)/.test(news));
+ok("the morality writer still describes GR80", moralityPrompt.includes("SAINT GR80"));
+// GR80 may still be MENTIONED in the news writer — Holly's paragraph says what
+// she is not by pointing at him — but never as one of its hosts.
+ok("the news writer's beat pattern is hers and Connor's",
+  /Holly reads the story/.test(news) && !/GR80 reframes/.test(news));
+
+// Only what each rig can perform, since a cue for a clip she has not got does
+// nothing on screen and she has two where the others have six or seven.
+for (const cue of Object.keys(REACTIONS.Holly)) {
+  ok(`the news writer offers Holly's "${cue}"`, news.includes(cue));
+}
+ok("and tells it that is all she has", /that is ALL she has/.test(news));
+for (const tag of DELIVERY_TAGS.Holly) {
+  ok(`her delivery tag ${tag} is offered`, news.includes(tag));
+}
+ok("GR80's tags are not offered on the news",
+  !DELIVERY_TAGS.Monk.every((t) => news.includes(t)));
+
+// Her register is the thing Michelle actually specified, so it is pinned.
+ok("she is written as a cyborg newscaster", /cyborg newscaster/i.test(news));
+ok("droll is named as the performance", /DROLL/.test(news));
+ok("and the no-contractions rule is spelled out", /NO CONTRACTIONS/.test(news));
+
+// The speaker cue a screenplay carries has to be the display name, or the
+// round trip through the editor loses her lines.
+ok("her speaker cue in the writer matches her CAST display name",
+  news.includes(CAST.Holly.displayName.toUpperCase()));
 
 console.log(failures ? `\n${failures} check(s) failed.\n` : "\nAll checks passed.\n");
 process.exit(failures ? 1 : 0);

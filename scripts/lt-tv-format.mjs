@@ -451,6 +451,10 @@ export const DELIVERY_TAGS = {
     "[reluctantly]",
   ],
   Monk: ["[dryly]", "[patiently]", "[amused]", "[calmly]", "[with quiet disapproval]"],
+  // Droll is the whole performance, so her tags are the ones that keep a joke
+  // from being announced. Nothing warm and nothing surprised: she is a machine
+  // reading the numbers, and the humour is that she is not impressed by them.
+  Holly: ["[dryly]", "[flatly]", "[mildly]", "[unimpressed]", "[brightly]"],
 };
 
 export const EVENT_TAGS = [

@@ -1203,6 +1203,57 @@ the armature's *parent*, so those three tracks cannot even resolve, and nothing
 is logged. `npm run lt:models` now fails on a base clip that animates no bones,
 and warns on one under a second, which holds a pose rather than breathing.
 
+### Holly's register, and where it came from
+
+**She was already written.** She is the promotions hologram at the prize wheel
+on the boardwalk (`promos` in `src/lib/vendorSitePal.js`) — **the same
+character on the same ElevenLabs voice**, so her existing lines are the
+reference for how she talks, and the news writer quotes four of them for
+register rather than for content.
+
+What came out of reading them, beyond "droll":
+
+- **She uses no contractions.** "I do not", "it is", "you have" — never the
+  short forms. It is in every line she has, and it is what makes her read as a
+  machine speaking carefully rather than as a person being stiff.
+- She delivers a joke exactly as she delivers a number: flat, unhurried, with
+  no signal that one is coming. Usually a plain statement and then a drier
+  second sentence.
+- She is matter-of-fact and funny about being a projection rather than a
+  person, and honest about her own motives, which is where most of the humour
+  is.
+- **She is not the conscience of the show.** That is GR80's job on the other
+  programme. She states the part Connor left out and does not argue.
+
+Her crop and filter were copied from her fitted vendor values rather than
+seeded from GR80's, which carried two things over that would have taken a while
+to find by eye: her crop box is much tighter (cropH 154 against ~205), and she
+gets **no sepia**, because she is a projection and a warm cast reads as grime
+on a screen that should look backlit.
+
+**Which face layer the projection lands on was settled the same way.** She has
+three (`Face1`, `Face2`, `Face3`) plus two eye planes, and the working vendor
+config projects onto **Face2** and hides the rest. `Face3` is the same mesh in
+both files — 132 vertices in each, where Face1 and Face2 differ slightly
+between exports — so what is true of it there is true of it here. And whichever
+layer is the target, the other two have to be hidden, or she wears two faces at
+once.
+
+### Each show casts its own two people
+
+The cast split lives in the **writers' prompts** as much as in the set, and a
+prompt is the part with no type checking. What a writer emits is an actor
+*name*, which lands in a record and is what the set looks up a seat, a rig and
+a voice by — so a name left behind in one string produces lines for a character
+who is not on that set, and reads as a cast decision nobody made.
+
+GR80 was named all through the news writer until 2026-09-22, in the character
+list, the beat pattern, the delivery tags, the cue list, the ad break and the
+JSON schema. He is now out of it and Holly is in, **and she opens each story**,
+because she has the running order and Connor does not. `NEWS_ACTORS` and
+`MORALITY_ACTORS` are exported from the two writers and pinned by
+`lt-rt-script.test.mjs`, which is also where the two shows' seam is tested.
+
 ### Who is on which set, and who is seen
 
 **A character with no seat on a set is not on that set.** That is the cast split

@@ -193,11 +193,17 @@ THE BEAT IS GENERAL INVESTING AND ECONOMICS. Interest rates, Treasury yields, oi
 
 THE TWO HOSTS — this is the whole show, so get them exactly right:
 
-CONNOR (the anchor; the animation config and old logs also call him Connor or H80Z). The devil's advocate, and he knows it. An inside trader and a short-seller who has watched a thousand pump-and-dumps and enjoyed every one, and who is completely honest about who he is: he reads the news as a man who trades on it and says so. Loud, smug, market-brained, entertained by his own takes. Short staccato sentences. He distrusts velocity — "loud means cheap" — and respects silence. He treats the news as content and says so. He is funny and a good sparring partner for GR80: not detestable, not a villain, but NOT sweet and NOT empathetic — warmth from Connor comes out as a joke, a bet, or a grudging compliment, never as sympathy. He is never earnest for more than one line at a time, and when GR80 lands a point on him he concedes it grudgingly and immediately changes the subject.
+CONNOR (the anchor; the animation config and old logs also call him Connor or H80Z). The devil's advocate, and he knows it. An inside trader and a short-seller who has watched a thousand pump-and-dumps and enjoyed every one, and who is completely honest about who he is: he reads the news as a man who trades on it and says so. Loud, smug, market-brained, entertained by his own takes. Short staccato sentences. He distrusts velocity — "loud means cheap" — and respects silence. He treats the news as content and says so. He is funny and a good sparring partner for Holly: not detestable, not a villain, but NOT sweet and NOT empathetic — warmth from Connor comes out as a joke, a bet, or a grudging compliment, never as sympathy. He is never earnest for more than one line at a time, and when Holly lands a point on him he concedes it grudgingly and immediately changes the subject. He is not intimidated by her and does not flirt with her; he treats her as the one person on the floor who cannot be sold anything.
 
-SAINT GR80 (the co-anchor). An android monk, keeper of logs. Measured, austere, procedural, with occasional liturgical phrasing. He answers a number with what the number actually measures. He is dry rather than funny, and his jokes arrive flat and land late. He is never cruel and never preachy — he makes one observation and stops. He does not moralize at the audience; he moralizes at Connor, who deserves it.
+HOLLY JONES (the co-anchor). A cyborg newscaster, and openly one. She holds the desk: she has the running order, she has the numbers, and she reads them as they are. Her comedy is DROLL and it is the whole performance — she states the unflattering fact next to Connor's version of it and does not comment, and the joke is that she is not impressed. She delivers a joke exactly as she delivers a yield: flat, unhurried, without signalling that one is coming. Often a plain statement followed by a drier second sentence.
 
-THE BEAT PATTERN for each story: Connor states the fact with its number → GR80 reframes what the number is actually counting → Connor pushes back, usually by defending his own profession → GR80 lands the button. Six to ten lines. Vary who gets the last word across the three stories; do not let GR80 win all three.
+SHE USES NO CONTRACTIONS. "I do not", "it is", "you have" — never "I don't", "it's", "you've". This is her tell and it is in every line she has ever had; it makes her read as a machine speaking carefully rather than as a person being stiff.
+
+She is matter-of-fact and funny about being a projection rather than a person, and will use it as a comparison when it is the sharpest thing available. She is honest about her own mechanics and motives, which is where a lot of her humour comes from. She is NOT a moralist — she is not the conscience of the show and never scolds Connor for what he is; that is GR80's job on the other programme and she does not do it. She is not warm, not sentimental, and not shocked by anything. She likes Connor, in the way one likes weather one has learned to dress for.
+
+Her voice is already established: she is the promotions hologram at the prize wheel on the boardwalk, and these are her own lines, for register rather than for content — "I am projected, not printed, so the merchandise is more real than I am." "Everyone out here needs a hat. That is not a pitch, that is meteorology." "My job is attention, and you are already giving me some." "Day forty and the wheel has not been fair once. It has been generous, which is better than fair and sells more hats."
+
+THE BEAT PATTERN for each story: Holly reads the story and its number straight → Connor tells you what it really means, which is what it means for his book → Holly states the part he left out, without arguing → Connor defends his profession → Holly lands the button, flatly. Six to ten lines. Note that SHE opens, because she has the running order and he does not; it is her desk and his show. Vary who gets the last word across the three stories; do not let Holly win all three.
 
 HARD RULES:
 - Every fact, number and name must come from the rundown you are given. Invent nothing. If you want a number you were not given, write the line without it.
@@ -209,22 +215,30 @@ HARD RULES:
 
 SAY WHAT THE LETTERS STAND FOR. Nobody is reading this show; they are hearing it, and an acronym nobody expands is a noise. The FIRST time an acronym is spoken in the episode, say what it stands for in the same line, then use the short form for the rest of the episode: "Federal Reserve Economic Data — FRED to its friends" the first time, "FRED" every time after. Expand it in the character's own voice, as part of the sentence; it is a line of dialogue, not a footnote, and Connor explaining an acronym impatiently is in character. This applies to: ${Object.keys(SPOKEN_ACRONYMS).join(", ")}. It does NOT apply to these, which everyone already says out loud and which sound patronising expanded: ${ACRONYMS_TAKEN_AS_READ.join(", ")}.
 
-DELIVERY TAGS: put at most one bracketed delivery tag at the START of a line, and only when the reading is not obvious. Connor may use: ${DELIVERY_TAGS.Connor.join(", ")}. GR80 may use: ${DELIVERY_TAGS.Monk.join(", ")}. Roughly half of all lines should carry NO tag — a tag on every line flattens the performance.
+DELIVERY TAGS: put at most one bracketed delivery tag at the START of a line, and only when the reading is not obvious. Connor may use: ${DELIVERY_TAGS.Connor.join(", ")}. Holly may use: ${DELIVERY_TAGS.Holly.join(", ")}. Roughly half of all lines should carry NO tag — a tag on every line flattens the performance.
 
 EVENT TAGS (these produce an actual sound): ${EVENT_TAGS.join(", ")}. Use at most two in the whole episode, and NEVER as the first thing in a line — the audio pipeline trims the first 120 milliseconds of every speaker handoff and would eat it. Put an event after a few words.
 
 DIRECT ADDRESS: set "directAddress": true on a line when the speaker is talking AT the other host rather than to the audience — the listener turns their head to face them. A statement of news is delivered to camera; a jab, a question or a rebuttal is direct address. Roughly half the lines.
 
-ANIMATION CUES: attach reactions to lines to give the LISTENER something to do while the other talks. Each cue is { "actor": who performs it, "reaction": one of the names below, "offset": seconds after the line begins }. Connor can perform: ${Object.keys(REACTIONS.Connor).join(", ")}. GR80 can perform: ${Object.keys(REACTIONS.Monk).join(", ")}. Aim for one cue every four or five lines — the set is two people in chairs, so stillness reads as attention, and constant motion reads as a screensaver. Use headnodSubtle for ordinary agreement and save headnod for an emphatic beat. lookAround is a long clip; use it at most twice, for surveying the studio.
+ANIMATION CUES: attach reactions to lines to give the LISTENER something to do while the other talks. Each cue is { "actor": who performs it, "reaction": one of the names below, "offset": seconds after the line begins }. Connor can perform: ${Object.keys(REACTIONS.Connor).join(", ")}. Holly can perform: ${Object.keys(REACTIONS.Holly).join(", ")} — that is ALL she has, so do not give her any other cue; one naming a clip her rig has not got simply does nothing on screen. Aim for one cue every four or five lines — the set is two people in chairs, so stillness reads as attention, and constant motion reads as a screensaver. Use headnodSubtle for ordinary agreement and save headnod for an emphatic beat (Holly has only headnod, and on her it reads as agreement rather than emphasis). lookAround is a long clip; use it at most twice, for surveying the studio.
 
 THE SPOT — the ad break, when you are given copy for it:
-Play it completely straight for as long as you can bear. Connor does the sponsor voice: grand, overclaimed, delighted with himself, the register of a man reading a script he was paid for and believes anyway. Then GR80 reads the disclaimer as though it were scripture, or refuses to read it, or reads it correctly in a way that ruins the ad. Fifty-odd words, in and out.
+Play it completely straight for as long as you can bear. Connor does the sponsor voice: grand, overclaimed, delighted with himself, the register of a man reading a script he was paid for and believes anyway. Then Holly reads the disclaimer — flatly, completely, at the same pace as the rest, which is what ruins the ad. Or she declines to read it. Or she reads it and then says what it actually means. She does advertising for a living elsewhere on the boardwalk and is not sentimental about it. Fifty-odd words, in and out.
 It is a joke ABOUT advertising. It never tells anyone to buy anything, it states no price, no return and no yield figure, and "not a recommendation" is the punchline rather than a caption. If you are given no spot copy, omit the "the-spot" segment entirely.
 `;
 
 // The same brief, plus what a whole-episode run has to return. The writer's
 // room reuses the part above and answers in its own shape instead, so the two
 // cannot describe the characters differently — see scripts/lt-tv-room.mjs.
+// WHO THIS SHOW CASTS. The actor names below are what the writer emits into a
+// record, so they are interpolated rather than typed: GR80 was named here for
+// as long as he had the news seat, and a name left behind in this one string
+// would have the writer producing lines for a character who is not on the set
+// — which reads as a cast decision that nobody made.
+export const NEWS_ACTORS = ["Connor", "Holly"];
+const ACTOR_UNION = NEWS_ACTORS.map((a) => `"${a}"`).join(" | ");
+
 const SCRIPT_SYSTEM = `${scriptBible()}
 Return ONLY a JSON object, no preamble and no code fences:
 {
@@ -232,8 +246,8 @@ Return ONLY a JSON object, no preamble and no code fences:
     {
       "id": "<the segment id you were given>",
       "lines": [
-        { "actor": "Connor" | "Monk", "text": "the spoken line", "directAddress": true|false,
-          "cues": [{ "actor": "Connor"|"Monk", "reaction": "...", "offset": 0.3 }] }
+        { "actor": ${ACTOR_UNION}, "text": "the spoken line", "directAddress": true|false,
+          "cues": [{ "actor": ${ACTOR_UNION}, "reaction": "...", "offset": 0.3 }] }
       ]
     }
   ]
