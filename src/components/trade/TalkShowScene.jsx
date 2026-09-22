@@ -117,6 +117,43 @@ const CHARACTER_CLIPS = {
 
 const EMPTY_FOR_ACTOR = { Monk: "Monk_Empty", Connor: "Demon_Empty" };
 
+/**
+ * The armature under a character's empty, whatever the exporter called it.
+ *
+ * `root` above is the node the clips' bone tracks are relative to, and it is
+ * the one name in this file that depends on HOW the model was exported rather
+ * than what is in it. GR80's is "Armature.001" purely because Connor's
+ * "Armature" sits in the same Blender file and Blender disambiguates the
+ * collision. Export a character on their OWN and there is no collision, so it
+ * comes out as "Armature" — and a lookup for "Armature001" then finds nothing,
+ * which costs the mixer and the head bone. The character loads, stands in its
+ * bind pose, never moves and never gets looked at, with no error anywhere.
+ *
+ * So the declared name is a preference and not a requirement: if it is not
+ * there, take the armature actually sitting under the empty, which is the node
+ * whose own children are bones. A character exported alone and a character
+ * exported with the set both resolve, and neither needs a name kept for the
+ * code's benefit.
+ */
+function findRig(scope, emptyName, declaredRoot) {
+  const declared = declaredRoot ? scope.getObjectByName(declaredRoot) : null;
+  if (declared) return declared;
+  const empty = scope.getObjectByName(emptyName);
+  if (!empty) return null;
+  let found = null;
+  empty.traverse((node) => {
+    if (found || node.isBone) return;
+    if ((node.children || []).some((child) => child.isBone)) found = node;
+  });
+  if (found) {
+    console.info(
+      `[TalkShowScene] ${emptyName}: no node named "${declaredRoot}", ` +
+        `using "${found.name}" as the rig — update CHARACTER_CLIPS.root to match.`,
+    );
+  }
+  return found;
+}
+
 // Full authored lengths at 30fps. A cue may still supply a shorter `duration`
 // when only the expressive portion of a pose-2 clip should play.
 const REACTION_DURATIONS = {
@@ -1637,19 +1674,31 @@ function TalkShowModel({
   // Rooting the mixers at the enclosing empties leaves those tracks unresolved
   // (and both characters in their bind-pose T). Keep the action-bank keys tied
   // to the character empties, but bind each mixer directly to its armature.
-  const mixers = useMemo(() => {
+  // Resolved once and shared, so the mixer and the head bone can never end up
+  // bound to different nodes — and so a rename is reported once rather than
+  // silently twice.
+  const rigRoots = useMemo(() => {
     const out = {};
     Object.entries(CHARACTER_CLIPS).forEach(([emptyName, clips]) => {
-      const root = cloned.getObjectByName(clips.root);
-      if (root) out[emptyName] = new THREE.AnimationMixer(root);
+      const root = findRig(cloned, emptyName, clips.root);
+      if (root) out[emptyName] = root;
     });
     return out;
   }, [cloned]);
 
+  const mixers = useMemo(() => {
+    const out = {};
+    Object.keys(CHARACTER_CLIPS).forEach((emptyName) => {
+      const root = rigRoots[emptyName];
+      if (root) out[emptyName] = new THREE.AnimationMixer(root);
+    });
+    return out;
+  }, [rigRoots]);
+
   const headBones = useMemo(() => {
     const out = {};
-    Object.values(CHARACTER_CLIPS).forEach((clips) => {
-      const root = cloned.getObjectByName(clips.root);
+    Object.entries(CHARACTER_CLIPS).forEach(([emptyName, clips]) => {
+      const root = rigRoots[emptyName];
       if (!root) return;
       root.traverse((node) => {
         // GLTFLoader sanitizes "mixamorig:Head" and adds a numeric suffix to
@@ -1661,7 +1710,7 @@ function TalkShowModel({
       });
     });
     return out;
-  }, [cloned]);
+  }, [rigRoots]);
 
   // The bind-pose head orientation is the neutral, straight-ahead direction
   // for these rigs. Connor's intro blends toward it to address the camera

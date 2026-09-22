@@ -795,6 +795,67 @@ two wide. A third chair, mic, cup and laptop can be another separate prop GLB
 placed the same way, or a re-export of the desk — but the desk is the only part
 of this that genuinely needs Blender.
 
+### Exporting the split: what goes in which file
+
+**Take all three characters out of the set, and export each one at the position
+they already sit in.** The set file becomes furniture only.
+
+You have to re-export the set either way, because GR80 has to come *out* of it —
+he cannot live in both the set file and his own, or he is drawn twice and his
+clips load twice. Since that re-export is already paid for, do it once
+completely: leaving Connor in means another set re-export the first time you
+want an episode without him, or a different anchor, and it leaves the code with
+a special case for Connor plus a general case for everyone else, which is where
+the bug would be.
+
+It costs nothing in duplicated textures. The characters share no materials with
+the set or with each other — Connor's are `PolygonOffice_Charaters.*`,
+`barron_hair`, `barron_eyes*`; GR80's are `MAT_01A.*`, `lambert1.001`; the set's
+are none of those. And the win is real: of the 4.3 MB set file, **1.9 MB is
+animation data** (Connor's clips 571 KB, GR80's 1,296 KB) plus 340 KB of GR80's
+textures. GR80 is the single heaviest thing in that file and he is not in the
+news show at all.
+
+**Export each character where they stand. Do not move them to the origin and do
+not apply or clear their transform.** The set's scene root sits at the origin of
+the group that holds it, so a node's coordinates inside a GLB are already the
+coordinates the code works in — the studio lights rely on exactly this, mounted
+as siblings of the set using positions read straight off the model. So a
+character file that keeps its set position lands in the right chair with no
+numbers from anyone. Exported at the origin instead, the lounge positions would
+have to be re-fitted by hand for no gain. (The news desk is unaffected: the code
+already overrides the seat position for the news set.)
+
+For reference, what the set currently says — you do not need to write these
+down, only to avoid zeroing them:
+
+| | position | yaw | scale |
+|---|---|---|---|
+| `Demon_Empty` (Connor) | −0.803, 0.210, −0.302 | ~29.5° | 1.125 |
+| `Monk_Empty` (GR80) | 0.950, 0.240, −0.361 | ~−3.4° | 1.081 |
+
+**The clips must travel with the character.** All 31 are in the set file today.
+After the split the set should have no animations at all, and each character
+file must carry its own — `barron_*` with Connor, `monk_*` with GR80. If the
+actions get left behind, the character loads, stands in its bind pose and never
+moves, with no error. Worth checking the export actually contains them before
+you call it done.
+
+**Keep these names.** The face projection finds what to hide and what to paint
+by name:
+
+- Connor: `Demon_Empty`, `FaceDemon1`, `FaceDemon2`, `Demon_Brows`
+- GR80: `Monk_Empty`, `Face1`, `Face2`, `Brows`
+
+**The armature name no longer matters.** GR80's is `Armature.001` *only* because
+Connor's `Armature` is in the same Blender file and Blender disambiguates the
+collision; exported alone it would come out as `Armature`, and the code used to
+look for `Armature001` and find nothing — costing the mixer and the head bone,
+so he would load in his bind pose, never move and never get looked at, with no
+error. `findRig` in `TalkShowScene.jsx` now falls back to whatever armature is
+actually under the empty and logs what it used, so either name works. This is
+the one thing in the old contract you can stop worrying about.
+
 ### What a character is, as a list of entries
 
 | Where | What |
