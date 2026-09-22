@@ -25,7 +25,7 @@ import CyborgTempleScene, {
 import VideoScreens from "@/components/VideoScreens";
 // import VideoScreensOptimized from "@/components/VideoScreensOptimized";
 import CouncilChatScreens from "@/components/CouncilChatScreens";
-import TalkShowScene, { preloadTalkShow, HouseAmbient } from "@/components/trade/TalkShowScene";
+import TalkShowScene, { preloadTalkShow, HouseAmbient, TALKSHOW_PROJECTION_CONFIG } from "@/components/trade/TalkShowScene";
 import LTTvLightPanel from "@/components/trade/LTTvLightPanel";
 import LTTvShotPanel from "@/components/trade/LTTvShotPanel";
 import LTTvBroadcastPanel from "@/components/trade/LTTvBroadcastPanel";
@@ -3622,8 +3622,10 @@ export default function CyborgTemple() {
           lighting board (right) can be open together. */}
       <LTTvShotPanel />
 
-      {/* Dev SitePal crop tuning panel — shows only when ?tune=sitepal */}
-      {/* <SitePalCropPanel /> */}
+      {/* Dev SitePal crop tuning panel — shows only when ?tune=sitepal.
+          It builds its talk-show tabs from TALKSHOW_PROJECTION_CONFIG, so a
+          new character gets one without being named here. */}
+      <SitePalCropPanel />
 
       {/* Single host SitePal embed. CyborgTempleScene swaps the
           loaded scene per character via window.loadSceneByID() on
@@ -4803,8 +4805,8 @@ export default function CyborgTemple() {
 
         {/* Talk-show SitePal fitting control — dev only (?tune=sitepal), while
             the TALK SHOW set is up. One character projects at a time (single
-            shared host portal); pair with the SitePalCropPanel's TS tabs to
-            fit the crop onto Face2 / FaceDemon2. */}
+            shared host portal); pair with the SitePalCropPanel's TS tabs,
+            bottom left, to fit the crop onto that character's face mesh. */}
         {mounted && !isMobileView && talkShowMode &&
           typeof window !== 'undefined' &&
           window.location.search.includes('tune=sitepal') && (
@@ -4831,8 +4833,14 @@ export default function CyborgTemple() {
               TALK SHOW · SITEPAL FIT
             </div>
             {[
-              { key: 'Monk', label: 'Project Monk (Face2)' },
-              { key: 'Connor', label: 'Project Connor (FaceDemon2)' },
+              // From the registry, not a hand-kept list: this shipped naming
+              // Monk and Connor, so the news co-anchor could not be isolated
+              // to fit her crop at all. Each entry names the mesh the feed
+              // lands on, which is the thing you are looking at while fitting.
+              ...Object.entries(TALKSHOW_PROJECTION_CONFIG).map(([key, cfg]) => ({
+                key,
+                label: `Project ${key} (${cfg.face2})`,
+              })),
               { key: null, label: 'Both (live show)' },
               { key: 'Off', label: 'Off (static faces)' },
             ].map(({ key, label }) => {

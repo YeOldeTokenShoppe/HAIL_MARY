@@ -392,10 +392,12 @@ export const TALKSHOW_PROJECTION_CONFIG = {
    * forward, because the scenes they borrow are not domain-locked. Hers came
    * with one, so it goes in.
    *
-   * Her projection target is Face3 rather than Face2 — she has three face
-   * meshes and Michelle confirmed Face1 is the one on screen until the
-   * projection arrives. The names are resolved WITHIN her own empty, which
-   * matters because Face1 and Face2 are GR80's names too.
+   * Her projection target is Face2, which Michelle confirmed on 2026-09-22
+   * after first saying Face3 — it is what her own working vendor config for
+   * the same character uses. Face1 is the mesh on screen until the projection
+   * arrives, and Face3 and both eye planes are hidden with it. Every name here
+   * is resolved WITHIN her own empty, which matters because Face1 and Face2
+   * are GR80's names too.
    */
   Holly: {
     label: "TS Holly",
