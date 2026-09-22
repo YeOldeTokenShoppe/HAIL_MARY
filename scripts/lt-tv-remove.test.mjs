@@ -15,7 +15,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { planRemove, applyRemove, partsOf, ROOMS_DIR } from "./lt-tv-remove.mjs";
+import { planRemove, applyRemove, partsOf, ROOMS_DIR, unpublishedRecording } from "./lt-tv-remove.mjs";
 import { SLATE_DIR, SLATE_INDEX, registerEpisode, unregisterEpisode } from "./lt-tv-slate-record.mjs";
 import { STAGING_DIR, AUDIO_DIR, PLANS_DIR } from "./lt-tv-rename.mjs";
 
@@ -138,6 +138,77 @@ console.log("\nWhat it refuses:");
 
   const strength = await planRemove("morality-01", { scope: "sort-of", root });
   ok("a strength it does not have", strength.problems.some((p) => p.includes("not a strength")));
+}
+
+// ── THE GUARD, WHICH COST A FINISHED EPISODE ─────────────────────────────
+//
+// 2026-09-22: a news episode was written, recorded and uploaded, but "Put it
+// on the guide" had not been run — so the guide still showed the PREVIOUS
+// week's entry under the same id (the writer reuses a week's existing number,
+// and both were week 2026-W39). One row in the studio, carrying the old
+// episode's title and the new episode's recording. Deleting the row to be rid
+// of the old show deleted the new recording, and none of `content/` is in git.
+//
+// The fixture below is that exact state.
+async function halfPublished({ published = null, recorded = [0, 1, 2] } = {}) {
+  const root = await fixture({ id: "news-01", onGuide: false });
+  await writeFile(
+    join(root, STAGING_DIR, "news-01.json"),
+    JSON.stringify({ id: "news-01", title: "Warsh Means It", timing: { lineStarts: recorded } }),
+  );
+  if (published) {
+    await writeFile(
+      join(root, SLATE_DIR, "news-01.json"),
+      JSON.stringify({ id: "news-01", title: "Hike Barrel Charizard", audio: { Connor: "c" }, lineStarts: published }),
+    );
+  }
+  return root;
+}
+
+console.log("\nA recording the guide has never published:");
+{
+  const root = await halfPublished({ published: [0, 1] });
+  const found = await unpublishedRecording("news-01", { root });
+  ok("is reported", Boolean(found));
+  check("with what is actually on disk", [found.lines, found.title], [3, "Warsh Means It"]);
+  check("and what the guide shows instead", found.guideTitle, "Hike Barrel Charizard");
+
+  const full = await planRemove("news-01", { scope: "everything", root });
+  check("the full delete refuses", full.problems.length, 1);
+  ok("naming the recording it would destroy", full.problems[0].includes("Warsh Means It"));
+  ok("and the title standing in its way", full.problems[0].includes("Hike Barrel Charizard"));
+  ok("and the button that was wanted", full.problems[0].includes("--from-guide"));
+  // applyRemove does not re-check `problems`, so a refused plan must carry
+  // nothing to act on. Anything else is one forgotten check from the loss
+  // this guard exists to prevent.
+  check("the refused plan is inert", [full.removes, full.unregister], [[], false]);
+
+  // The weaker strength is the right answer here, so it must stay available.
+  const off = await planRemove("news-01", { scope: "from-guide", root });
+  check("taking it off the guide is still allowed", off.problems, []);
+  ok("and touches only the guide", off.removes.every((r) => r.path.startsWith("src/")));
+
+  const forced = await planRemove("news-01", { scope: "everything", root, force: true });
+  check("--force still deletes it", forced.problems, []);
+  ok("all of it", forced.removes.length > 3);
+}
+
+console.log("\nWhat the guard must NOT block:");
+{
+  // Same line starts on both sides: the guide already has this recording, so
+  // deleting is the ordinary act it has always been.
+  const published = await halfPublished({ published: [0, 1, 2] });
+  check("an episode the guide already publishes", await unpublishedRecording("news-01", { root: published }), null);
+  check("deletes without complaint", (await planRemove("news-01", { scope: "everything", root: published })).problems, []);
+
+  // Written but never recorded: there is no recording to lose.
+  const unrecorded = await halfPublished({ recorded: [] });
+  check("an episode that was never recorded", await unpublishedRecording("news-01", { root: unrecorded }), null);
+  check("deletes without complaint too", (await planRemove("news-01", { scope: "everything", root: unrecorded })).problems, []);
+
+  // A recording with no guide entry at all is still worth keeping.
+  const orphan = await halfPublished();
+  ok("a recording with no guide entry is still guarded", Boolean(await unpublishedRecording("news-01", { root: orphan })));
 }
 
 console.log("\nThe index edit, on its own:");

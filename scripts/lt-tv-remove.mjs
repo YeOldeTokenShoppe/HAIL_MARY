@@ -41,6 +41,52 @@ import { parseId, STAGING_DIR, AUDIO_DIR, PLANS_DIR } from "./lt-tv-rename.mjs";
 
 export const ROOMS_DIR = "content/lt-tv/rooms";
 
+const readJson = async (path) => {
+  try {
+    return JSON.parse(await readFile(path, "utf8"));
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * A RECORDING ON DISK THAT THE GUIDE HAS NEVER PUBLISHED, or null.
+ *
+ * This is the case `--everything` must not walk into. It cost Michelle a
+ * finished episode on 2026-09-22: she had written, recorded and uploaded a
+ * news show with a new co-anchor, but had not run "Put it on the guide", so
+ * the guide still showed the PREVIOUS week's entry under the same id — the
+ * writer reuses a week's existing number, and both shows were week 2026-W39.
+ * The studio therefore had one row, carrying the old episode's title and the
+ * new episode's recording. She deleted the row to be rid of the old show and
+ * the new recording went with it, because none of `content/` is in git.
+ *
+ * The signal is simply that the two records disagree about the recording: the
+ * working record has line starts and the guide either has none or has
+ * different ones. "Take it off the guide" is the button that was wanted, and
+ * it keeps every file.
+ */
+export async function unpublishedRecording(id, { root = process.cwd() } = {}) {
+  const staging = await readJson(join(root, STAGING_DIR, `${id}.json`));
+  const starts = staging?.timing?.lineStarts;
+  if (!Array.isArray(starts) || starts.length === 0) return null;
+
+  const slate = await readJson(join(root, SLATE_DIR, `${id}.json`));
+  const published = Array.isArray(slate?.lineStarts) ? slate.lineStarts : null;
+  const same =
+    published &&
+    published.length === starts.length &&
+    published[published.length - 1] === starts[starts.length - 1];
+  if (same) return null;
+
+  return {
+    lines: starts.length,
+    title: staging?.title || null,
+    guideTitle: slate?.title || null,
+    onGuide: Boolean(published),
+  };
+}
+
 /** Everything an episode is made of, in the order a person would list them. */
 export function partsOf(id) {
   return {
@@ -70,7 +116,7 @@ export function partsOf(id) {
  *             tracked: string[],
  *             problems: string[] }}
  */
-export async function planRemove(id, { scope = "from-guide", root = process.cwd() } = {}) {
+export async function planRemove(id, { scope = "from-guide", root = process.cwd(), force = false } = {}) {
   const problems = [];
   if (!parseId(id)) problems.push(`"${id}" is not an episode id — expected <show>-<NN>, like morality-01.`);
   if (!["from-guide", "everything"].includes(scope)) {
@@ -101,6 +147,30 @@ export async function planRemove(id, { scope = "from-guide", root = process.cwd(
     problems.push(`there is nothing here called ${id} — nothing to remove.`);
   }
 
+  // The guard. Deliberately a REFUSAL rather than a warning: the thing it
+  // protects cannot be recovered by a checkout, and the right button is one
+  // click away.
+  if (scope === "everything" && !force) {
+    const fresh = await unpublishedRecording(id, { root });
+    if (fresh) {
+      const whose = fresh.title ? `"${fresh.title}"` : "it";
+      problems.push(
+        `${id} holds a recording the guide has never published — ${whose}, ${fresh.lines} lines. ` +
+          (fresh.onGuide && fresh.guideTitle && fresh.guideTitle !== fresh.title
+            ? `The guide still shows "${fresh.guideTitle}" under this id, so deleting that entry would take this recording with it. `
+            : "") +
+          `None of it is in git, so this cannot be undone. Use --from-guide ("Take it off the guide") ` +
+          `to unlist it and keep every file, or --force if you really mean to delete the recording.`,
+      );
+    }
+  }
+
+  // A REFUSED PLAN IS INERT. `applyRemove` does not re-check `problems`, so a
+  // plan that still carried its file list would delete everything if a caller
+  // forgot to look — which is the one mistake this module cannot afford. The
+  // bad-id path above already returns nothing; so does this one.
+  if (problems.length) return { removes: [], unregister: false, tracked: [], problems };
+
   return {
     removes,
     unregister,
@@ -128,6 +198,7 @@ export async function applyRemove(id, plan, { root = process.cwd() } = {}) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
+  const force = args.includes("--force");
   const scope = args.includes("--everything") ? "everything" : "from-guide";
   const [id] = args.filter((a) => !a.startsWith("--"));
 
@@ -135,10 +206,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.error("Usage: npm run lt:remove -- <episode id> (--from-guide | --everything) [--dry-run]");
     console.error("  --from-guide   unlist it, keep the script and the recording");
     console.error("  --everything   unlist it and delete everything it is made of");
+    console.error("  --force        allow --everything to delete a recording the guide never published");
     process.exit(2);
   }
 
-  const plan = await planRemove(id, { scope });
+  const plan = await planRemove(id, { scope, force });
   if (plan.problems.length) {
     console.error(`\nCannot remove ${id}:`);
     for (const p of plan.problems) console.error(`  ✗ ${p}`);
