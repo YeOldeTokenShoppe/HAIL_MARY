@@ -14,8 +14,12 @@ import { SHOT_FRAMING, SHOT_NAMES, isSingleShot } from "@/lib/ltTv/shotFraming.m
  *
  * HOLD IS THE POINT. In "Follow the show" the director cuts through the shot
  * list as the episode plays, which is no way to fit a shot. Pin one shot with
- * the Hold buttons and dial it in with the episode paused or stopped; "Follow
- * the show" hands it back.
+ * the Hold buttons and dial it in; "Follow the show" hands it back.
+ *
+ * FIT THE SINGLES WITH AN EPISODE RUNNING, not stopped. Hold works either way,
+ * but off air the faces are dimmed to a quarter (FACE_LIGHTING.offAir), and a
+ * dark face is the hardest thing to judge sharpness on — which is the one thing
+ * that actually limits how tight a single can go.
  *
  * THE FACE READOUT is the honest limit on pushing in. Each face is a crop of
  * SitePal's own render, about 195 source pixels tall — past 1.0× the shot is
@@ -43,7 +47,7 @@ function readSaved() {
 const SHOT_LABELS = {
   establish: "Establish · the whole set",
   two: "Two-shot · the pair at the desk",
-  direct: "Direct · down the lens, to the viewer",
+  direct: "Direct · the line read to the viewer",
   single: "Single · the speaker, across the desk",
   close: "Close · punched in on the speaker",
 };
@@ -158,9 +162,8 @@ export default function LTTvShotPanel() {
       const size = isSingleShot(name)
         ? `headShare: ${round(s.headShare)}`
         : `coverage: ${round(s.coverage)}`;
-      const extra = name === "direct" ? ", directToCamera: true" : "";
       return `    ${name}: { ${size}, fov: ${round(s.fov)}, azimuth: ${round(s.azimuth)}, ` +
-        `height: ${round(s.height)}, lookLift: ${round(s.lookLift)}${extra} },`;
+        `height: ${round(s.height)}, lookLift: ${round(s.lookLift)} },`;
     }).join("\n");
     return [
       "// SHOT_FRAMING, in src/lib/ltTv/shotFraming.mjs",
