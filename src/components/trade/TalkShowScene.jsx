@@ -33,11 +33,18 @@ import {
   cueIndexAt,
   episodeCast,
   sectionIndexAt,
+  shotAt,
   shotSubjectAt,
   speakerAt,
   stepSection,
   validateEpisode,
 } from "@/lib/ltTv/episodeTimeline.mjs";
+import {
+  SHOT_FRAMING,
+  faceScreenPixels,
+  isSingleShot,
+  solveShot,
+} from "@/lib/ltTv/shotFraming.mjs";
 import { findEpisode } from "@/content/lt-tv";
 
 // Version the URL when the Blender export changes so drei does not keep an
@@ -682,6 +689,130 @@ function updateCameraRig(feed, headBones, timeline, elapsed, running, delta) {
   applyRigOrientation(feed);
 }
 
+// The orbit rig's authored polar limits (page.js CameraControlsRig). The
+// director widens them while it owns the camera and restores these on the way
+// out, so a viewer who orbits after the show can't drop under the floor.
+const ORBIT_MIN_POLAR = Math.PI * 0.18;
+const ORBIT_MAX_POLAR = Math.PI * 0.52;
+
+// Swing the VIEWER's camera to the shot that is live now. Runs every frame
+// while the director is active; returns false when it has nothing to do, so
+// the caller knows to leave camera-controls alone.
+//
+// The heads move only a little (they're seated and only the head bone turns),
+// but reading their real world positions means the framing survives the set
+// being nudged or rescaled — the same reason the tripod feed reads bones and
+// not constants.
+function directViewerCamera({ state, controls, camera, headBones, timeline, elapsed, running, delta, aspect, viewportHeightPx }) {
+  const cfg = SHOT_FRAMING;
+  if (!cfg.enabled || !controls) return false;
+
+  // What the director is allowed to touch: playback (it follows the show) or a
+  // board that is holding one shot for fitting. Otherwise it yields — and
+  // hands the orbit's own polar limits back, which it widened below so the
+  // near-level singles wouldn't be clamped up off the eyeline.
+  const holding = cfg.hold && cfg.hold !== "auto";
+  if (!running && !holding) {
+    if (state.primed) {
+      controls.minPolarAngle = ORBIT_MIN_POLAR;
+      controls.maxPolarAngle = ORBIT_MAX_POLAR;
+    }
+    state.primed = false;
+    state.lastKey = null;
+    cfg.current = null;
+    return false;
+  }
+  // The show's singles sit almost level with the guests; the orbit's normal
+  // ceiling (~94°) would tip them back up. Open it right up while directing.
+  controls.minPolarAngle = 0.04 * Math.PI;
+  controls.maxPolarAngle = 0.96 * Math.PI;
+
+  // The two heads in world space. Missing (a still-loading clone) means the
+  // director can't frame anything, so it hands back rather than guessing.
+  const heads = {};
+  for (const [actor, bone] of Object.entries(headBones)) {
+    heads[actor] = bone.getWorldPosition(new THREE.Vector3());
+  }
+  if (Object.keys(heads).length < 1) return false;
+
+  // Which shot, and on whom.
+  let framing;
+  let subject;
+  if (holding) {
+    framing = cfg.hold;
+    subject = isSingleShot(framing)
+      ? (speakerAt(timeline, elapsed, running) ?? Object.keys(heads)[0])
+      : null;
+  } else {
+    const shot = shotAt(timeline, elapsed) || { framing: "two", subject: null };
+    framing = shot.framing || (shot.subject ? "single" : "two");
+    subject = shot.subject ?? null;
+  }
+
+  const solved = solveShot({
+    framing,
+    subject,
+    heads: {
+      // solveShot is THREE-free, so hand it plain objects.
+      ...Object.fromEntries(Object.entries(heads).map(([k, v]) => [k, { x: v.x, y: v.y, z: v.z }])),
+    },
+    front: state.front,
+    aspect,
+  });
+  if (!solved) return false;
+
+  const key = `${framing}:${subject ?? ""}`;
+  const isCut = key !== state.lastKey;
+  if (isCut) {
+    state.lastKey = key;
+    state.sinceCut = 0;
+  } else {
+    state.sinceCut += delta;
+  }
+
+  // A shot that never moves reads as a freeze-frame — creep in a touch as it
+  // holds, and reset on the cut. Along the eye→aim line, so it's a push-in.
+  state.targetEye.set(solved.eye.x, solved.eye.y, solved.eye.z);
+  state.targetAim.set(solved.aim.x, solved.aim.y, solved.aim.z);
+  const driftFrac = Math.min(cfg.driftMax, cfg.drift * state.sinceCut);
+  if (driftFrac > 0) {
+    state.targetEye.lerp(state.targetAim, driftFrac);
+  }
+  state.targetFov = solved.fov;
+
+  if (!state.primed || (isCut && cfg.cut)) {
+    // First frame, or a hard cut: land on the shot instantly.
+    state.eye.copy(state.targetEye);
+    state.aim.copy(state.targetAim);
+    state.fov = state.targetFov;
+    state.primed = true;
+  } else {
+    // An operator swinging the head, or a soft cut: ease toward it.
+    const k = 1 - Math.exp(-cfg.easeLambda * delta);
+    state.eye.lerp(state.targetEye, k);
+    state.aim.lerp(state.targetAim, k);
+    state.fov = THREE.MathUtils.lerp(state.fov, state.targetFov, k);
+  }
+
+  controls.setLookAt(
+    state.eye.x, state.eye.y, state.eye.z,
+    state.aim.x, state.aim.y, state.aim.z,
+    false,
+  );
+  if (Number.isFinite(state.fov) && Math.abs(camera.fov - state.fov) > 1e-3) {
+    camera.fov = state.fov;
+    camera.updateProjectionMatrix();
+  }
+
+  // Readout for the framing board: which shot is up and how much the face is
+  // being upscaled at this distance.
+  cfg.current = framing;
+  const face = faceScreenPixels(solved.headShare, viewportHeightPx);
+  cfg.facePixels = Math.round(face.pixels);
+  cfg.faceRatio = Number(face.ratio.toFixed(2));
+  return true;
+}
+
 // One offscreen pass from the prop's point of view. Every renderer flag it
 // touches is restored before the EffectComposer's pass runs.
 function renderMonitorFeed(feed, gl, scene) {
@@ -1243,6 +1374,8 @@ function TalkShowModel({
   onPlaybackReady,
   onPlaybackStateChange,
   onChapterChange,
+  directCamera,
+  cameraControlsRef,
 }) {
   const { scene, animations } = useGLTF(MODEL_URL, DRACO_PATH);
   const raisedSet = castHidden || newsMode;
@@ -1512,7 +1645,7 @@ function TalkShowModel({
   // four prop meshes. They run in the CAPTURE phase on window so a grab is
   // swallowed before CameraControlsRig's own listener sees it — otherwise the
   // same drag would orbit the viewer camera at the same time.
-  const { gl: renderer, camera: viewerCamera } = useThree();
+  const { gl: renderer, camera: viewerCamera, size } = useThree();
   useEffect(() => {
     const el = renderer.domElement;
     const raycaster = new THREE.Raycaster();
@@ -1683,6 +1816,29 @@ function TalkShowModel({
     () => Object.fromEntries(Object.entries(headBones).map(([actor, head]) => [actor, head.quaternion.clone()])),
     [headBones],
   );
+  // THE VIEWER-CAMERA DIRECTOR. The tripod monitor (updateCameraRig, above) is
+  // one camera; this is the other — the camera the viewer actually watches
+  // through. It reads the same shot list and swings the real camera to each
+  // shot, so an exchange cuts between a wide, the pair, a single angled across
+  // the desk, and a close, instead of sitting on one locked-off wide.
+  //
+  // It drives camera-controls by setLookAt rather than fighting it: on desktop
+  // during playback (or while the framing board is holding a shot) it owns the
+  // camera; the rest of the time it does nothing and the viewer can orbit as
+  // before. Front is world +Z — the side the composed poses were always shot
+  // from — so the maths doesn't depend on the model's internal orientation.
+  const shotDirectorRef = useRef({
+    front: new THREE.Vector3(0, 0, 1),
+    eye: new THREE.Vector3(),
+    aim: new THREE.Vector3(),
+    targetEye: new THREE.Vector3(),
+    targetAim: new THREE.Vector3(),
+    fov: null,
+    targetFov: 50,
+    lastKey: null,
+    sinceCut: 0,
+    primed: false,
+  });
   const listenerGazeRef = useRef(
     Object.fromEntries(Object.keys(TALKSHOW_PROJECTION_CONFIG).map((key) => [key, 0])),
   );
@@ -3103,6 +3259,26 @@ function TalkShowModel({
       if (repaint && st.cropCtx) paintCrop(st, cfg, source);
     });
 
+    // The viewer camera follows the shot list — the "camera operator". Runs
+    // before the monitor feed so the tripod's second render sees this frame's
+    // camera pose too. Only on desktop's set view (mobile has its own framing,
+    // and the lineup is a menu, not a show).
+    if (directCamera) {
+      const controls = cameraControlsRef?.current;
+      directViewerCamera({
+        state: shotDirectorRef.current,
+        controls,
+        camera,
+        headBones,
+        timeline,
+        elapsed,
+        running: playback.running,
+        delta,
+        aspect: size.width / size.height,
+        viewportHeightPx: gl.domElement.height,
+      });
+    }
+
     // Camera rig last, so the feed sees this frame's poses and faces. The feed
     // is a SECOND scene render (half rate, 384px) — worth it on desktop, but
     // the mobile mount turns it off to spend that budget on the SitePal faces.
@@ -3183,6 +3359,8 @@ export default function TalkShowScene({
   onPlaybackReady,
   onPlaybackStateChange,
   onChapterChange,
+  directCamera = false,
+  cameraControlsRef = null,
 }) {
   return (
     <group position={position} scale={scale} rotation={rotation}>
@@ -3202,6 +3380,8 @@ export default function TalkShowScene({
           onPlaybackReady={onPlaybackReady}
           onPlaybackStateChange={onPlaybackStateChange}
           onChapterChange={onChapterChange}
+          directCamera={directCamera}
+          cameraControlsRef={cameraControlsRef}
         />
       </Suspense>
     </group>
