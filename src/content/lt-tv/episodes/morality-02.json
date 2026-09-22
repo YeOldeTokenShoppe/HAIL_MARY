@@ -4,5 +4,234 @@
   "number": "02",
   "title": "Meme Season",
   "summary": "When attention becomes an asset, the joke may be the honest part.",
-  "status": "planned"
+  "airDate": "2026-09-22",
+  "leadIn": 2.5,
+  "speakers": [
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor",
+    "Monk",
+    "Connor"
+  ],
+  "audienceLines": [
+    0,
+    39,
+    44
+  ],
+  "cues": [
+    {
+      "line": 2,
+      "offset": 6,
+      "actor": "Monk",
+      "reaction": "headnodSubtle",
+      "duration": 4.33,
+      "note": "A company writes it in the filing, plain English: these sha…"
+    },
+    {
+      "line": 6,
+      "offset": 4,
+      "actor": "Monk",
+      "reaction": "headnodSubtle",
+      "duration": 4.33,
+      "note": "It names itself. This is a bet on attention, here is the pa…"
+    },
+    {
+      "line": 10,
+      "offset": 7.5,
+      "actor": "Connor",
+      "reaction": "shrug",
+      "duration": 4.33,
+      "note": "Because it's legible. The gambler has told me his horizon —…"
+    },
+    {
+      "line": 15,
+      "offset": 8,
+      "actor": "Connor",
+      "reaction": "headshakeDisappointment",
+      "duration": 4.33,
+      "note": "Knowing you are inside a joke is a status marker. It requir…"
+    },
+    {
+      "line": 19,
+      "offset": 5.5,
+      "actor": "Monk",
+      "reaction": "prayCrosschest",
+      "duration": 3.87,
+      "note": "The tone is the honesty. You are not wrong that nobody lied…"
+    },
+    {
+      "line": 23,
+      "offset": 5,
+      "actor": "Connor",
+      "reaction": "lookAround",
+      "duration": 7.6,
+      "note": "Management does the only responsible thing available to it.…"
+    },
+    {
+      "line": 27,
+      "offset": 4.5,
+      "actor": "Monk",
+      "reaction": "headshake",
+      "duration": 4.33,
+      "note": "That is the protection I would have written, and it hands t…"
+    },
+    {
+      "line": 32,
+      "offset": 3,
+      "actor": "Monk",
+      "reaction": "headnodSubtle",
+      "duration": 4.33,
+      "note": "No.  Some of them knew, and the rest inherited the confiden…"
+    },
+    {
+      "line": 38,
+      "offset": 2,
+      "actor": "Connor",
+      "reaction": "shrug",
+      "duration": 4.33,
+      "note": "No. I'm the one who knows what time it is, which pays bette…"
+    },
+    {
+      "line": 41,
+      "offset": 2.5,
+      "actor": "Connor",
+      "reaction": "headnod",
+      "duration": 4.33,
+      "note": "You are. Half a truth, honestly held, at the cheap end of t…"
+    }
+  ],
+  "audio": {
+    "Connor": "lttv_mm_ep02_connor",
+    "Monk": "lttv_mm_ep02_gr80"
+  },
+  "lineStarts": [
+    0,
+    8.582,
+    14.052,
+    40.631,
+    55.091,
+    66.561,
+    71.791,
+    86.381,
+    89.315,
+    101.745,
+    104.095,
+    119.27,
+    126.61,
+    134.87,
+    144.553,
+    147.863,
+    163.493,
+    170.803,
+    183.642,
+    186.792,
+    195.86,
+    201.245,
+    215.835,
+    219.945,
+    231.095,
+    242.016,
+    245.966,
+    254.316,
+    260.426,
+    266.815,
+    273.165,
+    277.465,
+    283.255,
+    295.205,
+    296.725,
+    304.506,
+    306.077,
+    319.299,
+    322.429,
+    328.009,
+    336.27,
+    341.608,
+    348.118,
+    355.816,
+    358.122
+  ],
+  "dialogueEnd": 368.002,
+  "sections": [
+    {
+      "startsAt": 0,
+      "audio": {
+        "Connor": "lttv_mm_ep02_connor",
+        "Monk": "lttv_mm_ep02_gr80"
+      }
+    },
+    {
+      "startsAt": 71.416,
+      "audio": {
+        "Connor": "lttv_mm_ep02_connor_s2",
+        "Monk": "lttv_mm_ep02_gr80_s2"
+      }
+    },
+    {
+      "startsAt": 147.488,
+      "audio": {
+        "Connor": "lttv_mm_ep02_connor_s3",
+        "Monk": "lttv_mm_ep02_gr80_s3"
+      }
+    },
+    {
+      "startsAt": 230.72,
+      "audio": {
+        "Connor": "lttv_mm_ep02_connor_s4",
+        "Monk": "lttv_mm_ep02_gr80_s4"
+      }
+    },
+    {
+      "startsAt": 305.702,
+      "audio": {
+        "Connor": "lttv_mm_ep02_connor_s5",
+        "Monk": "lttv_mm_ep02_gr80_s5"
+      }
+    }
+  ],
+  "producedFrom": {
+    "record": "content/lt-tv/episodes/morality-02.json",
+    "pipeline": "scripts/lt-rt-script.mjs",
+    "generatedAt": "2026-09-22T00:30:04.266Z"
+  }
 }
