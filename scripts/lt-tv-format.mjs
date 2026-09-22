@@ -6,6 +6,11 @@
 // component. scripts/lt-news-script.mjs generates against it and validates
 // against it; the audio build and the runtime read the same constants.
 
+import {
+  CHARACTERS as MODEL_CHARACTERS,
+  reactionDurations,
+} from "../src/lib/ltTv/modelContract.mjs";
+
 // ── The cast ──────────────────────────────────────────────────────────────
 //
 // THE ROSTER, not the cast of any one episode. An episode casts whoever has
@@ -13,19 +18,22 @@
 // the set counts that rather than the seats it can fill — so a character can
 // be rotated out of a week, or sat down for one, without touching this file.
 //
-// What a third seat costs, place by place, is written up under "Adding a
-// character, rotating the cast, or a guest" in docs/lt-tv.md. The short of it:
-// the set model holds two rigged bodies (Demon_Empty and Monk_Empty) and the
-// desk has two chairs, so a third one is Blender work plus a SitePal scene of
-// its own — and a personality paragraph in both writers, which is the part
-// that is writing rather than plumbing.
+// THREE CHARACTERS as of 2026-09-22, two per episode: Connor anchors both
+// shows, GR80 does Markets & Morality and the new co-anchor does the news.
+// Who has a chair on which set is in src/lib/ltTv/modelContract.mjs, and a
+// character with no seat on a set is not on it — so the split is geometry
+// rather than a rule anybody has to remember.
 //
-// The character is CONNOR, and the runtime agrees: CHARACTER_CLIPS and
-// process_dialogue.py's ACTOR_NAMES both say "Connor" now. What is left is
-// plumbing that was never his name — the GLB node is Demon_Empty, the baked
-// animation clips are barron_*, and the processor's speaker key is john.
-// Those are strings inside the model file and the audio pipeline; `actor`
-// below is the only name this pipeline uses.
+// Each character now ships as their own GLB, so adding one is an entry in the
+// contract, an entry here, and a SitePal scene of its own. What is NOT free is
+// a personality paragraph in both writers, which is writing rather than
+// plumbing. Written up under "Adding a character, rotating the cast, or a
+// guest" in docs/lt-tv.md.
+//
+// `actor` is the only name this pipeline uses, and it is deliberately not the
+// character's name: Connor's GLB node is still Demon_Empty and his processor
+// key is still john, because those are strings inside a model file and an
+// audio pipeline. `displayName` is what a viewer meets.
 export const CAST = {
   Connor: {
     actor: "Connor",
@@ -41,6 +49,20 @@ export const CAST = {
     voiceId: "bZ2WrEjNzHgFHfLLaFKQ",
     processorKey: "gr80", // → gr80-sitepal-balanced.wav
     clipKey: "gr80",
+    role: "co-anchor",
+  },
+  // THE NEWS CO-ANCHOR, added 2026-09-22. `displayName` is a placeholder and
+  // the only thing here that is not settled: Michelle has not named her yet,
+  // and the writers have no paragraph on who she is against Connor, so nothing
+  // writes her lines until both exist. The actor key follows her model and
+  // clips (`hologirl_*`) and is not a decision about her name — changing the
+  // display name costs nothing and changes no file.
+  HoloGirl: {
+    actor: "HoloGirl",
+    displayName: "HoloGirl",
+    voiceId: "wRBnwLc9kmVUe7Iim1Qo",
+    processorKey: "hologirl",
+    clipKey: "hologirl",
     role: "co-anchor",
   },
 };
@@ -89,25 +111,21 @@ export const ACTORS = Object.keys(CAST);
 // Mirrors CHARACTER_CLIPS and REACTION_DURATIONS in TalkShowScene.jsx. A cue
 // naming a reaction its actor does not have will T-pose or no-op at runtime,
 // so the generator refuses one rather than shipping it into an upload.
-export const REACTIONS = {
-  Connor: {
-    headnod: 4.33,
-    headnodSubtle: 4.33,
-    headshakeDisappointment: 4.33,
-    shrug: 4.33,
-    mockCrying: 4.83,
-    lookAround: 7.6,
-  },
-  Monk: {
-    headnod: 4.33,
-    headnodSubtle: 4.33,
-    headshake: 4.33,
-    headshakeDisappointment: 4.33,
-    shrug: 4.33,
-    prayCrosschest: 3.87,
-    lookAround: 7.6,
-  },
-};
+// WHICH CUES EACH RIG CAN ACTUALLY PERFORM, and how long each clip is.
+//
+// Derived from the model contract, which is the single place these are
+// written. This was a hand-maintained copy, as were the lists in
+// TalkShowScene.jsx and lt-tv-check.mjs — three copies of one fact, each with
+// a comment asking the next person to keep them in step. Two copies of a clip
+// name is what put Connor in a T-pose.
+//
+// It matters here because the writers are OFFERED these names: a cue naming a
+// clip the rig has not got does nothing on screen. The news co-anchor has two
+// gestures where the other two have six or seven, so the prompt must be built
+// from this rather than from prose about what a character can do.
+export const REACTIONS = Object.fromEntries(
+  Object.entries(MODEL_CHARACTERS).map(([actor, c]) => [actor, reactionDurations(c)]),
+);
 
 // ── Where a story may be verified from ────────────────────────────────────
 //

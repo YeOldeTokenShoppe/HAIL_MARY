@@ -91,14 +91,15 @@ export const CHARACTERS = {
     // name, and the note on them said only a Blender re-export could change
     // them — this is that re-export. Durations are unchanged, so they are the
     // same actions under the current name.
+    headBone: "mixamorig:Head",
     base: "connor_sit_pose2",
     reactions: {
-      headnod: "connor_headnod_pose2",
-      headnodSubtle: "connor_headnod_subtle_pose2",
-      headshakeDisappointment: "connor_headshake_disappointment_pose2",
-      lookAround: "connor_look_around_pose2",
-      shrug: "connor_shrug_pose2",
-      mockCrying: "connor_mockcrying_pose2",
+      headnod: { clip: "connor_headnod_pose2", duration: 4.33 },
+      headnodSubtle: { clip: "connor_headnod_subtle_pose2", duration: 4.33 },
+      headshakeDisappointment: { clip: "connor_headshake_disappointment_pose2", duration: 4.33 },
+      lookAround: { clip: "connor_look_around_pose2", duration: 7.6 },
+      shrug: { clip: "connor_shrug_pose2", duration: 4.33 },
+      mockCrying: { clip: "connor_mockcrying_pose2", duration: 4.83 },
     },
     // The news set's RESTING STATE once the show has finished, in place of the
     // seated idle: Connor turns away from the camera and sits out the
@@ -132,15 +133,16 @@ export const CHARACTERS = {
     file: "public/models/LTTV_GR80.glb",
     empty: "Monk_Empty",
     rig: "Armature001",
+    headBone: "mixamorig:Head",
     base: "monk_sit_pose2",
     reactions: {
-      headnod: "monk_headnod_pose2",
-      headnodSubtle: "monk_headnod_subtle_pose2",
-      headshake: "monk_headshake_pose2",
-      headshakeDisappointment: "monk_headshake_disappointment_pose2",
-      lookAround: "monk_look_around_pose2",
-      shrug: "monk_shrug_pose2",
-      prayCrosschest: "monk_pray_crosschest_pose2",
+      headnod: { clip: "monk_headnod_pose2", duration: 4.33 },
+      headnodSubtle: { clip: "monk_headnod_subtle_pose2", duration: 4.33 },
+      headshake: { clip: "monk_headshake_pose2", duration: 4.33 },
+      headshakeDisappointment: { clip: "monk_headshake_disappointment_pose2", duration: 4.33 },
+      lookAround: { clip: "monk_look_around_pose2", duration: 7.6 },
+      shrug: { clip: "monk_shrug_pose2", duration: 4.33 },
+      prayCrosschest: { clip: "monk_pray_crosschest_pose2", duration: 3.87 },
     },
     faces: { face1: "Face1", face2: "Face2", hide: ["Brows"] },
     // His export DOES sit at the lounge seat, to five decimal places. Pinned
@@ -159,11 +161,102 @@ export const CHARACTERS = {
       },
     },
   },
+  /*
+   * THE NEWS CO-ANCHOR, added 2026-09-22. Every name and number below was read
+   * off her export with `npm run lt:models -- public/models/LTTV_HoloGirl.glb`
+   * rather than assumed, and three of them would have been wrong if assumed.
+   *
+   * `HoloGirl` is the actor key because her clips are `hologirl_*` and her file
+   * is LTTV_HoloGirl.glb, so it is the one name already baked into things a
+   * re-export would have to change. Her DISPLAY name — what the writers call
+   * her and what a viewer hears — is a separate field in CAST and costs nothing
+   * to change, so this key is not a decision about who she is.
+   */
+  HoloGirl: {
+    file: "public/models/LTTV_HoloGirl.glb",
+    // Lowercase "g", while the FILE has a capital one. Both exactly as exported.
+    empty: "Hologirl_Empty",
+    // Not "Armature" — her rig is a different one throughout.
+    rig: "Root",
+    // AND A DIFFERENT SKELETON. Connor and GR80 are Mixamo rigs
+    // (`mixamorig:Head`); she is an Unreal-style one — `Pelvis`, `spine_01`,
+    // `head`. The gaze and the camera framing both need the head bone, and the
+    // pattern that finds theirs finds nothing here, which is why the head bone
+    // is named per character rather than matched.
+    headBone: "head",
+    // ⚠ AS EXPORTED 2026-09-22 THIS CLIP CANNOT SEAT HER. It carries three
+    // channels — `Hologirl_Empty`'s own translation, rotation and scale — and
+    // no bone animation at all, where her three other clips animate 168
+    // channels each. Her rest pose is not a seated pose (36 of her 56 bones sit
+    // elsewhere in the gesture clips), so this plays as her A-pose. Michelle
+    // was told to re-export the action off the ARMATURE; `npm run lt:models`
+    // fails until she does, rather than letting it reach an episode.
+    base: "hologirl_sitting",
+    // She has two gestures where the others have six or seven, so she is
+    // offered two cues and the writers' prompt lists what each actor can
+    // actually do. A cue naming a clip she has not got no-ops with a warning.
+    reactions: {
+      headnod: { clip: "hologirl_agreement", duration: 3.0 },
+      headshake: { clip: "hologirl_disagreement", duration: 3.0 },
+    },
+    outro: "hologirl_news_intermission",
+    // Face3 is the projection target, Michelle's answer 2026-09-22: "Face1 is
+    // the mesh before the projection arrives." Face2 is hers and stays as she
+    // left it. The eyes are separate meshes and go with the swap, the way the
+    // other two hide their brows — if the projected face turns out not to cover
+    // them, this is the line to change.
+    faces: { face1: "Face1", face2: "Face3", hide: ["Eye_L", "Eye_R"] },
+    /*
+     * NEWS ONLY, which is the cast split: GR80 does Markets & Morality and she
+     * does the news. A character with no seat on a set is not on that set —
+     * see the visibility effect in TalkShowScene.jsx — so this is also what
+     * keeps her out of the lounge, where there is no third chair for her.
+     *
+     * Taken from her own export, not copied from GR80's news seat: she is a
+     * different body, sits at 0.846 rather than 1.081, and is turned about 41°
+     * toward the middle where he is turned 3°. Those are hers.
+     */
+    seat: {
+      news: {
+        position: [0.45241, 0.33581, 0.02213],
+        quaternion: [0, -0.35246, 0, 0.93583],
+        scale: 0.84565,
+      },
+    },
+  },
 };
+
+/** The clip name for one reaction key, or undefined. */
+export function reactionClip(character, key) {
+  return character.reactions?.[key]?.clip;
+}
+
+/** key → clip name, for the action bank. */
+export function reactionClips(character) {
+  return Object.fromEntries(
+    Object.entries(character.reactions || {}).map(([key, r]) => [key, r.clip]),
+  );
+}
+
+/**
+ * key → authored length in seconds.
+ *
+ * THE ONE COPY OF THIS. It used to live three times — `REACTION_DURATIONS` in
+ * TalkShowScene.jsx, `REACTIONS` in scripts/lt-tv-format.mjs (what the writers
+ * are offered) and a third list in scripts/lt-tv-check.mjs — each with a
+ * comment asking the next person to keep it in step by hand. Three copies of a
+ * fact is how Connor ended up in a T-pose, and a third character was about to
+ * be added to all three.
+ */
+export function reactionDurations(character) {
+  return Object.fromEntries(
+    Object.entries(character.reactions || {}).map(([key, r]) => [key, r.duration]),
+  );
+}
 
 /** Every clip name a character's file has to carry, base first. */
 export function requiredClips(character) {
-  return [character.base, ...Object.values(character.reactions || {})];
+  return [character.base, ...Object.values(reactionClips(character))];
 }
 
 /** Clips that may be there and are used when they are. */

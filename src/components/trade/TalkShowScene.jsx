@@ -45,7 +45,13 @@ import {
   isSingleShot,
   solveShot,
 } from "@/lib/ltTv/shotFraming.mjs";
-import { CHARACTERS, SET_MODEL, modelUrl } from "@/lib/ltTv/modelContract.mjs";
+import {
+  CHARACTERS,
+  SET_MODEL,
+  modelUrl,
+  reactionClips,
+  reactionDurations,
+} from "@/lib/ltTv/modelContract.mjs";
 import { findEpisode } from "@/content/lt-tv";
 
 /* THE SET AND THE CHARACTERS ARE SEPARATE EXPORTS as of 2026-09-22.
@@ -118,8 +124,9 @@ const CHARACTER_CLIPS = Object.fromEntries(
     {
       actor,
       root: character.rig,
+      head: character.headBone,
       base: character.base,
-      reactions: character.reactions,
+      reactions: reactionClips(character),
       // Played once when the show is over instead of the seated idle. Only
       // Connor has one, and only the news show ends with it.
       outro: character.outro || null,
@@ -143,14 +150,32 @@ const EMPTY_FOR_ACTOR = Object.fromEntries(
  * Morality. So the seats live in the contract and a re-export cannot move
  * them; moving a seat for real is an edit there.
  */
-const SEAT_POSES = {
-  lounge: Object.fromEntries(
-    Object.values(CHARACTERS).map((c) => [c.empty, c.seat.lounge]),
-  ),
-  news: Object.fromEntries(
-    Object.values(CHARACTERS).map((c) => [c.empty, c.seat.news]),
-  ),
-};
+const SEAT_POSES = Object.fromEntries(
+  ["lounge", "news"].map((set) => [
+    set,
+    Object.fromEntries(
+      Object.values(CHARACTERS)
+        .filter((c) => c.seat[set])
+        .map((c) => [c.empty, c.seat[set]]),
+    ),
+  ]),
+);
+
+/* WHO HAS A CHAIR ON WHICH SET, which is the cast split expressed as geometry.
+ *
+ * GR80 does Markets & Morality and the co-anchor does the news, so she has no
+ * lounge seat — and the lounge has no third chair to give her. A character
+ * with no seat on the current set is not on that set at all, which is both
+ * correct and the thing that stops her turning up in the roundtable.
+ */
+const SEATED_ON = Object.fromEntries(
+  ["lounge", "news"].map((set) => [
+    set,
+    Object.entries(CHARACTERS)
+      .filter(([, c]) => c.seat[set])
+      .map(([actor]) => actor),
+  ]),
+);
 
 /**
  * The armature under a character's empty, whatever the exporter called it.
@@ -200,27 +225,12 @@ function findRig(scope, emptyName, declaredRoot) {
   return found;
 }
 
-// Full authored lengths at 30fps. A cue may still supply a shorter `duration`
-// when only the expressive portion of a pose-2 clip should play.
-const REACTION_DURATIONS = {
-  Connor: {
-    headnod: 4.33,
-    headnodSubtle: 4.33,
-    headshakeDisappointment: 4.33,
-    shrug: 4.33,
-    mockCrying: 4.83,
-    lookAround: 7.6,
-  },
-  Monk: {
-    headnod: 4.33,
-    headnodSubtle: 4.33,
-    headshake: 4.33,
-    headshakeDisappointment: 4.33,
-    shrug: 4.33,
-    prayCrosschest: 3.87,
-    lookAround: 7.6,
-  },
-};
+// Full authored lengths, from the contract, which is the only place they are
+// written. A cue may still supply a shorter `duration` when only the expressive
+// portion of a pose-2 clip should play.
+const REACTION_DURATIONS = Object.fromEntries(
+  Object.entries(CHARACTERS).map(([actor, c]) => [actor, reactionDurations(c)]),
+);
 
 // Seconds between the performance clock starting and the first WORD. Line
 // starts come from ElevenLabs' voice_segments, but the clock is stamped when
@@ -289,10 +299,27 @@ const idlePlayback = () => ({
 
 // Procedural listener gaze is applied after the animation mixer, so it layers
 // over breathing and reaction clips without needing separate look-at actions.
-const LISTENER_GAZE_YAW = {
-  Connor: THREE.MathUtils.degToRad(30),
-  Monk: THREE.MathUtils.degToRad(-23),
+/* How far a character turns their head toward whoever is addressing them.
+ *
+ * DEGREES, and live from `window.__tsGaze` so it can be fitted by eye on the
+ * set rather than reasoned about here — it is a number about a picture, and
+ * the two existing values are an empirical fit per rig rather than anything
+ * derivable (Connor turns +30 from a body already yawed +29.5, GR80 turns -23
+ * from a body yawed -3.4; the signs do not even agree, because the head bones
+ * do not share a local basis).
+ *
+ * The co-anchor's is a starting point and nothing more: she is a different
+ * skeleton again, and her body is exported already turned about 41° toward the
+ * middle, so she needs far less head turn than GR80 to look at the same place.
+ * Small and negative is the safe direction; fit it on the set.
+ */
+export const LISTENER_GAZE_DEGREES = {
+  Connor: 30,
+  Monk: -23,
+  HoloGirl: -8,
 };
+const listenerGazeYaw = (actor) =>
+  THREE.MathUtils.degToRad(LISTENER_GAZE_DEGREES[actor] ?? 0);
 
 // SOLO PROJECTION (mobile) paints one face per frame instead of two, because a
 // phone running two SitePal avatar renderers plus two per-frame canvas crops is
@@ -315,6 +342,11 @@ export const TALKSHOW_MONK_CROP = { cropX: 249, cropY: 150, cropW: 160, cropH: 2
 export const TALKSHOW_MONK_FILTER = { saturate: 99, contrast: 99, brightness: 93, hueRotate: -27, sepia: 0 };
 export const TALKSHOW_CONNOR_CROP = { cropX: 180, cropY: 118, cropW: 145, cropH: 195, rotateZ: 0, rotateX: 0 };
 export const TALKSHOW_CONNOR_FILTER = { saturate: 106, contrast: 102, brightness: 73, hueRotate: 0, sepia: 20 };
+// NOT FITTED YET. Seeded from the Monk's, which is only a starting point: Face3
+// is her own mesh with its own UVs, so the crop will be wrong until it is
+// fitted on the panel. That is what the panel is for and it takes a minute.
+export const TALKSHOW_HOLOGIRL_CROP = { cropX: 249, cropY: 150, cropW: 160, cropH: 205, rotateZ: 0, rotateX: 0 };
+export const TALKSHOW_HOLOGIRL_FILTER = { saturate: 99, contrast: 99, brightness: 93, hueRotate: 0, sepia: 0 };
 
 // Projection registry. sceneId reuses the temple's SitePal scenes (Monk =
 // GR80, Connor = the Demon/H80Z scene). face1 = static face to hide, face2 =
@@ -342,6 +374,34 @@ export const TALKSHOW_PROJECTION_CONFIG = {
     // Connor's brows live under Demon_Empty as `Demon_Brows` (the Monk's are
     // just `Brows`). Hide with the face swap so they don't float over Face2.
     hideExtra: ["Demon_Brows"],
+  },
+  /*
+   * The news co-anchor. The first talk-show character with her OWN SitePal
+   * scene rather than a borrowed one — Monk and Connor reuse the temple's, so
+   * their entries read a sceneId out of that config; hers is her own, from the
+   * embed code Michelle pasted.
+   *
+   * And the first to carry a `hash`. The portal URL has always forwarded one
+   * (`portalSrc`, as `&embed=`) and the other two have never had one to
+   * forward, because the scenes they borrow are not domain-locked. Hers came
+   * with one, so it goes in.
+   *
+   * Her projection target is Face3 rather than Face2 — she has three face
+   * meshes and Michelle confirmed Face1 is the one on screen until the
+   * projection arrives. The names are resolved WITHIN her own empty, which
+   * matters because Face1 and Face2 are GR80's names too.
+   */
+  HoloGirl: {
+    label: "TS HoloGirl",
+    sceneId: 2775585,
+    hash: "u2gpwL8UxKKa2eKLsXI3BVUPNHUdFxFT",
+    face1: CHARACTERS.HoloGirl.faces.face1,
+    face2: CHARACTERS.HoloGirl.faces.face2,
+    crop: TALKSHOW_HOLOGIRL_CROP,
+    filter: TALKSHOW_HOLOGIRL_FILTER,
+    // Her eyes are separate meshes, where the other two have brows. Same job:
+    // keep them from floating over the projected face.
+    hideExtra: CHARACTERS.HoloGirl.faces.hide,
   },
 };
 
@@ -1151,6 +1211,8 @@ export function HouseAmbient({ dimmed = false }) {
     if (typeof window === "undefined") return;
     window.__tsAmbient = HOUSE_AMBIENT;
     window.__tsHouse = HOUSE_PREVIEW;
+    // Read fresh every frame, so a value set here shows on the next one.
+    window.__tsGaze = LISTENER_GAZE_DEGREES;
   }, []);
 
   useFrame((state, delta) => {
@@ -1652,15 +1714,45 @@ function TalkShowModel({
     return () => { hidden.forEach((o) => { o.visible = true; }); };
   }, [cloned, hideCameraRig]);
 
-  // Empty chairs for LT TV's lineup. Each guest's empty parents the rig, the
-  // body and both faces, so hiding it takes the whole character.
+  /* WHO IS ACTUALLY IN THE ROOM.
+   *
+   * Every registered character loads, so somebody has to decide who is SEEN,
+   * and until there were three of them the answer was "everyone, unless this
+   * is the lineup". With a third it is not: the co-anchor does the news and
+   * GR80 does Markets & Morality, and the lounge has two chairs, so a rule of
+   * "everyone" puts her in mid-air beside a chair that is not hers.
+   *
+   * Three conditions, in order of how firmly they say no:
+   *   - the LINEUP wants empty chairs, so nobody is in them;
+   *   - a character with no seat on this set has nowhere to be on it;
+   *   - otherwise it is the episode's cast, which is already how the audio,
+   *     the readiness and the section tallies decide — a character with no
+   *     lines is not in the episode, and now that includes their body.
+   *
+   * An episode with no audio yet (a slate entry) names nobody, and then
+   * everyone with a chair here sits in it, which is the right thing to see
+   * while dressing a set.
+   *
+   * Each character's empty parents the rig, the body and every face, so
+   * hiding it takes the whole character.
+   */
   useEffect(() => {
-    const guests = Object.values(EMPTY_FOR_ACTOR)
-      .map((name) => cloned.getObjectByName(name))
-      .filter(Boolean);
-    guests.forEach((o) => { o.visible = !castHidden; });
-    return () => { guests.forEach((o) => { o.visible = true; }); };
-  }, [cloned, castHidden]);
+    const set = newsMode ? "news" : "lounge";
+    const cast = episodeCast(timeline);
+    const shown = (actor) =>
+      !castHidden &&
+      SEATED_ON[set].includes(actor) &&
+      (cast.length === 0 || cast.includes(actor));
+
+    const changed = [];
+    Object.entries(EMPTY_FOR_ACTOR).forEach(([actor, name]) => {
+      const object = cloned.getObjectByName(name);
+      if (!object) return;
+      changed.push([object, object.visible]);
+      object.visible = shown(actor);
+    });
+    return () => changed.forEach(([object, visible]) => { object.visible = visible; });
+  }, [cloned, castHidden, newsMode, timeline]);
 
   // The NewsDesk parent hides its entire prop hierarchy outside pre-show/news.
   // Desk chairs and sign supports follow the same rule. Lounge chairs
@@ -1981,11 +2073,30 @@ function TalkShowModel({
     return out;
   }, [rigRoots]);
 
+  /* THE HEAD BONE, WHICH IS NAMED PER CHARACTER AND NOT MATCHED.
+   *
+   * This used to test every bone against /^mixamorighead\d*$/, which worked
+   * while every character was a Mixamo rig. The news co-anchor is not: her
+   * skeleton is an Unreal-style one whose bones are `Pelvis`, `spine_01` and
+   * `head`, and that pattern finds nothing in it. A missing head bone is quiet
+   * and costs two things at once — she never turns to whoever is speaking, and
+   * the camera has no head position to frame her by, so the shot solver falls
+   * back on the desk.
+   *
+   * So the name comes from the contract. The pattern stays as a fallback,
+   * because the numeric suffix it tolerates is GLTFLoader's own answer to a
+   * duplicate rig name and a future re-export can still produce one.
+   */
   const headBones = useMemo(() => {
     const out = {};
     Object.entries(CHARACTER_CLIPS).forEach(([emptyName, clips]) => {
       const root = rigRoots[emptyName];
       if (!root) return;
+      const declared = clips.head ? root.getObjectByName(clips.head) : null;
+      if (declared?.isBone) {
+        out[clips.actor] = declared;
+        return;
+      }
       root.traverse((node) => {
         // GLTFLoader sanitizes "mixamorig:Head" and adds a numeric suffix to
         // duplicate rig names. Exclude HeadTop_End from the match.
@@ -1994,6 +2105,12 @@ function TalkShowModel({
           out[clips.actor] = node;
         }
       });
+      if (!out[clips.actor]) {
+        console.warn(
+          `[TalkShowScene] ${clips.actor}: no head bone (looked for "${clips.head}") — ` +
+            "no listener gaze, and the camera cannot frame them by the head",
+        );
+      }
     });
     return out;
   }, [rigRoots]);
@@ -3471,7 +3588,7 @@ function TalkShowModel({
 
     Object.entries(headBones).forEach(([actor, head]) => {
       const target =
-        addressedListener === actor ? LISTENER_GAZE_YAW[actor] : 0;
+        addressedListener === actor ? listenerGazeYaw(actor) : 0;
       const current = listenerGazeRef.current[actor] || 0;
       const eased = THREE.MathUtils.damp(
         current,

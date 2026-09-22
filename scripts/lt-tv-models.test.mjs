@@ -22,6 +22,7 @@ import {
   hasRig,
   seatDrift,
   clipDuration,
+  clipTargets,
   resolveSet,
   collisions,
 } from "./lt-tv-models.mjs";
@@ -30,9 +31,12 @@ import {
   CHARACTERS,
   requiredClips,
   optionalClips,
+  reactionClips,
+  reactionDurations,
   modelUrl,
   MODEL_VERSION,
 } from "../src/lib/ltTv/modelContract.mjs";
+import { REACTIONS, CAST, ACTORS } from "./lt-tv-format.mjs";
 
 let failures = 0;
 const check = (label, actual, expected) => {
@@ -168,9 +172,20 @@ ok("the shared bones are reported as expected rather than as a problem",
 // name they have.
 const preSplit = resolveSet([SET_MODEL.candidates[1]]).gltf;
 const clashing = collisions(preSplit, entries);
-ok("a character whose names are also in the set is caught", clashing.withSet.length === 2);
-ok("and the report names the nodes, not just the count",
-  clashing.withSet[0].names.includes(CHARACTERS[clashing.withSet[0].actor].empty));
+// Connor and GR80 are INSIDE that file, so they collide on everything they
+// have — empty, armature, faces, every bone.
+for (const actor of ["Connor", "Monk"]) {
+  const hit = clashing.withSet.find((c) => c.actor === actor);
+  ok(`${actor} is caught against a set that contains him`, hit && hit.names.length > 30);
+  ok(`and the report names the nodes, ${CHARACTERS[actor].empty} among them`,
+    hit?.names.includes(CHARACTERS[actor].empty));
+}
+// The co-anchor is not in that file, and still collides on two names — because
+// the names she shares are GR80's Face1/Face2, and his copy is in there. Which
+// is the point: a name is dangerous because of where it ends up, not whose it is.
+const holo = clashing.withSet.find((c) => c.actor === "HoloGirl");
+check("and a character not in the set is still caught on the names she shares",
+  holo?.names.sort(), ["Face1", "Face2"]);
 
 // Two entries pointed at the same file is the shared-empty case, and the one
 // that would leave the scoped lookups with nothing to scope by.
@@ -236,6 +251,126 @@ for (const [actor, character] of Object.entries(CHARACTERS)) {
 ok("the URL is versioned, so a re-export is never served from cache",
   modelUrl(SET_MODEL.file).includes("?v="));
 
+// ── A BASE CLIP THAT ANIMATES NOTHING ─────────────────────────────────────
+//
+// A clip's name and its duration both look fine on a clip that animates
+// nothing. The co-anchor's first export shipped a `hologirl_sitting` carrying
+// three channels on her empty and not one bone, where her gesture clips carry
+// 168 each — as a base idle, the whole episode in her rest pose. Same silent
+// bind-pose failure as a missing clip, reached from the other direction, so
+// the checker has to see it.
+console.log("\nA base clip is checked for actually animating something:");
+for (const [actor, character] of Object.entries(CHARACTERS)) {
+  const t = clipTargets(files[actor], character.base);
+  ok(`${actor}: the base clip is found`, t !== null);
+  console.log(`      (${actor}'s "${character.base}": ${t.channels} channels, ${t.bones} bones)`);
+}
+// WHAT IS ASSERTED HERE IS THE CHECKER, NOT THE STATE OF ANYONE'S EXPORT.
+// Michelle is re-exporting the co-anchor's base clip, so a test pinning it as
+// broken would fail the moment she fixes it, which is backwards. The live data
+// is `npm run lt:models`, which exits non-zero while a base clip animates
+// nothing; this proves that it would notice.
+const boneless = {
+  nodes: [{ name: "Someone_Empty" }, { name: "Root" }, { name: "head" }],
+  skins: [{ joints: [2] }],
+  animations: [
+    { name: "empty_only", channels: [
+      { target: { node: 0, path: "translation" } },
+      { target: { node: 0, path: "rotation" } },
+    ], samplers: [] },
+    { name: "real_idle", channels: [{ target: { node: 2, path: "rotation" } }], samplers: [] },
+  ],
+};
+check("a clip that only moves the empty reports no bones", clipTargets(boneless, "empty_only").bones, 0);
+check("and names what it does move", clipTargets(boneless, "empty_only").names, ["Someone_Empty"]);
+check("a clip that moves a bone reports one", clipTargets(boneless, "real_idle").bones, 1);
+check("two channels on one node count as one node", clipTargets(boneless, "empty_only").nodes, 1);
+
+// Against her real file, the part that stays true after the re-export: the
+// gesture clips animate the rig, so the difference between a clip that poses
+// her and one that does not is visible in the data.
+const holoGesture = clipTargets(files.HoloGirl, reactionClips(CHARACTERS.HoloGirl).headnod);
+const holoJoints = new Set((files.HoloGirl.skins || []).flatMap((sk) => sk.joints || [])).size;
+ok(`her gesture clip animates most of her rig (${holoGesture.bones} of ${holoJoints})`,
+  holoGesture.bones / holoJoints > 0.5);
+// And the mechanism, without needing to read a single keyframe: the base clip
+// does not touch the bones her gestures move, so whatever her rest pose is,
+// the base cannot put them anywhere. That is why a boneless base shows as her
+// rest pose rather than as nothing happening.
+const holoBaseNames = new Set(clipTargets(files.HoloGirl, CHARACTERS.HoloGirl.base).names);
+const untouched = holoGesture.names.filter((n) => !holoBaseNames.has(n));
+ok(`her base clip leaves ${untouched.length} of the nodes her gestures pose untouched`,
+  untouched.length > 40);
+
+// The ones already on air are fine, which is what makes the check useful
+// rather than just loud. Measured as a SHARE of each rig, because the rigs are
+// different sizes — Connor's has 65 bones and GR80's 33, so any fixed number
+// is either wrong for one of them or too weak to mean anything.
+for (const actor of ["Connor", "Monk"]) {
+  const t = clipTargets(files[actor], CHARACTERS[actor].base);
+  const joints = new Set((files[actor].skins || []).flatMap((sk) => sk.joints || [])).size;
+  ok(`${actor}'s base clip animates most of his rig (${t.bones} of ${joints})`,
+    t.bones / joints > 0.5);
+}
+check("a clip that is not there reports nothing rather than zero",
+  clipTargets(files.HoloGirl, "no_such_clip"), null);
+
+// ── ONE COPY OF THE REACTION TABLE ────────────────────────────────────────
+//
+// This lived three times — TalkShowScene.jsx, lt-tv-format.mjs and
+// lt-tv-check.mjs — each asking the next person to keep it in step by hand.
+// The writers are OFFERED these names, so a list that disagrees with the rig
+// is a cue that does nothing on screen.
+console.log("\nThe writers are offered exactly what each rig can perform:");
+for (const [actor, character] of Object.entries(CHARACTERS)) {
+  check(`${actor}: the same keys as the contract`,
+    Object.keys(REACTIONS[actor]).sort(), Object.keys(character.reactions).sort());
+  const clips = clipNames(files[actor]);
+  const absent = Object.values(reactionClips(character)).filter((n) => !clips.includes(n));
+  check(`${actor}: and every one of them is really in his or her file`, absent, []);
+}
+// The durations that were in those copies, pinned so the consolidation cannot
+// have quietly changed what the writers plan against.
+check("Connor's durations are unchanged", reactionDurations(CHARACTERS.Connor), {
+  headnod: 4.33, headnodSubtle: 4.33, headshakeDisappointment: 4.33,
+  lookAround: 7.6, shrug: 4.33, mockCrying: 4.83,
+});
+check("GR80's durations are unchanged", reactionDurations(CHARACTERS.Monk), {
+  headnod: 4.33, headnodSubtle: 4.33, headshake: 4.33, headshakeDisappointment: 4.33,
+  lookAround: 7.6, shrug: 4.33, prayCrosschest: 3.87,
+});
+ok("the co-anchor is offered only the two gestures she has",
+  Object.keys(REACTIONS.HoloGirl).length === 2);
+
+// ── A SEAT PER SET, AND THE CAST SPLIT IT EXPRESSES ───────────────────────
+console.log("\nWho has a chair on which set is the cast split:");
+const seatedOn = (set) =>
+  Object.entries(CHARACTERS).filter(([, c]) => c.seat[set]).map(([a]) => a).sort();
+check("the lounge seats Connor and GR80", seatedOn("lounge"), ["Connor", "Monk"]);
+check("the news desk seats Connor, GR80 and the co-anchor", seatedOn("news"), ["Connor", "HoloGirl", "Monk"]);
+ok("she has no lounge seat, which is what keeps her out of the roundtable",
+  !CHARACTERS.HoloGirl.seat.lounge);
+// GR80 keeps a news seat on purpose: news-01 is on air and casts him. It is
+// the episode's cast, not the seat, that takes a character off a set.
+ok("GR80 still has a news seat, because the episode on air casts him",
+  Boolean(CHARACTERS.Monk.seat.news));
+// Every seat must be complete, or the scene would read undefined off it.
+for (const [actor, character] of Object.entries(CHARACTERS)) {
+  for (const [set, seat] of Object.entries(character.seat)) {
+    ok(`${actor}/${set}: a position, a quaternion and a scale`,
+      seat.position?.length === 3 && seat.quaternion?.length === 4 && typeof seat.scale === "number");
+  }
+}
+
+// ── Every character the writers know has a model ──────────────────────────
+console.log("\nThe roster and the models agree:");
+check("the writers' roster is the contract's", ACTORS.sort(), Object.keys(CHARACTERS).sort());
+for (const actor of ACTORS) {
+  ok(`${actor} has a voice id`, /^[A-Za-z0-9]{16,}$/.test(CAST[actor].voiceId));
+  ok(`${actor}'s voice id is his or her own`,
+    ACTORS.filter((a) => CAST[a].voiceId === CAST[actor].voiceId).length === 1);
+}
+
 // ── The play-out clip ─────────────────────────────────────────────────────
 console.log("\nConnor's news intermission is optional and really is there:");
 check("it is listed as an optional clip", optionalClips(CHARACTERS.Connor), ["connor_news_intermission_head_turn"]);
@@ -245,6 +380,14 @@ ok("it is in his file", clipNames(files.Connor).includes(CHARACTERS.Connor.outro
 const outroLength = clipDuration(files.Connor, CHARACTERS.Connor.outro);
 ok(`it is long enough to be a play-out rather than a reaction (${outroLength?.toFixed(2)}s)`, outroLength > 20);
 ok("GR80 has no play-out, so nothing optional is expected of him", optionalClips(CHARACTERS.Monk).length === 0);
+// She has one too, and hers is nearly a clean loop where Connor's is exact.
+console.log("\nThe co-anchor's play-out:");
+check("it is declared", optionalClips(CHARACTERS.HoloGirl), ["hologirl_news_intermission"]);
+ok("it is in her file", clipNames(files.HoloGirl).includes(CHARACTERS.HoloGirl.outro));
+const holoOutro = clipDuration(files.HoloGirl, CHARACTERS.HoloGirl.outro);
+ok(`it is a play-out rather than a gesture (${holoOutro?.toFixed(2)}s)`, holoOutro > 20);
+ok("and it animates her rig, unlike her base clip",
+  clipTargets(files.HoloGirl, CHARACTERS.HoloGirl.outro).bones > 40);
 
 console.log(failures ? `\n${failures} check(s) failed.\n` : "\nAll checks passed.\n");
 process.exit(failures ? 1 : 0);

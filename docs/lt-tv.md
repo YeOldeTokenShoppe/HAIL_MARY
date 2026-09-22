@@ -1152,6 +1152,84 @@ error. `findRig` in `TalkShowScene.jsx` now falls back to whatever armature is
 actually under the empty and logs what it used, so either name works. This is
 the one thing in the old contract you can stop worrying about.
 
+### Adding one, as it actually went
+
+The news co-anchor was added on 2026-09-22 and is the worked example. **Every
+name and number in her entry was read off the export, and three of them would
+have been wrong if assumed:**
+
+| Assumed | Actually |
+|---|---|
+| `HoloGirl_Empty`, matching the filename | `Hologirl_Empty` — lowercase g, while the FILE has a capital one |
+| `Armature`, like the other two | `Root` |
+| `mixamorig:Head` | `head` — her skeleton is an Unreal-style one throughout (`Pelvis`, `spine_01`) |
+
+So the first step is always:
+
+```bash
+npm run lt:models -- public/models/LTTV_Whoever.glb
+```
+
+which prints the single scene root with its transform, the armature under it
+**under the name GLTFLoader will give it** (`Armature.001` → `Armature001`),
+every clip with its duration, the face meshes, and what it collides with.
+
+**The head bone is named per character, not matched.** It used to be found by
+testing every bone against `/^mixamorighead\d*$/`, which worked while every
+character was a Mixamo rig. A missing head bone is quiet and costs two things
+at once: the character never turns to whoever is speaking, and the camera has
+no head position to frame them by, so the shot solver falls back on the desk.
+
+**Her seat came from her own export, not from GR80's numbers.** She is a
+different body — 0.846 scale against his 1.081, and turned about 41° toward the
+middle where he is turned 3°. Copying his seat would have been a wrong answer
+that looked like a right one.
+
+**`hologirl_sitting` arrived with no bone animation**, three channels on her
+empty and nothing else, where her gesture clips carry 168 each. As a base idle
+that plays as the rig's **rest pose for the whole episode** — the same silent
+bind-pose failure as a missing clip, reached from the other direction. It is
+also worse than it sounds: the mixer is rooted at the armature and the empty is
+the armature's *parent*, so those three tracks cannot even resolve, and nothing
+is logged. `npm run lt:models` now fails on a base clip that animates no bones,
+and warns on one under a second, which holds a pose rather than breathing.
+
+### Who is on which set, and who is seen
+
+**A character with no seat on a set is not on that set.** That is the cast split
+expressed as geometry rather than as a rule someone has to remember: GR80 has no
+business in a news episode and the co-anchor has none in the roundtable, where
+there is no third chair for her anyway.
+
+On top of that, **a character is only seen if the episode casts them.** The
+audio, the readiness and the section tallies already worked this way; now the
+bodies do too. Three conditions, in order of how firmly they say no:
+
+1. the lineup wants empty chairs, so nobody is in them;
+2. a character with no seat on this set has nowhere to be on it;
+3. otherwise it is the episode's cast — no lines, not in the episode.
+
+An episode with no audio yet names nobody, and then everyone with a chair here
+sits in it, which is what you want while dressing a set.
+
+This is why GR80 still has a news seat: `news-01` is on air and casts him. It
+is the cast that takes a character off a set, not the seat.
+
+### One copy of the reaction table
+
+`reactions` in `modelContract.mjs` carries each cue's clip name **and its
+authored length**, and everything else derives from it: `REACTION_DURATIONS` in
+`TalkShowScene.jsx`, `REACTIONS` in `lt-tv-format.mjs` (what the writers are
+offered) and the cue list in `lt-tv-check.mjs`. Those were three hand-maintained
+copies, each with a comment asking the next person to keep them in step — and a
+third character was about to be added to all three. A list that disagrees with
+the rig is a cue that does nothing on screen.
+
+It matters immediately: the co-anchor has **two** gestures (`headnod` →
+`hologirl_agreement`, `headshake` → `hologirl_disagreement`) where the other two
+have six and seven, so the writers' prompt has to be built from this rather than
+from prose about what a character can do.
+
 ### What a character is, as a list of entries
 
 | Where | What |
@@ -1161,7 +1239,8 @@ the one thing in the old contract you can stop worrying about.
 | `DELIVERY_TAGS`, same file | the bracketed tags that read well in that voice |
 | `CHARACTERS`, `src/lib/ltTv/modelContract.mjs` | the GLB path, the empty's name, its armature, the base idle, the reaction clip names, an optional play-out, and both seats. `CHARACTER_CLIPS`, `EMPTY_FOR_ACTOR` and `SEAT_POSES` in `TalkShowScene.jsx` are all built from this |
 | `REACTION_DURATIONS`, `LISTENER_GAZE_YAW`, `TalkShowScene.jsx` | one entry each |
-| `TALKSHOW_PROJECTION_CONFIG` | the SitePal scene id, the Face1/Face2 mesh names, a crop and a filter (fit live with `?tune=sitepal`) |
+| `TALKSHOW_PROJECTION_CONFIG`, `TalkShowScene.jsx` | the SitePal scene id, an embed `hash` if the scene has one, the static/projection mesh names, a crop and a filter. **Fit live at `/trade?tune=sitepal`** — the panel builds its tabs from this registry, so a new character gets one for free. The crop will be wrong until it is fitted: the meshes have their own UVs, so seeded values do not transfer |
+| `LISTENER_GAZE_DEGREES`, `TalkShowScene.jsx` | how far they turn toward whoever is addressing them. Live from `window.__tsGaze`, because it is a number about a picture — the existing values are an empirical fit per rig and their signs do not even agree, since the head bones do not share a local basis |
 | SitePal account | **a scene of their own.** The two we have reuse the temple's Monk and Demon scenes; a third character needs a third scene. Account work, not code. |
 | `SPEAKERS`, `process_dialogue.py` | only if you ever use the older two-voice path |
 | The writers' prompts | see below — this is the part that is writing, not configuration |

@@ -21,17 +21,20 @@ import {
   formatRuntime,
   validateEpisode,
 } from "../src/lib/ltTv/episodeTimeline.mjs";
+import { CHARACTERS } from "../src/lib/ltTv/modelContract.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CONTENT = path.join(ROOT, "src/content/lt-tv");
 const EPISODES_DIR = path.join(CONTENT, "episodes");
 
-// The rig's authored clip lengths — the one thing the set knows and a record
-// doesn't. Kept in step with CHARACTER_CLIPS in TalkShowScene.jsx.
-const REACTIONS = {
-  Connor: ["headnod", "headnodSubtle", "headshakeDisappointment", "lookAround", "shrug", "mockCrying"],
-  Monk: ["headnod", "headnodSubtle", "headshake", "headshakeDisappointment", "lookAround", "shrug", "prayCrosschest"],
-};
+// WHICH CUES EACH RIG CAN PERFORM — the one thing the set knows and a record
+// doesn't. From the model contract, which is the only place it is written:
+// this was a third hand-maintained copy asking to be kept in step with
+// TalkShowScene.jsx, and a cue this list wrongly allows is a cue that does
+// nothing on screen.
+const REACTIONS = Object.fromEntries(
+  Object.entries(CHARACTERS).map(([actor, c]) => [actor, Object.keys(c.reactions || {})]),
+);
 
 const only = process.argv[2];
 const files = fs

@@ -97,6 +97,40 @@ export function clipDuration(gltf, name) {
   return end || null;
 }
 
+/**
+ * WHICH BONES A CLIP ACTUALLY ANIMATES.
+ *
+ * A clip's name and its duration both look fine on a clip that animates
+ * nothing. The news co-anchor's first export shipped a `hologirl_sitting` that
+ * carried three channels — her empty's own translation, rotation and scale —
+ * and not one bone, where her gesture clips carry 168 each. As a base idle that
+ * plays as her rest pose for the whole episode: the exact silent bind-pose
+ * failure this file exists to catch, arrived at from the other direction.
+ *
+ * Worse than useless, in fact: the mixer is rooted at the ARMATURE, and the
+ * empty is the armature's parent rather than its descendant, so those three
+ * tracks cannot even resolve. Nothing plays and nothing is logged.
+ */
+export function clipTargets(gltf, name) {
+  const animation = (gltf.animations || []).find((a) => a.name === name);
+  if (!animation) return null;
+  const joints = new Set((gltf.skins || []).flatMap((s) => s.joints || []));
+  const nodes = new Set();
+  let bones = 0;
+  for (const channel of animation.channels || []) {
+    const index = channel.target?.node;
+    if (index === undefined) continue;
+    if (!nodes.has(index) && joints.has(index)) bones += 1;
+    nodes.add(index);
+  }
+  return {
+    channels: (animation.channels || []).length,
+    nodes: nodes.size,
+    bones,
+    names: [...nodes].map((i) => (gltf.nodes || [])[i]?.name).filter(Boolean),
+  };
+}
+
 /** Distance between an exported position and where the seat was authored. */
 export function seatDrift(node, seat) {
   const at = node.translation || [0, 0, 0];
@@ -153,6 +187,34 @@ function checkCharacter(actor, character) {
     const d = clipDuration(gltf, name);
     return d ? ` — ${d.toFixed(2)}s` : "";
   };
+
+  // The base idle is the one clip that plays for the whole episode, so a base
+  // that animates no bones is a character who never moves at all.
+  const baseTargets = clipTargets(gltf, character.base);
+  if (baseTargets) {
+    if (baseTargets.bones === 0) {
+      problems.push(
+        `${actor}: "${character.base}" animates NO BONES (${baseTargets.channels} channels on ` +
+          `${baseTargets.names.join(", ")}). As the base idle that plays as the rig's rest pose ` +
+          `for the whole episode. Re-export the action off the armature.`,
+      );
+      say(`  ✗ "${character.base}" animates no bones — only ${baseTargets.names.join(", ")}`);
+      say(`      It is the base idle, so this is the character standing in their`);
+      say(`      rest pose for the whole episode. Re-export it off the ARMATURE.`);
+    } else {
+      say(`  ✓ "${character.base}" animates ${baseTargets.bones} bones${secs(character.base)}`);
+      // A base of one or two keyframes holds a pose rather than breathing.
+      const d = clipDuration(gltf, character.base);
+      if (d !== null && d < 1) {
+        warnings.push(
+          `${actor}: "${character.base}" is only ${d.toFixed(2)}s, so it holds a pose rather ` +
+            `than breathing. The others' idles are ~5.4s loops, and a still character beside ` +
+            `moving ones reads as a fault.`,
+        );
+        say(`  ! and only ${d.toFixed(2)}s, so it holds a pose rather than breathing`);
+      }
+    }
+  }
 
   for (const name of optionalClips(character)) {
     say(
