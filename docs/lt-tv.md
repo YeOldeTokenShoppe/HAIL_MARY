@@ -153,6 +153,64 @@ geometry when the set loads, so they are not on the board — change them in
 
 ---
 
+## The camera work — a camera operator for the set
+
+While an episode plays, the camera you watch through is not locked off. It cuts
+between four shots the way an operator would, following the same shot list the
+record already implies — who is speaking, who a line is aimed at, and where the
+chapters start. Nothing new has to be authored per episode; the shots fall out
+of the script.
+
+The four cameras:
+
+- **Establish** — the whole set. Top of the show, and every new story (a
+  chapter start).
+- **Two-shot** — the pair at the desk. The breather between runs of singles.
+- **Single** — the speaker, angled across the desk toward the other chair, for
+  a line aimed at the other host. The listener is turned toward them, so the
+  angle has something to be about.
+- **Close** — the same single punched in, when an exchange has sat on singles
+  long enough to be heating up.
+- **Direct** — a clean single straight down the lens, for a line read to the
+  room (an `audienceLines` line). This is the piece of news grammar worth
+  naming: the set used to go *wide* when a host addressed the viewer, which is
+  exactly the moment television punches in.
+
+**When each shot is live is decided in `src/lib/ltTv/episodeTimeline.mjs`**
+(the shot list, next to the listener turns), because it is a question about the
+script. **Where the lens goes for a shot is solved in
+`src/lib/ltTv/shotFraming.mjs`** from the live head positions and the window's
+aspect — a shot is authored as what it should *contain* ("2.6 m of desk
+across", "the head fills 21% of frame height"), so it stays composed at any
+window size rather than being a camera position that was right once.
+
+**To dial it in, open `/trade?tune=shots` and go to an LT TV set.** A board
+appears on the left (the lighting board is on the right, so both can be open):
+
+- **Follow the show**, then a button per shot. The show mode cuts through the
+  list as the episode plays; a shot button **holds** that one shot so you can
+  fit it with the episode paused or stopped. Tuning only; it resets on reload.
+- **On air / Face** readout — which shot is live, and how many screen pixels
+  tall the face is landing at, with a ratio. The SitePal face is a crop about
+  195 source pixels tall, so **past 1.0× the face is being enlarged beyond its
+  source and softens** while everything around it stays sharp. That number is
+  the honest limit on how far a shot can push in.
+- **Shot** — the selected shot's size (set width for the wides, head share for
+  the singles), lens (FOV), angle off front, lens height and aim height.
+- **Motion, all shots** — hard cuts vs. a swing between shots, the swing speed,
+  and the slow creep-in that keeps a held shot from reading as a freeze-frame.
+
+Everything applies as you drag and is remembered in your browser. Press **Copy
+values** and paste the block into the project thread, and the numbers become
+the defaults in `SHOT_FRAMING`.
+
+The set still hands the camera back to you between episodes and after you drag
+it — the director only owns the camera while a show is running (or while the
+board is holding a shot). Mobile keeps its own single framing; this is the
+desktop set.
+
+---
+
 ## Where is everything, from a terminal
 
 ```bash
