@@ -124,6 +124,17 @@ const CHARACTER_CLIPS = {
 
 const EMPTY_FOR_ACTOR = { Monk: "Monk_Empty", Connor: "Demon_Empty" };
 
+// Where each character sits, per set, keyed by the character's empty. A set
+// that names nobody leaves every seat as the model authored it. See the effect
+// in TalkShowModel that applies these for why the lounge is deliberately empty.
+const SEAT_POSES = {
+  lounge: {},
+  news: {
+    Demon_Empty: { position: [-0.44472, 0.42248, 0.018999], quaternion: [0, 0.255, 0, 0.967], scale: 1.125 },
+    Monk_Empty: { position: [0.53267, 0.39882, -0.049794], quaternion: [0, -0.030, 0, 1.000], scale: 1.081 },
+  },
+};
+
 /**
  * The armature under a character's empty, whatever the exporter called it.
  *
@@ -1589,15 +1600,27 @@ function TalkShowModel({
     };
   }, [cloned, raisedSet]);
 
+  // A SEAT IS A TRANSFORM, NOT A MODEL. One file per character, however many
+  // sets they sit on: the same rig, the same clips and the same scale sit in
+  // the lounge chair and at the news desk, and only the position differs (the
+  // desk lifts them ~0.2 and brings them in toward the middle). So a character
+  // who appears on both shows is exported once and placed twice.
+  //
+  // A set may PIN a character's seat in SEAT_POSES. Anything left unpinned
+  // keeps whatever the model authored, which is why the lounge is empty here:
+  // those chairs are art-directed in Blender and should stay that way, so
+  // moving one there still works. The news desk is pinned because its numbers
+  // came off a screenshot of the dressed desk rather than out of the export.
+  //
   // Screenshot transforms use Blender Z-up and quaternion WXYZ. Convert to
   // glTF Y-up: position (x,z,-y), quaternion (x,z,-y,w). Actor empties are
   // unparented in the export; their local coordinates are the model's basis.
+  //
+  // NOTE for the per-character-file split: this resolves names against the SET
+  // scene, so once characters load from their own GLBs the lookup has to search
+  // those scenes too.
   useEffect(() => {
-    if (!newsMode) return;
-    const poses = {
-      Demon_Empty: { position: [-0.44472, 0.42248, 0.018999], quaternion: [0, 0.255, 0, 0.967], scale: 1.125 },
-      Monk_Empty: { position: [0.53267, 0.39882, -0.049794], quaternion: [0, -0.030, 0, 1.000], scale: 1.081 },
-    };
+    const poses = SEAT_POSES[newsMode ? "news" : "lounge"] || {};
     const originals = [];
     for (const [name, pose] of Object.entries(poses)) {
       const actor = cloned.getObjectByName(name);

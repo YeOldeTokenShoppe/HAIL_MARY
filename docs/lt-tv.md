@@ -892,6 +892,22 @@ down, only to avoid zeroing them:
 | `Demon_Empty` (Connor) | −0.803, 0.210, −0.302 | ~29.5° | 1.125 |
 | `Monk_Empty` (GR80) | 0.950, 0.240, −0.361 | ~−3.4° | 1.081 |
 
+**Two seats is not two models.** Connor sits in the lounge chair on Markets &
+Morality and at the news desk on the news show, and that is one exported file
+placed twice — a seat is a transform, not geometry. Checked against the set:
+the two poses are the same facing and the same size (rotation agrees to about
+0.03°, scale to one part in six thousand) and differ only in **where** he is
+put. On the news set he slides in toward the middle and up onto the taller desk
+chair: x −0.80 → −0.44, y 0.21 → 0.42, z −0.30 → +0.02.
+
+`SEAT_POSES` in `TalkShowScene.jsx` holds one entry per set per character. A set
+that pins a seat wins; anything unpinned keeps whatever the model authored,
+which is why `lounge` is deliberately empty — those chairs stay art-directed in
+Blender, so moving one there still works. The news desk is pinned because its
+numbers came off a screenshot of the dressed desk. A character on both shows
+therefore needs one file and, at most, one pinned entry per set — and a seat can
+be nudged without going back to Blender.
+
 **The clips must travel with the character.** All 31 are in the set file today.
 After the split the set should have no animations at all, and each character
 file must carry its own — `barron_*` with Connor, `monk_*` with GR80. If the
