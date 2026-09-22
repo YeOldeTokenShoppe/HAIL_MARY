@@ -742,23 +742,59 @@ const ORBIT_MAX_POLAR = Math.PI * 0.52;
 // not constants.
 function directViewerCamera({ state, controls, camera, headBones, timeline, elapsed, running, delta, aspect, viewportHeightPx }) {
   const cfg = SHOT_FRAMING;
-  if (!cfg.enabled || !controls) return false;
+  if (!controls) return false;
 
   // What the director is allowed to touch: playback (it follows the show) or a
-  // board that is holding one shot for fitting. Otherwise it yields — and
-  // hands the orbit's own polar limits back, which it widened below so the
-  // near-level singles wouldn't be clamped up off the eyeline.
+  // board that is holding one shot for fitting. Switched off, or between
+  // episodes, it yields — and hands the orbit's own polar limits back, which it
+  // widened below so the near-level singles weren't clamped up off the eyeline.
   const holding = cfg.hold && cfg.hold !== "auto";
-  if (!running && !holding) {
+  if (!cfg.enabled || (!running && !holding)) {
     if (state.primed) {
       controls.minPolarAngle = ORBIT_MIN_POLAR;
       controls.maxPolarAngle = ORBIT_MAX_POLAR;
     }
     state.primed = false;
+    state.handingBack = false;
     state.lastKey = null;
     cfg.current = null;
     return false;
   }
+
+  // THE VIEWER CAN STILL TAKE THE CAMERA. Without this the director wins every
+  // frame — a drag moves the camera and the next setLookAt puts it straight
+  // back, so the orbit reads as broken rather than as overridden. Same handshake
+  // the tripod prop already uses (MONITOR_FEED.handBackAfter): while a hand is
+  // on it, and for a few seconds after letting go, the director touches nothing.
+  if (!state.detach) {
+    const onStart = () => { state.dragging = true; };
+    const onEnd = () => { state.dragging = false; state.releasedAt = performance.now(); };
+    controls.addEventListener("controlstart", onStart);
+    controls.addEventListener("controlend", onEnd);
+    state.detach = () => {
+      controls.removeEventListener("controlstart", onStart);
+      controls.removeEventListener("controlend", onEnd);
+    };
+  }
+  const heldRecently =
+    state.releasedAt > 0 &&
+    (performance.now() - state.releasedAt) / 1000 < cfg.handBackAfter;
+  if (state.dragging || heldRecently) {
+    // Hands on. Follow where the viewer puts it so the hand-back eases out of
+    // their pose instead of snapping, and give them the orbit's own limits back
+    // so they can't be dragged under the floor through the widened ones.
+    controls.minPolarAngle = ORBIT_MIN_POLAR;
+    controls.maxPolarAngle = ORBIT_MAX_POLAR;
+    camera.getWorldPosition(state.eye);
+    controls.getTarget(state.aim);
+    state.fov = camera.fov;
+    state.primed = true;
+    state.handingBack = true;
+    cfg.current = "viewer";
+    return true;
+  }
+  if (state.releasedAt) state.releasedAt = 0;
+
   // The show's singles sit almost level with the guests; the orbit's normal
   // ceiling (~94°) would tip them back up. Open it right up while directing.
   controls.minPolarAngle = 0.04 * Math.PI;
@@ -817,18 +853,24 @@ function directViewerCamera({ state, controls, camera, headBones, timeline, elap
   }
   state.targetFov = solved.fov;
 
-  if (!state.primed || (isCut && cfg.cut)) {
+  if (!state.primed || (isCut && cfg.cut && !state.handingBack)) {
     // First frame, or a hard cut: land on the shot instantly.
     state.eye.copy(state.targetEye);
     state.aim.copy(state.targetAim);
     state.fov = state.targetFov;
     state.primed = true;
   } else {
-    // An operator swinging the head, or a soft cut: ease toward it.
+    // An operator swinging the head, a soft cut, or coming back off a pose the
+    // viewer left the camera in: ease toward it. A hard cut is suppressed while
+    // handing back, because snapping out of someone's own framing the instant
+    // they stop touching it is the thing that feels like being overruled.
     const k = 1 - Math.exp(-cfg.easeLambda * delta);
     state.eye.lerp(state.targetEye, k);
     state.aim.lerp(state.targetAim, k);
     state.fov = THREE.MathUtils.lerp(state.fov, state.targetFov, k);
+    if (state.handingBack && state.eye.distanceTo(state.targetEye) < 0.02) {
+      state.handingBack = false;
+    }
   }
 
   controls.setLookAt(
@@ -1887,7 +1929,27 @@ function TalkShowModel({
     lastKey: null,
     sinceCut: 0,
     primed: false,
+    // Hand-back state: whether a hand is on the camera now, when it last came
+    // off, and whether the director is easing out of the viewer's own pose.
+    dragging: false,
+    releasedAt: 0,
+    handingBack: false,
+    detach: null,
   });
+
+  // The director attaches its grab listeners to camera-controls lazily (the
+  // controls instance is created by a sibling in page.js, so it may not exist
+  // on the scene's first frame). They belong to the controls, which outlives
+  // this set, so they come off when the set does.
+  useEffect(() => {
+    const state = shotDirectorRef.current;
+    return () => {
+      state.detach?.();
+      state.detach = null;
+      state.dragging = false;
+      state.releasedAt = 0;
+    };
+  }, []);
   const listenerGazeRef = useRef(
     Object.fromEntries(Object.keys(TALKSHOW_PROJECTION_CONFIG).map((key) => [key, 0])),
   );

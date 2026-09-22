@@ -197,17 +197,34 @@ appears on the left (the lighting board is on the right, so both can be open):
   the honest limit on how far a shot can push in.
 - **Shot** — the selected shot's size (set width for the wides, head share for
   the singles), lens (FOV), angle off front, lens height and aim height.
-- **Motion, all shots** — hard cuts vs. a swing between shots, the swing speed,
-  and the slow creep-in that keeps a held shot from reading as a freeze-frame.
+- **Motion, all shots** — the operator on/off, hard cuts vs. a swing between
+  shots, the swing speed, the slow creep-in that keeps a held shot from reading
+  as a freeze-frame, and how long the operator yields after a drag.
 
-Everything applies as you drag and is remembered in your browser. Press **Copy
-values** and paste the block into the project thread, and the numbers become
-the defaults in `SHOT_FRAMING`.
+Everything applies as you drag and is remembered in your browser — except the
+operator on/off, which comes back on after a reload so a switched-off camera
+can never be mistaken for a broken one. Press **Copy values** and paste the
+block into the project thread, and the numbers become the defaults in
+`SHOT_FRAMING`.
 
-The set still hands the camera back to you between episodes and after you drag
-it — the director only owns the camera while a show is running (or while the
-board is holding a shot). Mobile keeps its own single framing; this is the
-desktop set.
+### You can still grab the camera
+
+The orbit keeps working during an episode. The director listens for
+camera-controls' own `controlstart` / `controlend`, and while a hand is on the
+camera — drag or scroll-wheel — it touches nothing at all, so the drag is not
+fought. `SHOT_FRAMING.handBackAfter` seconds after you let go it eases (never
+snaps) back out of your pose into whatever shot the show is on by then. This is
+the same handshake the tripod prop's own lens already used.
+
+It also yields completely between episodes, while the board holds a shot, and
+if `enabled` is turned off — which gives back the single fixed shot the set had
+before any of this. Mobile keeps its own framing; all of this is the desktop
+set.
+
+Worth knowing: while the viewer holds the camera it gets the orbit's normal
+polar limits back (so it can't be dragged under the floor), and while the
+director holds it those limits are opened right up, because the singles sit
+almost level with the guests and the normal ceiling would tip them upward.
 
 ---
 

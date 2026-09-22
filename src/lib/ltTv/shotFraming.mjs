@@ -70,9 +70,12 @@ export const SHOT_FRAMING = {
   // this fraction of its distance per second, capped, and resets on the cut.
   drift: 0.012,
   driftMax: 0.08,
-  // Seconds after the viewer lets go of the camera before the director takes
-  // it back. Dragging the set around mid-episode should not be a fight.
-  handBackAfter: 5,
+  // Seconds after the viewer lets go of the camera before the director takes it
+  // back. The whole point of it: a locked-off show you can orbit and a directed
+  // show you cannot are both worse than one that yields while you are holding
+  // it. Raise it to be left alone for longer; `enabled: false` turns the
+  // operator off altogether and gives the orbit back permanently.
+  handBackAfter: 8,
   // Never dolly closer than this, whatever the arithmetic says — inside it the
   // near plane starts clipping the desk.
   minDistance: 0.85,
