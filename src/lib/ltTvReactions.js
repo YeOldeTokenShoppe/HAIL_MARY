@@ -16,6 +16,63 @@
 
 import { validateComment, validateRating } from "./ltTv/reactions.mjs";
 
+// COMING BACK FROM A SIGN-IN. Signing in navigates, so the half-written
+// comment in the box and the fact that the comments were even open are gone by
+// the time the viewer is back. The address bar remembers the episode (see
+// src/lib/ltTv/watchUrl.mjs); this remembers the rest, in sessionStorage,
+// which is per tab and survives the round trip.
+//
+// Every access is wrapped: a browser with storage blocked must lose the draft,
+// not break the comments.
+const RETURN_KEY = "lttv:signin-return";
+const RETURN_TTL_MS = 30 * 60 * 1000;
+
+export function rememberBeforeSignIn(episodeId, { draft = "", rating = null } = {}) {
+  if (typeof window === "undefined" || !episodeId) return;
+  try {
+    window.sessionStorage.setItem(
+      RETURN_KEY,
+      JSON.stringify({ episodeId, draft: draft || "", rating: rating ?? null, at: Date.now() }),
+    );
+  } catch {
+    // Storage blocked; the sign-in still works, what was in hand just does not
+    // survive it.
+  }
+}
+
+/** What was in hand before the sign-in — the draft, and the star they had
+ *  just clicked — without consuming it. */
+export function peekSignInReturn() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(RETURN_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    if (!saved?.episodeId) return null;
+    // A day-old draft is not what the viewer is in the middle of.
+    if (!saved.at || Date.now() - saved.at > RETURN_TTL_MS) {
+      clearSignInReturn();
+      return null;
+    }
+    return {
+      episodeId: saved.episodeId,
+      draft: saved.draft || "",
+      rating: Number.isInteger(saved.rating) ? saved.rating : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function clearSignInReturn() {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(RETURN_KEY);
+  } catch {
+    // Nothing to do; it will expire on its own.
+  }
+}
+
 export const EMPTY_STATS = { count: 0, sum: 0, average: 0, commentCount: 0 };
 
 /** The episode's tally and its comments, newest first. No sign-in needed. */

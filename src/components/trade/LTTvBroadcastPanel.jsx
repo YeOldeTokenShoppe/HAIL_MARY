@@ -5,6 +5,7 @@ import LTTvChiron from "@/components/trade/LTTvChiron";
 import useNewEpisodes from "@/components/trade/useNewEpisodes";
 import useTalkShowTransport, { clockTime } from "@/components/trade/useTalkShowTransport";
 import LTTvReactions, { useEpisodeReactions } from "@/components/trade/LTTvReactions";
+import { peekSignInReturn } from "@/lib/ltTvReactions";
 import { ratingSummary } from "@/lib/ltTv/reactions.mjs";
 import { SHOWS } from "@/content/lt-tv";
 
@@ -180,6 +181,19 @@ export default function LTTvBroadcastPanel({
     setReactionsOpen(false);
     setGuideOpen((open) => !open);
   };
+
+  // A viewer who signed in to leave a comment comes back to the comments open,
+  // not to a console they have to find their way through again. The draft they
+  // had is restored inside the panel; the address brought them to the episode.
+  const reopenedAfterSignIn = useRef(false);
+  useEffect(() => {
+    if (reopenedAfterSignIn.current || !selected.id) return;
+    const returning = peekSignInReturn();
+    if (returning?.episodeId !== selected.id) return;
+    reopenedAfterSignIn.current = true;
+    setGuideOpen(false);
+    setReactionsOpen(true);
+  }, [selected.id]);
 
   const toggleReactions = () => {
     setGuideOpen(false);

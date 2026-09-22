@@ -121,6 +121,32 @@ scrolls and needs no sheet.
 
 Clicking the star you already gave takes your rating back.
 
+**Signing in does not cost you your place.** Clerk redirects back to `/trade`
+after a sign-in, and a fresh `/trade` used to mean the trade landing with the
+episode, the open comments and the half-typed comment all gone. Three things
+survive it now:
+
+- **Where you were watching**, in one query parameter — `/trade?lttv=news-01`
+  for an episode, `/trade?lttv=news` for a show's lineup. It is written with
+  `history.replaceState`, so nothing navigates to keep it up to date, and it is
+  read back once on arrival. A value naming an episode that is no longer on the
+  slate is ignored rather than followed, and the parameter is dropped when LT
+  TV closes. It is an ordinary link too: that address is how you send somebody
+  straight to an episode.
+- **The comment you were writing**, and the star you had just clicked, in
+  `sessionStorage` for half an hour. The comments reopen on the way back with
+  your words still in the box. The star lands by itself; the comment does not
+  send itself, because words that go public get a last look.
+- Which means **you can write the comment before you sign in**. The box is
+  there either way and the button reads "Sign in and comment" when you are
+  signed out, rather than making you do the errand first and then remember what
+  you were going to say.
+
+`src/lib/ltTv/watchUrl.mjs` holds that, checked by `node
+scripts/lt-tv-watch-url.test.mjs`; `/trade`'s page reads and writes it. The
+phone screen keeps the draft but not the position — mobile LT TV lives inside
+the terminal's own screen stack rather than in a URL.
+
 **Where it is kept.** Firestore, under the episode's own id:
 
     ltTvEpisodes/{episodeId}                  the tally: count, sum, average, commentCount

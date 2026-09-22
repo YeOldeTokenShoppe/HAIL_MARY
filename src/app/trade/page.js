@@ -30,6 +30,7 @@ import LTTvLightPanel from "@/components/trade/LTTvLightPanel";
 import LTTvShotPanel from "@/components/trade/LTTvShotPanel";
 import LTTvBroadcastPanel from "@/components/trade/LTTvBroadcastPanel";
 import { SHOWS as LT_TV_SHOWS, findEpisode as findLtTvEpisode } from "@/content/lt-tv";
+import { WATCH_PARAM as LT_TV_WATCH_PARAM, readWatch as readLtTvWatch, watchValue as ltTvWatchValue, withWatch as withLtTvWatch } from "@/lib/ltTv/watchUrl.mjs";
 import TickerDisplay3 from "@/components/TickerDisplay3";
 import { useMusic } from '@/components/MusicContext';
 import { useUser, useClerk } from "@clerk/nextjs";
@@ -1368,6 +1369,40 @@ export default function CyborgTemple() {
     () => findLtTvEpisode(ltTvSelection.showId, ltTvSelection.episodeIndex),
     [ltTvSelection],
   );
+  // WHERE YOU WERE WATCHING SURVIVES A NAVIGATION. Signing in redirects back
+  // to /trade, and without this the page would mount fresh and drop the viewer
+  // on the landing with the episode and the comment they were writing gone.
+  // The position is kept in one query parameter, written with replaceState so
+  // nothing navigates, and read back once on arrival.
+  const ltTvWatchRestored = useRef(false);
+  useEffect(() => {
+    if (ltTvWatchRestored.current) return;
+    ltTvWatchRestored.current = true;
+    if (typeof window === 'undefined') return;
+    const asked = new URLSearchParams(window.location.search).get(LT_TV_WATCH_PARAM);
+    const seat = readLtTvWatch(asked, LT_TV_SHOWS);
+    if (!seat) return;
+    setLtTvSelection({ showId: seat.showId, episodeIndex: seat.episodeIndex });
+    setLtTvView(seat.view);
+    setTalkShowMode(true);
+  }, []);
+
+  useEffect(() => {
+    // Not until the restore has had its turn, or the first paint would wipe
+    // the parameter it is about to read.
+    if (!ltTvWatchRestored.current || typeof window === 'undefined') return;
+    const value = ltTvWatchValue({
+      open: talkShowMode,
+      view: ltTvView,
+      showId: ltTvSelection.showId,
+      episodeId: ltTvEpisode?.id,
+    });
+    const next = `${window.location.pathname}${withLtTvWatch(window.location.search, value)}${window.location.hash}`;
+    if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      window.history.replaceState(window.history.state, '', next);
+    }
+  }, [talkShowMode, ltTvView, ltTvSelection, ltTvEpisode]);
+
   const ltTvChannelCards = useMemo(() => {
     const show = LT_TV_SHOWS.find((item) => item.id === ltTvSelection.showId) || LT_TV_SHOWS[0];
     return [{

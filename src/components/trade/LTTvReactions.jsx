@@ -23,11 +23,14 @@ import {
 } from "@/lib/ltTv/reactions.mjs";
 import {
   EMPTY_STATS,
+  clearSignInReturn,
   deleteComment,
   editComment,
   fetchEpisodeReactions,
   fetchMyRating,
+  peekSignInReturn,
   postComment,
+  rememberBeforeSignIn,
   saveRating,
 } from "@/lib/ltTvReactions";
 
@@ -97,6 +100,9 @@ export default function LTTvReactions({ episodeId, episodeTitle, compact = false
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  // A star clicked while signed out. Held in state rather than in storage, so
+  // it waits for Clerk to finish loading rather than racing it.
+  const [pendingStar, setPendingStar] = useState(null);
   const [notice, setNotice] = useState(null);
   const draftRef = useRef(null);
 
@@ -121,22 +127,41 @@ export default function LTTvReactions({ episodeId, episodeTitle, compact = false
     return () => { live = false; };
   }, [episodeId, isSignedIn, getToken]);
 
-  // Switching episodes must not carry a half-typed comment onto another show.
+  // Switching episodes must not carry a half-typed comment onto another show
+  // — unless the "switch" is this episode coming back from a sign-in, which is
+  // the one case where the draft in hand is still the draft in hand.
   useEffect(() => {
-    setDraft("");
+    const returning = peekSignInReturn();
+    if (returning && returning.episodeId === episodeId) {
+      setDraft(returning.draft);
+      setPendingStar(returning.rating);
+      clearSignInReturn();
+    } else {
+      setDraft("");
+      setPendingStar(null);
+    }
     setEditingId(null);
     setNotice(null);
   }, [episodeId]);
 
-  const requireSignIn = useCallback(() => {
-    openSignIn?.({
-      forceRedirectUrl: typeof window !== "undefined" ? window.location.pathname : "/trade",
-    });
-  }, [openSignIn]);
+  // Signing in navigates away and back. Two things have to survive it: the
+  // address, which carries the episode (see src/lib/ltTv/watchUrl.mjs), and
+  // the half-written comment, which does not belong in a URL.
+  const requireSignIn = useCallback(
+    (rating = null) => {
+      rememberBeforeSignIn(episodeId, { draft, rating });
+      const here =
+        typeof window !== "undefined"
+          ? `${window.location.pathname}${window.location.search}`
+          : "/trade";
+      openSignIn?.({ forceRedirectUrl: here });
+    },
+    [draft, episodeId, openSignIn],
+  );
 
   const rate = useCallback(
     async (value) => {
-      if (!isSignedIn) return requireSignIn();
+      if (!isSignedIn) return requireSignIn(value);
       if (busy) return;
       // Clicking the star you already gave takes the rating back, the way a
       // toggle should; the tally then forgets you entirely.
@@ -156,6 +181,23 @@ export default function LTTvReactions({ episodeId, episodeTitle, compact = false
     },
     [busy, episodeId, getToken, isSignedIn, myRating, reload, requireSignIn],
   );
+
+  // The star they clicked on the way to signing in, landed now that they are
+  // back and signed in. One shot: cleared whether or not it took, so a refusal
+  // cannot loop.
+  useEffect(() => {
+    if (pendingStar == null || !isSignedIn || !episodeId) return;
+    const star = pendingStar;
+    setPendingStar(null);
+    setMyRating(star);
+    saveRating(episodeId, star, getToken).then((res) => {
+      if (res.ok) reload();
+      else {
+        setMyRating(null);
+        setNotice(res.reason);
+      }
+    });
+  }, [episodeId, getToken, isSignedIn, pendingStar, reload]);
 
   const send = useCallback(async () => {
     if (!isSignedIn) return requireSignIn();
@@ -261,31 +303,33 @@ export default function LTTvReactions({ episodeId, episodeTitle, compact = false
           : "Comments"}
       </h4>
 
-      {isSignedIn ? (
-        <div className="ltr-compose">
-          <textarea
-            ref={draftRef}
-            value={draft}
-            maxLength={COMMENT_MAX_LEN}
-            rows={compact ? 2 : 3}
-            placeholder="What did you make of this episode?"
-            onChange={(event) => setDraft(event.target.value)}
-            aria-label="Write a comment"
-          />
-          <div className="ltr-compose-row">
-            <span className="ltr-count">
-              {draft.length}/{COMMENT_MAX_LEN}
-            </span>
-            <button type="button" className="ltr-send" onClick={send} disabled={busy || !draft.trim()}>
-              {busy ? "Sending…" : "Comment"}
-            </button>
-          </div>
+      {/* THE BOX IS THERE WHETHER OR NOT YOU ARE SIGNED IN. Asking somebody to
+          sign in before they are allowed to type is asking them to decide
+          whether the thought is worth the errand; letting them write it first
+          and signing in to send it keeps the words, which come back with them.
+          Same for a star: clicking one signed out asks for the sign-in and
+          then lands the star, since a star is one click with nothing to
+          reconsider. The comment is NOT sent on the way back — it is put back
+          in the box, because words that go public get a last look. */}
+      <div className="ltr-compose">
+        <textarea
+          ref={draftRef}
+          value={draft}
+          maxLength={COMMENT_MAX_LEN}
+          rows={compact ? 2 : 3}
+          placeholder="What did you make of this episode?"
+          onChange={(event) => setDraft(event.target.value)}
+          aria-label="Write a comment"
+        />
+        <div className="ltr-compose-row">
+          <span className="ltr-count">
+            {draft.length}/{COMMENT_MAX_LEN}
+          </span>
+          <button type="button" className="ltr-send" onClick={send} disabled={busy || !draft.trim()}>
+            {busy ? "Sending…" : isSignedIn ? "Comment" : "Sign in and comment"}
+          </button>
         </div>
-      ) : (
-        <button type="button" className="ltr-signin" onClick={requireSignIn}>
-          Sign in to rate or comment
-        </button>
-      )}
+      </div>
 
       {notice && (
         <p className="ltr-notice" role="status">
@@ -397,12 +441,6 @@ export default function LTTvReactions({ episodeId, episodeTitle, compact = false
           background: linear-gradient(120deg, var(--cyan), var(--magenta));
         }
         .ltr-send:disabled { opacity: 0.45; cursor: default; }
-        .ltr-signin {
-          width: 100%; padding: 11px 16px; border-radius: 10px; cursor: pointer;
-          font: inherit; font-size: 13px; font-weight: 600; color: #f7f4fa;
-          background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.16);
-        }
-        .ltr-signin:hover { border-color: var(--cyan); }
         .ltr-notice { margin: 10px 0 0; font-size: 12px; color: #ffb4b4; }
         .ltr-link {
           background: none; border: 0; padding: 0; cursor: pointer;
