@@ -45,11 +45,32 @@ import {
   isSingleShot,
   solveShot,
 } from "@/lib/ltTv/shotFraming.mjs";
+import { CHARACTERS, SET_MODEL, modelUrl } from "@/lib/ltTv/modelContract.mjs";
 import { findEpisode } from "@/content/lt-tv";
 
-// Version the URL when the Blender export changes so drei does not keep an
-// older GLTF from its in-memory cache during hot reloads.
-const MODEL_URL = "/models/talk_show3-textures.glb?v=news-desk-hierarchy-1";
+/* THE SET AND THE CHARACTERS ARE SEPARATE EXPORTS as of 2026-09-22.
+ *
+ * Before, one file carried the set and both hosts, which meant a cast change
+ * was a re-export of the whole studio and every viewer downloaded every
+ * character whether or not they were in the episode. Now the set is its own
+ * file and each character is their own file, attached into the set at load.
+ *
+ * Nothing about the SHAPE of the scene changes: the character files each
+ * contain exactly one root (their empty) with no wrapper transform, so
+ * attaching them into the set clone puts them in the same place, under the
+ * same names, as when they were exported together. Every lookup by name in
+ * this file — the empties, the armatures, the face meshes, the prop regexes —
+ * therefore works unchanged.
+ *
+ * Names, clips and seats all come from src/lib/ltTv/modelContract.mjs, which
+ * `npm run lt:models` checks a real export against. The URLs are versioned so
+ * drei never serves a re-export out of its in-memory cache.
+ */
+const SET_URL = modelUrl(SET_MODEL.file);
+// Built at module level and in a fixed order: useGLTF suspends on its
+// argument, so a list rebuilt per render would re-suspend the whole set.
+const CHARACTER_EMPTIES = Object.values(CHARACTERS).map((c) => c.empty);
+const CHARACTER_URLS = Object.values(CHARACTERS).map((c) => modelUrl(c.file));
 // World up, for the camera prop's pan.
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const SITEPAL_ACCOUNT = "9308752";
@@ -91,48 +112,44 @@ const DRACO_PATH = "/draco/";
 // family. Reactions are full seated clips, not additive layers, so the director
 // briefly crossfades from the base, plays only the gesture portion, then blends
 // back before the trailing idle section.
-const CHARACTER_CLIPS = {
-  Demon_Empty: {
-    actor: "Connor",
-    root: "Armature",
-    base: "barron_sit_pose2",
-    reactions: {
-      headnod: "barron_headnod_pose2",
-      headnodSubtle: "barron_headnod_subtle_pose2",
-      headshakeDisappointment: "barron_headshake_disappointment_pose2",
-      lookAround: "barron_look_around_pose2",
-      shrug: "barron_shrug_pose2",
-      mockCrying: "barron_mockcrying_pose2",
+const CHARACTER_CLIPS = Object.fromEntries(
+  Object.entries(CHARACTERS).map(([actor, character]) => [
+    character.empty,
+    {
+      actor,
+      root: character.rig,
+      base: character.base,
+      reactions: character.reactions,
+      // Played once when the show is over instead of the seated idle. Only
+      // Connor has one, and only the news show ends with it.
+      outro: character.outro || null,
     },
-  },
-  Monk_Empty: {
-    actor: "Monk",
-    // GLTFLoader sanitizes Blender's "Armature.001" to "Armature001".
-    root: "Armature001",
-    base: "monk_sit_pose2",
-    reactions: {
-      headnod: "monk_headnod_pose2",
-      headnodSubtle: "monk_headnod_subtle_pose2",
-      headshake: "monk_headshake_pose2",
-      headshakeDisappointment: "monk_headshake_disappointment_pose2",
-      lookAround: "monk_look_around_pose2",
-      shrug: "monk_shrug_pose2",
-      prayCrosschest: "monk_pray_crosschest_pose2",
-    },
-  },
-};
+  ]),
+);
 
-const EMPTY_FOR_ACTOR = { Monk: "Monk_Empty", Connor: "Demon_Empty" };
+const EMPTY_FOR_ACTOR = Object.fromEntries(
+  Object.entries(CHARACTERS).map(([actor, character]) => [actor, character.empty]),
+);
 
-// Where each character sits, per set, keyed by the character's empty. A set
-// that names nobody leaves every seat as the model authored it. See the effect
-// in TalkShowModel that applies these for why the lounge is deliberately empty.
+/* Where each character sits, per set, keyed by the character's empty.
+ *
+ * BOTH SETS ARE NOW PINNED. The lounge used to be deliberately empty, so that
+ * a seat art-directed in Blender carried straight through to the screen. That
+ * stopped being true the moment each character became their own file: the
+ * transform in the file is wherever they happened to be standing on whichever
+ * set was open in Blender, which is not a statement about where they sit. The
+ * first split export proved it — Connor came out at the news desk, 55cm from
+ * his lounge chair, and would have been sitting in mid-air on Markets &
+ * Morality. So the seats live in the contract and a re-export cannot move
+ * them; moving a seat for real is an edit there.
+ */
 const SEAT_POSES = {
-  lounge: {},
-  news: {
-    Demon_Empty: { position: [-0.44472, 0.42248, 0.018999], quaternion: [0, 0.255, 0, 0.967], scale: 1.125 },
-    Monk_Empty: { position: [0.53267, 0.39882, -0.049794], quaternion: [0, -0.030, 0, 1.000], scale: 1.081 },
-  },
+  lounge: Object.fromEntries(
+    Object.values(CHARACTERS).map((c) => [c.empty, c.seat.lounge]),
+  ),
+  news: Object.fromEntries(
+    Object.values(CHARACTERS).map((c) => [c.empty, c.seat.news]),
+  ),
 };
 
 /**
@@ -152,12 +169,23 @@ const SEAT_POSES = {
  * whose own children are bones. A character exported alone and a character
  * exported with the set both resolve, and neither needs a name kept for the
  * code's benefit.
+ *
+ * AND THE SEARCH IS SCOPED TO THE EMPTY, not to the whole studio, which
+ * matters now that the characters arrive as separate files. Blender only
+ * disambiguates names that collide INSIDE one file, so two characters exported
+ * alone both come out with an "Armature" and an identical set of
+ * "mixamorig:*" bones — and once both trees are attached to the set, a
+ * scene-wide lookup for "Armature" returns whichever happens to be traversed
+ * first. That is a mixer bound to the wrong character's skeleton: two rigs
+ * playing one character's clips, which is worse than a T-pose because it looks
+ * deliberate. Scoping the lookup makes the collision impossible instead of
+ * unlikely.
  */
 function findRig(scope, emptyName, declaredRoot) {
-  const declared = declaredRoot ? scope.getObjectByName(declaredRoot) : null;
-  if (declared) return declared;
   const empty = scope.getObjectByName(emptyName);
   if (!empty) return null;
+  const declared = declaredRoot ? empty.getObjectByName(declaredRoot) : null;
+  if (declared) return declared;
   let found = null;
   empty.traverse((node) => {
     if (found || node.isBone) return;
@@ -166,7 +194,7 @@ function findRig(scope, emptyName, declaredRoot) {
   if (found) {
     console.info(
       `[TalkShowScene] ${emptyName}: no node named "${declaredRoot}", ` +
-        `using "${found.name}" as the rig — update CHARACTER_CLIPS.root to match.`,
+        `using "${found.name}" as the rig — set \`rig\` to that in modelContract.mjs.`,
     );
   }
   return found;
@@ -320,9 +348,11 @@ export const TALKSHOW_PROJECTION_CONFIG = {
 // One 600×800 portal per seat the set registers, in a row.
 const PORTAL_HOST_WIDTH = PORTAL_WIDTH * Object.keys(TALKSHOW_PROJECTION_CONFIG).length;
 
-// Warm the GLB fetch before the tab is opened (page.js calls this on mount).
+// Warm the GLB fetches before the tab is opened (page.js calls this on mount).
+// The set and every character, because the set alone is an empty studio.
 export function preloadTalkShow() {
-  useGLTF.preload(MODEL_URL, DRACO_PATH);
+  useGLTF.preload(SET_URL, DRACO_PATH);
+  CHARACTER_URLS.forEach((url) => useGLTF.preload(url, DRACO_PATH));
 }
 
 // Build (once) the crop canvas + CanvasTexture + MeshBasicMaterial for a
@@ -1467,7 +1497,17 @@ function TalkShowModel({
   directCamera,
   cameraControlsRef,
 }) {
-  const { scene, animations } = useGLTF(MODEL_URL, DRACO_PATH);
+  const { scene } = useGLTF(SET_URL, DRACO_PATH);
+  // One entry per character file, in CHARACTER_URLS order. Every registered
+  // character is fetched, not just this week's cast: the argument has to be
+  // stable or the set re-suspends, and a character who joins mid-episode (a
+  // guest cut in for one chapter) would otherwise pop in as a T-pose while
+  // their file downloads. What the download actually costs is one character
+  // file each; the set no longer carries them.
+  const characterGltfs = useGLTF(CHARACTER_URLS, DRACO_PATH);
+  // useLoader hands back a fresh array each render even though the loaded
+  // documents are cached, so key the derived memos on the documents instead.
+  const characterKey = characterGltfs.map((g) => g.scene.uuid).join("|");
   const raisedSet = castHidden || newsMode;
   // One entry per character the SET can seat, built from the registry rather
   // than listed, so a cast member is one entry in TALKSHOW_PROJECTION_CONFIG.
@@ -1504,6 +1544,11 @@ function TalkShowModel({
   // so both read the live timeline through a ref rather than closing over it.
   const timelineRef = useRef(timeline);
   timelineRef.current = timeline;
+  // The show-long effect below is deliberately not re-run when the set
+  // changes, so which set is dressed is read through a ref at the moment the
+  // episode ends rather than captured when it was set up.
+  const newsModeRef = useRef(newsMode);
+  newsModeRef.current = newsMode;
   const stopShowRef = useRef(null);
   // Set by the portal effect below: preloads every section of the mounted
   // episode into one portal. The timeline effect calls it on an episode swap.
@@ -1543,6 +1588,14 @@ function TalkShowModel({
   // tree, and so R3F isn't handed the same cached object twice.
   const cloned = useMemo(() => {
     const c = skeletonClone(scene);
+    // THE CAST IS ATTACHED INTO THE SET, which is what makes the split
+    // invisible to the rest of this file. Each character file has a single
+    // root — their empty — under an identity scene group, so adding that group
+    // to the set clone leaves every local transform, and therefore every world
+    // position, exactly as it was when the two shipped in one file. From here
+    // on `cloned` is the whole studio again and `getObjectByName` reaches the
+    // characters as before.
+    characterGltfs.forEach((gltf) => c.add(skeletonClone(gltf.scene)));
     // Hide the blank inner screen (the neon Frame border stays). LT TV's
     // lineup view lights it up as the channel screen — see useChannelScreen.
     const screen = c.getObjectByName("Content_Screen");
@@ -1554,7 +1607,27 @@ function TalkShowModel({
       if (m) m.visible = false;
     });
     return c;
-  }, [scene]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- characterKey identifies characterGltfs
+  }, [scene, characterKey]);
+
+  /* WHICH CLIPS EACH CHARACTER BROUGHT WITH THEM.
+   *
+   * This used to be one `animations` array off the single GLB, and the split
+   * is why Connor went T-pose: his actions were renamed barron_* to connor_* in
+   * his own export while the scene was still loading the combined file, which
+   * only ever had barron_*. Every lookup missed, no action was created, and a
+   * rig with no action is a rig in its bind pose — with nothing in the console
+   * beyond the "clip not found" warnings. Keyed per character so a clip can
+   * only ever be found in the file that is supposed to carry it.
+   */
+  const characterAnimations = useMemo(() => {
+    const out = {};
+    CHARACTER_EMPTIES.forEach((empty, index) => {
+      out[empty] = characterGltfs[index]?.animations || [];
+    });
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- characterKey identifies characterGltfs
+  }, [characterKey]);
 
   // Where the overhead bar's four fixtures are and which way they point. Read
   // once per model — nothing on the bar animates.
@@ -1646,21 +1719,17 @@ function TalkShowModel({
   // sets they sit on: the same rig, the same clips and the same scale sit in
   // the lounge chair and at the news desk, and only the position differs (the
   // desk lifts them ~0.2 and brings them in toward the middle). So a character
-  // who appears on both shows is exported once and placed twice.
+  // who appears on both shows is exported once and placed twice, from
+  // SEAT_POSES, which now pins both seats — see the note on it for why the
+  // model's own transform stopped being trustworthy.
   //
-  // A set may PIN a character's seat in SEAT_POSES. Anything left unpinned
-  // keeps whatever the model authored, which is why the lounge is empty here:
-  // those chairs are art-directed in Blender and should stay that way, so
-  // moving one there still works. The news desk is pinned because its numbers
-  // came off a screenshot of the dressed desk rather than out of the export.
+  // The lookup is against `cloned`, which is the set with the character files
+  // already attached, so it reaches a character whichever file they came out
+  // of.
   //
   // Screenshot transforms use Blender Z-up and quaternion WXYZ. Convert to
   // glTF Y-up: position (x,z,-y), quaternion (x,z,-y,w). Actor empties are
   // unparented in the export; their local coordinates are the model's basis.
-  //
-  // NOTE for the per-character-file split: this resolves names against the SET
-  // scene, so once characters load from their own GLBs the lookup has to search
-  // those scenes too.
   useEffect(() => {
     const poses = SEAT_POSES[newsMode ? "news" : "lounge"] || {};
     const originals = [];
@@ -1997,11 +2066,21 @@ function TalkShowModel({
   const actionsRef = useRef({});
   useEffect(() => {
     const started = [];
+    const listeners = [];
     const out = {};
-    const findAction = (mixer, name) => {
-      const clip = animations.find((a) => a.name === name);
+    // Each character's clips come out of their OWN file. A name that is not
+    // there is a real problem — a missing base is a character who never moves
+    // — so it is named along with the file it was expected in, because the
+    // usual cause is a renamed Blender action that only half landed.
+    const findAction = (mixer, emptyName, name) => {
+      const clip = (characterAnimations[emptyName] || []).find((a) => a.name === name);
       if (!clip) {
-        console.warn(`[TalkShowScene] clip "${name}" not found`);
+        console.warn(
+          `[TalkShowScene] ${emptyName}: clip "${name}" is not in that ` +
+            `character's file (it carries: ${(characterAnimations[emptyName] || [])
+              .map((a) => a.name)
+              .join(", ") || "nothing"})`,
+        );
         return null;
       }
       return mixer.clipAction(clip);
@@ -2009,7 +2088,7 @@ function TalkShowModel({
     Object.entries(CHARACTER_CLIPS).forEach(([emptyName, clips]) => {
       const mixer = mixers[emptyName];
       if (!mixer) return;
-      const base = findAction(mixer, clips.base);
+      const base = findAction(mixer, emptyName, clips.base);
       if (base) {
         base.reset();
         base.setLoop(THREE.LoopRepeat, Infinity);
@@ -2019,28 +2098,62 @@ function TalkShowModel({
       }
       const reactions = {};
       Object.entries(clips.reactions).forEach(([key, clipName]) => {
-        const action = findAction(mixer, clipName);
+        const action = findAction(mixer, emptyName, clipName);
         if (!action) return;
         action.enabled = true;
         action.setEffectiveWeight(0);
         reactions[key] = action;
       });
-      out[emptyName] = {
+      // THE SHOW'S PLAY-OUT, and the one clip that is allowed to be absent:
+      // an export without it simply holds the seated idle when the show ends,
+      // which is what every episode did until now. Prepared here and played
+      // from playOutro() at the end of a news episode.
+      // Looked up directly rather than through findAction, which warns: an
+      // absent play-out is allowed and must not read as a fault.
+      const outroClip = clips.outro
+        ? (characterAnimations[emptyName] || []).find((a) => a.name === clips.outro)
+        : null;
+      const outro = outroClip ? mixer.clipAction(outroClip) : null;
+      const bank = {
         actor: clips.actor,
         base,
         reactions,
+        outro,
         active: null,
       };
+      if (outro && base) {
+        outro.setLoop(THREE.LoopOnce, 1);
+        // Hold the last authored frame rather than snapping to the bind pose
+        // while the return to the idle crossfades — the same reason the
+        // reactions clamp.
+        outro.clampWhenFinished = true;
+        outro.enabled = true;
+        outro.setEffectiveWeight(0);
+        // It runs for 46s off air with nothing else driving the clock, so the
+        // settle back to the idle comes from the mixer rather than from the
+        // performance loop, which has stopped by then.
+        const settle = (event) => {
+          if (event.action !== outro) return;
+          base.enabled = true;
+          base.play();
+          outro.crossFadeTo(base, 0.8, false);
+        };
+        mixer.addEventListener("finished", settle);
+        listeners.push(() => mixer.removeEventListener("finished", settle));
+      }
+      out[emptyName] = bank;
     });
     actionsRef.current = out;
     return () => {
       playbackRef.current = idlePlayback();
+      listeners.forEach((off) => off());
       Object.values(out).forEach((bank) => {
         Object.values(bank.reactions).forEach((action) => action.stop());
+        bank.outro?.stop();
       });
       started.forEach((action) => action.stop());
     };
-  }, [mixers, animations]);
+  }, [mixers, characterAnimations]);
 
   // Build one hidden iframe per character. The iframe stays renderable (rather
   // than display:none) so SitePal continues painting the WebGL canvas that is
@@ -2263,6 +2376,16 @@ function TalkShowModel({
           action.setEffectiveWeight(0);
         });
         bank.active = null;
+        // The play-out runs OFF AIR and for 46 seconds, so it is the one clip
+        // that can still be going when the next thing happens. Dropped here
+        // too, or starting an episode during the intermission would run it
+        // against the idle at full weight.
+        if (bank.outro) {
+          bank.outro.stop();
+          bank.outro.stopFading();
+          bank.outro.enabled = true;
+          bank.outro.setEffectiveWeight(0);
+        }
         if (bank.base) {
           bank.base.reset();
           bank.base.stopFading();
@@ -2276,6 +2399,32 @@ function TalkShowModel({
     const resetPerformance = () => {
       playbackRef.current = idlePlayback();
       resetReactions();
+    };
+
+    /**
+     * THE PLAY-OUT. The news desk does not just stop: Connor turns away from
+     * the camera and sits out the intermission, so the set reads as a studio
+     * between shows rather than as two people frozen mid-breath.
+     *
+     * Only at the genuine end of a news episode — not on a section join, not
+     * on Stop, and not on Markets & Morality, which has no intermission clip.
+     * It plays once and settles back into the seated idle (the `finished`
+     * listener in the action-bank effect), so the set is left where a viewer
+     * who comes back to the tab expects it.
+     */
+    const playOutro = () => {
+      if (!newsModeRef.current) return;
+      Object.values(actionsRef.current).forEach((bank) => {
+        const outro = bank?.outro;
+        if (!outro || !bank.base) return;
+        outro.stop();
+        outro.reset();
+        outro.stopFading();
+        outro.enabled = true;
+        outro.setEffectiveWeight(1);
+        outro.play();
+        bank.base.crossFadeTo(outro, 0.6, false);
+      });
     };
 
     const timers = {};
@@ -2822,6 +2971,7 @@ function TalkShowModel({
 
       phase = "idle";
       resetPerformance();
+      playOutro();
       onPlaybackStateChange?.(false);
       resumePreloads();
     };

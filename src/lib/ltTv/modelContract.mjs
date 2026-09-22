@@ -35,11 +35,18 @@
  * before being renamed to LTTV_Set.glb — so listing it would imply the props
  * file might be the set. It would fail the content check anyway.
  */
+const SET_FILE = "public/models/LTTV_Set.glb";
+const PRE_SPLIT_SET_FILE = "public/models/talk_show3-textures.glb";
+
 export const SET_MODEL = {
-  candidates: [
-    "public/models/LTTV_Set.glb",
-    "public/models/talk_show3-textures.glb",
-  ],
+  // What the scene loads. One name, so the browser and the checker can never
+  // disagree about which file is the set.
+  file: SET_FILE,
+  // What the CHECKER will accept, newest first. The pre-split file is still in
+  // the repo and still a valid set (it just has the characters inside it too),
+  // so a check run against an older commit reports on that rather than
+  // claiming the set is missing.
+  candidates: [SET_FILE, PRE_SPLIT_SET_FILE],
   // Props the code reaches for by name. A missing one is a visible hole in the
   // set rather than a silent failure, but it is cheaper to catch here.
   requires: [
@@ -79,24 +86,43 @@ export const CHARACTERS = {
     file: "public/models/LTTV_Connor.glb",
     empty: "Demon_Empty",
     rig: "Armature",
-    base: "barron_sit_pose2",
+    // RENAMED IN THE 2026-09-22 EXPORT, from barron_* to connor_*. The old
+    // names were the last identifiers still carrying the character's previous
+    // name, and the note on them said only a Blender re-export could change
+    // them — this is that re-export. Durations are unchanged, so they are the
+    // same actions under the current name.
+    base: "connor_sit_pose2",
     reactions: {
-      headnod: "barron_headnod_pose2",
-      headnodSubtle: "barron_headnod_subtle_pose2",
-      headshakeDisappointment: "barron_headshake_disappointment_pose2",
-      lookAround: "barron_look_around_pose2",
-      shrug: "barron_shrug_pose2",
-      mockCrying: "barron_mockcrying_pose2",
+      headnod: "connor_headnod_pose2",
+      headnodSubtle: "connor_headnod_subtle_pose2",
+      headshakeDisappointment: "connor_headshake_disappointment_pose2",
+      lookAround: "connor_look_around_pose2",
+      shrug: "connor_shrug_pose2",
+      mockCrying: "connor_mockcrying_pose2",
     },
     // Played once the news show has finished rather than the seated idle, so
-    // the desk does not sit in a breathing loop through the outro. Optional:
-    // it arrived with the 2026-09-22 re-export and a file without it still
-    // plays every episode, it just holds the idle afterwards.
-    outro: "connor_news_intermission",
+    // the desk does not sit in a breathing loop through the outro. 46.7s, which
+    // is why it is an outro and not a reaction cue. Optional: a file without it
+    // still plays every episode and simply holds the idle afterwards.
+    outro: "connor_news_intermission_head_turn",
     faces: { face1: "FaceDemon1", face2: "FaceDemon2", hide: ["Demon_Brows"] },
+    // HE WAS EXPORTED AT THE NEWS DESK, so his own file no longer carries the
+    // lounge seat — it is 55cm from where he belongs on the roundtable set.
+    // Both seats are therefore pinned from here rather than taken from the
+    // model: once a character ships as its own file, exported from whichever
+    // set happened to be open, the authored transform stops being a reliable
+    // statement about where they sit.
     seat: {
-      lounge: { position: [-0.8031, 0.2098, -0.302], scale: 1.1248 },
-      news: { position: [-0.44472, 0.42248, 0.018999], scale: 1.125 },
+      lounge: {
+        position: [-0.80307, 0.2098, -0.30198],
+        quaternion: [0, 0.25504, 0, 0.96693],
+        scale: 1.12482,
+      },
+      news: {
+        position: [-0.44472, 0.42248, 0.018999],
+        quaternion: [0, 0.255, 0, 0.967],
+        scale: 1.125,
+      },
     },
   },
   Monk: {
@@ -114,9 +140,20 @@ export const CHARACTERS = {
       prayCrosschest: "monk_pray_crosschest_pose2",
     },
     faces: { face1: "Face1", face2: "Face2", hide: ["Brows"] },
+    // His export DOES sit at the lounge seat, to five decimal places. Pinned
+    // anyway, for the same reason as Connor's: the code should not depend on
+    // which set was open in Blender.
     seat: {
-      lounge: { position: [0.9501, 0.24, -0.3609], scale: 1.081 },
-      news: { position: [0.53267, 0.39882, -0.049794], scale: 1.081 },
+      lounge: {
+        position: [0.95011, 0.24002, -0.36088],
+        quaternion: [0, -0.02971, 0, 0.99956],
+        scale: 1.08099,
+      },
+      news: {
+        position: [0.53267, 0.39882, -0.049794],
+        quaternion: [0, -0.03, 0, 1],
+        scale: 1.081,
+      },
     },
   },
 };
@@ -129,4 +166,16 @@ export function requiredClips(character) {
 /** Clips that may be there and are used when they are. */
 export function optionalClips(character) {
   return character.outro ? [character.outro] : [];
+}
+
+/**
+ * The URL the browser fetches a model from.
+ *
+ * `file` is the repo path, which is what a node script checking the export
+ * needs; the scene needs the served path, which is the same thing without
+ * `public/`. Versioned so a re-export is never served from drei's cache.
+ */
+export const MODEL_VERSION = "split-1";
+export function modelUrl(file) {
+  return `${String(file).replace(/^public/, "")}?v=${MODEL_VERSION}`;
 }

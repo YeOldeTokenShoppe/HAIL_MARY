@@ -876,7 +876,9 @@ help — so that idea does not come back.
 ## Adding a character, rotating the cast, or a guest (both shows)
 
 **Short answer to the model question: a separate GLB, one file per character —
-not inside `newsDesk.glb`, and not baked into the set.**
+not inside `newsDesk.glb`, and not baked into the set. Done as of 2026-09-22:
+the set is `LTTV_Set.glb`, Connor is `LTTV_Connor.glb`, GR80 is
+`LTTV_GR80.glb`, and the scene attaches the characters into the set at load.**
 
 `public/models/newsDesk.glb` is props only: the desk body, two neon strips, and
 two each of coffee cup, microphone and laptop. No armature, no animation, and
@@ -899,17 +901,32 @@ own*. Ship it on its own:
 - **A guest is then one file, not a new version of the set.** Ship it, cast
   them, and the set model never moves.
 
-What that costs, once: the scene calls `useGLTF` on exactly one file today and
-builds a mixer per actor empty out of that file's single `animations` array
-(`TalkShowScene.jsx`, the mixers and action-bank effects). A per-character file
-needs a second `useGLTF`, a mixer rooted at the new character's own root, and
-the action lookup reading that character's own clips. One bounded change in one
-file, and then every cast member after it is free.
+**How the scene does it.** `TalkShowScene.jsx` loads the set, loads each
+character file, and adds the cloned character scenes into the cloned set. Each
+character file contains exactly one root — their empty — under an identity
+scene group, so attaching it puts them in the same place, under the same names,
+as when the two shipped in one file. Every lookup by name in that file therefore
+works unchanged, and a new cast member is an entry in `modelContract.mjs`
+rather than an edit to the scene.
 
-**Where they sit is already code, not model.** The news desk poses are numbers
-in `TalkShowScene.jsx` — the `newsMode` effect, positions and quaternions
-converted out of Blender Z-up. A third seat is a third entry there. What is NOT
-code is the furniture: the set has exactly two `DeskChair` nodes and the desk is
+The one thing that *is* per-character is the clips: each mixer resolves its
+actions against its own file's `animations` array. That is what stops a clip
+being found in the wrong file, which is exactly how Connor went T-pose on
+2026-09-22 — his actions were renamed `barron_*` to `connor_*` in his own export
+while the scene was still loading the combined file, which only ever had
+`barron_*`. Every lookup missed, no action was created, and a rig with no action
+is a rig in its bind pose.
+
+**Not yet: loading only this week's cast.** Every registered character is
+fetched, not just the ones in the episode. `useGLTF` suspends on its argument,
+so the list has to be stable, and a character who appears mid-episode would
+otherwise pop in as a T-pose while their file downloads. What the split already
+buys is that the set no longer carries anybody, so adding a fourth character
+costs one file rather than a new version of the studio.
+
+**Where they sit is code, not model.** Both seats are numbers in
+`modelContract.mjs`, applied by the `newsMode` effect in `TalkShowScene.jsx`.
+A third seat is a third entry there. What is NOT code is the furniture: the set has exactly two `DeskChair` nodes and the desk is
 two wide. A third chair, mic, cup and laptop can be another separate prop GLB
 placed the same way, or a re-export of the desk — but the desk is the only part
 of this that genuinely needs Blender.
@@ -930,28 +947,39 @@ the bug would be.
 It costs nothing in duplicated textures. The characters share no materials with
 the set or with each other — Connor's are `PolygonOffice_Charaters.*`,
 `barron_hair`, `barron_eyes*`; GR80's are `MAT_01A.*`, `lambert1.001`; the set's
-are none of those. And the win is real: of the 4.3 MB set file, **1.9 MB is
-animation data** (Connor's clips 571 KB, GR80's 1,296 KB) plus 340 KB of GR80's
-textures. GR80 is the single heaviest thing in that file and he is not in the
+are none of those. And the win is real: of the 4.3 MB combined file, **1.9 MB
+was animation data** (Connor's clips 571 KB, GR80's 1,296 KB) plus 340 KB of
+GR80's textures. GR80 was the single heaviest thing in it and he is not in the
 news show at all.
 
-**Export each character where they stand. Do not move them to the origin and do
-not apply or clear their transform.** The set's scene root sits at the origin of
-the group that holds it, so a node's coordinates inside a GLB are already the
-coordinates the code works in — the studio lights rely on exactly this, mounted
-as siblings of the set using positions read straight off the model. So a
-character file that keeps its set position lands in the right chair with no
-numbers from anyone. Exported at the origin instead, the lounge positions would
-have to be re-fitted by hand for no gain. (The news desk is unaffected: the code
-already overrides the seat position for the news set.)
+**What the split actually weighed, measured 2026-09-22.** Set 1.58 MB + Connor
+1.53 MB + GR80 2.42 MB = 5.53 MB, against 4.31 MB for the one combined file.
+So the news show (set + Connor = 3.11 MB) is a real win and Markets & Morality
+is worse, for two reasons that are both in the export settings rather than in
+the split: GR80's textures came out **PNG** (1.16 MB) where they had been WebP
+(0.34 MB), and both files carry 16 clips where the show plays 8 (~0.7 MB each of
+dead weight). Neither is urgent; both are a re-export away.
 
-For reference, what the set currently says — you do not need to write these
-down, only to avoid zeroing them:
+**Do not apply or clear a character's transform — but do not rely on it
+either.** Exported at the origin a character sinks through the floor at the
+middle of the set, so never zero it. But the transform in a character's own file
+is only ever "wherever they were standing on whichever set was open in
+Blender", which is not a statement about where they sit. The first split export
+proved it: GR80 came out of the roundtable and landed exactly on his lounge
+seat, and Connor came out of the news desk and was **55 cm** from his lounge
+chair — the same export convention, one of them in mid-air.
+
+So **both seats are pinned in `modelContract.mjs`** and a re-export cannot move
+them. What is on air:
 
 | | position | yaw | scale |
 |---|---|---|---|
-| `Demon_Empty` (Connor) | −0.803, 0.210, −0.302 | ~29.5° | 1.125 |
-| `Monk_Empty` (GR80) | 0.950, 0.240, −0.361 | ~−3.4° | 1.081 |
+| `Demon_Empty` (Connor), lounge | −0.803, 0.210, −0.302 | ~29.5° | 1.125 |
+| `Demon_Empty` (Connor), news | −0.445, 0.422, +0.019 | ~29.5° | 1.125 |
+| `Monk_Empty` (GR80), lounge | 0.950, 0.240, −0.361 | ~−3.4° | 1.081 |
+| `Monk_Empty` (GR80), news | 0.533, 0.399, −0.050 | ~−3.4° | 1.081 |
+
+Moving a seat for real is an edit there, and it needs no Blender.
 
 **Two seats is not two models.** Connor sits in the lounge chair on Markets &
 Morality and at the news desk on the news show, and that is one exported file
@@ -961,20 +989,29 @@ the two poses are the same facing and the same size (rotation agrees to about
 put. On the news set he slides in toward the middle and up onto the taller desk
 chair: x −0.80 → −0.44, y 0.21 → 0.42, z −0.30 → +0.02.
 
-`SEAT_POSES` in `TalkShowScene.jsx` holds one entry per set per character. A set
-that pins a seat wins; anything unpinned keeps whatever the model authored,
-which is why `lounge` is deliberately empty — those chairs stay art-directed in
-Blender, so moving one there still works. The news desk is pinned because its
-numbers came off a screenshot of the dressed desk. A character on both shows
-therefore needs one file and, at most, one pinned entry per set — and a seat can
-be nudged without going back to Blender.
+`seat` in `modelContract.mjs` holds one entry per set per character, and
+`SEAT_POSES` in `TalkShowScene.jsx` is built from it. The lounge used to be
+deliberately unpinned, so a chair art-directed in Blender carried straight
+through; that stopped being safe the moment each character became their own
+file, for the reason above.
 
-**The clips must travel with the character.** All 31 are in the set file today.
-After the split the set should have no animations at all, and each character
-file must carry its own — `barron_*` with Connor, `monk_*` with GR80. If the
-actions get left behind, the character loads, stands in its bind pose and never
-moves, with no error. Worth checking the export actually contains them before
-you call it done.
+**The clips must travel with the character.** The set should have no animations
+at all, and each character file must carry its own — `connor_*` with Connor,
+`monk_*` with GR80. If the actions get left behind, the character loads, stands
+in its bind pose and never moves, with no error. `npm run lt:models` is the
+check.
+
+**Connor's actions are `connor_*` as of 2026-09-22**, renamed in Blender from
+`barron_*` — the last identifiers still carrying his old name. The note that
+only a re-export could change them was right; this was that re-export. Durations
+are unchanged, so they are the same actions under the current name.
+
+**The news play-out.** `connor_news_intermission_head_turn` (46.7 s) plays once
+when a news episode finishes, instead of the seated idle, then settles back into
+it — so the desk reads as a studio between shows rather than as two people
+frozen mid-breath. It is declared as `outro` in the contract and is optional: an
+export without it just holds the idle, which is what every episode did before.
+Only the news show has one, and it does not play on Stop or at a section join.
 
 **Check the export before you upload anything:**
 
@@ -993,9 +1030,11 @@ nothing in the console. The names below are what it checks.
 
 `src/lib/ltTv/modelContract.mjs` is the contract it checks against (the set is
 `LTTV_Set.glb`; `newsDesk.glb` is the older desk-props-only export and is not
-the set), and it is
-the file to edit when a character gains a clip or a seat moves. A test pins it
-against the scene, so the two cannot disagree without the suite failing.
+the set), and it is the file to edit when a character gains a clip or a seat
+moves. **It is the only place a clip name or a model path is written** — the
+scene derives both from it, and `scripts/lt-tv-models.test.mjs` fails if a
+second copy appears, because two copies of a clip name is precisely what put
+Connor in a T-pose.
 
 **Keep these names.** The face projection finds what to hide and what to paint
 by name:
@@ -1019,8 +1058,8 @@ the one thing in the old contract you can stop worrying about.
 | `CAST`, `scripts/lt-tv-format.mjs` | actor, display name, ElevenLabs voice id, processor key, clip key, role |
 | `REACTIONS`, same file | which reaction clips the rig actually has — a cue naming one it doesn't T-poses |
 | `DELIVERY_TAGS`, same file | the bracketed tags that read well in that voice |
-| `CHARACTER_CLIPS`, `TalkShowScene.jsx` | the empty's name, its armature root, the base idle, the reaction clip names |
-| `EMPTY_FOR_ACTOR`, `REACTION_DURATIONS`, `LISTENER_GAZE_YAW` | one entry each |
+| `CHARACTERS`, `src/lib/ltTv/modelContract.mjs` | the GLB path, the empty's name, its armature, the base idle, the reaction clip names, an optional play-out, and both seats. `CHARACTER_CLIPS`, `EMPTY_FOR_ACTOR` and `SEAT_POSES` in `TalkShowScene.jsx` are all built from this |
+| `REACTION_DURATIONS`, `LISTENER_GAZE_YAW`, `TalkShowScene.jsx` | one entry each |
 | `TALKSHOW_PROJECTION_CONFIG` | the SitePal scene id, the Face1/Face2 mesh names, a crop and a filter (fit live with `?tune=sitepal`) |
 | SitePal account | **a scene of their own.** The two we have reuse the temple's Monk and Demon scenes; a third character needs a third scene. Account work, not code. |
 | `SPEAKERS`, `process_dialogue.py` | only if you ever use the older two-voice path |
