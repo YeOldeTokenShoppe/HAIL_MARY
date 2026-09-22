@@ -11,7 +11,20 @@
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
-export async function claude({ system, user, messages: turns = null, model, maxTokens = 8000, tools = null }) {
+export async function claude({
+  system,
+  user,
+  messages: turns = null,
+  model,
+  maxTokens = 8000,
+  tools = null,
+  // A GENERATOR wants an episode or nothing: a reply it cannot read is an
+  // error, because half a record is worse than none. A CONVERSATION is the
+  // other way round — the writer's words are the point and the JSON is only
+  // how a proposal rides along with them, so the room asks for the text back
+  // instead of an exception. See `prose` on the result.
+  lenient = false,
+}) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("ANTHROPIC_API_KEY is not set (or use --draft to skip the model).");
 
@@ -63,19 +76,32 @@ export async function claude({ system, user, messages: turns = null, model, maxT
     messages.push({ role: "assistant", content: data.content });
   }
 
-  if (data.stop_reason === "max_tokens") {
-    throw new Error("Model hit max_tokens — the reply was cut off. Raise --max-tokens and retry.");
-  }
-  if (data.stop_reason === "refusal") {
-    throw new Error("The model declined this request. Check the brief for anything unexpected.");
-  }
-
   const text = (data.content || [])
     .filter((b) => b.type === "text")
     .map((b) => b.text)
     .join("");
 
-  const parsed = parseJson(text);
+  if (data.stop_reason === "refusal") {
+    throw new Error("The model declined this request. Check the brief for anything unexpected.");
+  }
+  if (data.stop_reason === "max_tokens") {
+    // Cut off mid-sentence. In a conversation the words up to the cut are
+    // still worth reading and saying so is more use than losing them; in a
+    // generator they are half an episode.
+    if (!lenient) throw new Error("Model hit max_tokens — the reply was cut off. Raise --max-tokens and retry.");
+    return { say: text.trim(), changes: [], _prose: text.trim(), _cutOff: true };
+  }
+
+  let parsed;
+  try {
+    parsed = parseJson(text);
+  } catch (err) {
+    // The contract asks for JSON and a model in conversation sometimes simply
+    // answers. That is not a failure worth throwing away a good answer over,
+    // so the answer IS the reply and nothing is proposed with it.
+    if (!lenient) throw err;
+    parsed = { say: text.trim(), changes: [], _prose: text.trim() };
+  }
   if (searchNotes.length) parsed._searchNotes = searchNotes;
   return parsed;
 }

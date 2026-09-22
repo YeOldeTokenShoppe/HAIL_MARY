@@ -255,5 +255,64 @@ console.log("\nwhat the room is about");
   ok("neither is not a crash, it is an answer", refused?.includes("no pitch and no screenplay"));
 }
 
+console.log("\na turn that does not come back in the shape it was asked for");
+{
+  // 2026-09-21, Michelle in the room: "what is the takeaway for the crypto
+  // audience?" The writer answered in prose, and the turn was lost with
+  // "Model did not return JSON" — her question spent, the answer shown to her
+  // only as the first 400 characters of an error. A room that can lose a
+  // good answer is not a room.
+  const { mkdtemp, mkdir, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { say, readTranscript } = await import("./lt-tv-room.mjs");
+
+  const root = await mkdtemp(join(tmpdir(), "lttv-room-say-"));
+  await mkdir(join(root, "content/lt-tv/episodes"), { recursive: true });
+  await writeFile(join(root, "content/lt-tv/episodes/morality-09.txt"), SCRIPT);
+  await writeFile(
+    join(root, "content/lt-tv/episodes/morality-09.json"),
+    JSON.stringify({ id: "morality-09", show: "morality", number: "09", title: "Meme Season" }),
+  );
+
+  /** One turn of the room against a stubbed model reply. */
+  const turn = async (text, stop = "end_turn") => {
+    const realFetch = globalThis.fetch;
+    const realKey = process.env.ANTHROPIC_API_KEY;
+    globalThis.fetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ stop_reason: stop, content: [{ type: "text", text }] }),
+      text: async () => "",
+    });
+    process.env.ANTHROPIC_API_KEY = "sk-ant-test";
+    try {
+      return await say({ id: "morality-09", text: "what is the takeaway?", root });
+    } finally {
+      globalThis.fetch = realFetch;
+      if (realKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+      else process.env.ANTHROPIC_API_KEY = realKey;
+    }
+  };
+
+  const prose = "The takeaway is the disclosure asymmetry, and everyone knows means everyone already here.";
+  const { entry } = await turn(prose);
+  check("the answer is the answer", entry.text, prose);
+  check("with nothing proposed alongside it", entry.changes, []);
+  ok("and it is marked as having arrived as prose", entry.prose === true);
+  check("it is kept, so the next turn can build on it", (await readTranscript("morality-09", root)).length, 2);
+
+  const half = await turn("and the hard case is the part that ear", "max_tokens");
+  check("a cut-off answer keeps what was said", half.entry.text, "and the hard case is the part that ear");
+  ok("and says it was cut off", half.entry.cutOff === true);
+
+  // A change the room may not make refuses the PROPOSAL. Losing the message
+  // with it would leave her arguing with an error instead of a writer.
+  const bad = await turn('{"say":"Connor should open it.","changes":[{"op":"explode","n":2}]}');
+  check("a change it may not make keeps the message", bad.entry.text, "Connor should open it.");
+  check("and proposes nothing", bad.entry.changes, []);
+  ok("but says what it wanted and could not have", bad.entry.refused?.includes("explode"));
+}
+
 console.log(failures ? `\n${failures} failure(s)\n` : "\nAll good.\n");
 process.exit(failures ? 1 : 0);

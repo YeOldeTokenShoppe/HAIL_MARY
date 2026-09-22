@@ -746,6 +746,17 @@
   color: var(--green);
 }
 
+/* Something about the reply itself rather than something in it: it was cut
+   off, or it asked for a change the room is not allowed to make. Quieter than
+   a proposal and louder than the conversation, because it explains why a turn
+   that describes a change did not offer one. */
+.roomAside {
+  grid-column: 2;
+  margin: 6.4px 0 0;
+  font-size: 12.5px;
+  color: var(--amber);
+}
+
 /* ---- a proposal */
 
 .roomProposal {
@@ -862,7 +873,8 @@
     gap: 3.2px;
   }
   .roomProposal,
-  .roomNote {
+  .roomNote,
+  .roomAside {
     grid-column: 1;
   }
 }

@@ -653,6 +653,18 @@ function Turn({ message: m, index, busy, onDecide }) {
     <div className={s.roomTurn}>
       <span className={`${s.roomWho} ${writer ? s.roomWhoWriter : ''}`}>{writer ? 'writer' : 'you'}</span>
       <p className={s.roomSaid}>{m.text}</p>
+      {writer && m.cutOff && (
+        <p className={s.roomAside}>
+          That is as far as it got before it ran out of room. Ask it to carry on and it will pick the
+          thread up.
+        </p>
+      )}
+      {writer && m.refused && (
+        <p className={s.roomAside}>
+          It wanted a change the room cannot make: {m.refused} Nothing was proposed, so say how you
+          want it done instead.
+        </p>
+      )}
       {writer && m.changes?.length > 0 && (
         <div className={s.roomProposal}>
           {m.changes.map((c, i) => <Change key={i} change={c} />)}

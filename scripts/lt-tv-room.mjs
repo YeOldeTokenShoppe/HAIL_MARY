@@ -73,7 +73,11 @@ import {
 const EPISODE_DIR = "content/lt-tv/episodes";
 const SAMPLE_DIR = "content/lt-tv/samples";
 const MODEL = process.env.LT_TV_MODEL || "claude-opus-5";
-const MAX_TOKENS = 4000;
+// Room for a real answer. A turn here is two or three sentences plus a
+// proposal, so this is a ceiling rather than a target — but a ceiling the
+// model can reach mid-sentence is one that loses the answer, which is what
+// 4000 did to a long one on 2026-09-21.
+const MAX_TOKENS = 16000;
 
 // The two shows are written by two generators, so the room reads from the one
 // that wrote this show. The same brief the writer is given, built the same way
@@ -149,7 +153,9 @@ Reply with JSON only, no preamble and no code fences:
 {"say":"what you say to her","changes":[]}
 
 "changes" is an empty list when you are only talking. Say nothing outside the
-JSON.`;
+JSON. A long answer is still one JSON string in "say" — a reply that starts as
+prose cannot carry a proposal with it, and a reply that runs long enough to be
+cut off loses its end.`;
 
 const PITCH_RULES = `YOU ARE IN THE WRITER'S ROOM, AND NOTHING IS WRITTEN YET.
 
@@ -183,7 +189,9 @@ Reply with JSON only, no preamble and no code fences:
 {"say":"what you say to her","changes":[]}
 
 "changes" is an empty list when you are only talking. Say nothing outside the
-JSON.`;
+JSON. A long answer is still one JSON string in "say" — a reply that starts as
+prose cannot carry a proposal with it, and a reply that runs long enough to be
+cut off loses its end.`;
 
 /**
  * The system prompt for one turn of the room.
@@ -669,7 +677,30 @@ export async function say({ id, text, root = process.cwd(), model = MODEL }) {
           episode: { id: basename(subject.path).replace(/\.txt$/, ""), title: subject.title },
         });
 
-  const reply = await claude({ system, messages: toMessages(transcript), model, maxTokens: MAX_TOKENS });
+  // `lenient` because this is a conversation: a turn that comes back as plain
+  // prose is the writer answering, not a failure, and losing her answer to a
+  // parse error is worse than getting no proposal with it.
+  const reply = await claude({
+    system,
+    messages: toMessages(transcript),
+    model,
+    maxTokens: MAX_TOKENS,
+    lenient: true,
+  });
+
+  // A change the room is not allowed to make refuses the PROPOSAL, not the
+  // message. She still reads what the writer said and the reason nothing can
+  // be applied, and can answer it — which is the whole point of a room.
+  let changes = [];
+  let refused = null;
+  try {
+    changes =
+      subject.mode === "pitch"
+        ? validatePitchChanges(reply?.changes, subject.plan, pitchKind(subject.show))
+        : validateChanges(reply?.changes, indexScript(subject.text));
+  } catch (err) {
+    refused = err.message;
+  }
 
   const entry = {
     role: "writer",
@@ -679,10 +710,13 @@ export async function say({ id, text, root = process.cwd(), model = MODEL }) {
     // time: what she agreed to was a change to the thing that was in front of
     // her, and between the two a pitch can become a screenplay.
     mode: subject.mode,
-    changes:
-      subject.mode === "pitch"
-        ? validatePitchChanges(reply?.changes, subject.plan, pitchKind(subject.show))
-        : validateChanges(reply?.changes, indexScript(subject.text)),
+    changes,
+    ...(refused ? { refused } : {}),
+    // The reply came back as prose rather than in the shape the contract asks
+    // for. Worth recording, because it explains why a turn that plainly
+    // describes a change did not offer one.
+    ...(reply?._prose ? { prose: true } : {}),
+    ...(reply?._cutOff ? { cutOff: true } : {}),
     applied: false,
   };
   transcript.push(entry);
