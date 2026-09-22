@@ -19,11 +19,45 @@
 const GAZE_LEAD_IN = 0.22;
 const GAZE_RELEASE = 0.18;
 
-// The set has ONE camera, so a "cut" is a physical pan — the director commits
-// to a shot per line rather than chasing every exchange. Singles on the
-// speaker, pulling back to the two-shot for lines played to the room and
-// whenever the exchange has sat on singles too long. `subject: null` = wide.
+// THE SHOT LIST. The director commits to a shot per line rather than chasing
+// every exchange: singles on the speaker, pulling back to the pair for lines
+// played to the room and whenever the exchange has sat on singles too long.
+// `subject: null` = a wide on both chairs.
+//
+// Every shot also carries a `framing` — which of the gallery's four cameras is
+// being cut to. `src/lib/ltTv/shotFraming.mjs` turns that name into a lens and
+// a position; this file only decides WHEN each one is live, because that is a
+// question about the script and not about the set.
+//
+//   establish  the whole set. Top of the show, and every new story.
+//   two        the pair at the desk. The breather between runs of singles.
+//   direct     a clean single straight down the lens, for a line read TO the
+//              viewer. This is the one piece of news grammar the old shot list
+//              had backwards: it went WIDE when a host addressed the room,
+//              which is the moment television punches in.
+//   single     the speaker, angled across toward the other chair, for a line
+//              aimed at the other host — the listener is turned toward them,
+//              so the angle has something to be about.
+//   close      the same single punched in, for the third single of a run —
+//              an operator tightening as an exchange heats up.
 const SHOT_MAX_SINGLES = 3;
+// How many singles in a row before the next one punches in.
+const SHOT_PUNCH_IN_AFTER = 2;
+// A line longer than this gets a second shot partway through it. Lines in
+// these shows run ten seconds and more, and one camera held for the whole of
+// one reads as a freeze-frame however well it is composed.
+const SHOT_LONG_LINE = 14;
+// Where in a long line the second shot lands, as a fraction of it.
+const SHOT_LONG_LINE_AT = 0.55;
+// What the second shot of a long line cuts TO. Tight goes wider and wide goes
+// tighter, so the cut is always a change of size and never a jump cut.
+const SHOT_MID_LINE = {
+  establish: "two",
+  two: "single",
+  direct: "close",
+  single: "close",
+  close: "single",
+};
 // An operator reacts to a line instead of anticipating it, and won't whip off
 // a shot they only just landed — short lines play out as reaction shots on
 // whoever the camera is already holding.
@@ -384,7 +418,11 @@ export function buildEpisodeTimeline(record, { reactionDurations = {} } = {}) {
     }))
     .sort((a, b) => a.at - b.at);
 
-  const shots = buildShots(lineStarts, speakers, audienceLines);
+  const chapters = episodeChapters(record);
+  // A new story opens on a wide, the way every news show does it. Chapters
+  // name a LINE, which is exactly what the shot list is walking.
+  const chapterLines = new Set(chapters.map((chapter) => chapter.line));
+  const shots = buildShots(lineStarts, speakers, audienceLines, chapterLines, dialogueEnd);
 
   return {
     id: record.id,
@@ -397,25 +435,72 @@ export function buildEpisodeTimeline(record, { reactionDurations = {} } = {}) {
     gazes,
     cues,
     shots,
-    chapters: episodeChapters(record),
+    chapters,
   };
 }
 
-function buildShots(lineStarts, speakers, audienceLines) {
-  const shots = [{ at: 0, subject: null }];
+function buildShots(lineStarts, speakers, audienceLines, chapterLines = new Set(), dialogueEnd = 0) {
+  const shots = [{ at: 0, subject: null, framing: "establish" }];
   let singles = 0;
   lineStarts.forEach((start, line) => {
     const speaker = speakers[line];
-    const wide =
-      !speaker || audienceLines.has(line) || singles >= SHOT_MAX_SINGLES;
+    // A chapter start is an editorial cut, so it goes wide whoever is talking.
+    const opensChapter = chapterLines.has(line);
+    const wide = opensChapter || !speaker || singles >= SHOT_MAX_SINGLES;
     const subject = wide ? null : speaker;
-    singles = wide ? 0 : singles + 1;
-    const at = start + SHOT_REACTION_DELAY;
-    const prev = shots[shots.length - 1];
-    if (prev.subject === subject || at - prev.at < SHOT_MIN_HOLD) return;
-    shots.push({ at, subject });
+    // A line read TO THE VIEWER is a single down the lens, but it isn't part of
+    // the cross-talk run — it interrupts it, the way an anchor turning to
+    // camera does. So it doesn't count toward the pull-back-to-pair or the
+    // punch-in, and it resets the run.
+    const toRoom = !wide && audienceLines.has(line);
+    singles = wide || toRoom ? 0 : singles + 1;
+    let framing;
+    if (wide) framing = opensChapter ? "establish" : "two";
+    else if (toRoom) framing = "direct";
+    else framing = trailingSingles(shots) >= SHOT_PUNCH_IN_AFTER ? "close" : "single";
+
+    // A chapter cuts whatever is on air; everything else waits out SHOT_MIN_HOLD.
+    const landed = pushShot(shots, start + SHOT_REACTION_DELAY, subject, framing, opensChapter);
+
+    // A long line gets a second shot partway through it, so a ten-second read
+    // isn't ten seconds of one picture. It does double duty: when the opening
+    // cut LANDED it steps the size for variety, and when the opening cut was
+    // swallowed by the minimum hold — a fast line just before a slow one —
+    // it takes the shot now there's room, so the camera isn't stranded on the
+    // wrong person for the whole of a long line.
+    const ends = lineStarts[line + 1] ?? dialogueEnd;
+    const runs = ends - start;
+    if (!(runs > SHOT_LONG_LINE)) return;
+    const midFraming = landed ? (SHOT_MID_LINE[framing] ?? framing) : framing;
+    const midSubject =
+      midFraming === "two" || midFraming === "establish" ? null : subject ?? speaker ?? null;
+    if (!midSubject && midFraming !== "two" && midFraming !== "establish") return;
+    pushShot(shots, start + runs * SHOT_LONG_LINE_AT, midSubject, midFraming, false);
   });
   return shots;
+}
+
+/** Add a shot unless it repeats the one on air, or cuts one too soon. */
+function pushShot(shots, at, subject, framing, force) {
+  const prev = shots[shots.length - 1];
+  if (prev.subject === subject && prev.framing === framing) return false;
+  if (!force && at - prev.at < SHOT_MIN_HOLD) return false;
+  shots.push({ at, subject, framing });
+  return true;
+}
+
+// How many CROSS-TALK singles the director has cut in a row, at the tail of the
+// list. Direct-to-camera lines carry a subject but are not part of the run, so
+// they don't count — the punch-in is about an exchange heating up, not an
+// aside to the viewer.
+function trailingSingles(shots) {
+  let count = 0;
+  for (let i = shots.length - 1; i >= 0; i -= 1) {
+    const framing = shots[i].framing;
+    if (framing === "single" || framing === "close") count += 1;
+    else break;
+  }
+  return count;
 }
 
 /**
@@ -433,14 +518,24 @@ export function speakerAt(timeline, elapsed, running) {
   return speakers.find(Boolean) ?? null;
 }
 
-/** Which shot is live at `cue` seconds. `null` subject = the two-shot. */
+/** Which shot is live at `cue` seconds. `null` subject = a wide on both. */
 export function shotSubjectAt(timeline, cue) {
-  if (!timeline) return null;
-  const { shots } = timeline;
+  return shotAt(timeline, cue)?.subject ?? null;
+}
+
+/**
+ * The whole shot live at `cue` seconds — subject AND framing.
+ *
+ * The viewer camera needs both (the tripod monitor only ever needed the
+ * subject, which is why `shotSubjectAt` exists and still does).
+ */
+export function shotAt(timeline, cue) {
+  const shots = timeline?.shots;
+  if (!shots?.length) return null;
   for (let i = shots.length - 1; i >= 0; i -= 1) {
-    if (shots[i].at <= cue) return shots[i].subject;
+    if (shots[i].at <= cue) return shots[i];
   }
-  return null;
+  return shots[0];
 }
 
 /**

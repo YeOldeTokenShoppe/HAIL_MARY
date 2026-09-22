@@ -12,7 +12,7 @@ from pathlib import Path
 
 SPEAKERS = {
     "john": "IcFWazAaBzXNwLWpySgF",
-    "gr80": "Re5c3vCmpnygdZuSX2Wc",
+    "gr80": "bZ2WrEjNzHgFHfLLaFKQ",
 }
 
 ACTOR_NAMES = {

@@ -27,6 +27,7 @@ import VideoScreens from "@/components/VideoScreens";
 import CouncilChatScreens from "@/components/CouncilChatScreens";
 import TalkShowScene, { preloadTalkShow, HouseAmbient } from "@/components/trade/TalkShowScene";
 import LTTvLightPanel from "@/components/trade/LTTvLightPanel";
+import LTTvShotPanel from "@/components/trade/LTTvShotPanel";
 import LTTvBroadcastPanel from "@/components/trade/LTTvBroadcastPanel";
 import { SHOWS as LT_TV_SHOWS, findEpisode as findLtTvEpisode } from "@/content/lt-tv";
 import TickerDisplay3 from "@/components/TickerDisplay3";
@@ -750,6 +751,10 @@ function CameraControlsRig({
   // When set ({ position:[x,y,z], target:[x,y,z] }), snap to this fixed pose
   // and hold it (used by TALK SHOW — a composed static shot, no orbit).
   focusPose = null,
+  // Shared with TalkShowScene so its shot director can drive this camera by
+  // setLookAt during playback — see directViewerCamera. Populated once the
+  // controls instance exists.
+  controlsRef = null,
 }) {
   const ref = useRef(null);
   const startDistanceRef = useRef(null);
@@ -773,6 +778,7 @@ function CameraControlsRig({
     const c = ref.current;
     if (!c) return;
     initedRef.current = true;
+    if (controlsRef) controlsRef.current = c;
     c.minDistance = 0.1;
     // Bumped so the intro can start beyond the normal orbit envelope
     // without setLookAt clamping the radius.
@@ -815,7 +821,10 @@ function CameraControlsRig({
       introCompleteRef.current = true;
     };
     c.addEventListener('controlstart', onControlStart);
-    return () => c.removeEventListener('controlstart', onControlStart);
+    return () => {
+      c.removeEventListener('controlstart', onControlStart);
+      if (controlsRef && controlsRef.current === c) controlsRef.current = null;
+    };
   }, []);
 
   // Composed static pose (TALK SHOW). When focusPose flips non-null, smoothly
@@ -1424,6 +1433,9 @@ export default function CyborgTemple() {
   // Imperative handle to the mobile TradeLaptop so the START FAB can dive
   // straight into the CRT terminal (same as tapping the laptop screen).
   const laptopRef = useRef(null);
+  // Shared with the LT TV set so its shot director can drive the viewer camera
+  // through camera-controls during playback (see directViewerCamera).
+  const cameraControlsRef = useRef(null);
   // Lobby "MORE" popover (right bottom-nav slot) — mirrors the shrine's MORE
   // menu so the bottom nav reads as one shared system across pages.
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -3569,6 +3581,12 @@ export default function CyborgTemple() {
           re-reads every frame, and copies the numbers back out. */}
       <LTTvLightPanel />
 
+      {/* LT TV framing board — shows only when ?tune=shots is in the URL.
+          Writes straight into SHOT_FRAMING, which the shot director reads every
+          frame, and copies the numbers back out. Left-hand side, so it and the
+          lighting board (right) can be open together. */}
+      <LTTvShotPanel />
+
       {/* Dev SitePal crop tuning panel — shows only when ?tune=sitepal */}
       {/* <SitePalCropPanel /> */}
 
@@ -4202,6 +4220,8 @@ export default function CyborgTemple() {
                 onPlaybackReady={handleTalkShowPlaybackReady}
                 onPlaybackStateChange={handleTalkShowPlaybackState}
                 onChapterChange={handleTalkShowChapter}
+                directCamera={ltTvView === 'set' && !isMobileView}
+                cameraControlsRef={cameraControlsRef}
               />
             )}
 
@@ -4364,6 +4384,7 @@ export default function CyborgTemple() {
               introStartDistance={isMobileView ? 13 : 11}
               introDuration={12}
               focusPose={talkShowPose}
+              controlsRef={cameraControlsRef}
             />
           </Suspense>
           {/* <Stats className="stats-monitor" /> */}

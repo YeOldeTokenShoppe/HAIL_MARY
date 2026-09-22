@@ -20,7 +20,7 @@
     },
     "Monk": {
       "displayName": "Saint GR80",
-      "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+      "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
       "processorKey": "gr80",
       "sitepalAudio": "lttv_mm_ep01_gr80"
     }
@@ -43,7 +43,7 @@
         {
           "n": 1,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[dryly] You have never once wanted a straight answer.",
           "directAddress": true,
           "cues": [
@@ -66,7 +66,7 @@
         {
           "n": 3,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[patiently] The question assumes those are different things.",
           "directAddress": true,
           "cues": []
@@ -82,7 +82,7 @@
         {
           "n": 5,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "Then watch what a man does the morning after his number goes up, and tell me which one he acted on.",
           "directAddress": true,
           "cues": [
@@ -113,7 +113,7 @@
         {
           "n": 7,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "Go on.",
           "directAddress": true,
           "cues": []
@@ -129,7 +129,7 @@
         {
           "n": 9,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[calmly] And the careful version is sometimes right.",
           "directAddress": true,
           "cues": []
@@ -152,7 +152,7 @@
         {
           "n": 11,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "You are saying the belief is load-bearing.",
           "directAddress": true,
           "cues": []
@@ -168,7 +168,7 @@
         {
           "n": 13,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "Then I would like to ask who else is standing under it.",
           "directAddress": true,
           "cues": []
@@ -199,7 +199,7 @@
         {
           "n": 15,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[patiently] I am not going to tell you the confidence is fake. It is not. I am going to tell you what it buys.",
           "directAddress": true,
           "cues": []
@@ -215,7 +215,7 @@
         {
           "n": 17,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "Permission. A rising chart does not hand anybody money. It hands them permission to spend money that has not arrived yet.",
           "directAddress": true,
           "cues": []
@@ -231,7 +231,7 @@
         {
           "n": 19,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[with quiet disapproval] The difficulty is not the credit. It is that the permission is issued to everyone on the same morning, by the same chart, for the same reason.",
           "directAddress": true,
           "cues": []
@@ -247,7 +247,7 @@
         {
           "n": 21,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "And it is withdrawn from everyone on the same morning, for the same reason. A man alone can be wrong about his own courage. A market cannot be wrong quietly.",
           "directAddress": true,
           "cues": [
@@ -278,7 +278,7 @@
         {
           "n": 23,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "And his number is the highest it has ever been.",
           "directAddress": true,
           "cues": []
@@ -294,7 +294,7 @@
         {
           "n": 25,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[calmly] And mine says stop him, because the number that made him brave was not a promise.",
           "directAddress": true,
           "cues": []
@@ -317,7 +317,7 @@
         {
           "n": 27,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "The clinic does not open.",
           "directAddress": true,
           "cues": []
@@ -333,7 +333,7 @@
         {
           "n": 29,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[patiently] No. They are not.",
           "directAddress": true,
           "cues": []
@@ -349,7 +349,7 @@
         {
           "n": 31,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "That is the honest shape of it, yes.",
           "directAddress": true,
           "cues": []
@@ -373,7 +373,7 @@
         {
           "n": 33,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[calmly] I will give you something and it will cost me. Refusing the risk is also a decision made on somebody else's behalf.",
           "directAddress": true,
           "cues": []
@@ -396,7 +396,7 @@
         {
           "n": 35,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "I spend a great deal of time counting what your optimism costs. I have been counting it from a chair, and the man in the chair is never the one who pays either way.",
           "directAddress": true,
           "cues": []
@@ -412,7 +412,7 @@
         {
           "n": 37,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "You will recover.",
           "directAddress": true,
           "cues": []
@@ -436,7 +436,7 @@
         {
           "n": 39,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "[patiently] Choosing, like everyone. But knowing what he is choosing with.",
           "directAddress": true,
           "cues": []
@@ -459,7 +459,7 @@
         {
           "n": 41,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "A rising number does not make you wealthy. It makes you willing. Those are different virtues, and only one of them is yours to keep.",
           "directAddress": false,
           "cues": []
@@ -475,7 +475,7 @@
         {
           "n": 43,
           "actor": "Monk",
-          "voiceId": "Re5c3vCmpnygdZuSX2Wc",
+          "voiceId": "bZ2WrEjNzHgFHfLLaFKQ",
           "text": "The ledger is closed. None of this was advice.",
           "directAddress": false,
           "cues": []
