@@ -976,6 +976,25 @@ actions get left behind, the character loads, stands in its bind pose and never
 moves, with no error. Worth checking the export actually contains them before
 you call it done.
 
+**Check the export before you upload anything:**
+
+```bash
+npm run lt:models
+```
+
+It reads each GLB and says whether it carries what the code needs — the
+character's empty, an armature under it, every clip, the two face meshes — and
+whether the seat is where it was authored or got flattened to the origin. It
+also lists any clip the file carries that the code does not use yet, with its
+length, which is how a new animation gets picked up. The point is that none of
+this is checked at load time: a renamed node or an action left behind in the set
+gives you a character who loads, stands in its bind pose and never moves, with
+nothing in the console. The names below are what it checks.
+
+`src/lib/ltTv/modelContract.mjs` is the contract it checks against, and it is
+the file to edit when a character gains a clip or a seat moves. A test pins it
+against the scene, so the two cannot disagree without the suite failing.
+
 **Keep these names.** The face projection finds what to hide and what to paint
 by name:
 

@@ -14,6 +14,7 @@
     "lt": "node scripts/lt-tv-status.mjs",
     "lt:studio": "bash scripts/lt-tv-studio.sh",
     "lt:check": "node scripts/lt-tv-check.mjs",
+    "lt:models": "node scripts/lt-tv-models.mjs",
     "lt:edit": "node scripts/lt-tv-edit.mjs",
     "lt:rewrite": "node scripts/lt-tv-rewrite.mjs",
     "lt:room": "node scripts/lt-tv-room.mjs",
