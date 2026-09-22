@@ -216,16 +216,13 @@ export const CHARACTERS = {
      *
      *     projFace: "Face2", regularFaces: ["Face1", "Face3", "Eye_L", "Eye_R"]
      *
-     * Michelle said Face3 for the talk show. Following the vendor instead, for
-     * two reasons. Face3 is the SAME MESH in both files (132 vertices in each,
-     * where Face1 and Face2 differ slightly between exports), so whatever is
-     * true of it there is true of it here. And whichever layer the projection
-     * lands on, the other two have to be hidden or she wears two faces at
-     * once — "Face1 is the one before the projection arrives" is right and is
-     * not the whole list.
+     * Michelle first said Face3 for the talk show, then confirmed Face2 on
+     * 2026-09-22 once the vendor config was pointed out. SETTLED, not a guess.
      *
-     * If she did mean Face3 for this show, swap face2 and the first hide
-     * entry; it is one line either way.
+     * Worth keeping for the next character: whichever layer the projection
+     * lands on, the other two have to be HIDDEN or she wears two faces at
+     * once. "Face1 is the one on screen before the projection arrives" is
+     * true and is not the whole list.
      */
     faces: { face1: "Face1", face2: "Face2", hide: ["Face3", "Eye_L", "Eye_R"] },
     /*
