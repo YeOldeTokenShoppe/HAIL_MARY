@@ -16,7 +16,6 @@
 // and cannot be played, which is how a slate entry announces a show that has
 // not been recorded yet instead of quietly replaying another episode.
 import showsFile from "./shows.json";
-import news01 from "./episodes/news-01.json";
 import morality01 from "./episodes/morality-01.json";
 import morality02 from "./episodes/morality-02.json";
 import morality03 from "./episodes/morality-03.json";
@@ -26,7 +25,6 @@ import morality05 from "./episodes/morality-05.json";
 import { formatRuntime, episodeIsPlayable } from "@/lib/ltTv/episodeTimeline.mjs";
 
 const EPISODE_RECORDS = [
-  news01,
   morality01,
   morality02,
   morality03,
