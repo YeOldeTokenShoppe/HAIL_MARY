@@ -1,0 +1,474 @@
+{
+  "id": "news-01",
+  "showId": "news",
+  "number": "01",
+  "title": "Warsh Means It",
+  "summary": "The Fed raises rates for the first time in three years, crude hands back its war premium inside a week, and the most hyped Pokémon set ever lands the same afternoon as the hike.",
+  "airDate": "2026-09-22",
+  "week": "2026-W39",
+  "leadIn": 2.5,
+  "speakers": [
+    "Connor",
+    "Holly",
+    "Connor",
+    "Holly",
+    "Holly",
+    "Connor",
+    "Holly",
+    "Connor",
+    "Holly",
+    "Connor",
+    "Holly",
+    "Connor",
+    "Holly",
+    "Holly",
+    "Connor",
+    "Holly",
+    "Connor",
+    "Holly",
+    "Connor",
+    "Holly",
+    "Connor",
+    "Connor",
+    "Holly",
+    "Holly",
+    "Connor",
+    "Holly",
+    "Connor",
+    "Holly",
+    "Connor",
+    "Holly",
+    "Connor",
+    "Holly",
+    "Holly",
+    "Connor",
+    "Holly",
+    "Connor",
+    "Holly",
+    "Connor",
+    "Holly",
+    "Connor",
+    "Holly",
+    "Connor",
+    "Holly"
+  ],
+  "audienceLines": [
+    0,
+    4,
+    5,
+    6,
+    8,
+    12,
+    13,
+    14,
+    15,
+    17,
+    21,
+    22,
+    23,
+    24,
+    25,
+    29,
+    32,
+    33,
+    34,
+    36,
+    39,
+    40,
+    42
+  ],
+  "cues": [
+    {
+      "line": 0,
+      "offset": 4,
+      "actor": "Holly",
+      "reaction": "headshake",
+      "duration": 3,
+      "note": "Live from the Liminal Terminal, this is the LT Weekly News…"
+    },
+    {
+      "line": 3,
+      "offset": 2.5,
+      "actor": "Connor",
+      "reaction": "shrug",
+      "duration": 4.33,
+      "note": "You are buying confidence. I am projected, not printed, so…"
+    },
+    {
+      "line": 4,
+      "offset": 3,
+      "actor": "Connor",
+      "reaction": "headnodSubtle",
+      "duration": 4.33,
+      "note": "Story one. On September sixteenth the Federal Open Market C…"
+    },
+    {
+      "line": 9,
+      "offset": 3,
+      "actor": "Holly",
+      "reaction": "headshake",
+      "duration": 3,
+      "note": "That's respect for the supply problem, not for the press co…"
+    },
+    {
+      "line": 12,
+      "offset": 4,
+      "actor": "Connor",
+      "reaction": "shrug",
+      "duration": 4.33,
+      "note": "Then take the number as it reads. A quarter point does not…"
+    },
+    {
+      "line": 15,
+      "offset": 5,
+      "actor": "Connor",
+      "reaction": "headnodSubtle",
+      "duration": 4.33,
+      "note": "By Tuesday it traded down to a low of eighty-nine dollars a…"
+    },
+    {
+      "line": 18,
+      "offset": 4,
+      "actor": "Holly",
+      "reaction": "headnod",
+      "duration": 3,
+      "note": "Fine. That's a fair read. It is also the only honest price…"
+    },
+    {
+      "line": 21,
+      "offset": 3,
+      "actor": "Holly",
+      "reaction": "headshake",
+      "duration": 3,
+      "note": "RL80 staking is live. Stake, earn through the RewardsSplitt…"
+    },
+    {
+      "line": 23,
+      "offset": 2,
+      "actor": "Connor",
+      "reaction": "headnodSubtle",
+      "duration": 4.33,
+      "note": "Story three. Pokemon Trading Card Game: 30th Celebration we…"
+    },
+    {
+      "line": 29,
+      "offset": 4,
+      "actor": "Connor",
+      "reaction": "mockCrying",
+      "duration": 4.83,
+      "note": "Here is the part underneath it. On the day money got more e…"
+    },
+    {
+      "line": 32,
+      "offset": 3.5,
+      "actor": "Connor",
+      "reaction": "lookAround",
+      "duration": 7.6,
+      "note": "The board. The ten-year Treasury yield at five point oh one…"
+    },
+    {
+      "line": 34,
+      "offset": 2.5,
+      "actor": "Connor",
+      "reaction": "headnodSubtle",
+      "duration": 4.33,
+      "note": "The Nasdaq rose three point five seven percent to twenty-se…"
+    },
+    {
+      "line": 40,
+      "offset": 4.5,
+      "actor": "Connor",
+      "reaction": "headnod",
+      "duration": 4.33,
+      "note": "The ledger closes there. Nothing you heard was advice, none…"
+    }
+  ],
+  "audio": {
+    "Connor": "lttv_news_ep01_connor",
+    "Holly": "lttv_news_ep01_holly"
+  },
+  "lineStarts": [
+    0,
+    19.87,
+    26.817,
+    31.727,
+    37.867,
+    55.977,
+    70.727,
+    75.557,
+    88.379,
+    97.529,
+    109.218,
+    113.568,
+    118.689,
+    128.3,
+    138.73,
+    147,
+    161.35,
+    179.897,
+    189.927,
+    201.688,
+    204.729,
+    210.389,
+    222.808,
+    233.707,
+    243.257,
+    258.887,
+    262.277,
+    279.493,
+    284.003,
+    295.153,
+    303.343,
+    307.763,
+    313.95,
+    327.9,
+    335.53,
+    344.59,
+    348.06,
+    366.01,
+    372.12,
+    378.538,
+    390.285,
+    398.955,
+    400.915
+  ],
+  "dialogueEnd": 408.075,
+  "sections": [
+    {
+      "startsAt": 0,
+      "audio": {
+        "Connor": "lttv_news_ep01_connor",
+        "Holly": "lttv_news_ep01_holly"
+      }
+    },
+    {
+      "startsAt": 75.182,
+      "audio": {
+        "Connor": "lttv_news_ep01_connor_s2",
+        "Holly": "lttv_news_ep01_holly_s2"
+      }
+    },
+    {
+      "startsAt": 146.625,
+      "audio": {
+        "Connor": "lttv_news_ep01_connor_s3",
+        "Holly": "lttv_news_ep01_holly_s3"
+      }
+    },
+    {
+      "startsAt": 222.433,
+      "audio": {
+        "Connor": "lttv_news_ep01_connor_s4",
+        "Holly": "lttv_news_ep01_holly_s4"
+      }
+    },
+    {
+      "startsAt": 307.388,
+      "audio": {
+        "Connor": "lttv_news_ep01_connor_s5",
+        "Holly": "lttv_news_ep01_holly_s5"
+      }
+    },
+    {
+      "startsAt": 389.91,
+      "audio": {
+        "Connor": "lttv_news_ep01_connor_s6",
+        "Holly": "lttv_news_ep01_holly_s6"
+      }
+    }
+  ],
+  "graphics": {
+    "mode": "news",
+    "headline": "FED HIKES A QUARTER POINT, FIRST IN THREE YEARS",
+    "ticker": [
+      "FOMC VOTES 12-0 TO LIFT TARGET RANGE TO 3.75%-4%",
+      "WTI SLIDES TOWARD $89 FROM $107 AS IRAN SIGNALS HORMUZ REOPENING",
+      "POKEMON 30TH CELEBRATION LANDS THE SAME DAY AS THE HIKE",
+      "Kalshi asks CFTC to allow margin trading on prediction markets",
+      "Binance probed by US prosecutors over Iran-linked sanctions violations",
+      "Spot bitcoin ETFs take nearly $1 billion in biggest daily inflow in 11 months",
+      "Nvidia stock valuation hits decade low despite profit boom",
+      "Binance takes $100 million Circle stake in five-year USDC deal",
+      "Viking Therapeutics jumps on obesity drug data as Lilly and Novo fall",
+      "NOTHING ON THIS TICKER IS A RECOMMENDATION"
+    ],
+    "chapters": [
+      {
+        "line": 0,
+        "segment": "cold-open",
+        "kicker": "Tonight",
+        "headline": "FED HIKES A QUARTER POINT, FIRST IN THREE YEARS",
+        "screen": {
+          "kicker": "Tonight",
+          "headline": "FED HIKES A QUARTER POINT, FIRST IN THREE YEARS",
+          "lines": [
+            "The Fed hikes into an oil shock",
+            "Crude gives the war premium back",
+            "Cardboard's anniversary beats the Fed to the front page"
+          ],
+          "note": ""
+        }
+      },
+      {
+        "line": 4,
+        "segment": "story-1",
+        "kicker": "Macro",
+        "headline": "The Fed hikes into an oil shock",
+        "screen": {
+          "kicker": "Macro",
+          "headline": "The Fed hikes into an oil shock",
+          "lines": [
+            "The FOMC voted 12-0 on September 16 to raise the target range for the federal funds rate by a quarter point to 3.75%-4%, its first increase in more than three years, with updated projections pointing to the possibility of another hike this year."
+          ],
+          "note": ""
+        }
+      },
+      {
+        "line": 13,
+        "segment": "story-2",
+        "kicker": "Markets",
+        "headline": "Crude gives the war premium back",
+        "screen": {
+          "kicker": "Markets",
+          "headline": "Crude gives the war premium back",
+          "lines": [
+            "WTI closed the week to September 15 up 13.6% at $107.02 a barrel, then fell to a $89.16 low on September 22 as reports circulated that Iran could reopen the Strait of Hormuz within seven days, recovering to $90.20 after Iranian sources denied it."
+          ],
+          "note": ""
+        }
+      },
+      {
+        "line": 21,
+        "segment": "the-spot",
+        "kicker": "The break",
+        "headline": "FED HIKES A QUARTER POINT, FIRST IN THREE YEARS",
+        "screen": {
+          "kicker": "The break",
+          "headline": "FED HIKES A QUARTER POINT, FIRST IN THREE YEARS",
+          "lines": [],
+          "note": ""
+        }
+      },
+      {
+        "line": 23,
+        "segment": "story-3",
+        "kicker": "Collectibles",
+        "headline": "Cardboard's anniversary beats the Fed to the front page",
+        "screen": {
+          "kicker": "Collectibles",
+          "headline": "Cardboard's anniversary beats the Fed to the front page",
+          "lines": [
+            "Pokémon TCG: 30th Celebration went on global sale on September 16, 2026 — the same afternoon as the rate decision — billed by TCGplayer as arguably the most hyped Pokémon set ever, with single boosters carrying a $16.95 market price before release and the headline products not due for another seven weeks."
+          ],
+          "note": ""
+        }
+      },
+      {
+        "line": 32,
+        "segment": "the-board",
+        "kicker": "The board",
+        "headline": "The week in numbers",
+        "screen": {
+          "kicker": "The board",
+          "headline": "The week in numbers",
+          "lines": [
+            "Ten-year Treasury yield up 18 basis points on the week to 5.01%, its highest since 2007",
+            "Two-year up to 4.76% from 4.43%, leaving the two-to-ten spread at 25 basis points",
+            "WTI $107.02 on September 15, down near $89 by Tuesday",
+            "Nasdaq up 3.57% to 27,122 while the Dow slipped 0.71% to 52,049",
+            "Crypto Fear and Greed opened at 69, sagged to 50 midweek, closed at 78 — Extreme Greed"
+          ],
+          "note": "Polymarket has Together at 19.5 cents to win 13% or more of the vote in the 2026 Knesset elections, on under a hundred dollars of volume — thin enough to treat as a curiosity, not a forecast."
+        }
+      },
+      {
+        "line": 39,
+        "segment": "sign-off",
+        "kicker": "That was the week",
+        "headline": "FED HIKES A QUARTER POINT, FIRST IN THREE YEARS",
+        "screen": {
+          "kicker": "That was the week",
+          "headline": "FED HIKES A QUARTER POINT, FIRST IN THREE YEARS",
+          "lines": [
+            "The Fed hikes into an oil shock",
+            "Crude gives the war premium back",
+            "Cardboard's anniversary beats the Fed to the front page"
+          ],
+          "note": ""
+        }
+      }
+    ]
+  },
+  "sources": [
+    {
+      "title": "Federal Reserve issues FOMC statement",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+      "outlet": "federalreserve.gov"
+    },
+    {
+      "title": "Fed rate decision September 2026: Rates rise to 3.75%-4%",
+      "url": "https://www.cnbc.com/2026/09/16/fed-rate-decision-september-2026.html",
+      "outlet": "CNBC"
+    },
+    {
+      "title": "Fed meeting recap: Warsh says inflation is still too high as Fed hikes for the first time since 2023",
+      "url": "https://www.cnbc.com/2026/09/16/fed-meeting-today-live-updates.html",
+      "outlet": "CNBC"
+    },
+    {
+      "title": "Live updates: Oil falls as Iran signals possible Hormuz reopening, bitcoin holds near $86,000",
+      "url": "https://www.coindesk.com/markets/2026/09/22/live-updates-oil-falls-as-iran-signals-possible-hormuz-reopening-bitcoin-holds-near-usd86-000",
+      "outlet": "CoinDesk"
+    },
+    {
+      "title": "Oil prices fall as Saudi Arabia reportedly offers more crude via Hormuz after pipeline attack",
+      "url": "https://www.cnbc.com/2026/09/17/oil-prices-today-wti-brent-hormuz-iran-war.html",
+      "outlet": "CNBC"
+    },
+    {
+      "title": "U.S. crude oil tops $100 again – last seen in May – as market braces for prolonged Iran war",
+      "url": "https://www.cnbc.com/2026/09/10/iran-us-oil-hormuz-supply-trump-military-brent-wti.html",
+      "outlet": "CNBC"
+    },
+    {
+      "title": "The 10 Cards Everybody Wants from 30th Celebration",
+      "url": "https://www.tcgplayer.com/content/article/The-10-Cards-Everybody-Wants-from-30th-Celebration/cca44260-c894-44e4-8e27-118fbc86f72a/",
+      "outlet": "TCGplayer"
+    },
+    {
+      "title": "Buyer's Guide to Pokémon TCG: 30th Celebration",
+      "url": "https://www.tcgplayer.com/content/article/Buyer-s-Guide-to-Pok%C3%A9mon-TCG-30th-Celebration/0d9be702-6afe-467a-9aeb-d531592d9889/",
+      "outlet": "TCGplayer"
+    },
+    {
+      "title": "Everything We Know About Pokémon TCG: 30th Celebration",
+      "url": "https://www.tcgplayer.com/content/article/Everything-We-Know-About-Pok%C3%A9mon-TCG-30th-Celebration/b899e1ad-8f3e-4513-8f76-463ba83d22b3/",
+      "outlet": "TCGplayer"
+    },
+    {
+      "title": "Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity (DGS10)",
+      "url": "https://fred.stlouisfed.org/series/dgs10",
+      "outlet": "FRED, St. Louis Fed"
+    },
+    {
+      "title": "Treasury yields hitting 5% may not break markets now — but the clock is ticking",
+      "url": "https://www.cnbc.com/2026/09/16/10-year-treasury-yeilds-rise-impact-markets.html",
+      "outlet": "CNBC"
+    },
+    {
+      "title": "Live updates: Oil falls as Iran signals possible Hormuz reopening, bitcoin holds near $86,000",
+      "url": "https://www.coindesk.com/markets/2026/09/22/live-updates-oil-falls-as-iran-signals-possible-hormuz-reopening-bitcoin-holds-near-usd86-000",
+      "outlet": "CoinDesk"
+    },
+    {
+      "title": "Will Together win 13% or more of the vote in the 2026 Knesset elections?",
+      "url": "https://polymarket.com/event/will-together-win-13-percent-or-more-of-the-vote-in-the-2026-knesset-elections",
+      "outlet": "Polymarket"
+    }
+  ],
+  "producedFrom": {
+    "record": "content/lt-tv/episodes/news-01.json",
+    "pipeline": "scripts/lt-news-script.mjs",
+    "generatedAt": "2026-09-22T14:39:17.304Z"
+  }
+}

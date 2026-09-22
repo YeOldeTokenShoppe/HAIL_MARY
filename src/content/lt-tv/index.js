@@ -21,6 +21,7 @@ import morality02 from "./episodes/morality-02.json";
 import morality03 from "./episodes/morality-03.json";
 import morality04 from "./episodes/morality-04.json";
 import morality05 from "./episodes/morality-05.json";
+import news01 from "./episodes/news-01.json";
 
 import { formatRuntime, episodeIsPlayable } from "@/lib/ltTv/episodeTimeline.mjs";
 
@@ -30,6 +31,7 @@ const EPISODE_RECORDS = [
   morality03,
   morality04,
   morality05,
+  news01,
 ];
 
 // Runtime is DERIVED, not typed: it's the end of the dialogue the record
