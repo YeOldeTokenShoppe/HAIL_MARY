@@ -1916,17 +1916,36 @@ function TalkShowModel({
     };
   }, [renderer, viewerCamera]);
 
-  // Per-character projection state (face refs + lazily-built canvas/texture/mat).
+  /* Per-character projection state (face refs + lazily-built canvas/texture/mat).
+   *
+   * EVERY LOOKUP IS SCOPED TO THE CHARACTER'S OWN EMPTY, for the same reason
+   * findRig is: a character exported alone brings whatever names Blender gave
+   * them inside their own file, and nothing stops two characters using the
+   * same ones. GR80's static face is `Face1` and his projection target is
+   * `Face2` — perfectly ordinary names for a character to have, and the next
+   * character to arrive may well have them too. A scene-wide lookup would then
+   * return whichever of them the traversal reached first, so one character's
+   * SitePal feed would paint onto the other's face while their own stayed
+   * static. Scoped, the names only have to be unique within one character.
+   */
   const projRef = useRef({});
   useMemo(() => {
     const build = {};
     Object.entries(TALKSHOW_PROJECTION_CONFIG).forEach(([key, cfg]) => {
+      const empty = cloned.getObjectByName(EMPTY_FOR_ACTOR[key]);
+      if (!empty) {
+        // Their file did not load, or the registry and the contract disagree
+        // about who exists. Either way there is no face to paint, and saying
+        // so is better than silently finding somebody else's.
+        console.warn(
+          `[TalkShowScene] ${key}: no "${EMPTY_FOR_ACTOR[key]}" in the scene — no face projection`,
+        );
+      }
+      const within = (name) => (empty ? empty.getObjectByName(name) : null) || null;
       build[key] = {
-        face1: cloned.getObjectByName(cfg.face1) || null,
-        face2: cloned.getObjectByName(cfg.face2) || null,
-        hideExtra: (cfg.hideExtra || [])
-          .map((n) => cloned.getObjectByName(n))
-          .filter(Boolean),
+        face1: within(cfg.face1),
+        face2: within(cfg.face2),
+        hideExtra: (cfg.hideExtra || []).map(within).filter(Boolean),
         cropCanvas: null,
         cropCtx: null,
         texture: null,

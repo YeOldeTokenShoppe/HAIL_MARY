@@ -23,6 +23,7 @@ import {
   seatDrift,
   clipDuration,
   resolveSet,
+  collisions,
 } from "./lt-tv-models.mjs";
 import {
   SET_MODEL,
@@ -150,6 +151,34 @@ ok("each character's armature is nonetheless under their own empty",
 // Neither file may contain the other's empty, which is what makes scoping work.
 check("and the empties themselves do not collide",
   [CHARACTERS.Connor.empty, CHARACTERS.Monk.empty].filter((n) => connorNames.has(n) && monkNames.has(n)), []);
+
+// The checker has to SAY so, and has to distinguish the survivable collision
+// from the fatal one. A third character arriving with GR80's `Face1` is fine;
+// one arriving with the set's `Camera`, or with GR80's `Monk_Empty`, is not.
+console.log("\nThe checker tells the survivable collision from the fatal one:");
+const entries = Object.entries(CHARACTERS);
+const real = collisions(set, entries);
+check("today nobody shares a name with the set", real.withSet, []);
+check("and no two characters share an empty", real.sharedEmpties, []);
+ok("the shared bones are reported as expected rather than as a problem",
+  real.betweenCharacters.some((r) => r.bones > 10 && r.looked.length === 0));
+
+// Against a set that DOES collide — the character files are real, the set is
+// the pre-split one, which still contains both characters and therefore every
+// name they have.
+const preSplit = resolveSet([SET_MODEL.candidates[1]]).gltf;
+const clashing = collisions(preSplit, entries);
+ok("a character whose names are also in the set is caught", clashing.withSet.length === 2);
+ok("and the report names the nodes, not just the count",
+  clashing.withSet[0].names.includes(CHARACTERS[clashing.withSet[0].actor].empty));
+
+// Two entries pointed at the same file is the shared-empty case, and the one
+// that would leave the scoped lookups with nothing to scope by.
+const sameEmpty = collisions(set, [
+  ["A", CHARACTERS.Connor],
+  ["B", CHARACTERS.Connor],
+]);
+check("two characters on one empty are caught", sameEmpty.sharedEmpties, [["A", "B", CHARACTERS.Connor.empty]]);
 
 // ── The armature name genuinely does not matter ────────────────────────────
 //

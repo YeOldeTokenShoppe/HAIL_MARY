@@ -278,6 +278,162 @@ function checkSet() {
   }
 }
 
+/**
+ * NAME COLLISIONS BETWEEN FILES.
+ *
+ * Blender only disambiguates names that collide inside ONE file, so two
+ * characters exported on their own can both arrive carrying "Armature",
+ * "Face1" and the same 33 mixamorig bones. The scene attaches every character
+ * into the set, which means one namespace at runtime.
+ *
+ * Per-character lookups are scoped to that character's empty, so a collision
+ * BETWEEN CHARACTERS is survivable — that is what the scoping is for, and it
+ * is reported rather than failed. Two things are not survivable:
+ *
+ *  - a character sharing a name with the SET, because the set's own lookups
+ *    (props, the screen, the lamp heads) are scene-wide and would find the
+ *    character's node instead;
+ *  - two characters sharing an EMPTY name, because the empty is what every
+ *    scoped lookup starts from, so there would be nothing to scope by.
+ */
+export function collisions(setGltf, characters) {
+  const loaded = characters
+    .map(([actor, c]) => ({ actor, c, gltf: readGlb(resolve(c.file)) }))
+    .filter((x) => x.gltf);
+  const setNames = setGltf ? nodeNames(setGltf) : new Set();
+  const out = { withSet: [], betweenCharacters: [], sharedEmpties: [] };
+
+  for (const { actor, gltf } of loaded) {
+    const shared = [...nodeNames(gltf)].filter((n) => setNames.has(n));
+    if (shared.length) out.withSet.push({ actor, names: shared });
+  }
+  for (let i = 0; i < loaded.length; i++) {
+    for (let j = i + 1; j < loaded.length; j++) {
+      const a = loaded[i];
+      const b = loaded[j];
+      const bNames = nodeNames(b.gltf);
+      const shared = [...nodeNames(a.gltf)].filter((n) => bNames.has(n));
+      if (!shared.length) continue;
+      // The bones are expected to match and say nothing interesting.
+      const looked = shared.filter((n) => !n.startsWith("mixamorig:"));
+      out.betweenCharacters.push({ pair: [a.actor, b.actor], bones: shared.length - looked.length, looked });
+      if (a.c.empty === b.c.empty) out.sharedEmpties.push([a.actor, b.actor, a.c.empty]);
+    }
+  }
+  return out;
+}
+
+function checkCollisions() {
+  const setGltf = resolveSet().gltf;
+  const entries = Object.entries(CHARACTERS);
+  const c = collisions(setGltf, entries);
+  say(`\nNames across the files (they all share one namespace at runtime)`);
+
+  if (c.withSet.length === 0) {
+    say(`  ✓ no character shares a name with the set`);
+  } else {
+    for (const { actor, names } of c.withSet) {
+      problems.push(
+        `${actor} shares ${names.length} name(s) with the set: ${names.slice(0, 6).join(", ")}` +
+          `${names.length > 6 ? ", …" : ""}. The set resolves its own props scene-wide, so it would find the character's node.`,
+      );
+      say(`  ✗ ${actor} shares a name with the set: ${names.slice(0, 6).join(", ")}`);
+    }
+  }
+
+  for (const { pair, bones, looked } of c.betweenCharacters) {
+    if (looked.length) {
+      say(`  · ${pair.join(" and ")} share ${looked.join(", ")} — fine, per-character lookups are scoped to the empty`);
+    }
+    if (bones) say(`  · ${pair.join(" and ")} share ${bones} bone names — expected, same rig`);
+  }
+
+  for (const [a, b, empty] of c.sharedEmpties) {
+    problems.push(`${a} and ${b} both use the empty "${empty}" — there is nothing left to tell them apart`);
+    say(`  ✗ ${a} and ${b} both use "${empty}"`);
+  }
+}
+
+/**
+ * INSPECT A FILE THAT IS NOT IN THE CONTRACT YET.
+ *
+ *   npm run lt:models -- public/models/LTTV_Whoever.glb
+ *
+ * A new character's contract entry is a set of names that have to match the
+ * file exactly, and guessing one costs a silent bind-pose character. This
+ * prints what the file actually contains, in the shape the entry wants, so
+ * filling it in is copying rather than guessing.
+ */
+function inspect(file) {
+  const path = resolve(file.startsWith("public/") ? file : `public/models/${file.replace(/^\/?(models\/)?/, "")}`);
+  say(`Inspecting ${path.replace(`${process.cwd()}/`, "")}\n`);
+  const gltf = readGlb(path);
+  if (!gltf) {
+    say(`  Not there. Exported but not committed, or a different name.`);
+    // public/models holds hundreds of files from the rest of the site, so
+    // listing it whole buries the answer. Show the LT TV ones and anything
+    // whose name is close to what was asked for, which is what a typo or a
+    // rename looks like.
+    const want = path.split("/").pop().replace(/\.glb$/i, "").toLowerCase();
+    const all = fs.readdirSync(resolve("public/models")).filter((f) => f.endsWith(".glb"));
+    const near = all.filter(
+      (f) => /^LTTV_/i.test(f) || f.toLowerCase().includes(want.slice(0, 5)) || want.includes(f.replace(/\.glb$/i, "").toLowerCase()),
+    );
+    say(`  The LT TV files that ARE here${near.length ? ":" : ", of which there are none:"}`);
+    near.forEach((f) => say(`    ${f}`));
+    say(`  (${all.length} .glb files in public/models in total)`);
+    process.exit(1);
+  }
+
+  const nodes = gltf.nodes || [];
+  const roots = (gltf.scenes?.[0]?.nodes || []).map((i) => nodes[i]);
+  say(`Scene roots (a character should have exactly one, their empty):`);
+  roots.forEach((n) => {
+    const t = n.translation || [0, 0, 0];
+    const q = n.rotation || [0, 0, 0, 1];
+    const sc = n.scale || [1, 1, 1];
+    say(`  "${n.name}"`);
+    say(`      position: [${t.map((v) => +v.toFixed(5)).join(", ")}]`);
+    say(`      quaternion: [${q.map((v) => +v.toFixed(5)).join(", ")}]`);
+    say(`      scale: ${+sc[0].toFixed(5)}`);
+  });
+  if (roots.length !== 1) {
+    say(`  ! ${roots.length} roots. The scene attaches the whole file, so extra`);
+    say(`    roots come along too — usually a prop that wants its own file.`);
+  }
+
+  const rig = roots[0] ? hasRig(gltf, roots[0].name) : { found: false };
+  say(`\nArmature: ${rig.found ? `"${rig.name}"` : "NONE FOUND — nothing to animate"}`);
+  if (rig.found && rig.name.includes(".")) {
+    say(`  (GLTFLoader will call it "${rig.name.replace(/\./g, "")}" at load — use that in the contract)`);
+  }
+
+  const clips = clipNames(gltf);
+  say(`\nAnimations (${clips.length}):`);
+  clips.forEach((n) => {
+    const d = clipDuration(gltf, n);
+    say(`  ${n}${d ? ` — ${d.toFixed(2)}s` : ""}`);
+  });
+
+  const faces = [...nodeNames(gltf)].filter((n) => /face|brow|eye|hair/i.test(n));
+  say(`\nMeshes that look like faces (which is face1/face2/hide is yours to say):`);
+  faces.forEach((n) => say(`  ${n}`));
+
+  const setGltf = resolveSet().gltf;
+  const setNames = setGltf ? nodeNames(setGltf) : new Set();
+  const clash = [...nodeNames(gltf)].filter((n) => setNames.has(n));
+  say(`\nAgainst the set: ${clash.length ? `✗ shares ${clash.join(", ")}` : "✓ no shared names"}`);
+  for (const [actor, c] of Object.entries(CHARACTERS)) {
+    if (resolve(c.file) === path) continue; // inspecting a registered file
+    const other = readGlb(resolve(c.file));
+    if (!other) continue;
+    const otherNames = nodeNames(other);
+    const shared = [...nodeNames(gltf)].filter((n) => otherNames.has(n) && !n.startsWith("mixamorig:"));
+    say(`Against ${actor}: ${shared.length ? `shares ${shared.join(", ")} — fine, lookups are scoped` : "no shared names"}`);
+  }
+  say("");
+}
+
 // Imported by the test for its helpers; only reports when run as a command.
 const invokedDirectly = process.argv[1] && process.argv[1].endsWith("lt-tv-models.mjs");
 if (!invokedDirectly) {
@@ -287,9 +443,13 @@ if (!invokedDirectly) {
 }
 
 function run() {
+const target = process.argv[2];
+if (target) return inspect(target);
+
 say("LT TV models — checking each export against what the code needs");
 checkSet();
 for (const [actor, character] of Object.entries(CHARACTERS)) checkCharacter(actor, character);
+checkCollisions();
 
 if (warnings.length) {
   say(`\nWorth a look:`);
