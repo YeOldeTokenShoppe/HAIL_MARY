@@ -18,7 +18,8 @@
 import {
   CAST,
   ACTORS,
-  REACTIONS,
+  BEATS,
+  FACE_NAMES,
   SHOW_FORMATS,
   showFormat,
   packBlocks,
@@ -193,7 +194,8 @@ function assemble({
 
       const cues = [];
       for (const cue of line.cues || []) {
-        const table = REACTIONS[cue.actor];
+        // Body clips and face beats alike — see BEATS in lt-tv-format.mjs.
+        const table = BEATS[cue.actor];
         if (!table) {
           warnings.push(`Line ${n}: cue names unknown actor "${cue.actor}" — dropped.`);
           continue;
@@ -463,7 +465,12 @@ export function renderScript(episode) {
     "# camera pulls back to the two-shot. Bracketed words like [dryly] are",
     "# delivery directions ElevenLabs performs, and they are part of the line.",
     "# An indented (Monk headshake @ +0.4s) is an animation beat on the line",
-    "# above it. Lines starting with # are ignored.",
+    "# above it. A beat can also be a face, which SitePal performs on that",
+    "# character: (Connor smile @ +0.5s). The faces are",
+    `#     ${FACE_NAMES.join(", ")}`,
+    "# Delete a beat's line to drop it. Beats change nothing you hear, so on a",
+    "# recorded episode \"Apply my edits\" keeps the recording when only beats",
+    "# changed. Lines starting with # are ignored.",
     "#",
     "# Three marks change the recording without changing a word. Put one on",
     "# its own line, just above the line it acts on:",

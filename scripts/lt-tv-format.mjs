@@ -10,6 +10,7 @@ import {
   CHARACTERS as MODEL_CHARACTERS,
   reactionDurations,
 } from "../src/lib/ltTv/modelContract.mjs";
+import { FACES, FACE_NAMES, isFaceBeat } from "../src/lib/ltTv/faces.mjs";
 
 // ── The cast ──────────────────────────────────────────────────────────────
 //
@@ -131,6 +132,35 @@ export const ACTORS = Object.keys(CAST);
 // from this rather than from prose about what a character can do.
 export const REACTIONS = Object.fromEntries(
   Object.entries(MODEL_CHARACTERS).map(([actor, c]) => [actor, reactionDurations(c)]),
+);
+
+// ── Face beats ────────────────────────────────────────────────────────────
+//
+// SitePal expressions, cued exactly like a reaction — see
+// src/lib/ltTv/faces.mjs. Every character on the set is a SitePal face, so
+// every one of them has all of these. REACTIONS stays the body clips only,
+// because that is what the writers are offered per character; BEATS is every
+// name a cue may carry, with how long it lasts, and is what a cue is checked
+// against.
+export { FACES, FACE_NAMES, isFaceBeat };
+
+for (const [actor, clips] of Object.entries(REACTIONS)) {
+  const clash = FACE_NAMES.filter((f) => f in clips);
+  // One cue name meaning two things would fire whichever the set checks first.
+  if (clash.length) throw new Error(`${actor} has a body clip named like a face beat: ${clash.join(", ")}`);
+}
+
+// What BOTH writers are told about faces. One string, because the two
+// writers' prompts are otherwise separate files and a rule written twice is
+// a rule that drifts — and the room reads each writer's bible, so it gets
+// this too.
+export const FACE_BEAT_RULES = `FACE BEATS: the same "cues" array also takes facial expressions, which SitePal performs on that character's own face: ${FACE_NAMES.join(", ")}. A face beat is written exactly like a body beat — { "actor", "reaction": "smile", "offset" } — and every character has every face. Use one where the face says something the words do not: the speaker's smile on a line they are enjoying, the listener's disgusted look at a bad trade, thinking just before a considered answer, surprise at a number. There are two smiles: "smile" is closed-mouth and quiet, "grin" is open-mouth and delighted. Aim for roughly one face beat every four or five lines across the episode, no more than one per line, and never the same face on the same character twice running. A face holds about three seconds and relaxes by itself, and it shows whether or not that character is talking — so decide for each face whether it lands DURING the words or AFTER them. During: put it on the character's own line, early (offset 0.3 to 1), for a smile through a line they are enjoying. After: put it on the NEXT line, the one the other character speaks, at offset 0.2 or so, so it reads as a reaction to what was just said — the disgusted look lands as the other host starts talking, not over the punchline. Faces follow character: Connor's are knowing — a smile that is a smirk, a grin at someone else's bad trade, surprise that is mock innocence — and never sadness or fear in earnest. These are drafts: the producer reads the script through and deletes any that land wrong, so place each one where you mean it rather than to fill a quota.`;
+
+export const BEATS = Object.fromEntries(
+  Object.entries(REACTIONS).map(([actor, clips]) => [
+    actor,
+    { ...clips, ...Object.fromEntries(FACE_NAMES.map((f) => [f, FACES[f].duration])) },
+  ]),
 );
 
 // ── Where a story may be verified from ────────────────────────────────────

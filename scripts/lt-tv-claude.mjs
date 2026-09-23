@@ -24,6 +24,10 @@ export async function claude({
   // how a proposal rides along with them, so the room asks for the text back
   // instead of an exception. See `prose` on the result.
   lenient = false,
+  // How hard the model thinks before it answers (output_config.effort). Left
+  // unset, the model's own default — which is what every generator uses. The
+  // live desk lowers it, because a viewer is waiting on the answer.
+  effort = null,
 }) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("ANTHROPIC_API_KEY is not set (or use --draft to skip the model).");
@@ -53,6 +57,7 @@ export async function claude({
         system,
         messages,
         ...(tools ? { tools } : {}),
+        ...(effort ? { output_config: { effort } } : {}),
       }),
     });
 

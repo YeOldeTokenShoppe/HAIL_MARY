@@ -107,6 +107,52 @@ under "PAUSE, RESUME AND SKIPPING", the arithmetic is in
 
 ---
 
+## The live show — the Q&A desk
+
+The characters take viewers' questions live: the show's reader reads the
+question out, and the two characters answer it in character, spoken on the set
+with lip-sync while the camera cuts to whoever is talking. Nothing is recorded
+or uploaded.
+
+**To run it:** open `/trade?live=desk`, go into the news set or the Markets &
+Morality set, and use the LIVE DESK panel on the right.
+
+1. **Go live.** Lights up, a LIVE bug top left, the camera on the two-shot.
+2. **Add a question** — the viewer's name and their words, then Enter. It is
+   written straight away, so it is usually ready by the time you get to it,
+   and you can read the answer before it airs. **Rewrite** asks again.
+3. **Air it.** The question shows as a lower third while it is answered.
+   **Stop** cuts it off.
+
+On the deployed site the desk asks once for the admin password (the same one
+as the lineup page). Locally it does not.
+
+| Set | Reads the question | Answers |
+| --- | --- | --- |
+| News | Holly | Holly and Connor |
+| Markets & Morality | Connor | Connor and GR80 |
+
+**Why one browser.** The voices are SitePal's live speech (`sayText`, engine
+14, the characters' own ElevenLabs voice ids), which is generated each time it
+plays. Run in every viewer's page it would be generated, and paid for, once per
+viewer. So the show is performed in the producer's browser and broadcast from
+there.
+
+**The rules for a live answer** are the shows' own character briefs plus a live
+section in `scripts/lt-tv-live.mjs`: three to five lines, no advice, no figures
+or news stated as fact (there is no rundown live), and a question that should
+not go on air is declined in two lines rather than repeated. Try it from a
+terminal without the set: `node scripts/lt-tv-live.mjs --show news --name Dana
+"Is the Fed bluffing?"`. `LT_TV_LIVE_EFFORT=low` answers faster.
+
+Where: `src/components/trade/LTTvLiveDesk.jsx` (the panel),
+`src/app/api/lt-tv/live/route.js`, `src/lib/ltTv/liveDesk.mjs` (who sits where,
+what survives from the writer), `TALKSHOW_LIVE` in `TalkShowScene.jsx` (how the
+camera and the listener's head follow a live speaker). Tests:
+`node scripts/lt-tv-live.test.mjs`.
+
+---
+
 ## Ratings and comments
 
 Every episode carries a five-star rating and a comment thread, the way a video

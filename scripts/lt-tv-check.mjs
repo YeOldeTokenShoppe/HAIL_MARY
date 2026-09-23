@@ -22,6 +22,7 @@ import {
   validateEpisode,
 } from "../src/lib/ltTv/episodeTimeline.mjs";
 import { CHARACTERS } from "../src/lib/ltTv/modelContract.mjs";
+import { FACE_NAMES } from "../src/lib/ltTv/faces.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CONTENT = path.join(ROOT, "src/content/lt-tv");
@@ -32,8 +33,11 @@ const EPISODES_DIR = path.join(CONTENT, "episodes");
 // this was a third hand-maintained copy asking to be kept in step with
 // TalkShowScene.jsx, and a cue this list wrongly allows is a cue that does
 // nothing on screen.
+//
+// Plus the face beats, which every character has because every character is a
+// SitePal face (src/lib/ltTv/faces.mjs).
 const REACTIONS = Object.fromEntries(
-  Object.entries(CHARACTERS).map(([actor, c]) => [actor, Object.keys(c.reactions || {})]),
+  Object.entries(CHARACTERS).map(([actor, c]) => [actor, [...Object.keys(c.reactions || {}), ...FACE_NAMES]]),
 );
 
 const only = process.argv[2];
@@ -85,7 +89,7 @@ for (const file of files) {
     const known = REACTIONS[cue.actor];
     if (!known) report(record.id, `cues[${i}] names actor "${cue.actor}", who isn't on this set`);
     else if (!known.includes(cue.reaction)) {
-      report(record.id, `cues[${i}]: ${cue.actor} has no "${cue.reaction}" clip`);
+      report(record.id, `cues[${i}]: ${cue.actor} has no "${cue.reaction}" clip or face`);
     }
     const line = record.lineStarts[cue.line];
     const next = record.lineStarts[cue.line + 1] ?? record.dialogueEnd;

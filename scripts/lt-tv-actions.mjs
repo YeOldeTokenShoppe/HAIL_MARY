@@ -137,7 +137,7 @@ export const ACTIONS = {
     needsScreenplay: true,
     stages: ["written", "recorded", "on-air"],
     argv: (id) => ["node", ["scripts/lt-tv-edit.mjs", id]],
-    blurb: "Reads the screenplay back into the record. Free.",
+    blurb: "Reads the screenplay back into the record. Free. On a recorded episode, changing only beats or faces keeps the recording.",
   },
   "apply-edits-rerecord": {
     label: "Apply my edits and clear the audio",
