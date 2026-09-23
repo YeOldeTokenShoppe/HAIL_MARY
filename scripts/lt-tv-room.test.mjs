@@ -314,5 +314,15 @@ console.log("\na turn that does not come back in the shape it was asked for");
   ok("but says what it wanted and could not have", bad.entry.refused?.includes("explode"));
 }
 
+console.log("\nA cue with an apostrophe:");
+{
+  // KIP O'BRIEN, 2026-09-23: the first cue with punctuation in it, and a
+  // model or an editor types the curly apostrophe as often as the straight.
+  const straight = LINE_RE.exec("  12  KIP O'BRIEN  The Fed said it twice.");
+  const curly = LINE_RE.exec("  12  KIP O\u2019BRIEN  The Fed said it twice.");
+  ok("the straight apostrophe reads as a line", straight?.[4] === "The Fed said it twice.");
+  ok("and so does the curly one", curly?.[4] === "The Fed said it twice.");
+}
+
 console.log(failures ? `\n${failures} failure(s)\n` : "\nAll good.\n");
 process.exit(failures ? 1 : 0);

@@ -49,6 +49,7 @@ import { claude } from "./lt-tv-claude.mjs";
 import {
   LINE_RE,
   CUE_RE,
+  speakerCue,
   SEGMENT_RE,
   CUT_MARK_RE,
   PAUSE_MARK_RE,
@@ -299,8 +300,8 @@ export function indexScript(text) {
     if (!raw.trim() || SEGMENT_RE.test(raw)) current = null;
   });
 
-  const byDisplay = new Map(ACTORS.map((a) => [CAST[a].displayName.toUpperCase(), a]));
-  for (const entry of entries) entry.actor = byDisplay.get(entry.speaker) ?? null;
+  const byDisplay = new Map(ACTORS.map((a) => [speakerCue(CAST[a].displayName), a]));
+  for (const entry of entries) entry.actor = byDisplay.get(speakerCue(entry.speaker)) ?? null;
   return entries;
 }
 
@@ -321,7 +322,7 @@ export function titleOf(text) {
 
 // ── Checking what came back ───────────────────────────────────────────────
 
-const SPEAKERS = new Map(ACTORS.map((a) => [CAST[a].displayName.toUpperCase(), a]));
+const SPEAKERS = new Map(ACTORS.map((a) => [speakerCue(CAST[a].displayName), a]));
 
 function oneLine(value, what) {
   const text = typeof value === "string" ? value.trim() : "";
@@ -361,7 +362,7 @@ export function validateChanges(raw, entries) {
     }
     if (op === "add") {
       const after = lineNumber("after");
-      const speaker = String(change?.speaker ?? "").toUpperCase();
+      const speaker = speakerCue(change?.speaker);
       if (!SPEAKERS.has(speaker)) {
         throw new Error(`"${change?.speaker}" is not on this set — it has ${[...SPEAKERS.keys()].join(" and ")}.`);
       }

@@ -318,6 +318,10 @@ export const LISTENER_GAZE_DEGREES = {
   Connor: 30,
   Monk: -23,
   Holly: -8,
+  // A seed, like Holly's was. Same skeleton as hers, sitting on the other side
+  // of the desk and turned only ~1° toward the middle, so he turns the other
+  // way and further. Fit on the set.
+  Kip: 20,
 };
 const listenerGazeYaw = (actor) =>
   THREE.MathUtils.degToRad(LISTENER_GAZE_DEGREES[actor] ?? 0);
@@ -356,6 +360,12 @@ export const TALKSHOW_CONNOR_FILTER = { saturate: 106, contrast: 102, brightness
 // on a screen that should look backlit.
 export const TALKSHOW_HOLLY_CROP = { cropX: 216, cropY: 130, cropW: 168, cropH: 169, rotateZ: 4, rotateX: 0 };
 export const TALKSHOW_HOLLY_FILTER = { saturate: 126, contrast: 117, brightness: 92, hueRotate: 0, sepia: 0 };
+// KIP'S ARE A SEED, copied from Connor's (the seat he took) with the sepia
+// taken off, as Holly's fit showed a warm cast reads as grime here. Nothing
+// is painted with them until his model has a face layer; fit them then at
+// ?tune=sitepal → "TS Kip".
+export const TALKSHOW_KIP_CROP = { cropX: 180, cropY: 118, cropW: 145, cropH: 195, rotateZ: 0, rotateX: 0 };
+export const TALKSHOW_KIP_FILTER = { saturate: 106, contrast: 102, brightness: 80, hueRotate: 0, sepia: 0 };
 
 // Projection registry. sceneId reuses the temple's SitePal scenes (Monk =
 // GR80, Connor = the Demon/H80Z scene). face1 = static face to hide, face2 =
@@ -413,6 +423,27 @@ export const TALKSHOW_PROJECTION_CONFIG = {
     // Her eyes are separate meshes, where the other two have brows. Same job:
     // keep them from floating over the projected face.
     hideExtra: CHARACTERS.Holly.faces.hide,
+  },
+  /*
+   * The news anchor from 2026-09-23. His own SitePal scene and embed hash,
+   * from the embed code Michelle pasted that day (account 9308752, scene
+   * 2775617).
+   *
+   * HIS MODEL HAS NO FACE LAYER YET — one skinned mesh, head included — so
+   * face1/face2 are empty and nothing is painted. The portal still loads and
+   * still SPEAKS: the live desk's sayText and an episode's clips play through
+   * it with no face to show them on. The face names go in the contract when
+   * his re-export has them, and this entry picks them up.
+   */
+  Kip: {
+    label: "TS Kip",
+    sceneId: 2775617,
+    hash: "3OopzkzEudDgzDWJfvhZEutMbxn3VVrO",
+    face1: CHARACTERS.Kip.faces?.face1,
+    face2: CHARACTERS.Kip.faces?.face2,
+    crop: TALKSHOW_KIP_CROP,
+    filter: TALKSHOW_KIP_FILTER,
+    hideExtra: CHARACTERS.Kip.faces?.hide || [],
   },
 };
 
@@ -1774,6 +1805,7 @@ function TalkShowModel({
     // Projection targets start hidden; Face1 / FaceDemon1 are the visible
     // static faces until a SitePal projection activates.
     Object.values(TALKSHOW_PROJECTION_CONFIG).forEach((cfg) => {
+      if (!cfg.face2) return;
       const m = c.getObjectByName(cfg.face2);
       if (m) m.visible = false;
     });
@@ -2142,7 +2174,7 @@ function TalkShowModel({
           `[TalkShowScene] ${key}: no "${EMPTY_FOR_ACTOR[key]}" in the scene — no face projection`,
         );
       }
-      const within = (name) => (empty ? empty.getObjectByName(name) : null) || null;
+      const within = (name) => (empty && name ? empty.getObjectByName(name) : null) || null;
       build[key] = {
         face1: within(cfg.face1),
         face2: within(cfg.face2),

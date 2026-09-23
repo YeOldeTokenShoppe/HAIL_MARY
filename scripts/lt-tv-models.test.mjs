@@ -442,7 +442,10 @@ console.log("\nWho has a chair on which set is the cast split:");
 const seatedOn = (set) =>
   Object.entries(CHARACTERS).filter(([, c]) => c.seat[set]).map(([a]) => a).sort();
 check("the lounge seats Connor and GR80", seatedOn("lounge"), ["Connor", "Monk"]);
-check("the news desk seats Connor, GR80 and the co-anchor", seatedOn("news"), ["Connor", "Holly", "Monk"]);
+// Kip took the news desk 2026-09-23; Connor keeps a news seat only for the
+// news episodes already recorded with him.
+check("the news desk seats Connor, GR80, the co-anchor and Kip", seatedOn("news"), ["Connor", "Holly", "Kip", "Monk"]);
+ok("Kip has no lounge seat: Connor stays on Markets & Morality", !CHARACTERS.Kip.seat.lounge);
 ok("she has no lounge seat, which is what keeps her out of the roundtable",
   !CHARACTERS.Holly.seat.lounge);
 // GR80 keeps a news seat on purpose: news-01 is on air and casts him. It is
@@ -472,7 +475,9 @@ for (const actor of ACTORS) {
   const cue = CAST[actor].displayName.toUpperCase();
   ok(`${actor}'s speaker cue "${cue}" is unique`,
     ACTORS.filter((a) => CAST[a].displayName.toUpperCase() === cue).length === 1);
-  ok(`and it is a cue a screenplay can carry`, /^[A-Z0-9][A-Z0-9 ]*$/.test(cue));
+  // An apostrophe is allowed (KIP O'BRIEN); the parser reads a curly one as
+  // the same cue.
+  ok(`and it is a cue a screenplay can carry`, /^[A-Z0-9][A-Z0-9 ']*$/.test(cue));
   // Nor may one cue be a prefix of another, which is what would make
   // "HOLLY" and "HOLLY JONES" ambiguous to read.
   ok(`and no other cue starts with it`,

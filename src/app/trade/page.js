@@ -4855,7 +4855,7 @@ export default function CyborgTemple() {
               // lands on, which is the thing you are looking at while fitting.
               ...Object.entries(TALKSHOW_PROJECTION_CONFIG).map(([key, cfg]) => ({
                 key,
-                label: `Project ${key} (${cfg.face2})`,
+                label: `Project ${key} (${cfg.face2 || 'no face layer yet'})`,
               })),
               { key: null, label: 'Both (live show)' },
               { key: 'Off', label: 'Off (static faces)' },

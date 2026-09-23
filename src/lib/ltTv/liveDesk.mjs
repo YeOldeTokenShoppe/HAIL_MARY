@@ -35,7 +35,7 @@ export const LIVE_SHOWS = {
 export const liveShowFor = (show) => (LIVE_SHOWS[show] ? show : null);
 
 // What a viewer meets, for the desk's own labels.
-export const LIVE_NAMES = { Connor: "Connor", Monk: "GR80", Holly: "Holly" };
+export const LIVE_NAMES = { Connor: "Connor", Monk: "GR80", Holly: "Holly", Kip: "Kip" };
 
 // SitePal's live speech arguments. Language 1 is English; engine 14 is
 // ElevenLabs, and the voice argument is then the ElevenLabs voice id itself —

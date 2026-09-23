@@ -45,7 +45,7 @@ const VERDICTS = [
 ];
 
 // The registry keys are the rig names; this is who a viewer meets.
-const NAMES = { Monk: "GR80", Connor: "Connor", Holly: "Holly" };
+const NAMES = { Monk: "GR80", Connor: "Connor", Holly: "Holly", Kip: "Kip" };
 const nameOf = (key) => NAMES[key] || key;
 
 function readSaved() {

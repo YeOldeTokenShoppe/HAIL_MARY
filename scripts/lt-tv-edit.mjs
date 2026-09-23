@@ -38,12 +38,16 @@ const EPISODE_DIR = "content/lt-tv/episodes";
 
 // Speakers are matched by their display name rather than by column position,
 // so re-indenting a line by hand does not break it.
+//
+// A cue may carry an apostrophe (KIP O'BRIEN), and an editor or a model will
+// as often type a curly one, so both read as the same speaker.
+export const speakerCue = (name) => String(name ?? "").toUpperCase().replace(/[\u2018\u2019`]/g, "'");
 const DISPLAY_TO_ACTOR = new Map(
-  ACTORS.map((a) => [CAST[a].displayName.toUpperCase(), a]),
+  ACTORS.map((a) => [speakerCue(CAST[a].displayName), a]),
 );
 const SPEAKER_ALTERNATIVES = [...DISPLAY_TO_ACTOR.keys()]
   .sort((a, b) => b.length - a.length) // longest first: "SAINT GR80" before any prefix of it
-  .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+  .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/'/g, "['\u2018\u2019`]"))
   .join("|");
 
 // Exported so the rewrite step can find and replace a line without keeping a
@@ -164,7 +168,7 @@ export function parseScript(text, format = SHOW_FORMATS.news) {
         continue;
       }
       lastLine = {
-        actor: DISPLAY_TO_ACTOR.get(who),
+        actor: DISPLAY_TO_ACTOR.get(speakerCue(who)),
         text: body.trim(),
         directAddress: Boolean(aim),
         cues: [],
