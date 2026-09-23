@@ -30,12 +30,12 @@ import {
 
 const STORAGE_KEY = "lt_tv_expression_panel_v1";
 
-// The reference's thirteen, in its order, less two Michelle ruled out on
+// The reference's thirteen, in its order, less three Michelle ruled out on
 // 2026-09-23 as never useful on the show: Blink (SitePal already blinks on its
-// own) and Scream. "None" is the way back.
+// own), Scream and Blush. "None" is the way back.
 const EXPRESSIONS = [
   "ClosedSmile", "OpenSmile", "Sad", "Angry", "Fear", "Disgust", "Surprise",
-  "Thinking", "Blush", "LeftWink", "RightWink",
+  "Thinking", "LeftWink", "RightWink",
 ];
 
 const VERDICTS = [
