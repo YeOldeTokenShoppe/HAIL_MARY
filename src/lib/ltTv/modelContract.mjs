@@ -214,7 +214,19 @@ export const CHARACTERS = {
       headnod: { clip: "hologirl_agreement", duration: 3.0 },
       headshake: { clip: "hologirl_disagreement", duration: 3.0 },
     },
-    outro: "hologirl_news_intermission",
+    // HER COFFEE BREAK IS THE INTERMISSION, Michelle 2026-09-23, replacing
+    // `hologirl_news_intermission`, which her re-export no longer carries. Of
+    // her three coffee clips this is the one that suits sitting it out beside
+    // Kip; `hologirl_coffee_long` and `hologirl_coffee_short` are the others.
+    outro: "hologirl_coffee_long_conversation",
+    /* THE CUP RIDES HER HAND. The set carries `Hologirl_Sip_Cup` on the desk
+     * (under `Sip_Cup_Socket`) and her rig carries `Coffee_Cup_Control`, a
+     * bone that holds still on the desk in every clip but the coffee ones,
+     * where it goes up to her mouth and back. The scene re-parents the cup
+     * onto the bone once her idle has posed it, keeping the cup exactly where
+     * it sits, so from then on it follows her sip. Measured off the files: the
+     * bone rests 7cm from the socket, so the cup rides with that offset. */
+    props: [{ node: "Hologirl_Sip_Cup", bone: "Coffee_Cup_Control" }],
     /* SHE HAS THREE FACE LAYERS AND TWO EYE PLANES, and the same character is
      * already configured elsewhere in this repo — she is the promotions
      * hologram at the prize wheel in `src/lib/vendorSitePal.js`, on the same
@@ -263,10 +275,11 @@ export const CHARACTERS = {
    * Same Unreal-style skeleton as Holly (`Root`, `Pelvis`, `head`), so they
    * share 48 bone names — fine, every lookup is scoped to the empty.
    *
-   * NO FACES YET. His export is ONE skinned mesh, head and all, so there is no
-   * separate static face to hide or face layer for SitePal to paint onto. He
-   * is seated and animated, and nobody sees him until an episode casts him;
-   * a face pair and a SitePal scene are what put him on air.
+   * HIS FACES ARE HOLLY'S ARRANGEMENT, from his second export the same day
+   * (his first was one skinned mesh with no face layer at all): Face1 is the
+   * static face until SitePal arrives, Face2 is what it paints onto (its own
+   * material, lambert14.001), and Face3 is hidden with the swap so nothing
+   * floats over the projection.
    */
   Kip: {
     file: "public/models/LTTV_NewsAnchor.glb",
@@ -281,6 +294,7 @@ export const CHARACTERS = {
     // The news set's resting state between episodes, as Connor's head-turn
     // was: same 46.70s.
     outro: "anchorGuy_intermission",
+    faces: { face1: "Face1", face2: "Face2", hide: ["Face3"] },
     seat: {
       // From his own export, made on the 2026-09-23 set with the left chair
       // in its new place; his seated pelvis lands over it.

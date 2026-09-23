@@ -105,8 +105,11 @@ function newsBody(plan) {
     out.push(`${i + 1}.  ${String(story.beat ?? "").toUpperCase().padEnd(12)}${story.headline ?? ""}`);
     out.push(`    ${pad("Fact")}${story.fact ?? ""}`);
     out.push(`    ${pad("They differ on")}${story.tension ?? ""}`);
-    out.push(`    ${pad("Connor")}${story.connorAngle ?? ""}`);
-    out.push(`    ${pad("GR80")}${story.gr80Angle ?? ""}`);
+    // The field names are from the show's first cast and are kept, because
+    // every pitch on disk and the room's edits use them. Who fills them now:
+    // the anchor's read and the co-anchor's (Kip and Holly, 2026-09-23).
+    out.push(`    ${pad("Kip")}${story.connorAngle ?? ""}`);
+    out.push(`    ${pad("Holly")}${story.gr80Angle ?? ""}`);
     for (const source of story.sources || []) {
       out.push(`    ${pad("Source")}${source.outlet ?? "?"} — ${source.title ?? source.url ?? ""}`);
     }

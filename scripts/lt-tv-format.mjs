@@ -496,6 +496,10 @@ export const DELIVERY_TAGS = {
   // from being announced. Nothing warm and nothing surprised: she is a machine
   // reading the numbers, and the humour is that she is not impressed by them.
   Holly: ["[dryly]", "[flatly]", "[mildly]", "[unimpressed]", "[brightly]"],
+  // Network gravity, from Michelle's brief for him (2026-09-23): commanding on
+  // the headlines, warm on ordinary news, grave about trivia, and a hint of
+  // smug amusement at the end of a punchline. Nothing goofy.
+  Kip: ["[gravely]", "[solemnly]", "[authoritatively]", "[warmly]", "[with quiet satisfaction]"],
 };
 
 export const EVENT_TAGS = [

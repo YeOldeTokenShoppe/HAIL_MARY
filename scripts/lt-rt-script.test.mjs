@@ -238,7 +238,12 @@ const moralityPrompt = moralityBible("morality");
 // The names the writer is told to emit, which are the ones that matter: they
 // land in a record as `actor`, and the set looks up a seat, a rig and a voice
 // by them.
-check("the news show casts Connor and Holly", NEWS_ACTORS, ["Connor", "Holly"]);
+// Kip O'Brien took Connor's news seat 2026-09-23; Connor stays on M&M.
+check("the news show casts Kip and Holly", NEWS_ACTORS, ["Kip", "Holly"]);
+ok("the news writer does not offer Connor as a speaker", !/"Connor"/.test(news));
+ok("and describes Kip, from Michelle's brief", /KIP O'BRIEN \(the anchor\)/.test(news) && news.includes("COMPLETELY DEADPAN"));
+for (const tag of DELIVERY_TAGS.Kip) ok(`Kip's delivery tag ${tag} is offered`, news.includes(tag));
+for (const cue of Object.keys(REACTIONS.Kip)) ok(`the news writer offers Kip's "${cue}"`, news.includes(cue));
 check("Markets & Morality casts Connor and GR80", MORALITY_ACTORS, ["Connor", "Monk"]);
 ok("every name each show emits is a real character",
   [...NEWS_ACTORS, ...MORALITY_ACTORS].every((a) => CAST[a]));
@@ -252,15 +257,15 @@ ok("and names her as the co-anchor", /HOLLY JONES \(the co-anchor\)/.test(news))
 ok("the morality writer still describes GR80", moralityPrompt.includes("SAINT GR80"));
 // GR80 may still be MENTIONED in the news writer — Holly's paragraph says what
 // she is not by pointing at him — but never as one of its hosts.
-ok("the news writer's beat pattern is hers and Connor's",
-  /Holly reads the story/.test(news) && !/GR80 reframes/.test(news));
+ok("the news writer's beat pattern is Kip's and hers",
+  /Kip introduces the story/.test(news) && /Holly gives the number/.test(news) && !/GR80 reframes/.test(news));
 
 // Only what each rig can perform, since a cue for a clip she has not got does
 // nothing on screen and she has two where the others have six or seven.
 for (const cue of Object.keys(REACTIONS.Holly)) {
   ok(`the news writer offers Holly's "${cue}"`, news.includes(cue));
 }
-ok("and tells it those are all the body clips she has", /ALL the body clips she has/.test(news));
+ok("and tells it those are all the body clips each has", /ALL the body clips each of them has/.test(news));
 // Faces are SitePal's, not the rig's, so she has every one of them.
 for (const [name, bible] of [["news", news], ["Markets & Morality", moralityPrompt]]) {
   ok(`the ${name} writer is offered the face beats`, bible.includes("FACE BEATS") && FACE_NAMES.every((f) => bible.includes(f)));

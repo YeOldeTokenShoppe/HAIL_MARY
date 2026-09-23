@@ -361,9 +361,9 @@ export const TALKSHOW_CONNOR_FILTER = { saturate: 106, contrast: 102, brightness
 export const TALKSHOW_HOLLY_CROP = { cropX: 216, cropY: 130, cropW: 168, cropH: 169, rotateZ: 4, rotateX: 0 };
 export const TALKSHOW_HOLLY_FILTER = { saturate: 126, contrast: 117, brightness: 92, hueRotate: 0, sepia: 0 };
 // KIP'S ARE A SEED, copied from Connor's (the seat he took) with the sepia
-// taken off, as Holly's fit showed a warm cast reads as grime here. Nothing
-// is painted with them until his model has a face layer; fit them then at
-// ?tune=sitepal → "TS Kip".
+// taken off, as Holly's fit showed a warm cast reads as grime here. His own
+// SitePal scene will frame him differently, so fit them at ?tune=sitepal →
+// "TS Kip" and paste the values back.
 export const TALKSHOW_KIP_CROP = { cropX: 180, cropY: 118, cropW: 145, cropH: 195, rotateZ: 0, rotateX: 0 };
 export const TALKSHOW_KIP_FILTER = { saturate: 106, contrast: 102, brightness: 80, hueRotate: 0, sepia: 0 };
 
@@ -429,21 +429,17 @@ export const TALKSHOW_PROJECTION_CONFIG = {
    * from the embed code Michelle pasted that day (account 9308752, scene
    * 2775617).
    *
-   * HIS MODEL HAS NO FACE LAYER YET — one skinned mesh, head included — so
-   * face1/face2 are empty and nothing is painted. The portal still loads and
-   * still SPEAKS: the live desk's sayText and an episode's clips play through
-   * it with no face to show them on. The face names go in the contract when
-   * his re-export has them, and this entry picks them up.
+   * His face names come from the contract, as Holly's do.
    */
   Kip: {
     label: "TS Kip",
     sceneId: 2775617,
     hash: "3OopzkzEudDgzDWJfvhZEutMbxn3VVrO",
-    face1: CHARACTERS.Kip.faces?.face1,
-    face2: CHARACTERS.Kip.faces?.face2,
+    face1: CHARACTERS.Kip.faces.face1,
+    face2: CHARACTERS.Kip.faces.face2,
     crop: TALKSHOW_KIP_CROP,
     filter: TALKSHOW_KIP_FILTER,
-    hideExtra: CHARACTERS.Kip.faces?.hide || [],
+    hideExtra: CHARACTERS.Kip.faces.hide,
   },
 };
 
@@ -2341,6 +2337,9 @@ function TalkShowModel({
   // Per-character action banks. Bases loop continuously. Reactions are created
   // up front but only played when the script director reaches their cue.
   const actionsRef = useRef({});
+  // Which props have been handed to a character's bone (`props` in the
+  // contract), per built scene. See the frame loop.
+  const carriedRef = useRef({ scene: null, done: new Set() });
   useEffect(() => {
     const started = [];
     const out = {};
@@ -3708,6 +3707,32 @@ function TalkShowModel({
     Object.values(mixers).forEach((m) =>
       m.update(playback.pausedAt === null ? delta : 0),
     );
+
+    /* A PROP THAT RIDES A BONE — Holly's cup on `Coffee_Cup_Control`. The
+     * bone's bind pose is nowhere near the desk (it sits at the armature's
+     * origin), so the cup can only be handed over once her idle has posed the
+     * bone, i.e. after a mixer update, and only while she is on her idle: in
+     * the middle of a sip the bone is at her mouth. `attach` keeps the cup's
+     * world transform, so it does not move at the handover, and follows the
+     * bone from then on. Once per built scene. */
+    if (carriedRef.current.scene !== cloned) carriedRef.current = { scene: cloned, done: new Set() };
+    Object.values(CHARACTERS).forEach((character) => {
+      (character.props || []).forEach(({ node, bone }) => {
+        const key = `${character.empty}:${node}`;
+        const carried = carriedRef.current.done;
+        if (carried.has(key)) return;
+        const bank = actionsRef.current[character.empty];
+        if (!bank?.base || bank.active || (bank.outro && bank.outro.getEffectiveWeight() > 0)) return;
+        const holder = cloned.getObjectByName(character.empty)?.getObjectByName(bone);
+        const prop = cloned.getObjectByName(node);
+        carried.add(key);
+        if (!holder || !prop) {
+          console.warn(`[TalkShowScene] ${node} cannot ride ${bone}: ${!holder ? "no bone" : "no prop"} in the scene`);
+          return;
+        }
+        holder.attach(prop);
+      });
+    });
     Object.entries(headBones).forEach(([actor, head]) => {
       animatedHeadQuaternions[actor].copy(head.quaternion);
     });

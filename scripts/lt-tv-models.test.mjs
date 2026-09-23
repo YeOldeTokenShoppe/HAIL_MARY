@@ -498,12 +498,25 @@ ok(`it is long enough to be a play-out rather than a reaction (${outroLength?.to
 ok("GR80 has no play-out, so nothing optional is expected of him", optionalClips(CHARACTERS.Monk).length === 0);
 // She has one too, and hers is nearly a clean loop where Connor's is exact.
 console.log("\nThe co-anchor's play-out:");
-check("it is declared", optionalClips(CHARACTERS.Holly), ["hologirl_news_intermission"]);
+// Her coffee break since 2026-09-23 (Michelle), in place of the head-turn
+// intermission her re-export no longer carries.
+check("it is declared", optionalClips(CHARACTERS.Holly), ["hologirl_coffee_long_conversation"]);
 ok("it is in her file", clipNames(files.Holly).includes(CHARACTERS.Holly.outro));
 const hollyOutro = clipDuration(files.Holly, CHARACTERS.Holly.outro);
 ok(`it is a play-out rather than a gesture (${hollyOutro?.toFixed(2)}s)`, hollyOutro > 20);
 ok("and it animates her rig, unlike her base clip",
   clipTargets(files.Holly, CHARACTERS.Holly.outro).bones > 40);
+
+console.log("\nHer cup rides her hand:");
+{
+  // The cup is in the SET and the bone in HER file; the scene hands one to
+  // the other at run time, so both names have to exist or the cup stays put.
+  const [{ node, bone }] = CHARACTERS.Holly.props;
+  ok(`the set carries ${node}`, nodeNames(set).has(node));
+  ok(`and her rig carries ${bone}`, nodeNames(files.Holly).has(bone));
+  ok("and the cup is not a name any character also uses",
+    Object.values(files).every((g) => !g || !nodeNames(g).has(node)));
+}
 
 console.log(failures ? `\n${failures} check(s) failed.\n` : "\nAll checks passed.\n");
 process.exit(failures ? 1 : 0);

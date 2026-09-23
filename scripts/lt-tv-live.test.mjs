@@ -73,27 +73,27 @@ check("a line is capped", speakable("word ".repeat(400)).length <= MAX_LINE_CHAR
 console.log("\nthe answer as it comes back");
 const good = readExchange({
   lines: [
-    { speaker: "Holly", text: "Dana asks whether the Fed is bluffing." },
-    { speaker: "Connor", text: "[smug] Everybody bluffs. The Fed just does it with a podium." },
-    { speaker: "Holly Jones", text: "It is not a bluff if you have already said it twice." },
+    { speaker: "Kip O’Brien", text: "Dana asks whether the Fed is bluffing." },
+    { speaker: "Holly", text: "[flatly] Everybody bluffs. The Fed just does it with a podium." },
+    { speaker: "Kip", text: "It is not a bluff if you have already said it twice." },
   ],
 }, "news");
-check("three lines, in order", good.lines?.map((l) => l.speaker), ["Holly", "Connor", "Holly"]);
+check("three lines, in order, Kip by either apostrophe", good.lines?.map((l) => l.speaker), ["Kip", "Holly", "Kip"]);
 check("the tag is gone before it reaches SitePal", good.lines?.[1].text, "Everybody bluffs. The Fed just does it with a podium.");
 
 const stray = readExchange({
   lines: [
-    { speaker: "Holly", text: "A question." },
-    { speaker: "Monk", text: "GR80 is not on the news set." },
-    { speaker: "Connor", text: "An answer." },
+    { speaker: "Kip", text: "A question." },
+    { speaker: "Connor", text: "Connor is not on the news set any more." },
+    { speaker: "Holly", text: "An answer." },
   ],
 }, "news");
-check("a character not at this desk is dropped, not reassigned", stray.lines?.map((l) => l.speaker), ["Holly", "Connor"]);
+check("a character not at this desk is dropped, not reassigned", stray.lines?.map((l) => l.speaker), ["Kip", "Holly"]);
 
 const monk = readExchange({ lines: [{ speaker: "Saint GR80", text: "Logged." }, { speaker: "GR80", text: "Again." }] }, "morality");
 check("GR80 by either name is the Monk", monk.lines?.map((l) => l.speaker), ["Monk", "Monk"]);
 
-const many = readExchange({ lines: Array.from({ length: 20 }, (_, i) => ({ speaker: i % 2 ? "Connor" : "Holly", text: `Line ${i}.` })) }, "news");
+const many = readExchange({ lines: Array.from({ length: 20 }, (_, i) => ({ speaker: i % 2 ? "Kip" : "Holly", text: `Line ${i}.` })) }, "news");
 check("an answer is capped", many.lines?.length, MAX_LINES);
 ok("prose is an error, not a crash", readExchange({ say: "hello" }, "news").error);
 ok("nobody on this set is an error", readExchange({ lines: [{ speaker: "Monk", text: "hi" }] }, "news").error);
@@ -102,11 +102,11 @@ ok("an unknown show is an error", readExchange({ lines: [] }, "roundtable").erro
 
 console.log("\nthe brief");
 const newsBrief = liveSystem("news");
-ok("carries Connor as the shows describe him", newsBrief.includes("devil's advocate"));
+ok("carries Kip as the show describes him", newsBrief.includes("COMPLETELY DEADPAN"));
 ok("carries Holly's no-contractions rule", newsBrief.includes("NO CONTRACTIONS"));
 ok("says tonight is live", newsBrief.includes("TONIGHT THE SHOW IS LIVE"));
-ok("Holly reads the question on the news", newsBrief.includes("The FIRST line is Holly Jones reading the question"));
-ok("the answer may only name the news cast", newsBrief.includes('"speaker": "Holly" or "Connor"') && !newsBrief.includes('"Monk"'));
+ok("Kip reads the question on the news", newsBrief.includes("The FIRST line is Kip O'Brien reading the question"));
+ok("the answer may only name the news cast", newsBrief.includes('"speaker": "Kip" or "Holly"') && !newsBrief.includes('"Monk"') && !newsBrief.includes('"Connor"'));
 const moralityBrief = liveSystem("morality");
 ok("Connor reads on Markets & Morality", moralityBrief.includes("The FIRST line is Connor reading the question"));
 ok("GR80 is named the way the answer must name him", moralityBrief.includes('"Monk" (Saint GR80)'));
@@ -126,11 +126,11 @@ ok("banter rides along too, as banter", afterBanter.includes("Between questions:
 
 console.log("\nbanter");
 const newsBanter = banterSystem("news");
-ok("the same characters", newsBanter.includes("devil's advocate") && newsBanter.includes("NO CONTRACTIONS"));
+ok("the same characters", newsBanter.includes("COMPLETELY DEADPAN") && newsBanter.includes("NO CONTRACTIONS"));
 ok("says it is banter, not an answer", newsBanter.includes("This is BANTER") && !newsBanter.includes("reading the question"));
 ok("still no advice", newsBanter.includes("NO FINANCIAL ADVICE"));
 ok("still no figures", newsBanter.includes("Never state a price"));
-ok("only the news cast", newsBanter.includes('"speaker": "Holly" or "Connor"') && !newsBanter.includes('"Monk"'));
+ok("only the news cast", newsBanter.includes('"speaker": "Kip" or "Holly"') && !newsBanter.includes('"Monk"'));
 ok("GR80 banters on Markets & Morality", banterSystem("morality").includes('"Monk" (Saint GR80)'));
 const bu = banterUser({ angle: "the chairs", recent: [{ name: "kai", question: "Is it a bubble?", lines: [{ speaker: "Connor", text: "pin" }] }] });
 ok("carries its angle", bu.includes("Tonight's angle: the chairs."));
@@ -180,12 +180,12 @@ console.log("\nasking the writer (model stubbed)");
 
     stub(JSON.stringify({ lines: [
       { speaker: "Holly", text: "It is quiet." },
-      { speaker: "Connor", text: "[smug] Quiet is when I make money." },
+      { speaker: "Kip", text: "[gravely] Quiet is, itself, a story." },
       { speaker: "Monk", text: "Not on this set." },
     ] }));
     const banter = await writeBanter({ show: "news", angle: "the quiet" });
-    check("banter comes back as lines for this set", banter.lines?.map((l) => l.speaker), ["Holly", "Connor"]);
-    check("in their own voices, tags gone", banter.lines?.map((l) => [l.voice, l.text]), [[CAST.Holly.voiceId, "It is quiet."], [CAST.Connor.voiceId, "Quiet is when I make money."]]);
+    check("banter comes back as lines for this set", banter.lines?.map((l) => l.speaker), ["Holly", "Kip"]);
+    check("in their own voices, tags gone", banter.lines?.map((l) => [l.voice, l.text]), [[CAST.Holly.voiceId, "It is quiet."], [CAST.Kip.voiceId, "Quiet is, itself, a story."]]);
     ok("with the banter brief and its angle", sent?.system?.includes("This is BANTER") && sent?.messages?.[0]?.content?.includes?.("the quiet"));
     stub("Sure, here is some banter.");
     ok("prose banter is a message, not a crash", (await writeBanter({ show: "morality" })).error);

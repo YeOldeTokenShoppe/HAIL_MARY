@@ -22,13 +22,13 @@
 /**
  * Who sits at which desk, and who reads the question out.
  *
- * The reader is whoever holds that show's running order: Holly on the news
- * ("it is her desk and his show"), Connor as host of Markets & Morality.
+ * The reader is the show's anchor or host: Kip O'Brien on the news (Connor's
+ * seat there from 2026-09-23), Connor as host of Markets & Morality.
  * Actor keys are the rig keys (`Monk` is Saint GR80), because those are what
  * the set's portals are keyed by.
  */
 export const LIVE_SHOWS = {
-  news: { title: "LT Weekly News Recap", actors: ["Holly", "Connor"], reader: "Holly" },
+  news: { title: "LT Weekly News Recap", actors: ["Kip", "Holly"], reader: "Kip" },
   morality: { title: "Markets & Morality", actors: ["Connor", "Monk"], reader: "Connor" },
 };
 
@@ -117,7 +117,9 @@ export function readExchange(parsed, show) {
   }
   byName.set("saint gr80", "Monk");
   byName.set("holly jones", "Holly");
-  const labels = [...new Set([...cfg.actors, ...cfg.actors.map((a) => LIVE_NAMES[a]), "Saint GR80", "Holly Jones"])];
+  byName.set("kip o'brien", "Kip");
+  byName.set("kip o\u2019brien", "Kip");
+  const labels = [...new Set([...cfg.actors, ...cfg.actors.map((a) => LIVE_NAMES[a]), "Saint GR80", "Holly Jones", "Kip O'Brien"])];
 
   const lines = [];
   for (const entry of raw) {
