@@ -39,6 +39,7 @@ import { dirname, join, resolve } from "node:path";
 import {
   ACTORS,
   REACTIONS,
+  FACE_BEAT_RULES,
   DELIVERY_TAGS,
   EVENT_TAGS,
   showFormat,
@@ -141,6 +142,8 @@ EVENT TAGS (these produce an actual sound): ${EVENT_TAGS.join(", ")}. Use at mos
 DIRECT ADDRESS: set "directAddress": true on a line when the speaker is talking AT the other host rather than to the audience — the listener turns their head to face them. This show is mostly two people talking to each other, so direct address is the NORM here: roughly two thirds of lines. The exceptions are the opening address to the audience and the closing line.
 
 ANIMATION CUES: attach reactions to lines to give the LISTENER something to do while the other talks. Each cue is { "actor": who performs it, "reaction": one of the names below, "offset": seconds after the line begins }. Connor can perform: ${Object.keys(REACTIONS.Connor).join(", ")}. GR80 can perform: ${Object.keys(REACTIONS.Monk).join(", ")}. Aim for one cue every four or five lines — the set is two people in chairs, so stillness reads as attention and constant motion reads as a screensaver. Use headnodSubtle for ordinary agreement and save headnod for an emphatic beat. lookAround is a long clip; use it at most twice.
+
+${FACE_BEAT_RULES}
 `;
 
 // The same brief, plus what a whole-episode run has to return. The writer's

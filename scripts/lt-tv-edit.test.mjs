@@ -12,7 +12,9 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { renderScript } from "./lt-tv-episode.mjs";
-import { parseScript, applyScript, describeEdit } from "./lt-tv-edit.mjs";
+import { parseScript, applyScript, describeEdit, beatsOnly, withBeatsFrom } from "./lt-tv-edit.mjs";
+import { FACES } from "../src/lib/ltTv/faces.mjs";
+import { toSlateRecord } from "./lt-tv-slate-record.mjs";
 
 let failures = 0;
 const check = (label, actual, expected) => {
@@ -111,8 +113,8 @@ check("its beat survives the round trip",
 ok("and gets its clip length back from the reaction table",
   lines(rebuilt).find((l) => l.n === firstCued.n).cues.every((c) => c.duration > 0));
 
-ok("a reaction the character does not have is refused",
-  parseError(script.replace(/\(Monk lookAround/, "(Monk moonwalk"))?.includes("no reaction"));
+ok("a beat the character does not have is refused",
+  parseError(script.replace(/\(Monk lookAround/, "(Monk moonwalk"))?.includes("no beat"));
 ok("the refusal lists what they can do",
   parseError(script.replace(/\(Monk lookAround/, "(Monk moonwalk"))?.includes("headnod"));
 ok("a beat for someone not in the cast is refused",
@@ -149,6 +151,42 @@ check("the sources it was built on", rebuilt.sources, episode.sources);
 check("the rundown", rebuilt.rundown.stories?.length ?? 0, episode.rundown.stories?.length ?? 0);
 check("the id", rebuilt.id, episode.id);
 ok("but it records that it was edited", Boolean(rebuilt.provenance.editedAt));
+
+console.log("\nFace beats ride the same line as body beats:");
+{
+  const faceLine = "                  (Connor smile @ +0.5s)";
+  const smiled = script.replace(/^(\s*2\s+CONNOR .*)$/m, `$1\n${faceLine}`);
+  const withFace = applyScript(episode, parseScript(smiled));
+  const cue = lines(withFace)[2].cues.find((c) => c.reaction === "smile");
+  ok("a face beat parses", Boolean(cue));
+  check("with its offset and the face's own length", [cue?.actor, cue?.offset, cue?.duration],
+    ["Connor", 0.5, FACES.smile.duration]);
+  check("it survives a render and a re-read",
+    lines(applyScript(withFace, parseScript(renderScript(withFace))))[2].cues.map((c) => c.reaction),
+    lines(withFace)[2].cues.map((c) => c.reaction));
+  const slateCue = toSlateRecord(withFace).cues.find((c) => c.reaction === "smile");
+  check("and reaches the slate record the set reads", [slateCue?.line, slateCue?.actor], [2, "Connor"]);
+  ok("a face nobody offers is an error, not a silent drop",
+    /no beat "smirk"/.test(parseError(script.replace(/^(\s*2\s+CONNOR .*)$/m, "$1\n                  (Connor smirk @ +0.5s)")) || ""));
+
+  const changes = describeEdit(episode, withFace);
+  ok("adding one is a beat-only edit", beatsOnly(changes));
+  ok("rewording a line is not", !beatsOnly(describeEdit(episode, applyScript(episode,
+    parseScript(smiled.replace("Three stories tonight.", "Four stories tonight."))))));
+
+  // What "Apply my edits" does to a RECORDED episode when only beats moved.
+  const recorded = {
+    ...episode,
+    timing: { lineStarts: lines(episode).map((_, i) => i * 3), durationSeconds: 999, leadIn: 2.5 },
+    segments: episode.segments.map((seg) => ({
+      ...seg, lines: seg.lines.map((l) => ({ ...l, voiceId: `frozen-${l.actor}` })),
+    })),
+  };
+  const kept = withBeatsFrom(recorded, withFace);
+  check("the recording's timing is kept", kept.timing, recorded.timing);
+  ok("so are the voice ids it was recorded with", lines(kept).every((l) => l.voiceId.startsWith("frozen-")));
+  ok("and the new face is in", lines(kept)[2].cues.some((c) => c.reaction === "smile"));
+}
 
 console.log("\nThe title and the chiron are edited in the script too:");
 const retitled = applyScript(episode, parseScript(script.replace(episode.title, "A Different Title")));

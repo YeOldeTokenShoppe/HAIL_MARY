@@ -29,6 +29,7 @@ import { parseScript, applyScript } from "./lt-tv-edit.mjs";
 import { toSlateRecord } from "./lt-tv-slate-record.mjs";
 import { unwrittenTopics, scriptBible as moralityBible, MORALITY_ACTORS } from "./lt-rt-script.mjs";
 import { scriptBible as newsBible, NEWS_ACTORS } from "./lt-news-script.mjs";
+import { FACE_NAMES } from "../src/lib/ltTv/faces.mjs";
 import { CAST, REACTIONS, DELIVERY_TAGS } from "./lt-tv-format.mjs";
 
 let failures = 0;
@@ -259,7 +260,11 @@ ok("the news writer's beat pattern is hers and Connor's",
 for (const cue of Object.keys(REACTIONS.Holly)) {
   ok(`the news writer offers Holly's "${cue}"`, news.includes(cue));
 }
-ok("and tells it that is all she has", /that is ALL she has/.test(news));
+ok("and tells it those are all the body clips she has", /ALL the body clips she has/.test(news));
+// Faces are SitePal's, not the rig's, so she has every one of them.
+for (const [name, bible] of [["news", news], ["Markets & Morality", moralityPrompt]]) {
+  ok(`the ${name} writer is offered the face beats`, bible.includes("FACE BEATS") && FACE_NAMES.every((f) => bible.includes(f)));
+}
 for (const tag of DELIVERY_TAGS.Holly) {
   ok(`her delivery tag ${tag} is offered`, news.includes(tag));
 }

@@ -30,7 +30,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve, basename } from "node:path";
 
-import { CAST, ACTORS, REACTIONS, SHOW_FORMATS, showFormat } from "./lt-tv-format.mjs";
+import { CAST, ACTORS, BEATS, SHOW_FORMATS, showFormat } from "./lt-tv-format.mjs";
 import { assemble, renderScript } from "./lt-tv-episode.mjs";
 import { toSlateRecord, writeSlateRecord, slateId, SLATE_DIR } from "./lt-tv-slate-record.mjs";
 
@@ -140,14 +140,15 @@ export function parseScript(text, format = SHOW_FORMATS.news) {
         errors.push(`line ${lineNo}: an animation beat with no line above it to attach to.`);
         continue;
       }
-      if (!REACTIONS[actor]) {
+      if (!BEATS[actor]) {
         errors.push(`line ${lineNo}: "${actor}" is not one of this show's characters (${ACTORS.join(", ")}).`);
         continue;
       }
-      if (!(reaction in REACTIONS[actor])) {
+      // Body clips and face beats share the one table — see BEATS.
+      if (!(reaction in BEATS[actor])) {
         errors.push(
-          `line ${lineNo}: ${actor} has no reaction "${reaction}". ` +
-            `Valid: ${Object.keys(REACTIONS[actor]).join(", ")}.`,
+          `line ${lineNo}: ${actor} has no beat "${reaction}". ` +
+            `Valid: ${Object.keys(BEATS[actor]).join(", ")}.`,
         );
         continue;
       }
@@ -220,6 +221,45 @@ export function describeEdit(before, after) {
 }
 
 const anyChange = (c) => c.reworded + c.added + c.removed + c.aimChanged + c.cuesChanged > 0;
+
+/**
+ * Whether an edit changed ONLY the beats — body reactions and faces — and not
+ * a word, a line or who a line is aimed at.
+ *
+ * That matters once an episode is recorded. A beat is timed from the start of
+ * its line, and line starts come from the audio, so nothing a beat does can
+ * put the recording out of step. Refusing the edit, or clearing the timing,
+ * would make deleting one smile off a finished episode cost a re-record.
+ */
+export function beatsOnly(changes) {
+  return changes.cuesChanged > 0 &&
+    changes.reworded + changes.added + changes.removed + changes.aimChanged === 0;
+}
+
+/**
+ * The episode as it was, with the beats of the rebuilt one.
+ *
+ * Deliberately NOT the rebuilt record with the old timing pasted in. A
+ * recorded record carries things a rebuild would quietly replace: frozen
+ * voice ids, clip names that were chosen for it, block offsets the audio
+ * build filled in. Copying the beats across is the one change being made, so
+ * it is the only one made.
+ */
+export function withBeatsFrom(episode, rebuilt) {
+  const beats = new Map(allLines(rebuilt).map((l) => [l.n, l.cues]));
+  return {
+    ...episode,
+    segments: episode.segments.map((segment) => ({
+      ...segment,
+      lines: segment.lines.map((line) => ({ ...line, cues: beats.get(line.n) ?? line.cues })),
+    })),
+    provenance: {
+      ...episode.provenance,
+      editedAt: new Date().toISOString(),
+      editedBy: "scripts/lt-tv-edit.mjs",
+    },
+  };
+}
 
 /** Rebuild a record from an edited screenplay. Pure, so it is testable. */
 export function applyScript(episode, parsed) {
@@ -469,6 +509,24 @@ async function main() {
   // have any, and the old timing describes sentences that no longer exist, so
   // it cannot simply be carried over.
   const recorded = Array.isArray(episode.timing?.lineStarts);
+
+  // Except when no word moved. Beats ride on the line starts rather than
+  // making them, so the recording stands — see beatsOnly.
+  if (recorded && beatsOnly(changes)) {
+    const kept = withBeatsFrom(episode, rebuilt);
+    await writeFile(json, JSON.stringify(kept, null, 2) + "\n");
+    // The screenplay is NOT rewritten here. It already says what was meant,
+    // and rewriting it would wipe every # cut, # pause and # take mark in it
+    // — marks that decide how this episode is recorded next time.
+    console.log(`${episode.id}: ${summariseEdits(changes)}. The recording is untouched.`);
+    console.log(`Wrote ${json}`);
+    const onSlate = resolve(SLATE_DIR, `${slateId(kept)}.json`);
+    if (existsSync(onSlate)) {
+      const { path } = await writeSlateRecord(toSlateRecord(kept));
+      console.log(`Refreshed ${path} — the set plays the new beats on the next play.`);
+    }
+    return;
+  }
   if (recorded && !process.argv.includes("--rerecord")) {
     // Naming only the flag sends whoever is holding a mouse looking for a
     // terminal. The studio offers this exact run as its own button, so the

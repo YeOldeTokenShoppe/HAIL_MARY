@@ -52,6 +52,7 @@ import {
   reactionClips,
   reactionDurations,
 } from "@/lib/ltTv/modelContract.mjs";
+import { FACES, isFaceBeat } from "@/lib/ltTv/faces.mjs";
 import { findEpisode } from "@/content/lt-tv";
 
 /* THE SET AND THE CHARACTERS ARE SEPARATE EXPORTS as of 2026-09-22.
@@ -1300,6 +1301,8 @@ export function HouseAmbient({ dimmed = false }) {
     };
     // Read fresh every frame, so a value set here shows on the next one.
     window.__tsGaze = LISTENER_GAZE_DEGREES;
+    // Each face beat's amplitude and default length, read as the beat fires.
+    window.__tsExpressions = FACES;
   }, []);
 
   useFrame((state, delta) => {
@@ -2608,9 +2611,20 @@ function TalkShowModel({
       });
     };
 
+    // A face beat set for a few seconds would otherwise outlive a Stop or a
+    // seek and land on whatever plays next.
+    const clearFaces = () => {
+      Object.values(portalsRef.current).forEach((portal) => {
+        try {
+          portal?.frame?.contentWindow?.clearExpressionList?.();
+        } catch (e) {}
+      });
+    };
+
     const resetPerformance = () => {
       playbackRef.current = idlePlayback();
       resetReactions();
+      clearFaces();
     };
 
     /**
@@ -3553,6 +3567,24 @@ function TalkShowModel({
       ) {
         const cue = cues[playback.cueIndex];
         playback.cueIndex += 1;
+
+        // A FACE BEAT goes to SitePal, not to the rig: the expression is made
+        // in that character's portal and reaches the set through the face
+        // crop like everything else the portal draws. See faces.mjs.
+        if (isFaceBeat(cue.reaction)) {
+          const face = FACES[cue.reaction];
+          try {
+            portalsRef.current[cue.actor]?.frame?.contentWindow?.setFacialExpression?.(
+              face.expression,
+              face.amplitude,
+              cue.duration ?? face.duration,
+            );
+          } catch (e) {
+            console.warn(`[TalkShowScene] ${cue.actor} could not make a ${cue.reaction} face`, e);
+          }
+          continue;
+        }
+
         const emptyName = EMPTY_FOR_ACTOR[cue.actor];
         const bank = actionsRef.current[emptyName];
         const action = bank?.reactions?.[cue.reaction];

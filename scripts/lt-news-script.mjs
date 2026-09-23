@@ -34,6 +34,7 @@ import {
   CAST,
   ACTORS,
   REACTIONS,
+  FACE_BEAT_RULES,
   SEGMENTS,
   OPTIONAL_SEGMENTS,
   SHOW_FORMATS,
@@ -221,7 +222,9 @@ EVENT TAGS (these produce an actual sound): ${EVENT_TAGS.join(", ")}. Use at mos
 
 DIRECT ADDRESS: set "directAddress": true on a line when the speaker is talking AT the other host rather than to the audience — the listener turns their head to face them. A statement of news is delivered to camera; a jab, a question or a rebuttal is direct address. Roughly half the lines.
 
-ANIMATION CUES: attach reactions to lines to give the LISTENER something to do while the other talks. Each cue is { "actor": who performs it, "reaction": one of the names below, "offset": seconds after the line begins }. Connor can perform: ${Object.keys(REACTIONS.Connor).join(", ")}. Holly can perform: ${Object.keys(REACTIONS.Holly).join(", ")} — that is ALL she has, so do not give her any other cue; one naming a clip her rig has not got simply does nothing on screen. Aim for one cue every four or five lines — the set is two people in chairs, so stillness reads as attention, and constant motion reads as a screensaver. Use headnodSubtle for ordinary agreement and save headnod for an emphatic beat (Holly has only headnod, and on her it reads as agreement rather than emphasis). lookAround is a long clip; use it at most twice, for surveying the studio.
+ANIMATION CUES: attach reactions to lines to give the LISTENER something to do while the other talks. Each cue is { "actor": who performs it, "reaction": one of the names below, "offset": seconds after the line begins }. Connor can perform: ${Object.keys(REACTIONS.Connor).join(", ")}. Holly can perform: ${Object.keys(REACTIONS.Holly).join(", ")} — those are ALL the body clips she has, so give her no other body cue (she does have every face beat below); one naming a clip her rig has not got simply does nothing on screen. Aim for one cue every four or five lines — the set is two people in chairs, so stillness reads as attention, and constant motion reads as a screensaver. Use headnodSubtle for ordinary agreement and save headnod for an emphatic beat (Holly has only headnod, and on her it reads as agreement rather than emphasis). lookAround is a long clip; use it at most twice, for surveying the studio.
+
+${FACE_BEAT_RULES}
 
 THE SPOT — the ad break, when you are given copy for it:
 Play it completely straight for as long as you can bear. Connor does the sponsor voice: grand, overclaimed, delighted with himself, the register of a man reading a script he was paid for and believes anyway. Then Holly reads the disclaimer — flatly, completely, at the same pace as the rest, which is what ruins the ad. Or she declines to read it. Or she reads it and then says what it actually means. She does advertising for a living elsewhere on the boardwalk and is not sentimental about it. Fifty-odd words, in and out.

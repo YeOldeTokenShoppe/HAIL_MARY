@@ -14,6 +14,8 @@
 // Pure and side-effect free: give it a record, get a timeline. No THREE, no
 // React, so it can be unit-tested and reused by a future script generator.
 
+import { FACES } from "./faces.mjs";
+
 // A listener turns a beat INTO the line they're being addressed on and lets go
 // shortly before it ends, so the exchange doesn't look mechanical.
 const GAZE_LEAD_IN = 0.22;
@@ -419,6 +421,7 @@ export function buildEpisodeTimeline(record, { reactionDurations = {} } = {}) {
       duration:
         cue.duration ??
         reactionDurations[cue.actor]?.[cue.reaction] ??
+        FACES[cue.reaction]?.duration ??
         DEFAULT_REACTION_DURATION,
       at: lineStarts[cue.line] + cue.offset,
     }))
