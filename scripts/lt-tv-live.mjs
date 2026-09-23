@@ -61,7 +61,7 @@ export function liveSystem(show) {
   return `${BIBLES[show]()}
 TONIGHT THE SHOW IS LIVE, AND WHAT YOU ARE WRITING IS NOT AN EPISODE.
 
-Everything above about the length and shape of an episode, delivery tags, event tags, animation cues, direct address, the beat pattern, the rundown, the acronym rule's "first time in the episode" and the ad spot does NOT apply tonight. Who the characters are, how they talk, and the hard rules about advice and invention DO apply, in full.
+Everything above about the length and shape of an episode, delivery tags, event tags, animation cues, face beats, direct address, the beat pattern, the rundown, the acronym rule's "first time in the episode" and the ad spot does NOT apply tonight. Who the characters are, how they talk, and the hard rules about advice and invention DO apply, in full.
 
 A viewer watching the live broadcast has sent in a question. ${readerName} reads it out, and ${readerName} and ${otherName} field it, on air, in character.
 
