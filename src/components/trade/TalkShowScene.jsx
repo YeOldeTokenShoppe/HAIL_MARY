@@ -1725,6 +1725,10 @@ function TalkShowModel({
   // ask again — a week that seats a character the previous one did not is the
   // case where the answer legitimately changes without a portal doing anything.
   const notifyReadyRef = useRef(null);
+  // Takes the news set out of the intermission and back to the seated on-air
+  // idle, for the live desk (see leaveIntermission below).
+  const leaveIntermissionRef = useRef(null);
+  const liveWasOnRef = useRef(false);
 
   // SWITCHING EPISODES. The portals stay up — rebuilding them costs ~18s of
   // "Loading voices…" — so changing episode takes the set off air and swaps
@@ -2666,6 +2670,28 @@ function TalkShowModel({
         bank.base.crossFadeTo(outro, 0.6, false);
       });
     };
+
+    /**
+     * BACK TO THE DESK FOR THE LIVE SHOW. The intermission loops until
+     * something ends it, and a news episode that has finished leaves the set
+     * in it — Connor turned away, Holly off duty. That is the wrong picture for
+     * a live Q&A, which is the characters at their most engaged (Michelle,
+     * 2026-09-23: "we should use the regular positions used for the news
+     * casts"). So going live cross-fades the intermission back to the seated
+     * idle every episode plays over. A soft version of resetReactions: the
+     * intermission is faded rather than cut, and nothing else is touched.
+     */
+    const leaveIntermission = () => {
+      Object.values(actionsRef.current).forEach((bank) => {
+        const outro = bank?.outro;
+        if (!outro || !bank.base || outro.getEffectiveWeight() === 0) return;
+        bank.base.enabled = true;
+        bank.base.setEffectiveWeight(1);
+        bank.base.play();
+        outro.crossFadeTo(bank.base, 0.6, false);
+      });
+    };
+    leaveIntermissionRef.current = leaveIntermission;
 
     const timers = {};
 
@@ -3720,6 +3746,9 @@ function TalkShowModel({
 
     // A live answer holds the set only while no episode is playing.
     const live = TALKSHOW_LIVE.on && !playback.running;
+    // The moment the desk goes live, the set comes out of the intermission.
+    if (live && !liveWasOnRef.current) leaveIntermissionRef.current?.();
+    liveWasOnRef.current = live;
     let addressedListener = live ? TALKSHOW_LIVE.listener : null;
     if (playback.running) {
       for (const cue of timeline?.gazes || []) {
