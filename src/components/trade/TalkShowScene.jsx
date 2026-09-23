@@ -1237,6 +1237,18 @@ export const SITEPAL_HEAD_MOTION = {
   recenter: true, // put the gaze back to centre once the scene is up
 };
 
+/**
+ * THE LIVE PORTALS, for a board outside the canvas to reach.
+ *
+ * Every SitePal call that changes a face on this set has to land in THAT
+ * character's portal document — `window.setFacialExpression` on the page
+ * itself is nobody (which is why the old expression panel on /main never
+ * reached /trade). The scene points `current` at its own portal map while it
+ * is mounted and clears it on the way out, so a board reads
+ * `TALKSHOW_PORTALS.current?.[key]` and gets `{ frame, ready }` or nothing.
+ */
+export const TALKSHOW_PORTALS = { current: null };
+
 /** Push the head-motion settings into one portal's document. */
 export function applyHeadMotion(win, cfg = SITEPAL_HEAD_MOTION) {
   if (!win) return;
@@ -2909,6 +2921,7 @@ function TalkShowModel({
       host.appendChild(frame);
       armWatchdog(key);
     });
+    TALKSHOW_PORTALS.current = portalsRef.current;
 
     const stopShow = () => {
       stopped = true;
@@ -3454,6 +3467,7 @@ function TalkShowModel({
     window.__talkShowStatus = talkShowStatus;
 
     return () => {
+      if (TALKSHOW_PORTALS.current === portalsRef.current) TALKSHOW_PORTALS.current = null;
       stopShow();
       Object.values(timers).forEach(clearTimeout);
       Object.values(preloads).forEach((q) => clearTimeout(q.timer));
