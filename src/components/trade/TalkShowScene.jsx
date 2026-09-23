@@ -852,7 +852,7 @@ const ORBIT_MAX_POLAR = Math.PI * 0.52;
 // but reading their real world positions means the framing survives the set
 // being nudged or rescaled — the same reason the tripod feed reads bones and
 // not constants.
-function directViewerCamera({ state, controls, camera, headBones, timeline, elapsed, running, delta, aspect, viewportHeightPx }) {
+function directViewerCamera({ state, controls, camera, headBones, timeline, elapsed, running, live = false, delta, aspect, viewportHeightPx }) {
   const cfg = SHOT_FRAMING;
   if (!controls) return false;
 
@@ -929,7 +929,9 @@ function directViewerCamera({ state, controls, camera, headBones, timeline, elap
       ? (speakerAt(timeline, elapsed, running) ?? Object.keys(heads)[0])
       : null;
   } else {
-    const shot = shotAt(timeline, elapsed) || { framing: "two", subject: null };
+    const shot = live
+      ? { framing: TALKSHOW_LIVE.framing, subject: TALKSHOW_LIVE.speaker }
+      : shotAt(timeline, elapsed) || { framing: "two", subject: null };
     framing = shot.framing || (shot.subject ? "single" : "two");
     subject = shot.subject ?? null;
   }
@@ -1249,6 +1251,19 @@ export const SITEPAL_HEAD_MOTION = {
  * `TALKSHOW_PORTALS.current?.[key]` and gets `{ frame, ready }` or nothing.
  */
 export const TALKSHOW_PORTALS = { current: null };
+
+/**
+ * THE LIVE DESK'S HAND ON THE SET (src/components/trade/LTTvLiveDesk.jsx).
+ *
+ * A recorded episode drives the camera and the listeners' heads from its
+ * timeline. A live answer has no timeline — nobody knows how long a line is
+ * until SitePal says it has finished — so the desk says who is speaking as it
+ * happens and the frame loop reads it from here instead. `on` holds the set
+ * as a show (the director keeps the camera, the preload chain keeps out of the
+ * portals); `speaker` is who holds the floor, `listener` who is being talked
+ * to, and `framing` one of SHOT_NAMES. Ignored while an episode is playing.
+ */
+export const TALKSHOW_LIVE = { on: false, speaker: null, listener: null, framing: "two" };
 
 /** Push the head-motion settings into one portal's document. */
 export function applyHeadMotion(win, cfg = SITEPAL_HEAD_MOTION) {
@@ -2758,6 +2773,9 @@ function TalkShowModel({
       clearTimeout(q.timer);
       q.timer = 0;
       if (phase !== "idle") return; // resumes from the next idle audio-loaded
+      // The live desk speaks into these portals. A `loadAudio` landing mid-
+      // answer is exactly the untested case the note above avoids.
+      if (TALKSHOW_LIVE.on) return;
       const clip = q.clips[q.at];
       if (!clip) return;
       q.at += 1;
@@ -3700,7 +3718,9 @@ function TalkShowModel({
       }
     }
 
-    let addressedListener = null;
+    // A live answer holds the set only while no episode is playing.
+    const live = TALKSHOW_LIVE.on && !playback.running;
+    let addressedListener = live ? TALKSHOW_LIVE.listener : null;
     if (playback.running) {
       for (const cue of timeline?.gazes || []) {
         if (elapsed >= cue.startAt && elapsed < cue.endAt) {
@@ -3743,7 +3763,7 @@ function TalkShowModel({
     // rather than freezing on one frame), which is a fraction of the cost of
     // painting them every tick.
     const soloKey = soloProjection
-      ? speakerAt(timeline, elapsed, playback.running)
+      ? (live ? TALKSHOW_LIVE.speaker : speakerAt(timeline, elapsed, playback.running))
       : null;
     solotickRef.current = (solotickRef.current + 1) % SOLO_LISTENER_EVERY_NTH;
 
@@ -3804,7 +3824,8 @@ function TalkShowModel({
         headBones,
         timeline,
         elapsed,
-        running: playback.running,
+        running: playback.running || live,
+        live,
         delta,
         aspect: size.width / size.height,
         viewportHeightPx: gl.domElement.height,
