@@ -15,10 +15,10 @@
 //
 // WHY THE LIST IS THIS LIST. SitePal offers thirteen expressions. Michelle
 // tried them on the set board (/trade?tune=faces) on 2026-09-23 and ruled out
-// Blink (SitePal blinks by itself), Scream and Blush as never useful on this
-// show; RightWink is left out because one wink is all a writer needs and which
-// eye reads better is a camera question, not a script one. The rest are here
-// under the word a writer would reach for, not SitePal's own spelling.
+// Blink (SitePal blinks by itself), Scream, Blush and both winks as never
+// useful on this show. The rest are here under the word a writer would reach
+// for, not SitePal's own spelling — and there are two smiles: `smile` is
+// SitePal's closed-mouth one, `grin` its open-mouth one.
 //
 // Amplitude and duration are the defaults a beat gets. The face is a crop fitted
 // to a NEUTRAL face, so a full-strength expression is the one most likely to
@@ -34,7 +34,6 @@ export const FACES = {
   disgusted: { expression: "Disgust", amplitude: 0.7, duration: 2.5 },
   surprised: { expression: "Surprise", amplitude: 0.8, duration: 2 },
   thinking: { expression: "Thinking", amplitude: 0.8, duration: 3 },
-  wink: { expression: "LeftWink", amplitude: 1, duration: 1 },
 };
 
 export const FACE_NAMES = Object.keys(FACES);

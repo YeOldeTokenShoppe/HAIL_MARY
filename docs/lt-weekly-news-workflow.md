@@ -341,9 +341,9 @@ Three things in the file are more than decoration:
   above it. A reaction a character does not have is refused by name, with the
   valid list printed.
 - **A face beat** is written the same way, `(Connor smile @ +0.5s)`, and SitePal
-  makes that face on that character for a few seconds. The faces are smile,
-  grin, sad, angry, afraid, disgusted, surprised, thinking and wink
-  (`src/lib/ltTv/faces.mjs`, which also holds each one's strength and length).
+  makes that face on that character for a few seconds. The faces are smile
+  (closed mouth), grin (open mouth), sad, angry, afraid, disgusted, surprised
+  and thinking (`src/lib/ltTv/faces.mjs`, which also holds each one's strength and length).
   Both writers now add some; delete the line to drop one. Beats change nothing
   you hear, so on a recorded episode "Apply my edits" keeps the recording when
   only beats or faces changed, and refreshes what the set plays.
