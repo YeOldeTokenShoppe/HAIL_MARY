@@ -58,6 +58,16 @@ export function readGlb(path) {
 export const nodeNames = (gltf) => new Set((gltf.nodes || []).map((n) => n.name).filter(Boolean));
 export const clipNames = (gltf) => (gltf.animations || []).map((a) => a.name).filter(Boolean);
 
+/**
+ * Names that read as a working copy someone meant to delete. Only nodes that
+ * CARRY GEOMETRY count: an empty by that name draws nothing and costs nothing.
+ */
+export const LEFTOVER_NAME = /(?:^|[_.])(?:orig|original|backup|bak|copy|duplicate)(?:[_.]|\d|$)/i;
+export const leftoverCopies = (gltf) =>
+  (gltf.nodes || [])
+    .filter((n) => n.name && n.mesh !== undefined && LEFTOVER_NAME.test(n.name))
+    .map((n) => n.name);
+
 /** The node by name, or null. */
 export const nodeByName = (gltf, name) => (gltf.nodes || []).find((n) => n.name === name) || null;
 
@@ -391,14 +401,63 @@ export function resolveSet(candidates = SET_MODEL.candidates) {
 
 function checkSet() {
   const resolved = resolveSet();
-  say(`\nThe set — ${resolved.file}`);
-  const gltf = resolved.gltf;
+  // CHECK WHAT THE BROWSER LOADS, NOT WHAT RESOLVED.
+  //
+  // resolveSet takes the first candidate carrying every required prop, but the
+  // scene never resolves anything: it always loads SET_MODEL.file. So whenever
+  // that file is in the repo AT ALL it is the subject here, prop-complete or
+  // not — reporting its missing props and then describing a different file's
+  // contents is how a broken re-export gets a clean bill of health.
+  //
+  // The deliberate fallback survives: at an older commit the contract names
+  // the pre-split file too, so that IS SET_MODEL.file and nothing changes.
+  const loaded = resolved.seen.find((c) => c.file === SET_MODEL.file && c.present);
+  const subject = loaded ? loaded.file : resolved.file;
+  const gltf = loaded ? loaded.gltf : resolved.gltf;
+  say(`\nThe set — ${subject}`);
   if (!gltf) {
     problems.push(`no set file found (looked for ${SET_MODEL.candidates.join(", ")})`);
     say(`  ✗ none of the candidates is in the repo: ${SET_MODEL.candidates.join(", ")}`);
     return;
   }
-  const others = resolved.seen.filter((c) => c.isSet && c.file !== resolved.file);
+  // WHY A SKIPPED CANDIDATE HAS TO BE SAID OUT LOUD.
+  //
+  // resolveSet walks the candidates newest first and takes the first one that
+  // carries every required prop. So a set file that is ABSENT and one that is
+  // PRESENT BUT SHORT A PROP both fall through to the pre-split file, and the
+  // report used to be character-for-character identical in either case: a
+  // header naming the old file and not one word about the new one.
+  //
+  // That matters because the scene does not resolve anything — it always
+  // loads SET_MODEL.file (`modelUrl(SET_MODEL.file)` in TalkShowScene.jsx).
+  // When this check falls back, every line under the header describes a file
+  // the browser never opens, and the pre-split file's stowaway characters and
+  // leftover clips read as brand-new failures in the re-export.
+  //
+  // Cost Michelle a round on 2026-09-22: she re-exported the set, ran this,
+  // and got four "problem(s) that would show up on air" that were all just
+  // what talk_show3-textures.glb has always contained.
+  const skipped = [];
+  for (const candidate of resolved.seen) {
+    if (candidate.file === subject) break;
+    if (!candidate.present) {
+      say(`  ✗ ${candidate.file} is not in the repo — is it saved in the right folder?`);
+      skipped.push(`${candidate.file} is not there`);
+    } else {
+      const short = SET_MODEL.requires.filter((name) => !nodeNames(candidate.gltf).has(name));
+      say(`  ✗ ${candidate.file} is here but does not read as a set — missing: ${short.join(", ")}`);
+      skipped.push(`${candidate.file} is missing ${short.join(", ")}`);
+    }
+  }
+  if (subject !== SET_MODEL.file) {
+    problems.push(
+      `the scene loads ${SET_MODEL.file}, but ${skipped.join("; ")} — so this run checked ` +
+        `${subject} instead, and nothing it says describes what the browser opens`,
+    );
+    say(`  ✗ the scene loads ${SET_MODEL.file}, so everything below is about the WRONG FILE`);
+  }
+
+  const others = resolved.seen.filter((c) => c.isSet && c.file !== subject);
   if (others.length) {
     warnings.push(
       `more than one file looks like the set (${[resolved.file, ...others.map((o) => o.file)].join(", ")}) — ` +
@@ -437,6 +496,40 @@ function checkSet() {
     if (clips.length === 0) say(`  ✓ no animations left in the set`);
     else say(`  · still carries ${clips.length} clip(s) — they belong with the characters`);
   }
+
+  // WORKING COPIES LEFT IN THE SET.
+  //
+  // `requires` only asks whether each prop is THERE, so anything EXTRA sails
+  // straight through it. Michelle's re-export on 2026-09-22 added three
+  // objects the set had never carried — NewsDesk_original_backup,
+  // NeonTop_original_backup and Paper_original_backup — and every one of them
+  // held real geometry, so every one of them would have been drawn.
+  //
+  // Two sat on the exact transform of the prop they were copied from, which
+  // is z-fighting rather than a visible duplicate: the flicker reads as a
+  // texture or lighting fault, not as a second object.
+  //
+  // They also survive the desk-hiding pass. TalkShowScene hides the news props
+  // by name with `(?:[._]?\d+)?` on the end, which forgives `NewsDesk.002` but
+  // not `NewsDesk_original_backup` — so a working copy is on screen during
+  // Markets & Morality too, where the whole desk is meant to be gone.
+  const leftovers = leftoverCopies(gltf);
+  if (leftovers.length === 0) {
+    say(`  ✓ no working copies left in the set`);
+  } else {
+    const named = leftovers.slice();
+    problems.push(
+      `the set carries ${named.length} working cop${named.length === 1 ? "y" : "ies"} with geometry ` +
+        `(${named.join(", ")}) — they would be drawn, and the desk-hiding pass does not match them`,
+    );
+    say(`  ✗ working copies that would be drawn: ${named.join(", ")}`);
+  }
+
+  // A "two props on the same transform" check was written here and deleted
+  // unshipped. glTF splits one Blender object into a node per material, so
+  // those siblings legitimately share a transform: it flagged 16 palm leaves
+  // and the content screen on the set that is on air today. A check that is
+  // noisy on a known-good file teaches people to skip the output.
 }
 
 /**

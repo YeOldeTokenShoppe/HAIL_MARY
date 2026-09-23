@@ -1198,6 +1198,59 @@ export const FACE_LIGHTING = {
   fadeLambda: 2.2,
 };
 
+/**
+ * SITEPAL'S OWN HEAD MOTION, WHICH THIS SET DOES NOT WANT.
+ *
+ * A SitePal character moves its head on its own in three ways: it looks
+ * around at random when idle (`setIdleMovement`, default frequency 50), it
+ * makes random head movements while speaking (`setSpeechMovement`, default
+ * amplitude 50), and its gaze can follow the cursor (`followCursor`). All
+ * three are documented in docs/sitepal.md under Animation Control Functions.
+ *
+ * On a normal SitePal page that motion is the performance. Here it is damage.
+ * The face reaches the set as a FIXED CROP — `paintCrop` copies one rectangle
+ * of the player's render into the canvas every frame, and that rectangle does
+ * not know the head has moved. So SitePal's motion slides and rotates the
+ * face WITHIN the crop box while the Face2 mesh it is painted onto holds
+ * still, which reads as the face drifting loose of the head. Michelle
+ * reported exactly that on 2026-09-23.
+ *
+ * The head motion the show does want comes from the GLB instead: the head
+ * bone is animated by the clips and the listener gaze, and the face rides
+ * along because it is painted on the mesh. So this is not a trade of motion
+ * for stillness — it is removing the one source of movement the projection
+ * cannot follow, and keeping the one it can.
+ *
+ * Blinking is deliberately LEFT ALONE at SitePal's default. It moves eyelids,
+ * not the head, so the crop still lines up, and a face that never blinks
+ * reads as dead.
+ *
+ * Live-tunable from `window.__tsHead`, and pushed to both portals again by
+ * `window.__tsHead.apply()`, so the difference can be judged by eye on the
+ * set rather than argued about here.
+ */
+export const SITEPAL_HEAD_MOTION = {
+  idleFrequency: 0, // 0 turns idle look-around off; 0-100, SitePal's default 50
+  idleAmplitude: 50, // ignored while the frequency is 0
+  speechAmplitude: 0, // 0 turns random head movement during speech off
+  followCursor: 0, // 0 = OFF, 1 = in the embed box, 2 = anywhere on the page
+  recenter: true, // put the gaze back to centre once the scene is up
+};
+
+/** Push the head-motion settings into one portal's document. */
+export function applyHeadMotion(win, cfg = SITEPAL_HEAD_MOTION) {
+  if (!win) return;
+  try {
+    win.setIdleMovement?.(cfg.idleFrequency, cfg.idleAmplitude);
+    win.setSpeechMovement?.(cfg.speechAmplitude);
+    win.followCursor?.(cfg.followCursor);
+    if (cfg.recenter) win.recenter?.();
+  } catch (e) {
+    // A portal mid-reload has no API yet; the next ready message re-applies.
+    console.warn("[TalkShowScene] could not set head motion on a portal", e);
+  }
+}
+
 // HOLDING THE STATE WHILE YOU TUNE IT. The two looks the rig has are "an
 // episode is running" and "one isn't", and reaching the first one honestly
 // means sitting through a show — useless when the thing being judged is the
@@ -1221,6 +1274,18 @@ export function HouseAmbient({ dimmed = false }) {
     if (typeof window === "undefined") return;
     window.__tsAmbient = HOUSE_AMBIENT;
     window.__tsHouse = HOUSE_PREVIEW;
+    // Edit the numbers, then call apply() to push them into both portals.
+    // Nothing reads these per frame — a portal only takes them when told.
+    window.__tsHead = SITEPAL_HEAD_MOTION;
+    window.__tsHead.apply = () => {
+      document.querySelectorAll("iframe").forEach((f) => {
+        try {
+          if (f.contentWindow?.setIdleMovement) applyHeadMotion(f.contentWindow);
+        } catch {
+          // a cross-origin iframe on the page is not ours to touch
+        }
+      });
+    };
     // Read fresh every frame, so a value set here shows on the next one.
     window.__tsGaze = LISTENER_GAZE_DEGREES;
   }, []);
@@ -2711,6 +2776,9 @@ function TalkShowModel({
         } catch (e) {
           console.warn(`[TalkShowScene] could not silence ${key} portal`, e);
         }
+        // Every portal-ready is a FRESH DOCUMENT, so these have to go in
+        // again on each one rather than once at mount.
+        applyHeadMotion(portal.frame.contentWindow);
         preloadEpisode(key);
         notifyReady();
       }
