@@ -18,6 +18,8 @@ import {
   readGlb,
   nodeNames,
   clipNames,
+  leftoverCopies,
+  LEFTOVER_NAME,
   nodeByName,
   hasRig,
   seatDrift,
@@ -95,6 +97,31 @@ ok("the props-only file's own missing props are discoverable from seen",
   SET_MODEL.requires.filter((n) => !nodeNames(rejected.seen[0].gltf).has(n)).length > 0);
 ok("both cases are distinguishable from a clean run, which resolves to the scene's own file",
   absent.file !== SET_MODEL.file && rejected.file !== SET_MODEL.file && resolved.file === SET_MODEL.file);
+
+// WORKING COPIES LEFT IN THE SET. `requires` only asks whether a prop is
+// there, so extra geometry sails through it — Michelle's 2026-09-22 re-export
+// carried NewsDesk_original_backup, NeonTop_original_backup and
+// Paper_original_backup, all with meshes, all of which would have been drawn.
+check("the set on air carries no working copies", leftoverCopies(set), []);
+const fakeSet = {
+  nodes: [
+    { name: "NewsDesk", mesh: 0 },
+    { name: "NewsDesk.002", mesh: 1 },
+    { name: "NewsDesk_original_backup", mesh: 2 },
+    { name: "Paper_original_backup", mesh: 3 },
+    { name: "Spare_backup_Empty" },
+  ],
+};
+check("a working copy with geometry is named", leftoverCopies(fakeSet),
+  ["NewsDesk_original_backup", "Paper_original_backup"]);
+ok("a numbered duplicate is NOT a working copy - the desk-hiding regex forgives .002",
+  !LEFTOVER_NAME.test("NewsDesk.002"));
+ok("and an empty by a leftover name is ignored, since it draws nothing",
+  !leftoverCopies(fakeSet).includes("Spare_backup_Empty"));
+// Names on the set today that must NOT be mistaken for leftovers.
+for (const name of ["Photocall", "Palm_Leaf19_Color_1_0", "Base4.001", "Content_Screen", "DeskChair.001"]) {
+  ok(`"${name}" reads as a real prop`, !LEFTOVER_NAME.test(name));
+}
 
 // ── Each character's own export ───────────────────────────────────────────
 console.log("\nEvery character file carries what the set asks of it:");
