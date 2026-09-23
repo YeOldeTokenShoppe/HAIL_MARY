@@ -139,9 +139,13 @@ for (const [actor, character] of Object.entries(CHARACTERS)) {
   ok(`${actor}: an armature is found under it`, hasRig(gltf, character.empty).found);
   check(`${actor}: no required clip is missing`,
     requiredClips(character).filter((n) => !clips.includes(n)), []);
-  ok(`${actor}: the face to hide (${character.faces.face1}) is there`, names.has(character.faces.face1));
-  ok(`${actor}: the face to paint (${character.faces.face2}) is there`, names.has(character.faces.face2));
-  for (const hide of character.faces.hide) ok(`${actor}: ${hide} is there`, names.has(hide));
+  // A character with no `faces` has no SitePal face yet (Kip, as first
+  // exported): seated and animated, but not castable until they get one.
+  if (character.faces) {
+    ok(`${actor}: the face to hide (${character.faces.face1}) is there`, names.has(character.faces.face1));
+    ok(`${actor}: the face to paint (${character.faces.face2}) is there`, names.has(character.faces.face2));
+    for (const hide of character.faces.hide) ok(`${actor}: ${hide} is there`, names.has(hide));
+  }
 
   // It should be their file and nobody else's: a stray second empty means the
   // export took the neighbouring character along and they would be drawn twice.

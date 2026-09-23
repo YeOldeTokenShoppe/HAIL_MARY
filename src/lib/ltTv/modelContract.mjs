@@ -122,9 +122,14 @@ export const CHARACTERS = {
         quaternion: [0, 0.25504, 0, 0.96693],
         scale: 1.12482,
       },
+      // MOVED WITH HIS CHAIR 2026-09-23. Michelle's set re-export slid the
+      // left desk chair about 14cm forward and turned it ~18° toward the
+      // camera; this is his old seat carried through exactly that motion, so he
+      // is still in it. Kip took the news seat that day and Connor keeps this
+      // one only for news episodes already recorded with him (Warsh Means It).
       news: {
-        position: [-0.44472, 0.42248, 0.018999],
-        quaternion: [0, 0.255, 0, 0.967],
+        position: [-0.40006, 0.42248, 0.15376],
+        quaternion: [0, 0.10119, 0, 0.99487],
         scale: 1.125,
       },
     },
@@ -154,9 +159,10 @@ export const CHARACTERS = {
         quaternion: [0, -0.02971, 0, 0.99956],
         scale: 1.08099,
       },
+      // Carried with the right desk chair's 2026-09-23 move, as Connor's is.
       news: {
-        position: [0.53267, 0.39882, -0.049794],
-        quaternion: [0, -0.03, 0, 1],
+        position: [0.47845, 0.39882, 0.11092],
+        quaternion: [0, -0.00636, 0, 0.99998],
         scale: 1.081,
       },
     },
@@ -236,10 +242,52 @@ export const CHARACTERS = {
      * toward the middle where he is turned 3°. Those are hers.
      */
     seat: {
+      // FROM HER 2026-09-23 EXPORT, which was made on the re-exported set with
+      // the chairs in their new places — her seated pelvis lands over the
+      // moved right chair. That re-export also changed her rig's own
+      // transforms (smaller empty, the armature re-rooted), so the old seat
+      // numbers would not have carried across even for the old chair.
       news: {
-        position: [0.45241, 0.33581, 0.02213],
-        quaternion: [0, -0.35246, 0, 0.93583],
-        scale: 0.84565,
+        position: [0.76251, 0.66461, 0.19016],
+        quaternion: [0, -0.29694, 0, 0.9549],
+        scale: 0.73529,
+      },
+    },
+  },
+  /*
+   * KIP O'BRIEN, THE NEWS ANCHOR, added 2026-09-23. He takes Connor's seat on
+   * the news and ONLY the news: Connor stays on Markets & Morality (Michelle,
+   * 2026-09-23). Every name below was read off his export with
+   * `npm run lt:models -- public/models/LTTV_NewsAnchor.glb`.
+   *
+   * Same Unreal-style skeleton as Holly (`Root`, `Pelvis`, `head`), so they
+   * share 48 bone names — fine, every lookup is scoped to the empty.
+   *
+   * NO FACES YET. His export is ONE skinned mesh, head and all, so there is no
+   * separate static face to hide or face layer for SitePal to paint onto. He
+   * is seated and animated, and nobody sees him until an episode casts him;
+   * a face pair and a SitePal scene are what put him on air.
+   */
+  Kip: {
+    file: "public/models/LTTV_NewsAnchor.glb",
+    empty: "NewsGuy_Empty",
+    rig: "Root",
+    headBone: "head",
+    base: "newsAnchor_idle_sit",
+    reactions: {
+      headnod: { clip: "anchorGuy_agreement", duration: 3.0 },
+      headshake: { clip: "anchorGuy_disagreement", duration: 3.0 },
+    },
+    // The news set's resting state between episodes, as Connor's head-turn
+    // was: same 46.70s.
+    outro: "anchorGuy_intermission",
+    seat: {
+      // From his own export, made on the 2026-09-23 set with the left chair
+      // in its new place; his seated pelvis lands over it.
+      news: {
+        position: [-0.42587, 1.31709, 0.10489],
+        quaternion: [0, 0.01121, 0, 0.99994],
+        scale: 0.84526,
       },
     },
   },

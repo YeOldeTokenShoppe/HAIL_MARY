@@ -72,6 +72,17 @@ export const CAST = {
     clipKey: "holly",
     role: "co-anchor",
   },
+  // THE NEWS ANCHOR from 2026-09-23, in Connor's news seat (Connor stays on
+  // Markets & Morality). Voice from Michelle the same day. His clips will be
+  // lttv_news_epNN_kip.
+  Kip: {
+    actor: "Kip",
+    displayName: "Kip O'Brien",
+    voiceId: "PrphkIjVNo6xpWZI8duh",
+    processorKey: "kip",
+    clipKey: "kip",
+    role: "anchor",
+  },
 };
 
 // ── SitePal clip names ────────────────────────────────────────────────────
