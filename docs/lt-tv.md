@@ -107,6 +107,24 @@ under "PAUSE, RESUME AND SKIPPING", the arithmetic is in
 
 ---
 
+## The news cast: Kip O'Brien and Holly Jones (from 2026-09-23)
+
+Kip O'Brien took Connor's news seat on 2026-09-23; Connor stays on Markets &
+Morality, and keeps a news seat only so the episodes he already recorded there
+(Warsh Means It) still play. Kip is `LTTV_NewsAnchor.glb` (empty
+`NewsGuy_Empty`, the same Unreal-style skeleton as Holly), voice
+`PrphkIjVNo6xpWZI8duh`, SitePal scene 2775617, clips `lttv_news_epNN_kip`. His
+character is Michelle's brief, in the news writer: a veteran network anchor,
+completely deadpan, too grave about trivia. He opens each story; Holly has the
+numbers.
+
+The same export moved both desk chairs, so every news seat moved with them
+(`modelContract.mjs`). Holly's intermission is now her coffee break,
+`hologirl_coffee_long_conversation`, and the cup on the desk
+(`Hologirl_Sip_Cup`) is handed to her `Coffee_Cup_Control` bone once her idle
+has posed it, so it follows her sip. Her crop and Kip's are seeds until fitted
+at `/trade?tune=sitepal`.
+
 ## The live show — the Q&A desk
 
 The characters take viewers' questions live: the show's reader reads the
@@ -142,7 +160,7 @@ as the lineup page). Locally it does not.
 
 | Set | Reads the question | Answers |
 | --- | --- | --- |
-| News | Holly | Holly and Connor |
+| News | Kip | Kip and Holly |
 | Markets & Morality | Connor | Connor and GR80 |
 
 **Why one browser.** The voices are SitePal's live speech (`sayText`, engine

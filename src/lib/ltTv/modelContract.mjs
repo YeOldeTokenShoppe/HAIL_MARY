@@ -242,7 +242,9 @@ export const CHARACTERS = {
      * once. "Face1 is the one on screen before the projection arrives" is
      * true and is not the whole list.
      */
-    faces: { face1: "Face1", face2: "Face2", hide: ["Face3", "Eye_L", "Eye_R"] },
+    // Her 2026-09-23 re-export folded the two eye planes into Face3 (it now
+    // carries the eye materials), so Face3 is the only thing left to hide.
+    faces: { face1: "Face1", face2: "Face2", hide: ["Face3"] },
     /*
      * NEWS ONLY, which is the cast split: GR80 does Markets & Morality and she
      * does the news. A character with no seat on a set is not on that set —
