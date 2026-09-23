@@ -28,6 +28,7 @@ import CouncilChatScreens from "@/components/CouncilChatScreens";
 import TalkShowScene, { preloadTalkShow, HouseAmbient, TALKSHOW_PROJECTION_CONFIG } from "@/components/trade/TalkShowScene";
 import LTTvLightPanel from "@/components/trade/LTTvLightPanel";
 import LTTvShotPanel from "@/components/trade/LTTvShotPanel";
+import LTTvExpressionPanel from "@/components/trade/LTTvExpressionPanel";
 import LTTvBroadcastPanel from "@/components/trade/LTTvBroadcastPanel";
 import { SHOWS as LT_TV_SHOWS, findEpisode as findLtTvEpisode } from "@/content/lt-tv";
 import { WATCH_PARAM as LT_TV_WATCH_PARAM, readWatch as readLtTvWatch, watchValue as ltTvWatchValue, withWatch as withLtTvWatch } from "@/lib/ltTv/watchUrl.mjs";
@@ -3621,6 +3622,12 @@ export default function CyborgTemple() {
           frame, and copies the numbers back out. Left-hand side, so it and the
           lighting board (right) can be open together. */}
       <LTTvShotPanel />
+
+      {/* LT TV expression board — shows only when ?tune=faces is in the URL.
+          Fires SitePal's setFacialExpression into one character's portal, the
+          iframe their face on the set is cropped from, and records whether
+          each expression reads through the projection. */}
+      <LTTvExpressionPanel />
 
       {/* Dev SitePal crop tuning panel — shows only when ?tune=sitepal.
           It builds its talk-show tabs from TALKSHOW_PROJECTION_CONFIG, so a
