@@ -19,7 +19,16 @@ import {
   readExchange,
   speakable,
 } from "../src/lib/ltTv/liveDesk.mjs";
-import { answerQuestion, liveSystem, liveUser, RECENT_EXCHANGES } from "./lt-tv-live.mjs";
+import {
+  answerQuestion,
+  banterSystem,
+  banterUser,
+  BANTER_ANGLES,
+  liveSystem,
+  liveUser,
+  RECENT_EXCHANGES,
+  writeBanter,
+} from "./lt-tv-live.mjs";
 import { CAST } from "./lt-tv-format.mjs";
 import { NEWS_ACTORS } from "./lt-news-script.mjs";
 import { MORALITY_ACTORS } from "./lt-rt-script.mjs";
@@ -112,6 +121,21 @@ ok("the question is fenced as the viewer's words", user.includes("<question>\nIs
 ok("and credited to them", user.includes("from kai"));
 ok(`only the last ${RECENT_EXCHANGES} exchanges ride along`, user.includes("joke 8") && user.includes("joke 5") && !user.includes("joke 4"));
 check("a first question has no history", liveUser({ question: "q", name: "n" }).startsWith("The next question"), true);
+const afterBanter = liveUser({ question: "q", name: "n", recent: [{ kind: "banter", lines: [{ speaker: "Monk", text: "the chairs again" }] }] });
+ok("banter rides along too, as banter", afterBanter.includes("Between questions:\nGR80: the chairs again"));
+
+console.log("\nbanter");
+const newsBanter = banterSystem("news");
+ok("the same characters", newsBanter.includes("devil's advocate") && newsBanter.includes("NO CONTRACTIONS"));
+ok("says it is banter, not an answer", newsBanter.includes("This is BANTER") && !newsBanter.includes("reading the question"));
+ok("still no advice", newsBanter.includes("NO FINANCIAL ADVICE"));
+ok("still no figures", newsBanter.includes("Never state a price"));
+ok("only the news cast", newsBanter.includes('"speaker": "Holly" or "Connor"') && !newsBanter.includes('"Monk"'));
+ok("GR80 banters on Markets & Morality", banterSystem("morality").includes('"Monk" (Saint GR80)'));
+const bu = banterUser({ angle: "the chairs", recent: [{ name: "kai", question: "Is it a bubble?", lines: [{ speaker: "Connor", text: "pin" }] }] });
+ok("carries its angle", bu.includes("Tonight's angle: the chairs."));
+ok("and what was said tonight", bu.includes("kai asked: Is it a bubble?"));
+ok("there are angles to pick from", BANTER_ANGLES.length >= 6 && new Set(BANTER_ANGLES).size === BANTER_ANGLES.length);
 
 console.log("\nthe failsafe");
 ok("a line always gets time to be said", lineTimeoutMs("Hi.") >= 12000);
@@ -154,7 +178,20 @@ console.log("\nasking the writer (model stubbed)");
     stub("Sure! Here is a fun answer with no JSON at all.");
     ok("prose is a message for the producer", (await answerQuestion({ show: "news", question: "q", name: "n" })).error);
 
+    stub(JSON.stringify({ lines: [
+      { speaker: "Holly", text: "It is quiet." },
+      { speaker: "Connor", text: "[smug] Quiet is when I make money." },
+      { speaker: "Monk", text: "Not on this set." },
+    ] }));
+    const banter = await writeBanter({ show: "news", angle: "the quiet" });
+    check("banter comes back as lines for this set", banter.lines?.map((l) => l.speaker), ["Holly", "Connor"]);
+    check("in their own voices, tags gone", banter.lines?.map((l) => [l.voice, l.text]), [[CAST.Holly.voiceId, "It is quiet."], [CAST.Connor.voiceId, "Quiet is when I make money."]]);
+    ok("with the banter brief and its angle", sent?.system?.includes("This is BANTER") && sent?.messages?.[0]?.content?.includes?.("the quiet"));
+    stub("Sure, here is some banter.");
+    ok("prose banter is a message, not a crash", (await writeBanter({ show: "morality" })).error);
+
     sent = null;
+    ok("banter for no show, no call", (await writeBanter({ show: "roundtable" })).error && sent === null);
     ok("no question, no call", (await answerQuestion({ show: "news", question: "   ", name: "n" })).error && sent === null);
     ok("not a live show, no call", (await answerQuestion({ show: "roundtable", question: "q", name: "n" })).error && sent === null);
 

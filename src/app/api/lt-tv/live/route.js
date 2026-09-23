@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { answerQuestion } from '../../../../../scripts/lt-tv-live.mjs';
+import { answerQuestion, writeBanter } from '../../../../../scripts/lt-tv-live.mjs';
 import { SESSION_COOKIE, tokenIsValid } from '@/lib/ltTv/lineupAuth.mjs';
 import { IS_DEV } from '@/lib/ltTv/devOnly.mjs';
 import { liveShowFor } from '@/lib/ltTv/liveDesk.mjs';
@@ -8,7 +8,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // THE LIVE DESK'S WRITER, over HTTP: one viewer question in, a short in-
-// character exchange out. The desk on /trade?live=desk calls this and speaks
+// character exchange out — or, with `kind: "banter"` and no question, what the
+// two of them say to each other while the queue is empty. The desk on /trade?live=desk calls this and speaks
 // the result on the set; scripts/lt-tv-live.mjs is where the words are made.
 //
 // A THIRD KIND OF ROUTE UNDER /api/lt-tv/. The studio routes 404 outside
@@ -47,7 +48,9 @@ export async function POST(request) {
   if (!show) return Response.json({ error: 'The live desk runs on the news set or the Markets & Morality set.' }, { status: 400 });
 
   const recent = Array.isArray(body?.recent) ? body.recent.slice(-8) : [];
-  const out = await answerQuestion({ show, question: body?.question, name: body?.name, recent });
+  const out = body?.kind === 'banter'
+    ? await writeBanter({ show, recent })
+    : await answerQuestion({ show, question: body?.question, name: body?.name, recent });
   if (out.error) return Response.json({ error: out.error }, { status: 422 });
   return Response.json({ lines: out.lines });
 }

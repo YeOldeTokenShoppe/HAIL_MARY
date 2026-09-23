@@ -27,6 +27,12 @@ import {
  * spoken live by SitePal in their own ElevenLabs voices with lip-sync, while
  * the camera cuts to whoever is talking.
  *
+ * BETWEEN QUESTIONS the pair banter. While the desk is live and nothing is in
+ * the queue, a piece of small talk is kept written in advance and aired once
+ * the set has been quiet for a few seconds; pressing Air it on a question
+ * during banter cuts in after the line being spoken. It is off the moment the
+ * desk is not live, because every piece is a writer call and live speech.
+ *
  * ONE BROWSER, ON PURPOSE. Live speech is generated per playback, so this is
  * run in the producer's browser and broadcast from there — never in viewers'
  * pages, where it would be generated (and paid for) once per viewer. See
@@ -47,6 +53,12 @@ const SHOT_FOR_LINE = ["direct", "single", "two", "single", "close", "single"];
 // A breath between one character finishing and the next starting. SitePal
 // also takes a moment to start live speech, so this is kept short.
 const GAP_MS = 250;
+// Banter opens wide, so it reads as the two of them talking rather than a
+// segment, and cuts in for the lines after.
+const SHOT_FOR_BANTER = ["two", "single", "single", "two", "close", "single"];
+// How long the set is quiet, after the last thing said, before they banter.
+const BANTER_WAITS = [10, 20, 40, 60];
+const BANTER = "banter";
 const newId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 function portalWindow(key) {
@@ -131,7 +143,17 @@ export default function LTTvLiveDesk({ show = null, episodePlaying = false }) {
   const [password, setPassword] = useState("");
   const [signInError, setSignInError] = useState("");
   const [faces, setFaces] = useState({});
+  const [banterOn, setBanterOn] = useState(true);
+  const [banterAfter, setBanterAfter] = useState(20);
+  // The next piece of banter, written ahead: { show, status, lines, error }.
+  const [spare, setSpare] = useState(null);
+  const [banterOnAir, setBanterOnAir] = useState(null); // its lines, while airing
+  const [nextId, setNextId] = useState(null); // a question waiting for banter to yield
   const abortRef = useRef(null);
+  const airingRef = useRef(null); // { id, kind } — read by the banter timer
+  const quietSinceRef = useRef(0);
+  const nextRef = useRef(null);
+  const spareTokenRef = useRef(0);
   const itemsRef = useRef(items);
   itemsRef.current = items;
   const historyRef = useRef(history);
@@ -154,14 +176,16 @@ export default function LTTvLiveDesk({ show = null, episodePlaying = false }) {
       ));
     }
     if (Array.isArray(saved?.history)) setHistory(saved.history);
+    if (typeof saved?.banterOn === "boolean") setBanterOn(saved.banterOn);
+    if (BANTER_WAITS.includes(saved?.banterAfter)) setBanterAfter(saved.banterAfter);
   }, []);
 
   useEffect(() => {
     if (!visible) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ items, history: history.slice(-12) }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ items, history: history.slice(-12), banterOn, banterAfter }));
     } catch {}
-  }, [visible, items, history]);
+  }, [visible, items, history, banterOn, banterAfter]);
 
   // Which faces on this set can speak. Polled: the set loads long after the
   // desk mounts and says nothing when it does.
@@ -192,6 +216,9 @@ export default function LTTvLiveDesk({ show = null, episodePlaying = false }) {
     // The lights are only touched while live, so a lighting or faces board
     // open alongside keeps whatever pin it set.
     if (on) HOUSE_PREVIEW.force = "on";
+    // Going live starts the quiet clock, so banter does not open the show
+    // before the producer has said anything.
+    if (on) quietSinceRef.current = Date.now();
     return () => {
       TALKSHOW_LIVE.on = false;
       TALKSHOW_LIVE.speaker = null;
@@ -268,13 +295,18 @@ export default function LTTvLiveDesk({ show = null, episodePlaying = false }) {
       setPassword("");
       // Everything that failed for want of a session gets written now.
       itemsRef.current.filter((it) => it.status === "error").forEach((it) => write(it));
+      setSpare((sp) => (sp?.status === "error" ? null : sp));
     } catch {
       setSignInError("Could not reach the site.");
     }
   };
 
-  const air = async (item) => {
-    if (!cfg || airing || episodePlaying || !item.lines?.length) return;
+  /**
+   * Performs lines on the set: the camera on whoever speaks, the other one
+   * listening, one line after another until the end, Stop, or — for banter —
+   * a question cutting in.
+   */
+  const perform = async ({ id, kind, lines }) => {
     if (!live) setLive(true);
     // Let the live effect run first so the lights and camera are already up
     // when the first word lands.
@@ -284,19 +316,23 @@ export default function LTTvLiveDesk({ show = null, episodePlaying = false }) {
 
     const controller = new AbortController();
     abortRef.current = controller;
-    patch(item.id, { status: "airing" });
+    airingRef.current = { id, kind };
+    const shots = kind === BANTER ? SHOT_FOR_BANTER : SHOT_FOR_LINE;
     const used = new Set();
     let stopped = false;
+    let yielded = false;
     let problem = "";
 
-    for (let i = 0; i < item.lines.length; i += 1) {
+    for (let i = 0; i < lines.length; i += 1) {
       if (controller.signal.aborted) { stopped = true; break; }
-      const line = item.lines[i];
+      // Banter gives way to a question at the end of the line being spoken.
+      if (kind === BANTER && nextRef.current) { yielded = true; break; }
+      const line = lines[i];
       if (!cfg.actors.includes(line.speaker) || !line.voice) continue;
-      setAiring({ id: item.id, line: i });
+      setAiring({ id, line: i });
       TALKSHOW_LIVE.speaker = line.speaker;
       TALKSHOW_LIVE.listener = cfg.actors.find((a) => a !== line.speaker) || null;
-      TALKSHOW_LIVE.framing = SHOT_FOR_LINE[i] || "single";
+      TALKSHOW_LIVE.framing = shots[i] || "single";
       used.add(line.speaker);
       const result = await speakLine({ key: line.speaker, text: line.text, voice: line.voice, signal: controller.signal });
       if (result.why === "stopped") { stopped = true; break; }
@@ -314,8 +350,24 @@ export default function LTTvLiveDesk({ show = null, episodePlaying = false }) {
       try { portalWindow(key)?.setPlayerVolume?.(0); } catch {}
     });
     if (abortRef.current === controller) abortRef.current = null;
+    airingRef.current = null;
+    quietSinceRef.current = Date.now();
     setAiring(null);
+    return { stopped, yielded, problem };
+  };
 
+  const air = async (item) => {
+    if (!cfg || episodePlaying || !item.lines?.length) return;
+    if (airingRef.current) {
+      // During banter, a question goes next rather than waiting for the end.
+      if (airingRef.current.kind === BANTER) {
+        nextRef.current = item.id;
+        setNextId(item.id);
+      }
+      return;
+    }
+    patch(item.id, { status: "airing" });
+    const { stopped, problem } = await perform({ id: item.id, kind: "question", lines: item.lines });
     if (stopped) {
       patch(item.id, { status: "ready", error: "Stopped part way through." });
       return;
@@ -323,8 +375,97 @@ export default function LTTvLiveDesk({ show = null, episodePlaying = false }) {
     patch(item.id, { status: "aired", error: problem });
     setHistory((list) => [...list, { show: item.show, name: item.name, question: item.question, lines: item.lines }].slice(-12));
   };
+  const airRef = useRef(air);
+  airRef.current = air;
 
-  const stop = () => abortRef.current?.abort();
+  // ── Banter ──────────────────────────────────────────────────────────────
+
+  const writeBanter = useCallback(async (forShow) => {
+    const token = ++spareTokenRef.current;
+    setSpare({ show: forShow, status: "writing", lines: null, error: "" });
+    const settle = (fields) => {
+      // A set change or a skip while this was being written makes it stale.
+      if (spareTokenRef.current === token) setSpare({ show: forShow, lines: null, error: "", ...fields });
+    };
+    try {
+      const res = await fetch("/api/lt-tv/live", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          kind: BANTER,
+          show: forShow,
+          recent: historyRef.current.filter((h) => h.show === forShow).slice(-4),
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 401 && body?.signIn) {
+        setNeedsSignIn(true);
+        settle({ status: "error", error: "Sign in below and it will be written." });
+        return;
+      }
+      if (!res.ok || !Array.isArray(body?.lines)) {
+        settle({ status: "error", error: body?.error || `The writer failed (${res.status}).` });
+        return;
+      }
+      settle({ status: "ready", lines: body.lines });
+    } catch {
+      settle({ status: "error", error: "Could not reach the writer." });
+    }
+  }, []);
+
+  // Keep one piece written ahead while live, so it airs the moment it is due.
+  // Nothing is written while the desk is not live: each piece costs a call.
+  useEffect(() => {
+    if (!visible || !live || !cfg || !banterOn) return;
+    if (spare && spare.show === show) return;
+    writeBanter(show);
+  }, [visible, live, cfg, banterOn, show, spare, writeBanter]);
+
+  const airBanter = async () => {
+    const piece = spare;
+    if (!cfg || airingRef.current || episodePlaying || piece?.status !== "ready" || piece.show !== show) return;
+    // Straight into tonight's history, so the next piece — written while this
+    // one airs — knows what was just said.
+    setHistory((list) => [...list, { show, kind: BANTER, lines: piece.lines }].slice(-12));
+    setBanterOnAir(piece.lines);
+    setSpare(null);
+    const { stopped } = await perform({ id: BANTER, kind: BANTER, lines: piece.lines });
+    setBanterOnAir(null);
+    // A question pressed during the last line is still waiting when banter
+    // ends on its own, so it goes on either way — unless Stop was pressed.
+    const waiting = nextRef.current;
+    nextRef.current = null;
+    setNextId(null);
+    if (stopped || !waiting) return;
+    const item = itemsRef.current.find((it) => it.id === waiting);
+    if (item?.lines?.length && (item.status === "ready" || item.status === "aired")) airRef.current(item);
+  };
+  const airBanterRef = useRef(airBanter);
+  airBanterRef.current = airBanter;
+
+  // The cue: live, nothing on air, nothing in the queue for this set, and
+  // quiet for long enough. Checked every second from refs, so the timer does
+  // not restart every time the desk re-renders.
+  const facesReadyNow = cfg ? cfg.actors.every((k) => faces[k] === "ready") : false;
+  const cueRef = useRef({});
+  cueRef.current = { banterAfter, episodePlaying, facesReady: facesReadyNow };
+  useEffect(() => {
+    if (!visible || !live || !cfg || !banterOn) return;
+    const id = setInterval(() => {
+      const cue = cueRef.current;
+      if (airingRef.current || cue.episodePlaying || !cue.facesReady) return;
+      if (itemsRef.current.some((it) => it.show === show && (it.status === "ready" || it.status === "writing"))) return;
+      if (Date.now() - quietSinceRef.current < cue.banterAfter * 1000) return;
+      airBanterRef.current();
+    }, 1000);
+    return () => clearInterval(id);
+  }, [visible, live, cfg, banterOn, show]);
+
+  const stop = () => {
+    nextRef.current = null;
+    setNextId(null);
+    abortRef.current?.abort();
+  };
   const drop = (id) => setItems((list) => list.filter((it) => it.id !== id));
   const clearAired = () => setItems((list) => list.filter((it) => it.status !== "aired"));
 
@@ -342,7 +483,8 @@ export default function LTTvLiveDesk({ show = null, episodePlaying = false }) {
 
   const queue = items.filter((it) => it.show === show);
   const others = items.length - queue.length;
-  const facesReady = cfg ? cfg.actors.every((k) => faces[k] === "ready") : false;
+  const facesReady = facesReadyNow;
+  const banterAiring = airing?.id === BANTER;
   const onAirItem = airing ? items.find((it) => it.id === airing.id) : null;
 
   return (
@@ -472,12 +614,12 @@ export default function LTTvLiveDesk({ show = null, episodePlaying = false }) {
                   {(it.status === "ready" || it.status === "aired") && (
                     <button
                       type="button"
-                      style={{ ...S.primary, ...(airing || episodePlaying || !facesReady ? S.disabled : null) }}
+                      style={{ ...S.primary, ...((airing && !banterAiring) || nextId || episodePlaying || !facesReady ? S.disabled : null) }}
                       onClick={() => air(it)}
-                      disabled={!!airing || episodePlaying || !facesReady}
-                      title={!facesReady ? "Waiting for the faces to load" : ""}
+                      disabled={(!!airing && !banterAiring) || !!nextId || episodePlaying || !facesReady}
+                      title={!facesReady ? "Waiting for the faces to load" : banterAiring ? "Cuts in when the line being spoken ends" : ""}
                     >
-                      {it.status === "aired" ? "Air it again" : "Air it"}
+                      {nextId === it.id ? "Up next…" : banterAiring ? "Air next" : it.status === "aired" ? "Air it again" : "Air it"}
                     </button>
                   )}
                   {it.status !== "writing" && it.status !== "airing" && (
@@ -498,8 +640,74 @@ export default function LTTvLiveDesk({ show = null, episodePlaying = false }) {
           </div>
         )}
 
+        {cfg && (
+          <div style={S.group}>
+            <div style={S.groupLabel}>Between questions</div>
+            <div style={S.row}>
+              <button
+                type="button"
+                style={{ ...S.chip, ...(banterOn ? S.chipOn : null) }}
+                onClick={() => setBanterOn((v) => !v)}
+              >
+                {banterOn ? "Banter: on" : "Banter: off"}
+              </button>
+              <label style={S.sub}>
+                after{" "}
+                <select value={banterAfter} onChange={(e) => setBanterAfter(Number(e.target.value))} style={S.select}>
+                  {BANTER_WAITS.map((n) => <option key={n} value={n}>{n}s</option>)}
+                </select>{" "}
+                quiet
+              </label>
+            </div>
+            {!banterOn ? (
+              <div style={S.sub}>Off. The set stays quiet between questions.</div>
+            ) : !live ? (
+              <div style={S.sub}>When you go live, {cfg.actors.map((a) => LIVE_NAMES[a]).join(" and ")} talk between questions whenever the queue is empty.</div>
+            ) : (
+              <div style={{ ...S.card, ...(banterAiring ? S.cardOnAir : null) }}>
+                <div style={S.cardHead}>
+                  <b style={S.asker}>{banterAiring ? "Banter" : "Next banter"}</b>
+                  <span style={banterAiring ? S.status.airing : S.status[spare?.status] || S.sub}>
+                    {banterAiring ? "on air" : spare?.status === "writing" ? "writing…" : spare?.status === "ready" ? "ready" : spare?.status === "error" ? "needs attention" : ""}
+                  </span>
+                </div>
+                {(banterAiring ? banterOnAir : spare?.lines)?.length > 0 && (
+                  <ol style={S.lines}>
+                    {(banterAiring ? banterOnAir : spare.lines).map((line, i) => (
+                      <li key={i} style={banterAiring && airing.line === i ? S.lineOn : S.line}>
+                        <b>{LIVE_NAMES[line.speaker] || line.speaker}:</b> {line.text}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {!banterAiring && spare?.error && <div style={S.warnNote}>{spare.error}</div>}
+                {banterAiring && nextId && <div style={S.sub}>The question goes on when this line ends.</div>}
+                {!banterAiring && (
+                  <div style={S.row}>
+                    {spare?.status === "ready" && (
+                      <button
+                        type="button"
+                        style={{ ...S.chip, ...(airing || episodePlaying || !facesReady ? S.disabled : null) }}
+                        onClick={() => airBanter()}
+                        disabled={!!airing || episodePlaying || !facesReady}
+                      >
+                        Banter now
+                      </button>
+                    )}
+                    {spare?.status !== "writing" && (
+                      <button type="button" style={S.chip} onClick={() => setSpare(null)}>
+                        {spare?.status === "error" ? "Try again" : "Write another"}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={S.fine}>
-          Each question is one call to the writer. Each line is spoken live by SitePal in the character&apos;s own ElevenLabs voice, once, in this browser only.
+          Banter is one writer call per piece, and only while live. Each question is one call to the writer. Each line is spoken live by SitePal in the character&apos;s own ElevenLabs voice, once, in this browser only.
         </div>
       </div>
     </>
@@ -552,6 +760,11 @@ const S = {
   chip: {
     background: "rgba(20,26,38,0.9)", color: "#cfe3ff", cursor: "pointer",
     border: "1px solid rgba(150,170,200,0.3)", borderRadius: 6, padding: "3px 8px", font: "inherit",
+  },
+  chipOn: { borderColor: "#7fe0a0", color: "#7fe0a0" },
+  select: {
+    background: "rgba(20,26,38,0.9)", color: "#e6f0ff", border: "1px solid rgba(150,170,200,0.3)",
+    borderRadius: 6, padding: "2px 4px", font: "inherit",
   },
   link: { background: "none", border: 0, color: "#8fb8ff", cursor: "pointer", font: "inherit", fontSize: 10, padding: 0, textTransform: "none", letterSpacing: 0 },
   primary: {

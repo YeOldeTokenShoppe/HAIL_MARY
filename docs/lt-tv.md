@@ -124,6 +124,19 @@ Morality set, and use the LIVE DESK panel on the right.
 3. **Air it.** The question shows as a lower third while it is answered.
    **Stop** cuts it off.
 
+**Between questions they banter.** While the desk is live and nothing is in the
+queue (nothing being written, nothing ready to air), the pair talk to each
+other in character once the set has been quiet for the time set under
+**Between questions** (20 seconds unless changed). One piece is always written
+ahead, and shown on the desk, so it airs straight away. **Write another** throws
+it away for a fresh one, **Banter now** airs it immediately, and **Banter: off**
+keeps the set quiet. Pressing **Air next** on a question during banter cuts in
+when the line being spoken ends. Nothing is written for banter while the desk
+is not live, since each piece is a writer call plus live speech. Each piece
+starts from a random angle (`BANTER_ANGLES` in `scripts/lt-tv-live.mjs`) so it
+does not land on the same joke, and it knows what was said earlier that night.
+Try it from a terminal: `node scripts/lt-tv-live.mjs --show morality --banter`.
+
 On the deployed site the desk asks once for the admin password (the same one
 as the lineup page). Locally it does not.
 
