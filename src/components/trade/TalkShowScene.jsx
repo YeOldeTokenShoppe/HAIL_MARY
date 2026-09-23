@@ -1289,8 +1289,13 @@ export const TALKSHOW_PORTALS = { current: null };
  * as a show (the director keeps the camera, the preload chain keeps out of the
  * portals); `speaker` is who holds the floor, `listener` who is being talked
  * to, and `framing` one of SHOT_NAMES. Ignored while an episode is playing.
+ *
+ * `cast` is who is at the desk tonight. Without it the set seats whoever the
+ * SELECTED EPISODE casts, which on 2026-09-23 was Connor — the only news
+ * episode was recorded before Kip took the seat — so Kip would have answered
+ * questions from an empty chair while Connor sat in his.
  */
-export const TALKSHOW_LIVE = { on: false, speaker: null, listener: null, framing: "two" };
+export const TALKSHOW_LIVE = { on: false, speaker: null, listener: null, framing: "two", cast: null };
 
 /** Push the head-motion settings into one portal's document. */
 export function applyHeadMotion(win, cfg = SITEPAL_HEAD_MOTION) {
@@ -1882,13 +1887,19 @@ function TalkShowModel({
       (cast.length === 0 || cast.includes(actor));
 
     const changed = [];
+    const baseline = {};
     Object.entries(EMPTY_FOR_ACTOR).forEach(([actor, name]) => {
       const object = cloned.getObjectByName(name);
       if (!object) return;
       changed.push([object, object.visible]);
       object.visible = shown(actor);
+      baseline[actor] = { object, visible: object.visible, seated: !castHidden && SEATED_ON[set].includes(actor) };
     });
-    return () => changed.forEach(([object, visible]) => { object.visible = visible; });
+    seatingRef.current = baseline;
+    return () => {
+      seatingRef.current = {};
+      changed.forEach(([object, visible]) => { object.visible = visible; });
+    };
   }, [cloned, castHidden, newsMode, timeline]);
 
   // The NewsDesk parent hides its entire prop hierarchy outside pre-show/news.
@@ -2340,6 +2351,9 @@ function TalkShowModel({
   // Which props have been handed to a character's bone (`props` in the
   // contract), per built scene. See the frame loop.
   const carriedRef = useRef({ scene: null, done: new Set() });
+  // Who the visibility effect seats from the episode, and who has a chair
+  // here at all — so the live desk can seat its own cast over it per frame.
+  const seatingRef = useRef({});
   useEffect(() => {
     const started = [];
     const out = {};
@@ -3717,7 +3731,7 @@ function TalkShowModel({
      * bone from then on. Once per built scene. */
     if (carriedRef.current.scene !== cloned) carriedRef.current = { scene: cloned, done: new Set() };
     Object.values(CHARACTERS).forEach((character) => {
-      (character.props || []).forEach(({ node, bone }) => {
+      (character.props || []).forEach(({ node, bone, settle = 0 }) => {
         const key = `${character.empty}:${node}`;
         const carried = carriedRef.current.done;
         if (carried.has(key)) return;
@@ -3729,6 +3743,15 @@ function TalkShowModel({
         if (!holder || !prop) {
           console.warn(`[TalkShowScene] ${node} cannot ride ${bone}: ${!holder ? "no bone" : "no prop"} in the scene`);
           return;
+        }
+        if (settle) {
+          // Down onto the desk, in the SET's own units: the mount scales the
+          // whole studio, so a world-space metre is not the file's metre.
+          const at = cloned.worldToLocal(prop.getWorldPosition(new THREE.Vector3()));
+          at.y -= settle;
+          prop.parent.updateWorldMatrix(true, false);
+          prop.position.copy(prop.parent.worldToLocal(cloned.localToWorld(at)));
+          prop.updateMatrixWorld(true);
         }
         holder.attach(prop);
       });
@@ -3806,6 +3829,15 @@ function TalkShowModel({
     // The moment the desk goes live, the set comes out of the intermission.
     if (live && !liveWasOnRef.current) leaveIntermissionRef.current?.();
     liveWasOnRef.current = live;
+    // Live, the desk's cast sits in the chairs; otherwise the episode's does.
+    // Written every frame (a handful of objects) so ending live puts the
+    // episode's cast straight back without the effect having to re-run.
+    Object.entries(seatingRef.current).forEach(([actor, seat]) => {
+      const visible = live && TALKSHOW_LIVE.cast
+        ? seat.seated && TALKSHOW_LIVE.cast.includes(actor)
+        : seat.visible;
+      if (seat.object.visible !== visible) seat.object.visible = visible;
+    });
     let addressedListener = live ? TALKSHOW_LIVE.listener : null;
     if (playback.running) {
       for (const cue of timeline?.gazes || []) {

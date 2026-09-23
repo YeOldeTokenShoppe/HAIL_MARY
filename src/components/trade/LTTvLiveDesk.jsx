@@ -210,6 +210,7 @@ export default function LTTvLiveDesk({ show = null, episodePlaying = false }) {
   useEffect(() => {
     const on = visible && live && !!cfg;
     TALKSHOW_LIVE.on = on;
+    TALKSHOW_LIVE.cast = on ? cfg.actors : null;
     TALKSHOW_LIVE.speaker = null;
     TALKSHOW_LIVE.listener = null;
     TALKSHOW_LIVE.framing = "two";
@@ -221,6 +222,7 @@ export default function LTTvLiveDesk({ show = null, episodePlaying = false }) {
     if (on) quietSinceRef.current = Date.now();
     return () => {
       TALKSHOW_LIVE.on = false;
+      TALKSHOW_LIVE.cast = null;
       TALKSHOW_LIVE.speaker = null;
       TALKSHOW_LIVE.listener = null;
       if (on) HOUSE_PREVIEW.force = null;
@@ -312,6 +314,7 @@ export default function LTTvLiveDesk({ show = null, episodePlaying = false }) {
     // when the first word lands.
     await new Promise((r) => setTimeout(r, 60));
     TALKSHOW_LIVE.on = true;
+    TALKSHOW_LIVE.cast = cfg.actors;
     HOUSE_PREVIEW.force = "on";
 
     const controller = new AbortController();

@@ -225,8 +225,13 @@ export const CHARACTERS = {
      * where it goes up to her mouth and back. The scene re-parents the cup
      * onto the bone once her idle has posed it, keeping the cup exactly where
      * it sits, so from then on it follows her sip. Measured off the files: the
-     * bone rests 7cm from the socket, so the cup rides with that offset. */
-    props: [{ node: "Hologirl_Sip_Cup", bone: "Coffee_Cup_Control" }],
+     * bone rests 7cm from the socket, so the cup rides with that offset.
+     *
+     * `settle` is how far the cup is lowered first, in the set file's metres.
+     * As exported 2026-09-23 the cup's base is at y 1.005 and the countertop's
+     * surface at 0.974, so it hovered 3.1cm over the desk — Michelle saw it
+     * floating. Zero it if the socket is ever moved down in Blender. */
+    props: [{ node: "Hologirl_Sip_Cup", bone: "Coffee_Cup_Control", settle: 0.031 }],
     /* SHE HAS THREE FACE LAYERS AND TWO EYE PLANES, and the same character is
      * already configured elsewhere in this repo — she is the promotions
      * hologram at the prize wheel in `src/lib/vendorSitePal.js`, on the same
