@@ -140,6 +140,8 @@ Invent nothing, ever. No number, date, name or quote may come from your own memo
 
 ${TITLE_RULES}
 
+THE STUDIO SCREEN. Behind the hosts, a screen shows each story while it is read. Viewers glance at it; they do not read it. So each story's "screen" is written FOR A SCREEN, not copied from the fact: a short headline, then EITHER one big figure with a label and one short line, when the story turns on one number, OR two or three bullets of a few words each, when it does not (a court case, a ruling, a mania). Never a sentence with clauses. Every number on the screen must appear in that story's "fact" (rounding is fine: 99.25 may be shown as $99); the screen is not re-checked, so a number that is not in the fact is thrown away. The same goes for the board's "screen" items against its lines and market.
+
 Return ONLY a JSON object, no preamble and no code fences:
 {
   "title": "the episode title, written to the title rules above",
@@ -163,12 +165,20 @@ Return ONLY a JSON object, no preamble and no code fences:
       "gr80Angle": "Holly's read: what the number actually measures, the part he will leave out, one sentence",
       "sources": [{ "title": "...", "url": "...", "outlet": "..." }],
       "verified": true | false,
-      "gaps": "anything you could not source or confirm, or empty string"
+      "gaps": "anything you could not source or confirm, or empty string",
+      "screen": {
+        "headline": "the studio screen's headline, under 32 characters",
+        "figure": "the ONE number this story is about, as a price screen would show it ($103.08, 4.96%, 25 bp), or empty string",
+        "label": "what that figure is, under 32 characters, or empty string",
+        "points": ["with a figure: ONE short line; without one: 2 or 3 bullets; each under 30 characters, no full stop"]
+      }
     }
   ],
   "board": {
     "lines": ["3 to 4 short sentences, each one number that moved and its direction"],
     "market": "the prediction-market line with its odds and its venue, one sentence",
+    "screen": ["the board as the studio screen lists it: 3 to 5 items, each a label and a number, under 24 characters, e.g. \"10-yr  4.96%\", \"WTI  $96.41 ▼9.9%\""],
+    "screenNote": "the prediction-market line for the screen, under 40 characters, e.g. \"Polymarket · Knesset long shot · 17.8¢\"",
     "sources": [{ "title": "...", "url": "...", "outlet": "..." }]
   }
 }`;

@@ -19,7 +19,7 @@
 
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { buildChapters } from "./lt-tv-chapters.mjs";
+import { buildChapters, keepScreenCopy, numbersChecked } from "./lt-tv-chapters.mjs";
 import { buildTicker } from "./lt-tv-episode.mjs";
 import { toSlateRecord } from "./lt-tv-slate-record.mjs";
 import {
@@ -83,6 +83,51 @@ ok(
     c.headline === "The week in numbers"),
 );
 ok("nothing empty is drawn", !everyString.includes('"headline":""'));
+
+console.log("\nThe studio screen gets copy written for a screen:");
+{
+  const fact = "Brent rebounded 3.9% to $103.08 on Wednesday after five straight down sessions.";
+  const withScreen = structuredClone(episode);
+  const s1 = withScreen.rundown.stories.find((s) => s.slot === "story-1");
+  s1.fact = fact;
+  s1.screen = { headline: "Oil bounces", figure: "$103.08", label: "Brent, Wednesday", points: ["Up 3.9% in a day", "extra"] };
+  const s2 = withScreen.rundown.stories.find((s) => s.slot === "story-2");
+  s2.screen = { headline: "Short one", figure: "$999", label: "made up", points: ["Invented 42% move", "No numbers here"] };
+  withScreen.rundown.board.lines = ["The ten-year closed at 4.96%", "WTI settled at $96.41, down 9.91%"];
+  withScreen.rundown.board.screen = ["10-yr  4.96%", "WTI  $96.41 ▼9.9%", "Gold  $7,777.77"];
+  const warned = [];
+  const built = buildChapters(withScreen, { warn: (m) => warned.push(m) });
+  const one = built.find((c) => c.segment === "story-1");
+  check("a figure story shows its figure, label and ONE line", [one.screen.figure, one.screen.label, one.screen.lines], ["$103.08", "Brent, Wednesday", ["Up 3.9% in a day"]]);
+  check("with the screen's short headline", one.screen.headline, "Oil bounces");
+  check("while the chiron keeps the story headline", one.headline, s1.headline);
+  const two = built.find((c) => c.segment === "story-2");
+  ok("a figure not in the fact is dropped", !two.screen.figure);
+  check("and so is a bullet with an unchecked number", two.screen.lines, ["No numbers here"]);
+  const boardCard = built.find((c) => c.segment === "the-board");
+  check("the board lists short items, checked against its lines", boardCard.screen.lines, ["10-yr  4.96%", "WTI  $96.41 ▼9.9%"]);
+  check("every drop is reported", warned.length, 3);
+  check("the running order uses the short headlines", built.find((c) => c.segment === "cold-open").screen.lines[0], "Oil bounces");
+  ok("authored cards are not marked derived", !one.screen.derived);
+  ok("a card built from the fact is", chapters.find((c) => c.segment === "story-1").screen.derived);
+}
+
+console.log("\nNumbers are matched as written or rounded, never invented:");
+ok("rounded is fine", numbersChecked("Brent $99", "Brent settled at $99.25"));
+ok("a thousands comma is fine", numbersChecked("Dow 51,512", "The Dow closed 51,511.59"));
+ok("a different number is not", !numbersChecked("Brent $98", "Brent settled at $99.25"));
+ok("a label like 10-yr is not a number", numbersChecked("10-yr 4.96%", "the ten-year at 4.96%"));
+ok("a 72-year-old in the fact counts", numbersChecked("Ohio man, 72", "A 72-year-old Ohio man"));
+
+console.log("\nA card written onto the slate by hand survives a re-stage:");
+{
+  const handMade = chapters.map((c) =>
+    c.segment === "story-1" ? { ...c, screen: { kicker: c.kicker, headline: "Short", lines: ["a", "b"], note: "" } } : c);
+  const kept = keepScreenCopy(chapters, handMade);
+  check("the same story keeps its hand-written card", kept.find((c) => c.segment === "story-1").screen.headline, "Short");
+  const nextWeek = chapters.map((c) => (c.segment === "story-1" ? { ...c, source: "A different story" } : c));
+  check("next week's story-1 does not inherit it", keepScreenCopy(nextWeek, handMade).find((c) => c.segment === "story-1").screen.lines, [story1.fact]);
+}
 
 console.log("\nA show with no chiron gets no chapters:");
 check("the roundtable stays as it was", buildChapters({ ...episode, graphics: undefined }), []);

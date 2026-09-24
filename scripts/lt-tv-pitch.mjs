@@ -110,6 +110,11 @@ function newsBody(plan) {
     // the anchor's read and the co-anchor's (Kip and Holly, 2026-09-23).
     out.push(`    ${pad("Kip")}${story.connorAngle ?? ""}`);
     out.push(`    ${pad("Holly")}${story.gr80Angle ?? ""}`);
+    if (story.screen) {
+      const sc = story.screen;
+      const figure = sc.figure ? `${sc.figure}${sc.label ? ` (${sc.label})` : ""} · ` : "";
+      out.push(`    ${pad("On screen")}${sc.headline ?? ""} — ${figure}${(sc.points || []).join(" · ")}`);
+    }
     for (const source of story.sources || []) {
       out.push(`    ${pad("Source")}${source.outlet ?? "?"} — ${source.title ?? source.url ?? ""}`);
     }
@@ -125,6 +130,7 @@ function newsBody(plan) {
     out.push("THE BOARD");
     for (const line of board.lines || []) out.push(`    ${line}`);
     if (board.market) out.push(`    ${board.market}`);
+    if (board.screen?.length) out.push(`    ${pad("On screen")}${board.screen.join(" · ")}${board.screenNote ? ` · ${board.screenNote}` : ""}`);
     out.push("");
   }
 

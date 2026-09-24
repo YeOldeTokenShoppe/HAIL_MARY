@@ -1703,6 +1703,8 @@ function chapterCards(timeline) {
       kind: "chapter",
       kicker: chapter.screen?.kicker ?? chapter.kicker ?? "",
       headline: chapter.screen?.headline ?? chapter.headline ?? "",
+      figure: chapter.screen?.figure ?? "",
+      label: chapter.screen?.label ?? "",
       lines: chapter.screen?.lines ?? [],
       note: chapter.screen?.note ?? "",
     }))

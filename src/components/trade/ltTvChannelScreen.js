@@ -5,9 +5,9 @@
 // new show appears as soon as it's in SHOWS.
 //
 // ON THE NEWS SET IT IS THE STUDIO SCREEN, carrying a card per chapter of the
-// episode — the running order in the cold open, the beat and the story's one
-// concrete fact while that story runs, the numbers listed as a board when the
-// hosts read the board. The deck is the same canvas and the same inks, so the
+// episode — the running order in the cold open, the beat and the story's
+// screen copy while that story runs (one big figure, or two or three short
+// bullets), the numbers listed as a board when the hosts read the board. The deck is the same canvas and the same inks, so the
 // accompanying graphics cost no art and no downloads either: a card is the
 // copy the script already wrote, set in type. Which card is up is not this
 // module's decision — the set owns the clock, and passes `indexRef`.
@@ -107,6 +107,7 @@ function wrap(ctx, text, maxWidth) {
 // show the numbers. A viewer cannot tell a dropped line from a line the show
 // never had. Small type is a worse card; a missing number is a wrong one.
 const BODY_MAX = 25;
+const NOTE_LINE = 29;
 const BODY_MIN = 16;
 
 function fitBody(ctx, entries, maxWidth, maxHeight) {
@@ -178,7 +179,15 @@ function drawChapterCard(ctx, card) {
     y += 76;
   }
 
-  const { size, lines } = fitTitle(ctx, String(card.headline || "").toUpperCase(), W - 130, 4, 52);
+  // Screen copy gets at most three lines of headline, shrinking to fit, so
+  // the figure or the bullets under it keep their size. A card built from a
+  // sentence keeps the four it always had.
+  const entries = (card.lines || []).map((entry) => String(entry).trim()).filter(Boolean);
+  const pointed = entries.length > 0 && entries.every((entry) => entry.length <= POINT_CHARS);
+  const screenCopy = Boolean(card.figure) || pointed;
+  const { size, lines } = fitTitle(
+    ctx, String(card.headline || "").toUpperCase(), W - 130, screenCopy ? 3 : 4, screenCopy ? 46 : 52,
+  );
   const lineHeight = size * 1.14;
   ctx.save();
   ctx.fillStyle = INK.title;
@@ -190,12 +199,25 @@ function drawChapterCard(ctx, card) {
 
   // The note is pinned to the bottom, so it is measured BEFORE the body: it is
   // what decides how much room the body has to fit in.
-  const NOTE_LINE = 29;
   ctx.font = '500 21px Orbitron, sans-serif';
   const noteLines = card.note ? wrap(ctx, String(card.note), W - 130).slice(0, 3) : [];
   const noteTop = noteLines.length ? H - 76 - (noteLines.length - 1) * NOTE_LINE : H - 56;
 
-  const body = fitBody(ctx, card.lines, W - 130, noteTop - 28 - y);
+  const room = noteTop - 28 - y;
+  if (card.figure) {
+    drawFigure(ctx, card, y);
+    finishCard(ctx, noteLines, noteTop);
+    return;
+  }
+  if (pointed) {
+    drawPoints(ctx, entries, y, room);
+    finishCard(ctx, noteLines, noteTop);
+    return;
+  }
+
+  // A sentence rather than screen copy: an episode written before the writer
+  // gave the screen its own copy. Set as paragraphs, as it always was.
+  const body = fitBody(ctx, card.lines, W - 130, room);
   ctx.save();
   ctx.font = `500 ${body.size}px Orbitron, sans-serif`;
   ctx.fillStyle = INK.body;
@@ -219,6 +241,11 @@ function drawChapterCard(ctx, card) {
   }
   ctx.restore();
 
+  finishCard(ctx, noteLines, noteTop);
+}
+
+// The note at the foot of a chapter card, then the scanlines and vignette.
+function finishCard(ctx, noteLines, noteTop) {
   if (noteLines.length) {
     ctx.save();
     ctx.font = '500 21px Orbitron, sans-serif';
@@ -234,6 +261,81 @@ function drawChapterCard(ctx, card) {
   vignette.addColorStop(1, "rgba(0,0,0,0.55)");
   ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, W, H);
+}
+
+// Screen copy, as opposed to a sentence: anything this short is drawn as a
+// bullet list rather than a paragraph. The writer is asked for under 30
+// characters; the running order's headlines run a little longer.
+const POINT_CHARS = 48;
+const POINT_MAX = 32;
+const POINT_MIN = 20;
+
+// Bullets, left-aligned behind a small plate in the kicker's ink, at the
+// largest size that fits them all. Same rule as fitBody: shrink, never drop.
+function drawPoints(ctx, entries, y, room) {
+  const left = 92;
+  const indent = 34;
+  const maxWidth = W - 70 - left - indent;
+  let fit = null;
+  for (let size = POINT_MAX; size >= POINT_MIN; size -= 1) {
+    ctx.font = `500 ${size}px Orbitron, sans-serif`;
+    const lineHeight = Math.round(size * 1.3);
+    const gap = Math.round(size * 0.75);
+    const blocks = entries.map((entry) => wrap(ctx, entry, maxWidth));
+    const height =
+      blocks.reduce((sum, block) => sum + block.length * lineHeight, 0) + gap * (blocks.length - 1);
+    fit = { size, lineHeight, gap, blocks };
+    if (height <= room) break;
+  }
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.font = `500 ${fit.size}px Orbitron, sans-serif`;
+  const mark = Math.round(fit.size * 0.44);
+  for (const block of fit.blocks) {
+    ctx.fillStyle = INK.format;
+    ctx.shadowColor = INK.format;
+    ctx.shadowBlur = 8;
+    ctx.fillRect(left, y - mark / 2, mark, mark);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = INK.body;
+    block.forEach((line, i) => ctx.fillText(line, left + indent, y + i * fit.lineHeight));
+    y += block.length * fit.lineHeight + fit.gap;
+  }
+  ctx.restore();
+}
+
+// One big number, what it is, and one short line under it — the card for a
+// story that turns on a single figure.
+function drawFigure(ctx, card, y) {
+  const figure = fitTitle(ctx, String(card.figure), W - 140, 1, 120);
+  ctx.save();
+  ctx.font = `800 ${figure.size}px Orbitron, "Arial Black", sans-serif`;
+  ctx.fillStyle = INK.latest;
+  ctx.shadowColor = "rgba(142,255,196,0.7)";
+  ctx.shadowBlur = 18;
+  ctx.fillText(figure.lines[0], W / 2, y + figure.size * 0.45);
+  ctx.restore();
+  y += figure.size + 36;
+
+  if (card.label) {
+    ctx.save();
+    ctx.font = '700 23px Orbitron, "Arial Black", sans-serif';
+    if ("letterSpacing" in ctx) ctx.letterSpacing = "3px";
+    ctx.fillStyle = INK.note;
+    const lines = wrap(ctx, String(card.label).toUpperCase(), W - 150).slice(0, 2);
+    lines.forEach((line, i) => ctx.fillText(line, W / 2, y + i * 31));
+    ctx.restore();
+    y += lines.length * 31 + 40;
+  }
+
+  const line = String((card.lines || [])[0] || "").trim();
+  if (!line) return;
+  ctx.save();
+  ctx.font = '500 26px Orbitron, sans-serif';
+  ctx.fillStyle = INK.body;
+  // One short line is asked for; two is the most a glance will take.
+  wrap(ctx, line, W - 150).slice(0, 2).forEach((l, i) => ctx.fillText(l, W / 2, y + i * 36));
+  ctx.restore();
 }
 
 /**

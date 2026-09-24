@@ -256,13 +256,14 @@
         "segment": "cold-open",
         "kicker": "Tonight",
         "headline": "OIL SNAPS FIVE-DAY SLIDE AS IRAN TALKS WOBBLE",
+        "source": "Oil unwinds the war premium, then takes half of it back | CFTC tells prediction markets that word bets are presumptively riggable | The Pokémon restock, tracked by GPS",
         "screen": {
           "kicker": "Tonight",
           "headline": "OIL SNAPS FIVE-DAY SLIDE AS IRAN TALKS WOBBLE",
           "lines": [
-            "Oil unwinds the war premium, then takes half of it back",
-            "CFTC tells prediction markets that word bets are presumptively riggable",
-            "The Pokémon restock, tracked by GPS"
+            "Oil gives back the war premium",
+            "Word bets ruled riggable",
+            "A GPS on the Pokémon run"
           ],
           "note": ""
         }
@@ -272,11 +273,14 @@
         "segment": "story-1",
         "kicker": "Markets",
         "headline": "Oil unwinds the war premium, then takes half of it back",
+        "source": "Oil unwinds the war premium, then takes half of it back",
         "screen": {
           "kicker": "Markets",
-          "headline": "Oil unwinds the war premium, then takes half of it back",
+          "headline": "Oil gives back the war premium",
+          "figure": "$103.08",
+          "label": "Brent, Wednesday",
           "lines": [
-            "Crude fell for five straight sessions into Tuesday — WTI settling at $94.59 and Brent at $99.25, down nearly 9% over the run — before Brent rebounded 3.9% to $103.08 on Wednesday after Iran's president told the UN General Assembly his country would not surrender."
+            "Up 3.9% after five straight down days"
           ],
           "note": ""
         }
@@ -286,11 +290,14 @@
         "segment": "story-2",
         "kicker": "Prediction markets",
         "headline": "CFTC tells prediction markets that word bets are presumptively riggable",
+        "source": "CFTC tells prediction markets that word bets are presumptively riggable",
         "screen": {
           "kicker": "Prediction markets",
-          "headline": "CFTC tells prediction markets that word bets are presumptively riggable",
+          "headline": "Word bets ruled riggable",
+          "figure": "$172,539",
+          "label": "Paid over Trump-speech bets",
           "lines": [
-            "In a Tuesday advisory, the CFTC's Division of Market Oversight said contracts on what a person says or does — 'mention markets' — may be presumptively readily susceptible to manipulation and can be listed only in limited circumstances, following an August settlement in which a former White House teleprompter operator paid $172,539, including $107,539.02 in returned profits, over bets on Trump speeches."
+            "CFTC: \"mention markets\" only in limited cases"
           ],
           "note": ""
         }
@@ -300,11 +307,13 @@
         "segment": "the-spot",
         "kicker": "The break",
         "headline": "OIL SNAPS FIVE-DAY SLIDE AS IRAN TALKS WOBBLE",
+        "source": "",
         "screen": {
           "kicker": "The break",
           "headline": "OIL SNAPS FIVE-DAY SLIDE AS IRAN TALKS WOBBLE",
           "lines": [],
-          "note": ""
+          "note": "",
+          "derived": true
         }
       },
       {
@@ -312,11 +321,14 @@
         "segment": "story-3",
         "kicker": "Collectibles",
         "headline": "The Pokémon restock, tracked by GPS",
+        "source": "The Pokémon restock, tracked by GPS",
         "screen": {
           "kicker": "Collectibles",
-          "headline": "The Pokémon restock, tracked by GPS",
+          "headline": "A GPS on the Pokémon run",
           "lines": [
-            "A 72-year-old Ohio man allegedly attached a GPS tracker to a Pokémon card delivery driver's vehicle to monitor when stores were restocked, and faces up to six months in jail."
+            "Ohio man, 72",
+            "Tracker on a card delivery driver",
+            "Faces up to six months in jail"
           ],
           "note": ""
         }
@@ -326,17 +338,18 @@
         "segment": "the-board",
         "kicker": "The board",
         "headline": "The week in numbers",
+        "source": "The ten-year went nowhere loudly: 4.96% on the 11th, 5.01% twice mid-week, 4.96% at Tuesday's close",
         "screen": {
           "kicker": "The board",
           "headline": "The week in numbers",
           "lines": [
-            "The ten-year went nowhere loudly: 4.96% on the 11th, 5.01% twice mid-week, 4.96% at Tuesday's close",
-            "Two-year at 4.71% leaves the 2s10s spread at 25 basis points",
-            "WTI spot $96.41, down 9.91% on the week",
-            "Crypto Fear & Greed ran 51 neutral last Wednesday to 78 extreme greed Tuesday, then back to 71",
-            "The Dow closed 51,511.59, up 0.1% — the S&P and Nasdaq feeds came in blank and we are not reading a zero out loud"
+            "10-yr  4.96%",
+            "2s10s  25 bp",
+            "WTI  $96.41 ▼9.91%",
+            "Fear & Greed  71",
+            "Dow  51,511.59 ▲0.1%"
           ],
-          "note": "Polymarket has 'Will Together win 13% or more of the vote in the 2026 Knesset elections' at 17.8 cents on yes, on about $100 of volume — quoted as much for the volume as the odds."
+          "note": "Polymarket · Knesset long shot · 17.8¢"
         }
       },
       {
@@ -344,13 +357,14 @@
         "segment": "sign-off",
         "kicker": "That was the week",
         "headline": "OIL SNAPS FIVE-DAY SLIDE AS IRAN TALKS WOBBLE",
+        "source": "Oil unwinds the war premium, then takes half of it back | CFTC tells prediction markets that word bets are presumptively riggable | The Pokémon restock, tracked by GPS",
         "screen": {
           "kicker": "That was the week",
           "headline": "OIL SNAPS FIVE-DAY SLIDE AS IRAN TALKS WOBBLE",
           "lines": [
-            "Oil unwinds the war premium, then takes half of it back",
-            "CFTC tells prediction markets that word bets are presumptively riggable",
-            "The Pokémon restock, tracked by GPS"
+            "Oil gives back the war premium",
+            "Word bets ruled riggable",
+            "A GPS on the Pokémon run"
           ],
           "note": ""
         }

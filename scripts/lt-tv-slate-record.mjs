@@ -29,7 +29,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { sectionsForRecord } from "./lt-tv-sections.mjs";
-import { buildChapters } from "./lt-tv-chapters.mjs";
+import { buildChapters, keepScreenCopy } from "./lt-tv-chapters.mjs";
 
 export const SLATE_DIR = "src/content/lt-tv/episodes";
 export const SLATE_INDEX = "src/content/lt-tv/index.js";
@@ -135,7 +135,7 @@ export function toSlateRecord(episode) {
   // at staging time means an episode written before chapters existed picks
   // them up by being re-staged — no rewriting, no re-recording, no API calls.
   if (episode.graphics) {
-    const chapters = buildChapters(episode);
+    const chapters = buildChapters(episode, { warn: (message) => console.warn(`  ! ${message}`) });
     record.graphics = chapters.length
       ? { ...episode.graphics, chapters }
       : episode.graphics;
@@ -182,6 +182,18 @@ function excerpt(text) {
 export async function writeSlateRecord(record, { root = process.cwd() } = {}) {
   const path = join(root, SLATE_DIR, `${record.id}.json`);
   await mkdir(dirname(path), { recursive: true });
+
+  // Screen copy written by hand onto the record being replaced is kept when
+  // the production record has none of its own (see keepScreenCopy). Every
+  // writer of a slate record comes through here, so none of them can drop it.
+  if (record.graphics?.chapters) {
+    try {
+      const before = JSON.parse(await readFile(path, "utf8"));
+      record.graphics.chapters = keepScreenCopy(record.graphics.chapters, before.graphics?.chapters);
+    } catch {
+      // Nothing staged under this id yet.
+    }
+  }
   await writeFile(path, JSON.stringify(record, null, 2) + "\n");
 
   const indexPath = join(root, SLATE_INDEX);
