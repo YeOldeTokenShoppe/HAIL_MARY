@@ -358,8 +358,13 @@ export const TALKSHOW_CONNOR_FILTER = { saturate: 106, contrast: 102, brightness
 // this is a dim studio. What survived the fit: the tighter box than the other
 // two (169 against their ~205) and NO SEPIA, since a warm cast reads as grime
 // on a screen that should look backlit.
-export const TALKSHOW_HOLLY_CROP = { cropX: 216, cropY: 130, cropW: 168, cropH: 169, rotateZ: 4, rotateX: 0 };
-export const TALKSHOW_HOLLY_FILTER = { saturate: 126, contrast: 117, brightness: 92, hueRotate: 0, sepia: 0 };
+//
+// REFITTED 2026-09-24 for her re-export, whose Face2 is a new mesh with its
+// own UVs, and her re-issued SitePal embed: the box moved up-left and widened
+// (216,130 168x169 → 200,138 179x169), rotateZ 4 → 0 and rotateX 0 → 6, and
+// contrast/brightness nudged (117/92 → 113/95). Still no sepia.
+export const TALKSHOW_HOLLY_CROP = { cropX: 200, cropY: 138, cropW: 179, cropH: 169, rotateZ: 0, rotateX: 6 };
+export const TALKSHOW_HOLLY_FILTER = { saturate: 126, contrast: 113, brightness: 95, hueRotate: 0, sepia: 0 };
 // KIP'S ARE MICHELLE'S OWN, fitted on the set and pasted back 2026-09-24.
 // They started as a copy of Connor's (the seat he took). The box grew to
 // 173x223, the loosest of the four, and the colour went a long way from the
