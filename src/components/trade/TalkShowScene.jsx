@@ -1774,6 +1774,9 @@ function TalkShowModel({
   // idle, for the live desk (see leaveIntermission below).
   const leaveIntermissionRef = useRef(null);
   const liveWasOnRef = useRef(false);
+  // Where each character's `intermissionTalk` clock was last frame, so its
+  // beats fire once as the intermission passes them (and again next loop).
+  const intermissionTalkRef = useRef({});
 
   // SWITCHING EPISODES. The portals stay up — rebuilding them costs ~18s of
   // "Loading voices…" — so changing episode takes the set off air and swaps
@@ -3862,6 +3865,50 @@ function TalkShowModel({
     // The moment the desk goes live, the set comes out of the intermission.
     if (live && !liveWasOnRef.current) leaveIntermissionRef.current?.();
     liveWasOnRef.current = live;
+
+    /* THE INTERMISSION'S CONVERSATION (`intermissionTalk` in the contract):
+     * mouths moving with no audio, and the odd expression, timed to one
+     * character's intermission clip. Only while that clip is what the set is
+     * showing, and never under an episode or the live desk — whose real speech
+     * would interrupt `saySilent` anyway. A beat fires once as the clip's
+     * clock passes it, including across the loop's wrap. */
+    Object.values(CHARACTERS).forEach((character) => {
+      const talk = character.intermissionTalk;
+      if (!talk) return;
+      const outro = actionsRef.current[character.empty]?.outro;
+      const state = (intermissionTalkRef.current[character.empty] ||= { last: null });
+      const on =
+        !live &&
+        !playback.running &&
+        outro?.getClip().name === talk.clip &&
+        outro.isRunning() &&
+        outro.getEffectiveWeight() > 0.5;
+      if (!on) {
+        state.last = null;
+        return;
+      }
+      const frame = outro.time * talk.fps;
+      const last = state.last;
+      state.last = frame;
+      if (last === null) return;
+      const wrapped = frame < last;
+      for (const beat of talk.beats) {
+        const passed = wrapped
+          ? beat.frame > last || beat.frame <= frame
+          : beat.frame > last && beat.frame <= frame;
+        if (!passed) continue;
+        const portal = portalsRef.current[beat.actor];
+        const w = portal?.ready ? portal.frame?.contentWindow : null;
+        if (!w) continue;
+        try {
+          if (beat.say) w.saySilent?.(beat.say);
+          const face = beat.face ? FACES[beat.face] : null;
+          if (face) w.setFacialExpression?.(face.expression, face.amplitude, face.duration);
+        } catch (e) {
+          console.warn(`[TalkShowScene] ${beat.actor}: intermission beat at frame ${beat.frame} failed`, e);
+        }
+      }
+    });
     // Live, the desk's cast sits in the chairs; otherwise the episode's does.
     // Written every frame (a handful of objects) so ending live puts the
     // episode's cast straight back without the effect having to re-run.

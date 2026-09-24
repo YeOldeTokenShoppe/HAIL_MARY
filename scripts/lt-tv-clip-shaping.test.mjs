@@ -12,6 +12,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { readGlb } from "./lt-tv-models.mjs";
 import { shapeClip, turnAmount, closeLoop } from "../src/lib/ltTv/clipShaping.mjs";
 import { CHARACTERS, clipShape, matchesAuthoredName } from "../src/lib/ltTv/modelContract.mjs";
+import { FACES } from "../src/lib/ltTv/faces.mjs";
 
 // GLTFLoader warns about things a browser would do (textures, extensions)
 // that a node run has no use for; the checks below print their own lines.
@@ -194,9 +195,28 @@ console.log("\nKip's intermission turns him to Holly and comes home (Michelle, 2
   ok(`mid-turn the upper spine leads the lower (${upper.toFixed(2)}° vs ${lower.toFixed(2)}° at the base)`, upper > lower);
 
   const [b900, a900] = [before(900 / fps), after(900 / fps)];
-  ok("typing at the laptop (frame 900) is the clip as animated", addedRotation(b900, a900, "head").degrees < 0.1);
+  ok("typing at the laptop (frame 900) is not turned", addedRotation(b900, a900, "head").degrees < 0.1);
   const tipsY = (e) => Math.min(...shape.rest[0].tips.map((n) => e.getObjectByName(n).getWorldPosition(new THREE.Vector3()).y));
-  ok("and so are his hands", Math.abs(tipsY(before(900 / fps)) - tipsY(after(900 / fps))) < 1e-4);
+
+  // Her second note: typing, the hands were too high over the keys. The
+  // lowest a fingertip gets while typing is judged across the whole stretch
+  // of held typing, so it is the bottom of the keystrokes.
+  for (const rest of shape.rest.slice(1)) {
+    const heldFrom = rest.keys.find(([, v]) => v === 1)[0];
+    const heldTo = rest.keys.filter(([, v]) => v === 1).pop()[0];
+    const low = (pose) => {
+      let y = Infinity;
+      for (let f = heldFrom; f <= heldTo; f += 1) {
+        const e = pose(f / fps);
+        for (const n of rest.tips) y = Math.min(y, e.getObjectByName(n).getWorldPosition(new THREE.Vector3()).y);
+      }
+      return y - rest.surface;
+    };
+    const was = low(before);
+    const now = low(after);
+    ok(`${rest.hand} typed ${(was * 100).toFixed(1)}cm over the keys, or this proves nothing`, was > 0.02);
+    ok(`and now reaches them (${(now * 100).toFixed(1)}cm)`, Math.abs(now) < 0.01);
+  }
 
   // The hand Michelle saw hovering (screen left, his right): 3-5cm over the
   // desk as animated, on it once rested.
@@ -223,6 +243,29 @@ console.log("\nHolly's coffee break comes home too:");
   const { clip: shaped } = shapeClip(clip, rig, clipShape(holly, holly.outro));
   const gap = loopGapDegrees(poser(empty, rig.name, shaped), shaped.duration, shaped.tracks[0].times[0]);
   ok(`${holly.outro} ends on its first frame (${gap.toFixed(3)}°)`, gap < 0.1);
+}
+
+console.log("\nThe intermission's silent conversation names things that exist:");
+for (const [actor, character] of Object.entries(CHARACTERS)) {
+  const talk = character.intermissionTalk;
+  if (!talk) continue;
+  ok(`${actor}: it runs on their intermission clip (${talk.clip})`, talk.clip === character.outro);
+  const gltf = await loadRig(character.file);
+  const clip = gltf.animations.find((a) => a.name === talk.clip);
+  const lastFrame = clip ? clip.duration * talk.fps : 0;
+  const bad = talk.beats.filter(
+    (b) =>
+      !CHARACTERS[b.actor] ||
+      !(b.frame > 0 && b.frame < lastFrame) ||
+      (b.face !== undefined && !FACES[b.face]) ||
+      (b.say !== undefined && !(Number.isInteger(b.say) && b.say > 0)) ||
+      (b.say === undefined && b.face === undefined),
+  );
+  check(`${actor}: every beat is a real actor, inside the clip, a known face or whole seconds of talk`, bad, []);
+  // saySilent from two portals at once would be two people talking over each other.
+  const talking = talk.beats.filter((b) => b.say).sort((a, b) => a.frame - b.frame);
+  const overlaps = talking.filter((b, i) => i && b.actor !== talking[i - 1].actor && b.frame < talking[i - 1].frame + talking[i - 1].say * talk.fps);
+  check(`${actor}: nobody talks over anybody`, overlaps, []);
 }
 
 if (failures) {

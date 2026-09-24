@@ -162,8 +162,10 @@ export function lowerHand(upper, lower, hand, drop) {
  *   rest     [{ upper, lower, hand, tips: [bone], surface, keys }]
  *            Lowers a hand that hovers over a surface until its lowest tip
  *            touches it, eased by `keys`. Judged against the lowest the tips
- *            get within a second either way, so a gesture lifting off the desk
- *            still lifts — it just starts from the desk.
+ *            get within `window` frames either way (default a second), so a
+ *            gesture lifting off the desk still lifts — it just starts from
+ *            the desk. A hand may have more than one, with keys that do not
+ *            overlap (Kip's right hand rests on the desk, then on the keys).
  *
  * Returns `{ clip, report }`. `report` says what was found, so a bone name
  * that does not exist is reported rather than silently doing nothing.
@@ -284,7 +286,7 @@ export function shapeClip(clip, rig, shape, placement = null) {
       });
     }
     arms.forEach((arm, i) => {
-      const window = Math.round(fps);
+      const window = arm.rest.window ?? Math.round(fps);
       for (let k = 0; k < times.length; k += 1) {
         let floor = Infinity;
         for (let j = Math.max(0, k - window); j <= Math.min(times.length - 1, k + window); j += 1) {

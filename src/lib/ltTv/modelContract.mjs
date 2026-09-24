@@ -340,7 +340,7 @@ export const CHARACTERS = {
      *
      * First fits, not watched on the set — change the numbers.
      *
-     * `rest`: his right hand (screen left) hovers 3–5cm over the countertop
+     * `rest`, the first entry: his right hand (screen left) hovers 3–5cm over the countertop
      * as animated, fingertips at 1.00–1.03 against a desk top at 0.974
      * (measured, LTTV_Set.glb `Countertop`, 2026-09-24). It is brought down
      * onto the desk with a two-bone arm solve, hand orientation kept, except
@@ -386,8 +386,52 @@ export const CHARACTERS = {
             surface: 0.982,
             keys: [[1, 0], [30, 1], [820, 1], [846, 0]],
           },
+          // THE TYPING, her note 2026-09-24: "the height of the hands when
+          // typing are too high". As animated the fingertips peck at ~1.05
+          // over a keyboard deck at 0.987 (LTTV_Set.glb `Laptop.001`, decoded
+          // and measured), so both hands come down onto the keys. A short
+          // window, so each keystroke is judged against the strokes around it
+          // rather than against the hands leaving the laptop at the end.
+          ...["r", "l"].map((side) => ({
+            upper: side === "r" ? "UpperArm_R" : "UpperArm_L",
+            lower: `lowerarm_${side}`,
+            hand: side === "r" ? "Hand_R" : "Hand_L",
+            tips: [`finger_04_${side}`, `finger_03_${side}`, `finger_02_${side}`, `indexFinger_04_${side}`],
+            surface: 0.995,
+            window: 12,
+            keys: [[848, 0], [864, 1], [916, 1], [936, 0]],
+          })),
         ],
       },
+    },
+    /* THE INTERMISSION'S CONVERSATION, Michelle 2026-09-24: "how can i show
+     * the character's face speaking with mouth movement? Use sitepal but
+     * mute? ... we could also use some of the sitepal expressions like grin".
+     * SitePal has exactly that: `saySilent(seconds)` "silently animate[s] the
+     * mouth" with no audio at all (docs/sitepal.md), so nothing is fetched,
+     * muted or paid for, and real speech interrupts it — an episode or the
+     * live desk starting cuts it off by itself. Faces are the FACES
+     * vocabulary (src/lib/ltTv/faces.mjs), the same as the scripts' beats.
+     *
+     * Timed in frames of HIS intermission clip, because it is his turn toward
+     * Holly that makes it a conversation; Holly's lines are placed while he is
+     * glancing at her, so he looks at her while she talks and while he does.
+     * `say` is whole seconds of mouth movement. A first draft, not watched. */
+    intermissionTalk: {
+      clip: "anchorGuy_intermission2",
+      fps: 30,
+      beats: [
+        { frame: 32, actor: "Kip", say: 3 },
+        { frame: 118, actor: "Holly", face: "grin" },
+        { frame: 150, actor: "Holly", say: 2 },
+        { frame: 322, actor: "Holly", say: 2 },
+        { frame: 390, actor: "Kip", face: "smile" },
+        { frame: 544, actor: "Kip", say: 1 },
+        { frame: 590, actor: "Holly", face: "grin" },
+        { frame: 712, actor: "Kip", say: 2 },
+        { frame: 776, actor: "Holly", say: 1 },
+        { frame: 805, actor: "Kip", face: "thinking" },
+      ],
     },
     faces: { face1: "Face1", face2: "Face2", hide: ["Face3"] },
     seat: {
@@ -476,7 +520,7 @@ export function optionalClips(character) {
  * invisible — the character just goes on doing what the old file said, which
  * reads as the fix not working.
  */
-export const MODEL_VERSION = "split-6";
+export const MODEL_VERSION = "split-7";
 export function modelUrl(file) {
   return `${String(file).replace(/^public/, "")}?v=${MODEL_VERSION}`;
 }
