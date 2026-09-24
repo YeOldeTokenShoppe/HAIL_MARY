@@ -22,6 +22,8 @@ import {
   CHARACTERS,
   requiredClips,
   optionalClips,
+  matchesAuthoredName,
+  clipShape,
 } from "../src/lib/ltTv/modelContract.mjs";
 
 const GLB_MAGIC = 0x46546c67;
@@ -286,6 +288,16 @@ function checkCharacter(actor, character) {
   const checkLoop = (name, why) => {
     const gap = loopGap(gltf, name);
     if (!gap || gap.degrees <= 1) return;
+    // The site closes it on load (`closeLoopFrames` in the contract), so the
+    // gap in the file is not what plays.
+    const closing = clipShape(character, name)?.closeLoopFrames;
+    if (closing > 0) {
+      say(
+        `  · ends ${gap.degrees.toFixed(2)}° from where it starts (${gap.node}) — ` +
+          `the site eases the last ${closing} frames home, so it does not snap`,
+      );
+      return;
+    }
     warnings.push(
       `${actor}: "${name}" ends ${gap.degrees.toFixed(2)}° away from where it starts ` +
         `(${gap.node}), and ${why}. THREE jumps straight back to the first frame, so that ` +
@@ -340,17 +352,24 @@ function checkCharacter(actor, character) {
   }
 
   const faces = character.faces || {};
+  // Blender's duplicate suffix ("Face1.001") is accepted, as the scene does.
+  const asExported = (name) =>
+    names.has(name) ? name : [...names].find((n) => matchesAuthoredName(name, n)) || null;
+  const found = (name) => {
+    const hit = asExported(name);
+    if (!hit) return false;
+    say(`  ✓ ${name}${hit === name ? "" : ` (exported as "${hit}" — Blender's suffix, accepted)`}`);
+    return true;
+  };
   for (const [label, name] of [["face1", faces.face1], ["face2", faces.face2]]) {
     if (!name) continue;
-    if (names.has(name)) say(`  ✓ ${name}`);
-    else {
+    if (!found(name)) {
       problems.push(`${actor}: no "${name}" mesh (${label})`);
       say(`  ✗ no "${name}" — the SitePal face has nothing to paint onto`);
     }
   }
   for (const name of faces.hide || []) {
-    if (names.has(name)) say(`  ✓ ${name}`);
-    else warnings.push(`${actor}: no "${name}" to hide behind the projected face`);
+    if (!found(name)) warnings.push(`${actor}: no "${name}" to hide behind the projected face`);
   }
 
   const node = nodeByName(gltf, character.empty);

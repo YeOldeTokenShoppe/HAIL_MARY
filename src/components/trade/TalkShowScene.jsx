@@ -49,10 +49,13 @@ import {
 import {
   CHARACTERS,
   SET_MODEL,
+  clipShape,
+  matchesAuthoredName,
   modelUrl,
   reactionClips,
   reactionDurations,
 } from "@/lib/ltTv/modelContract.mjs";
+import { shapeClip } from "@/lib/ltTv/clipShaping.mjs";
 import { FACES, isFaceBeat } from "@/lib/ltTv/faces.mjs";
 import { findEpisode } from "@/content/lt-tv";
 
@@ -1836,8 +1839,27 @@ function TalkShowModel({
    */
   const characterAnimations = useMemo(() => {
     const out = {};
+    const characters = Object.values(CHARACTERS);
     CHARACTER_EMPTIES.forEach((empty, index) => {
-      out[empty] = characterGltfs[index]?.animations || [];
+      const gltf = characterGltfs[index];
+      const character = characters[index];
+      // A clip the contract RESHAPES (`shapes`: Kip's intermission turning to
+      // Holly, and closing its loop) is swapped for the reshaped copy here,
+      // under the same name, so everything downstream just plays it. Sampled on
+      // a clone of the loaded rig; the loaded file itself is never posed.
+      out[empty] = (gltf?.animations || []).map((clip) => {
+        const shape = clipShape(character, clip.name);
+        if (!shape) return clip;
+        const rig = findRig(gltf.scene, empty, character.rig);
+        const { clip: shaped, report } = shapeClip(clip, rig, shape);
+        if (report.missingBones.length) {
+          console.warn(
+            `[TalkShowScene] ${empty}: "${clip.name}" turns bones the rig does not have: ` +
+              report.missingBones.join(", "),
+          );
+        }
+        return shaped;
+      });
     });
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- characterKey identifies characterGltfs
@@ -2191,7 +2213,18 @@ function TalkShowModel({
           `[TalkShowScene] ${key}: no "${EMPTY_FOR_ACTOR[key]}" in the scene — no face projection`,
         );
       }
-      const within = (name) => (empty && name ? empty.getObjectByName(name) : null) || null;
+      // Exact name first, then Blender's duplicate suffix ("Face1.001", which
+      // GLTFLoader turns into "Face1001") — still only inside this empty.
+      const within = (name) => {
+        if (!empty || !name) return null;
+        const exact = empty.getObjectByName(name);
+        if (exact) return exact;
+        let found = null;
+        empty.traverse((node) => {
+          if (!found && matchesAuthoredName(name, node.name)) found = node;
+        });
+        return found;
+      };
       build[key] = {
         face1: within(cfg.face1),
         face2: within(cfg.face2),

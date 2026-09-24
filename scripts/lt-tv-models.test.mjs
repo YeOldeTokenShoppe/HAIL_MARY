@@ -38,6 +38,7 @@ import {
   reactionDurations,
   modelUrl,
   MODEL_VERSION,
+  matchesAuthoredName,
 } from "../src/lib/ltTv/modelContract.mjs";
 import { REACTIONS, CAST, ACTORS } from "./lt-tv-format.mjs";
 
@@ -141,10 +142,13 @@ for (const [actor, character] of Object.entries(CHARACTERS)) {
     requiredClips(character).filter((n) => !clips.includes(n)), []);
   // A character with no `faces` has no SitePal face yet (Kip, as first
   // exported): seated and animated, but not castable until they get one.
+  // Blender's duplicate suffix counts ("Face1.001"): the scene accepts it,
+  // scoped to the character's empty, since Kip's 2026-09-24 export.
   if (character.faces) {
-    ok(`${actor}: the face to hide (${character.faces.face1}) is there`, names.has(character.faces.face1));
-    ok(`${actor}: the face to paint (${character.faces.face2}) is there`, names.has(character.faces.face2));
-    for (const hide of character.faces.hide) ok(`${actor}: ${hide} is there`, names.has(hide));
+    const has = (name) => [...names].some((n) => matchesAuthoredName(name, n));
+    ok(`${actor}: the face to hide (${character.faces.face1}) is there`, has(character.faces.face1));
+    ok(`${actor}: the face to paint (${character.faces.face2}) is there`, has(character.faces.face2));
+    for (const hide of character.faces.hide) ok(`${actor}: ${hide} is there`, has(hide));
   }
 
   // It should be their file and nobody else's: a stray second empty means the

@@ -219,6 +219,12 @@ export const CHARACTERS = {
     // her three coffee clips this is the one that suits sitting it out beside
     // Kip; `hologirl_coffee_long` and `hologirl_coffee_short` are the others.
     outro: "hologirl_coffee_long_conversation",
+    // As exported it ends 10.79° from its first frame at the right shoulder,
+    // so it snapped once a loop; eased home over its last 45 frames on load,
+    // as Kip's intermission is (2026-09-24). See clipShaping.mjs.
+    shapes: {
+      hologirl_coffee_long_conversation: { fps: 30, closeLoopFrames: 45 },
+    },
     /* THE CUP RIDES HER HAND. The set carries `Hologirl_Sip_Cup` on the desk
      * (under `Sip_Cup_Socket`) and her rig carries `Coffee_Cup_Control`, a
      * bone that holds still on the desk in every clip but the coffee ones,
@@ -303,8 +309,38 @@ export const CHARACTERS = {
       headshake: { clip: "anchorGuy_disagreement", duration: 3.0 },
     },
     // The news set's resting state between episodes, as Connor's head-turn
-    // was: same 46.70s.
+    // was: same 46.70s. Michelle's 2026-09-24 re-export changed it (a new
+    // right arm throughout, and the Root moves from about frame 800) under the
+    // same name, and it is RESHAPED on load — see `shapes` below.
     outro: "anchorGuy_intermission",
+    /* THE INTERMISSION TURNS HIM TO HOLLY, Michelle 2026-09-24: "rotate
+     * towards Holly, but then rotate torso back to laptop during the laptop
+     * typing section around keyframes ~850 to ~961. I also need the animation
+     * to loop back to position of frame 1." Done here rather than in Blender
+     * (src/lib/ltTv/clipShaping.mjs), so a re-export of the same action keeps it.
+     *
+     * `keys` are BLENDER FRAMES (30fps, frame 1 is the first) against how much
+     * of the turn is on: 0 is the clip as animated, 1 the full turn. He turns
+     * to her over the first 40 frames, is back on the laptop by 850, stays
+     * there to 961, turns back to her, and comes home to frame 1's pose for
+     * the join. `degrees` is the turn each bone adds about world up, positive
+     * toward Holly (she sits at +X of him): 30° of torso over the three spine
+     * bones, and 45° more of neck and head, about 75° of the ~86° she is off
+     * his front. A first fit, not measured on the set — change the numbers.
+     *
+     * `closeLoopFrames` eases the last 45 frames of every channel onto frame
+     * 1. As exported the clip ends 12.9° away at the right shoulder, which
+     * snaps once a loop. */
+    shapes: {
+      anchorGuy_intermission: {
+        fps: 30,
+        closeLoopFrames: 45,
+        turn: {
+          degrees: { spine_01: 8, spine_02: 10, spine_03: 12, neck_01: 18, head: 27 },
+          keys: [[1, 0], [40, 1], [820, 1], [850, 0], [961, 0], [991, 1], [1346, 1], [1386, 0]],
+        },
+      },
+    },
     faces: { face1: "Face1", face2: "Face2", hide: ["Face3"] },
     seat: {
       // From his own export, made on the 2026-09-23 set with the left chair
@@ -317,6 +353,27 @@ export const CHARACTERS = {
     },
   },
 };
+
+/**
+ * Does a node name in a loaded or exported file stand for the name authored
+ * here? Exactly, or with the numeric suffix Blender adds when two objects in
+ * ONE .blend share a name — "Face1.001" as exported, "Face1001" once
+ * GLTFLoader has stripped the dot. Kip's faces came out that way on
+ * 2026-09-24 because Holly's Face1–3 are in the same Blender file now, and
+ * renaming them back there would only move the clash onto hers. Every lookup
+ * that uses this is scoped to one character's empty, so the suffix cannot
+ * reach another character's mesh.
+ */
+export function matchesAuthoredName(authored, name) {
+  if (!authored || !name) return false;
+  if (name === authored) return true;
+  return name.startsWith(authored) && /^\.?\d{3,}$/.test(name.slice(authored.length));
+}
+
+/** The reshaping declared for one of a character's clips, or null. */
+export function clipShape(character, clipName) {
+  return character?.shapes?.[clipName] || null;
+}
 
 /** The clip name for one reaction key, or undefined. */
 export function reactionClip(character, key) {
@@ -371,7 +428,7 @@ export function optionalClips(character) {
  * invisible — the character just goes on doing what the old file said, which
  * reads as the fix not working.
  */
-export const MODEL_VERSION = "split-3";
+export const MODEL_VERSION = "split-4";
 export function modelUrl(file) {
   return `${String(file).replace(/^public/, "")}?v=${MODEL_VERSION}`;
 }
