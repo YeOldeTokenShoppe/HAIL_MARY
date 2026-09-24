@@ -97,17 +97,80 @@ function bonesInOrder(root, names) {
   return found;
 }
 
+/** Turn a bone by a WORLD rotation `r` where it stands: parent⁻¹ · r · parent · local. */
+function rotateInWorld(bone, r, scratch) {
+  bone.parent.updateWorldMatrix(true, false);
+  bone.parent.getWorldQuaternion(scratch);
+  const local = scratch.clone().invert().multiply(r).multiply(scratch).multiply(bone.quaternion);
+  bone.quaternion.copy(local.normalize());
+  bone.updateMatrixWorld(true);
+}
+
+/**
+ * Bring a hand down by `drop` metres with a two-bone solve on the arm, keeping
+ * the elbow in the plane it was already in and the hand's own orientation — so
+ * the fingers lie the way they were animated, only lower.
+ */
+export function lowerHand(upper, lower, hand, drop) {
+  if (!(drop > 0)) return;
+  const q = new THREE.Quaternion();
+  const r = new THREE.Quaternion();
+  upper.updateWorldMatrix(true, true);
+  const handWorld = hand.getWorldQuaternion(new THREE.Quaternion());
+  const A = upper.getWorldPosition(new THREE.Vector3());
+  const B = lower.getWorldPosition(new THREE.Vector3());
+  const C = hand.getWorldPosition(new THREE.Vector3());
+  const T = C.clone();
+  T.y -= drop;
+  const a = A.distanceTo(B);
+  const b = B.distanceTo(C);
+  const d = THREE.MathUtils.clamp(A.distanceTo(T), Math.abs(a - b) + 1e-4, a + b - 1e-4);
+  // 1. Open or close the elbow until shoulder-to-hand is the length it needs.
+  const u = A.clone().sub(B);
+  const v = C.clone().sub(B);
+  const axis = new THREE.Vector3().crossVectors(u, v);
+  if (axis.lengthSq() > 1e-12) {
+    const current = u.angleTo(v);
+    const wanted = Math.acos(THREE.MathUtils.clamp((a * a + b * b - d * d) / (2 * a * b), -1, 1));
+    r.setFromAxisAngle(axis.normalize(), wanted - current);
+    rotateInWorld(lower, r, q);
+  }
+  // 2. Swing the whole arm at the shoulder so the hand lands on the target.
+  const reach = hand.getWorldPosition(new THREE.Vector3()).sub(A).normalize();
+  r.setFromUnitVectors(reach, T.clone().sub(A).normalize());
+  rotateInWorld(upper, r, q);
+  // 3. The hand keeps the orientation it had.
+  hand.parent.updateWorldMatrix(true, false);
+  hand.parent.getWorldQuaternion(q);
+  hand.quaternion.copy(q.invert().multiply(handWorld));
+  hand.updateMatrixWorld(true);
+}
+
 /**
  * The clip with `shape` applied, under the same name. `rig` is the node the
  * character's mixer is rooted at (their armature), from the LOADED file; it is
- * cloned for sampling and never posed itself.
+ * cloned for sampling and never posed itself. `placement` is the seat the
+ * clip plays in ({position, quaternion, scale} from the contract) — only a
+ * `rest` needs it, because a desk height is a height in the set.
+ *
+ * Shape fields, all optional:
+ *   turns    [{ degrees: {bone: °}, keys: [[frame, 0..1]], lag: {bone: frames} }]
+ *            Layers of yaw about world up, summed per bone. `lag` makes a
+ *            bone follow the rest of its layer by that many frames, so a turn
+ *            travels down the body instead of arriving everywhere at once.
+ *            (`turn`, a single layer, is still read.)
+ *   rest     [{ upper, lower, hand, tips: [bone], surface, keys }]
+ *            Lowers a hand that hovers over a surface until its lowest tip
+ *            touches it, eased by `keys`. Judged against the lowest the tips
+ *            get within a second either way, so a gesture lifting off the desk
+ *            still lifts — it just starts from the desk.
  *
  * Returns `{ clip, report }`. `report` says what was found, so a bone name
  * that does not exist is reported rather than silently doing nothing.
  */
-export function shapeClip(clip, rig, shape) {
+export function shapeClip(clip, rig, shape, placement = null) {
   const fps = shape.fps || 30;
-  const report = { clip: clip.name, missingBones: [], turnedBones: [], closedOver: 0 };
+  const report = { clip: clip.name, missingBones: [], turnedBones: [], rested: [], closedOver: 0 };
   let tracks = clip.tracks;
 
   if (shape.closeLoopFrames > 0) {
@@ -115,21 +178,51 @@ export function shapeClip(clip, rig, shape) {
     report.closedOver = shape.closeLoopFrames / fps;
   }
 
-  const turn = shape.turn;
-  const boneNames = Object.keys(turn?.degrees || {});
-  if (!boneNames.length || !rig) {
+  const layers = shape.turns || (shape.turn ? [shape.turn] : []);
+  const rests = shape.rest || [];
+  const turnNames = [...new Set(layers.flatMap((l) => Object.keys(l.degrees || {})))];
+  if ((!turnNames.length && !rests.length) || !rig) {
     return { clip: new THREE.AnimationClip(clip.name, clip.duration, tracks), report };
   }
 
-  // A private copy of the whole character to pose: the clip is sampled on it
-  // frame by frame, and the turn is applied down the chain so each bone's
-  // parent already carries the turn above it.
+  // A private copy of the whole character to pose, standing where the clip
+  // plays: sampled frame by frame, with the turn applied down the chain so
+  // each bone's parent already carries the turn above it.
   const holder = new THREE.Group();
+  if (placement) {
+    holder.position.fromArray(placement.position);
+    holder.quaternion.fromArray(placement.quaternion);
+    holder.scale.setScalar(placement.scale ?? 1);
+  }
   const sampleRoot = skeletonClone(rig);
   holder.add(sampleRoot);
-  const bones = bonesInOrder(sampleRoot, boneNames);
-  report.turnedBones = bones.map((b) => b.name);
-  report.missingBones = boneNames.filter((n) => !report.turnedBones.includes(n));
+  const byName = (name) => sampleRoot.getObjectByName(name) || null;
+
+  const turned = bonesInOrder(sampleRoot, turnNames);
+  report.turnedBones = turned.map((b) => b.name);
+  report.missingBones = turnNames.filter((n) => !report.turnedBones.includes(n));
+  const arms = rests
+    .map((rest) => ({
+      rest,
+      upper: byName(rest.upper),
+      lower: byName(rest.lower),
+      hand: byName(rest.hand),
+      tips: (rest.tips || []).map(byName).filter(Boolean),
+    }))
+    .filter((arm) => {
+      const ok = arm.upper && arm.lower && arm.hand && arm.tips.length;
+      if (!ok) report.missingBones.push(`${arm.rest.hand} (rest)`);
+      return ok;
+    });
+  report.rested = arms.map((arm) => arm.hand.name);
+
+  // Every bone this writes, in parent-before-child order.
+  const touched = [];
+  sampleRoot.traverse((node) => {
+    if (turned.includes(node) || arms.some((arm) => [arm.upper, arm.lower, arm.hand].includes(node))) {
+      touched.push(node);
+    }
+  });
 
   const loopClosed = new THREE.AnimationClip(clip.name, clip.duration, tracks);
   const mixer = new THREE.AnimationMixer(sampleRoot);
@@ -139,57 +232,82 @@ export function shapeClip(clip, rig, shape) {
   action.clampWhenFinished = true;
   action.play();
 
-  // Each turned bone's quaternion track is replaced by one resampled on the
+  // Each written bone's quaternion track is replaced by one resampled on the
   // densest grid the clip already has (the baked per-frame tracks).
   const grid = tracks.reduce((a, t) => (t.times.length > a.length ? t.times : a), []);
   const times = grid.length > 2 ? Float32Array.from(grid) : (() => {
     const n = Math.max(2, Math.round(clip.duration * fps) + 1);
     return Float32Array.from({ length: n }, (_, i) => (i / (n - 1)) * clip.duration);
   })();
-  const values = Object.fromEntries(bones.map((b) => [b.name, new Float32Array(times.length * 4)]));
 
-  const parentWorld = new THREE.Quaternion();
+  const scratch = new THREE.Quaternion();
   const yaw = new THREE.Quaternion();
-  const local = new THREE.Quaternion();
-  const animated = bones.map(() => new THREE.Quaternion());
-  for (let k = 0; k < times.length; k += 1) {
+  const animated = touched.map(() => new THREE.Quaternion());
+  let sampled = false;
+  const pose = (k, drops) => {
     // The mixer only writes a value that CHANGED since its last write, so a
-    // turned bone is put back to what the mixer left before the next sample —
+    // written bone is put back to what the mixer left before the next sample —
     // otherwise a frame the clip holds still would keep the last frame's turn
     // and turn it again.
-    if (k > 0) bones.forEach((bone, i) => bone.quaternion.copy(animated[i]));
+    if (sampled) touched.forEach((bone, i) => bone.quaternion.copy(animated[i]));
+    sampled = true;
     // A clamped LoopOnce action pauses itself on reaching the end, and a
     // paused action ignores setTime — so un-pause before every sample.
     action.paused = false;
     mixer.setTime(times[k]);
-    bones.forEach((bone, i) => animated[i].copy(bone.quaternion));
-    const amount = turnAmount(turn.keys, times[k] * fps);
-    for (const bone of bones) {
-      const degrees = turn.degrees[bone.name] * amount;
-      if (degrees !== 0) {
-        bone.parent.updateWorldMatrix(true, false);
-        bone.parent.getWorldQuaternion(parentWorld);
-        yaw.setFromAxisAngle(UP, THREE.MathUtils.degToRad(degrees));
-        // parent⁻¹ · yaw · parent · local: the bone's animated orientation,
-        // turned about world up where it stands.
-        local
-          .copy(parentWorld)
-          .invert()
-          .multiply(yaw)
-          .multiply(parentWorld)
-          .multiply(bone.quaternion);
-        bone.quaternion.copy(local.normalize());
+    touched.forEach((bone, i) => animated[i].copy(bone.quaternion));
+    const frame = times[k] * fps;
+    for (const bone of turned) {
+      let degrees = 0;
+      for (const layer of layers) {
+        const d = layer.degrees?.[bone.name];
+        if (d) degrees += d * turnAmount(layer.keys, frame - (layer.lag?.[bone.name] || 0));
       }
-      bone.quaternion.toArray(values[bone.name], k * 4);
+      if (degrees !== 0) {
+        yaw.setFromAxisAngle(UP, THREE.MathUtils.degToRad(degrees));
+        rotateInWorld(bone, yaw, scratch);
+      }
     }
+    holder.updateMatrixWorld(true);
+    if (drops) arms.forEach((arm, i) => lowerHand(arm.upper, arm.lower, arm.hand, drops[i][k]));
+  };
+
+  // Pass one, only when a hand is to be rested: how high its tips are.
+  const drops = arms.map(() => new Float32Array(times.length));
+  if (arms.length) {
+    const lowest = arms.map(() => new Float32Array(times.length));
+    const p = new THREE.Vector3();
+    for (let k = 0; k < times.length; k += 1) {
+      pose(k, null);
+      arms.forEach((arm, i) => {
+        lowest[i][k] = Math.min(...arm.tips.map((tip) => tip.getWorldPosition(p).y));
+      });
+    }
+    arms.forEach((arm, i) => {
+      const window = Math.round(fps);
+      for (let k = 0; k < times.length; k += 1) {
+        let floor = Infinity;
+        for (let j = Math.max(0, k - window); j <= Math.min(times.length - 1, k + window); j += 1) {
+          floor = Math.min(floor, lowest[i][j]);
+        }
+        const hover = Math.min(Math.max(0, floor - arm.rest.surface), arm.rest.maxDrop ?? 0.08);
+        drops[i][k] = hover * turnAmount(arm.rest.keys || [[0, 1]], times[k] * fps);
+      }
+    });
+  }
+
+  const values = touched.map(() => new Float32Array(times.length * 4));
+  for (let k = 0; k < times.length; k += 1) {
+    pose(k, arms.length ? drops : null);
+    touched.forEach((bone, i) => bone.quaternion.toArray(values[i], k * 4));
   }
   mixer.stopAllAction();
   mixer.uncacheRoot(sampleRoot);
 
-  const turnedTrackNames = new Set(bones.map((b) => `${b.name}.quaternion`));
-  const shaped = tracks.filter((t) => !turnedTrackNames.has(t.name));
-  for (const bone of bones) {
-    shaped.push(new THREE.QuaternionKeyframeTrack(`${bone.name}.quaternion`, times, values[bone.name]));
-  }
+  const written = new Set(touched.map((b) => `${b.name}.quaternion`));
+  const shaped = tracks.filter((t) => !written.has(t.name));
+  touched.forEach((bone, i) => {
+    shaped.push(new THREE.QuaternionKeyframeTrack(`${bone.name}.quaternion`, times, values[i]));
+  });
   return { clip: new THREE.AnimationClip(clip.name, clip.duration, shaped), report };
 }

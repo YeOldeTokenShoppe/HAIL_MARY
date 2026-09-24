@@ -1851,7 +1851,7 @@ function TalkShowModel({
         const shape = clipShape(character, clip.name);
         if (!shape) return clip;
         const rig = findRig(gltf.scene, empty, character.rig);
-        const { clip: shaped, report } = shapeClip(clip, rig, shape);
+        const { clip: shaped, report } = shapeClip(clip, rig, shape, character.seat?.[shape.seat || "news"]);
         if (report.missingBones.length) {
           console.warn(
             `[TalkShowScene] ${empty}: "${clip.name}" turns bones the rig does not have: ` +

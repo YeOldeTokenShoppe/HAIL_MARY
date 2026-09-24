@@ -319,15 +319,33 @@ export const CHARACTERS = {
      * to loop back to position of frame 1." Done here rather than in Blender
      * (src/lib/ltTv/clipShaping.mjs), so a re-export of the same action keeps it.
      *
-     * `keys` are BLENDER FRAMES (30fps, frame 1 is the first) against how much
-     * of the turn is on: 0 is the clip as animated, 1 the full turn. He turns
-     * to her over the first 40 frames and is back on the laptop by 850, where
-     * his hands come up to type (measured off the export: they reach the
-     * keyboard by frame 860 and stay there to the clip's last frame, 953).
-     * `degrees` is the turn each bone adds about world up, positive toward
-     * Holly (she sits at +X of him): 30° of torso over the three spine bones,
-     * and 45° more of neck and head, about 75° of the ~86° she is off his
-     * front. A first fit, not watched on the set — change the numbers.
+     * Frames are BLENDER FRAMES (30fps, frame 1 is the first) against how much
+     * of a layer is on: 0 is the clip as animated, 1 the full turn. Degrees
+     * are about world up, positive toward Holly (she sits at +X of him).
+     *
+     * HER NOTES ON THE FIRST CUT, same evening: everything turning together
+     * "looks machine-like", and a head "glued on Holly" is "a little creepy —
+     * better to occasionally glance towards Holly, like a real conversation".
+     * So it is two layers now:
+     *
+     *   BODY  24° over the spine, and it TRAVELS: the upper spine goes first
+     *         and each bone below follows a few frames later (`lag`), after
+     *         the head has already started. He angles himself toward her for
+     *         the whole conversation and is back square to the laptop by 850,
+     *         where his hands come up to type (measured off the export: on the
+     *         keys by 860, there to the last frame, 953).
+     *   GLANCES  40° more of neck and head, four times, held for 1.5 to 3s
+     *         and irregularly spaced. Between them his head sits where his
+     *         body points, into the space between them rather than at her.
+     *
+     * First fits, not watched on the set — change the numbers.
+     *
+     * `rest`: his right hand (screen left) hovers 3–5cm over the countertop
+     * as animated, fingertips at 1.00–1.03 against a desk top at 0.974
+     * (measured, LTTV_Set.glb `Countertop`, 2026-09-24). It is brought down
+     * onto the desk with a two-bone arm solve, hand orientation kept, except
+     * around the typing. It eases in over the first second so the join from
+     * the typing is him putting his hand down.
      *
      * `closeLoopFrames` eases the last 30 frames of every channel onto frame
      * 1. As exported the clip ends with his hands on the keyboard and frame 1
@@ -337,10 +355,38 @@ export const CHARACTERS = {
       anchorGuy_intermission2: {
         fps: 30,
         closeLoopFrames: 30,
-        turn: {
-          degrees: { spine_01: 8, spine_02: 10, spine_03: 12, neck_01: 18, head: 27 },
-          keys: [[1, 0], [40, 1], [815, 1], [850, 0]],
-        },
+        turns: [
+          {
+            // BODY
+            degrees: { spine_03: 10, spine_02: 8, spine_01: 6 },
+            lag: { spine_03: 0, spine_02: 5, spine_01: 10 },
+            keys: [[1, 0], [16, 0], [62, 1], [780, 1], [836, 0]],
+          },
+          {
+            // GLANCES — the first starts before the body does, so he looks
+            // before he turns; the last is over before the body turns back.
+            degrees: { neck_01: 15, head: 25 },
+            lag: { head: 0, neck_01: 3 },
+            keys: [
+              [1, 0], [6, 0], [26, 1], [110, 1], [134, 0],
+              [300, 0], [318, 1], [385, 1], [405, 0],
+              [525, 0], [540, 1], [585, 1], [604, 0],
+              [690, 0], [707, 1], [758, 1], [776, 0],
+            ],
+          },
+        ],
+        rest: [
+          {
+            upper: "UpperArm_R",
+            lower: "lowerarm_r",
+            hand: "Hand_R",
+            tips: ["finger_04_r", "finger_03_r", "finger_02_r", "indexFinger_04_r", "thumb_03_r"],
+            // The desk top plus a finger's half-thickness: the tips are bones,
+            // down the middle of the finger, not its underside.
+            surface: 0.982,
+            keys: [[1, 0], [30, 1], [820, 1], [846, 0]],
+          },
+        ],
       },
     },
     faces: { face1: "Face1", face2: "Face2", hide: ["Face3"] },
@@ -430,7 +476,7 @@ export function optionalClips(character) {
  * invisible — the character just goes on doing what the old file said, which
  * reads as the fix not working.
  */
-export const MODEL_VERSION = "split-5";
+export const MODEL_VERSION = "split-6";
 export function modelUrl(file) {
   return `${String(file).replace(/^public/, "")}?v=${MODEL_VERSION}`;
 }

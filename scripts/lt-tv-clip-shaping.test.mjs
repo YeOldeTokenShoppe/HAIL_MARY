@@ -151,27 +151,60 @@ console.log("\nKip's intermission turns him to Holly and comes home (Michelle, 2
   const rig = empty.getObjectByName(kip.rig);
   const clip = gltf.animations.find((a) => a.name === kip.outro);
   const shape = clipShape(kip, kip.outro);
-  const { clip: shaped } = shapeClip(clip, rig, shape);
+  const { clip: shaped } = shapeClip(clip, rig, shape, kip.seat.news);
   const fps = shape.fps;
   const before = poser(empty, rig.name, clip);
   const after = poser(empty, rig.name, shaped);
-  const at = (frame) => [before(frame / fps), after(frame / fps)];
+  const added = (frame, bone) => {
+    const b = before(frame / fps);
+    const a = after(frame / fps);
+    return addedRotation(b, a, bone);
+  };
+  const [body, glances] = shape.turns;
+  const bodyTotal = Object.values(body.degrees).reduce((s, d) => s + d, 0);
+  const glanceTotal = Object.values(glances.degrees).reduce((s, d) => s + d, 0);
+  const on = (layer, frame) => turnAmount(layer.keys, frame);
+  // Frames picked off the keys, not hard-coded, so retiming the glances
+  // cannot leave these testing nothing.
+  const held = (layer, f, v) => [0, 5, 10].every((back) => on(layer, f - back) === v);
+  const glancing = [...Array(820).keys()].find((f) => f > 200 && held(glances, f, 1) && held(body, f, 1));
+  const between = [...Array(820).keys()].find((f) => f > 200 && held(glances, f, 0) && held(body, f, 1));
 
-  const [b400, a400] = at(400);
-  const chest = addedRotation(b400, a400, "spine_03");
-  const head = addedRotation(b400, a400, "head");
-  const torso = ["spine_01", "spine_02", "spine_03"].reduce((s, b) => s + shape.turn.degrees[b], 0);
-  const whole = Object.values(shape.turn.degrees).reduce((s, d) => s + d, 0);
-  ok(`mid-clip the chest is turned the torso's ${torso}° (${chest.degrees.toFixed(2)}°)`, Math.abs(chest.degrees - torso) < 0.1);
-  ok(`and the head the whole ${whole}° (${head.degrees.toFixed(2)}°)`, Math.abs(head.degrees - whole) < 0.1);
+  const chest = added(glancing, "spine_03");
+  const head = added(glancing, "head");
+  ok(`turned, the chest carries the body's ${bodyTotal}° (${chest.degrees.toFixed(2)}°)`, Math.abs(chest.degrees - bodyTotal) < 0.1);
+  ok(`mid-glance the head adds ${glanceTotal}° more (${head.degrees.toFixed(2)}°)`, Math.abs(head.degrees - bodyTotal - glanceTotal) < 0.1);
   // About WORLD UP, and toward +X, where Holly sits: a turn, not a lean.
   ok(`about world up, not tilted (axis y ${head.up.toFixed(4)})`, head.up > 0.9999);
   ok("toward Holly, who is at +X of him", CHARACTERS.Holly.seat.news.position[0] > kip.seat.news.position[0]);
-  const hand = (e) => e.getObjectByName("Hand_R").getWorldPosition(new THREE.Vector3());
-  ok("his right hand swings toward +X with him", hand(a400).x > hand(b400).x);
 
-  const [b900, a900] = at(900);
+  // "A little creepy" was a head glued on her: between glances it goes with
+  // the body instead of holding her.
+  ok(`between glances the head only goes where the body does (${added(between, "head").degrees.toFixed(2)}°)`,
+    Math.abs(added(between, "head").degrees - bodyTotal) < 0.1);
+  const glanceCount = glances.keys.filter(([, v], i, k) => v === 1 && (i === 0 || k[i - 1][1] === 0)).length;
+  ok(`he glances more than once (${glanceCount})`, glanceCount >= 3);
+
+  // "Machine-like" was every bone arriving together: the head starts first,
+  // and the turn travels down the spine.
+  const start = Math.round((body.keys[1][0] + body.keys[2][0]) / 2);
+  ok(`the head is on its way before the body (frame ${body.keys[1][0]})`, added(body.keys[1][0], "head").degrees > 5);
+  const upper = added(start, "spine_03").degrees - added(start, "spine_02").degrees;
+  const lower = added(start, "spine_01").degrees;
+  ok(`mid-turn the upper spine leads the lower (${upper.toFixed(2)}° vs ${lower.toFixed(2)}° at the base)`, upper > lower);
+
+  const [b900, a900] = [before(900 / fps), after(900 / fps)];
   ok("typing at the laptop (frame 900) is the clip as animated", addedRotation(b900, a900, "head").degrees < 0.1);
+  const tipsY = (e) => Math.min(...shape.rest[0].tips.map((n) => e.getObjectByName(n).getWorldPosition(new THREE.Vector3()).y));
+  ok("and so are his hands", Math.abs(tipsY(before(900 / fps)) - tipsY(after(900 / fps))) < 1e-4);
+
+  // The hand Michelle saw hovering (screen left, his right): 3-5cm over the
+  // desk as animated, on it once rested.
+  const surface = shape.rest[0].surface;
+  const hover = tipsY(before(200 / fps)) - surface;
+  const rested = tipsY(after(200 / fps)) - surface;
+  ok(`his right hand hovered (${(hover * 100).toFixed(1)}cm over the desk), or this proves nothing`, hover > 0.02);
+  ok(`and now rests on it (${(rested * 100).toFixed(1)}cm)`, Math.abs(rested) < 0.01);
 
   const first = shaped.tracks[0].times[0];
   const gapBefore = loopGapDegrees(before, clip.duration, first);
