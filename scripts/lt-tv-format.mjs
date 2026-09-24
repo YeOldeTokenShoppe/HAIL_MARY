@@ -78,7 +78,7 @@ export const CAST = {
   Kip: {
     actor: "Kip",
     displayName: "Kip O'Brien",
-    voiceId: "PHu8g8qpgxBEhHYfNhFa",
+    voiceId: "oH5P5eoGWAbm8qwjWWCR",
     processorKey: "kip",
     clipKey: "kip",
     role: "anchor",
