@@ -11,6 +11,27 @@
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
+// Dollars per million tokens, and per web search, from Anthropic's pricing
+// page (2026-09-24). Only used to print what a call cost; a model missing from
+// this list prints its token counts without a price.
+const PRICES = {
+  "claude-opus-5-5": { input: 4, output: 20 },
+  "claude-opus-5": { input: 5, output: 25 },
+};
+const PER_SEARCH = 0.01;
+
+/** One line saying what a call used, and roughly what it cost. */
+export function usageLine(model, usage) {
+  const { input = 0, output = 0, searches = 0 } = usage;
+  const price = PRICES[model];
+  const cost = price ? (input * price.input + output * price.output) / 1e6 + searches * PER_SEARCH : null;
+  return (
+    `  Used ${input.toLocaleString("en-US")} tokens in, ${output.toLocaleString("en-US")} out` +
+    (searches ? `, ${searches} web search${searches === 1 ? "" : "es"}` : "") +
+    (cost === null ? "" : ` — about $${cost.toFixed(2)}`)
+  );
+}
+
 export async function claude({
   system,
   user,
@@ -40,6 +61,7 @@ export async function claude({
   // pause_turn loop below appends to this list.
   const messages = turns ? [...turns] : [{ role: "user", content: user }];
   const searchNotes = [];
+  const usage = { input: 0, output: 0, searches: 0 };
   let data;
 
   // Server-side tools run on Anthropic's side, but a long tool-using turn can
@@ -69,6 +91,14 @@ export async function claude({
 
     data = await res.json();
 
+    // A pause_turn resume is billed as a call of its own, so the totals add up
+    // across the loop. Cached input would be cheaper than this counts it, but
+    // none of the writers cache.
+    const u = data.usage || {};
+    usage.input += (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
+    usage.output += u.output_tokens || 0;
+    usage.searches += u.server_tool_use?.web_search_requests || 0;
+
     // A server-tool failure arrives as a 200 with an error object in place of
     // the usual result list. The show degrades rather than dying: an
     // unverified rundown is worse than a verified one, but far better than no
@@ -82,6 +112,8 @@ export async function claude({
     if (data.stop_reason !== "pause_turn") break;
     messages.push({ role: "assistant", content: data.content });
   }
+
+  console.log(usageLine(model, usage));
 
   const text = (data.content || [])
     .filter((b) => b.type === "text")
