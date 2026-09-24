@@ -360,12 +360,14 @@ export const TALKSHOW_CONNOR_FILTER = { saturate: 106, contrast: 102, brightness
 // on a screen that should look backlit.
 export const TALKSHOW_HOLLY_CROP = { cropX: 216, cropY: 130, cropW: 168, cropH: 169, rotateZ: 4, rotateX: 0 };
 export const TALKSHOW_HOLLY_FILTER = { saturate: 126, contrast: 117, brightness: 92, hueRotate: 0, sepia: 0 };
-// KIP'S ARE A SEED, copied from Connor's (the seat he took) with the sepia
-// taken off, as Holly's fit showed a warm cast reads as grime here. His own
-// SitePal scene will frame him differently, so fit them at ?tune=sitepal →
-// "TS Kip" and paste the values back.
-export const TALKSHOW_KIP_CROP = { cropX: 180, cropY: 118, cropW: 145, cropH: 195, rotateZ: 0, rotateX: 0 };
-export const TALKSHOW_KIP_FILTER = { saturate: 106, contrast: 102, brightness: 80, hueRotate: 0, sepia: 0 };
+// KIP'S ARE MICHELLE'S OWN, fitted on the set and pasted back 2026-09-24.
+// They started as a copy of Connor's (the seat he took). The box grew to
+// 173x223, the loosest of the four, and the colour went a long way from the
+// seed: saturation more than doubled, a -38 hue turn and half sepia, where
+// Holly's fit threw sepia out. The same studio wants a different correction
+// per avatar, so a seed is only ever a starting point.
+export const TALKSHOW_KIP_CROP = { cropX: 181, cropY: 118, cropW: 173, cropH: 223, rotateZ: 0, rotateX: 0 };
+export const TALKSHOW_KIP_FILTER = { saturate: 248, contrast: 83, brightness: 74, hueRotate: -38, sepia: 50 };
 
 // Projection registry. sceneId reuses the temple's SitePal scenes (Monk =
 // GR80, Connor = the Demon/H80Z scene). face1 = static face to hide, face2 =
