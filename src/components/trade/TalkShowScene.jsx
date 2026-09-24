@@ -417,7 +417,7 @@ export const TALKSHOW_PROJECTION_CONFIG = {
   Holly: {
     label: "TS Holly",
     sceneId: 2775585,
-    hash: "u2gpwL8UxKKa2eKLsXI3BVUPNHUdFxFT",
+    hash: "roLOPw4o3yboDWTSmdTgN3HUeHdhC7pF", // re-issued by SitePal 2026-09-24, same scene
     face1: CHARACTERS.Holly.faces.face1,
     face2: CHARACTERS.Holly.faces.face2,
     crop: TALKSHOW_HOLLY_CROP,
