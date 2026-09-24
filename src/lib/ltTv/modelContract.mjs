@@ -308,11 +308,11 @@ export const CHARACTERS = {
       headnod: { clip: "anchorGuy_agreement", duration: 3.0 },
       headshake: { clip: "anchorGuy_disagreement", duration: 3.0 },
     },
-    // The news set's resting state between episodes, as Connor's head-turn
-    // was: same 46.70s. Michelle's 2026-09-24 re-export changed it (a new
-    // right arm throughout, and the Root moves from about frame 800) under the
-    // same name, and it is RESHAPED on load — see `shapes` below.
-    outro: "anchorGuy_intermission",
+    // The news set's resting state between episodes. Michelle's own
+    // `anchorGuy_intermission2` (2026-09-24, 31.77s) replaces the 46.70s
+    // `anchorGuy_intermission`, which is still in the file and unused. It is
+    // RESHAPED on load — see `shapes` below.
+    outro: "anchorGuy_intermission2",
     /* THE INTERMISSION TURNS HIM TO HOLLY, Michelle 2026-09-24: "rotate
      * towards Holly, but then rotate torso back to laptop during the laptop
      * typing section around keyframes ~850 to ~961. I also need the animation
@@ -321,23 +321,25 @@ export const CHARACTERS = {
      *
      * `keys` are BLENDER FRAMES (30fps, frame 1 is the first) against how much
      * of the turn is on: 0 is the clip as animated, 1 the full turn. He turns
-     * to her over the first 40 frames, is back on the laptop by 850, stays
-     * there to 961, turns back to her, and comes home to frame 1's pose for
-     * the join. `degrees` is the turn each bone adds about world up, positive
-     * toward Holly (she sits at +X of him): 30° of torso over the three spine
-     * bones, and 45° more of neck and head, about 75° of the ~86° she is off
-     * his front. A first fit, not measured on the set — change the numbers.
+     * to her over the first 40 frames and is back on the laptop by 850, where
+     * his hands come up to type (measured off the export: they reach the
+     * keyboard by frame 860 and stay there to the clip's last frame, 953).
+     * `degrees` is the turn each bone adds about world up, positive toward
+     * Holly (she sits at +X of him): 30° of torso over the three spine bones,
+     * and 45° more of neck and head, about 75° of the ~86° she is off his
+     * front. A first fit, not watched on the set — change the numbers.
      *
-     * `closeLoopFrames` eases the last 45 frames of every channel onto frame
-     * 1. As exported the clip ends 12.9° away at the right shoulder, which
-     * snaps once a loop. */
+     * `closeLoopFrames` eases the last 30 frames of every channel onto frame
+     * 1. As exported the clip ends with his hands on the keyboard and frame 1
+     * has them resting, 79° apart at the right forearm, so the last second is
+     * him taking his hands off the keys. */
     shapes: {
-      anchorGuy_intermission: {
+      anchorGuy_intermission2: {
         fps: 30,
-        closeLoopFrames: 45,
+        closeLoopFrames: 30,
         turn: {
           degrees: { spine_01: 8, spine_02: 10, spine_03: 12, neck_01: 18, head: 27 },
-          keys: [[1, 0], [40, 1], [820, 1], [850, 0], [961, 0], [991, 1], [1346, 1], [1386, 0]],
+          keys: [[1, 0], [40, 1], [815, 1], [850, 0]],
         },
       },
     },
@@ -428,7 +430,7 @@ export function optionalClips(character) {
  * invisible — the character just goes on doing what the old file said, which
  * reads as the fix not working.
  */
-export const MODEL_VERSION = "split-4";
+export const MODEL_VERSION = "split-5";
 export function modelUrl(file) {
   return `${String(file).replace(/^public/, "")}?v=${MODEL_VERSION}`;
 }

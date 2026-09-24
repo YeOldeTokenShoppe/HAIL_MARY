@@ -158,6 +158,9 @@ export function shapeClip(clip, rig, shape) {
     // otherwise a frame the clip holds still would keep the last frame's turn
     // and turn it again.
     if (k > 0) bones.forEach((bone, i) => bone.quaternion.copy(animated[i]));
+    // A clamped LoopOnce action pauses itself on reaching the end, and a
+    // paused action ignores setTime — so un-pause before every sample.
+    action.paused = false;
     mixer.setTime(times[k]);
     bones.forEach((bone, i) => animated[i].copy(bone.quaternion));
     const amount = turnAmount(turn.keys, times[k] * fps);

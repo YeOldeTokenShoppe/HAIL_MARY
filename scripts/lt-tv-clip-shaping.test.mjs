@@ -73,6 +73,8 @@ function poser(root, rigName, clip) {
   action.clampWhenFinished = true;
   action.play();
   return (seconds) => {
+    // Clamping pauses the action at the end, and a paused action ignores setTime.
+    action.paused = false;
     mixer.setTime(seconds);
     copy.updateMatrixWorld(true);
     return copy;
