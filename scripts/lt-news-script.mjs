@@ -24,7 +24,7 @@
 //   node scripts/lt-news-script.mjs --brief <f> --no-search               # skip source verification
 //
 // Env: ANTHROPIC_API_KEY (required unless --draft)
-//      LT_NEWS_MODEL     (default claude-opus-5)
+//      LT_NEWS_MODEL     (default claude-opus-5-5)
 
 import { readFile, writeFile, mkdir, readdir, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -64,7 +64,7 @@ import { writePlan } from "./lt-tv-pitch.mjs";
 
 const claude = (opts) => callClaude({ ...opts, model: MODEL });
 
-const MODEL = process.env.LT_NEWS_MODEL || "claude-opus-5";
+const MODEL = process.env.LT_NEWS_MODEL || "claude-opus-5-5";
 
 // Every flag this script knows. An unrecognised one is almost always a typo,
 // and silently ignoring it is how `--check-sources.` — one stray full stop —

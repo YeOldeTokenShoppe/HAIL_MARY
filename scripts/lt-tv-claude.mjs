@@ -24,10 +24,12 @@ export async function claude({
   // how a proposal rides along with them, so the room asks for the text back
   // instead of an exception. See `prose` on the result.
   lenient = false,
-  // How hard the model thinks before it answers (output_config.effort). Left
-  // unset, the model's own default — which is what every generator uses. The
-  // live desk lowers it, because a viewer is waiting on the answer.
-  effort = null,
+  // How hard the model thinks before it answers (output_config.effort). The
+  // generators and the room write at "high", said out loud rather than left to
+  // the model: every episode so far was written by Opus 5, whose default was
+  // high, and Opus 5.5 quietly defaults to medium. The live desk lowers it,
+  // because a viewer is waiting on the answer. LT_TV_EFFORT overrides.
+  effort = process.env.LT_TV_EFFORT || "high",
 }) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("ANTHROPIC_API_KEY is not set (or use --draft to skip the model).");

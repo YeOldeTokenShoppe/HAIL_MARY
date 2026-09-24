@@ -31,7 +31,7 @@
 // and a stronger one: there is nothing to get wrong.
 //
 // Env: ANTHROPIC_API_KEY (required unless --draft)
-//      LT_TV_MODEL       (default claude-opus-5)
+//      LT_TV_MODEL       (default claude-opus-5-5)
 
 import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -52,7 +52,7 @@ import { readStyleNotes, withStyleNotes } from "./lt-tv-style-notes.mjs";
 import { writePlan } from "./lt-tv-pitch.mjs";
 import { toSlateRecord, writeSlateRecord, SLATE_DIR, SLATE_INDEX } from "./lt-tv-slate-record.mjs";
 
-const MODEL = process.env.LT_TV_MODEL || "claude-opus-5";
+const MODEL = process.env.LT_TV_MODEL || "claude-opus-5-5";
 const PIPELINE = "scripts/lt-rt-script.mjs";
 // The shows this generator writes, in slate order. Both resolve through
 // showFormat, so adding one here is adding it to SHOW_FORMATS and nothing else.

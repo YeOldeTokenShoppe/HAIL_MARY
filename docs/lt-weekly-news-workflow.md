@@ -251,7 +251,7 @@ week you do not want to think about:
 node scripts/lt-news-script.mjs --brief content/lt-tv/briefs/news-2026-W38.json
 ```
 
-Two Claude calls (`claude-opus-5` by default; override with `LT_NEWS_MODEL`),
+Two Claude calls (`claude-opus-5-5` by default; override with `LT_NEWS_MODEL`),
 raw `fetch` against the Messages API — the same convention as every other Claude
 call in this repo, so no SDK dependency is added.
 

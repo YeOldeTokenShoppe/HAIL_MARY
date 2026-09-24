@@ -38,7 +38,7 @@ import { showFormat } from "./lt-tv-format.mjs";
 import { readStyleNotes, withStyleNotes, rememberStyleNote, STYLE_NOTES_PATH } from "./lt-tv-style-notes.mjs";
 
 const EPISODE_DIR = "content/lt-tv/episodes";
-const MODEL = process.env.LT_TV_MODEL || "claude-opus-5";
+const MODEL = process.env.LT_TV_MODEL || "claude-opus-5-5";
 const MAX_TOKENS = 4000;
 
 // A note is `#` then the text. `#!` means remember it as well as fix it — and

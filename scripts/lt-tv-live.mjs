@@ -22,7 +22,7 @@
 //
 // Environment:
 //   ANTHROPIC_API_KEY
-//   LT_TV_LIVE_MODEL   (default claude-opus-5, the same as every LT TV writer)
+//   LT_TV_LIVE_MODEL   (default claude-opus-5-5, the same as every LT TV writer)
 //   LT_TV_LIVE_EFFORT  (default medium; low answers faster, high writes better)
 
 import { claude } from "./lt-tv-claude.mjs";
@@ -38,7 +38,7 @@ import {
   readExchange,
 } from "../src/lib/ltTv/liveDesk.mjs";
 
-const MODEL = process.env.LT_TV_LIVE_MODEL || "claude-opus-5";
+const MODEL = process.env.LT_TV_LIVE_MODEL || "claude-opus-5-5";
 const EFFORT = process.env.LT_TV_LIVE_EFFORT || "medium";
 // Five short lines of dialogue is a few hundred tokens. The ceiling is for the
 // thinking that comes before them, so an answer is never cut off mid-line.

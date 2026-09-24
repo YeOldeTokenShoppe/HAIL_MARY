@@ -39,7 +39,7 @@
 // it — exactly like the rewrite step.
 //
 // Env: ANTHROPIC_API_KEY (required)
-//      LT_TV_MODEL       (default claude-opus-5)
+//      LT_TV_MODEL       (default claude-opus-5-5)
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -73,7 +73,7 @@ import {
 
 const EPISODE_DIR = "content/lt-tv/episodes";
 const SAMPLE_DIR = "content/lt-tv/samples";
-const MODEL = process.env.LT_TV_MODEL || "claude-opus-5";
+const MODEL = process.env.LT_TV_MODEL || "claude-opus-5-5";
 // Room for a real answer. A turn here is two or three sentences plus a
 // proposal, so this is a ceiling rather than a target — but a ceiling the
 // model can reach mid-sentence is one that loses the answer, which is what
