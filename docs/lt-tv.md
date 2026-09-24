@@ -149,7 +149,9 @@ other in character once the set has been quiet for the time set under
 ahead, and shown on the desk, so it airs straight away. **Write another** throws
 it away for a fresh one, **Banter now** airs it immediately, and **Banter: off**
 keeps the set quiet. Pressing **Air next** on a question during banter cuts in
-when the line being spoken ends. Nothing is written for banter while the desk
+when the line being spoken ends. During banter both characters turn to each
+other for the whole piece (`TALKSHOW_LIVE.facing`), where an answer turns only
+whoever is listening. Nothing is written for banter while the desk
 is not live, since each piece is a writer call plus live speech. Each piece
 starts from a random angle (`BANTER_ANGLES` in `scripts/lt-tv-live.mjs`) so it
 does not land on the same joke, and it knows what was said earlier that night.
