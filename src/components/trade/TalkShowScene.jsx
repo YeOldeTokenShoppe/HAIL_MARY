@@ -1321,7 +1321,10 @@ export const TALKSHOW_PORTALS = { current: null };
  * episode was recorded before Kip took the seat — so Kip would have answered
  * questions from an empty chair while Connor sat in his.
  */
-export const TALKSHOW_LIVE = { on: false, speaker: null, listener: null, framing: "two", cast: null };
+// `facing`: characters who turn toward the other chair whether or not they are
+// the one listening. Banter sets it to both, so the pair talk TO each other
+// rather than one of them addressing the room.
+export const TALKSHOW_LIVE = { on: false, speaker: null, listener: null, framing: "two", cast: null, facing: null };
 
 /** Push the head-motion settings into one portal's document. */
 export function applyHeadMotion(win, cfg = SITEPAL_HEAD_MOTION) {
@@ -3942,8 +3945,9 @@ function TalkShowModel({
     }
 
     Object.entries(headBones).forEach(([actor, head]) => {
-      const target =
-        addressedListener === actor ? listenerGazeYaw(actor) : 0;
+      const turned =
+        addressedListener === actor || (live && TALKSHOW_LIVE.facing?.includes(actor));
+      const target = turned ? listenerGazeYaw(actor) : 0;
       const current = listenerGazeRef.current[actor] || 0;
       const eased = THREE.MathUtils.damp(
         current,

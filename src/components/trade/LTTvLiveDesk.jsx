@@ -214,6 +214,7 @@ export default function LTTvLiveDesk({ show = null, episodePlaying = false }) {
     TALKSHOW_LIVE.cast = on ? cfg.actors : null;
     TALKSHOW_LIVE.speaker = null;
     TALKSHOW_LIVE.listener = null;
+    TALKSHOW_LIVE.facing = null;
     TALKSHOW_LIVE.framing = "two";
     // The lights are only touched while live, so a lighting or faces board
     // open alongside keeps whatever pin it set.
@@ -226,6 +227,7 @@ export default function LTTvLiveDesk({ show = null, episodePlaying = false }) {
       TALKSHOW_LIVE.cast = null;
       TALKSHOW_LIVE.speaker = null;
       TALKSHOW_LIVE.listener = null;
+      TALKSHOW_LIVE.facing = null;
       if (on) HOUSE_PREVIEW.force = null;
     };
   }, [visible, live, cfg]);
@@ -322,6 +324,9 @@ export default function LTTvLiveDesk({ show = null, episodePlaying = false }) {
     abortRef.current = controller;
     airingRef.current = { id, kind };
     const shots = kind === BANTER ? SHOT_FOR_BANTER : SHOT_FOR_LINE;
+    // Banter is the pair killing time together, so both turn to each other
+    // for the whole piece, gaps included, not only whoever is listening.
+    TALKSHOW_LIVE.facing = kind === BANTER ? cfg.actors : null;
     const used = new Set();
     let stopped = false;
     let yielded = false;
@@ -349,6 +354,7 @@ export default function LTTvLiveDesk({ show = null, episodePlaying = false }) {
     // load clips into them silently, and assume they are silent.
     TALKSHOW_LIVE.speaker = null;
     TALKSHOW_LIVE.listener = null;
+    TALKSHOW_LIVE.facing = null;
     TALKSHOW_LIVE.framing = "two";
     used.forEach((key) => {
       try { portalWindow(key)?.setPlayerVolume?.(0); } catch {}
