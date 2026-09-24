@@ -2,6 +2,17 @@
 const nextConfig = {
   reactStrictMode: false,
   devIndicators: false,
+
+  // Firebase App Hosting builds with `output: standalone` and then copies each
+  // top-level repo entry into .next/standalone — but SKIPS any entry that
+  // already exists there. Next's file tracing pulls public/manifest.json into
+  // .next/standalone/public, so the directory exists and the whole of public/
+  // (every .glb, the draco decoders, fonts, favicon) was silently left out of
+  // the deployed container: 404 in production, fine in `next dev`.
+  // Tracing public/ ourselves populates that directory for real.
+  outputFileTracingIncludes: {
+    '/**': ['./public/**/*'],
+  },
   turbopack: {
     rules: {
       '*.vert': {
