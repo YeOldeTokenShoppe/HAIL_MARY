@@ -113,7 +113,7 @@ Kip O'Brien took Connor's news seat on 2026-09-23; Connor stays on Markets &
 Morality, and keeps a news seat only so the episodes he already recorded there
 (Warsh Means It) still play. Kip is `LTTV_NewsAnchor.glb` (empty
 `NewsGuy_Empty`, the same Unreal-style skeleton as Holly), voice
-`PrphkIjVNo6xpWZI8duh`, SitePal scene 2775617, clips `lttv_news_epNN_kip`. His
+`PHu8g8qpgxBEhHYfNhFa` (his first voice, `PrphkIjVNo6xpWZI8duh`, was swapped 2026-09-24), SitePal scene 2775617, clips `lttv_news_epNN_kip`. His
 character is Michelle's brief, in the news writer: a veteran network anchor,
 completely deadpan, too grave about trivia. He opens each story; Holly has the
 numbers.
