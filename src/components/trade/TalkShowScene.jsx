@@ -377,8 +377,10 @@ export const TALKSHOW_HOLLY_FILTER = { saturate: 126, contrast: 113, brightness:
 // a seed is only ever a starting point.
 // Fine-tuned the same evening (01:19Z): rotateZ 1, and the colour pulled
 // most of the way back — saturate 248 → 129, hue -38 → -12, sepia 50 → 0.
-export const TALKSHOW_KIP_CROP = { cropX: 181, cropY: 118, cropW: 173, cropH: 223, rotateZ: 1, rotateX: 0 };
-export const TALKSHOW_KIP_FILTER = { saturate: 129, contrast: 96, brightness: 65, hueRotate: -12, sepia: 0 };
+// Refitted again 2026-09-24 04:41Z (her push): box 181,118 173x223 →
+// 190,118 157x223, rotateZ 1 → 0, contrast 96 → 102, hue -12 → -15.
+export const TALKSHOW_KIP_CROP = { cropX: 190, cropY: 118, cropW: 157, cropH: 223, rotateZ: 0, rotateX: 0 };
+export const TALKSHOW_KIP_FILTER = { saturate: 129, contrast: 102, brightness: 65, hueRotate: -15, sepia: 0 };
 // OFF AIR HE IS BRIGHTER, Michelle 2026-09-24 ("whenever the lights are
 // dimmed, can we increase Kip's brightness to 79"): his intermission is where
 // the silent conversation happens, and at 65 under the dimmed house his face
