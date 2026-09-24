@@ -379,6 +379,12 @@ export const TALKSHOW_HOLLY_FILTER = { saturate: 126, contrast: 113, brightness:
 // most of the way back — saturate 248 → 129, hue -38 → -12, sepia 50 → 0.
 export const TALKSHOW_KIP_CROP = { cropX: 181, cropY: 118, cropW: 173, cropH: 223, rotateZ: 1, rotateX: 0 };
 export const TALKSHOW_KIP_FILTER = { saturate: 129, contrast: 96, brightness: 65, hueRotate: -12, sepia: 0 };
+// OFF AIR HE IS BRIGHTER, Michelle 2026-09-24 ("whenever the lights are
+// dimmed, can we increase Kip's brightness to 79"): his intermission is where
+// the silent conversation happens, and at 65 under the dimmed house his face
+// read too dark. Only the fields named here change, and they ride the same
+// eased house cue as FACE_LIGHTING, so the change arrives with the lights.
+export const TALKSHOW_KIP_FILTER_OFF_AIR = { brightness: 79 };
 
 // Projection registry. sceneId reuses the temple's SitePal scenes (Monk =
 // GR80, Connor = the Demon/H80Z scene). face1 = static face to hide, face2 =
@@ -452,6 +458,7 @@ export const TALKSHOW_PROJECTION_CONFIG = {
     face2: CHARACTERS.Kip.faces.face2,
     crop: TALKSHOW_KIP_CROP,
     filter: TALKSHOW_KIP_FILTER,
+    offAirFilter: TALKSHOW_KIP_FILTER_OFF_AIR,
     hideExtra: CHARACTERS.Kip.faces.hide,
   },
 };
@@ -500,12 +507,18 @@ function ensureProjectionMaterial(st) {
 }
 
 // Crop the shared SitePal source into the 512² face canvas (filter + rotate),
-// matching CyborgTempleScene's paintProjection exactly.
-function paintCrop(st, cfg, source) {
+// matching CyborgTempleScene's paintProjection exactly. `dim` is how far the
+// house is toward off air (0 on air, 1 off), for a character whose filter
+// has an `offAirFilter`; the fields it names are eased toward it.
+function paintCrop(st, cfg, source, dim = 0) {
   const ctx = st.cropCtx;
   const canvas = st.cropCanvas;
   const { cropX, cropY, cropW, cropH, rotateZ, rotateX } = cfg.crop;
-  const f = cfg.filter;
+  let f = cfg.filter;
+  if (cfg.offAirFilter && dim > 0) {
+    f = { ...f };
+    for (const [k, v] of Object.entries(cfg.offAirFilter)) f[k] = f[k] + (v - f[k]) * dim;
+  }
   ctx.fillStyle = "#9F7854";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   try {
@@ -3975,6 +3988,11 @@ function TalkShowModel({
       delta,
     );
 
+    const houseDim = THREE.MathUtils.clamp(
+      (FACE_LIGHTING.onAir - faceLevelRef.current) / (FACE_LIGHTING.onAir - FACE_LIGHTING.offAir || 1),
+      0,
+      1,
+    );
     Object.entries(TALKSHOW_PROJECTION_CONFIG).forEach(([key, cfg]) => {
       const st = projRef.current[key];
       // No one in the chairs, nothing to paint.
@@ -4006,7 +4024,7 @@ function TalkShowModel({
 
       const isListener = soloKey && soloKey !== key;
       const repaint = show && (!isListener || solotickRef.current === 0);
-      if (repaint && st.cropCtx) paintCrop(st, cfg, source);
+      if (repaint && st.cropCtx) paintCrop(st, cfg, source, houseDim);
     });
 
     // The viewer camera follows the shot list — the "camera operator". Runs
