@@ -377,8 +377,8 @@ export const TALKSHOW_HOLLY_FILTER = { saturate: 126, contrast: 113, brightness:
 // a seed is only ever a starting point.
 // Fine-tuned the same evening (01:19Z): rotateZ 1, and the colour pulled
 // most of the way back — saturate 248 → 129, hue -38 → -12, sepia 50 → 0.
-export const TALKSHOW_KIP_CROP = { cropX: 181, cropY: 118, cropW: 173, cropH: 223, rotateZ: 1, rotateX: 0 };
-export const TALKSHOW_KIP_FILTER = { saturate: 129, contrast: 96, brightness: 65, hueRotate: -12, sepia: 0 };
+export const TALKSHOW_KIP_CROP = { cropX: 190, cropY: 118, cropW: 157, cropH: 223, rotateZ: 0, rotateX: 0 };
+export const TALKSHOW_KIP_FILTER = { saturate: 129, contrast: 102, brightness: 65, hueRotate: -15, sepia: 0 };
 
 // Projection registry. sceneId reuses the temple's SitePal scenes (Monk =
 // GR80, Connor = the Demon/H80Z scene). face1 = static face to hide, face2 =
