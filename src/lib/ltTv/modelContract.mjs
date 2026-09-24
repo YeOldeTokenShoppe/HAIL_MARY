@@ -222,16 +222,20 @@ export const CHARACTERS = {
     /* THE CUP RIDES HER HAND. The set carries `Hologirl_Sip_Cup` on the desk
      * (under `Sip_Cup_Socket`) and her rig carries `Coffee_Cup_Control`, a
      * bone that holds still on the desk in every clip but the coffee ones,
-     * where it goes up to her mouth and back. The scene re-parents the cup
-     * onto the bone once her idle has posed it, keeping the cup exactly where
-     * it sits, so from then on it follows her sip. Measured off the files: the
-     * bone rests 7cm from the socket, so the cup rides with that offset.
+     * where it goes up to her mouth and back. The scene moves the cup's origin
+     * ONTO the bone once her idle has posed it, keeping the cup's own tilt, and
+     * re-parents it there, so from then on it follows her sip.
      *
-     * `settle` is how far the cup is lowered first, in the set file's metres.
-     * As exported 2026-09-23 the cup's base is at y 1.005 and the countertop's
-     * surface at 0.974, so it hovered 3.1cm over the desk — Michelle saw it
-     * floating. Zero it if the socket is ever moved down in Blender. */
-    props: [{ node: "Hologirl_Sip_Cup", bone: "Coffee_Cup_Control", settle: 0.031 }],
+     * ON the bone, not near it. The socket is NOT where the cup belongs: as
+     * exported 2026-09-23 it sits 7cm from the bone and 3.1cm above the
+     * countertop. Riding with that offset left her fingers 9.1cm from the
+     * cup's axis mid-sip, 4.6cm clear of a cup 4.5cm in radius, which is the
+     * gap Michelle saw during the intermission. With the origin on the bone her
+     * grip lands 4.4cm from the axis, on the cup's surface, all through both
+     * coffee clips, and at idle the cup's base is at 0.972 against a
+     * countertop at 0.974. That is the relationship Blender has, and the
+     * socket never enters into it. */
+    props: [{ node: "Hologirl_Sip_Cup", bone: "Coffee_Cup_Control" }],
     /* SHE HAS THREE FACE LAYERS AND TWO EYE PLANES, and the same character is
      * already configured elsewhere in this repo — she is the promotions
      * hologram at the prize wheel in `src/lib/vendorSitePal.js`, on the same

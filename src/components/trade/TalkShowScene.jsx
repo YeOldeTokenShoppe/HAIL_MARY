@@ -3739,12 +3739,13 @@ function TalkShowModel({
      * bone's bind pose is nowhere near the desk (it sits at the armature's
      * origin), so the cup can only be handed over once her idle has posed the
      * bone, i.e. after a mixer update, and only while she is on her idle: in
-     * the middle of a sip the bone is at her mouth. `attach` keeps the cup's
-     * world transform, so it does not move at the handover, and follows the
-     * bone from then on. Once per built scene. */
+     * the middle of a sip the bone is at her mouth. The cup's origin goes ON
+     * the bone and keeps its own tilt (why, measured: `props` in
+     * modelContract.mjs); `attach` then keeps that world transform and
+     * follows the bone from then on. Once per built scene. */
     if (carriedRef.current.scene !== cloned) carriedRef.current = { scene: cloned, done: new Set() };
     Object.values(CHARACTERS).forEach((character) => {
-      (character.props || []).forEach(({ node, bone, settle = 0 }) => {
+      (character.props || []).forEach(({ node, bone }) => {
         const key = `${character.empty}:${node}`;
         const carried = carriedRef.current.done;
         if (carried.has(key)) return;
@@ -3757,15 +3758,10 @@ function TalkShowModel({
           console.warn(`[TalkShowScene] ${node} cannot ride ${bone}: ${!holder ? "no bone" : "no prop"} in the scene`);
           return;
         }
-        if (settle) {
-          // Down onto the desk, in the SET's own units: the mount scales the
-          // whole studio, so a world-space metre is not the file's metre.
-          const at = cloned.worldToLocal(prop.getWorldPosition(new THREE.Vector3()));
-          at.y -= settle;
-          prop.parent.updateWorldMatrix(true, false);
-          prop.position.copy(prop.parent.worldToLocal(cloned.localToWorld(at)));
-          prop.updateMatrixWorld(true);
-        }
+        holder.updateWorldMatrix(true, false);
+        prop.parent.updateWorldMatrix(true, false);
+        prop.position.copy(prop.parent.worldToLocal(holder.getWorldPosition(new THREE.Vector3())));
+        prop.updateMatrixWorld(true);
         holder.attach(prop);
       });
     });

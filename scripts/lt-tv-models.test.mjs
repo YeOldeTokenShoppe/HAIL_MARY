@@ -516,6 +516,10 @@ console.log("\nHer cup rides her hand:");
   ok(`and her rig carries ${bone}`, nodeNames(files.Holly).has(bone));
   ok("and the cup is not a name any character also uses",
     Object.values(files).every((g) => !g || !nodeNames(g).has(node)));
+  // The cup goes ON the bone. An offset (the old `settle`) rides with the
+  // hand and left her fingers 4.6cm off the cup mid-sip.
+  ok("the cup carries no offset from the bone",
+    CHARACTERS.Holly.props.every((prop) => Object.keys(prop).every((k) => k === "node" || k === "bone")));
 }
 
 console.log(failures ? `\n${failures} check(s) failed.\n` : "\nAll checks passed.\n");
