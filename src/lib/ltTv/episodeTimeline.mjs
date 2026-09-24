@@ -371,6 +371,24 @@ export function episodeChapters(record) {
     .sort((a, b) => a.at - b.at);
 }
 
+/** Shows whose hosts read every line played to the room down the lens. */
+export const READS_TO_CAMERA = new Set(["news"]);
+
+/**
+ * How much `actor` is looking down the lens at `elapsed`, 0 to 1. A look
+ * lets go over the last 0.6s of its line, so the head is already on its way
+ * back when the next line starts.
+ */
+export function cameraLookAt(timeline, actor, elapsed) {
+  let weight = 0;
+  for (const look of timeline?.toCamera || []) {
+    if (look.actor !== actor || elapsed < look.startAt || elapsed >= look.endAt) continue;
+    const t = Math.min(1, Math.max(0, (elapsed - (look.endAt - 0.6)) / 0.6));
+    weight = Math.max(weight, 1 - t * t * (3 - 2 * t));
+  }
+  return weight;
+}
+
 /**
  * The played form of an episode.
  *
@@ -413,6 +431,33 @@ export function buildEpisodeTimeline(record, { reactionDurations = {} } = {}) {
     });
   });
 
+  // Who looks down the lens, and when. Every show's opener is played to the
+  // viewer, so whoever speaks first holds the camera until the second line
+  // lands (from the very start, lead-in included). On the news the anchors
+  // READ to camera: every line played to the room is also delivered to the
+  // lens, the way a newsreader does it. Markets & Morality keeps it to the
+  // opener — two people arguing across a table do not keep checking the lens.
+  const toCamera = [];
+  if (speakers[0]) {
+    toCamera.push({
+      line: 0,
+      actor: speakers[0],
+      startAt: Number.NEGATIVE_INFINITY,
+      endAt: lineStarts[1] ?? dialogueEnd,
+    });
+  }
+  if (READS_TO_CAMERA.has(record.showId)) {
+    speakers.forEach((speaker, line) => {
+      if (line === 0 || !speaker || !audienceLines.has(line)) return;
+      toCamera.push({
+        line,
+        actor: speaker,
+        startAt: lineStarts[line],
+        endAt: lineStarts[line + 1] ?? dialogueEnd,
+      });
+    });
+  }
+
   // Reaction beats, resolved to absolute seconds and played in order.
   const cues = (record.cues || [])
     .filter((cue) => cue.line >= 0 && cue.line < lineStarts.length)
@@ -442,6 +487,7 @@ export function buildEpisodeTimeline(record, { reactionDurations = {} } = {}) {
     dialogueEnd,
     speakers,
     gazes,
+    toCamera,
     cues,
     shots,
     chapters,

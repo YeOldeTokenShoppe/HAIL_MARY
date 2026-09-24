@@ -103,7 +103,11 @@ A typical week is the Fed and interest rates, the ten-year Treasury, the price o
 
 The signal you are given is grouped: macro (Fed press releases, the Treasury yield curve, economy headlines), markets (index and commodity levels week over week), crypto, collectibles (the trading-card and memorabilia beat — set launches, manias, people buying things as investments), and predictions (Polymarket and Kalshi odds).
 
-You are choosing THREE stories for a six-to-seven-minute show, in running order. Spread them across beats: if story one is macro, story two should not be. Story three is usually the absurd one, and collectibles live there naturally.
+You are choosing THREE stories for a six-to-seven-minute show, in running order. Spread them across beats: if story one is macro, story two should not be. Story three is the lighter one: the week's mania, oddity or strange new asset, from whichever beat produced it.
+
+COLLECTIBLES ARE OPTIONAL. They are one more asset class that has become popular as people look for safe alternatives or the next hot thing — not a standing segment. Cover them only when something genuinely interesting or newsworthy happened there this week. Most weeks they will not appear at all, and that is correct.
+
+CRYPTO IS ALWAYS MENTIONED, AND USUALLY BRIEFLY. The show is representative of general investing and markets, so crypto gets a STORY only when it is genuinely one of the week's biggest investing stories. Every week, whatever the stories, the board carries one short crypto line (see THE BOARD below) — a single sentence if the market was flat.
 
 WHAT MAKES A GOOD STORY HERE:
 - It has a number or a concrete fact in it. "Sentiment is mixed" is not a story; "six hundred million left the ETFs in four sessions" is.
@@ -118,7 +122,8 @@ WHAT TO REJECT:
 
 Also pick THE SIDEBAR: four to six headlines from the brief that you are NOT covering tonight, which crawl along the ticker under the show. This is what makes the ticker read like a real newscast rather than a repeat of the segment you are watching — a ticker restating the story being spoken aloud is dead screen. Pick the near-misses: the stories that were real news this week and simply did not make a three-story show. They must be things the brief actually nominated; do not reach for anything outside it, and do not put a covered story on the sidebar in different words. Each one is a headline, not a sentence: under 80 characters, no full stop, and no number you did not get from the brief.
 
-Also pick THE BOARD: the three or four numbers that actually moved this week, read as a board. Candidates are the ten-year Treasury yield and its direction, the Fear & Greed arc across the week (the arc, not today's reading), oil or gold if either moved meaningfully, and the indices. Plus ONE prediction-market line from Polymarket or Kalshi worth quoting, with its odds. Do not recite every number you were given — pick what moved.
+Also pick THE BOARD: the three or four numbers that actually moved this week, read as a board. Candidates are the ten-year Treasury yield and its direction, oil or gold if either moved meaningfully, and the indices. Plus ONE prediction-market line from Polymarket or Kalshi worth quoting, with its odds. Do not recite every number you were given — pick what moved.
+The board ALWAYS includes exactly one crypto line, whatever else moved: bitcoin's week, with the Fear & Greed arc if it says something. If the market was flat, say so in one short sentence and move on. Take bitcoin's price from the brief's crypto data, or confirm it with a search like any other number.
 
 HOW TO SOURCE A STORY — the brief nominates, the web confirms:
 The brief you are given is made of headlines and social posts. It is enough to tell you what the week was ABOUT and nowhere near enough to read a number out loud on air. So:
@@ -170,15 +175,27 @@ Return ONLY a JSON object, no preamble and no code fences:
 
 // The ad copy is a file a human keeps current — the show's one hand-fed input.
 // No copy means no ad break that week, which is a normal week.
-async function readSpots(path = "content/lt-tv/rl80-spots.md") {
+export async function readSpots(path = "content/lt-tv/rl80-spots.md") {
   try {
     const text = await readFile(resolve(path), "utf8");
     // Bullets under "Retired" are kept for reuse but are not in rotation.
     const live = text.split(/^##\s+Retired/m)[0];
-    return live
-      .split("\n")
-      .filter((line) => /^-\s+\S/.test(line))
-      .map((line) => line.replace(/^-\s+/, "").trim());
+    // A bullet may wrap onto indented lines; those are part of it. Reading
+    // only the "-" line used to drop the end of every wrapped bullet, which
+    // for an ad is usually the disclaimer.
+    const spots = [];
+    let open = false;
+    for (const line of live.split("\n")) {
+      if (/^-\s+\S/.test(line)) {
+        spots.push(line.replace(/^-\s+/, "").trim());
+        open = true;
+      } else if (open && /^\s+\S/.test(line)) {
+        spots[spots.length - 1] += ` ${line.trim()}`;
+      } else {
+        open = false;
+      }
+    }
+    return spots;
   } catch {
     return [];
   }
@@ -231,6 +248,7 @@ ${FACE_BEAT_RULES}
 THE SPOT — the ad break, when you are given copy for it:
 Play it completely straight for as long as you can bear. Kip does the sponsor voice: the full network gravity, as though the product were a matter of national importance, the register of a man reading a script he was paid for and believes anyway. Then Holly reads the disclaimer — flatly, completely, at the same pace as the rest, which is what ruins the ad. Or she declines to read it. Or she reads it and then says what it actually means. She does advertising for a living elsewhere on the boardwalk and is not sentimental about it. Fifty-odd words, in and out.
 It is a joke ABOUT advertising. It never tells anyone to buy anything, it states no price, no return and no yield figure, and "not a recommendation" is the punchline rather than a caption. If you are given no spot copy, omit the "the-spot" segment entirely.
+THE COPY IS THE PRODUCER'S. Every claim about the product comes from the spot copy and nowhere else: never add a feature, a mechanism or a promise it does not state (no staking, rewards, yields or roadmaps unless the copy says so). When the copy is already a finished read — sentences written to be said — use its words exactly as written: Kip reads the sponsor lines and Holly reads the disclaimer line. The comedy goes around the copy, in the set-up and the button, never into it.
 `;
 
 // The same brief, plus what a whole-episode run has to return. The writer's

@@ -252,14 +252,14 @@ export const SEGMENTS = [
     label: "Cold open",
     targetWords: 95,
     intent:
-      "Connor welcomes the audience and previews the three stories in one breath. GR80 undercuts the preview in a line. Fast, no news yet.",
+      "Kip welcomes the audience and previews the stories in one breath. Holly undercuts the preview in a line. Fast, no news yet.",
   },
   {
     id: "story-1",
     label: "Lead story",
     targetWords: 210,
     intent:
-      "The week's biggest story, from ANY market — a rate decision, a bill moving through Congress, the ten-year, oil, the indices, or crypto. Connor states the fact with its number, GR80 reframes what the number actually measures, Connor pushes back, GR80 lands the button.",
+      "The week's biggest story, from ANY market — a rate decision, a bill moving through Congress, the ten-year, oil, the indices, or crypto. Kip introduces it with full gravity, Holly gives the number and what it actually measures, Kip over-dignifies it, Holly lands the button.",
   },
   {
     id: "story-2",
@@ -273,28 +273,28 @@ export const SEGMENTS = [
     label: "The spot",
     targetWords: 55,
     intent:
-      "A commercial-style read for RL80, played completely straight as an ad break and then punctured. Connor does the sponsor voice — grand, overclaimed, delighted. GR80 reads the disclaimer as if it were scripture, or refuses to read it. It is a joke about advertising, never a recommendation to buy anything. Skipped entirely when there is no spot copy for the week.",
+      "A commercial-style read for RL80, played completely straight as an ad break and then punctured. Kip does the sponsor voice with full network gravity; Holly reads the disclaimer flatly, which is what ruins it. The product claims are the spot copy's and nobody else's. It is a joke about advertising, never a recommendation to buy anything. Skipped entirely when there is no spot copy for the week.",
   },
   {
     id: "story-3",
     label: "Third story",
     targetWords: 185,
     intent:
-      "The week's absurd one — usually collectibles, a mania, or whatever people have newly decided is an asset. The comedy slot: Connor enjoys it, GR80 finds the uncomfortable truth underneath it.",
+      "The week's lighter one — a mania, an oddity, or whatever people have newly decided is an asset, from any beat. Collectibles only when something genuinely newsworthy happened there, never to fill the slot. The comedy slot: Kip treats it as a matter of state, Holly finds the uncomfortable number underneath it.",
   },
   {
     id: "the-board",
     label: "The board",
     targetWords: 135,
     intent:
-      "The week's numbers read as a board: the ten-year, the Fear & Greed arc, oil or gold if either moved, and ONE prediction-market line from Polymarket or Kalshi. Pick the three or four that actually moved; do not recite all of them. Ends on GR80 turning a number into a moral.",
+      "The week's numbers read as a board: the ten-year, the indices, oil or gold if either moved, ONE prediction-market line from Polymarket or Kalshi, and ALWAYS a short crypto update — bitcoin's week, a single line if the market was flat. Pick what actually moved; do not recite all of it. Ends on Holly turning a number into a one-line verdict.",
   },
   {
     id: "sign-off",
     label: "Sign-off",
     targetWords: 70,
     intent:
-      "Connor recaps the three stories in one sentence. GR80 closes the ledger and states plainly that none of it was a recommendation. Recurring closer — keep the shape week to week.",
+      "Kip recaps the stories in one sentence. Holly closes the ledger and states plainly that none of it was a recommendation. Recurring closer — keep the shape week to week.",
   },
 ];
 

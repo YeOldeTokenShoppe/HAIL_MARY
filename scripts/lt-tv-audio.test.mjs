@@ -54,6 +54,7 @@ import {
 import { wavInfo, sliceWav, perLineRender, layoutLine, clipChanges, clipChangesReport } from "./lt-tv-split.mjs";
 import { planSections, TARGET_SECTION_SECONDS } from "./lt-tv-sections.mjs";
 import { CAST } from "./lt-tv-format.mjs";
+import { spoken } from "../src/lib/ltTv/pronounce.mjs";
 import { renderScript } from "./lt-tv-episode.mjs";
 import { pendingEdits, readPauseMarks, readTakeMarks, readCutMarks } from "./lt-tv-edit.mjs";
 
@@ -625,6 +626,25 @@ console.log("\nThe clip files are the split's, not the recording's:");
   const many = Array.from({ length: 12 }, (_, i) => `lttv_rt_ep02_connor_s${i + 1}.wav`);
   ok("a long list is summarised", staleClipWarning(many).includes("and 8 more"));
   ok("but still says how many there are", staleClipWarning(many).includes("12 clip file"));
+}
+
+// ── RL80 is said "Our Lady" ──────────────────────────────────────────────
+// The voice is handed the respelling; the record keeps the brand as written.
+{
+  check("RL80 is said as the name", spoken("Brought to you by RL80."), "Brought to you by Our Lady.");
+  check("…with a ticker sign or a possessive", spoken("$RL80 and RL80's"), "Our Lady and Our Lady's");
+  check("the web address is left alone", spoken("rl80.com"), "rl80.com");
+  const ad = {
+    id: "news-t",
+    segments: [{ id: "the-spot", lines: [
+      { n: 1, actor: "Kip", voiceId: "v", text: "Tonight's episode is brought to you by RL80." },
+      { n: 2, actor: "Holly", voiceId: "h", text: "Financial miracles not guaranteed." },
+    ] }],
+  };
+  const units = linePlan(ad, new Map());
+  check("the voice gets the respelling", units[0].text, "Tonight's episode is brought to you by Our Lady.");
+  check("the record keeps the brand", ad.segments[0].lines[0].text, "Tonight's episode is brought to you by RL80.");
+  check("a line without it is sent as written", units[1].text, "Financial miracles not guaranteed.");
 }
 
 console.log(failures ? `\n${failures} check(s) failed.\n` : "\nAll checks passed.\n");

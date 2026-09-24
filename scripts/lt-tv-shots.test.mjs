@@ -23,6 +23,7 @@ import { resolve, join } from "node:path";
 
 import {
   buildEpisodeTimeline,
+  cameraLookAt,
   shotAt,
   shotSubjectAt,
 } from "../src/lib/ltTv/episodeTimeline.mjs";
@@ -164,6 +165,35 @@ for (const file of files) {
   // Same floor on the real slate, where the starvation actually showed up.
   const pair = timeline.shots.filter((s) => s.framing === "two").length / timeline.shots.length;
   ok(`${id}: cuts back to the pair for reactions (>12% of shots)`, pair > 0.12);
+}
+
+// ── Looking down the lens ────────────────────────────────────────────────
+// Whoever opens holds the camera until the second line; on the news, every
+// line played to the room is read to camera too. Markets & Morality keeps it
+// to the opener.
+{
+  const record = (showId) => ({
+    id: `${showId}-t`, showId, audio: { mode: "sections" },
+    sections: [{ clips: {}, start: 0, end: 20 }],
+    lineStarts: [0.5, 4, 8, 12], dialogueEnd: 16,
+    speakers: ["Kip", "Holly", "Kip", "Holly"],
+    audienceLines: [0, 2],
+  });
+  const news = buildEpisodeTimeline(record("news"));
+  const talk = buildEpisodeTimeline(record("morality"));
+  if (!news || !talk) {
+    ok("the look-to-camera fixture is playable", false);
+  } else {
+    check("news: who reads to camera, by line", news.toCamera.map((l) => [l.line, l.actor]), [[0, "Kip"], [2, "Kip"]]);
+    check("morality: only the opener", talk.toCamera.map((l) => [l.line, l.actor]), [[0, "Kip"]]);
+    check("the opener holds the lens through the lead-in", cameraLookAt(news, "Kip", 0), 1);
+    check("…and mid-line", cameraLookAt(news, "Kip", 2), 1);
+    ok("…letting go over the end of the line", cameraLookAt(news, "Kip", 3.7) < 0.5);
+    check("a line to the other host is not to camera", cameraLookAt(news, "Kip", 5), 0);
+    check("news: a later line to the room is", cameraLookAt(news, "Kip", 9), 1);
+    check("morality: a later line to the room is not", cameraLookAt(talk, "Kip", 9), 0);
+    check("the listener never looks", cameraLookAt(news, "Holly", 9), 0);
+  }
 }
 
 console.log(failures ? `\n${failures} check(s) failed.` : "\nAll checks passed.");

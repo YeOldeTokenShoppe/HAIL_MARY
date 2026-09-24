@@ -15,6 +15,7 @@ import {
   cleanQuestion,
   lineTimeoutMs,
 } from "@/lib/ltTv/liveDesk.mjs";
+import { spoken } from "@/lib/ltTv/pronounce.mjs";
 
 /**
  * THE LIVE Q&A DESK — the producer's panel for a live LT TV show.
@@ -122,7 +123,7 @@ function speakLine({ key, text, voice, signal }) {
     try {
       w.stopSpeech?.();
       w.setPlayerVolume?.(7);
-      w.sayText(text, voice, LIVE_TTS.lang, LIVE_TTS.engine);
+      w.sayText(spoken(text), voice, LIVE_TTS.lang, LIVE_TTS.engine);
     } catch (error) {
       console.warn("[LTTvLiveDesk] sayText failed", error);
       finish({ ok: false, why: "SitePal refused the line" });

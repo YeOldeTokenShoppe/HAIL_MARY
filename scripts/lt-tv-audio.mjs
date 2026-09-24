@@ -46,6 +46,7 @@ import { createHash } from "node:crypto";
 import { uploadPlan } from "./lt-tv-split.mjs";
 import { CAST } from "./lt-tv-format.mjs";
 import { pendingEdits, summariseEdits, readPauseMarks, readTakeMarks } from "./lt-tv-edit.mjs";
+import { spoken } from "../src/lib/ltTv/pronounce.mjs";
 
 const ENDPOINT = "https://api.elevenlabs.io/v1/text-to-speech";
 export const MODEL_ID = "eleven_v3";
@@ -222,7 +223,9 @@ export function linePlan(
       n: line.n,
       actor: line.actor,
       voiceId: line.voiceId,
-      text: line.text,
+      // What the VOICE is given: RL80 said as "Our Lady" (pronounce.mjs). The
+      // record keeps the words as written, for the screen.
+      text: spoken(line.text),
       segmentId: line.segmentId,
       opensAct,
       pauseBefore: seconds,

@@ -29,6 +29,7 @@ import { SITEPAL_PROJECTION_CONFIG } from "@/components/CyborgTempleScene";
 import { useChannelScreen } from "@/components/trade/ltTvChannelScreen";
 import {
   buildEpisodeTimeline,
+  cameraLookAt,
   chapterIndexAt,
   cueIndexAt,
   episodeCast,
@@ -2340,7 +2341,11 @@ function TalkShowModel({
   );
   const listenerGazeQuatRef = useRef(new THREE.Quaternion());
   const listenerGazeAxisRef = useRef(new THREE.Vector3(0, 1, 0));
+  // Scratch for the look-to-camera below, shared by every head, plus each
+  // head's own smoothing state (`smoothed[actor]`), which is what makes a look
+  // ease in and let go rather than snap.
   const cameraAimRef = useRef({
+    smoothed: {},
     dummy: new THREE.Object3D(),
     cameraPosition: new THREE.Vector3(),
     headPosition: new THREE.Vector3(),
@@ -2351,7 +2356,6 @@ function TalkShowModel({
     targetQuaternion: new THREE.Quaternion(),
     blendedTargetQuaternion: new THREE.Quaternion(),
     euler: new THREE.Euler(0, 0, 0, "YXZ"),
-    smoothedQuaternion: null,
   });
 
   // Per-character action banks. Bases loop continuously. Reactions are created
@@ -3769,25 +3773,19 @@ function TalkShowModel({
       animatedHeadQuaternions[actor].copy(head.quaternion);
     });
 
-    // The opener is played to the viewer, so the host holds the camera until
-    // the second line lands.
-    const secondLineAt = timeline?.lineStarts?.[1];
-    const introCameraFocus =
-      playback.running && secondLineAt !== undefined
-        ? 1 -
-          THREE.MathUtils.smoothstep(elapsed, secondLineAt - 0.6, secondLineAt)
-        : 0;
-    if (
-      introCameraFocus > 0.001 &&
-      headBones.Connor &&
-      neutralHeadQuaternions.Connor
-    ) {
-      const head = headBones.Connor;
-      if (head.parent) {
+    // LOOKING DOWN THE LENS. The opener is played to the viewer, so whoever
+    // speaks first holds the camera until the second line lands; on the news
+    // the anchors also read every line played to the room to camera
+    // (`toCamera` in episodeTimeline.mjs says who and when). The aim is the
+    // actual viewer camera, so it follows the shot and the viewer's drag.
+    Object.entries(headBones).forEach(([actor, head]) => {
+      const aim = cameraAimRef.current;
+      const weight = playback.running ? cameraLookAt(timeline, actor, elapsed) : 0;
+      const baseLocal = neutralHeadQuaternions[actor];
+      if (weight > 0.001 && head.parent && baseLocal) {
         // Mirror CyborgTempleScene's proven Demon look-at math. A dummy
         // Object3D aims at the actual viewer camera, then its world rotation is
         // converted into the head bone's local space and clamped without roll.
-        const aim = cameraAimRef.current;
         cloned.updateWorldMatrix(true, true);
         camera.getWorldPosition(aim.cameraPosition);
         head.getWorldPosition(aim.headPosition);
@@ -3798,7 +3796,6 @@ function TalkShowModel({
           .copy(aim.parentWorldQuaternion)
           .multiply(aim.dummy.quaternion);
 
-        const baseLocal = neutralHeadQuaternions.Connor;
         aim.deltaQuaternion
           .copy(baseLocal)
           .invert()
@@ -3816,22 +3813,20 @@ function TalkShowModel({
         // state between frames just like the Temple focus interaction.
         aim.blendedTargetQuaternion
           .copy(head.quaternion)
-          .slerp(aim.targetQuaternion, introCameraFocus);
-        if (!aim.smoothedQuaternion) {
-          aim.smoothedQuaternion = head.quaternion.clone();
+          .slerp(aim.targetQuaternion, weight);
+        if (!aim.smoothed[actor]) aim.smoothed[actor] = head.quaternion.clone();
+        aim.smoothed[actor].slerp(aim.blendedTargetQuaternion, 0.08);
+        head.quaternion.copy(aim.smoothed[actor]);
+      } else if (aim.smoothed[actor]) {
+        // Letting go: ease back onto the animation, then hand the head back.
+        const animQuaternion = head.quaternion.clone();
+        aim.smoothed[actor].slerp(animQuaternion, 0.08);
+        head.quaternion.copy(aim.smoothed[actor]);
+        if (aim.smoothed[actor].angleTo(animQuaternion) < 0.01) {
+          aim.smoothed[actor] = null;
         }
-        aim.smoothedQuaternion.slerp(aim.blendedTargetQuaternion, 0.08);
-        head.quaternion.copy(aim.smoothedQuaternion);
       }
-    } else if (cameraAimRef.current.smoothedQuaternion && headBones.Connor) {
-      const aim = cameraAimRef.current;
-      const animQuaternion = headBones.Connor.quaternion.clone();
-      aim.smoothedQuaternion.slerp(animQuaternion, 0.08);
-      headBones.Connor.quaternion.copy(aim.smoothedQuaternion);
-      if (aim.smoothedQuaternion.angleTo(animQuaternion) < 0.01) {
-        aim.smoothedQuaternion = null;
-      }
-    }
+    });
 
     // A live answer holds the set only while no episode is playing.
     const live = TALKSHOW_LIVE.on && !playback.running;

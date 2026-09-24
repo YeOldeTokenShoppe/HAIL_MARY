@@ -28,7 +28,7 @@ import { assemble, renderScript } from "./lt-tv-episode.mjs";
 import { parseScript, applyScript } from "./lt-tv-edit.mjs";
 import { toSlateRecord } from "./lt-tv-slate-record.mjs";
 import { unwrittenTopics, scriptBible as moralityBible, MORALITY_ACTORS } from "./lt-rt-script.mjs";
-import { scriptBible as newsBible, NEWS_ACTORS } from "./lt-news-script.mjs";
+import { scriptBible as newsBible, NEWS_ACTORS, readSpots } from "./lt-news-script.mjs";
 import { FACE_NAMES } from "../src/lib/ltTv/faces.mjs";
 import { CAST, REACTIONS, DELIVERY_TAGS } from "./lt-tv-format.mjs";
 
@@ -285,6 +285,28 @@ ok("and the no-contractions rule is spelled out", /NO CONTRACTIONS/.test(news));
 // round trip through the editor loses her lines.
 ok("her speaker cue in the writer matches her CAST display name",
   news.includes(CAST.Holly.displayName.toUpperCase()));
+
+// ── The spot copy ────────────────────────────────────────────────────────
+// A bullet that wraps keeps its second line — for an ad, usually the
+// disclaimer — and retired bullets stay out of rotation.
+{
+  const dir = await mkdtemp(join(tmpdir(), "lt-spots-"));
+  const file = join(dir, "spots.md");
+  await writeFile(file, [
+    "# The spot", "", "Some prose about the file.", "", "## Currently running", "",
+    "- Tonight's episode is brought to you by RL80. A token to believe in. Financial",
+    "  miracles not guaranteed.",
+    "- A second, one-line spot.",
+    "", "## Retired", "", "- An old one.", "",
+  ].join("\n"));
+  check("a wrapped bullet is read whole, retired ones are not read", await readSpots(file), [
+    "Tonight's episode is brought to you by RL80. A token to believe in. Financial miracles not guaranteed.",
+    "A second, one-line spot.",
+  ]);
+  const live = await readSpots("content/lt-tv/rl80-spots.md");
+  ok("no spot in rotation mentions staking", live.every((spot) => !/stak/i.test(spot)));
+  ok("the news rules forbid inventing product claims", newsBible().includes("never add a feature"));
+}
 
 console.log(failures ? `\n${failures} check(s) failed.\n` : "\nAll checks passed.\n");
 process.exit(failures ? 1 : 0);
