@@ -2,7 +2,7 @@
 # Lowrider (/old_landing) model: Blender export + WebP optimize + install. ~5 min, mostly the Blender export.
 # Usage: scripts/export-lowrider.sh [path/to/lowRider_scene.blend]
 # Works from the SAVED .blend, not a File > Export GLB (that drops the per-action clips the page plays).
-# Rebuilds the girl's slow wrist tap, exports at 30 fps with Draco, WebP-encodes color textures, checks the
+# Rebuilds the girl's slow wrist tap, exports at 24 fps with Draco, WebP-encodes color textures, checks the
 # page's looping clips, keeps the previous model in models-src/, installs, then bumps ?v= in palmTreeDriveCar.mjs.
 set -euo pipefail
 cd "$(dirname "$0")/.."

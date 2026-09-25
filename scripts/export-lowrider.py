@@ -65,8 +65,8 @@ if rig and rig.animation_data and rig.animation_data.action and rig.animation_da
     note = '' if len(peaks) == 2 and peaks[1] - peaks[0] == 30 else ' — WARNING: expected two taps 30 frames apart'
     print(f'LOWRIDER_EXPORT slow wrist tap rebuilt, tap peaks at frames {peaks}{note}')
 
-# The page's clip timings and the 60 BPM tap were authored at 30 fps; the working file may be at 24.
-scene.render.fps = 30
+# Export at 24 fps: the live clip lengths (e.g. SlowTap 210 frames = 8.75 s) were set at 24; 30 would play them 25% fast.
+scene.render.fps = 24
 scene.render.fps_base = 1.0
 scene.frame_set(1)
 
