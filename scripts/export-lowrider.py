@@ -70,6 +70,33 @@ scene.render.fps = 30
 scene.render.fps_base = 1.0
 scene.frame_set(1)
 
+
+def skin_bone_children():
+    """Re-rig bone-parented meshes (the Shiba's eyes) as meshes skinned fully to that bone.
+
+    The glTF exporter misplaces bone-parented objects on this rig (the eyes landed ~1.6 m off the head),
+    while skinned meshes export correctly. Placement is taken in rest pose, where the armature modifier
+    leaves vertices where they are, so the eyes sit exactly where they did under the bone.
+    """
+    children = [o for o in scene.objects if o.type == 'MESH' and o.parent_type == 'BONE' and o.parent and o.parent_bone]
+    for obj in children:
+        rig, bone = obj.parent, obj.parent_bone
+        rig.data.pose_position = 'REST'
+        bpy.context.view_layer.update()
+        rest_world = obj.matrix_world.copy()
+        obj.parent_type = 'OBJECT'
+        obj.parent_bone = ''
+        obj.matrix_world = rest_world
+        group = obj.vertex_groups.get(bone) or obj.vertex_groups.new(name=bone)
+        group.add(range(len(obj.data.vertices)), 1.0, 'REPLACE')
+        obj.modifiers.new('Armature', 'ARMATURE').object = rig
+        rig.data.pose_position = 'POSE'
+        bpy.context.view_layer.update()
+        print(f'LOWRIDER_EXPORT skinned {obj.name} to {rig.name}:{bone}')
+
+
+skin_bone_children()
+
 # Visible, render-enabled meshes plus the rigs that deform them and all their parents.
 keep = set()
 for obj in scene.objects:
