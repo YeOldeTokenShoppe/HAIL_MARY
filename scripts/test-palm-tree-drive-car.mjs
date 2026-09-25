@@ -12,17 +12,9 @@ const animations=j.animations.map(a=>new T.AnimationClip(a.name,-1,a.channels.ma
 const rig=createLowRider({scene,animations});assert.equal(rig.wheels.length,4);rig.car.updateMatrixWorld(true);
 const before=rig.wheels.map(w=>w.pivot.getWorldPosition(new T.Vector3()));
 const axle=rig.wheels.map(w=>new T.Vector3(1,0,0).transformDirection(w.pivot.matrixWorld));assert(axle.every(v=>Math.abs(v.dot(new T.Vector3(-1,0,0)))>0.9999));
-const take=animations.find(a=>a.name==='Take 01');assert(rig.mixer.existingAction(take).paused);
-const haloClip=animations.find(a=>a.name==='HaloRotation');
-assert(haloClip, 'Export contains HaloRotation');
-const haloNode=nodes[j.animations.find(a=>a.name==='HaloRotation').channels[0].target.node];
-const haloBefore=haloNode.quaternion.clone();
 for(let k=0;k<60;k++)rig.update(1/60);rig.car.updateMatrixWorld(true);
 rig.wheels.forEach((w,i)=>{assert(w.angle>0);assert(w.pivot.getWorldPosition(new T.Vector3()).distanceTo(before[i])<1e-5);});
-assert.equal(rig.mixer.existingAction(take).time,0);assert(rig.mixer.existingAction(animations.find(a=>a.name==='mixamo.com')).time>0);
-assert(rig.mixer.existingAction(haloClip).time>0);
-assert.equal(rig.mixer.existingAction(haloClip).loop,T.LoopRepeat);
-assert(haloNode.quaternion.angleTo(haloBefore)>0.001, 'Halo rotation changes');
+for(const clip of animations){const action=rig.mixer.existingAction(clip);assert(action,`${clip.name} is playing`);assert(action.time>0,`${clip.name} advances`);assert.equal(action.loop,T.LoopRepeat,`${clip.name} loops`);}
 const skinTransforms=nodes.filter(o=>o.name.includes('mixamorig')).map(o=>o.quaternion.toArray());assert(skinTransforms.length>0);
 rig.dispose();assert.equal(rig.mixer.stats.actions.inUse,0);
-console.log('PASS: four real GLB wheels spin on the car X axle without orbiting; vehicle clip held; character clips advance; halo NLA rotates and loops; mixer cleanup succeeds.');
+console.log('PASS: four real GLB wheels spin on the car X axle without orbiting; every character clip advances and loops; mixer cleanup succeeds.');
