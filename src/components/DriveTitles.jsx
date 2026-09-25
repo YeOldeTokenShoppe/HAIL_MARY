@@ -9,10 +9,10 @@ export default function DriveTitles({ moment }) {
   return <div className="drive-titles">
     <div className={`title opening ${moment === 'opening' ? 'visible' : ''}`} aria-hidden={moment !== 'opening'}>
       <div className={`opening-headline lettering ${plainBlack.className}`}>
-        <span className="opening-first">A Hail Mary</span>
-        <span className="opening-second">may not be necessary<br /></span>
+        <span className="opening-first">If character</span>
+        <span className="opening-second">is Destiny</span>
       </div>
-      <div className={`tagline opening-subheading ${interItalic.className}`}>But it couldn't hurt.</div>
+      <div className={`tagline opening-subheading ${interItalic.className}`}>get in the car, let's go</div>
     </div>
     <div className={`title finale ${moment === 'final' ? 'visible' : ''}`} aria-hidden={moment !== 'final'}>
       <div className={`lettering ${plainBlack.className}`}>
