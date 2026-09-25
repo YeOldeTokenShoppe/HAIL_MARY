@@ -450,6 +450,14 @@ float prismPhase(vec3 nView, float time) {
 float prismFresnel(float facing) {
   return pow(1.0 - clamp(facing, 0.0, 1.0), ${PRISM.rimPower.toFixed(3)}) * ${PRISM.rimStrength.toFixed(3)};
 }
+// Recolour: keep c's brightness but take hue's chroma. Normalised by the MAX
+// channel (not luma) so a dark hue like violet can't be scaled past 1 and clip
+// toward pink — needed on surfaces already running near white (the gusher core),
+// where adding the rainbow on top would just clip.
+vec3 prismRecolor(vec3 c, vec3 hue) {
+  float cl = min(dot(c, vec3(0.299, 0.587, 0.114)) * 1.15, 1.0);
+  return hue / max(max(hue.r, max(hue.g, hue.b)), 0.05) * cl;
+}
 vec3 prismSaturate(vec3 c, float s) {
   float l = dot(c, vec3(0.299, 0.587, 0.114));
   return max(mix(vec3(l), c, s), 0.0);
@@ -739,6 +747,7 @@ float fbm(vec2 p) {
   return v;
 }
 ${GUSHER_GLSL}
+${PRISM_GLSL}
 void main() {
   float x = vUv.x - 0.5;
   // When viewing the back face, flip x so the flow pattern stays consistent
@@ -903,6 +912,29 @@ void main() {
   // Parabolum-only so night/hell keep their own hot cores.
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
   col = mix(col, vec3(0.18, 0.82, 0.92) * lum, smoothstep(0.9, 1.5, lum) * uParabolum * 0.5);
+
+  // ── Prism (glass-ring optics) — applied AFTER the white guard so it isn't
+  //    pulled back to flat cyan. The billboard has no normals, so fake a round
+  //    column: nx runs -1..1 across the width, nz bulges toward the viewer, and
+  //    the turbulence tilts ny. The rainbow phase follows that view-space normal
+  //    (ring's x*1.4 + y*0.9 + drift), split per channel for dispersion, with a
+  //    violet band (R<B, never pink) so it spans more than the teal palette.
+  float pnx = clamp(xOff / max(columnWidth, 1e-3), -1.0, 1.0);
+  vec3 pN = normalize(vec3(pnx, (scroll1 - 0.0) * 0.8, sqrt(max(1.0 - pnx * pnx, 0.0)) + 0.05));
+  float pPh = prismPhase(pN, T) + y * 0.9 - T * 0.12;
+  vec3 pRim = vec3(gusherPalette(pPh + 0.07).r, gusherPalette(pPh).g, gusherPalette(pPh - 0.07).b);
+  pRim = mix(pRim, vec3(0.50, 0.16, 0.95), smoothstep(0.5, 0.95, 0.5 + 0.5 * cos(6.28318530718 * pPh + 2.1)) * 0.75);
+  // Softer fresnel power than the ring (1.6 vs 4.25): the column's alpha dies at
+  // the silhouette, so a razor-thin rim would be invisible.
+  float pFres = pow(1.0 - pN.z, 1.6) * ${PRISM.rimStrength.toFixed(3)};
+  // Chromatic Worley caustics racing up the column (split into tiny spectra).
+  vec3 pCaus = prismCaustic(vec2(x * 9.0 + scroll2 * 0.6, y * 5.0 - T * 1.6), T * 0.9, 0.12);
+  float pAmt = uParabolum * smoothstep(0.02, 0.2, density);
+  // Hue bands swap in (brightness kept), strongest at the fresnel edge; the
+  // caustic network then adds coloured light on top.
+  col = mix(col, prismRecolor(col, pRim), pAmt * clamp(0.5 + pFres * 0.8, 0.0, 0.85));
+  col += pCaus * pRim * 0.6 * pAmt;
+  col = mix(col, prismSaturate(col, ${PRISM.sat.toFixed(2)}), uParabolum);
 
   // ── Alpha compositing ──
   float alpha = shape * density * uOpacity;
@@ -1084,6 +1116,7 @@ precision highp float;
 varying vec2 vUv;
 uniform float uOpacity;
 uniform float uGrow;
+uniform float uTime;
 uniform float uNightMode;
 uniform float uParabolum;
 uniform float uHell;
@@ -1118,6 +1151,7 @@ float splat(vec2 p, vec2 c, float r, float seed) {
   return smoothstep(edge, edge * 0.55, length(d));
 }
 ${GUSHER_GLSL}
+${PRISM_GLSL}
 void main() {
   vec2 p = (vUv - 0.5) * 2.0; // -1..1
   float g = mix(0.45, 1.0, clamp(uGrow, 0.0, 1.0)); // spread factor as the spill builds
@@ -1183,6 +1217,20 @@ void main() {
   // rolls in as iridescent bands. Blue-dominant violet (R<B) so it stays purple.
   float vBand = 0.5 + 0.5 * cos(6.28318530718 * irT + 2.1);
   col = mix(col, vec3(0.40, 0.16, 0.66), uParabolum * cov * vBand * 0.9);
+
+  // ── Prism (glass-ring optics) ──
+  // Floor caustics: the ring throws chromatic Worley caustics onto its floor; the
+  // puddle gets the same drifting cell network, R/G/B split into tiny spectra.
+  vec3 pCaus = prismCaustic(p * 5.5 + vec2(uTime * 0.07, -uTime * 0.05), uTime * 0.6, 0.12);
+  // Thin-film edge: where the puddle thins out (mid coverage) a dispersed rainbow
+  // band rings each splat, its hue drifting with time like the ring's rim.
+  float pEdge = smoothstep(0.02, 0.3, cov) * (1.0 - smoothstep(0.35, 0.9, cov));
+  float pPh = irT + dist * 0.8 + uTime * ${PRISM.rimSpeed.toFixed(3)} * 3.0;
+  vec3 pRim = vec3(gusherPalette(pPh + 0.07).r, gusherPalette(pPh).g, gusherPalette(pPh - 0.07).b);
+  pRim = mix(pRim, vec3(0.50, 0.16, 0.95), smoothstep(0.5, 0.95, 0.5 + 0.5 * cos(6.28318530718 * pPh + 2.1)) * 0.75);
+  col = mix(col, prismRecolor(col, pRim), uParabolum * clamp(0.35 + pEdge, 0.0, 0.85));
+  col += (pRim * pEdge * 0.6 + pCaus * mix(${_v3(GUSHER_IRID.glow)}, pRim, 0.5) * cov * 0.8) * uParabolum;
+  col = mix(col, prismSaturate(col, ${PRISM.sat.toFixed(2)}), uParabolum);
 
   gl_FragColor = vec4(col, cov * uOpacity * 0.92);
 }
@@ -2920,6 +2968,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const spillUniforms = useRef({
     uOpacity: { value: 0.0 },
     uGrow: { value: 0.0 },
+    uTime: { value: 0.0 },  // drives the prism caustics + rim drift
     uNightMode: { value: 0.0 },
     uParabolum: { value: 0.0 },
     uHell: { value: 0.0 },
@@ -3912,6 +3961,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         spillMatRef.current.uniforms.uHell.value = hell ? 1.0 : 0.0;
         spillMatRef.current.uniforms.uGrow.value = vis.sputter ? (fountain ? 0.6 : sputterEnv) : blowbackRef.current;
         spillMatRef.current.uniforms.uOpacity.value = fade;
+        spillMatRef.current.uniforms.uTime.value += delta;
         // Clip the puddle to the playfield: plane center (grid space) = cell pos +
         // wellhead offset; field is centered at origin with these half-extents.
         spillMatRef.current.uniforms.uClipCenter.value.set(
