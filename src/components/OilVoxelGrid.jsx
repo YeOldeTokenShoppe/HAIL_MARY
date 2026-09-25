@@ -397,6 +397,65 @@ vec3 iridPalette(float t) {
 }
 `;
 
+// ── Prism: glass-ring optics borrowed for the oil ────────────────────────────
+// Lifted from the "Volatile Nexus" glass ring (TSL) and ported to GLSL:
+//  • prismRim   — the fresnel rainbow edge. Hue is driven by the VIEW-SPACE normal
+//                 (x*1.4 + y*0.9) plus a slow time drift, so colour bands sweep
+//                 around silhouettes as the camera orbits; pow(1-facing, 4.25) keeps
+//                 it a thin skin. Here the hue comes from the substance palette
+//                 (passed in as three per-channel phases) rather than a raw RGB
+//                 rainbow, so each substance keeps its designed spectrum.
+//  • prismCaustic — Worley-cell caustics sampled once per colour channel at a
+//                 slightly offset position (the ring's causticChroma), so the
+//                 bright cell edges split into little spectra.
+//  • prismSaturate — the refraction pass's saturation lift.
+// Constants mirror the ring's tuned defaults (edgeStrength 0.87, edgePower 4.25,
+// rainbowSpeed 0.04, causticChroma 0.02 × scale).
+const PRISM = { rimStrength: 0.87, rimPower: 4.25, rimSpeed: 0.04, chroma: 0.02, sat: 1.4 };
+const PRISM_GLSL = `
+vec2 prismHash22(vec2 p) {
+  p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+  return fract(sin(p) * 43758.5453);
+}
+// Animated 2D Worley: feature points orbit inside their cells over time.
+float prismWorley(vec2 p, float t) {
+  vec2 i = floor(p), f = fract(p);
+  float best = 1e9;
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
+      vec2 g = vec2(float(x), float(y));
+      vec2 o = 0.5 + 0.5 * sin(t + 6.28318530718 * prismHash22(i + g));
+      vec2 r = g + o - f;
+      best = min(best, dot(r, r));
+    }
+  }
+  return sqrt(best);
+}
+float prismCell(vec2 p, float t) {
+  float w = 1.0 - min(1.0, prismWorley(p, t));
+  return w * w * w;
+}
+// Chromatic caustic: R/G/B cells sampled at split offsets (scale-relative chroma).
+vec3 prismCaustic(vec2 p, float t, float chroma) {
+  return vec3(
+    prismCell(p + vec2(-chroma, 0.0), t),
+    prismCell(p + vec2(0.0, -chroma), t),
+    prismCell(p + vec2(chroma, chroma), t)
+  );
+}
+// Rainbow phase from a view-space normal (the ring's emissive rainbow term).
+float prismPhase(vec3 nView, float time) {
+  return nView.x * 1.4 + nView.y * 0.9 + time * ${PRISM.rimSpeed.toFixed(3)};
+}
+float prismFresnel(float facing) {
+  return pow(1.0 - clamp(facing, 0.0, 1.0), ${PRISM.rimPower.toFixed(3)}) * ${PRISM.rimStrength.toFixed(3)};
+}
+vec3 prismSaturate(vec3 c, float s) {
+  float l = dot(c, vec3(0.299, 0.587, 0.114));
+  return max(mix(vec3(l), c, s), 0.0);
+}
+`;
+
 // ── EXPERIMENT: "Abyss Teal" palette for the eruption ────────────────────────
 // Recolors the erupting gusher (geyser shader) AND its ground spill/splatter to a
 // teal/green/blue variant of the opal substance: full thin-film iridescence +
@@ -474,10 +533,12 @@ function buildFragShader({ deposits, gridX, gridY, depthZ, cellSize, depthCellSi
 
   uniform float uReveal;
   uniform float uParabolum;
+  uniform float uTime;
 
   varying vec3 vOrigin;
   varying vec3 vDirection;
 ${IRID_GLSL}
+${PRISM_GLSL}
   const vec3 BOUNDS_MIN = vec3(${(-halfW).toFixed(4)}, ${(-halfH).toFixed(4)}, ${(-halfD).toFixed(4)});
   const vec3 BOUNDS_MAX = vec3(${halfW.toFixed(4)}, ${halfH.toFixed(4)}, ${halfD.toFixed(4)});
   const float DEPTH_SCALE = ${depthScale};
@@ -528,6 +589,16 @@ ${depositLines}
     vec3 color = vec3(0.0);
     float alpha = 0.0;
 
+    // Prism skin (glass-ring optics): evaluated ONCE per pixel, at the first
+    // sample that enters a deposit — a density-gradient normal gives the blob a
+    // real surface for the fresnel rainbow rim + chromatic caustics.
+    vec3 skin = vec3(0.0);
+    bool hitSkin = false;
+    // Camera-aligned basis (the volume mesh is never rotated, so object space
+    // is world-aligned and this stands in for view space).
+    vec3 camRight = normalize(cross(rayDir, abs(rayDir.y) > 0.99 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0)));
+    vec3 camUp = cross(camRight, rayDir);
+
     // Crude (amber) → Paraboleum (neon-green phosphorescence), mixed by uParabolum
     vec3 colLow  = mix(vec3(0.15, 0.08, 0.02), vec3(0.03, 0.14, 0.05), uParabolum);
     vec3 colMid  = mix(vec3(0.35, 0.18, 0.05), vec3(0.09, 0.52, 0.16), uParabolum);
@@ -555,6 +626,37 @@ ${depositLines}
         float irT = fract(worldPos.y * 0.16 + worldPos.x * 0.06 + worldPos.z * 0.04 + intensity);
         oilColor += iridPalette(irT) * uParabolum * intensity * intensity * 0.5 * ${ACTIVE_IRID.sheen.toFixed(3)};
 
+        if (!hitSkin && uParabolum > 0.0) {
+          hitSkin = true;
+          // Bisect back toward the previous step so the skin sits ON the
+          // isosurface instead of snapping to march steps (contour rings).
+          float lo = max(t - stepSize, tHit.x), hi = t;
+          for (int k = 0; k < 5; k++) {
+            float mid = 0.5 * (lo + hi);
+            if (density(vOrigin + rayDir * mid, deposits, richness) * uReveal > 0.05) hi = mid; else lo = mid;
+          }
+          vec3 sp = vOrigin + rayDir * hi;
+          // Density rises toward a deposit's core, so the outward normal is -∇d.
+          float e = stepSize * 0.5;
+          vec3 grad = vec3(
+            density(sp + vec3(e, 0.0, 0.0), deposits, richness) - density(sp - vec3(e, 0.0, 0.0), deposits, richness),
+            density(sp + vec3(0.0, e, 0.0), deposits, richness) - density(sp - vec3(0.0, e, 0.0), deposits, richness),
+            density(sp + vec3(0.0, 0.0, e), deposits, richness) - density(sp - vec3(0.0, 0.0, e), deposits, richness)
+          );
+          vec3 N = -grad / max(length(grad), 1e-5);
+          vec3 nView = vec3(dot(N, camRight), dot(N, camUp), dot(N, -rayDir));
+          float fres = prismFresnel(abs(dot(N, rayDir)));
+          // Rainbow rim, hue split per channel (dispersion) through the opal palette.
+          float ph = prismPhase(nView, uTime);
+          vec3 rim = vec3(iridPalette(fract(ph + 0.04)).r, iridPalette(fract(ph)).g, iridPalette(fract(ph - 0.04)).b);
+          // Chromatic caustics drifting over the skin (≈1.6 cells per grid cell).
+          vec2 cp = sp.xz * 1.6 + vec2(sp.y * 0.9, -sp.y * 0.7);
+          vec3 caus = prismCaustic(cp, uTime * 0.35, ${(PRISM.chroma * 6.0).toFixed(3)});
+          // Caustics favour faces turned toward the viewer (the ring's occlusion term).
+          float occ = pow(abs(nView.z), 2.0);
+          skin = rim * fres * 1.6 + caus * iridPalette(fract(ph + 0.5)) * occ * 0.55;
+        }
+
         float sampleAlpha = clamp(d * 0.35, 0.0, 1.0);
         color += (1.0 - alpha) * sampleAlpha * oilColor;
         alpha += (1.0 - alpha) * sampleAlpha;
@@ -564,6 +666,10 @@ ${depositLines}
     }
 
     if (alpha < 0.01) discard;
+    // The skin rides on the accumulated body (brighter where the deposit is
+    // dense behind it), then the whole thing gets the ring's saturation lift.
+    color += skin * uParabolum * clamp(alpha * 1.6, 0.0, 1.0);
+    color = mix(color, prismSaturate(color, ${PRISM.sat.toFixed(2)}), uParabolum);
     gl_FragColor = vec4(color, alpha * 0.9);
   }
 `;
@@ -4456,7 +4562,7 @@ function TowerLiquid({ towerBounds, position, fill, scale }) {
         gl_Position = projectionMatrix * viewMatrix * wp;
       }
     `,
-    fragmentShader: GUSHER_GLSL + `
+    fragmentShader: GUSHER_GLSL + PRISM_GLSL + `
       precision highp float;
       varying vec2 vUv;
       varying vec3 vNormalW;
@@ -4482,7 +4588,10 @@ function TowerLiquid({ towerBounds, position, fill, scale }) {
         float ang = vUv.x;                    // 0..1 around the tank
 
         vec3 V = normalize(cameraPosition - vWorldPos);
-        float fres = pow(1.0 - abs(dot(normalize(vNormalW), V)), 2.5);
+        vec3 Nw = normalize(vNormalW);
+        float facing = abs(dot(Nw, V));
+        float fres = pow(1.0 - facing, 2.5);
+        vec3 nView = normalize((viewMatrix * vec4(Nw, 0.0)).xyz);
 
         // deep murk at the bottom -> luminous near the surface
         vec3 base = mix(${_v3(GUSHER_IRID.base)}, ${_v3(GUSHER_IRID.baseHi)}, smoothstep(0.0, 1.0, h));
@@ -4501,7 +4610,11 @@ function TowerLiquid({ towerBounds, position, fill, scale }) {
         // collapsing to a see-through near-black navy
         vec3 col = base + ${_v3(GUSHER_IRID.glow)} * 0.22;
         col += irid * iridAmt;
-        col += ${_v3(GUSHER_IRID.glow)} * caustic * 0.42;
+        col += ${_v3(GUSHER_IRID.glow)} * caustic * 0.30;
+        // Chromatic Worley caustics (glass-ring optics): per-channel offset cells
+        // so the bright network fringes into tiny spectra, tinted by the palette.
+        vec3 wc = prismCaustic(vec2(ang * 9.0, h * 5.0 - uTime * 0.08), uTime * 0.4, ${(PRISM.chroma * 5.0).toFixed(3)});
+        col += wc * mix(${_v3(GUSHER_IRID.glow)}, irid, 0.5) * (0.35 + 0.4 * caustic);
 
         // rising shimmer streaks
         float streak = smoothstep(0.6, 1.0, fbm(vec2(ang * 22.0, h * 3.0 - uTime * 0.5)));
@@ -4519,12 +4632,16 @@ function TowerLiquid({ towerBounds, position, fill, scale }) {
         col += vec3(0.45, 0.10, 0.78) * vBand * 0.6;
 
         // fresnel rim glow + slow overall breathing (brightening, not dimming)
-        col += ${_v3(GUSHER_IRID.glow)} * fres * 0.45;
+        col += ${_v3(GUSHER_IRID.glow)} * fres * 0.30;
+        // Prism rim: hue follows the view-space normal, so bands sweep around the
+        // column as the camera moves; per-channel phase split = dispersion.
+        float ph = prismPhase(nView, uTime);
+        vec3 rim = vec3(gusherPalette(ph + 0.05).r, gusherPalette(ph).g, gusherPalette(ph - 0.05).b);
+        col += rim * prismFresnel(facing) * 1.4;
         col *= 1.0 + 0.1 * sin(uTime * 0.6);
 
         // lift saturation so the broadband opal sheen doesn't read dingy/gray
-        float luma = dot(col, vec3(0.299, 0.587, 0.114));
-        col = mix(vec3(luma), col, 1.4);
+        col = prismSaturate(col, ${PRISM.sat.toFixed(2)});
 
         // mostly opaque body so you can't see through to the tank floor; rim +
         // surface push to fully solid
@@ -7870,6 +7987,7 @@ export default function OilVoxelGrid({
   const shaderUniforms = useMemo(() => ({
     uReveal: { value: revealProgress },
     uParabolum: { value: 1 }, // Paraboleum is the default substance — always green
+    uTime: { value: 0 },      // drives the prism rim drift + caustic cells
   }), [revealProgress, parabolum]);
 
   // Sync Parabolum flag into the live volume material
@@ -7891,6 +8009,7 @@ export default function OilVoxelGrid({
   }, [animateReveal]);
 
   useFrame((_, delta) => {
+    if (matRef.current) matRef.current.uniforms.uTime.value += delta;
     if (!animatingRef.current) return;
     revealRef.current = Math.min(1, revealRef.current + delta / revealDuration);
     if (matRef.current) matRef.current.uniforms.uReveal.value = revealRef.current;
