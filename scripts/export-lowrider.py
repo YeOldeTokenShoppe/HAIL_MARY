@@ -97,6 +97,35 @@ def skin_bone_children():
 
 skin_bone_children()
 
+
+def blacken_empty_textures():
+    """Blender renders an Image Texture node with no image as black; the glTF exporter drops it and the
+    material comes out default white (the Shiba's eyes vanished into its fur). Export those as black."""
+    for material in bpy.data.materials:
+        if not material.use_nodes:
+            continue
+        for node in material.node_tree.nodes:
+            if node.type != 'BSDF_PRINCIPLED':
+                continue
+            socket = node.inputs['Base Color']
+            if socket.is_linked and socket.links[0].from_node.type == 'TEX_IMAGE' and not socket.links[0].from_node.image:
+                material.node_tree.links.remove(socket.links[0])
+                socket.default_value = (0, 0, 0, 1)
+                print(f'LOWRIDER_EXPORT {material.name}: empty image texture exported as black')
+
+
+blacken_empty_textures()
+
+# An unpacked image whose file is missing also exports as plain white, silently. Stop instead.
+missing = sorted({f'{image.name} ({image.filepath}) on {obj.name}'
+                  for obj in scene.objects if obj.type == 'MESH' and not obj.hide_render
+                  for slot in obj.material_slots if slot.material and slot.material.use_nodes
+                  for node in slot.material.node_tree.nodes if node.type == 'TEX_IMAGE' and (image := node.image)
+                  and image.source == 'FILE' and not image.packed_file
+                  and not Path(bpy.path.abspath(image.filepath)).exists()})
+if missing:
+    sys.exit('LOWRIDER_EXPORT missing image files (File > External Data > Pack Resources, then save): ' + '; '.join(missing))
+
 # Visible, render-enabled meshes plus the rigs that deform them and all their parents.
 keep = set()
 for obj in scene.objects:
