@@ -760,11 +760,11 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
 
   // Different settings for desktop vs tablet vs mobile with user rotation
   const baseRotationY = isDesktop 
-    ? -Math.PI/2
+    ? -Math.PI/4 // Desktop: three-quarter view (was -π/2, side-on)
     : isTabletPortrait
     ? -Math.PI/6 // Tablet portrait: slight angle for centered view
     : isTablet 
-    ? -Math.PI/2.5 // Tablet landscape: 30° angle
+    ? -Math.PI/4 // Tablet landscape: three-quarter view, like desktop
     : -Math.PI/12; // Mobile: 45° angle for better front-facing view
   
   const rotation = [0, baseRotationY + userRotation, 0];
@@ -775,9 +775,30 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
     ? [centerOffset.x + 1, centerOffset.y - 0, centerOffset.z] // Tablet portrait: offset right
     : isTablet
     ? [centerOffset.x + 2, centerOffset.y + 0.5, centerOffset.z + 1] // Tablet landscape: closer and higher
-    : [centerOffset.x, centerOffset.y + 0.5, centerOffset.z - 1]; // Mobile: centered, higher
+    : [centerOffset.x, centerOffset.y - 0.4, centerOffset.z - 1]; // Mobile: centered, lowered to fill the portrait screen (no bottom heading strip any more)
   
   const scale = isDesktop ? 2 : isTablet ? 1.8 : 1.5; // Tablet: between desktop and mobile
+
+  // Orbit around the model, not the world origin. The model is placed off
+  // to one side (desktop: right of the reading panel), so orbiting [0,0,0]
+  // swung it around an empty point. Its group origin is its bbox centre
+  // (see the centring effect above), so `position` IS the model's centre:
+  // move the orbit target there and slide the camera by the same delta —
+  // the starting view is unchanged, only the pivot moves. Re-runs when the
+  // centre is measured on load or the layout class changes.
+  // Selectors, so Model (heavy) only re-renders when these two change.
+  const camera = useThree((st) => st.camera);
+  const controls = useThree((st) => st.controls);
+  useEffect(() => {
+    if (!controls) return;
+    const pivot = new THREE.Vector3(position[0], position[1], position[2]);
+    const delta = pivot.clone().sub(controls.target);
+    if (delta.lengthSq() < 1e-8) return;
+    controls.target.copy(pivot);
+    camera.position.add(delta);
+    controls.update();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [controls, camera, position[0], position[1], position[2]]);
 
   // Pulsing animation for scroll objects and ball
   useFrame(({ clock }) => {
@@ -1262,7 +1283,22 @@ function PyramidModel() {
 // Preload the pyramid model
 useGLTF.preload('/models/pyramid.glb');
 
-export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onLoadingChange, is80sMode = false, isMiniApp = false, onBookClick, onBookHoverChange }) {
+// Slide the picture sideways without moving the camera or the orbit pivot
+// (three's lens shift, in mm of a 35mm film gauge — the model keeps
+// rotating about its own centre, it just sits further across the screen).
+// Negative = scene moves right. Re-applied on resize, which rebuilds the
+// projection matrix.
+function LensShift({ offset = 0 }) {
+  const camera = useThree((st) => st.camera);
+  const size = useThree((st) => st.size);
+  useEffect(() => {
+    camera.filmOffset = offset;
+    camera.updateProjectionMatrix();
+  }, [camera, offset, size.width, size.height]);
+  return null;
+}
+
+export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onLoadingChange, is80sMode = false, isMiniApp = false, onBookClick, onBookHoverChange, scrollRequest = null, onScrollOpen, onScrollClose }) {
   const { locale } = useLanguage();
   const [selectedChart, setSelectedChart] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -1525,10 +1561,83 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
     if (onLoadingChange) onLoadingChange(true);
   }, []);
   
+  // Open a scroll in the viewer — shared by taps on the 3D scrolls and the
+  // page's SCROLL button (via scrollRequest). Reports the scroll number
+  // through onScrollOpen only when it actually opens (a tap mid-transition
+  // is dropped), so the page's "next scroll" always follows what's shown.
+  const openScrollPath = (scrollPath) => {
+    // Don't transition if already transitioning
+    if (isTransitioning) return;
+
+    const newSrc = `${scrollPath}?device=${deviceType}&lang=${locale}`;
+    const scrollNumber = Number(scrollPath.match(/scroll(\d+)/)?.[1]) || null;
+
+    // Phones skip the curled 3D scroll and read in the flat view. Already
+    // open (NEXT SCROLL from the dock) → just swap the scroll in place.
+    if (isMobile) {
+      setCurrentScrollSrc(newSrc);
+      if (!showMagnifiedScroll) setMagnifiedZoom(1.0);
+      setShowMagnifiedScroll(true);
+      onScrollOpen?.(scrollNumber);
+      return;
+    }
+
+    // First mobile click: the iframe isn't mounted yet (we don't
+    // preload anything to avoid a flash of the default scroll).
+    // Set the chosen src and reveal — the heading stays up until
+    // onLoad fires so the swap looks like one beat.
+    if (!hasOpenedScroll && isMobile) {
+      setCurrentScrollSrc(newSrc);
+      setHasOpenedScroll(true);
+      onScrollOpen?.(scrollNumber);
+      return;
+    }
+
+    // First tap on any scroll dismisses the mobile heading/intro
+    // overlay so the viewer becomes fully visible.
+    setHasOpenedScroll(true);
+
+    onScrollOpen?.(scrollNumber);
+
+    // Store next scroll with device parameter
+    setNextScrollSrc(newSrc);
+    setIsTransitioning(true);
+
+    // Hide iframe during transition
+    const iframe = isDesktop || isTablet ? scrollIframeRef.current : mobileScrollIframeRef.current;
+    if (iframe) {
+      iframe.style.opacity = '0';
+      iframe.style.transition = 'opacity 0.3s';
+    }
+  };
+
+  // Phone/iPad viewer only (desktop's reading panel is permanent): put the
+  // scroll away and bring the heading/intro back. The next open mounts a
+  // fresh iframe and re-runs the load-then-reveal flow.
+  const closeMobileScroll = () => {
+    setHasOpenedScroll(false);
+    setMobileScrollLoaded(false);
+    onScrollClose?.();
+  };
+
+  const closeMagnifiedScroll = () => {
+    setShowMagnifiedScroll(false);
+    if (isMobile) onScrollClose?.(); // on phones this reader IS the scroll
+  };
+
+  // The page asks for a scroll by number; `id` makes repeat asks distinct.
+  useEffect(() => {
+    if (scrollRequest?.n) openScrollPath(`/scroll${scrollRequest.n}.html`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollRequest?.id]);
+
   return (
-    <div style={{ 
-      width: '100%', 
-      height: '100vh', 
+    <div style={{
+      width: '100%',
+      // dvh, not vh: on iOS 100vh is the toolbar-collapsed height, taller
+      // than the visible page (and /exlibris' 100dvh wrapper), which gave
+      // the page a vertical scroll.
+      height: '100dvh',
       background: is80sMode ? 'transparent' : '#000000', 
       position: 'relative',
       animation: is80sMode ? 'subtle-glitch 8s infinite' : 'none',
@@ -1829,11 +1938,16 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
         <CleanCanvas
           style={{ position: 'relative', zIndex: 1, pointerEvents: 'auto' }}
           camera={{ 
+            // Each start sits at ±22.5° azimuth — where the old orbit limits
+            // used to clamp the originals ([-7,0.5,6.5], [-6,1.5,6] and the
+            // phones' [3.8,0.95,4.75], i.e. ~5% closer than [4,1,5]). Same
+            // distance and height, so the opening view is unchanged now
+            // that the orbit is unlimited.
             position: isDesktop
-              ? [-7, 0.5, 6.5]
+              ? [-3.66, 0.5, 8.83]
               : isTablet
-              ? [-6, 1.5, 6]
-              : [4, 1, 5],
+              ? [-3.25, 1.5, 7.84]
+              : [2.33, 0.95, 5.62],
             fov: isDesktop ? 40 : isTablet ? 45 : 50 
           }}
           gl={{ 
@@ -1859,50 +1973,21 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
             modelPath={modelPath} 
             onLoaded={() => setModelLoaded(true)} 
             is80sMode={is80sMode} 
-            onScrollClick={(scrollPath) => {
-              // Don't transition if already transitioning
-              if (isTransitioning) return;
-
-              const newSrc = `${scrollPath}?device=${deviceType}&lang=${locale}`;
-
-              // First mobile click: the iframe isn't mounted yet (we don't
-              // preload anything to avoid a flash of the default scroll).
-              // Set the chosen src and reveal — the heading stays up until
-              // onLoad fires so the swap looks like one beat.
-              if (!hasOpenedScroll && isMobile) {
-                setCurrentScrollSrc(newSrc);
-                setHasOpenedScroll(true);
-                return;
-              }
-
-              // First tap on any scroll dismisses the mobile heading/intro
-              // overlay so the viewer becomes fully visible.
-              setHasOpenedScroll(true);
-
-              // Store next scroll with device parameter
-              setNextScrollSrc(newSrc);
-              setIsTransitioning(true);
-
-              // Hide iframe during transition
-              const iframe = isDesktop || isTablet ? scrollIframeRef.current : mobileScrollIframeRef.current;
-              if (iframe) {
-                iframe.style.opacity = '0';
-                iframe.style.transition = 'opacity 0.3s';
-              }
-            }}
+            onScrollClick={openScrollPath}
             onBallClick={() => setShowNumerology(true)}
             onPyramidClick={() => {}} // Disabled for now
             onBookClick={() => {
               // Tearing down the mobile scroll viewer so the book overlay
-              // can take focus. Next scroll tap will mount a fresh iframe
-              // and re-trigger the load-then-reveal flow.
-              setHasOpenedScroll(false);
-              setMobileScrollLoaded(false);
+              // can take focus.
+              closeMobileScroll();
               if (onBookClick) onBookClick();
             }}
             onBookHoverChange={onBookHoverChange}
           />
           <Environment preset="night" />
+          {/* Desktop + landscape tablet: nudge the scene right, clear of
+              the reading panel. Phones / portrait tablets stay centred. */}
+          <LensShift offset={isDesktop ? -10 : isTablet && !isTabletPortrait ? -8 : 0} />
           {/* <FlatCharts onChartClick={setSelectedChart} /> */}
           <OrbitControls
             enablePan={false}
@@ -1912,15 +1997,17 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
             maxDistance={10}
             minPolarAngle={Math.PI / 3}    // ~60° - allow looking slightly from above
             maxPolarAngle={Math.PI / 2.2}  // ~82° - prevent looking from below
-            minAzimuthAngle={-Math.PI / 8}  // -22.5 degrees
-            maxAzimuthAngle={Math.PI / 8}   // +22.5 degrees (±22.5° total range)
+            // No azimuth limits: free 360° spin around the model's centre.
             rotateSpeed={0.3}
             zoomSpeed={0.8}
             zoomDampingFactor={0.1}
             zoomToCursor={true}
-            dampingFactor={0.05}
+            // Phones: more damping so a swipe settles faster instead of drifting.
+            dampingFactor={isMobile ? 0.1 : 0.05}
             enableDamping={true}
-            target={[0, 0, 0]}
+            // No target prop: Model moves the target onto the model's
+            // centre (via makeDefault), and a prop would snap it back.
+            makeDefault
           />
         </Suspense>
         {is80sMode ? (
@@ -2041,9 +2128,12 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
             <div
               style={{
                 position: 'absolute',
+                // Clear the page's bottom nav dock (~65px + safe area) —
+                // at 3rem the intro's last line and the scroll's foot sat
+                // behind it. The mini-app has no dock.
                 bottom: isMiniApp ? '2rem' :
                         deviceType === 'ipad-mini' ? '5rem' :
-                        deviceType === 'ipad' ? '4rem' : '3rem',
+                        'calc(72px + env(safe-area-inset-bottom, 0px))',
                 left: deviceType === 'ipad-mini' ? '25%' :
                       deviceType === 'ipad' ? '20%' : '1rem',
                 right: deviceType === 'ipad-mini' ? '25%' :
@@ -2057,10 +2147,42 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
                 borderRadius: '8px'
               }}
             >
+              {/* Mobile close button — top-left, opposite the magnifier;
+                  same visibility rule. */}
+              <button
+                onClick={closeMobileScroll}
+                style={{
+                  position: 'absolute',
+                  top: '0.4rem',
+                  left: '0.5rem',
+                  width: '2.75rem',
+                  height: '2.75rem',
+                  padding: 0,
+                  borderRadius: '50%',
+                  background: 'rgba(20, 12, 4, 0.7)',
+                  border: '2px solid rgba(212, 175, 55, 0.8)',
+                  color: '#d4af37',
+                  fontSize: '1.6rem',
+                  lineHeight: 1,
+                  cursor: 'pointer',
+                  zIndex: 10,
+                  pointerEvents: hasOpenedScroll && mobileScrollLoaded ? 'auto' : 'none',
+                  visibility: hasOpenedScroll && mobileScrollLoaded ? 'visible' : 'hidden',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)',
+                }}
+                title="Close scroll"
+                aria-label="Close scroll"
+              >
+                ×
+              </button>
+
               {/* Mobile magnify button - hidden until first scroll opens */}
               <button
                 onClick={() => {
-                  setMagnifiedZoom(1.25); // Reset zoom to default when opening
+                  setMagnifiedZoom(1.0); // Phones/iPad open at 100% (desktop: 125%)
                   setShowMagnifiedScroll(true);
                 }}
                 style={{
@@ -2125,7 +2247,9 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
                   the top half of the screen clear so the glowing scrolls
                   are fully tappable, which was the core bug: the old
                   top-left heading was intercepting tap targets on mobile. */}
-              {!isMiniApp && !(hasOpenedScroll && mobileScrollLoaded) && (
+              {/* Phones don't get it at all: they read in the flat view (no
+                  strip viewer to cover) and it made the page scroll. */}
+              {!isMiniApp && !isMobile && !(hasOpenedScroll && mobileScrollLoaded) && (
                 <div
                   style={{
                     position: 'absolute',
@@ -2175,17 +2299,6 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
                     }}
                   >
                     Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, metaphysicist and medieval scholar.
-                  </p>
-                  <p
-                    style={{
-                      color: '#8e662b',
-                      fontSize: '1rem',
-                      margin: 0,
-                      letterSpacing: '0.05em',
-                      textShadow: '1px 1px 3px rgba(0, 0, 0, 0.8)',
-                    }}
-                  >
-                    Tap a glowing scroll above to read.
                   </p>
                 </div>
               )}
@@ -2310,13 +2423,15 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
       {/* Magnified Scroll Modal Overlay */}
       {showMagnifiedScroll && (
         <div 
-          onClick={() => setShowMagnifiedScroll(false)}
+          onClick={closeMagnifiedScroll}
           style={{
             position: 'fixed',
             top: 0,
             left: 0,
             right: 0,
-            bottom: 0,
+            // Phones: leave the page's bottom dock uncovered so its NEXT
+            // SCROLL button works while reading. The mini-app has no dock.
+            bottom: isMobile && !isMiniApp ? 'calc(72px + env(safe-area-inset-bottom, 0px))' : 0,
             background: 'rgba(0, 0, 0, 0.9)',
             display: 'flex',
             justifyContent: 'center',
@@ -2331,8 +2446,8 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
               position: 'relative',
               width: isMobile ? '100vw' : '95vw',
               maxWidth: isMobile ? 'none' : '50vw',
-              height: isMobile ? '100dvh' : '95vh',
-              maxHeight: isMobile ? '-webkit-fill-available' : 'none',
+              height: isMobile ? '100%' : '95vh',
+              maxHeight: isMobile ? '100%' : 'none',
               background: 'rgba(20, 20, 20, 0.95)',
               borderRadius: isMobile ? '0' : '1rem',
               border: isMobile ? 'none' : '2px solid #8e662b',
@@ -2346,7 +2461,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setShowMagnifiedScroll(false);
+                closeMagnifiedScroll();
               }}
               style={{
                 position: 'absolute',

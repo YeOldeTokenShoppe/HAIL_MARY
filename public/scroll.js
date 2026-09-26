@@ -73,7 +73,10 @@ function createScrollOverlay(el, panelHeight, num, angle) {
       bottomPanel.style.transform = transYrotX(0, 0);
     } else {
       topPanel.style.transform = transYrotX(-panelHeight + 0.25, angle);
-      bottomPanel.style.transform = transYrotX(panelHeight - 0.25, angle);
+      // Negative: the bottom curls AWAY, like the top. Curling toward the
+      // viewer, the roll stood ~70px off the page, and #container's
+      // rotateY(20deg) swung it ~30px past the right edge as a blank slab.
+      bottomPanel.style.transform = transYrotX(panelHeight - 0.25, -angle);
 
       totalTheta += angle;
       totalTheta %= 2 * Math.PI;
@@ -135,6 +138,21 @@ if (isFlat) {
   var el = $("#content");
   el.style.overflowY = "auto";
   el.style.webkitOverflowScrolling = "touch";
+  // Every div here is position:absolute, so a width-less #content sizes to
+  // its text, not its container — on a phone that ran ~100px past the
+  // right edge under body{overflow:hidden}, clipped with no way to pan.
+  // Pin it to the container; the magnifier's zoom then rewraps instead.
+  el.style.left = "0";
+  el.style.width = "100%";
+  el.style.boxSizing = "border-box";
+  el.style.overflowX = "hidden"; // text wraps now; don't let it nudge sideways
+  // Fixed-size inline images (scroll4/5's 200px heart) would still poke out
+  // of a narrow, zoomed column — cap them at the column width. object-fit
+  // keeps the art undistorted inside its authored box instead of squashing.
+  el.querySelectorAll("img").forEach(function (img) {
+    img.style.maxWidth = "100%";
+    img.style.objectFit = "contain";
+  });
 } else {
   createScrollOverlay($("#content"), 20, num, theta);
 }
