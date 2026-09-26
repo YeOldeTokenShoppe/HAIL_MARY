@@ -35,6 +35,7 @@ import { SHOWS as LT_TV_SHOWS, findEpisode as findLtTvEpisode } from "@/content/
 import { WATCH_PARAM as LT_TV_WATCH_PARAM, readWatch as readLtTvWatch, watchValue as ltTvWatchValue, withWatch as withLtTvWatch } from "@/lib/ltTv/watchUrl.mjs";
 import TickerDisplay3 from "@/components/TickerDisplay3";
 import { useMusic } from '@/components/MusicContext';
+import ModernMusicPlayer from '@/components/ModernMusicPlayer';
 import { useUser, useClerk } from "@clerk/nextjs";
 import CyberNav from '@/components/CyberNav';
 import NavControls from '@/components/NavControls';
@@ -2963,6 +2964,7 @@ export default function CyborgTemple() {
     is80sMode: context80sMode,
     setIs80sMode: setContext80sMode,
     setMusicDucked,
+    setMusicSilenced,
   } = useMusic();
 
   // Dev: force the 80s visual theme (?theme80=1). The theme normally rides
@@ -2982,6 +2984,15 @@ export default function CyborgTemple() {
     setMusicDucked(speechActive);
   }, [speechActive, setMusicDucked]);
   useEffect(() => () => setMusicDucked(false), [setMusicDucked]);
+
+  // LT TV and the Pitch Bot (its services drawer and the VC game it launches)
+  // are dialogue-first, so music fades out while either is up and resumes on
+  // the way out. The music player hides for the same span.
+  const vocalTabActive = talkShowMode || pressMode || (railExpanded && !isMobileView);
+  useEffect(() => {
+    setMusicSilenced(vocalTabActive);
+  }, [vocalTabActive, setMusicSilenced]);
+  useEffect(() => () => setMusicSilenced(false), [setMusicSilenced]);
     
 
     // Check if mobile view and device
@@ -4884,10 +4895,16 @@ export default function CyborgTemple() {
           </div>
         )}
 
-        {/* Top Controls Container - User and Nav.
-            No music control here on purpose: /trade is a speaking-avatars page,
-            so music would compete with the dialogue. (Any music already playing
-            from another page is ducked during speech via setMusicDucked.) */}
+        {/* Music player — desktop lobby only. Hidden on the voiced LT TV and
+            Pitch Bot tabs (music is faded out there via setMusicSilenced);
+            character speech in the lobby ducks it via setMusicDucked. */}
+        <ModernMusicPlayer
+          visible={mounted && !isMobileView && !vocalTabActive}
+          border="1px solid rgba(212, 175, 55, 0.35)"
+          style={{ position: "fixed", top: "1rem", right: "1rem", zIndex: 1001 }}
+        />
+
+        {/* Top Controls Container - User and Nav. */}
         {mounted && (
           <>
             {/* Nav Controls - Desktop only */}

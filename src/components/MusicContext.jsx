@@ -91,6 +91,22 @@ const allTracks = (() => {
 // Normalize a track path for comparison (some entries have a leading slash, some don't)
 const normalizeTrackPath = (p) => (p || '').replace(/^\//, '');
 
+// iOS Safari ignores (and always reads back 1 for) HTMLMediaElement.volume, so
+// ducking by volume is silent there; callers fall back to pause/resume instead.
+let volumeLocked;
+const isVolumeLocked = () => {
+  if (volumeLocked === undefined) {
+    try {
+      const probe = new Audio();
+      probe.volume = 0.5;
+      volumeLocked = probe.volume !== 0.5;
+    } catch {
+      volumeLocked = false;
+    }
+  }
+  return volumeLocked;
+};
+
 // Ride page exclusive track
 export const gangstasParadiseTrack = { name: "Gangsta's Paradise - Coolio", path: "/audio/gangstas_paradise.mp3", bpm: 80 };
 
@@ -101,6 +117,8 @@ export const MusicProvider = ({ children }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.2);
   const [isDucked, setIsDucked] = useState(false); // music dips while a character speaks
+  const [isSilenced, setIsSilenced] = useState(false); // a page fades music out entirely (e.g. /trade's voiced tabs)
+  const resumeAfterHushRef = React.useRef(false); // true only when the hush itself paused the music
   const [trackProgress, setTrackProgress] = useState(0);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [is80sMode, setIs80sMode] = useState(false);
@@ -808,25 +826,58 @@ export const MusicProvider = ({ children }) => {
     }
   }, [musicEra, isShuffled, loadTrack]);
   
+  // Keep play/pause reachable from the volume effect without re-running it
+  // every time their identities change.
+  const playRef = React.useRef(play);
+  const pauseRef = React.useRef(pause);
+  playRef.current = play;
+  pauseRef.current = pause;
+
   // Update volume when it changes, with a smooth "duck" ramp while a character
   // is speaking (isDucked) so dialogue stays intelligible over the music.
+  // A "hush" (isSilenced, or a duck where volume can't be set) fades to
+  // silence and pauses; lifting it resumes only music the hush paused.
   useEffect(() => {
     if (!globalAudioManager) return;
     const audio = globalAudioManager.getAudio();
     if (!audio) return;
 
+    const locked = isVolumeLocked();
+    const hush = isSilenced || (isDucked && locked);
     const DUCK_FACTOR = 0.18; // music drops to 18% of chosen volume while speaking
-    const target = Math.max(0, Math.min(1, volume * (isDucked ? DUCK_FACTOR : 1)));
+    const target = hush ? 0 : Math.max(0, Math.min(1, volume * (isDucked ? DUCK_FACTOR : 1)));
+
+    const resume = () => {
+      resumeAfterHushRef.current = false;
+      if (audio.paused) playRef.current();
+    };
+    const finishHush = () => {
+      if (!hush || audio.paused) return;
+      resumeAfterHushRef.current = true;
+      pauseRef.current();
+    };
+    if (locked) {
+      if (hush) { finishHush(); return; }
+      if (!resumeAfterHushRef.current) return;
+      // Speech toggles between lines; wait out the gap so music doesn't
+      // stutter back in mid-conversation.
+      const timer = setTimeout(resume, 600);
+      return () => clearTimeout(timer);
+    }
+    if (!hush && resumeAfterHushRef.current) resume();
+
     const start = audio.volume;
     const delta = target - start;
 
-    // Snap if the change is negligible; otherwise ease over ~280ms.
+    // Snap if the change is negligible; otherwise ease over ~280ms (a slower
+    // ~700ms fade when hushing).
     if (Math.abs(delta) < 0.005) {
       audio.volume = target;
+      finishHush();
       return;
     }
 
-    const duration = 280;
+    const duration = hush ? 700 : 280;
     let raf = null;
     let startTs = null;
     const step = (ts) => {
@@ -835,10 +886,11 @@ export const MusicProvider = ({ children }) => {
       const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; // easeInOutQuad
       audio.volume = Math.max(0, Math.min(1, start + delta * eased));
       if (t < 1) raf = requestAnimationFrame(step);
+      else finishHush();
     };
     raf = requestAnimationFrame(step);
     return () => { if (raf) cancelAnimationFrame(raf); };
-  }, [volume, isDucked]);
+  }, [volume, isDucked, isSilenced]);
   
   // Removed restoration logic - now handled by MusicManager component
   
@@ -854,6 +906,8 @@ export const MusicProvider = ({ children }) => {
     setVolume,
     isDucked,
     setMusicDucked: setIsDucked,
+    isSilenced,
+    setMusicSilenced: setIsSilenced,
     trackProgress,
     setTrackProgress,
     currentTrackIndex,
