@@ -67,11 +67,14 @@ export default function DriveTitles({ moment }) {
       @keyframes titleFadeIn { from { opacity: 0; } to { opacity: 1; } }
       @media (max-aspect-ratio: 1/1) {
         .opening { left: 4%; top: 20%; width: 92%; }
-        .opening .lettering, .finale .lettering { -webkit-text-stroke-width: 2px; text-shadow: 2px 3px 0 #171019; }
-        .opening .lettering { font-size: clamp(30px, 10.5vw, 80px); }
-        .finale { top: auto; bottom: max(20%, 150px); right: 5%; width: 90%; max-width: none; }
-        .finale .lettering { font-size: clamp(32px, 10.5vw, 66px); }
+        .opening .lettering, .finale .lettering { -webkit-text-stroke-width: 2.5px; text-shadow: 2px 3px 0 #171019; }
+        .opening .lettering { font-size: clamp(48px, 18vw, 110px); }
+        .finale { top: auto; bottom: max(34%, 230px); right: 5%; width: 90%; max-width: none; }
+        .finale .lettering { font-size: clamp(40px, 14vw, 84px); }
         .tagline { font-size: clamp(18px, 5vw, 26px); margin-top: 18px; }
+        .opening .opening-subheading, .finale .finale-subheading { font-size: clamp(19px, 5.4vw, 26px); }
+        /* The finale tagline sits over the heart's bloom; a dark halo keeps it legible. */
+        .finale .finale-subheading { margin-top: 14px; text-shadow: 0 1px 2px #171019, 0 2px 6px rgba(23,16,25,.9), 0 0 16px rgba(23,16,25,.75); }
       }
       @media (prefers-reduced-motion: reduce) {
         .title { transition: none; }
