@@ -10,6 +10,7 @@ import CoinLoader from '@/components/CoinLoader';
 import CyberNav from '@/components/CyberNav';
 import NavControlsHome from '@/components/NavControlsHome';
 import MobileBottomNav from '@/components/MobileBottomNav';
+import RadialNavMenu from '@/components/RadialNavMenu';
 import FountainDonationModal from '@/components/FountainDonationModal';
 import BuyModal from '@/components/BuyModal';
 import PolaroidSnapshot from '@/components/PolaroidSnapshot';
@@ -733,13 +734,13 @@ export default function FountainPage() {
         title="Take a snapshot"
         style={{
           position: "fixed",
-          // Mobile: the music player is gone, so the camera takes the now-vacated
-          // top-right corner. Desktop: still tucked under the music player
-          // (48px tall, anchored at top:1rem) with an 8px gap.
-          top: isMobileView
-            ? "calc(1rem + env(safe-area-inset-top))"
-            : "calc(1rem + 56px)",
-          right: "1rem",
+          // Mobile: the nav menu owns the top-right, so the camera drops to the
+          // bottom-left — shutter-button territory, under the thumb. Desktop:
+          // still tucked under the music player (48px tall, anchored at
+          // top:1rem) with an 8px gap.
+          ...(isMobileView
+            ? { bottom: "calc(1rem + env(safe-area-inset-bottom))", left: "1rem" }
+            : { top: "calc(1rem + 56px)", right: "1rem" }),
           width: isMobileView ? "44px" : "48px",
           height: isMobileView ? "44px" : "48px",
           borderRadius: "10px",
@@ -780,6 +781,17 @@ export default function FountainPage() {
           )}
         </span>
       </button>
+
+      {/* Site navigation — a corner compass that blooms into a radial menu, in
+          place of MobileBottomNav so the scene keeps its whole bottom edge.
+          Bottom-left on desktop, top-right on phones (the camera moves down to
+          make room). Folds away while the Coin Guide is open. */}
+      <RadialNavMenu
+        current="fountain"
+        hidden={infoPanelOpen}
+        ready={!isLoading}
+        corner={isMobileView ? "top-right" : "bottom-left"}
+      />
 
       {/* Hidden canvas: the iframe's captured frame is drawn here, then PolaroidSnapshot
           reads it by id. Off-screen rather than display:none so the canvas still rasterizes. */}

@@ -47,6 +47,8 @@ import RogueAdminPanel from "@/components/RogueAdminPanel";
 import useCctvRecorder from "@/hooks/useCctvRecorder";
 import PumpPurchaseModal from "@/components/PumpPurchaseModal";
 import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
+import MusicButton from '@/components/MusicButton';
+import RadialNavMenu, { TelescopeIcon } from '@/components/RadialNavMenu';
 import CoinLoader from "@/components/CoinLoader";
 
 // ── Milestone caption pools ──────────────────────────────────────────────────
@@ -8319,6 +8321,55 @@ export default function OilPage() {
     setTimeout(() => document.getElementById("your-rig")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
   };
 
+  // Site nav (same radial menu as /fountain; Home takes this page's slot).
+  // Desktop: the header brand mark is the trigger. Phones: a telescope at
+  // the far right of the header, where the leaderboard trophy used to be
+  // (the leaderboard is already a section in the page body).
+  // Colours follow the page theme (day/night/Lyquid80…): disk in the page
+  // background, icons in its strong text, accent for hover + the x.
+  // Phones: the header is just music + telescope, so How to play and
+  // Account (the old ? and gear buttons) ride in the menu instead.
+  const mobileMenuActions = [
+    {
+      key: "help",
+      label: "How to play",
+      onSelect: openWelcome,
+      icon: (
+        <>
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+          <path d="M12 17h.01" />
+        </>
+      ),
+    },
+    {
+      key: "account",
+      label: user ? "Account" : "Sign in",
+      onSelect: () => (user ? setShowAccountModal(true) : router.push("/sign-in?redirect_url=/hailmary")),
+      icon: (
+        <>
+          <circle cx="12" cy="8" r="5" />
+          <path d="M20 21a8 8 0 0 0-16 0" />
+        </>
+      ),
+    },
+  ];
+
+  const navMenuProps = {
+    current: "hailmary",
+    demoKey: "oil_nav_demo_seen",
+    ready: !isLoading,
+    triggerLabel: "Site navigation",
+    colors: {
+      disk: `color-mix(in srgb, ${theme.bg} 96%, transparent)`,
+      hub: theme.bg,
+      icon: theme.textStrong,
+      accent: theme.accent,
+      ring: theme.goldBorder,
+      glyph: theme.accent,
+    },
+  };
+
   // ═══════════════════════════════════════════════════════════
   // MOBILE LAYOUT — tabbed views + scrollable panel below
   // ═══════════════════════════════════════════════════════════
@@ -8350,60 +8401,22 @@ export default function OilPage() {
             </div>
           </div>
           <div style={styles.headerRight}>
-            <button
-              onClick={() => setShowLeaderboard(true)}
-              title="Leaderboard"
-              style={{
+            <MusicButton accent={theme.accent} />
+            <RadialNavMenu
+              {...navMenuProps}
+              triggerStyle={{
                 display: "inline-flex", alignItems: "center", justifyContent: "center",
                 width: 40, height: 40, borderRadius: 10,
                 background: "rgba(212, 175, 55, 0.05)",
                 border: "1.5px solid rgba(212, 175, 55, 0.2)",
-                color: theme.accent, cursor: "pointer", padding: 0,
-                flexShrink: 0, fontFamily: "inherit",
+                color: theme.accent, flexShrink: 0,
               }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
-            </button>
-            <button
-              onClick={openWelcome}
-              className={helpNudge ? "help-nudge" : undefined}
-              title="How to play"
-              style={{
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                width: 40, height: 40, borderRadius: 10,
-                background: "rgba(212, 175, 55, 0.05)",
-                border: "1.5px solid rgba(212, 175, 55, 0.2)",
-                color: theme.accent, cursor: "pointer", padding: 0,
-                flexShrink: 0, fontSize: 18, fontWeight: "bold", fontFamily: "inherit",
-                // The pulse itself is the .help-nudge CLASS, not an inline
-                // animation: inline styles cannot carry the reduced-motion
-                // media query, and a stylesheet cannot override them without
-                // !important.
-              }}
-            >
-              ?
-            </button>
-            {/* Account: the phone has no bottom nav any more (it duplicated the
-                stack's own buttons and its FAB sat over them), so identity
-                lives here — sign-in when signed out, the account modal when in. */}
-            <button
-              onClick={() => (user ? setShowAccountModal(true) : router.push("/sign-in?redirect_url=/hailmary"))}
-              title={user ? "Account" : "Sign in"}
-              aria-label={user ? "Account" : "Sign in"}
-              style={{
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                width: 40, height: 40, borderRadius: 10,
-                background: "rgba(212, 175, 55, 0.05)",
-                border: "1.5px solid rgba(212, 175, 55, 0.2)",
-                color: theme.accent, cursor: "pointer", padding: 0,
-                flexShrink: 0, fontFamily: "inherit",
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </button>
+              trigger={<TelescopeIcon />}
+              actions={mobileMenuActions}
+              // The old ? button's first-visit pulse now points at the menu
+              // that holds How to play.
+              triggerClassName={helpNudge ? "help-nudge" : ""}
+            />
           </div>
         </header>
 
@@ -8957,13 +8970,11 @@ export default function OilPage() {
 
       <header style={{ ...styles.header, zoom: uiScale }}>
         <div style={styles.headerLeft}>
-          <Link
-            href="/home"
-            title="Return to shrine"
-            style={{ ...styles.logoMark, cursor: "pointer", textDecoration: "none" }}
-          >
-            <img src="/brand-mark-cyan.svg" alt="Home" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} />
-          </Link>
+          <RadialNavMenu
+            {...navMenuProps}
+            triggerStyle={{ ...styles.logoMark, flexShrink: 0 }}
+            trigger={<img src="/brand-mark-cyan.svg" alt="" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} />}
+          />
           <div>
             <h1 style={{ ...styles.title, display: "flex", alignItems: "center", gap: 8 }}>
               <span>HAIL MARY PROSPECTING CO.{modeBadge}</span>

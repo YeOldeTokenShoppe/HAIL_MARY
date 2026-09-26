@@ -12,6 +12,7 @@ import { RL80_ADDRESS } from "@/lib/contracts";
 import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
 import ChartShrine, { TIMEFRAME_OPTIONS } from "@/components/ChartShrine";
 import ChartWidget from "@/components/ChartWidget";
+import RadialNavMenu from "@/components/RadialNavMenu";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import useCyberConfirm from "@/components/useCyberConfirm";
 import ModernMusicPlayer from "@/components/ModernMusicPlayer";
@@ -2287,6 +2288,7 @@ export default function HomePage() {
   // destinations (Coin Fountain, Ex Libris) that don't each warrant a
   // permanent nav slot.
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [moreAnchor, setMoreAnchor] = useState(null);
   const [candleLit, setCandleLit] = useState(false);
   const [litAt, setLitAt] = useState(null);
   // Post-ignition nudge shown only to anonymous visitors who just lit a
@@ -3107,8 +3109,9 @@ export default function HomePage() {
       />
 
       <MobileBottomNav
-        /* Slots, left to right: BUY (book slot, fixed) | HAIL MARY |
-           CANDLE (center FAB, fixed) | TERMINAL | MORE. Music and
+        /* Slots, left to right: BUY (book slot, fixed) | CANDLE (center
+           FAB, fixed) | MORE. Hail Mary and the Terminal live in the radial
+           menu MORE opens, with the other destinations. Music and
            Wallet slots are suppressed. The dedicated account/LOGIN slot
            is intentionally absent — sign-in surfaces through the
            post-light nudge and the picker's disconnect flow. Buttons
@@ -3173,7 +3176,12 @@ export default function HomePage() {
         centerTitle={candleLit ? "Your candle" : "Light candle"}
         /* Far-right slot is a MORE popover holding the secondary
            destinations (Coin Fountain, Ex Libris). */
-        onMenuClick={() => setShowMoreMenu((v) => !v)}
+        onMenuClick={() => {
+          // The dock doesn't hand us its button, so find it to anchor the
+          // radial menu on.
+          setMoreAnchor(document.querySelector(".btm-nav-menu"));
+          setShowMoreMenu((v) => !v);
+        }}
         menuIcon={
           <svg
             className="btm-book-icon-svg"
@@ -3213,220 +3221,24 @@ export default function HomePage() {
             <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>
         }
-        extraLeft={[
-          {
-            key: 'hailmary',
-            /* Promoted out of the MORE popover into a permanent slot.
-               Label stays short — dock labels ellipsize past ~88px, so
-               the full company name lands in the confirm's title. */
-            label: 'Hail Mary',
-            title: 'Hail Mary Prospecting Co',
-            onClick: () => { router.push('/hailmary'); },
-            confirm: {
-              title: 'Hail Mary Prospecting Co',
-              body: "Find your fortune in the digital frontier. Our Lady's prospectors never rest.",
-              accent: 'hsl(189, 84%, 55%)',
-              shadow: 'hsl(189, 70%, 38%)',
-            },
-            icon: (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#f4b53f"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{
-                  width: 24,
-                  height: 24,
-                  display: 'block',
-                  filter: 'drop-shadow(0 0 4px rgba(244, 181, 63, 0.7))',
-                }}
-                aria-hidden="true"
-              >
-                <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
-                <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024" />
-                <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069" />
-                <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z" />
-              </svg>
-            ),
-          },
-        ]}
-        extraRight={[
-          {
-            key: 'terminal',
-            /* Label stays short — the dock's slot labels ellipsize past
-               ~88px. The full name lands in the confirm's title. */
-            label: 'Liminal Terminal',
-            title: 'The Liminal Terminal',
-            onClick: () => { router.push('/trade'); },
-            confirm: {
-              title: 'The Liminal Terminal',
-              body: 'Read the tape. Four consultants, one verdict — the market confesses to those who listen.',
-              accent: 'hsl(189, 84%, 55%)',
-              shadow: 'hsl(189, 70%, 38%)',
-            },
-            icon: (
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#39ff14"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{
-                  width: 24,
-                  height: 24,
-                  display: 'block',
-                  filter: 'drop-shadow(0 0 4px rgba(57, 255, 20, 0.7))',
-                }}
-                aria-hidden="true"
-              >
-                <rect width="20" height="14" x="2" y="3" rx="2" />
-                <line x1="8" x2="16" y1="21" y2="21" />
-                <line x1="12" x2="12" y1="17" y2="21" />
-              </svg>
-            ),
-          },
-        ]}
       />
 
-      {/* MORE popover — anchored above the far-right bottom-nav slot. Holds
-          secondary destinations that don't each warrant a permanent slot.
-          Tap-away backdrop closes it; selecting an item navigates + closes. */}
-      {showMoreMenu && (
-        <>
-          <div
-            onClick={() => setShowMoreMenu(false)}
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 10001,
-              background: "transparent",
-            }}
-          />
-          <div
-            role="menu"
-            aria-label="More"
-            style={{
-              position: "fixed",
-              right: "10px",
-              bottom: "calc(74px + env(safe-area-inset-bottom, 0px))",
-              zIndex: 10002,
-              display: "flex",
-              flexDirection: "column",
-              minWidth: "184px",
-              padding: "6px",
-              borderRadius: "14px",
-              background: "rgba(15, 0, 30, 0.97)",
-              border: "1px solid rgba(255, 0, 255, 0.3)",
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              boxShadow:
-                "0 -2px 24px rgba(255, 0, 255, 0.18), 0 8px 32px rgba(0, 0, 0, 0.5)",
-              fontFamily: "'Rajdhani', sans-serif",
-            }}
-          >
-            {[
-              {
-                path: "/fountain",
-                label: "Coin Fountain",
-                stroke: "#2ad6ee",
-                confirm: {
-                  title: "Coin Fountain",
-                  body: "Toss a coin, whisper a wish. Our Lady keeps every offering the faithful let fall.",
-                  accent: "hsl(189, 84%, 55%)",
-                  shadow: "hsl(189, 70%, 38%)",
-                },
-                icon: (
-                  <>
-                    <path d="M12 10L12 2" />
-                    <path d="M16 6L12 10L8 6" />
-                    <path d="M2 15C2.6 15.5 3.2 16 4.5 16C7 16 7 14 9.5 14C12.1 14 11.9 16 14.5 16C17 16 17 14 19.5 14C20.8 14 21.4 14.5 22 15" />
-                    <path d="M2 21C2.6 21.5 3.2 22 4.5 22C7 22 7 20 9.5 20C12.1 20 11.9 22 14.5 22C17 22 17 20 19.5 20C20.8 20 21.4 20.5 22 21" />
-                  </>
-                ),
-              },
-                            {
-                path: "/exlibris",
-                label: "Ex Libris",
-                stroke: "#ff44d4",
-                confirm: {
-                  title: "Ex Libris",
-                  body: "The perpetual ledger. Every flame, every name, inscribed for those who came to pray.",
-                  accent: "hsl(300, 90%, 62%)",
-                  shadow: "hsl(300, 75%, 42%)",
-                },
-                icon: (
-                  <>
-                    <path d="M15 12h-5" />
-                    <path d="M15 8h-5" />
-                    <path d="M19 17V5a2 2 0 0 0-2-2H4" />
-                    <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" />
-                  </>
-                ),
-              },
-            ].map((link) => (
-              <button
-                key={link.path}
-                role="menuitem"
-                onClick={() => {
-                  setShowMoreMenu(false);
-                  moreConfirm({
-                    ...link.confirm,
-                    onProceed: () => router.push(link.path),
-                  });
-                }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  width: "100%",
-                  padding: "11px 12px",
-                  borderRadius: "10px",
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  transition: "background 0.15s ease",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "rgba(255, 0, 255, 0.12)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "transparent")
-                }
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke={link.stroke}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ width: 22, height: 22, flexShrink: 0, display: "block", filter: `drop-shadow(0 0 4px ${link.stroke}66)` }}
-                  aria-hidden="true"
-                >
-                  {link.icon}
-                </svg>
-                <span
-                  style={{
-                    fontSize: "0.95rem",
-                    fontWeight: 700,
-                    letterSpacing: "0.5px",
-                    textTransform: "uppercase",
-                    color: "#ffffff",
-                  }}
-                >
-                  {link.label}
-                </span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+      {/* MORE → the site's radial menu (same disk as /fountain, /hailmary,
+          /trade), spinning open over the MORE slot. The dock keeps just this
+          page's main actions: BUY | CANDLE | MORE. */}
+      <RadialNavMenu
+        anchorEl={moreAnchor}
+        open={showMoreMenu}
+        onRequestClose={() => setShowMoreMenu(false)}
+        colors={{
+          disk: "rgba(15, 0, 30, 0.9)",
+          hub: "rgba(15, 0, 30, 0.9)",
+          icon: "#efe2ff",
+          accent: "#2ad6ee",
+          ring: "#ff00ff",
+          glyph: "#2ad6ee",
+        }}
+      />
 
       <BuyModal isOpen={showBuyModal} onClose={() => setShowBuyModal(false)} />
 

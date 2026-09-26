@@ -3,13 +3,14 @@ import React, { Suspense, useState, useEffect, useRef, useMemo, useCallback } fr
 import { createPortal } from 'react-dom';
 import * as THREE from 'three';
 import CleanCanvas from '@/components/CleanCanvas';
+import RadialNavMenu from '@/components/RadialNavMenu';
 import FullscreenCRTOverlay from '@/components/FullscreenCRTOverlay';
 import FullscreenChatOverlay from '@/components/FullscreenChatOverlay';
 import EvidenceScreens from '@/components/EvidenceScreens';
 import EvidenceOverlay, { hasRichVisual } from '@/components/EvidenceOverlay';
 import ProgressiveText from '@/components/ProgressiveText';
 import LiveCaption from '@/components/LiveCaption';
-import { CameraControls, Stats, Cloud, Clouds } from '@react-three/drei';
+import { CameraControls, Stats, Cloud, Clouds, useProgress } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import ConstellationModel from '@/components/ConstellationModel';
 import Aurora from '@/components/Aurora';
@@ -655,6 +656,15 @@ function SitePalHostEmbed({ config }) {
 // so we can see what's actually allocated on the GPU. Re-logs every
 // 5s to catch growth over time. Remove or guard behind a debug flag
 // once GPU memory is back under control.
+// Phone-lobby site menu. Holds its first-visit demo until drei's loading
+// manager goes idle (the laptop GLB streams in after the page mounts), so the
+// demo doesn't play to a black screen. Its own component so only it
+// re-renders when loading starts/stops (selector), not the whole page.
+function TradeNavMenu({ ready, ...props }) {
+  const assetsLoading = useProgress((s) => s.active);
+  return <RadialNavMenu {...props} ready={ready && !assetsLoading} />;
+}
+
 function GpuMemoryProbe() {
   const loggedAtRef = useRef(0);
   useFrame((state) => {
@@ -6170,216 +6180,253 @@ export default function CyborgTemple() {
                   </div>,
                   document.body
                 )}
-              <MobileBottomNav
-                subdued={talkShowMode && talkShowPlaying}
-                  hideWallet
-                  accountOnLeft
-                /* No center FAB in the lobby on any width (2026-08-01): the
-                   mobile TERMINAL FAB was removed — tapping the laptop screen
-                   in the scene already zooms into the CRT, and desktop reaches
-                   SERVICES from the right-edge feature rail. With onBuyClick
-                   undefined and the lobby centerSlot null, the center renders
-                   nothing. Game/review modes still override it via centerSlot. */
-                centerSlot={
-                  // Once a verdict is committed the verdict control is dropped
-                  // and, in the final reveal beat, replaced with the NEXT CASE /
-                  // BACK actions (moved here out of the score panel).
-                  tradeMode === 'game' && verdict ? (
-                    revealPhase === 'vindicate' ? (
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
-                        <button
-                          onClick={advanceToNextCase}
-                          disabled={!nextCaseAvailable}
-                          title={nextCaseAvailable ? undefined : 'More cases coming soon'}
-                          style={{
-                            height: 60,
-                            padding: '0 18px',
-                            borderRadius: 10,
-                            background: nextCaseAvailable
-                              ? 'linear-gradient(135deg, rgba(77,255,170,0.22), rgba(13,80,50,0.34))'
-                              : 'rgba(20,30,40,0.45)',
-                            border: `1px solid ${nextCaseAvailable ? 'rgba(120,255,180,0.95)' : 'rgba(77,255,170,0.25)'}`,
-                            color: nextCaseAvailable ? '#d6ffe5' : 'rgba(142,255,196,0.35)',
-                            fontFamily: "'Orbitron', monospace",
-                            fontSize: 12,
-                            fontWeight: 800,
-                            letterSpacing: '0.14em',
-                            cursor: nextCaseAvailable ? 'pointer' : 'not-allowed',
-                            textShadow: nextCaseAvailable ? '0 0 10px rgba(77,255,170,0.5)' : 'none',
-                            boxShadow: nextCaseAvailable
-                              ? '0 0 14px rgba(77,255,170,0.35), inset 0 1px 0 rgba(255,255,255,0.1)'
-                              : 'none',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {nextCaseAvailable ? '▸ NEXT CASE' : '▸ NEXT — SOON'}
-                        </button>
-                        <button
-                          onClick={returnToServiceRail}
-                          style={{
-                            height: 60,
-                            padding: '0 16px',
-                            borderRadius: 10,
-                            background: 'rgba(20,30,40,0.45)',
-                            border: '1px solid rgba(110,181,154,0.6)',
-                            color: '#9ed6bb',
-                            fontFamily: "'Orbitron', monospace",
-                            fontSize: 12,
-                            fontWeight: 800,
-                            letterSpacing: '0.14em',
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          ▸ BACK
-                        </button>
-                      </div>
-                    ) : null
-                  )
-                  : tradeMode === 'game' && isReviewMode ? (
-                    // Review mode — the team renders the verdict, not
-                    // the player. Single READ TEAM VERDICT button stays
-                    // disabled until they've asked at least one question
-                    // (otherwise the consensus screen would render
-                    // before they've engaged with any character).
-                    (() => {
-                      const enabled = investigated.size > 0 && !verdict;
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => { if (enabled) revealTeamVerdict(); }}
-                          disabled={!enabled}
-                          aria-label="Read the team's verdict on this token"
-                          title={enabled
-                            ? "Read the team's consensus"
-                            : "Talk to at least one character first"}
-                          style={{
-                            minWidth: 220,
-                            height: 60,
-                            padding: '10px 18px',
-                            borderRadius: 10,
-                            background: enabled
-                              ? 'linear-gradient(135deg, rgba(142,233,255,0.20), rgba(13,50,80,0.32))'
-                              : 'rgba(20,30,40,0.45)',
-                            border: `1px solid ${enabled ? 'rgba(142,233,255,0.85)' : 'rgba(142,233,255,0.25)'}`,
-                            color: enabled ? '#c8efff' : 'rgba(200,239,255,0.35)',
-                            fontFamily: "'Orbitron', monospace",
-                            fontSize: 12,
-                            fontWeight: 800,
-                            letterSpacing: '0.18em',
-                            cursor: enabled ? 'pointer' : 'not-allowed',
-                            textShadow: enabled ? '0 0 10px rgba(142,233,255,0.55)' : 'none',
-                            boxShadow: enabled
-                              ? '0 0 14px rgba(142,233,255,0.35), inset 0 1px 0 rgba(255,255,255,0.1)'
-                              : 'none',
-                          }}
-                        >
-                          ✦ READ TEAM VERDICT
-                        </button>
-                      );
-                    })()
-                  ) : tradeMode === 'game' ? (
-                    // Forensic (graded) case — calibrated confidence slider.
-                    // The player sets P(scam); the committed probability buckets
-                    // to believe/abstain/doubt only for the character reaction.
-                    <ConfidenceVerdict
-                      enabled={investigated.size > 0 && !verdict}
-                      isMobileView={isMobileView}
-                      disabledHint="Investigate at least one station first"
-                      onCommit={(p, bucket) => submitVerdict(bucket, p)}
-                    />
-                  ) : (
-                    // Lobby → no centerSlot override, so the round START FAB
-                    // (centerLabel/centerSubLabel above) renders, matching the
-                    // shrine's center FAB. The FAB's onBuyClick opens the
-                    // services drawer; each service launches from its own card.
-                    null
-                  )
-                }
-                /* Shared app-nav slots (lobby only): a cross-link back to the
-                   shrine on the left, Hail Mary on the right — mirrors the
-                   shrine's BUY | Terminal | CANDLE | Hail Mary | MORE layout.
-                   Suppressed in game/review so the immersive nav stays minimal
-                   and can't bypass the leave-game confirm. */
-                extraLeft={
-                  tradeMode ? [] : [
+              {/* Phone lobby: no dock — the radial menu (same as /fountain and
+                  /hailmary) sits top-right, next to the title, and the scene
+                  gets the whole bottom edge. In a case the dock stays: its
+                  centre IS the game (verdict slider, READ TEAM VERDICT, NEXT
+                  CASE) and its MENU guards the leave-game confirm. Hidden
+                  while the CRT is zoomed or an evidence overlay is up. */}
+              {isMobileView && !tradeMode ? (
+                <TradeNavMenu
+                  current="trade"
+                  demoKey="trade_nav_demo_seen"
+                  corner="top-right"
+                  ready={mounted && !isSceneLoading}
+                  hidden={grailZoomed || !!screenOverlay}
+                  colors={{
+                    disk: 'rgba(15, 0, 30, 0.9)',
+                    hub: 'rgba(15, 0, 30, 0.9)',
+                    icon: '#efe2ff',
+                    accent: '#2ad6ee',
+                    ring: '#ff00ff',
+                    glyph: '#2ad6ee',
+                  }}
+                  actions={[
                     {
-                      key: 'home',
-                      label: 'Home',
-                      title: 'Our Lady of Perpetual Profit',
-                      onClick: () => router.push('/home'),
+                      key: 'buy',
+                      label: 'Buy RL80',
+                      onSelect: () => setShowBuyModal(true),
                       icon: (
-                        <img src="/favicon.svg" alt="" style={{ width: 24, height: 24, display: 'block' }} />
+                        <>
+                          <line x1="12" y1="1" x2="12" y2="23" />
+                          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                        </>
                       ),
                     },
-                  ]
-                }
-                /* No extraRight slots — the Team Chat dock slot was removed
-                   (2026-08-01). Desktop still reaches Team Chat from the
-                   right-edge feature rail. */
-                /* Right slot: lobby → MORE popover (matches the shrine);
-                   game mode → MENU so the path picker is reachable (verdict
-                   buttons have taken the center). Book slot (left) is BUY.
-                   Mid-case (game, no verdict yet) → confirm first so a stray
-                   tap doesn't nuke an in-progress investigation. */
-                onMenuClick={
-                  tradeMode === 'game'
-                    ? (verdict ? returnToServiceRail : () => setShowLeaveGameConfirm(true))
-                    : () => setShowMoreMenu((v) => !v)
-                }
-                menuIcon={
-                  tradeMode === 'game' ? (
-                    <svg
-                      className="btm-book-icon-svg"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#2ad6ee"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <rect x="3" y="3" width="7" height="7" rx="1" />
-                      <rect x="14" y="3" width="7" height="7" rx="1" />
-                      <rect x="3" y="14" width="7" height="7" rx="1" />
-                      <rect x="14" y="14" width="7" height="7" rx="1" />
+                  ]}
+                />
+              ) : (
+                <MobileBottomNav
+                  subdued={talkShowMode && talkShowPlaying}
+                    hideWallet
+                    accountOnLeft
+                  /* No center FAB in the lobby on any width (2026-08-01): the
+                     mobile TERMINAL FAB was removed — tapping the laptop screen
+                     in the scene already zooms into the CRT, and desktop reaches
+                     SERVICES from the right-edge feature rail. With onBuyClick
+                     undefined and the lobby centerSlot null, the center renders
+                     nothing. Game/review modes still override it via centerSlot. */
+                  centerSlot={
+                    // Once a verdict is committed the verdict control is dropped
+                    // and, in the final reveal beat, replaced with the NEXT CASE /
+                    // BACK actions (moved here out of the score panel).
+                    tradeMode === 'game' && verdict ? (
+                      revealPhase === 'vindicate' ? (
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+                          <button
+                            onClick={advanceToNextCase}
+                            disabled={!nextCaseAvailable}
+                            title={nextCaseAvailable ? undefined : 'More cases coming soon'}
+                            style={{
+                              height: 60,
+                              padding: '0 18px',
+                              borderRadius: 10,
+                              background: nextCaseAvailable
+                                ? 'linear-gradient(135deg, rgba(77,255,170,0.22), rgba(13,80,50,0.34))'
+                                : 'rgba(20,30,40,0.45)',
+                              border: `1px solid ${nextCaseAvailable ? 'rgba(120,255,180,0.95)' : 'rgba(77,255,170,0.25)'}`,
+                              color: nextCaseAvailable ? '#d6ffe5' : 'rgba(142,255,196,0.35)',
+                              fontFamily: "'Orbitron', monospace",
+                              fontSize: 12,
+                              fontWeight: 800,
+                              letterSpacing: '0.14em',
+                              cursor: nextCaseAvailable ? 'pointer' : 'not-allowed',
+                              textShadow: nextCaseAvailable ? '0 0 10px rgba(77,255,170,0.5)' : 'none',
+                              boxShadow: nextCaseAvailable
+                                ? '0 0 14px rgba(77,255,170,0.35), inset 0 1px 0 rgba(255,255,255,0.1)'
+                                : 'none',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {nextCaseAvailable ? '▸ NEXT CASE' : '▸ NEXT — SOON'}
+                          </button>
+                          <button
+                            onClick={returnToServiceRail}
+                            style={{
+                              height: 60,
+                              padding: '0 16px',
+                              borderRadius: 10,
+                              background: 'rgba(20,30,40,0.45)',
+                              border: '1px solid rgba(110,181,154,0.6)',
+                              color: '#9ed6bb',
+                              fontFamily: "'Orbitron', monospace",
+                              fontSize: 12,
+                              fontWeight: 800,
+                              letterSpacing: '0.14em',
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            ▸ BACK
+                          </button>
+                        </div>
+                      ) : null
+                    )
+                    : tradeMode === 'game' && isReviewMode ? (
+                      // Review mode — the team renders the verdict, not
+                      // the player. Single READ TEAM VERDICT button stays
+                      // disabled until they've asked at least one question
+                      // (otherwise the consensus screen would render
+                      // before they've engaged with any character).
+                      (() => {
+                        const enabled = investigated.size > 0 && !verdict;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => { if (enabled) revealTeamVerdict(); }}
+                            disabled={!enabled}
+                            aria-label="Read the team's verdict on this token"
+                            title={enabled
+                              ? "Read the team's consensus"
+                              : "Talk to at least one character first"}
+                            style={{
+                              minWidth: 220,
+                              height: 60,
+                              padding: '10px 18px',
+                              borderRadius: 10,
+                              background: enabled
+                                ? 'linear-gradient(135deg, rgba(142,233,255,0.20), rgba(13,50,80,0.32))'
+                                : 'rgba(20,30,40,0.45)',
+                              border: `1px solid ${enabled ? 'rgba(142,233,255,0.85)' : 'rgba(142,233,255,0.25)'}`,
+                              color: enabled ? '#c8efff' : 'rgba(200,239,255,0.35)',
+                              fontFamily: "'Orbitron', monospace",
+                              fontSize: 12,
+                              fontWeight: 800,
+                              letterSpacing: '0.18em',
+                              cursor: enabled ? 'pointer' : 'not-allowed',
+                              textShadow: enabled ? '0 0 10px rgba(142,233,255,0.55)' : 'none',
+                              boxShadow: enabled
+                                ? '0 0 14px rgba(142,233,255,0.35), inset 0 1px 0 rgba(255,255,255,0.1)'
+                                : 'none',
+                            }}
+                          >
+                            ✦ READ TEAM VERDICT
+                          </button>
+                        );
+                      })()
+                    ) : tradeMode === 'game' ? (
+                      // Forensic (graded) case — calibrated confidence slider.
+                      // The player sets P(scam); the committed probability buckets
+                      // to believe/abstain/doubt only for the character reaction.
+                      <ConfidenceVerdict
+                        enabled={investigated.size > 0 && !verdict}
+                        isMobileView={isMobileView}
+                        disabledHint="Investigate at least one station first"
+                        onCommit={(p, bucket) => submitVerdict(bucket, p)}
+                      />
+                    ) : (
+                      // Lobby → no centerSlot override, so the round START FAB
+                      // (centerLabel/centerSubLabel above) renders, matching the
+                      // shrine's center FAB. The FAB's onBuyClick opens the
+                      // services drawer; each service launches from its own card.
+                      null
+                    )
+                  }
+                  /* Shared app-nav slots (lobby only): a cross-link back to the
+                     shrine on the left, Hail Mary on the right — mirrors the
+                     shrine's BUY | Terminal | CANDLE | Hail Mary | MORE layout.
+                     Suppressed in game/review so the immersive nav stays minimal
+                     and can't bypass the leave-game confirm. */
+                  extraLeft={
+                    tradeMode ? [] : [
+                      {
+                        key: 'home',
+                        label: 'Home',
+                        title: 'Our Lady of Perpetual Profit',
+                        onClick: () => router.push('/home'),
+                        icon: (
+                          <img src="/favicon.svg" alt="" style={{ width: 24, height: 24, display: 'block' }} />
+                        ),
+                      },
+                    ]
+                  }
+                  /* No extraRight slots — the Team Chat dock slot was removed
+                     (2026-08-01). Desktop still reaches Team Chat from the
+                     right-edge feature rail. */
+                  /* Right slot: lobby → MORE popover (matches the shrine);
+                     game mode → MENU so the path picker is reachable (verdict
+                     buttons have taken the center). Book slot (left) is BUY.
+                     Mid-case (game, no verdict yet) → confirm first so a stray
+                     tap doesn't nuke an in-progress investigation. */
+                  onMenuClick={
+                    tradeMode === 'game'
+                      ? (verdict ? returnToServiceRail : () => setShowLeaveGameConfirm(true))
+                      : () => setShowMoreMenu((v) => !v)
+                  }
+                  menuIcon={
+                    tradeMode === 'game' ? (
+                      <svg
+                        className="btm-book-icon-svg"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#2ad6ee"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <rect x="3" y="3" width="7" height="7" rx="1" />
+                        <rect x="14" y="3" width="7" height="7" rx="1" />
+                        <rect x="3" y="14" width="7" height="7" rx="1" />
+                        <rect x="14" y="14" width="7" height="7" rx="1" />
+                      </svg>
+                    ) : (
+                      <svg
+                        className="btm-book-icon-svg"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#2ad6ee"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M17 12h.01" />
+                        <path d="M12 12h.01" />
+                        <path d="M7 12h.01" />
+                      </svg>
+                    )
+                  }
+                  menuLabel={tradeMode === 'game' ? 'MENU' : 'MORE'}
+                  isUserSignedIn={isSignedIn}
+                  userImage={user?.imageUrl}
+                  show80sButton={false}
+                  isMobile
+                  is80sMode
+                  onBookClick={() => setShowBuyModal(true)}
+                  bookLabel="BUY RL80"
+                  bookTitle="Buy RL80"
+                  bookIcon={
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: '#39ff14', filter: 'drop-shadow(0 0 4px rgba(57, 255, 20, 0.6))' }}>
+                      <line x1="12" y1="1" x2="12" y2="23" />
+                      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                     </svg>
-                  ) : (
-                    <svg
-                      className="btm-book-icon-svg"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#2ad6ee"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <path d="M17 12h.01" />
-                      <path d="M12 12h.01" />
-                      <path d="M7 12h.01" />
-                    </svg>
-                  )
-                }
-                menuLabel={tradeMode === 'game' ? 'MENU' : 'MORE'}
-                isUserSignedIn={isSignedIn}
-                userImage={user?.imageUrl}
-                show80sButton={false}
-                isMobile
-                is80sMode
-                onBookClick={() => setShowBuyModal(true)}
-                bookLabel="BUY RL80"
-                bookTitle="Buy RL80"
-                bookIcon={
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: '#39ff14', filter: 'drop-shadow(0 0 4px rgba(57, 255, 20, 0.6))' }}>
-                    <line x1="12" y1="1" x2="12" y2="23" />
-                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                  </svg>
-                }
-              />
+                  }
+                />
+              )}
             </>
 
             {/* MORE popover — secondary destinations; mirrors the shrine's
