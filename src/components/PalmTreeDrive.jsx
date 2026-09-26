@@ -1057,6 +1057,18 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange, onIntroComplete, has
     
     const loader = new GLTFLoader(loadingManager);
     loader.setDRACOLoader(dracoLoader);
+    // iOS drops this page's WebGL context mid-tour, and WebKit ImageBitmaps come back
+    // empty on the re-upload, so every glTF texture (the finale's crown included) turns
+    // black. Image elements can be re-decoded, so decode through TextureLoader on WebKit.
+    const ua = navigator.userAgent;
+    if (/AppleWebKit/.test(ua) && !/Chrome|Chromium|Android/.test(ua)) {
+      loader.register(parser => {
+        parser.textureLoader = new THREE.TextureLoader(parser.options.manager);
+        parser.textureLoader.setCrossOrigin(parser.options.crossOrigin);
+        parser.textureLoader.setRequestHeader(parser.options.requestHeader);
+        return { name: 'webkit-context-safe-textures' };
+      });
+    }
     
     
     // Helper function to load models with retry logic
