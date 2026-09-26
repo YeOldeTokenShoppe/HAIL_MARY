@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export const LOW_RIDER_MODEL_URL = '/models/lowRider_scene_V2_optimized.glb?v=lowrider-20260917-1500';
+export const LOW_RIDER_MODEL_URL = '/models/lowRider_scene_V2_optimized.glb?v=lowrider-20260925-0141';
 
 // Character clips loop during the drive; the car model is static.
 // 'HaloRotation' was dropped when the halo was deleted from the scene — restore it here if it comes back.
