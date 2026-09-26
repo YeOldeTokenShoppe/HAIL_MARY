@@ -13,8 +13,8 @@ const logoFont = localFont({
 export const INTRO_DURATION_MS = 4500;
 export const REDUCED_INTRO_DURATION_MS = 300;
 
-// [char, x, baseline y, textLength] in the 400×540 portrait viewBox.
-const STACKED = [['R', 8, 215, 280], ['L', 175, 325, 210], ['8', 8, 425, 250], ['0', 170, 530, 220]];
+// [char, x, baseline y, textLength] in the 400×600 portrait viewBox.
+const STACKED = [['R', 8, 215, 272], ['L', 178, 340, 207], ['8', 8, 465, 244], ['0', 172, 590, 218]];
 
 export default function RL80SceneIntro({ onComplete, started = true }) {
   const id = useId().replace(/:/g, '');
@@ -38,7 +38,7 @@ export default function RL80SceneIntro({ onComplete, started = true }) {
   const lettering = { fontFamily: logoFont.style.fontFamily, fontWeight: 400, fontSize: 'clamp(100px, 24vw, 360px)' };
   const stackedLettering = { fontFamily: logoFont.style.fontFamily, fontWeight: 400, fontSize: 250, letterSpacing: 0 };
   const wide = props => <text className="wide-letters" x="50%" y="50%" dy=".35em" textAnchor="middle" textLength="82%" lengthAdjust="spacingAndGlyphs" {...props} style={{ ...lettering, ...props.style }}>RL80</text>;
-  const stacked = props => <svg className="stacked-letters" x="2%" y="10%" width="96%" height="62%" viewBox="0 0 400 540" preserveAspectRatio="xMidYMid meet">
+  const stacked = props => <svg className="stacked-letters" x="2%" y="6%" width="96%" height="66%" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet">
     {STACKED.map(([char, x, y, len]) => <text key={char} x={x} y={y} textLength={len} lengthAdjust="spacingAndGlyphs" style={stackedLettering} {...props}>{char}</text>)}
   </svg>;
   // GTA-style double border (after the Vice City "VI" codepen): a gold→pink band hugging
