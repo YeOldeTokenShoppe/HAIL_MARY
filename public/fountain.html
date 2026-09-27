@@ -143,114 +143,6 @@
 				}
 			}
 
-		/* Charity Modal Styles */
-		.charity-modal {
-			display: none;
-			position: fixed !important;
-			z-index: 2147483647 !important;  /* Maximum z-index value to ensure it's on top */
-			left: 0 !important;
-			top: 0 !important;
-			width: 100% !important;
-			height: 100% !important;
-			background-color: rgba(0, 0, 0, 0.6);
-			backdrop-filter: blur(5px);
-			/* Ensure modal is in root stacking context */
-			isolation: isolate;
-		}
-
-		.charity-modal-content {
-			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-			margin: 15% auto;
-			padding: 30px;
-			border: none;
-			border-radius: 20px;
-			width: 90%;
-			max-width: 400px;
-			box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-			text-align: center;
-			color: white;
-			animation: modalSlideIn 0.3s ease-out;
-			position: relative;
-			z-index: 2147483647 !important;
-		}
-
-		@keyframes modalSlideIn {
-			from {
-				transform: translateY(-50px);
-				opacity: 0;
-			}
-			to {
-				transform: translateY(0);
-				opacity: 1;
-			}
-		}
-
-		.charity-modal h2 {
-			margin-bottom: 20px;
-			font-size: 28px;
-			font-weight: bold;
-		}
-
-		.charity-modal p {
-			margin-bottom: 25px;
-			font-size: 16px;
-			opacity: 0.95;
-		}
-
-		.charity-options {
-			display: flex;
-			flex-direction: column;
-			gap: 15px;
-			margin-bottom: 20px;
-		}
-
-		.charity-button {
-			background: rgba(255, 255, 255, 0.2);
-			border: 2px solid rgba(255, 255, 255, 0.5);
-			color: white;
-			padding: 15px 20px;
-			font-size: 18px;
-			border-radius: 10px;
-			cursor: pointer;
-			transition: all 0.3s ease;
-			font-weight: 600;
-		}
-
-		.charity-button:hover {
-			background: rgba(255, 255, 255, 0.3);
-			transform: translateY(-2px);
-			box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-		}
-
-		.charity-button:active {
-			transform: translateY(0);
-		}
-
-		.modal-cancel {
-			background: rgba(0, 0, 0, 0.3);
-			border: 1px solid rgba(255, 255, 255, 0.3);
-			color: white;
-			padding: 10px 20px;
-			font-size: 14px;
-			border-radius: 8px;
-			cursor: pointer;
-			transition: all 0.3s ease;
-		}
-
-		.modal-cancel:hover {
-			background: rgba(0, 0, 0, 0.5);
-		}
-		
-		/* Override any parent page elements when modal is active */
-		.charity-modal ~ * {
-			z-index: 1 !important;
-		}
-		
-		/* Ensure modal stays on top of everything */
-		body.modal-open > *:not(.charity-modal) {
-			z-index: 1 !important;
-		}
-
 		/* UNIFIED MODAL SYSTEM */
 		.pumpkin-modal {
 			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -912,7 +804,6 @@
 			/* Hide UI elements when in portal view */
 			body.portal-view #info,
 			body.portal-view #coinCounter,
-			body.portal-view #charityModal,
 			body.portal-view #coinTossButtons,
 			body.portal-view #mobileCollectionCounter,
 			body.portal-view #desktopInfoBtn {
@@ -927,30 +818,13 @@
 		</style>
 	</head>
 	<body>
-		<!-- Charity Selection Modal -->
-		<div id="charityModal" class="charity-modal">
-			<div class="charity-modal-content pumpkin-modal">
-				<h2>Choose Your Charity</h2>
-				<p>Your coin toss will support one of these amazing organizations:</p>
-				<div class="charity-options">
-					<button class="charity-button pumpkin-modal-button" data-charity="world-central-kitchen">
-						🍽️ World Central Kitchen
-					</button>
-					<button class="charity-button pumpkin-modal-button" data-charity="aspca">
-						🐶 ASPCA
-					</button>
-				</div>
-				<button class="modal-cancel pumpkin-modal-button cancel">Cancel</button>
-			</div>
-		</div>
-
 		<!-- Celebration VFX Overlay -->
 		<div id="celebrationOverlay">
 			<div id="goldenFlash"></div>
 			<div id="confettiContainer"></div>
 			<div id="thankYouBanner">
 				<div class="main-text">Thank You!</div>
-				<div class="charity-text">Your wish supports <span id="charityName">charity</span></div>
+				<div class="charity-text">Your wish supports <span id="charityName">the site</span></div>
 				<div class="emoji-burst">✨ 💫 ⭐ 💫 ✨</div>
 			</div>
 		</div>
@@ -1001,28 +875,19 @@
 						<li>Tap anywhere; the coin flies there.</li>
 						<li>Virtual coins are free and unlimited.</li>
 				
-						<li>Click <strong>'Donate'</strong> button above to give to a charity (or tip the Dev), pay, then toss the Golden Coin.</li>
+						<li>Tap <strong>Support the site</strong> below to send a real USDC/ETH contribution, then toss your golden coin.</li>
 						<li>Donated coins stay in the fountain.</li>
 								<li>Tap a sparkling coin to view donation details.</li>
 										<li>Look around. You might find a surprise or two.</li>
 					</ul>
 				</section>
-				<section class="info-section">
-					<strong class="info-section-title">How It Works</strong>
-					<ul class="info-list">
-						<li>USDC/ETH goes to the selected recipient wallet.</li>
-						<li>Charity wallets are pooled to near 100 USDC, then sent via <a class="info-link" href="https://thegivingblock.com" target="_blank">The Giving Block</a>.</li>
-					</ul>
-				</section>
-				<section class="info-section">
+				<!-- <section class="info-section">
 					<strong class="info-section-title">Verify Wallets (Base)</strong>
 					<div class="wallet-links" aria-label="Wallet verification links">
-						<a class="wallet-link" href="https://basescan.org/address/0xbAC39697250cDF6A808Bd39D2D1828388DF87967" target="_blank">🏥 St. Jude's</a>
-						<a class="wallet-link" href="https://basescan.org/address/0xF9EAdD659e730BbC05f4BFfe618A98fB0b910fDD" target="_blank">🐶 ASPCA</a>
-						<a class="wallet-link" href="https://etherscan.io/address/0x07363eac9c24Af6451EBA07ff16CbD687dA4508A" target="_blank">❤️ The Dev</a>
+						<a class="wallet-link" href="https://basescan.org/address/0x07363eac9c24Af6451EBA07ff16CbD687dA4508A" target="_blank">🕯️ rl80.eth (site wallet)</a>
 					</div>
 					<p class="info-footnote">All transactions are visible on-chain.</p>
-				</section>
+				</section> -->
 			</div>
 		</div>
 		
@@ -1176,7 +1041,7 @@
 				padding-bottom: 6px;
 				letter-spacing: 0.3px;
 			">
-				Charity Pool
+				Support Pool
 			</div>
 			<!-- Simplified mobile stats - large stylized number -->
 			<div class="compact-stats mobile-only" style="
@@ -1218,20 +1083,6 @@
 			">
 				<span style="font-size: 16px;">💎</span>
 				<span style="flex: 1; color: #FFD700; font-size: 12px;">Total Given: $<span id="totalRL80Donated" style="font-weight: 700;">0</span></span>
-			</div>
-			<div style="
-				padding: 6px 10px;
-				background: rgba(255, 255, 255, 0.05);
-				border-radius: 10px;
-			">
-				<div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-					<span style="font-size: 14px;">🏥</span>
-					<span style="flex: 1; color: rgba(255, 255, 255, 0.9); font-size: 11px;">St. Jude's: <span id="stJudesPercentage" style="font-weight: 700;">0</span>%</span>
-				</div>
-				<div style="display: flex; align-items: center; gap: 6px;">
-					<span style="font-size: 14px;">🐶</span>
-					<span style="flex: 1; color: rgba(255, 255, 255, 0.9); font-size: 11px;">ASPCA: <span id="aspcaPercentage" style="font-weight: 700;">0</span>%</span>
-				</div>
 			</div>
 			<div id="resetMessage" style="
 				display: none;
@@ -1545,27 +1396,15 @@
 				duration: 4000
 			};
 
+			// Recipient labels for the celebration banner + coin card. The fountain
+			// gives to ONE recipient — the site (key 'DEV', rl80.eth) — so every key
+			// resolves to it. (The charity options were retired 2026-09-27.)
 			function getCharityDisplayName(charityKey) {
-				const charityNames = {
-					'ST_JUDES': "St. Jude's Children's Hospital",
-					'ASPCA': 'the ASPCA',
-					'st-judes': "St. Jude's Children's Hospital",
-					'aspca': 'the ASPCA',
-					'DEV': "the dev's coffee fund",
-					'donation': 'charity'
-				};
-				return charityNames[charityKey] || 'charity';
+				return 'the site';
 			}
 
 			function getCharityEmoji(charityKey) {
-				const charityEmojis = {
-					'ST_JUDES': '🏥',
-					'ASPCA': '🐶',
-					'st-judes': '🏥',
-					'aspca': '🐶',
-					'DEV': '❤️'
-				};
-				return charityEmojis[charityKey] || '💝';
+				return '🕯️';
 			}
 
 			function createConfetti() {
@@ -1809,26 +1648,13 @@
 			// Load Illumin80 users on page load
 			loadIllumin80Users();
 
+			// Toast labels — same single recipient as getCharityDisplayName above.
 			function getCharityIcon(charityKey) {
-				const icons = {
-						'DEV': '☕',
-					'ST_JUDES': '🏥',
-					'ASPCA': '🐶',
-					'st-judes': '🏥',
-					'aspca': '🐶'
-				};
-				return icons[charityKey] || '💝';
+				return '🕯️';
 			}
 
 			function getCharityShortName(charityKey) {
-				const names = {
-						'DEV': 'The Dev',
-					'ST_JUDES': "St. Jude's",
-					'ASPCA': 'ASPCA',
-					'st-judes': "St. Jude's",
-					'aspca': 'ASPCA'
-				};
-				return names[charityKey] || 'Charity';
+				return 'the Site';
 			}
 
 			// The wish is the one client-authored string in the feed — always
@@ -2655,17 +2481,16 @@
 			// --- Coin Counter and Performance Settings ---
 			let totalCoinCount = 0;
 			let collectedCoinCount = 0;
-			let charityAllocation = { 'world-central-kitchen': 0, 'aspca': 0 };
 			let isResetting = false;
 
 			// --- Donation tracking (USD) ---
 			// Donations are USDC/ETH; totals are tracked in dollars. USDC
 			// counts at face value, ETH via the usdValue the modal logs at
 			// donation time. Legacy RL80 donations (docs without a
-			// `currency` field) and dev tips don't enter the charity
-			// counter. Element ids still say RL80 for markup-compat.
+			// `currency` field) stay out. Every recipient counts toward the
+			// total — since 2026-09-27 that's just the site wallet ('DEV').
+			// Element ids still say RL80 for markup-compat.
 			let totalUsdGiven = 0;
-			let usdByCharity = { 'ST_JUDES': 0, 'ASPCA': 0 };
 
 			// Format large numbers (e.g., 1234567 -> "1.23M")
 			function formatNumber(num) {
@@ -2701,8 +2526,6 @@
 				const coinCountElement = document.getElementById('coinCount');
 				const collectedCountElement = document.getElementById('collectedCount');
 				const mobileCurrentCountElement = document.getElementById('mobileCurrentCount');
-				const stJudesPercentageElement = document.getElementById('stJudesPercentage');
-				const aspcaPercentageElement = document.getElementById('aspcaPercentage');
 				const totalRL80Element = document.getElementById('totalRL80Donated');
 				const mobileRL80Element = document.getElementById('mobileRL80Total');
 
@@ -2727,18 +2550,6 @@
 				}
 				if (mobileRL80Element) {
 					mobileRL80Element.textContent = usdDisplay;
-				}
-
-				// Update allocation percentages based on dollar amounts
-				const totalSplit = usdByCharity['ST_JUDES'] + usdByCharity['ASPCA'];
-				if (totalSplit > 0 && stJudesPercentageElement && aspcaPercentageElement) {
-					const stJudesPercent = Math.round((usdByCharity['ST_JUDES'] / totalSplit) * 100);
-					const aspcaPercent = Math.round((usdByCharity['ASPCA'] / totalSplit) * 100);
-					stJudesPercentageElement.textContent = stJudesPercent;
-					aspcaPercentageElement.textContent = aspcaPercent;
-				} else if (stJudesPercentageElement && aspcaPercentageElement) {
-					stJudesPercentageElement.textContent = '0';
-					aspcaPercentageElement.textContent = '0';
 				}
 			}
 			
@@ -2768,15 +2579,6 @@
 					(snapshot) => {
 						// Update total count based on the collection size
 						totalCoinCount = snapshot.size;
-						
-						// Update charity allocation based on changes
-						charityAllocation = { 'world-central-kitchen': 0, 'aspca': 0 };
-						snapshot.forEach((doc) => {
-							const data = doc.data();
-							if (data.charity && charityAllocation[data.charity] !== undefined) {
-								charityAllocation[data.charity]++;
-							}
-						});
 						
 						// Update the display
 						updateCoinCounter();
@@ -2809,7 +2611,6 @@
 					(snapshot) => {
 						// Reset totals
 						totalUsdGiven = 0;
-						usdByCharity = { 'ST_JUDES': 0, 'ASPCA': 0 };
 
 						// Track current donation IDs and data
 						const currentDonationIds = new Set();
@@ -2822,22 +2623,14 @@
 							const amount = parseFloat(data.amount) || 0;
 							// Dollar value: USDC at face value, ETH via the
 							// usdValue logged at donation time. Legacy RL80 docs
-							// (no currency) stay out of the $ counter, and dev
-							// tips don't count as charity giving.
+							// (no currency) stay out of the $ counter.
 							let usd = 0;
 							if (data.currency === 'USDC') {
 								usd = parseFloat(data.usdValue) || amount;
 							} else if (data.currency === 'ETH') {
 								usd = parseFloat(data.usdValue) || 0;
 							}
-							if (data.charity !== 'DEV') {
-								totalUsdGiven += usd;
-							}
-
-							// Track by charity (same dollar basis; DEV isn't a key)
-							if (data.charity && usdByCharity[data.charity] !== undefined) {
-								usdByCharity[data.charity] += usd;
-							}
+							totalUsdGiven += usd;
 
 							currentDonationIds.add(doc.id);
 							allDonations.push(donationWithId);
@@ -2901,7 +2694,6 @@
 						// Update collected count
 						collectedCoinCount = data.cumulativeTotal || (collectedCoinCount + data.archivedCount);
 						totalCoinCount = 0;
-						charityAllocation = { 'world-central-kitchen': 0, 'aspca': 0 };
 						updateCoinCounter();
 						
 						// Clear visual coins (old instanced pile + the Rapier frozen pile/colliders)
@@ -3128,9 +2920,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						.limit(COINS_TO_LOAD)
 						.get();
 					
-					// Clear existing static coin data and reset charity allocation
+					// Clear existing static coin data
 					staticCoinData = [];
-					charityAllocation = { 'world-central-kitchen': 0, 'aspca': 0 };
 
 					// RAPIER mode: load the saved pile as FROZEN Rapier coins (static collider +
 					// instanced render) so new coins pile on it. Defer the actual freeze to the first
@@ -3145,7 +2936,6 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 								rx: (data.rotation && data.rotation.x) || 0, ry: (data.rotation && data.rotation.y) || 0, rz: (data.rotation && data.rotation.z) || 0,
 								scale: data.scale || 1,
 							});
-							if (data.charity && charityAllocation[data.charity] !== undefined) charityAllocation[data.charity]++;
 						});
 						rapierPendingLoad = pend;
 					} else {
@@ -3160,12 +2950,6 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 									txHash: data.txHash || null,
 									charity: data.charity || null
 								});
-							}
-							// Count charity allocations
-							if (data.charity) {
-								if (charityAllocation[data.charity] !== undefined) {
-									charityAllocation[data.charity]++;
-								}
 							}
 						});
 
@@ -3355,6 +3139,12 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			window.minRestFaceY = 0.8;        // coins only rest on faces flatter than this (↑ = slide off steeper slopes)
 			window.coinFountainClearance = 0.006; // gap a coin rests above the fountain stone parts (ledge/rim/statue) — small; tossed + stream
 			window.coinGroundClearance = 0.092;  // gap a coin rests above the open GROUND/plaza only (its plane sits below the visible ground, so it needs more) — tossed + stream
+			// Resting camera after the fly-in: a three-quarter view from the sunlit (west) side —
+			// full basin in frame, Our Lady against the facade, palm + lit cloud on the right.
+			// (Was the flat frontal { 0, 1, 4.4 } looking at the origin.)
+			window.introCamEnd    = { x: -2.3,  y: 0.95, z: 4.4 };
+			window.introCamLookAt = { x: -0.15, y: 0.45, z: 0 };
+			window.introOrbitEnabled = false; // master switch for the post-intro auto-orbit (attract mode) — off: camera stays where the fly-in / user leaves it
 			window.introOrbitIdleMs = 10000;  // resume the slow auto-orbit after this many ms of no interaction
 			window.introOrbitSpeed = 1.0;     // target auto-orbit speed (~60s/rev); the resume eases up to this
 			window.introOrbitRampTau = 1.6;   // ease-in time constant (s) — higher = gentler ramp from a standstill
@@ -3980,9 +3770,9 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				
 				// Target positions for the camera animation (matching the default setup)
 				const startPos = { x: 0, y: 0, z: 18 };
-				const endPos = { x: 0, y: 1, z: 4.4 };  // Default camera position
+				const endPos = window.introCamEnd;        // resting camera pose (tunable, see window.introCamEnd)
 				const startLookAt = { x: 0, y: 3, z: 0 };
-				const endLookAt = { x: 0, y: 0, z: 0 };  // Default look-at target
+				const endLookAt = window.introCamLookAt;  // resting look-at target
 				
 				// Animation duration in milliseconds
 				const duration = 4000;
@@ -4039,6 +3829,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			let introOrbitPointers = 0;   // pointers currently down (a drag in progress)
 
 			function startIntroOrbit() {
+				if (!window.introOrbitEnabled) return; // auto-rotate disabled (covers both the fly-in start and the idle resume)
 				introOrbitActive = true;
 				controls.autoRotate = true;
 				controls.autoRotateSpeed = 0; // ease in from a standstill — the render loop ramps up to window.introOrbitSpeed
@@ -4139,7 +3930,6 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 			// Function to update button text
 			// Track if modal is being shown to prevent immediate close
-			let modalJustOpened = false;
 
 			// Floating banner while a golden coin waits in hand — the payment
 			// is done, the ceremony (the toss) is the user's to take.
@@ -4192,88 +3982,6 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				}
 			}
 			
-			function showCharityModal() {
-				const modal = document.getElementById('charityModal');
-				modal.style.display = 'block';
-				document.body.classList.add('modal-open');
-				modalJustOpened = true;
-				
-				// Tell parent window to hide UI elements
-				if (window.parent !== window) {
-					window.parent.postMessage({ type: 'hideUIElements' }, '*');
-				}
-				
-				// Prevent immediate close on mobile
-				setTimeout(() => {
-					modalJustOpened = false;
-				}, 300);
-			}
-
-			function hideCharityModal() {
-				if (modalJustOpened) return; // Prevent immediate close
-				const modal = document.getElementById('charityModal');
-				modal.style.display = 'none';
-				document.body.classList.remove('modal-open');
-				
-				// Tell parent window to show UI elements again
-				if (window.parent !== window) {
-					window.parent.postMessage({ type: 'showUIElements' }, '*');
-				}
-				
-				// Don't clear selectedCharity here - keep it for the next coin toss
-			}
-
-			function setupCharityModalListeners() {
-				const modal = document.getElementById('charityModal');
-				const charityButtons = modal.querySelectorAll('.charity-button');
-				const cancelButton = modal.querySelector('.modal-cancel');
-
-				// Handle charity selection with both click and touch events
-				charityButtons.forEach(button => {
-					const handleSelection = (e) => {
-						e.preventDefault();
-						e.stopPropagation();
-						selectedCharity = e.currentTarget.getAttribute('data-charity');
-						const charityName = e.currentTarget.textContent.trim();
-						
-						// Small delay before hiding to ensure touch event completes
-						setTimeout(() => {
-							hideCharityModal();
-						}, 100);
-					};
-					
-					button.addEventListener('click', handleSelection);
-					button.addEventListener('touchend', handleSelection);
-				});
-
-				// Handle cancel with both click and touch events
-				const handleCancel = (e) => {
-					e.preventDefault();
-					e.stopPropagation();
-					selectedCharity = null; // Clear selection on cancel
-					setTimeout(() => {
-						hideCharityModal();
-					}, 100);
-				};
-				cancelButton.addEventListener('click', handleCancel);
-				cancelButton.addEventListener('touchend', handleCancel);
-
-				// Close modal when clicking outside
-				const handleBackdropClick = (e) => {
-					if (e.target === modal && !modalJustOpened) {
-						selectedCharity = null; // Clear selection when clicking outside
-						hideCharityModal();
-					}
-				};
-				modal.addEventListener('click', handleBackdropClick);
-				modal.addEventListener('touchend', handleBackdropClick);
-				
-				// Prevent modal content from closing modal on touch
-				const modalContent = modal.querySelector('.charity-modal-content');
-				modalContent.addEventListener('click', (e) => e.stopPropagation());
-				modalContent.addEventListener('touchend', (e) => e.stopPropagation());
-			}
-
 			// Set up mobile button event handlers
 			function setupMobileButtons() {
 				// Mobile now uses the same toggle component as desktop
@@ -4444,7 +4152,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						setTrayOpen(false);
 						// Donation modal lives in the parent (wallet + amount +
 						// USDC/ETH); a golden coin lands in hand on completion.
-						window.parent.postMessage({ type: 'openDonation', charity: this.dataset.charity }, '*');
+						window.parent.postMessage({ type: 'openDonation' }, '*');
 					});
 				});
 
@@ -4554,6 +4262,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 1000 );
 				camera.position.set( 0, 0, 5 );
 				camera.lookAt( 0, 0, 0 );
+				window.__fountainCam = { camera }; // console/tuning handle (controls attached once created)
 
 				scene = new THREE.Scene();
 				
@@ -4610,11 +4319,13 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				// Post-processing will be setup after shaders are defined
 
 				controls = new OrbitControls( camera, container );
+				if (window.__fountainCam) window.__fountainCam.controls = controls;
 				controls.minDistance = 0.1;
 				controls.maxDistance = 23;
 				controls.zoomToCursor = true;
 				controls.minPolarAngle = 0;
 				controls.maxPolarAngle = Math.PI / 2;
+				controls.dampingFactor = 0.05;
 
 				// Auto-hide the control panel while the user orbits/zooms (restores when idle)
 				wireAutoHideOnOrbit(controls, camera);
@@ -4680,9 +4391,6 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 renderer.domElement.addEventListener('webglcontextrestored', function() {
                     init(); // Reinitialize the scene
                 }, false);
-                
-                // Setup charity modal listeners
-                setupCharityModalListeners();
           
 				const rgbeLoader = new RGBELoader().setPath( './' );
 				
@@ -6388,12 +6096,6 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				activePointers++;
 				tapStart = null;
 
-				// Don't process 3D interactions if modal is open
-				const modal = document.getElementById('charityModal');
-				if (modal && modal.style.display === 'block') {
-					return;
-				}
-
 				// Touch has no hover: the held coin appears above the finger
 				// on press (desktop already placed it via pointermove)
 				positionHandCoinFromEvent(event);
@@ -7581,33 +7283,36 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 const info = document.getElementById('info');
                 if (!info || info.dataset.hubAugmented) return;
                 const content = info.querySelector('.info-content') || info;
+                // Controls live at the BOTTOM of the guide (read first, act second):
+                // a full-width "Support the site" button with the Cam/Sound toggles
+                // in a quiet row beneath it.
                 const row = document.createElement('div');
                 row.id = 'infoHubControls';
-                // Two columns: the two toggles stacked on the left, Donate on the right.
-                row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;'
-                    + 'margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,0.12);';
+                row.style.cssText = 'display:flex;flex-direction:column;gap:10px;'
+                    + 'margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.14);';
+                const donate = document.createElement('button');
+                donate.type = 'button';
+                donate.id = 'infoHubDonate';
+                donate.innerHTML = '<span aria-hidden="true">\uD83D\uDD6F\uFE0F</span> Support the site';
+                donate.style.cssText = 'display:block;width:100%;padding:12px 18px;border-radius:12px;border:none;'
+                    + 'cursor:pointer;background:linear-gradient(135deg,#ffd700,#ffb700);color:#3a2c00;'
+                    + 'font-weight:800;font-size:14px;letter-spacing:0.2px;text-transform:none;'
+                    + 'box-shadow:0 6px 18px rgba(255,183,0,0.25);';
+                donate.addEventListener('click', function () {
+                    // Close the panel, then open the parent's real donation modal
+                    // (wallet + amount, single recipient: the site wallet).
+                    if (info.style.display === 'block' && typeof toggleInstructions === 'function') toggleInstructions();
+                    try { window.parent.postMessage({ type: 'openDonation' }, '*'); } catch (e) {}
+                });
+                row.appendChild(donate);
                 const toggles = document.createElement('div');
-                toggles.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start;gap:6px;';
+                toggles.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;gap:8px;';
                 const cam = document.getElementById('coinCamToggle');
                 const sound = document.getElementById('waterSoundToggle');
                 if (cam) toggles.appendChild(cam);     // moved from the control strip, listeners intact
                 if (sound) toggles.appendChild(sound); // moved from the control strip, listeners intact
                 row.appendChild(toggles);
-                const donate = document.createElement('button');
-                donate.type = 'button';
-                donate.id = 'infoHubDonate';
-                donate.innerHTML = '<span aria-hidden="true">\uD83E\uDE99</span> Donate';
-                donate.style.cssText = 'flex:0 0 auto;padding:11px 20px;border-radius:12px;border:none;'
-                    + 'cursor:pointer;background:linear-gradient(135deg,#ffd700,#ffb700);color:#3a2c00;'
-                    + 'font-weight:800;font-size:14px;letter-spacing:0.3px;';
-                donate.addEventListener('click', function () {
-                    // Close the panel, then open the parent's real donation modal
-                    // (charity-select step). Same path as the old chip tray.
-                    if (info.style.display === 'block' && typeof toggleInstructions === 'function') toggleInstructions();
-                    try { window.parent.postMessage({ type: 'openDonation' }, '*'); } catch (e) {}
-                });
-                row.appendChild(donate);
-                content.insertBefore(row, content.firstChild);
+                content.appendChild(row);
 
                 // (A desktop-only social row for the bottom of the panel was prototyped
                 // here but parked: the mobile panel doesn't scroll cleanly — a drag closes
@@ -8579,7 +8284,6 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			// Make functions globally accessible for mobile buttons
 			window.triggerCoinToss = triggerCoinToss;
 			window.tossHeldCoin = tossHeldCoin;
-			window.showCharityModal = showCharityModal;
 			window.getSelectedCharity = () => selectedCharity;
 			window.setSelectedCharity = (charity) => { selectedCharity = charity; };
 			
@@ -10420,7 +10124,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 		</style>
 		<!-- "Coin in your hand" chip: tossing is always one tap on the water;
 		     this chip only chooses WHICH coin that tap throws. Tapping the
-		     chip opens the tray; picking a charity runs the parent's donation
+		     chip opens the tray; "Support the site" runs the parent's donation
 		     modal, and a successful donation puts a golden coin in hand. -->
 		<!-- <div id="coinTossButtons" style="
 			position: fixed;
@@ -10450,9 +10154,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						</span>
 					</div>
 					<div class="coin-tray-charities">
-						<button type="button" class="coin-tray-charity" data-charity="ST_JUDES">🏥 St. Jude's</button>
-						<button type="button" class="coin-tray-charity" data-charity="ASPCA">🐶 ASPCA</button>
-						<button type="button" class="coin-tray-charity" data-charity="DEV">❤️ Dev</button>
+						<button type="button" class="coin-tray-charity" data-charity="DEV">🕯️ Support the site</button>
 					</div>
 				</div>
 				<button type="button" id="coinChip" class="coin-chip" aria-haspopup="true" aria-expanded="false">

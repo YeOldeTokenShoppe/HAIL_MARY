@@ -35,7 +35,6 @@ export default function FountainPage() {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showDonationModal, setShowDonationModal] = useState(false);
-  const [preselectedCharity, setPreselectedCharity] = useState(null);
   const [showBuyModal, setShowBuyModal] = useState(false);
   // The Coin Guide panel lives inside the fountain iframe; these social icons live
   // here on the parent page. A z-index inside the iframe can't stack above them, so
@@ -313,10 +312,7 @@ export default function FountainPage() {
       <FountainFrame
         ref={iframeRef}
         onFullyLoaded={handleFountainReady}
-        onDonateClick={(charity) => {
-          setPreselectedCharity(charity);
-          setShowDonationModal(true);
-        }}
+        onDonateClick={() => setShowDonationModal(true)}
       />
 
       {/* UI Overlay - Our Lady of Perpetual Profit Logo (Desktop) / RL80 (Mobile) */}
@@ -611,11 +607,7 @@ export default function FountainPage() {
       {/* Donation Modal */}
       <FountainDonationModal
         isOpen={showDonationModal}
-        onClose={() => {
-          setShowDonationModal(false);
-          setPreselectedCharity(null);
-        }}
-        preselectedCharity={preselectedCharity}
+        onClose={() => setShowDonationModal(false)}
         onDonationComplete={(donation) => {
           // Optionally notify the iframe about the successful donation
           if (iframeRef.current) {

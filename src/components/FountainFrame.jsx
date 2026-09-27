@@ -37,11 +37,10 @@ const FountainFrame = forwardRef(({ onFullyLoaded, onDonateClick }, ref) => {
           onFullyLoaded();
         }
       }
-      // Handle donation trigger from iframe
+      // Handle donation trigger from iframe (single recipient — no
+      // charity key rides along any more)
       if (event.data?.type === 'openDonation') {
-        if (onDonateClick) {
-          onDonateClick(event.data?.charity || null);
-        }
+        if (onDonateClick) onDonateClick();
       }
     };
 
