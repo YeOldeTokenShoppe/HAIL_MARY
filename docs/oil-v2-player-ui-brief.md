@@ -1,0 +1,246 @@
+# /hailmary v2 — Player UI pass: design brief
+
+_2026-09-27 · handoff for the Michelle-led pass (build-order step 6, season-one IN #2 in
+[oil-game.md](oil-game.md)). Everything the pass needs is on this page or one link away;
+nothing here requires reading the code to design against._
+
+## 1. What the pass is
+
+Style and lay out the v2 **decision surfaces** and the **season-end reckoning** so a
+first-time player, on a phone, reads a strike alert and states the cost model back
+correctly, decides in one tap, and understands what happened at the buzzer.
+
+**Fixed inputs (not the pass's to change):** the loop rules, the copy rule (§4), the data
+each surface receives (§6 — the props contracts), the fairness constraints (§5), and the
+handlers behind every button. **The pass owns:** layout, hierarchy, colour language, type,
+motion, iconography, the split of surfaces between the sidebar card and the in-world rig
+panel, and the wording *within* the copy rule.
+
+**Done looks like:** the same components with the same props, restyled; a state sheet
+(§3) with every state designed; the open decisions in §8 answered.
+
+## 2. The surfaces — inventory
+
+| # | Surface | Where it lives | Status | File |
+|---|---|---|---|---|
+| A | **Core Sample card** — the decision surface: charges, cadence line, core rack, the pending layer with EXTRACT / PASS, salvage board, frontier board, ledger, standing order, WALK | Sidebar YOUR RIG card (desktop); the panels under the 3D tab (phone) | Functionally complete, **plain chrome** | `src/components/OilCoreSampleV2.jsx` |
+| B | **In-world machine panel** on the player's rig — pressure gauge, panel screen, free-standing DEPTH board, the PASS cover Michelle built 2026-09-08 (press feedback works; **the physical PASS is not yet wired to the decide route**), crew who walk to the button on a decision | Desktop: click the rig; phone: the MACHINE PANEL chip zooms to it | Built as theatre; verbs not wired | `src/components/OilVoxelGrid.jsx` (~1880–2000, 336), `RigCrew.jsx` (`hm:decide`) |
+| C | **Strata wall** — the earth block as public game-state voxels: passes, extractions, wildcat scars, tunnel bars for salvage | 3D scene, loopV2 seasons | Built (promoted from the `?strata=1` mock) | `src/components/StrataVoxels.jsx` |
+| D | **Alerts** — push + Telegram on every strike (`CORE ASSAY — LAYER n` with the cost-model body), hell breach, tonic cap, artifact, dry layer | Phone lock screen, Telegram | Built, copy follows the rule | `oil-strike-tick/route.js` ~530–665, `lib/oilLoopV2.assayAlertBody` |
+| E | **While-you-were-away recap** | Landing overlay for a returning player | **Still v1**: shows TANK · UNBANKED and a BANK action; needs a v2 version (pending layer, what the crew resolved, what neighbours took) | `src/components/OilAwayRecap.jsx` |
+| F | **The Reckoning** — the per-player season-end account | Above the FINAL HAUL share card, both layouts, every v2 rig | Functionally complete, **plain chrome** | `src/components/OilReckoning.jsx` |
+| G | **FINAL HAUL share card** (PNG capture + tweet) | Same spot, score > 0 only | Built, v1 numbers (banked + tank) | `hailmary/page.js` ~7290 |
+| H | **Walk mode** — stand on a frontier cell, press E to wildcat | 3D, desktop | Built (beta) | `src/components/PlayerWalker.jsx` |
+| I | **Onboarding** — welcome modal saints, intro video, how-to-play | First visit | **Still says BANK** ("Bank what you find", "Bank often") | `OilWelcomeModal.jsx`, intro video |
+
+The pass is A, F and E first. B is the big design question (§8.2). D's copy is fixed by the
+rule; its *tone* is open. G and I are copy sweeps, not design.
+
+## 3. States — the sheet to design against
+
+Every state below exists in code today and can be reached with real data. A design that
+misses one will show plain chrome there.
+
+**A · Core Sample card**
+
+| State | Trigger | Must show |
+|---|---|---|
+| Nothing on the table | `pending == null`, season live | cadence line ("next lands before …"), the rack, standing order |
+| Pending · wet · above the line | `oil ≥ threshold` | assay, cost copy, "crew would EXTRACT" + deadline, both verbs |
+| Pending · wet · below the line | `oil < threshold` | same, "crew would PASS" — this is the decision moment |
+| Pending · dry | `oil == 0` | "passing is free", PASS only makes sense; EXTRACT still allowed (never hidden) |
+| Pending · inclusion flagged | `hasInclusion` | the anomalous-inclusion ping; "only recovered on EXTRACT — the crew never gambles on it" |
+| No charges left | `chargesRemaining == 0` | EXTRACT / TAKE / WILDCAT disabled, PASS live, CHARGES in red |
+| Column fully revealed | `remainingLayers == 0` | "nothing more comes up; the buzzer settles what's on the table"; charges still work next door |
+| Season over | `now ≥ seasonEnd` | hand-off to the Reckoning |
+| No season clock | legacy settings | no cadence line at all (never a fake one) |
+| Salvage board | ≥ 1 open pocket next door | first-lateral-wins framing, TAKE −1⚡, +N more |
+| Frontier board | ≥ 1 unclaimed neighbour in reach | "blind · assay unknown", WILDCAT −1⚡ |
+| Ledger | empty / populated | totals always; rows behind a toggle today (open question §8.5) |
+
+**Core rack cell states (9):** undrilled · pending · extracted · passed (open) · salvaged
+(a neighbour took it) · dry · hell · hell capped · revealed (neutral). Plain chrome uses
+one glyph each and a legend; the wall already has a colour language for the same states
+(§8.1).
+
+**F · The Reckoning**
+
+| State | Trigger | Must show |
+|---|---|---|
+| Seed published | `revealedSeed` set (post-`gameEnded`) | full column total, never-reached oil, capture % |
+| Seed not yet published | ended, seed pending | "N layers still sealed" — never a guessed total |
+| Dry rig | banked 0 | the honest "here is what was under you" — this player deserves the best version of the card |
+| Core left on the table | `pendingUnresolved` | one line: the crew settles it by the standing order |
+
+**E · Away recap (to be designed for v2)** — what struck while away, what the crew
+resolved and how, what neighbours took from your passes, what is pending now and its
+deadline, charges left.
+
+## 4. The copy rule and the vocabulary
+
+**Copy rule (playtested 2026-08-26, binding):** every decision surface and alert states the
+cost model explicitly — *"EXTRACT banks the full N BTR for 1 charge · PASS is free but final
+(opens to neighbours)."* The threshold is **never** shown bare: a playtester read "your
+line: 764" as a *price* ("do I spend 764 to get 1,285?"). It is always the crew's standing
+order: *"if you're away, the crew follows your standing order (extract ≥ 800) → would PASS."*
+
+| Say | Never say | Why |
+|---|---|---|
+| charge (⚡) | drill, bonus drill | a charge is what you spend; the bore drills by itself |
+| standing order | threshold, line, limit, price | see above |
+| EXTRACT / PASS | bank, keep, skip | extraction *is* banking in v2; BANK is v1 |
+| salvage · taken | poach, steal | a lateral takes what its owner discarded; the race is between rivals |
+| frontier · wildcat | claim-jump, raid | unclaimed ground, drilled blind |
+| core · assay · BTR | oil amount, score | the number is exact; the ambiguity lives only in the inclusion ping |
+| hell pocket · tonic caps it | trap, curse | one consumable, one moment |
+| stranded · stayed in the ground | lost, stolen | nothing kept was ever touched |
+| "next lands before 14:32" | "next strike at 14:32" | the moment is unguessable by design (§5) |
+
+## 5. Constraints that are not negotiable
+
+- **No seed on the client during a season.** The card and rack render only server
+  reveals and public plot fields. The reckoning regenerates the player's column from the
+  seed only after `gameEnded`. A design cannot ask for a number the client does not have
+  (e.g. "how much is left in my column" mid-season — it is unknown by construction; the
+  SEISMIC lower bound is the honest stand-in).
+- **The strike moment stays unguessable.** The countdown shows the end of the reveal
+  window, never the target. "In 3.2 h" means "no later than", and the copy must read that
+  way.
+- **Numbers are real.** The assay is exact. Only the inclusion is ambiguous ("anomalous
+  inclusion detected"). Nothing may imply odds on the oil number.
+- **Every action states its cost on the control** (−1⚡), and PASS is always marked final.
+- **Six theme palettes** ship: `light`, `duskLight`, `Geode`, `dark`, `solsticeLight`,
+  `parabolumDark` (`hailmary/page.js` ~258–400). Components receive `theme` tokens
+  (`text`, `muted`, `gold`, `green`, `red`, `warn`, `border`, `accent`); a design must
+  hold in all six. The FINAL HAUL card is the one exception (fixed dark palette for PNG
+  capture).
+- **Phone first**: the card lives in a panel column under the 3D tab; 16 px gutters, no
+  horizontal scroll; the rack is 20 cells wide on a ~360 px column.
+- **Type**: `'Share Tech Mono'` is the instrument voice throughout the panels.
+- **Handlers are fixed:** `onDecide`, `onSetThreshold`, `onLateral`, `onWildcat`,
+  `onWalk`. Wire the in-world PASS/EXTRACT to the same handlers (they already dispatch
+  `hm:decide` for the crew).
+
+## 6. Props contracts (design against these; nothing else is available)
+
+**`OilCoreSampleV2`**
+```
+theme, pending: { layer, oil, hasInclusion, revealedAt } | null,
+chargesRemaining, chargesCap, threshold,
+salvage: [{ col, row, layer, oil, hasInclusion }],
+frontier: [{ col, row, layer }],
+cadence: { intervalMs, latestMs, remainingLayers, seasonEndMs } | null,
+rack:    [{ layer, state, oil, hasInclusion, takenBy }]            // 20 entries
+ledger:  { rows: [{ kind: extract|pass|salvage|wildcat, layer, oil, charge, col?, row?, takenBy?, hell? }],
+           banked, chargesSpent, extractedOwn, salvagedIn, wildcatIn, wildcatDry, wildcatHell,
+           passedTotal, takenByRivals, leftOpen }
+onDecide(action), onSetThreshold(btr), onLateral({col,row,layer}), onWildcat({col,row,layer}), onWalk()
+```
+Ledger rows carry **no timestamps** (none are stored) — own rows sort by layer, then
+salvage, then wildcats by coordinate. A timeline design would need a server change (out
+of scope for season one).
+
+**`OilReckoning`**
+```
+theme, col, row,
+reckoning: { banked, payoutUsd, usdRate,
+             columnTotal, unknownLayers, hellLayers, hellCapped,
+             extractedOwn, captureRate | null,
+             passedTotal, takenByRivals, leftOpen,
+             neverReachedLayers, neverReachedOil, stranded,
+             salvagedIn, salvageCount, wildcatIn, wildcatDry, wildcatHell, wildcatCount,
+             chargesSpent, chargesCap, chargesUnspent, pendingUnresolved,
+             layers: [{ layer, oil | null, hell, reached }], ledger }
+```
+`reckoningText()` in `lib/oilLoopV2.js` is the plain-text version (COPY REPORT) — the
+share card's words, if the reckoning becomes the share.
+
+## 7. The plain versions, as they read today
+
+Server-rendered text of the current components (styling stripped), so the pass starts
+from what exists. Sizes: the card is ~330 lines of plain JSX; the reckoning ~110.
+
+**Card · pending, below the line, inclusion, everything populated**
+> CORE SAMPLE — EXTRACT OR PASS · CHARGES 6/8 · REVEALS every 9.1 h · next lands before
+> 10:40 AM (in 7.1 h) · 13 layers to go · CORE RACK — your column, L1 → L20
+> `✕ ■ ○ ▣ ⛨ ○ ? · · · · · · · · · · · · ·` · L7 · 300 BTR · 🏺 ANOMALOUS INCLUSION ·
+> EXTRACT banks the full 300 BTR for 1 charge · PASS is free but final (opens to
+> neighbours). The inclusion is only recovered on EXTRACT — the crew never gambles on it.
+> Revealed 25m ago · if you do nothing, the crew follows your standing order at the next
+> strike — before 10:40 AM (in 7.1 h) → would PASS. [EXTRACT −1⚡] [PASS · FINAL] ·
+> SALVAGE BOARD — open next door · first lateral wins · (4,3) L10 · 700 BTR [TAKE −1⚡] ·
+> FRONTIER — unclaimed ground in reach · blind, first wildcat wins · (2,2) · deepest in
+> reach L5 · 🎲 assay unknown [WILDCAT −1⚡] · LEDGER [5 ENTRIES ▾] BANKED 1,000 BTR ·
+> 2/8 charges spent · passed 900 BTR — neighbours took 900, 0 still open · salvaged in
+> 600 · wildcats +0, 1 dry · STANDING ORDER: extract ≥ [800] BTR [SET]
+
+**Card · nothing on the table, no season clock, fresh rig**
+> CORE SAMPLE — EXTRACT OR PASS · CHARGES 8/8 · CORE RACK `· · · · …` · No core on the
+> table — the next strike pulls one. Your standing order decides it if you're away. ·
+> LEDGER [0 ENTRIES ▾] BANKED 0 BTR · 0/8 charges spent · STANDING ORDER …
+
+**Card · column fully revealed**
+> COLUMN FULLY REVEALED — nothing more comes up; the buzzer settles anything still on the
+> table. · No core on the table — your column is fully revealed. Charges left still work
+> next door and on the frontier.
+
+**Reckoning · seed published**
+> THE RECKONING — SEASON CLOSED · plot (3,3) · BANKED 1,000 BTR ≈ $1.00 USDC · real USDC,
+> paid to your wallet on Base at the season's fixed rate · YOUR COLUMN · under your column
+> 1,550 BTR · 1 hell pocket (1 capped) · you extracted 400 BTR (26% of your column) · you
+> passed 900 BTR · neighbours took 900 BTR · stayed in the ground 0 BTR · never reached 2
+> layers · 250 BTR · stranded — never banked 250 BTR · BEYOND YOUR FENCE · salvaged next
+> door +600 BTR · 1 lateral · wildcats +0 BTR · 1 dug, 1 dry · charges 3/8 spent · 5 wasted
+> [COPY REPORT]
+
+**Reckoning · seed not yet published**
+> under your column (2 layers still sealed) 1,300 BTR … never reached 2 layers · sealed …
+> The sealed layers fill in when the season's seed is published — check VERIFY THE MAP.
+
+## 8. Open decisions for the pass (Michelle's)
+
+1. **One colour language for cell states.** The strata wall already speaks: gold pulse =
+   pending, dark = extracted, green = passed (open), amber = taken by a neighbour, red =
+   hell, grey stub = dry wildcat. The plain rack currently uses **green for extracted** and
+   a gold outline for passed — it disagrees with the wall. Pick one language and apply it
+   to the rack, the ledger, the wall and the reckoning.
+2. **Where does the decision live on desktop — the rig or the card?** The in-world panel
+   (gauge, screen, DEPTH board, PASS cover, crew) is already the more theatrical surface
+   and the MACHINE PANEL chip exists to reach it. Options: (a) rig panel is primary,
+   card becomes ledger + boards; (b) card is primary, rig panel mirrors state only;
+   (c) both act, same handlers. Phone is card-only either way.
+3. **Does the Reckoning replace the FINAL HAUL card as the share?** Lean yes: one card,
+   the reckoning's words, PNG-captured in the fixed palette, dry players included.
+4. **The away recap for v2.** Redesign brief in §3·E. It is the payoff of the check-back
+   loop and today it still talks about the tank.
+5. **Ledger: totals + toggle, or always-open list?** Rows have no times; a "timeline"
+   look would promise ordering we don't have.
+6. **Rack orientation.** Horizontal strip (fits the phone column) vs a vertical core that
+   matches the physical core sample and the wall's columns.
+7. **How loud is the countdown?** A deadline that reads as urgency drives checking; one
+   that reads as a timer contradicts "never punished for being offline" (the standing
+   order already covers you). The copy says "if you do nothing" for that reason.
+8. **Alert tone.** Titles today: "⛏ CORE ASSAY — LAYER 7", "🔥 YOUR RIG BREACHED A HELL
+   POCKET!", "🧪 TONIC CAPPED A HELL POCKET", "🪨 Dry layer". Same information, the voice
+   is open.
+
+## 9. How to see the states while designing
+
+- **Live components with real data:** admin test tools on `/hailmary?mode=test` (the
+  LAYER stepper reveals; EXTRACT / PASS / LATERAL controls and a threshold field are on the
+  v2 build list and should be added if not present — one-line ask to whoever picks this
+  up). `settings.loopV2 = true` on the dev season.
+- **The wall's mock season:** `/hailmary?strata=1` runs a 90-second v2 season on the real
+  seeded field — the fastest way to watch pending → resolve → salvage rhythm.
+- **Every state on one page (not built):** a `?v2fixture=1` page that mounts the card and
+  the reckoning in each §3 state with static props would make the pass and later
+  regressions cheap. Recommended as the first build ticket of the pass.
+
+## 10. Hand-back
+
+The pass returns: the two components restyled against the §6 contracts (props unchanged;
+new presentational props are fine), the state sheet with each §3 state screenshotted on
+phone and desktop in at least `dark` and `light`, the §8 answers written into
+[oil-game.md](oil-game.md) as dated decisions, and the list of copy changes (all within
+§4). Anything that needs data the props do not carry goes on the season-two list with a
+line saying what server field it would need.
