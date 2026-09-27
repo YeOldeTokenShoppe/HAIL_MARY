@@ -6,9 +6,116 @@ A 3D oil exploration game where players claim land on a fixed 10x10 grid and dri
 
 > **Status: BUILT (2026-06-07).** The pacing/depth model, the uncapped local tank, the depth levers, and the fixed-rate prize economics in this section are implemented and tested — see *TIMING FRAMEWORK* and *Depth levers* below for specifics and file pointers. Older descriptive sections (Core Mechanics, Game Phase Flow, Data Model) have been reconciled to match. **Still proposal-only:** the *contested-capture* theft rework in **Rogue Characters → Consequences v2** — the dino still takes un-banked tank oil today.
 
-## v2 LOOP — EXTRACT OR PASS (decided 2026-08-23 · NOT BUILT)
+## SEASON ONE — SHIP SCOPE (drafted 2026-09-27 · PROPOSAL, for Michelle to cut)
 
-> **Status: DESIGN, decided with Michelle 2026-08-23 — supersedes "Local tank & banking" and the "milk-vs-gamble" line of the current loop. Nothing below is implemented yet; see *What changes* for the build list.**
+> **Status: DRAFT.** Purpose: define *shippable* for the first real-money season so that what remains is a list, not a feeling. The design is far ahead of the build's last stretch — the 25 most recent commits are all `/trade`, LT TV and navigation — and "ship" was never written down. Rule of this page: **anything not under IN is OUT until season two.** Cut freely; the value is the line, not the contents.
+
+### The definition
+
+A stranger who holds the token can, on their phone, with no operator touching Firestore: register → pick a plot on the field → watch their rig reveal 20 layers over the season at times they can't predict → EXTRACT or PASS each one (or let the crew follow their standing order) → salvage a neighbour's discard and wildcat the frontier → get pushed when it matters → see the reckoning at the buzzer → get paid in USDC → verify the map themselves.
+
+### Status as of 2026-09-27 — verified against the code, not the doc
+
+The doc's own headers lag the build (the v2 header still read NOT BUILT; it is built and flag-gated). This table is what the routes, libs and components actually say today.
+
+| Piece | Status | Evidence |
+|---|---|---|
+| Provable fairness (commit → future block → reveal), public verifier | **BUILT** | `lib/oilFairness.js`, `/api/oil-fairness`, `/api/oil-verify`, `OilVerifyExplainer` |
+| Pre-season lobby, on-field plot pick, anchor-as-event, waitlist | **BUILT** | `/api/oil-claim`, `/api/oil-waitlist`, `OilAnchorEvent` |
+| Strike clock — fill-the-season pace, random placement in window | **BUILT** | `lib/oilStrikeClock.js`, `scripts/test-oil-clock.mjs` |
+| **v2 loop** — reveal → pending → threshold resolve, EXTRACT / PASS, charges, buzzer resolves the last pending by standing order | **BUILT, flag-gated** `settings.loopV2` | `/api/oil-layer-decide`, `/api/oil-threshold`, `lib/oilLoopV2.js` + `oilLoopV2Server.js`, strike-tick lines ~108 & ~370, `scripts/test-oil-loop-v2.mjs` |
+| Salvage laterals (4-orthogonal, passed-and-unclaimed) | **BUILT, flag-gated** | `/api/oil-lateral` |
+| Wildcats — 8 adjacent unclaimed columns, depth = reach | **BUILT** | `/api/oil-wildcat`, FRONTIER board, wall scars |
+| Player decision surface | **PARTIAL** — working surface exists (assay, EXTRACT / PASS, threshold, CHARGES, salvage, frontier); the Michelle-led design pass (build step 6) is **not started** | `OilCoreSampleV2.jsx`, `hailmary/page.js` ~4828 |
+| End-of-season reckoning (banked vs column total vs taken by rivals vs stranded) | **NOT BUILT** | report mode exists; nothing per-player |
+| Company ring | **DEFERRED** (2026-08-27) | — |
+| Rule of capture — siphon + pool drain | **NOT BUILT** | only in the `StrataVoxels` mock and `scripts/sim-v2-ring-capture.mjs` |
+| Multi-element core — `{ oil, inclusion? }` | **PARTIAL** — inclusions ride through `applyV2Resolution`; no appraiser, no identification | strike-tick `inclusionArtifact` |
+| Substrate artifacts, phases 1–3 (generation, finds, museum) | **BUILT** | `lib/artifactDistribution.js`, `MuseumPanel.jsx` |
+| Substrate phase 4 (outlaw-map assembly, cache payout, curse cleanse, Curators podium) | **NOT BUILT** | — |
+| Daily ticket — mint / settle / verify; prizes: charges, tonic, stall coupon | **BUILT** | `/api/oil-ticket-*`, `lib/oilTicket.js` |
+| Hell demon bounty (arena + on-foot) | **BUILT** | `/api/oil-demon-*` |
+| Alerts — web push + Telegram; away recap | **BUILT** | `/api/oil-push-*`, `OilAwayRecap` |
+| Payout Rail A (off-chain push) | **BUILT script; open items from 2026-06-07 unresolved** | `scripts/oil-payout.js` — note it scores `totalCollected + tankOil`; under v2 the buzzer resolves every pending so `tankOil` should be 0 at payout — confirm in rehearsal |
+| Payout Rail B (Merkle distributor) | scaffold + tests; **not for season one** | `OilPayoutDistributor.sol` |
+| v1 loop (BANK, `oil-tank-drain`, `depthCapFor`) | **still live** as the flag's off state | strike-tick legacy branch |
+| Commercial strip | 8 stalls live; game hooks on **Remedies** (holy water via `/api/oil-vendor-buy`, tank oil) and **Promos** (Pimp My Pump + ticket coupon); **chapel** step 1 of 7 | `CommercialStrip.jsx`, `VendorStage.jsx`, `docs/midway-chapel.md` |
+
+### IN — season one
+
+Each item has a done-test. If it can't be tested on a phone by someone who isn't us, it isn't done.
+
+1. **v2 is the only loop.** `loopV2 = true` for the season. The v1 branch stays as the flag's off state for one more season (safety), then retires. *Done:* a fresh season on prod runs the whole loop with the flag on and nothing on the page says BANK.
+2. **Decision-surface design pass (build step 6, Michelle-led).** Requirements are the mock's surfaces: decision card with explicit cost copy, the claim's column always visible (core rack), CHARGES n/20, the standing order phrased as the crew's order (never a bare number), the pending layer with its countdown, the cadence line, a running ledger. The copy rule (2026-08-26) applies to every alert and control. *Done:* a first-time tester reads a strike alert and states the cost model back correctly.
+3. **Reckoning screen at the buzzer.** Per player: banked · what was under your column · what rivals salvaged from your passes · what you left stranded · what your wildcats found · payout in USDC. This is the individual's reveal; it is also the share moment. *Done:* renders from Firestore + the revealed seed with no client-side seed use before `gameEnded`.
+4. **Payout Rail A, rehearsed.** Close the three 2026-06-07 open items: (a) reset stale-scale data via `scripts/oil-reset.js`, (b) Rail A confirmed as the season-one rail, (c) the sweepstakes-optics legal pass (the *Regulatory posture* line) done before real money. *Done:* a rehearsal season pays a tester wallet the amount the reckoning screen showed.
+5. **Tuning locked before COMMIT.** From the field-tuning sim: ~30 deposits, 8 passive charges, bonuses to 20; grid sized 2–4× confirmed signups (6×6 unless demand says otherwise); 8-day season. Re-run `sim-v2-ring-capture.mjs` at the chosen numbers and record the bind rate. Anchor knobs (deposits, radius band, artifact knobs) move only pre-commit. *Done:* the numbers are written in `oilGame/settings` and in this doc before the commit step.
+6. **The full dress rehearsal** (exit criterion, checklist below): admin runbook end to end on a compressed clock with ≥ 6 non-dev testers on phones.
+7. **Prod ops verified:** strike-tick cron firing on prod at the intended cadence; Telegram and web push arriving on iOS and Android; `testingEnabled` off; Firestore rules deny-by-default confirmed against a non-admin session.
+8. **Onboarding speaks v2.** Welcome modal, intro video copy, away recap and the how-to-play say *charges*, *standing order*, *extract / pass*, *salvage*, *frontier* — never BANK or "in tank · at risk". *Done:* a grep for BANK in player-facing strings returns only admin/test tools.
+9. **Admin cheatsheet updated** for v2 (EXTRACT / PASS / LATERAL test tools, the flag, the reckoning).
+10. **Season-one strip rule applied** (below): every stall has its one-line answer; nothing new is added to the strip before the rehearsal passes.
+
+### OUT — season two or later (explicit, so nobody builds it by accident)
+
+- **Rule of capture** (siphon, pool drains). The sim says it matters on lattice fields; season one is a dense small grid where bind comes from deposits ÷ charges. Revisit with season-one data.
+- **Company ring** (already deferred).
+- **Substrate phase 4** — the outlaw map assembled across players' plots in chat, the cache split, curse cleanse, the Curators podium. **This is the season-two headline**: the game's mystery arc is already designed and half-built; it needs the assembly view, dig-at-X resolution and cache payout.
+- **The appraiser stall** and relic identification / boardwalk credit (closes ground → player → boardwalk).
+- **Cards as boardwalk goods** (parked 2026-09-27, notes at the end of this section).
+- **Rail B** + audit; stake-gated.
+- **Chapel steps 2–7** beyond cosmetics; the cleanse verb belongs with Substrate phase 4.
+- New vendors, faces, rides, stall props.
+- **Salvage depth prerequisite:** decided by rule for season one, not by build — default **no** (salvage stays reactive; simplest, and it keeps the decision game legible). Revisit with data.
+- Full 3×3 territories (v3).
+
+### Decisions Michelle owns (blocking for season one)
+
+1. Season parameters: grid, season length, deposits, charges, pot size and sponsor.
+2. A date for the decision-surface design pass.
+3. **The dino:** keep it hunting passed layers, or retire it for season one (lean: retire; laterals already give passed layers a predator, and one fewer thing to explain).
+4. Salvage depth prerequisite: confirm **no** for season one.
+5. Audience: testers-plus-friends, or public.
+6. Whether the reckoning screen is the share card (lean: yes — it replaces the Polaroid as the end-of-season dispatch).
+
+### The dress rehearsal — exit criterion
+
+Run the admin cheatsheet's new-season runbook on prod (or a prod-shaped staging project) with a compressed season (2 days, so the cadence is ~2.4 h per reveal) and ≥ 6 testers on their own phones. Pass = every row observed by someone who isn't the operator.
+
+1. RESET BOARD → ZERO SCORES → phase REGISTRATION → GRID → START DATE + SEASON LENGTH → COMMIT. *Observe:* lobby shows the commitment; daily ticket mints; a tester's first-plot claim succeeds; a second claim on the same cell fails.
+2. Qualification snapshot; a tester below the floor is disqualified and sees it.
+3. Anchor block mines → ANCHOR → phase ACTIVE, together. *Observe:* first-plot claims now rejected; strike-tick stops skipping `no_seed`.
+4. First strike per rig at an unpredictable time. *Observe:* push + Telegram arrive; the assay alert states the cost model; the pending layer shows a countdown.
+5. EXTRACT on one rig, PASS on another, a third left for the crew → next strike resolves it by the standing order. *Observe:* charges decrement correctly; the passed layer opens on the neighbour's Core Sample; the wall vents.
+6. A neighbour salvages the passed layer; a second neighbour's attempt fails (closed). A border rig wildcats frontier at its reach; a wildcat into a hell pocket wakes the demon; a tonic caps one.
+7. A hell reveal without a tonic summons the demon; a tester captures it and the bounty pays.
+8. An artifact find on a dry layer sends a real push; it appears in the museum.
+9. Buzzer: strike-tick flips to ended, resolves every pending by standing order, reveals the seed. *Observe:* `tankOil` is 0 on every rig; `/api/oil-verify` returns VERIFIED; a tester runs the in-browser verification.
+10. Reckoning screen on every tester's phone; numbers match `oilDrills`.
+11. `scripts/oil-payout.js --dry-run` matches the reckoning; live run pays testnet-sized USDC to the tester wallets.
+12. Post-mortem: every confusion a tester voiced goes on the season-one bug list; anything structural goes to OUT with a date.
+
+### The strip rule for season one
+
+Michelle's taxonomy (2026-08-26) is the rule: the strip sells boardwalk goods, relics only come out of the ground, and flow is one-directional. So each stall answers one question — **what does this do to my rig?** — and the answer is written on its card. Amusement is a legitimate answer; it just has to be cheap to keep alive (SitePal minutes, armature budget on iPad).
+
+| Stall | Season-one answer | Later |
+|---|---|---|
+| Remedies | Tonics / holy water for tank oil — **game** | — |
+| Promos | Pimp My Pump, takes the ticket coupon — **game** | — |
+| Chapel | Amusement (indulgences as cosmetics) | Cleanse a cursed relic (Substrate phase 4) |
+| Fortunes | Amusement | Sell the daily field scan / seismic read — never anything derived from the secret |
+| Souvenirs, Tattoos | Cosmetics + share pipeline — **growth** | — |
+| Carny | Amusement | — |
+| Hot dogs, Rugs | Amusement; watch the cost | Rugs is the natural slot for the **appraiser** |
+
+### Parked — cards as boardwalk goods (idea logged 2026-09-27)
+
+Raised as "daily card draws instead of pre-seeded deposits." Assessment: replacing the sealed map with draws breaks the capped pot (cards would mint oil), the spatial game (position stops mattering, so extract-or-pass, salvage and wildcats lose their object), the pacing thesis (a second daily appointment) and the taxonomy (boardwalk → oil). The keepable insight: the map is shared randomness, a hand is private randomness, and the game lives in combining them. If pursued: the **daily ticket becomes a pack**; the per-player HMAC seed already makes it provably fair; cards are **modifiers that resolve against the map and never create oil** — charge, tonic, survey (peek a neighbour's next layer), long reach (distance-2 wildcat / lateral, the "acquired reach tool" already in Open questions), rain check (hold a pending past the next strike), casing (seal one of your own passed layers), royalty (a cut of the next lateral into your column). The one place a draw may legitimately decide an oil outcome is the blind wildcat (pick the layer, or two layers on one charge). Season three at the earliest; needs a live season to attach to.
+
+## v2 LOOP — EXTRACT OR PASS (decided 2026-08-23 · BUILT behind `settings.loopV2` — capture NOT BUILT)
+
+> **Status (reconciled 2026-09-27): core loop BUILT, flag-gated.** Decided with Michelle 2026-08-23; supersedes "Local tank & banking" and the "milk-vs-gamble" line of the v1 loop. Built and gated on `settings.loopV2 === true` per season: reveal → pending → threshold resolve (`lib/oilLoopV2.js`, strike-tick), `oil-layer-decide`, `oil-threshold`, salvage laterals (`oil-lateral`), wildcats (`oil-wildcat`), the buzzer resolving the last pending by standing order, and the working decision surface (`OilCoreSampleV2.jsx`). Tests: `scripts/test-oil-loop-v2.mjs`. **Not built:** rule of capture (step 5), the Michelle-led player UI pass (step 6), the end-of-season reckoning. With the flag off, the v1 BANK loop still runs. Ship scope for the first real season is in *SEASON ONE — SHIP SCOPE* above.
 
 ### Why
 
