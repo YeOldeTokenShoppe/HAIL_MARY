@@ -171,3 +171,77 @@ export function buildLedger({ plot, drill, allPlots = {}, userId }) {
     passedTotal, takenByRivals, leftOpen: passedTotal - takenByRivals,
   };
 }
+
+// ── THE RECKONING — the player's season-end account (plain, 2026-09-27) ──────
+// "Banked · what was under your column · what rivals took from your passes ·
+// what you left stranded · what your wildcats found · payout." Everything is
+// derived from server reveals + public plot docs, EXCEPT the column total for
+// layers the bore never reached: that needs the map, so the page passes
+// `column` ({ oil: number[depthZ], hell: number[] }) ONLY after the game has
+// ended and the server has published the seed — before that `column` is null
+// and the total is reported with `unknownLayers` still sealed.
+export function buildReckoning({ plot, drill, allPlots = {}, userId, column = null, depthZ = 20, usdRate = 0, chargesCap = 0 }) {
+  const p = plot || {};
+  const d = drill || {};
+  const ledger = buildLedger({ plot: p, drill: d, allPlots, userId });
+  const reached = Math.max(0, Math.min(depthZ, Number(p.drillDay) || 0));
+  const colHell = new Set((column && column.hell) || []);
+
+  let columnTotal = 0, unknownLayers = 0, neverReachedOil = 0, hellLayers = 0, hellCapped = 0;
+  const layers = [];
+  for (let z = 0; z < depthZ; z++) {
+    const hell = !!p.hellLayers?.[z] || colHell.has(z);
+    const revealed = p.revealed?.[z];
+    let oil = null;
+    if (hell) oil = 0;
+    else if (revealed !== undefined) oil = Number(revealed) || 0;
+    else if (column && Array.isArray(column.oil)) oil = Number(column.oil[z]) || 0;
+    if (hell) { hellLayers += 1; if (p.hellCapped?.[z]) hellCapped += 1; }
+    if (oil == null) unknownLayers += 1; else columnTotal += oil;
+    const reachedZ = z < reached || revealed !== undefined;
+    if (!reachedZ && oil != null) neverReachedOil += oil;
+    layers.push({ layer: z, oil, hell, reached: reachedZ });
+  }
+  const neverReachedLayers = layers.filter((l) => !l.reached).length;
+  const stranded = ledger.leftOpen + neverReachedOil;
+  const banked = ledger.banked;
+  const chargesUnspent = Math.max(0, (Number(chargesCap) || 0) - ledger.chargesSpent);
+  const pendingUnresolved = !!(d.pending && typeof d.pending.layer === "number");
+
+  return {
+    ledger, layers,
+    banked, payoutUsd: banked * (Number(usdRate) || 0), usdRate: Number(usdRate) || 0,
+    columnTotal, unknownLayers, hellLayers, hellCapped,
+    extractedOwn: ledger.extractedOwn,
+    captureRate: columnTotal > 0 ? ledger.extractedOwn / columnTotal : null,
+    passedTotal: ledger.passedTotal, takenByRivals: ledger.takenByRivals, leftOpen: ledger.leftOpen,
+    neverReachedLayers, neverReachedOil, stranded,
+    salvagedIn: ledger.salvagedIn, salvageCount: ledger.rows.filter((r) => r.kind === "salvage").length,
+    wildcatIn: ledger.wildcatIn, wildcatDry: ledger.wildcatDry, wildcatHell: ledger.wildcatHell,
+    wildcatCount: ledger.rows.filter((r) => r.kind === "wildcat").length,
+    chargesSpent: ledger.chargesSpent, chargesCap: Number(chargesCap) || 0, chargesUnspent,
+    pendingUnresolved, reached, depthZ,
+  };
+}
+
+// Plain-text version of the reckoning (the COPY REPORT button; also what a
+// share card would print). Pure so the wording is testable.
+export function reckoningText(r, { col, row } = {}) {
+  const btr = (n) => Math.round(n || 0).toLocaleString();
+  const usd = (n) => `$${(n || 0).toFixed(2)}`;
+  const where = col != null && row != null ? ` · plot (${col + 1},${row + 1})` : "";
+  const lines = [
+    `HAIL MARY PROSPECTING CO. — THE RECKONING${where}`,
+    `BANKED ${btr(r.banked)} BTR ≈ ${usd(r.payoutUsd)} USDC`,
+    r.unknownLayers > 0
+      ? `Under your column: ${btr(r.columnTotal)} BTR known · ${r.unknownLayers} layer${r.unknownLayers === 1 ? "" : "s"} still sealed`
+      : `Under your column: ${btr(r.columnTotal)} BTR${r.hellLayers ? ` · ${r.hellLayers} hell pocket${r.hellLayers === 1 ? "" : "s"}` : ""}`,
+    `You extracted ${btr(r.extractedOwn)}${r.captureRate != null ? ` (${Math.round(r.captureRate * 100)}%)` : ""}`,
+    `You passed ${btr(r.passedTotal)} — neighbours took ${btr(r.takenByRivals)}, ${btr(r.leftOpen)} stayed in the ground`,
+    `Never reached: ${r.neverReachedLayers} layer${r.neverReachedLayers === 1 ? "" : "s"}${r.neverReachedOil > 0 ? ` holding ${btr(r.neverReachedOil)}` : ""}`,
+    `Salvaged next door: +${btr(r.salvagedIn)} (${r.salvageCount})`,
+    `Wildcats: +${btr(r.wildcatIn)} (${r.wildcatCount}${r.wildcatDry ? `, ${r.wildcatDry} dry` : ""}${r.wildcatHell ? `, ${r.wildcatHell} hell` : ""})`,
+    `Charges: ${r.chargesSpent}/${r.chargesCap} spent${r.chargesUnspent ? ` · ${r.chargesUnspent} wasted` : ""}`,
+  ];
+  return lines.join("\n");
+}

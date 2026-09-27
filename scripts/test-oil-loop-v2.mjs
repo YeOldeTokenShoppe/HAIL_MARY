@@ -7,7 +7,7 @@ const load = async (rel) => {
   const src = readFileSync(new URL(rel, import.meta.url), "utf8");
   return import("data:text/javascript;charset=utf-8," + encodeURIComponent(src));
 };
-const { PASSIVE_CHARGES, chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, fmtSpan, buildColumnRack, buildLedger } =
+const { PASSIVE_CHARGES, chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, fmtSpan, buildColumnRack, buildLedger, buildReckoning, reckoningText } =
   await load("../src/lib/oilLoopV2.js");
 
 let pass = 0, fail = 0;
@@ -134,6 +134,48 @@ t("buildLedger: no userId → no salvage/wildcat scan; empty rig → zeroed tota
   const L = buildLedger({ plot: null, drill: null, allPlots: { a: { col: 0, row: 0, lateralTaken: { 1: "x" } } }, userId: null });
   assert.deepEqual(L.rows, []);
   assert.equal(L.banked, 0); assert.equal(L.leftOpen, 0); assert.equal(L.chargesSpent, 0);
+});
+
+t("buildReckoning: seed known → column total covers unreached layers; stranded = open passes + never reached", () => {
+  const me = "me";
+  // 6-layer column: reached 4 (L1..L4). L1 dry pass, L2 extracted 400, L3 passed 900 (rival took it), L4 hell (capped).
+  const plot = { col: 2, row: 2, drillDay: 4, revealed: { 0: 0, 1: 400, 2: 900, 3: 0 }, extracted: { 1: 400 },
+    passed: { 2: 900 }, lateralTaken: { 2: "rival" }, hellLayers: { 3: true }, hellCapped: { 3: true } };
+  const drill = { totalCollected: 1000, chargesSpent: 3, layersExtracted: { 1: 400 }, layersPassed: { 0: 0, 2: 900 } };
+  const allPlots = { "2_2": plot, "3_2": { col: 3, row: 2, passed: { 5: 600 }, lateralTaken: { 5: me } } };
+  const column = { oil: [0, 400, 900, 777, 250, 0], hell: [3] };  // seed says L5 held 250, L6 nothing
+  const r = buildReckoning({ plot, drill, allPlots, userId: me, column, depthZ: 6, usdRate: 0.001, chargesCap: 8 });
+  assert.equal(r.columnTotal, 400 + 900 + 250);      // hell counts 0, L4's 777 is under a hell pocket → 0
+  assert.equal(r.unknownLayers, 0);
+  assert.equal(r.hellLayers, 1); assert.equal(r.hellCapped, 1);
+  assert.equal(r.extractedOwn, 400);
+  assert.equal(Math.round(r.captureRate * 100), 26);
+  assert.equal(r.takenByRivals, 900); assert.equal(r.leftOpen, 0);
+  assert.equal(r.neverReachedLayers, 2); assert.equal(r.neverReachedOil, 250);
+  assert.equal(r.stranded, 250);
+  assert.equal(r.salvagedIn, 600); assert.equal(r.salvageCount, 1);
+  assert.equal(r.banked, 1000); assert.equal(r.payoutUsd, 1);
+  assert.equal(r.chargesUnspent, 5);
+  assert.equal(r.pendingUnresolved, false);
+});
+
+t("buildReckoning: seed unknown → unreached layers are sealed, not zero", () => {
+  const plot = { col: 0, row: 0, drillDay: 2, revealed: { 0: 100, 1: 0 }, extracted: { 0: 100 } };
+  const drill = { totalCollected: 100, chargesSpent: 1, layersExtracted: { 0: 100 }, layersPassed: { 1: 0 } };
+  const r = buildReckoning({ plot, drill, allPlots: {}, userId: "me", column: null, depthZ: 5, usdRate: 0.001, chargesCap: 8 });
+  assert.equal(r.columnTotal, 100);
+  assert.equal(r.unknownLayers, 3);
+  assert.equal(r.neverReachedLayers, 3); assert.equal(r.neverReachedOil, 0);
+  assert.equal(r.stranded, 0);
+  assert.match(reckoningText(r, { col: 0, row: 0 }), /3 layers still sealed/);
+  assert.match(reckoningText(r, { col: 0, row: 0 }), /plot \(1,1\)/);
+});
+
+t("buildReckoning: empty rig → zeros, no NaN; a leftover pending is flagged", () => {
+  const r = buildReckoning({ plot: null, drill: { pending: { layer: 3, oil: 5 } }, allPlots: {}, userId: null, column: null, depthZ: 4 });
+  assert.equal(r.banked, 0); assert.equal(r.payoutUsd, 0); assert.equal(r.captureRate, null);
+  assert.equal(r.unknownLayers, 4); assert.equal(r.pendingUnresolved, true);
+  assert.ok(!/NaN/.test(reckoningText(r)));
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

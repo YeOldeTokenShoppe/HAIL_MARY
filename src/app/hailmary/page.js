@@ -30,8 +30,9 @@ import VendorSitePalHost from "@/components/VendorSitePalHost";
 import { setVendorGreetingContext } from "@/lib/vendorSitePal";
 import OilOverlayModal from "@/components/OilOverlayModal";
 import OilCoreSampleV2 from "@/components/OilCoreSampleV2";
+import OilReckoning from "@/components/OilReckoning";
 import PlayerWalker from "@/components/PlayerWalker";
-import { chargesCapFor, buildColumnRack, buildLedger } from "@/lib/oilLoopV2";
+import { chargesCapFor, buildColumnRack, buildLedger, buildReckoning } from "@/lib/oilLoopV2";
 import { seasonClock, revealWindow } from "@/lib/oilStrikeClock";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useWalletAuth } from "@/components/WalletAuthProvider";
@@ -2180,6 +2181,9 @@ export default function OilPage() {
   // Public commitment to the seed (SHA-256). Shown during play; the raw seed is
   // only published (and used) at game end. Players never receive the raw seed.
   const [seedCommitment, setSeedCommitment] = useState(null);
+  // The distribution seed the server published at game end (null until then).
+  // Feeds THE RECKONING's column total; never set while a season is live.
+  const [revealedSeed, setRevealedSeed] = useState(null);
   // Admin testing: when on, render the reveal-only PLAYER view (hide seed data)
   // even in admin/report/test, so you can watch reveal-on-drill without a 2nd tab.
   const [previewAsPlayer, setPreviewAsPlayer] = useState(false);
@@ -2228,7 +2232,12 @@ export default function OilPage() {
         // prior test cycle) would hand every player the live map. Gate on
         // gameEnded/phase, not merely the field's presence.
         const endedNow = d.gameEnded === true || d.gamePhase === "ended";
-        if (endedNow && d.seedReveal) setBlockHash(d.seedReveal);
+        // Under the future-block scheme `seedReveal` is the server SECRET and
+        // the map seed is `finalSeedReveal`; the legacy direct scheme only
+        // writes `seedReveal` (= the seed). Prefer the final seed, fall back.
+        const revealed = endedNow ? (d.finalSeedReveal || d.seedReveal || null) : null;
+        setRevealedSeed(revealed);
+        if (revealed) setBlockHash(revealed);
         // Legacy/pre-migration games may still carry a public blockHash. Gate
         // adoption on the PASSWORD-VERIFIED admin flag (not the URL `mode`,
         // which any visitor can set to admin/report/test) so a stray legacy
@@ -4934,6 +4943,32 @@ export default function OilPage() {
   const rigLedger = useMemo(() => (loopV2 && userDrill && userDrill.col != null)
     ? buildLedger({ plot: ownPlotV2, drill: userDrill, allPlots: allPlotsMap, userId: user?.id }) : null,
   [loopV2, userDrill, ownPlotV2, allPlotsMap, user?.id]);
+  // THE RECKONING (season end). The column total needs the whole map, so the
+  // player's column is regenerated ONLY from the seed the server published at
+  // game end (`revealedSeed`, set by the settings listener strictly under
+  // gameEnded) — never before. Until that lands the card reports the reveals
+  // alone and says how many layers are still sealed.
+  const reckoningColumn = useMemo(() => {
+    if (!loopV2 || !gameEnded || !revealedSeed || !userDrill || userDrill.col == null) return null;
+    try {
+      const { grid, hellPockets } = generateOilDistribution3D({
+        blockHash: revealedSeed, gridX: gridSize, gridY: gridSize, depthZ: DEPTH_Z,
+        totalOilBudget: OIL_FIELD_UNITS, numberOfDeposits, numberOfHellPockets,
+      });
+      const colOil = grid?.[userDrill.col]?.[userDrill.row] || [];
+      const hell = (hellPockets || []).filter((h) => h.x === userDrill.col && h.y === userDrill.row).map((h) => h.z);
+      return { oil: Array.from({ length: DEPTH_Z }, (_, z) => colOil[z] || 0), hell };
+    } catch (e) {
+      console.warn("[reckoning] column regen failed:", e.message);
+      return null;
+    }
+  }, [loopV2, gameEnded, revealedSeed, userDrill, gridSize, numberOfDeposits, numberOfHellPockets]);
+  const reckoning = useMemo(() => (loopV2 && gameEnded && userDrill && userDrill.col != null)
+    ? buildReckoning({
+      plot: ownPlotV2, drill: userDrill, allPlots: allPlotsMap, userId: user?.id, column: reckoningColumn,
+      depthZ: DEPTH_Z, usdRate: oilUsdRate, chargesCap: chargesCapFor(userDrill, { passiveCharges }, DEPTH_Z),
+    }) : null,
+  [loopV2, gameEnded, userDrill, ownPlotV2, allPlotsMap, user?.id, reckoningColumn, oilUsdRate, passiveCharges]);
 
   // Bounty claimed toast
   const [bountyToast, setBountyToast] = useState(null);
@@ -7329,6 +7364,13 @@ export default function OilPage() {
     </div>
   );
 
+  // THE RECKONING — every v2 rig gets one at the buzzer, dry or not (the
+  // FINAL HAUL card below only appears with a score). Plain chrome; see
+  // OilReckoning.jsx.
+  const reckoningCard = loopV2 && gameEnded && !isAdmin && !isReport && !isTest && user && reckoning && userDrill?.col != null && (
+    <OilReckoning theme={theme} reckoning={reckoning} col={userDrill.col} row={userDrill.row} />
+  );
+
   // Rig state block — CTA + status copy for the player's rig, one branch per
   // drillStatus. Rendered inside the YOUR RIG card (no section chrome here).
   const drillButton = !isAdmin && !isReport && !isTest && (
@@ -8806,6 +8848,7 @@ export default function OilPage() {
 
           {/* Panels below active view */}
           {testStepper}
+          {reckoningCard}
           {finalHaulCard}
           {/* Live first: the rig, its core, its finds, then the field. */}
           {yourRigCard}
@@ -9414,6 +9457,7 @@ export default function OilPage() {
             transform: mounted ? "translateX(0)" : "translateX(20px)",
           }}>
             {testStepper}
+            {reckoningCard}
             {finalHaulCard}
             {/* Live first: the rig, its core, its finds, then the field. */}
             {yourRigCard}
