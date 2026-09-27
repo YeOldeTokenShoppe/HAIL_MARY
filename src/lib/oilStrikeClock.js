@@ -46,12 +46,27 @@ export function strikeFraction(userId, windowIndex) {
 // Next strike's target time. `lastStrikeMs` is the rig's last strike (ms) or null
 // for its first strike (→ window opens at season start). interval = remaining
 // season ÷ remaining layers; target = windowStart + frac·interval.
-export function strikeTargetMs(season, lastStrikeMs, currentDepth, depthCap, userId) {
+// The current reveal WINDOW — what the player is allowed to see. Deliberately
+// has no userId and computes no target: the strike moment inside the window
+// stays unguessable (the engagement engine), while the pace ("a reveal every
+// 9.6 h") and the LATEST the next strike can land ("before 14:32") are honest
+// and public. The client's countdown and cadence line read this, never
+// strikeTargetMs. `latestMs` is null once the column is fully revealed.
+export function revealWindow(season, lastStrikeMs, currentDepth, depthCap) {
+  if (!season) return null;
   const windowStartMs = lastStrikeMs == null ? season.startMs : lastStrikeMs;
-  const remainingLayers = depthCap - currentDepth;
-  if (remainingLayers <= 0) return { windowStartMs, intervalMs: 0, targetMs: Infinity };
+  const remainingLayers = Math.max(0, depthCap - currentDepth);
+  if (remainingLayers <= 0) {
+    return { windowStartMs, intervalMs: 0, latestMs: null, remainingLayers: 0, seasonEndMs: season.endMs };
+  }
   const remainingMs = Math.max(season.endMs - windowStartMs, 0);
   const intervalMs = remainingMs / remainingLayers;
-  const targetMs = windowStartMs + strikeFraction(userId, currentDepth) * intervalMs;
-  return { windowStartMs, intervalMs, targetMs };
+  return { windowStartMs, intervalMs, latestMs: windowStartMs + intervalMs, remainingLayers, seasonEndMs: season.endMs };
+}
+
+export function strikeTargetMs(season, lastStrikeMs, currentDepth, depthCap, userId) {
+  const w = revealWindow(season, lastStrikeMs, currentDepth, depthCap);
+  if (w.remainingLayers <= 0) return { windowStartMs: w.windowStartMs, intervalMs: 0, targetMs: Infinity };
+  const targetMs = w.windowStartMs + strikeFraction(userId, currentDepth) * w.intervalMs;
+  return { windowStartMs: w.windowStartMs, intervalMs: w.intervalMs, targetMs };
 }

@@ -7,7 +7,7 @@ const load = async (rel) => {
   const src = readFileSync(new URL(rel, import.meta.url), "utf8");
   return import("data:text/javascript;charset=utf-8," + encodeURIComponent(src));
 };
-const { PASSIVE_CHARGES, chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody } =
+const { PASSIVE_CHARGES, chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, fmtSpan, buildColumnRack, buildLedger } =
   await load("../src/lib/oilLoopV2.js");
 
 let pass = 0, fail = 0;
@@ -61,6 +61,79 @@ t("alert copy states the cost model and the standing order (copy rule)", () => {
 t("alert copy: dry layer says it passes free; inclusion adds the ping line", () => {
   assert.match(assayAlertBody({ col: 0, row: 0, layer: 2, oil: 0, threshold: 500, chargesRemaining: 8, hasInclusion: false }), /dry — passes free/);
   assert.match(assayAlertBody({ col: 0, row: 0, layer: 2, oil: 0, threshold: 500, chargesRemaining: 8, hasInclusion: true }), /Anomalous inclusion detected/);
+});
+
+t("fmtSpan: minutes, hours to one decimal, days", () => {
+  assert.equal(fmtSpan(20 * 1000), "<1 min");
+  assert.equal(fmtSpan(42 * 60000), "42 min");
+  assert.equal(fmtSpan(9.6 * 3600000), "9.6 h");
+  assert.equal(fmtSpan(3 * 3600000), "3 h");
+  assert.equal(fmtSpan(3.1 * 86400000), "3.1 d");
+  assert.equal(fmtSpan(-5), "—");
+  assert.equal(fmtSpan(NaN), "—");
+});
+
+t("buildColumnRack: one entry per layer, states from the rig maps + public plot", () => {
+  const plot = {
+    drillDay: 6,
+    revealed: { 0: 0, 1: 400, 2: 0, 3: 900, 4: 0, 5: 1200 },
+    extracted: { 1: 400 },
+    passed: { 3: 900 },
+    lateralTaken: { 3: "neighbour" },
+    hellLayers: { 4: true }, hellCapped: { 4: true },
+    inclusionFlags: { 5: true },
+  };
+  const drill = {
+    layersExtracted: { 1: 400 }, layersPassed: { 0: 0, 3: 900 },
+    pending: { layer: 5, oil: 1200, hasInclusion: true, revealedAt: 1 },
+  };
+  const rack = buildColumnRack({ plot, drill, depthZ: 8 });
+  assert.equal(rack.length, 8);
+  assert.deepEqual(rack.map((r) => r.state),
+    ["dry", "extracted", "revealed", "salvaged", "hell_capped", "pending", "undrilled", "undrilled"]);
+  assert.equal(rack[1].oil, 400);
+  assert.equal(rack[3].takenBy, "neighbour");
+  assert.equal(rack[5].hasInclusion, true);
+  assert.equal(rack[5].oil, 1200);
+});
+
+t("buildColumnRack: untaken pass reads 'passed'; uncapped hell reads 'hell'; empty inputs are all undrilled", () => {
+  const rack = buildColumnRack({ plot: { passed: { 2: 300 }, hellLayers: { 0: true } }, drill: { layersPassed: { 2: 300 } }, depthZ: 4 });
+  assert.deepEqual(rack.map((r) => r.state), ["hell", "undrilled", "passed", "undrilled"]);
+  assert.ok(buildColumnRack({ plot: null, drill: null, depthZ: 3 }).every((r) => r.state === "undrilled"));
+});
+
+t("buildLedger: own rows by layer, salvage + wildcats derived from public plots, totals add up", () => {
+  const me = "me";
+  const plot = { col: 2, row: 2, passed: { 4: 500, 7: 250 }, lateralTaken: { 4: "rival" } };
+  const drill = { totalCollected: 1800, chargesSpent: 4, layersExtracted: { 6: 1000, 1: 200 }, layersPassed: { 4: 500, 7: 250, 2: 0 } };
+  const allPlots = {
+    "2_2": plot,
+    "3_2": { col: 3, row: 2, passed: { 5: 600 }, lateralTaken: { 5: me } },
+    "1_1": { col: 1, row: 1, revealed: { 3: 0, 8: 450 }, wildcatTaken: { 3: me, 8: me } },
+    "1_3": { col: 1, row: 3, revealed: { 2: 0 }, hellLayers: { 2: true }, wildcatTaken: { 2: me } },
+    "9_9": { col: 9, row: 9, passed: { 1: 999 }, lateralTaken: { 1: "someone-else" } },
+  };
+  const L = buildLedger({ plot, drill, allPlots, userId: me });
+  assert.deepEqual(L.rows.map((r) => `${r.kind}:${r.layer}`),
+    ["extract:1", "pass:2", "pass:4", "extract:6", "pass:7", "salvage:5", "wildcat:3", "wildcat:8", "wildcat:2"]);
+  assert.equal(L.rows.find((r) => r.kind === "pass" && r.layer === 4).takenBy, "rival");
+  assert.equal(L.banked, 1800);
+  assert.equal(L.chargesSpent, 4);
+  assert.equal(L.extractedOwn, 1200);
+  assert.equal(L.salvagedIn, 600);
+  assert.equal(L.wildcatIn, 450);
+  assert.equal(L.wildcatDry, 1);
+  assert.equal(L.wildcatHell, 1);
+  assert.equal(L.passedTotal, 750);
+  assert.equal(L.takenByRivals, 500);
+  assert.equal(L.leftOpen, 250);
+});
+
+t("buildLedger: no userId → no salvage/wildcat scan; empty rig → zeroed totals", () => {
+  const L = buildLedger({ plot: null, drill: null, allPlots: { a: { col: 0, row: 0, lateralTaken: { 1: "x" } } }, userId: null });
+  assert.deepEqual(L.rows, []);
+  assert.equal(L.banked, 0); assert.equal(L.leftOpen, 0); assert.equal(L.chargesSpent, 0);
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

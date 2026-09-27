@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 
 const libSrc = readFileSync(new URL("../src/lib/oilStrikeClock.js", import.meta.url), "utf8");
 const clock = await import("data:text/javascript;charset=utf-8," + encodeURIComponent(libSrc));
-const { PASSIVE_DRILLS, MAX_DEPTH, depthCapFor, seasonClock, strikeFraction, strikeTargetMs } = clock;
+const { PASSIVE_DRILLS, MAX_DEPTH, depthCapFor, seasonClock, strikeFraction, strikeTargetMs, revealWindow } = clock;
 
 const DAY = 86400000;
 const TICK = 5 * 60000; // 5-min cron cadence, matches the Firebase scheduled fn
@@ -128,6 +128,46 @@ t("strikes are unpredictable but each lands once (idempotent re-runs match)", ()
   const a = simulate({ userId: "dave", season: SEASON, depthCap: 12 });
   const b = simulate({ userId: "dave", season: SEASON, depthCap: 12 });
   assert.deepEqual(a.strikes, b.strikes, "non-deterministic across runs");
+});
+
+t("revealWindow: latest = window start + interval; matches strikeTargetMs's window", () => {
+  const season = seasonClock({ gameStartDate: "2026-06-01", seasonLengthDays: 8 });
+  const w = revealWindow(season, null, 0, 20);
+  assert.equal(w.windowStartMs, season.startMs);
+  assert.equal(w.remainingLayers, 20);
+  assert.equal(w.intervalMs, (8 * DAY) / 20);           // 9.6 h
+  assert.equal(w.latestMs, season.startMs + w.intervalMs);
+  assert.equal(w.seasonEndMs, season.endMs);
+  const tgt = strikeTargetMs(season, null, 0, 20, "erin");
+  assert.equal(tgt.windowStartMs, w.windowStartMs);
+  assert.equal(tgt.intervalMs, w.intervalMs);
+  assert.ok(tgt.targetMs >= w.windowStartMs && tgt.targetMs < w.latestMs, "target must fall inside the public window");
+});
+
+t("revealWindow: re-paces from the last strike (remaining time ÷ remaining layers)", () => {
+  const season = seasonClock({ gameStartDate: "2026-06-01", seasonLengthDays: 8 });
+  const last = season.startMs + 3 * DAY;
+  const w = revealWindow(season, last, 5, 20);
+  assert.equal(w.windowStartMs, last);
+  assert.equal(w.remainingLayers, 15);
+  assert.equal(w.intervalMs, (5 * DAY) / 15);           // 8 h
+  assert.equal(w.latestMs, last + (5 * DAY) / 15);
+});
+
+t("revealWindow: fully revealed column → no latest, zero layers; null season → null", () => {
+  const season = seasonClock({ gameStartDate: "2026-06-01", seasonLengthDays: 8 });
+  const w = revealWindow(season, season.startMs + DAY, 20, 20);
+  assert.equal(w.remainingLayers, 0);
+  assert.equal(w.latestMs, null);
+  assert.equal(w.intervalMs, 0);
+  assert.equal(revealWindow(null, null, 0, 20), null);
+});
+
+t("revealWindow: past the buzzer the window collapses onto its start (interval 0)", () => {
+  const season = seasonClock({ gameStartDate: "2026-06-01", seasonLengthDays: 8 });
+  const w = revealWindow(season, season.endMs + DAY, 12, 20);
+  assert.equal(w.intervalMs, 0);
+  assert.equal(w.latestMs, w.windowStartMs);
 });
 
 console.log(`\n${fail === 0 ? "✅ PASS" : "❌ FAIL"} — ${pass} passed, ${fail} failed\n`);

@@ -31,7 +31,8 @@ import { setVendorGreetingContext } from "@/lib/vendorSitePal";
 import OilOverlayModal from "@/components/OilOverlayModal";
 import OilCoreSampleV2 from "@/components/OilCoreSampleV2";
 import PlayerWalker from "@/components/PlayerWalker";
-import { chargesCapFor } from "@/lib/oilLoopV2";
+import { chargesCapFor, buildColumnRack, buildLedger } from "@/lib/oilLoopV2";
+import { seasonClock, revealWindow } from "@/lib/oilStrikeClock";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useWalletAuth } from "@/components/WalletAuthProvider";
 import { useMusic } from "@/components/MusicContext";
@@ -2841,7 +2842,7 @@ export default function OilPage() {
       setDrillLoaded(true);
       if (snap.exists()) {
         const d = snap.data();
-        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0, tankOil: d.tankOil, lastStrikeAt: d.lastStrikeAt || null, lastStrikeOil: d.lastStrikeOil ?? null, lastStrikeDepth: d.lastStrikeDepth ?? null, lastStrikeHell: d.lastStrikeHell || false, armed: d.armed, rigDepleted: d.rigDepleted || false, bonusFromShares: d.bonusFromShares || 0, bonusFromHolding: d.bonusFromHolding || 0, artifacts: d.artifacts || {}, artifactFinds: d.artifactFinds || 0, lastStrikeArtifact: d.lastStrikeArtifact || null, supplies: d.supplies || {}, coupon: d.coupon || null, bonusClaimJumps: d.bonusClaimJumps || 0, bonusFromTickets: d.bonusFromTickets || 0, ticketStreak: d.ticketStreak || 0, pending: d.pending || null, chargesSpent: d.chargesSpent || 0, threshold: d.threshold ?? null });
+        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0, tankOil: d.tankOil, lastStrikeAt: d.lastStrikeAt || null, lastStrikeOil: d.lastStrikeOil ?? null, lastStrikeDepth: d.lastStrikeDepth ?? null, lastStrikeHell: d.lastStrikeHell || false, armed: d.armed, rigDepleted: d.rigDepleted || false, bonusFromShares: d.bonusFromShares || 0, bonusFromHolding: d.bonusFromHolding || 0, artifacts: d.artifacts || {}, artifactFinds: d.artifactFinds || 0, lastStrikeArtifact: d.lastStrikeArtifact || null, supplies: d.supplies || {}, coupon: d.coupon || null, bonusClaimJumps: d.bonusClaimJumps || 0, bonusFromTickets: d.bonusFromTickets || 0, ticketStreak: d.ticketStreak || 0, pending: d.pending || null, chargesSpent: d.chargesSpent || 0, threshold: d.threshold ?? null, layersExtracted: d.layersExtracted || {}, layersPassed: d.layersPassed || {}, laterals: d.laterals || 0, wildcats: d.wildcats || 0, autopilot: d.autopilot === true });
         if (d.username) setUsername(d.username);
       } else {
         setUserDrill(null);
@@ -4836,10 +4837,17 @@ export default function OilPage() {
     const res = await oilApiFetch("/api/oil-layer-decide", { method: "POST", body: JSON.stringify({ action }) });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || "decide failed");
-    setUserDrill((prev) => prev ? {
-      ...prev, pending: null,
-      chargesSpent: (prev.chargesSpent || 0) + (action === "extract" ? 1 : 0),
-    } : prev);
+    setUserDrill((prev) => {
+      if (!prev) return prev;
+      const p = prev.pending;
+      const next = { ...prev, pending: null, chargesSpent: (prev.chargesSpent || 0) + (action === "extract" ? 1 : 0) };
+      // Keep the core rack + ledger honest during the snapshot round-trip.
+      if (p && typeof p.layer === "number") {
+        if (action === "extract") next.layersExtracted = { ...(prev.layersExtracted || {}), [p.layer]: p.oil || 0 };
+        else next.layersPassed = { ...(prev.layersPassed || {}), [p.layer]: p.oil || 0 };
+      }
+      return next;
+    });
     return data;
   }, [oilApiFetch]);
   const handleSetThreshold = useCallback(async (btr) => {
@@ -4906,6 +4914,26 @@ export default function OilPage() {
     }
     return out;
   }, [loopV2, userDrill, allPlotsMap, gridSize]);
+  // Decision-surface plumbing (plain chrome, 2026-09-27): the reveal WINDOW
+  // (never the strike target — the moment stays unguessable), the claim's
+  // column (core rack) and the running ledger. Pure builders in
+  // lib/oilStrikeClock + lib/oilLoopV2; inputs are server reveals + public plots.
+  const ownPlotV2 = (loopV2 && userDrill && userDrill.col != null)
+    ? (allPlotsMap[`${userDrill.col}_${userDrill.row}`] || null) : null;
+  const revealCadence = useMemo(() => {
+    if (!loopV2 || !userDrill || userDrill.col == null) return null;
+    const season = seasonClock({ gameStartDate, seasonLengthDays });
+    if (!season) return null;
+    const raw = userDrill.lastStrikeAt;
+    const lastMs = raw?.toMillis?.() ?? (typeof raw === "number" ? raw : null);
+    return revealWindow(season, lastMs, ownPlotV2?.drillDay || 0, DEPTH_Z);
+  }, [loopV2, userDrill, ownPlotV2, gameStartDate, seasonLengthDays]);
+  const columnRack = useMemo(() => (loopV2 && userDrill && userDrill.col != null)
+    ? buildColumnRack({ plot: ownPlotV2, drill: userDrill, depthZ: DEPTH_Z }) : [],
+  [loopV2, userDrill, ownPlotV2]);
+  const rigLedger = useMemo(() => (loopV2 && userDrill && userDrill.col != null)
+    ? buildLedger({ plot: ownPlotV2, drill: userDrill, allPlots: allPlotsMap, userId: user?.id }) : null,
+  [loopV2, userDrill, ownPlotV2, allPlotsMap, user?.id]);
 
   // Bounty claimed toast
   const [bountyToast, setBountyToast] = useState(null);
@@ -8287,6 +8315,9 @@ export default function OilPage() {
           onLateral={handleLateral}
           frontier={frontierTargets}
           onWildcat={handleWildcat}
+          cadence={revealCadence}
+          rack={columnRack}
+          ledger={rigLedger}
           // No WALK during the intro fly-in — CameraFlyIn drives the camera
           // until introComplete, and two camera drivers = the shake.
           onWalk={introComplete ? () => setWalkMode(true) : undefined}
