@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import dynamic from "next/dynamic";
-import { HOW_TO_PLAY_STEPS } from "./HowToPlayPanel";
+import { HOW_TO_PLAY_STEPS, HOW_TO_PLAY_STEPS_V2 } from "./HowToPlayPanel";
 
 const OilVerifyExplainer = dynamic(() => import("./OilVerifyExplainer"), { ssr: false });
 
@@ -35,6 +35,10 @@ export default function OilWelcomeModal({
   fairnessOpen = false,
   // Daily-ticket verification (per player): the page's authenticated fetch + sign-in state.
   apiFetch = null, signedIn = false,
+  // v2 extract-or-pass season: the walkthrough swaps to the v2 steps. The
+  // intro transcript stays verbatim (it mirrors the recorded audio) with a
+  // one-line season note until the intro is re-recorded.
+  loopV2 = false,
 }) {
   // Close on Escape for keyboard users.
   useEffect(() => {
@@ -163,11 +167,16 @@ export default function OilWelcomeModal({
           }}>
             Strike Betroleum — the only crude you can wager. Here's how it works.
           </p>
+          {loopV2 && (
+            <p style={{ margin: "6px 0 0", fontSize: 10, color: c.accent, letterSpacing: "0.04em", lineHeight: 1.5 }}>
+              This season runs EXTRACT OR PASS. Where the intro says &quot;bank&quot;, read &quot;extract&quot; — the steps below are the current rules.
+            </p>
+          )}
         </div>
 
         {/* Steps */}
         <div style={{ padding: "12px 18px 4px" }}>
-          {HOW_TO_PLAY_STEPS.map((s) => (
+          {(loopV2 ? HOW_TO_PLAY_STEPS_V2 : HOW_TO_PLAY_STEPS).map((s) => (
             <div key={s.num} style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "flex-start" }}>
               <span style={{
                 fontSize: 14, fontWeight: 700, color: c.stepNum,

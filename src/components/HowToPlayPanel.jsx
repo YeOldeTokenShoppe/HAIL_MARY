@@ -16,7 +16,17 @@ export const HOW_TO_PLAY_STEPS = [
   { num: "9", title: "PIMP YOUR PUMP", desc: "Customize your rig with colors, materials, and add-ons — including defensive cameras. Make it yours." },
 ];
 
-export default function HowToPlayPanel({ isMobile, darkMode = false, defaultExpanded = false, onLaunch = null }) {
+// v2 EXTRACT-OR-PASS season copy (docs/oil-game.md → v2 LOOP + Copy rule). Steps
+// 3–5 change: the bore reveals every layer, charges decide what you keep, and
+// charges also work next door. BANK is v1 vocabulary — never in v2 copy.
+const V2_OVERRIDES = {
+  "3": { title: "YOUR RIG DRILLS 24/7", desc: "No clicking required. Once the season is live, your bore reveals your column one layer at a time, at moments you can't predict — roughly evenly over the season. Every reveal is a core sample with an exact assay in BTR. Check back to decide what to do with it." },
+  "4": { title: "EXTRACT OR PASS", desc: "Every revealed layer is a decision. EXTRACT banks the full amount for 1 charge — safe and final. PASS is free but final: the layer opens to your neighbours' lateral drills. You start with a season budget of charges; referrals and daily-ticket prizes add more. If you're away, your crew follows your standing order (\"extract anything ≥ 800 BTR\")." },
+  "5": { title: "SALVAGE AND THE FRONTIER", desc: "Charges also work beyond your fence: take a layer a neighbour passed (first lateral wins), or wildcat an unclaimed column beside you — blind, at a depth your own bore has reached. Your payout is your banked Betroleum × a fixed rate: it depends only on your own haul, never on how many others play." },
+};
+export const HOW_TO_PLAY_STEPS_V2 = HOW_TO_PLAY_STEPS.map((s) => (V2_OVERRIDES[s.num] ? { ...s, ...V2_OVERRIDES[s.num] } : s));
+
+export default function HowToPlayPanel({ isMobile, darkMode = false, defaultExpanded = false, onLaunch = null, loopV2 = false }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   const c = darkMode ? {
@@ -29,7 +39,7 @@ export default function HowToPlayPanel({ isMobile, darkMode = false, defaultExpa
     activeBg: "#b8922e", stepNum: "#b8922e",
   };
 
-  const steps = HOW_TO_PLAY_STEPS;
+  const steps = loopV2 ? HOW_TO_PLAY_STEPS_V2 : HOW_TO_PLAY_STEPS;
 
   const titleIcon = (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={c.activeBg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999"/><path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024"/><path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069"/><path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z"/></svg>

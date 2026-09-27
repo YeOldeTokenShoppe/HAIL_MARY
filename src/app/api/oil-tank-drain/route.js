@@ -16,6 +16,14 @@ export async function POST(req) {
     const username = typeof body.username === "string" ? body.username.trim() : null;
 
     const db = getAdminDb();
+    // v2 EXTRACT-OR-PASS (settings.loopV2): the tank is a DECISION BUFFER that
+    // holds the pending layer, not a balance. Draining it would bank that layer
+    // without spending a charge and leave `pending` set for the next strike to
+    // resolve — and pay — again. Extraction IS banking in v2; refuse the drain.
+    const settingsSnap = await db.collection("oilGame").doc("settings").get();
+    if (settingsSnap.exists && settingsSnap.data()?.loopV2 === true) {
+      return NextResponse.json({ error: "banking is retired this season — EXTRACT banks a layer" }, { status: 409 });
+    }
     const drillRef = db.collection("oilDrills").doc(userId);
     const communityRef = db.collection("oilGame").doc("communityStorage");
 

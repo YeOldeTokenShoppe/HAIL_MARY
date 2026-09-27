@@ -61,7 +61,11 @@ export default function OilAwayRecap({
   usdRate = 0,      // $ per oil unit (pot ÷ OIL_FIELD_UNITS)
   tankHeavy = false,
   referralCode = null, // baked into the share link — every share recruits
-  onBank,           // optional — wired to the tank-drain handler
+  onBank,           // optional — wired to the tank-drain handler (v1 only)
+  // v2 extract-or-pass (docs/oil-game.md → v2 LOOP): { pending, latestMs,
+  // crewWould, threshold, chargesRemaining } | null. When set, the tank/BANK
+  // block is replaced by the core on the table and the crew's call.
+  v2 = null,
   onClose,
 }) {
   const heroOil = useCountUp(recap?.oilGained || 0);
@@ -246,9 +250,24 @@ export default function OilAwayRecap({
         {recap.bankedDelta > 0 && (
           <div style={row}>
             <span style={{ color: green }}>▸</span>
-            <span><b style={{ color: green }}>+{recap.bankedDelta.toLocaleString()} BTR</b> banked while away {usd(recap.bankedDelta) ? `(${usd(recap.bankedDelta)})` : ""}</span>
+            <span><b style={{ color: green }}>+{recap.bankedDelta.toLocaleString()} BTR</b> {v2 ? "extracted" : "banked"} while away {usd(recap.bankedDelta) ? `(${usd(recap.bankedDelta)})` : ""}</span>
           </div>
         )}
+        {v2 && v2.pending && (
+          <div style={{ ...row, marginTop: 8, padding: "8px 10px", border: `1px solid ${gold}`, borderRadius: 3, background: "rgba(212,168,84,0.06)", flexDirection: "column", alignItems: "stretch", gap: 2 }}>
+            <span style={{ color: gold, fontSize: 10, letterSpacing: "0.1em" }}>ON THE TABLE · L{v2.pending.layer + 1}</span>
+            <span style={{ color: text, fontWeight: 700 }}>
+              {(v2.pending.oil || 0) > 0 ? `${Math.round(v2.pending.oil).toLocaleString()} BTR` : "dry"}
+              {usd(v2.pending.oil) ? <span style={{ fontWeight: 400, color: muted }}> {usd(v2.pending.oil)}</span> : null}
+              {v2.pending.hasInclusion ? <span style={{ fontWeight: 400, color: gold }}> · anomalous inclusion</span> : null}
+            </span>
+            <span style={{ color: muted, fontSize: 10 }}>
+              {(v2.pending.oil || 0) > 0 ? "EXTRACT banks it for 1 charge · PASS is free but final. " : "Dry — passing is free. "}
+              If you do nothing, the crew follows your standing order (extract ≥ {Math.round(v2.threshold || 0).toLocaleString()}){v2.latestMs ? ` before ${new Date(v2.latestMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : " at the next strike"} → would {v2.crewWould}. Charges: {v2.chargesRemaining}.
+            </span>
+          </div>
+        )}
+        {!v2 && (
         <div style={{ ...row, marginTop: 8, padding: "8px 10px", border: `1px solid ${tankHeavy ? red : border}`, borderRadius: 3, background: tankHeavy ? `${red}14` : "rgba(212,168,84,0.06)", justifyContent: "space-between" }}>
           <span style={{ color: tankHeavy ? red : muted, fontSize: 10, letterSpacing: "0.1em" }}>
             TANK · UNBANKED
@@ -257,7 +276,8 @@ export default function OilAwayRecap({
             {(recap.tank ?? 0).toLocaleString()} BTR {usd(recap.tank) ? <span style={{ fontWeight: 400, color: muted }}> {usd(recap.tank)}</span> : null}
           </span>
         </div>
-        {tankHeavy && onBank && (
+        )}
+        {!v2 && tankHeavy && onBank && (
           <button
             onClick={() => { onBank(); onClose(); }}
             style={{

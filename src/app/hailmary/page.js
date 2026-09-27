@@ -32,7 +32,7 @@ import OilOverlayModal from "@/components/OilOverlayModal";
 import OilCoreSampleV2 from "@/components/OilCoreSampleV2";
 import OilReckoning from "@/components/OilReckoning";
 import PlayerWalker from "@/components/PlayerWalker";
-import { chargesCapFor, buildColumnRack, buildLedger, buildReckoning } from "@/lib/oilLoopV2";
+import { chargesCapFor, buildColumnRack, buildLedger, buildReckoning, resolvePendingDecision } from "@/lib/oilLoopV2";
 import { seasonClock, revealWindow } from "@/lib/oilStrikeClock";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useWalletAuth } from "@/components/WalletAuthProvider";
@@ -4970,6 +4970,19 @@ export default function OilPage() {
     }) : null,
   [loopV2, gameEnded, userDrill, ownPlotV2, allPlotsMap, user?.id, reckoningColumn, oilUsdRate, passiveCharges]);
 
+  // WHILE YOU WERE AWAY under v2: the recap drops the tank/BANK block and
+  // shows the core on the table with its deadline + the crew's call instead.
+  const awayRecapV2 = useMemo(() => {
+    if (!loopV2 || !userDrill) return null;
+    const p = userDrill.pending && typeof userDrill.pending.layer === "number" ? userDrill.pending : null;
+    const chargesRemaining = Math.max(0, chargesCapFor(userDrill, { passiveCharges }, DEPTH_Z) - (userDrill.chargesSpent || 0));
+    const threshold = Number(userDrill.threshold) || 0;
+    const crewWould = p
+      ? (resolvePendingDecision({ pending: p, threshold, chargesRemaining, depthZ: DEPTH_Z, autopilot: userDrill.autopilot === true }) === "extract" ? "EXTRACT" : "PASS")
+      : null;
+    return { pending: p, latestMs: revealCadence?.latestMs ?? null, crewWould, threshold, chargesRemaining };
+  }, [loopV2, userDrill, passiveCharges, revealCadence]);
+
   // Bounty claimed toast
   const [bountyToast, setBountyToast] = useState(null);
   const bountyToastTimer = useRef(null);
@@ -7897,7 +7910,9 @@ export default function OilPage() {
   const showPayout = gamePhase !== "ticket_sale";
   const bankedOil = activeUserDrill?.totalCollected || 0;
   const tankShownOil = tankDrained ? 0 : oilInTank;
-  const tankHeavy = tankFill >= 1.0 && !tankDrained;
+  // v2: the tank is the decision buffer (the Core Sample card owns it) — no
+  // "at risk" meter, no BANK button, no heavy pulse.
+  const tankHeavy = !loopV2 && tankFill >= 1.0 && !tankDrained;
   const fmtUsd = (oil) => {
     const v = (oil || 0) * (oilUsdRate || 0);
     return `$${v === 0 || v >= 0.01 ? v.toFixed(2) : v.toFixed(4)}`;
@@ -7923,6 +7938,7 @@ export default function OilPage() {
         </span>
       </div>
 
+      {!loopV2 && (<>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 8, marginBottom: 3 }}>
         <span style={{ fontSize: 10, letterSpacing: "0.14em", color: tankHeavy ? theme.red : theme.accent }}>IN TANK · AT RISK</span>
         <span style={{ fontSize: 11, letterSpacing: "0.06em", color: tankHeavy ? theme.red : theme.textStrong }}>
@@ -7969,6 +7985,7 @@ export default function OilPage() {
           SENT TO MAIN TANK
         </div>
       )}
+      </>)}
     </div>
   );
 
@@ -8938,7 +8955,7 @@ export default function OilPage() {
           onClose={() => setShowBuyModal(false)}
         />
 
-        <OilWelcomeModal apiFetch={oilApiFetch} signedIn={!!user} isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} fairnessOpen={helpFairness} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
+        <OilWelcomeModal loopV2={loopV2} apiFetch={oilApiFetch} signedIn={!!user} isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} fairnessOpen={helpFairness} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
 
         {/* SitePal host for the commercial-strip vendors (mobile branch —
             the desktop branch mounts its own; the embed itself is guarded
@@ -8956,8 +8973,9 @@ export default function OilPage() {
           theme={theme}
           isMobile={isMobile}
           usdRate={totalOilBudget / OIL_FIELD_UNITS}
-          tankHeavy={(awayRecap?.tank ?? 0) >= TANK_CAPACITY}
-          onBank={handleTankDrain}
+          tankHeavy={!loopV2 && (awayRecap?.tank ?? 0) >= TANK_CAPACITY}
+          onBank={loopV2 ? undefined : handleTankDrain}
+          v2={awayRecapV2}
           onClose={() => setAwayRecap(null)}
         />
 
@@ -9596,7 +9614,7 @@ export default function OilPage() {
         onClose={() => setShowBuyModal(false)}
       />
 
-      <OilWelcomeModal apiFetch={oilApiFetch} signedIn={!!user} isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} fairnessOpen={helpFairness} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
+      <OilWelcomeModal loopV2={loopV2} apiFetch={oilApiFetch} signedIn={!!user} isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} fairnessOpen={helpFairness} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
 
       {/* SitePal host for the commercial-strip vendors. Mounted on mobile
           too: only one vendor speaks at a time, and without the host mobile
@@ -9615,8 +9633,9 @@ export default function OilPage() {
         theme={theme}
         isMobile={isMobile}
         usdRate={totalOilBudget / OIL_FIELD_UNITS}
-        tankHeavy={(awayRecap?.tank ?? 0) >= TANK_CAPACITY}
-        onBank={handleTankDrain}
+        tankHeavy={!loopV2 && (awayRecap?.tank ?? 0) >= TANK_CAPACITY}
+        onBank={loopV2 ? undefined : handleTankDrain}
+        v2={awayRecapV2}
         onClose={() => setAwayRecap(null)}
       />
 
