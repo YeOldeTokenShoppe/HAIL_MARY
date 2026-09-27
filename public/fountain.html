@@ -872,7 +872,7 @@
 				<section class="info-section">
 					<strong class="info-section-title">Tossing Coins</strong>
 					<ul class="info-list">
-						<li>Tap anywhere; the coin flies there.</li>
+						<li>Pick up a coin from the pocket at the bottom, then tap where you want it to fly. Empty-handed taps just look around.</li>
 						<li>Virtual coins are free and unlimited.</li>
 				
 						<li>Tap <strong>Support the site</strong> below to send a real USDC/ETH contribution, then toss your golden coin.</li>
@@ -3009,6 +3009,13 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			// ({charity, amount, currency, wish}) and cleared by the toss;
 			// null means the free token coin.
 			let heldGoldCoin = null;
+			// Pick-up model (2026-09-27): the hand is EMPTY by default, so taps are
+			// free to orbit and inspect the scene. Tapping the coin pocket
+			// (#coinPocket) puts a coin in hand; the next tap on the scene throws it
+			// and the hand empties again. A pocket long-press turns on coinSticky,
+			// which refills the hand after every toss (the old always-armed feel).
+			let coinArmed = false;
+			let coinSticky = false;
 			let tapStart = null; // pointerdown snapshot for tap-vs-drag detection
 			let activePointers = 0; // >1 concurrent pointers = pinch, not a tap
 			const mouseCoords = new THREE.Vector2();
@@ -4163,6 +4170,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					}
 				});
 
+				initCoinPocket();
+
 				// Listen for messages from parent
 				window.addEventListener('message', function(event) {
 					if (event.data) {
@@ -4180,6 +4189,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 							};
 							selectedCharity = heldGoldCoin.charity;
 							updateCoinChip();
+							setCoinArmed(true); // the offering goes straight into the hand
 							showGoldCoinReadyMessage();
 						}
 						// Parent page wants a snapshot of the scene (for the Polaroid). Flag it; the
@@ -5643,7 +5653,140 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				groundMesh.position.y = -0.958; // Plaza sits at the fountain's base (measured min.y ≈ -1.07). Was -2, which left a ~0.93u gap so the fountain read as hovering once a coin fell to the ground.
 				groundMesh.receiveShadow = true;
 				scene.add(groundMesh);
-				
+
+				// --- Synthwave I-80 road + sign (ported from PalmTreeDrive / the /i80 page) ---
+				// A flat neon grid highway runs north past the east palm, from behind the
+				// resting camera toward the mountains, with the I-80 sign on its near
+				// shoulder. Static: no streaming grid, no height noise. The strip fades to
+				// transparent at its edges and with distance so it sits on the sand and
+				// dissolves into the same horizon blend as the ground shader.
+				const ROAD_X = 36;                 // centre line, well east of the mission (east wall x≈9) and clear of the cactus at x≈26
+				const ROAD_Y = -0.958 + 0.02;      // a hair above the plaza plane (no z-fight)
+				// Bend, on the SOUTH (+z) end: straight until `start` units south of z = 0, a
+				// quadratic ease over `length`, then a constant heading that carries the
+				// centreline under the synthwave sun sprite (createBackSun). The slope is
+				// derived from the sun's position, so moving the sun moves the road with it.
+				// Live-tune: window.__i80.bend.start.value / .length.value / .slope.value
+				const ROAD_SUN = { x: -20, z: 195 };  // keep in sync with backSun.position
+				const ROAD_BEND = { start: 80, length: 100 };
+				ROAD_BEND.slope = (ROAD_SUN.x - ROAD_X) /
+					(0.9 * ROAD_BEND.length + (ROAD_SUN.z - ROAD_BEND.start - ROAD_BEND.length));
+				// The plane is wide enough for the bent strip; everything outside it is transparent.
+				const roadGeometry = new THREE.PlaneGeometry(150, 600, 1, 1);
+				roadGeometry.rotateX(-Math.PI / 2);
+				roadGeometry.translate(ROAD_X - 50, ROAD_Y, 20); // z = -280 through z = +320
+				const roadMaterial = new THREE.ShaderMaterial({
+					uniforms: {
+						uCenterX: { value: ROAD_X },
+						// Radial fade from the origin. The sun sits ~196 out, so the road is
+						// still half-lit as it passes under the disc and dissolves beyond it.
+						uFadeStart: { value: 150.0 },
+						uFadeEnd: { value: 250.0 },
+						uBendStart: { value: ROAD_BEND.start },
+						uBendLength: { value: ROAD_BEND.length },
+						uBendSlope: { value: ROAD_BEND.slope },
+						// Deep violet asphalt: the drive's flat cyan read as a river against the
+						// warm plaza. Live-tune: window.__i80.road.material.uniforms.uLaneColor.value.set('#hex')
+						uLaneColor: { value: new THREE.Color(0x2b1a5e) },
+						uGridColor: { value: new THREE.Color(0xff9ef5) },
+					},
+					vertexShader: `
+						varying vec3 vWorldPosition;
+						void main() {
+							vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+							vWorldPosition = worldPosition.xyz;
+							gl_Position = projectionMatrix * viewMatrix * worldPosition;
+						}
+					`,
+					fragmentShader: `
+						precision highp float;
+						uniform float uCenterX;
+						uniform float uFadeStart;
+						uniform float uFadeEnd;
+						uniform vec3 uLaneColor;
+						uniform vec3 uGridColor;
+						uniform float uBendStart;
+						uniform float uBendLength;
+						uniform float uBendSlope;
+						varying vec3 vWorldPosition;
+
+						// Centreline offset at forward distance t (continuous position + heading).
+						float roadCentre(float t) {
+							float u = clamp((t - uBendStart) / uBendLength, 0.0, 1.0);
+							float past = max(t - uBendStart - uBendLength, 0.0);
+							return uBendSlope * (0.5 * uBendLength * u * u + past);
+						}
+
+						float gridLine(vec2 p, float width, float cell) {
+							vec2 coord = p / cell;
+							vec2 grid = abs(fract(coord - 0.5) - 0.5) / (fwidth(coord) * width);
+							return min(min(grid.x, grid.y), 1.0);
+						}
+
+						float dashLine(float x, float z) {
+							float dashPattern = step(0.5, fract(z / 5.0)); // 3 on, 2 off
+							float lineMask = 1.0 - smoothstep(0.0, 0.2, abs(x));
+							return lineMask * dashPattern;
+						}
+
+						void main() {
+							float lz = vWorldPosition.z;                                   // along the road (south = +z, toward the sun)
+							float lx = vWorldPosition.x - uCenterX - roadCentre(lz);       // across the bent centreline
+							float l = gridLine(vec2(lx, lz), 1.0, 2.0);
+							// The drive faded the lanes to black past the shoulder; here the
+							// sand is the shoulder, so the cyan stays solid and only the alpha
+							// falls off, letting the plaza colour show through.
+							vec3 base = uLaneColor;
+							// A pale pink grid at part strength, so the white dashes lead the eye
+							// (the drive's full-strength #ff00ee competed with them).
+							vec3 c = mix(base, uGridColor, (1.0 - l) * 0.25);
+							c = mix(c, vec3(1.0), dashLine(lx, lz) * 0.9);
+
+							// Shoulders dissolve into the sand; the far end dissolves like the ground.
+							float alpha = 1.0 - smoothstep(5.0, 7.5, abs(lx));
+							alpha *= 1.0 - smoothstep(uFadeStart, uFadeEnd, length(vWorldPosition.xz));
+
+							gl_FragColor = vec4(c, alpha);
+							#include <colorspace_fragment>
+						}
+					`,
+					transparent: true,
+					depthWrite: false,
+				});
+				const roadMesh = new THREE.Mesh(roadGeometry, roadMaterial);
+				roadMesh.name = 'I80Road';
+				roadMesh.renderOrder = 1; // after the (transparent) ground plane, before water/coins (99)
+				scene.add(roadMesh);
+				window.__i80 = { road: roadMesh, ROAD_X, ROAD_Y, bend: {
+					start: roadMaterial.uniforms.uBendStart,
+					length: roadMaterial.uniforms.uBendLength,
+					slope: roadMaterial.uniforms.uBendSlope,
+				} }; // console tuning handle
+
+				// The sign is Draco-compressed; its own loader keeps it off the intro's
+				// asset gate so a slow fetch never delays the fly-in.
+				{
+					const signDraco = new DRACOLoader();
+					signDraco.setDecoderPath('/draco/');
+					const signLoader = new GLTFLoader();
+					signLoader.setDRACOLoader(signDraco);
+					signLoader.load('/models/sign2.glb', (gltf) => {
+						const sign = gltf.scene;
+						sign.name = 'I80Sign';
+						sign.traverse((node) => {
+							if (!node.isMesh) return;
+							node.castShadow = true;
+							node.material.side = THREE.DoubleSide;
+						});
+						// West shoulder, facing the resting camera (+Z). Far enough north that it
+						// sits inside the resting frame (the road's near end is off-screen right).
+						sign.position.set(ROAD_X - 6.8, -0.958, -18);
+						sign.scale.setScalar(2.0);
+						scene.add(sign);
+						window.__i80.sign = sign;
+					}, undefined, (error) => console.warn('[Fountain] I-80 sign failed to load:', error));
+				}
+
 				// No fog - let the ground shader handle the horizon blend
 				// The sky gradient should remain untouched
 				
@@ -6145,8 +6288,10 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			}
             function onKeyDown( event ) {
                 if ( event.key === 'Escape' && candleFocusActive ) { startCandleZoomOut(); return; }
+                if ( event.key === 'Escape' && coinArmed ) { putCoinBack(); return; }
                 if ( event.key.toLowerCase() === 'c' ) {
-                    tossHeldCoin(); // keyboard shortcut throws whatever's in hand
+                    // 'c' picks a coin up when the hand is empty, throws it when armed
+                    if (coinArmed) tossHeldCoin(); else pickUpCoin();
                 }
                 // 'P' toggles refraction on/off for an instant A/B (the perf HUD's "refr"
                 // line + draw-call count reflect it). Remembers the last tuned mix.
@@ -6176,8 +6321,15 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
             function coinInFlight() {
                 if (!inFlightCoin) return false;
                 const u = inFlightCoin.userData;
-                const landed = u.underwater || u.stopped ||
-                    coins.indexOf(inFlightCoin) === -1 ||
+                // The coin lives in one of two sims: the classic `coins` list, or
+                // the Rapier list of {mesh, inWater} records, which drops a coin
+                // once it freezes into the pile. Missing from both means it has
+                // landed or left the world. Rapier only mirrors userData.underwater
+                // for the coin-cam's followed coin, so read the record's own flag.
+                const rapierRecord = rapierCoins.find(rc => rc.mesh === inFlightCoin);
+                const stillSimulated = !!rapierRecord || coins.indexOf(inFlightCoin) !== -1;
+                const splashed = rapierRecord ? rapierRecord.inWater : (u.underwater || u.stopped);
+                const landed = splashed || !stillSimulated ||
                     (performance.now() - inFlightTossedAt) > 5000; // safety net
                 if (landed) {
                     inFlightCoin = null;
@@ -6211,6 +6363,9 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                     inFlightCoin = triggerCoinToss(true);
                     inFlightTossedAt = performance.now();
                 }
+                // The thrown coin leaves the hand. Sticky mode re-arms once it lands
+                // (positionHandCoinFromEvent keeps the hand empty while it flies).
+                if (!coinSticky) setCoinArmed(false); else updateCoinPocket();
             }
 
             // Instant local credit at toss time ("You · $5 → St. Jude").
@@ -7379,6 +7534,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
             // the landing is what puts the next coin in your hand.
             function positionHandCoinFromEvent(event) {
                 if (!window.handCoinReady) { hideHandCoin(); return; } // wait for the cinematic intro + UI to appear
+                if (!coinArmed) { hideHandCoin(); return; }            // empty hand: nothing rides the pointer
                 if (cameraFollowActive) return;
                 if (coinInFlight()) {
                     hideHandCoin();
@@ -7406,6 +7562,109 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 syncHandCoinStyle();
             }
             // --- End hand coin ---
+
+            // --- Coin pocket: the coin's home when it isn't in your hand ---
+            // Tap: pick up (or put back). Long-press: toggle sticky mode, which
+            // keeps a coin in hand after each toss. The pocket empties while a
+            // coin is in hand or in the air and refills when it lands.
+            function setCoinArmed(on) {
+                coinArmed = !!on;
+                if (!coinArmed) hideHandCoin();
+                updateCoinPocket();
+            }
+            function pickUpCoin() {
+                if (!window.handCoinReady || cameraFollowActive) return;
+                if (coinInFlight()) { nudgeCoinPocket(); return; } // wait for the landing
+                setCoinArmed(true);
+            }
+            function putCoinBack() {
+                coinSticky = false;
+                setCoinArmed(false);
+            }
+            function nudgeCoinPocket() {
+                const pocket = document.getElementById('coinPocket');
+                if (!pocket) return;
+                pocket.classList.remove('pulse');
+                void pocket.offsetWidth; // restart the animation
+                pocket.classList.add('pulse');
+            }
+            function updateCoinPocket() {
+                const pocket = document.getElementById('coinPocket');
+                const btn = document.getElementById('coinPocketBtn');
+                const hint = document.getElementById('coinPocketHint');
+                if (!pocket || !btn || !hint) return;
+                const flying = coinInFlight();
+                pocket.classList.toggle('ready', !!window.handCoinReady);
+                pocket.classList.toggle('armed', coinArmed && !flying);
+                pocket.classList.toggle('flying', flying);
+                pocket.classList.toggle('sticky', coinSticky);
+                pocket.classList.toggle('gold', !!heldGoldCoin);
+                btn.setAttribute('aria-pressed', String(coinArmed));
+                let text;
+                if (flying) text = 'Coin in the air…';
+                else if (!coinArmed) text = heldGoldCoin ? 'Pick up your offering' : 'Pick up a coin';
+                else if (coinSticky) text = 'Holding coins · tap to put away';
+                else if (heldGoldCoin) text = 'Tap the water to cast it';
+                else text = 'Tap where to toss · tap here to put back';
+                if (hint.textContent !== text) hint.textContent = text;
+                btn.setAttribute('aria-label', text);
+            }
+            function syncPocketCamButton() {
+                const camBtn = document.getElementById('coinPocketCam');
+                if (!camBtn) return;
+                camBtn.classList.toggle('active', coinCamEnabled);
+                camBtn.setAttribute('aria-pressed', String(coinCamEnabled));
+                camBtn.title = coinCamEnabled
+                    ? 'Coin Cam on: the camera follows your coin underwater. Tap to turn off.'
+                    : 'Coin Cam off: tap to follow your coin underwater after a toss.';
+            }
+            function initCoinPocket() {
+                const btn = document.getElementById('coinPocketBtn');
+                if (!btn) return;
+                const LONG_PRESS_MS = 500;
+                let pressTimer = 0;
+                let longPressed = false;
+                const cancelPress = () => { clearTimeout(pressTimer); pressTimer = 0; };
+                btn.addEventListener('pointerdown', (e) => {
+                    e.stopPropagation(); // not a scene press: never a toss candidate
+                    longPressed = false;
+                    cancelPress();
+                    pressTimer = setTimeout(() => {
+                        pressTimer = 0;
+                        longPressed = true;
+                        if (!window.handCoinReady || coinInFlight()) return;
+                        coinSticky = !coinSticky;
+                        setCoinArmed(coinSticky);
+                        nudgeCoinPocket();
+                    }, LONG_PRESS_MS);
+                });
+                ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => btn.addEventListener(t, cancelPress));
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (longPressed) { longPressed = false; return; } // the long-press already acted
+                    if (coinArmed) putCoinBack(); else pickUpCoin();
+                });
+                btn.addEventListener('contextmenu', (e) => e.preventDefault()); // long-press on touch
+                // Coin-cam toggle on the pocket. It drives the info panel's existing
+                // #coinCamToggle (single source of truth for coinCamEnabled + label), so
+                // the two controls can never disagree.
+                const camBtn = document.getElementById('coinPocketCam');
+                if (camBtn) {
+                    camBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+                    camBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const master = document.getElementById('coinCamToggle');
+                        if (master) master.click(); else { coinCamEnabled = !coinCamEnabled; syncPocketCamButton(); }
+                    });
+                }
+                // Refill the pocket when a tossed coin lands; cheap, and the DOM
+                // only changes when a class or the hint actually flips. The first
+                // refresh is deferred: init() runs before the module body reaches
+                // the `let inFlightCoin` that coinInFlight() reads (TDZ otherwise).
+                setTimeout(updateCoinPocket, 0);
+                setInterval(updateCoinPocket, 250);
+            }
+            // --- End coin pocket ---
 
             // Find the 3D point under the aimed pixel: water, fountain stone,
             // or the plaza — the coin can be thrown anywhere in the scene.
@@ -7587,7 +7846,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                     saintTapTimer = 0;
                     if (candleFocusActive || cameraFollowActive) return; // taps don't toss while focused
                     aimedCoords.copy(_saintTapCoords); // a later press may have re-aimed
-                    if (!tryInspectCoin(aimedCoords)) tossHeldCoin();
+                    if (!tryInspectCoin(aimedCoords) && coinArmed) tossHeldCoin();
                 }, window.saintDoubleTapMs ?? 350);
                 return true;
             }
@@ -8300,8 +8559,10 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						this.setAttribute('aria-pressed', String(coinCamEnabled));
 						const label = document.getElementById('coinCamLabel');
 						if (label) label.textContent = coinCamEnabled ? 'Cam on' : 'Cam off';
+						syncPocketCamButton(); // the pocket's 🎥 mirrors this state
 					});
 				}
+				syncPocketCamButton();
 			}, 100);
 
 			// Fold the Cam/Sound toggles + a Donate button into the #info (how-to-play)
@@ -8344,8 +8605,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 								/* patron saint: double-tap -> close-up (a lone tap tosses after a beat) */
 							} else if (tryClickCandle(aimedCoords)) {
 								/* tapped a votive candle -> zoom in close */
-							} else if (!tryInspectCoin(aimedCoords)) {
-							tossHeldCoin();
+							} else if (!tryInspectCoin(aimedCoords) && coinArmed) {
+							tossHeldCoin(); // empty-handed taps are just exploration
 						}
 					}
 				}
@@ -9304,6 +9565,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                                             heldGoldCoin = coin.userData.donation;
                                             selectedCharity = heldGoldCoin.charity;
                                             updateCoinChip();
+                                            setCoinArmed(true); // back in hand for another try
                                             showCoinMissedMessage();
                                             scene.remove(coin);
                                             coins.splice(i, 1);
@@ -9471,6 +9733,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                                 heldGoldCoin = coin.userData.donation;
                                 selectedCharity = heldGoldCoin.charity;
                                 updateCoinChip();
+                                setCoinArmed(true); // back in hand for another try
                                 showCoinMissedMessage();
                                 scene.remove(coin);
                                 coins.splice(i, 1);
@@ -10166,7 +10429,142 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			</div>
 		</div> -->
 
+		<!-- Coin pocket: the coin's home when it isn't in your hand. Tap it to pick
+		     a coin up (then tap the scene to toss), tap again or press Esc to put it
+		     back, long-press to keep a coin in hand after every toss. -->
+		<div id="coinPocket" class="coin-pocket">
+			<button type="button" id="coinPocketBtn" class="coin-pocket-btn" aria-pressed="false" aria-label="Pick up a coin">
+				<span class="coin-pocket-slot" aria-hidden="true">
+					<span class="coin-pocket-coin"><span class="hand-coin-face"><span class="hand-coin-text">80</span></span></span>
+				</span>
+				<span class="coin-pocket-hint" id="coinPocketHint">Pick up a coin</span>
+			</button>
+			<button type="button" id="coinPocketCam" class="coin-pocket-cam" aria-pressed="false"
+				aria-label="Coin Cam" title="Coin Cam off: tap to follow your coin underwater after a toss.">
+				<span aria-hidden="true">🎥</span>
+			</button>
+		</div>
+
 		<style>
+			/* ===== Coin pocket ===== */
+			.coin-pocket {
+				position: fixed;
+				left: 50%;
+				bottom: max(18px, env(safe-area-inset-bottom, 0px));
+				transform: translateX(-50%);
+				z-index: 1500;
+				opacity: 0;
+				pointer-events: none;
+				transition: opacity 0.4s ease;
+			}
+			.coin-pocket.ready {
+				opacity: 1;
+				pointer-events: auto;
+			}
+			.coin-pocket {
+				display: flex;
+				align-items: stretch;
+				gap: 6px;
+			}
+			/* Coin-cam toggle: a small round button beside the pick-up pill */
+			.coin-pocket-cam {
+				width: 44px;
+				border-radius: 100px;
+				border: 1px solid rgba(255, 255, 255, 0.18);
+				background: rgba(255, 255, 255, 0.07);
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				box-shadow: 0 2px 9px rgba(0, 0, 0, 0.25);
+				color: rgba(255, 255, 255, 0.85);
+				font-size: 16px;
+				line-height: 1;
+				cursor: pointer;
+				opacity: 0.55;
+				filter: grayscale(1);
+				touch-action: manipulation;
+				transition: opacity 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
+			}
+			.coin-pocket-cam:hover {
+				opacity: 0.85;
+			}
+			.coin-pocket-cam.active {
+				opacity: 1;
+				filter: none;
+				border-color: rgba(255, 215, 0, 0.6);
+				box-shadow: 0 2px 9px rgba(0, 0, 0, 0.25), 0 0 14px rgba(255, 215, 0, 0.35);
+			}
+			.coin-pocket-btn {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				padding: 5px 15px 5px 5px;
+				background: rgba(255, 255, 255, 0.07);
+				border: 1px solid rgba(255, 255, 255, 0.18);
+				border-radius: 100px;
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				box-shadow: 0 2px 9px rgba(0, 0, 0, 0.25);
+				color: rgba(255, 255, 255, 0.85);
+				font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+				cursor: pointer;
+				touch-action: manipulation;
+				-webkit-user-select: none;
+				user-select: none;
+				-webkit-touch-callout: none;
+				transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+			}
+			.coin-pocket-btn:hover {
+				border-color: rgba(255, 255, 255, 0.4);
+				background: rgba(255, 255, 255, 0.11);
+			}
+			.coin-pocket-slot {
+				width: 38px;
+				height: 38px;
+				border-radius: 50%;
+				border: 1.5px dashed rgba(255, 255, 255, 0.35);
+				box-sizing: border-box;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				transition: border-color 0.25s ease;
+			}
+			.coin-pocket-coin {
+				width: 28px;
+				height: 28px;
+				transition: transform 0.25s ease, opacity 0.25s ease;
+			}
+			/* In hand or in the air: the slot is empty */
+			.coin-pocket.armed .coin-pocket-coin,
+			.coin-pocket.flying .coin-pocket-coin {
+				transform: translateY(-14px) scale(0.5);
+				opacity: 0;
+			}
+			.coin-pocket.armed .coin-pocket-btn {
+				border-color: rgba(130, 200, 255, 0.6);
+				box-shadow: 0 2px 9px rgba(0, 0, 0, 0.25), 0 0 18px rgba(120, 180, 255, 0.35);
+			}
+			.coin-pocket.sticky .coin-pocket-slot {
+				border-style: solid;
+				border-color: rgba(130, 200, 255, 0.85);
+			}
+			.coin-pocket.gold .hand-coin-face {
+				background: radial-gradient(circle at 35% 28%, #fffbe0 0%, #ffe066 28%, #ffc400 58%, #9a6b00 100%);
+				border-color: rgba(255, 215, 0, 0.95);
+				box-shadow: 0 0 0 1.5px rgba(255, 245, 200, 0.6) inset, 0 0 14px rgba(255, 215, 0, 0.75);
+			}
+			.coin-pocket.gold .coin-pocket-btn {
+				border-color: rgba(255, 215, 0, 0.6);
+			}
+			.coin-pocket-hint {
+				font-size: 12px;
+				font-weight: 600;
+				letter-spacing: 0.3px;
+				white-space: nowrap;
+			}
+			.coin-pocket.pulse .coin-pocket-btn {
+				animation: chipNudge 0.4s ease;
+			}
+
 			/* ===== Coin chip + tray ===== */
 						.coin-chip-dock {
 				position: relative;
