@@ -138,6 +138,11 @@ export default function OilCoreSampleV3({
   onDecide, onSetThreshold, salvage = [], onLateral, frontier = [], onWildcat, onWalk,
   cadence = null, rack = [], ledger = null,
   ended = false,      // settings.gameEnded — the ONLY thing that says "season closed"
+  // CREW ORDERS (option B, 2026-09-28): SALVAGE = auto-take a neighbour's pass at
+  // or above the line; AUTOPILOT = extract everything once charges cover the
+  // layers left. Same settings the rig panel's first toggle and key flip.
+  orders = { autopilot: false, salvage: false },
+  onSetOrders = null, // async ({ salvage?: bool, autopilot?: bool }) => void
   // SPECTATOR: a viewer with no rig looks at the SELECTED plot as the field
   // sees it — the public column (reveals, extractions, open pockets, hell),
   // read-only, no verbs, with a nudge to claim. { col, row, owner } | null.
@@ -427,7 +432,7 @@ export default function OilCoreSampleV3({
       {/* crew orders — behind a link */}
       <div style={{ marginTop: 10, textAlign: "center" }}>
         <button onClick={() => setOrdersOpen((o) => !o)} style={{ background: "none", border: "none", cursor: "pointer", ...meta, color: muted }}>
-          [ crew orders · extract ≥ {fmtBtr(T)} BTR {ordersOpen ? "▴" : "▾"} ]
+          [ crew orders · extract ≥ {fmtBtr(T)} BTR · salvage {orders?.salvage ? "on" : "off"} · autopilot {orders?.autopilot ? "on" : "off"} {ordersOpen ? "▴" : "▾"} ]
         </button>
         {ordersOpen && (
           <div style={{ display: "flex", gap: 6, alignItems: "center", justifyContent: "center", marginTop: 6 }}>
@@ -437,6 +442,25 @@ export default function OilCoreSampleV3({
             <span style={mono({ color: muted, fontSize: 10 })}>BTR</span>
             <button style={smallBtn(gold, busy || thrDraft == null)} disabled={busy || thrDraft == null}
               onClick={() => { const v = Number(thrDraft); if (!Number.isFinite(v) || v < 0) return; run(() => onSetThreshold(v).then(() => setThrDraft(null)), `✔ crew orders set: extract ≥ ${fmtBtr(v)}`); }}>Set</button>
+          </div>
+        )}
+        {ordersOpen && onSetOrders && (
+          <div style={{ marginTop: 8, textAlign: "left" }}>
+            {[
+              ["salvage", "SALVAGE", `take a neighbour's passed layer at or above your line, for 1 charge. Earliest order on a pocket wins.`],
+              ["autopilot", "AUTOPILOT", "extract everything once your charges cover every layer left in your column."],
+            ].map(([key, name, desc]) => (
+              <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "6px 0", borderTop: `1px solid ${theme.border || muted}` }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={mono({ letterSpacing: "0.16em", fontSize: 10, color: orders?.[key] ? gold : theme.text })}>{name} · {orders?.[key] ? "ON" : "OFF"}</div>
+                  <div style={mono({ color: muted, fontSize: 10, lineHeight: 1.4 })}>{desc}</div>
+                </div>
+                <button style={smallBtn(orders?.[key] ? theme.red : gold, busy)} disabled={busy}
+                  onClick={() => run(() => onSetOrders({ [key]: !orders?.[key] }), `✔ ${name.toLowerCase()} ${orders?.[key] ? "off" : "on"}`)}>
+                  {orders?.[key] ? "Turn off" : "Turn on"}
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>

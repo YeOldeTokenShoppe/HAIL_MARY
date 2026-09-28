@@ -216,6 +216,7 @@ export default function HailMaryV2FixturePage() {
   const handlers = useMemo(() => ({
     onDecide: async (action) => { setWorld((w) => simDecide(w, action)); note(`${action.toUpperCase()} L${(world.drill.pending?.layer ?? 0) + 1}`); return { inclusion: action === "extract" && world.drill.pending?.hasInclusion ? "relic" : null }; },
     onSetThreshold: async (btr) => { setWorld((w) => ({ ...structuredClone(w), drill: { ...structuredClone(w.drill), threshold: btr } })); note(`standing order → ${btr}`); },
+    onSetOrders: async (patch) => { setWorld((w) => { const n = structuredClone(w); if (patch.autopilot !== undefined) n.drill.autopilot = !!patch.autopilot; if (patch.salvage !== undefined) n.drill.orders = { ...(n.drill.orders || {}), salvage: !!patch.salvage, salvageSetAt: patch.salvage ? Date.now() : null }; return n; }); note(`crew orders: ${Object.entries(patch).map(([k, v]) => `${k} ${v ? "on" : "off"}`).join(", ")}`); },
     onLateral: async (t) => { setWorld((w) => simLateral(w, t)); note(`SALVAGE (${t.col + 1},${t.row + 1}) L${t.layer + 1}`); return { oil: world.allPlots[`${t.col}_${t.row}`]?.passed?.[t.layer] || 0 }; },
     onWildcat: async (t) => { const oil = frontierOil(t.col, t.row, t.layer); setWorld((w) => simWildcat(w, t)); note(`WILDCAT (${t.col + 1},${t.row + 1}) L${t.layer + 1} → ${oil || "dry"}`); return { oil, hell: false, inclusion: null }; },
   }), [world]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -225,11 +226,12 @@ export default function HailMaryV2FixturePage() {
     chargesCap: chargesCapFor(w.drill, { passiveCharges: w.settings.passiveCharges }, DEPTH_Z),
   }), []);
 
-  const noop = { onDecide: async () => ({}), onSetThreshold: async () => ({}), onLateral: async () => ({}), onWildcat: async () => ({}) };
+  const noop = { onDecide: async () => ({}), onSetThreshold: async () => ({}), onLateral: async () => ({}), onWildcat: async () => ({}), onSetOrders: async () => ({}) };
   const cardFor = (w, h = noop, key, version = cardVersion, extra = {}) => {
     const b = deriveBoards(w);
     const props = { ...extra, theme, pending: w.drill.pending, chargesRemaining: b.chargesRemaining, chargesCap: b.cap, threshold: w.drill.threshold,
-      salvage: b.salvage, frontier: b.frontier, cadence: b.cadence, rack: b.rack, ledger: b.ledger, ended: !!w.ended, ...h };
+      salvage: b.salvage, frontier: b.frontier, cadence: b.cadence, rack: b.rack, ledger: b.ledger, ended: !!w.ended,
+      orders: { autopilot: !!w.drill.autopilot, salvage: !!w.drill.orders?.salvage }, ...h };
     if (version === "both") return (<div key={key} style={{ display: "flex", gap: 12, flexWrap: "wrap" }}><div style={{ width, maxWidth: "100%" }}><OilCoreSampleV3 {...props} /></div><div style={{ width, maxWidth: "100%" }}><OilCoreSampleV2 {...props} /></div></div>);
     return version === "v2" ? <OilCoreSampleV2 key={key} {...props} /> : <OilCoreSampleV3 key={key} {...props} />;
   };

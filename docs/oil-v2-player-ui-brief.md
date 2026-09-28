@@ -136,7 +136,8 @@ rack:    [{ layer, state, oil, hasInclusion, takenBy }]            // 20 entries
 ledger:  { rows: [{ kind: extract|pass|salvage|wildcat, layer, oil, charge, col?, row?, takenBy?, hell? }],
            banked, chargesSpent, extractedOwn, salvagedIn, wildcatIn, wildcatDry, wildcatHell,
            passedTotal, takenByRivals, leftOpen }
-onDecide(action), onSetThreshold(btr), onLateral({col,row,layer}), onWildcat({col,row,layer}), onWalk()
+onDecide(action), onSetThreshold(btr), onLateral({col,row,layer}), onWildcat({col,row,layer}), onWalk(),
+orders: { salvage, autopilot }, onSetOrders({ salvage?, autopilot? }), ended, spectator
 ```
 Ledger rows carry **no timestamps** (none are stored) — own rows sort by layer, then
 salvage, then wildcats by coordinate. A timeline design would need a server change (out

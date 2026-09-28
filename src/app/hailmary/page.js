@@ -2729,7 +2729,7 @@ export default function OilPage() {
       setDrillLoaded(true);
       if (snap.exists()) {
         const d = snap.data();
-        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0, tankOil: d.tankOil, lastStrikeAt: d.lastStrikeAt || null, lastStrikeOil: d.lastStrikeOil ?? null, lastStrikeDepth: d.lastStrikeDepth ?? null, lastStrikeHell: d.lastStrikeHell || false, armed: d.armed, rigDepleted: d.rigDepleted || false, bonusFromShares: d.bonusFromShares || 0, bonusFromHolding: d.bonusFromHolding || 0, artifacts: d.artifacts || {}, artifactFinds: d.artifactFinds || 0, lastStrikeArtifact: d.lastStrikeArtifact || null, supplies: d.supplies || {}, coupon: d.coupon || null, bonusClaimJumps: d.bonusClaimJumps || 0, bonusFromTickets: d.bonusFromTickets || 0, ticketStreak: d.ticketStreak || 0, pending: d.pending || null, chargesSpent: d.chargesSpent || 0, threshold: d.threshold ?? null, layersExtracted: d.layersExtracted || {}, layersPassed: d.layersPassed || {}, laterals: d.laterals || 0, wildcats: d.wildcats || 0, autopilot: d.autopilot === true });
+        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0, tankOil: d.tankOil, lastStrikeAt: d.lastStrikeAt || null, lastStrikeOil: d.lastStrikeOil ?? null, lastStrikeDepth: d.lastStrikeDepth ?? null, lastStrikeHell: d.lastStrikeHell || false, armed: d.armed, rigDepleted: d.rigDepleted || false, bonusFromShares: d.bonusFromShares || 0, bonusFromHolding: d.bonusFromHolding || 0, artifacts: d.artifacts || {}, artifactFinds: d.artifactFinds || 0, lastStrikeArtifact: d.lastStrikeArtifact || null, supplies: d.supplies || {}, coupon: d.coupon || null, bonusClaimJumps: d.bonusClaimJumps || 0, bonusFromTickets: d.bonusFromTickets || 0, ticketStreak: d.ticketStreak || 0, pending: d.pending || null, chargesSpent: d.chargesSpent || 0, threshold: d.threshold ?? null, layersExtracted: d.layersExtracted || {}, layersPassed: d.layersPassed || {}, laterals: d.laterals || 0, wildcats: d.wildcats || 0, autopilot: d.autopilot === true, orders: d.orders || null });
         if (d.username) setUsername(d.username);
       } else {
         setUserDrill(null);
@@ -4737,6 +4737,20 @@ export default function OilPage() {
     });
     return data;
   }, [oilApiFetch]);
+  // CREW ORDERS (standing orders, option B — 2026-09-28): SALVAGE and AUTOPILOT
+  // live on the rig doc; one route sets any subset. Optimistic local update.
+  const handleSetOrders = useCallback(async (patch) => {
+    const res = await oilApiFetch("/api/oil-threshold", { method: "POST", body: JSON.stringify(patch) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "orders failed");
+    setUserDrill((prev) => prev ? {
+      ...prev,
+      ...(patch.autopilot !== undefined ? { autopilot: patch.autopilot === true } : {}),
+      ...(patch.salvage !== undefined ? { orders: { ...(prev.orders || {}), salvage: patch.salvage === true } } : {}),
+      ...(patch.btr !== undefined ? { threshold: patch.btr } : {}),
+    } : prev);
+    return data;
+  }, [oilApiFetch]);
   // The rig's MACHINE PANEL acts too (Michelle, 2026-09-28: both surfaces, same
   // handlers). The pumpjack fires window events on a confirmed press — the caged
   // PASS (hm:pass-confirm) and, under v2, the red button as EXTRACT
@@ -4752,10 +4766,23 @@ export default function OilPage() {
       handleLayerDecide(action).catch((err) => console.warn(`[rig panel] ${action} failed:`, err.message));
     };
     const onPass = onConfirm("pass"), onExtract = onConfirm("extract");
+    // Panel orders: the key = AUTOPILOT; the first toggle (N) = SALVAGE (option B —
+    // toggles are orders, not neighbours; the other three are dead for now).
+    const own = userDrill && userDrill.col != null;
+    const onKey = (e) => { if (own) handleSetOrders({ autopilot: !!e?.detail?.on }).catch((err) => console.warn("[rig panel] autopilot failed:", err.message)); };
+    const onToggle = (e) => {
+      if (!own || e?.detail?.dir !== "N") return;
+      handleSetOrders({ salvage: !!e?.detail?.on }).catch((err) => console.warn("[rig panel] salvage order failed:", err.message));
+    };
     window.addEventListener("hm:pass-confirm", onPass);
     window.addEventListener("hm:extract-confirm", onExtract);
-    return () => { window.removeEventListener("hm:pass-confirm", onPass); window.removeEventListener("hm:extract-confirm", onExtract); };
-  }, [loopV2, userDrill, handleLayerDecide]);
+    window.addEventListener("hm:autopilot", onKey);
+    window.addEventListener("hm:lateral-toggle", onToggle);
+    return () => {
+      window.removeEventListener("hm:pass-confirm", onPass); window.removeEventListener("hm:extract-confirm", onExtract);
+      window.removeEventListener("hm:autopilot", onKey); window.removeEventListener("hm:lateral-toggle", onToggle);
+    };
+  }, [loopV2, userDrill, handleLayerDecide, handleSetOrders]);
   const handleSetThreshold = useCallback(async (btr) => {
     const res = await oilApiFetch("/api/oil-threshold", { method: "POST", body: JSON.stringify({ btr }) });
     const data = await res.json().catch(() => ({}));
@@ -8254,6 +8281,8 @@ export default function OilPage() {
         rack={columnRack}
         ledger={rigLedger}
         ended={gameEnded}
+        orders={{ autopilot: userDrill.autopilot === true, salvage: userDrill.orders?.salvage === true }}
+        onSetOrders={handleSetOrders}
         onWalk={introComplete ? () => setWalkMode(true) : undefined}
       />
     </PanelSection>

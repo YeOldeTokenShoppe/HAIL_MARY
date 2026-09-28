@@ -8,8 +8,8 @@ import { sendPlayerAlert } from "@/lib/oilAlerts";
 import {
   PASSIVE_DRILLS, MAX_DEPTH, depthCapFor, seasonClock, strikeTargetMs,
 } from "@/lib/oilStrikeClock";
-import { chargesCapFor, resolvePendingDecision, assayAlertBody } from "@/lib/oilLoopV2";
-import { applyV2Resolution } from "@/lib/oilLoopV2Server";
+import { chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, pickSalvageOrder } from "@/lib/oilLoopV2";
+import { applyV2Resolution, applyLateralTake } from "@/lib/oilLoopV2Server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -679,7 +679,95 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
     }
   }
 
+  // Standing orders (v2): after the rigs have struck and resolved, sweep the
+  // field's open pockets for SALVAGE orders. Earliest-set order wins.
+  if (loopV2) {
+    try {
+      summary.salvagedByOrder = await runSalvageOrders(db, { settings, depthZ, gridSize, artifactsByKey });
+    } catch (err) {
+      summary.errors++;
+      console.error("[oil-strike-tick] salvage-order sweep failed:", err.message);
+    }
+  }
+
   return { ok: true, date: today, hour, ...summary, strikes };
+}
+
+// SALVAGE standing orders (docs/oil-game.md → standing orders, 2026-09-28).
+// For every passed pocket nobody has taken, the four orthogonal neighbours with
+// a SALVAGE order, a charge to spend, and a line at or below the pocket's oil
+// are candidates; the one whose order was set earliest takes it (a live player
+// can still TAKE by hand between ticks — the sweep runs on the cron cadence).
+// Each take is its own transaction through applyLateralTake, the same writes
+// as a manual lateral. Returns the number of pockets taken this tick.
+async function runSalvageOrders(db, { settings, depthZ, gridSize, artifactsByKey }) {
+  const [plotsSnap, drillsSnap] = await Promise.all([
+    db.collection("oilPlots").get(), db.collection("oilDrills").get(),
+  ]);
+  const rigByCell = new Map();
+  for (const d of drillsSnap.docs) {
+    const r = d.data();
+    if (r && r.col != null && r.row != null) rigByCell.set(`${r.col}_${r.row}`, { id: d.id, ...r });
+  }
+  const communityRef = db.collection("oilGame").doc("communityStorage");
+  let taken = 0;
+  for (const p of plotsSnap.docs) {
+    const plot = p.data();
+    if (!plot || plot.col == null || plot.row == null || !plot.passed) continue;
+    for (const [ls, oil] of Object.entries(plot.passed)) {
+      const layer = Number(ls);
+      if (!(Number(oil) > 0) || plot.lateralTaken?.[layer] !== undefined) continue;
+      const candidates = [];
+      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const c = plot.col + dc, r = plot.row + dr;
+        if (c < 0 || c >= gridSize || r < 0 || r >= gridSize) continue;
+        const rig = rigByCell.get(`${c}_${r}`);
+        if (!rig || rig.orders?.salvage !== true) continue;
+        candidates.push({
+          userId: rig.id, salvage: true, setAt: rig.orders?.salvageSetAt,
+          chargesRemaining: chargesRemainingFor(rig, settings, depthZ), threshold: Number(rig.threshold) || 0,
+        });
+      }
+      const winner = pickSalvageOrder({ oil: Number(oil) }, candidates);
+      if (!winner) continue;
+      const drillRef = db.collection("oilDrills").doc(winner.userId);
+      const targetRef = db.collection("oilPlots").doc(`${plot.col}_${plot.row}`);
+      const inclusionArtifact = plot.passedInclusions?.[layer] ? (artifactsByKey[artifactKey(plot.col, plot.row, layer)] || null) : null;
+      const result = await db.runTransaction(async (t) => {
+        const drillNow = (await t.get(drillRef)).data();
+        const target = { col: plot.col, row: plot.row, ...((await t.get(targetRef)).data() || {}) };
+        return applyLateralTake(t, {
+          FieldValue, drillRef, targetRef, communityRef,
+          drillNow, target, userId: winner.userId, layer, inclusionArtifact,
+          chargesRemaining: drillNow ? chargesRemainingFor(drillNow, settings, depthZ) : 0, viaOrder: true,
+        });
+      });
+      if (result.error) continue; // raced by a manual TAKE or the order just turned off — fine
+      taken++;
+      // Keep the in-memory rig current so one rig cannot overspend within a tick.
+      for (const v of rigByCell.values()) if (v.id === winner.userId) v.chargesSpent = (v.chargesSpent || 0) + 1;
+      try {
+        await logTimeline(db, { type: "lateral", username: result.username, userId: winner.userId, detail: "crew salvaged a neighbour's discard (standing order)" });
+        await sendPlayerAlert(db, winner.userId, {
+          title: "⚙ YOUR CREW SALVAGED NEXT DOOR",
+          body: `Standing order: L${layer + 1} at (${plot.col + 1}, ${plot.row + 1}) — ${Math.round(result.oil).toLocaleString()} BTR banked for 1 charge.`,
+          tag: "hmpc-lateral-order",
+          telegramHtml: `⚙ <b>YOUR CREW SALVAGED NEXT DOOR</b>\nStanding order: L${layer + 1} at (${plot.col + 1}, ${plot.row + 1}) — ${Math.round(result.oil).toLocaleString()} BTR banked for 1 charge.`,
+        });
+        if (result.ownerId && result.ownerId !== winner.userId) {
+          await sendPlayerAlert(db, result.ownerId, {
+            title: "🛢 YOUR DISCARD WAS SALVAGED",
+            body: `The layer you passed at L${layer + 1} (${Math.round(result.oil).toLocaleString()} BTR) was taken by a neighbour's standing order. You lost nothing — pass is final.`,
+            tag: "hmpc-lateral", channels: { telegram: true, push: false },
+            telegramHtml: `🛢 <b>YOUR DISCARD WAS SALVAGED</b>\nThe layer you passed at L${layer + 1} (${Math.round(result.oil).toLocaleString()} BTR) was taken by a neighbour's standing order.`,
+          });
+        }
+      } catch (err) {
+        console.error("[oil-strike-tick] salvage-order feed/alert failed:", err.message);
+      }
+    }
+  }
+  return taken;
 }
 
 // Admin scout: reveal where the oil is (no writes) so a tester can aim a rig.
