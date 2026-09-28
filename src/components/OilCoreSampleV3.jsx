@@ -119,6 +119,7 @@ export default function OilCoreSampleV3({
   theme, pending, chargesRemaining, chargesCap, threshold,
   onDecide, onSetThreshold, salvage = [], onLateral, frontier = [], onWildcat, onWalk,
   cadence = null, rack = [], ledger = null,
+  ended = false,      // settings.gameEnded — the ONLY thing that says "season closed"
 }) {
   const [tab, setTab] = useState("core"); // core | next | ledger
   const [busy, setBusy] = useState(false);
@@ -137,12 +138,16 @@ export default function OilCoreSampleV3({
   const oil = pending ? (pending.oil || 0) : 0;
   const dry = !!pending && oil <= 0;
   const crewWould = !pending ? null : chargesRemaining <= 0 ? "PASS" : dry ? "PASS" : oil >= T ? "EXTRACT" : "PASS";
-  const seasonOver = cadence?.seasonEndMs != null && nowMs >= cadence.seasonEndMs;
+  // "Season closed" comes from the game flag, never from the clock alone: a
+  // test board with a stale start date is past its clock but still live.
+  const seasonOver = !!ended;
+  const clockOut = !ended && cadence?.seasonEndMs != null && nowMs >= cadence.seasonEndMs;
   const columnDone = cadence != null && cadence.remainingLayers <= 0;
   const revealedCount = rack.filter((c) => c.state !== "undrilled").length;
-  const deadline = !cadence || seasonOver || columnDone ? null : { at: clockOf(cadence.latestMs), until: untilCopy(cadence.latestMs, nowMs) };
-  const cadenceLine = !cadence ? null
-    : seasonOver ? "season closed"
+  const deadline = !cadence || seasonOver || clockOut || columnDone ? null : { at: clockOf(cadence.latestMs), until: untilCopy(cadence.latestMs, nowMs) };
+  const cadenceLine = seasonOver ? "season closed"
+    : !cadence ? null
+    : clockOut ? "season clock has run out · the buzzer settles what is on the table"
     : columnDone ? "column fully revealed"
     : `next core lands before ${clockOf(cadence.latestMs)} · ${untilCopy(cadence.latestMs, nowMs)}`;
 
@@ -208,7 +213,7 @@ export default function OilCoreSampleV3({
           {dataRow("ASSAY", dry ? "dry" : `${fmtBtr(oil)} BTR`, dry ? muted : cream)}
           {pending.hasInclusion && dataRow("FLAG", "anomalous inclusion", warn)}
           {dataRow("CREW", `would ${crewWould}`, crewWould === "EXTRACT" ? theme.green : theme.text)}
-          {deadline ? dataRow("BY", `${deadline.at} · ${deadline.until}`) : dataRow("BY", columnDone || seasonOver ? "the buzzer" : "the next strike")}
+          {deadline ? dataRow("BY", `${deadline.at} · ${deadline.until}`) : dataRow("BY", columnDone || seasonOver || clockOut ? "the buzzer" : "the next strike")}
           {pending.hasInclusion && <div style={{ ...mono({ color: warn, letterSpacing: "0.14em" }), marginTop: 8 }}>!! ANOMALOUS INCLUSION !!</div>}
           <div style={{ marginTop: 8 }}>
             {(dry
@@ -233,11 +238,12 @@ export default function OilCoreSampleV3({
         <CoreCylinder rack={rack} pending={null} theme={theme} />
         <div style={{ flex: 1, minWidth: 0, paddingTop: 4 }}>
           {dataRow("TABLE", "nothing on it", muted)}
-          {cadence && !seasonOver && !columnDone && dataRow("NEXT CORE", `before ${clockOf(cadence.latestMs)} · ${untilCopy(cadence.latestMs, nowMs)}`)}
-          {cadence && !seasonOver && !columnDone && dataRow("PACE", `a core every ${fmtSpan(cadence.intervalMs)}`)}
+          {cadence && !seasonOver && !clockOut && !columnDone && dataRow("NEXT CORE", `before ${clockOf(cadence.latestMs)} · ${untilCopy(cadence.latestMs, nowMs)}`)}
+          {cadence && !seasonOver && !clockOut && !columnDone && dataRow("PACE", `a core every ${fmtSpan(cadence.intervalMs)}`)}
           {dataRow("REVEALED", `${revealedCount} of ${rack.length || 20}`)}
           <div style={{ marginTop: 8 }}>
             {(seasonOver ? ["Season closed. The reckoning is below."]
+              : clockOut ? ["The season clock has run out.", "The buzzer settles anything on the table."]
               : columnDone ? ["Your column is fully revealed.", "Charges left still work next door."]
               : ["The next strike pulls a core.", "Away? The crew follows your orders."]).map(noteLine)}
           </div>

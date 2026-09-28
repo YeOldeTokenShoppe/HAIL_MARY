@@ -185,7 +185,8 @@ const CARD_SCENARIOS = [
   { key: "incl", name: "Pending · inclusion flagged", trigger: "below the line, anomalous inclusion", world: () => mkWorld({ drillDay: 7, extracted: { 1: 400, 3: 900 }, layersPassed: { 0: 0, 2: 0, 4: 0, 5: 1200 }, passed: { 5: 1200 }, chargesSpent: 2, totalCollected: 1300, pending: { layer: 6, oil: 300, hasInclusion: true, revealedAt: Date.now() - 25 * 60000 } }) },
   { key: "nocharges", name: "No charges left", trigger: "8/8 spent, wet layer pending", world: () => mkWorld({ drillDay: 12, extracted: { 1: 400, 3: 900, 5: 1200, 6: 300, 8: 650 }, layersPassed: { 0: 0, 2: 0, 4: 0, 7: 0, 10: 0 }, chargesSpent: 8, totalCollected: 3450, pending: { layer: 11, oil: 1800, hasInclusion: false, revealedAt: Date.now() - 10 * 60000 }, neighbours: NEIGHBOURS_FULL }) },
   { key: "done", name: "Column fully revealed", trigger: "20 layers up, season still live", world: () => mkWorld({ drillDay: 20, extracted: { 1: 400, 3: 900, 5: 1200, 11: 1800, 15: 2400, 19: 3100 }, layersPassed: { 0: 0, 2: 0, 4: 0, 6: 300, 7: 0, 8: 650, 10: 0, 12: 200, 13: 0, 14: 0, 16: 0, 17: 500, 18: 0 }, passed: { 6: 300, 8: 650, 12: 200, 17: 500 }, chargesSpent: 6, totalCollected: 9800, neighbours: NEIGHBOURS_FULL }) },
-  { key: "over", name: "Season over", trigger: "past the buzzer (hand-off to the Reckoning)", world: () => mkWorld({ drillDay: 20, gameStartDate: dayStr(30 * D), extracted: { 1: 400 }, chargesSpent: 1, totalCollected: 400, pending: { layer: 19, oil: 3100, hasInclusion: false, revealedAt: Date.now() - 3 * D } }) },
+  { key: "clockout", name: "Season clock run out (not ended)", trigger: "stale start date, game still live — never says closed", world: () => mkWorld({ drillDay: 3, gameStartDate: dayStr(30 * D), layersPassed: { 0: 0, 1: 0 }, pending: { layer: 2, oil: 0, hasInclusion: false, revealedAt: Date.now() - 60000 } }) },
+  { key: "over", name: "Season over", trigger: "gameEnded (hand-off to the Reckoning)", world: () => mkWorld({ ended: true, drillDay: 20, gameStartDate: dayStr(30 * D), extracted: { 1: 400 }, chargesSpent: 1, totalCollected: 400, pending: { layer: 19, oil: 3100, hasInclusion: false, revealedAt: Date.now() - 3 * D } }) },
   { key: "noclock", name: "No season clock", trigger: "legacy settings — no cadence line at all", world: () => mkWorld({ drillDay: 4, gameStartDate: null, extracted: { 1: 400 }, layersPassed: { 0: 0, 2: 0 }, chargesSpent: 1, totalCollected: 400, pending: { layer: 3, oil: 900, hasInclusion: false, revealedAt: Date.now() - 5 * 60000 } }) },
 ];
 const RECKONING_SCENARIOS = [
@@ -225,7 +226,7 @@ export default function HailMaryV2FixturePage() {
   const cardFor = (w, h = noop, key, version = cardVersion) => {
     const b = deriveBoards(w);
     const props = { theme, pending: w.drill.pending, chargesRemaining: b.chargesRemaining, chargesCap: b.cap, threshold: w.drill.threshold,
-      salvage: b.salvage, frontier: b.frontier, cadence: b.cadence, rack: b.rack, ledger: b.ledger, ...h };
+      salvage: b.salvage, frontier: b.frontier, cadence: b.cadence, rack: b.rack, ledger: b.ledger, ended: !!w.ended, ...h };
     if (version === "both") return (<div key={key} style={{ display: "flex", gap: 12, flexWrap: "wrap" }}><div style={{ width, maxWidth: "100%" }}><OilCoreSampleV3 {...props} /></div><div style={{ width, maxWidth: "100%" }}><OilCoreSampleV2 {...props} /></div></div>);
     return version === "v2" ? <OilCoreSampleV2 key={key} {...props} /> : <OilCoreSampleV3 key={key} {...props} />;
   };

@@ -52,7 +52,8 @@ misses one will show plain chrome there.
 | Pending · inclusion flagged | `hasInclusion` | the anomalous-inclusion ping; "only recovered on EXTRACT — the crew never gambles on it" |
 | No charges left | `chargesRemaining == 0` | EXTRACT / TAKE / WILDCAT disabled, PASS live, CHARGES in red |
 | Column fully revealed | `remainingLayers == 0` | "nothing more comes up; the buzzer settles what's on the table"; charges still work next door |
-| Season over | `now ≥ seasonEnd` | hand-off to the Reckoning |
+| Season over | `gameEnded` (the flag, never the clock alone) | hand-off to the Reckoning |
+| Season clock run out, not ended | stale start date on a live board | "clock has run out · the buzzer settles what is on the table"; never "closed" |
 | No season clock | legacy settings | no cadence line at all (never a fake one) |
 | Salvage board | ≥ 1 open pocket next door | first-lateral-wins framing, TAKE −1⚡, +N more |
 | Frontier board | ≥ 1 unclaimed neighbour in reach | "blind · assay unknown", WILDCAT −1⚡ |

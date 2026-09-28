@@ -8133,7 +8133,10 @@ export default function OilPage() {
       default: return { label: String(drillStatus).toUpperCase(), color: theme.muted };
     }
   })();
-  const gaugesPanel = showGauges && (
+  // v2: the CORE SAMPLE card carries depth (the cylinder) and the last layer's
+  // assay, so the v1 gauge trio is redundant there. The one unique signal —
+  // hell proximity (AREA SCAN) — is a follow-up for the card's meta line.
+  const gaugesPanel = showGauges && !loopV2 && (
     <DrillGeode
       embedded
       drillEvent={drillEvent}
@@ -8178,9 +8181,22 @@ export default function OilPage() {
         cadence={revealCadence}
         rack={columnRack}
         ledger={rigLedger}
+        ended={gameEnded}
         onWalk={introComplete ? () => setWalkMode(true) : undefined}
       />
     </PanelSection>
+  );
+
+  // Why the v2 card is not showing (loopV2 on, inspector visible): one line
+  // above the inspector so nobody has to guess — admin without VIEW AS PLAYER,
+  // signed out, or no rig on this board.
+  const coreSampleHint = loopV2 && !coreSampleCard && !isTest && !isReport && (
+    <div style={{ padding: "6px 14px", fontFamily: "'Share Tech Mono', monospace", fontSize: 10, letterSpacing: "0.08em", lineHeight: 1.6, color: theme.muted, borderBottom: `1px solid ${theme.border}` }}>
+      LOOP V2 is on · {isAdmin && !previewAsPlayer
+        ? "turn VIEW AS PLAYER on to see the player's CORE SAMPLE card"
+        : !user ? "sign in to see your CORE SAMPLE card"
+        : "your account has no rig on this board — claim a plot (admin: the ADMIN CLAIM tool) and the CORE SAMPLE card replaces this inspector"}
+    </div>
   );
 
   const yourRigCard = (drillButton || gaugesPanel || rigDetails) && (
@@ -8750,6 +8766,7 @@ export default function OilPage() {
           {/* Live first: the rig, its core, its finds, then the field. */}
           {yourRigCard}
           {gusherShutoffPanel}
+          {coreSampleHint}
           {coreSampleCard || (
           <CoreSamplePanel
             theme={theme}
@@ -9362,6 +9379,7 @@ export default function OilPage() {
             {/* Live first: the rig, its core, its finds, then the field. */}
             {yourRigCard}
             {gusherShutoffPanel}
+            {coreSampleHint}
             {coreSampleCard || (
             <CoreSamplePanel
               theme={theme}
