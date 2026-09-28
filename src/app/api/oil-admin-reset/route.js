@@ -28,7 +28,9 @@ async function handle(req) {
   for (const d of plotsSnap.docs) {
     const p = d.data();
     if (p.currentOwnerId != null || p.drillDay || p.revealed || p.hellLayers ||
-        p.passed || p.inclusionFlags || p.passedInclusions || p.hellCapped) {
+        p.passed || p.inclusionFlags || p.passedInclusions || p.hellCapped ||
+        p.lastStrikeAt || p.extracted || p.lateralTaken || p.lateralByOrder || p.wildcatTaken ||
+        p.revealedArtifacts) {
       batch.set(d.ref, {
         currentOwnerId: null,
         drillDay: 0,
@@ -40,6 +42,15 @@ async function handle(req) {
         inclusionFlags: FieldValue.delete(),
         hellCapped: FieldValue.delete(),
         revealedArtifacts: FieldValue.delete(),
+        // strike/take history — lastStrikeAt alone keeps the "24H" gold border
+        // on the survey map after a wipe (2026-09-28 bot test); the take maps
+        // keep old pockets reading as taken on the next season's board.
+        lastStrikeAt: FieldValue.delete(),
+        lastStrikeOil: FieldValue.delete(),
+        extracted: FieldValue.delete(),
+        lateralTaken: FieldValue.delete(),
+        lateralByOrder: FieldValue.delete(),
+        wildcatTaken: FieldValue.delete(),
       }, { merge: true });
       plotsCleared++; n++; await flush(false);
     }
@@ -52,7 +63,8 @@ async function handle(req) {
   for (const d of drillsSnap.docs) {
     const dd = d.data();
     if (dd.col != null || dd.tankOil || dd.drillDay ||
-        dd.pending || dd.chargesSpent || dd.layersExtracted || dd.layersPassed) {
+        dd.pending || dd.chargesSpent || dd.layersExtracted || dd.layersPassed ||
+        dd.orders || dd.autopilot || dd.laterals || dd.wildcats || dd.lateralsByOrder || dd.lastStrikeAt) {
       batch.set(d.ref, {
         col: null, row: null,
         drillDay: 0, tankOil: 0,
@@ -67,6 +79,14 @@ async function handle(req) {
         threshold: FieldValue.delete(),
         layersExtracted: FieldValue.delete(),
         layersPassed: FieldValue.delete(),
+        // crew orders + per-season take counters (a new season starts with the
+        // crew on ORDERS and no lateral-extract queue stamp)
+        orders: FieldValue.delete(),
+        autopilot: FieldValue.delete(),
+        laterals: FieldValue.delete(),
+        lateralsByOrder: FieldValue.delete(),
+        wildcats: FieldValue.delete(),
+        lastStrikeAt: FieldValue.delete(),
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
       rigsCleared++; n++; await flush(false);

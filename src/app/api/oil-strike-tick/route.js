@@ -510,6 +510,12 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
         if (outcome.status === "struck") {
           summary.struck++;
           strikes.push({ userId, col, row, ...outcome });
+          // v2: count what the standing orders did to last strike's pending
+          // layer, so the admin FORCE STRIKE toast can say it out loud.
+          if (outcome.resolved) {
+            const k = outcome.resolved.decision === "extract" ? "extracted" : (outcome.resolved.oil > 0 ? "passedOpen" : "passedDry");
+            summary[k] = (summary[k] || 0) + 1;
+          }
           if (outcome.tonicUsed) {
             summary.tonicsUsed = (summary.tonicsUsed || 0) + 1;
             await logTimeline(db, { type: "tonic", username: outcome.username, userId, detail: "two layers in one strike" });

@@ -4311,6 +4311,47 @@ export default function OilPage() {
     }
   }, [adminPassword]);
 
+  // RIG STATUS rows for TEST TOOLS (v2 only). Joined from the all-rigs listener
+  // and the plot map; names of every rig by id also resolve "taken by".
+  const rigStatusRows = useMemo(() => {
+    if (!loopV2) return [];
+    const nameOf = {};
+    for (const d of allDrillers) nameOf[d.id] = d.username || d.id;
+    const queue = allDrillers
+      .filter((d) => d.col != null && d.orders?.salvage === true)
+      .sort((a, b) => (Number(a.orders?.salvageSetAt) || 0) - (Number(b.orders?.salvageSetAt) || 0) || String(a.id).localeCompare(String(b.id)));
+    const queueRank = new Map(queue.map((d, i) => [d.id, i + 1]));
+    const layerList = (obj, fmt) => Object.entries(obj || {})
+      .map(([z, v]) => [Number(z), v]).sort((a, b) => a[0] - b[0]).map(([z, v]) => fmt(z, v));
+    return allDrillers
+      .filter((d) => d.col != null && d.row != null)
+      .map((d) => {
+        const plot = allPlotsMap[`${d.col}_${d.row}`] || {};
+        const isBot = String(d.id).startsWith("bot_");
+        const depth = Math.max(Number(plot.drillDay) || 0, Number(d.drillDay) || 0);
+        const cap = chargesCapFor(d, { passiveCharges }, DEPTH_Z);
+        const left = Math.max(0, cap - (d.chargesSpent || 0));
+        const p = d.pending;
+        const pendingText = p && typeof p.layer === "number"
+          ? `pending L${p.layer + 1} ${Math.round(p.oil || 0).toLocaleString()} BTR`
+          : "no pending";
+        const line = Number(d.threshold) || 0;
+        const ordersText = `${left}/${cap} charges · line ${line >= 1e8 ? "∞ (passes all)" : line.toLocaleString()} · ${d.autopilot ? "AUTO-PILOT" : "ORDERS"}`
+          + (d.orders?.salvage === true ? ` · LATERAL EXTRACT #${queueRank.get(d.id)}` : "");
+        const taken = plot.lateralTaken || {};
+        const open = layerList(plot.passed, (z, v) => (Number(v) > 0 && taken[z] === undefined ? `L${z + 1} ${Math.round(v).toLocaleString()}` : null)).filter(Boolean);
+        const tookList = layerList(taken, (z, uid) => `L${z + 1}→${nameOf[uid] || uid}${plot.lateralByOrder?.[z] ? " (crew)" : ""}`);
+        const extracted = layerList(plot.extracted, (z, v) => `L${z + 1} ${Math.round(v).toLocaleString()}`);
+        return {
+          id: d.id, name: nameOf[d.id], col: d.col, row: d.row, isBot, depth, pendingText, ordersText,
+          openText: open.length ? `open next door: ${open.join(", ")}` : "",
+          takenText: tookList.length ? `taken: ${tookList.join(", ")}` : "",
+          extractedText: extracted.length ? `extracted: ${extracted.join(", ")}` : "",
+        };
+      })
+      .sort((a, b) => (b.isBot - a.isBot) || a.name.localeCompare(b.name));
+  }, [loopV2, allDrillers, allPlotsMap, passiveCharges]);
+
   const handleSelectX = useCallback((x) => {
     setSelectedX(x);
     setDrillDepth(0);
@@ -5480,7 +5521,12 @@ export default function OilPage() {
           const reasons = r.skipReasons && Object.keys(r.skipReasons).length
             ? ` (${Object.entries(r.skipReasons).map(([k, v]) => `${k}:${v}`).join(", ")})`
             : "";
-          return `✓ struck ${r.struck}${scope} · skipped ${r.skipped}${reasons}${r.depleted ? ` · depleted ${r.depleted}` : ""}${r.demonsSummoned ? ` · demons ${r.demonsSummoned}` : ""}`;
+          // v2: say what the crews did — the strike itself is silent on the
+          // board, so without this line a bot test looks like nothing happened.
+          const v2Line = loopV2
+            ? ` · crews: ${r.extracted || 0} extracted, ${r.passedOpen || 0} passed open, ${r.passedDry || 0} passed dry, ${r.salvagedByOrder || 0} lateral-extracted`
+            : "";
+          return `✓ struck ${r.struck}${scope} · skipped ${r.skipped}${reasons}${r.depleted ? ` · depleted ${r.depleted}` : ""}${r.demonsSummoned ? ` · demons ${r.demonsSummoned}` : ""}${v2Line}`;
         })}>FORCE STRIKE</button>
         <button disabled={toolBusy || selectedX === null} style={styles.btn} onClick={() => runTool("Banking tank", async () => {
           // Bank the selected rig's un-banked tankOil into the community tank
@@ -5540,6 +5586,30 @@ export default function OilPage() {
       {toolStatus && (
         <div style={{ marginTop: 8, fontSize: 10, fontFamily: "'Share Tech Mono', monospace", color: theme.accent, wordBreak: "break-word", lineHeight: 1.4 }}>
           {toolStatus}
+        </div>
+      )}
+      {/* RIG STATUS (2026-09-28): one line per rig on the board, bots first, so a
+          queue test reads without hunting the survey map — which plot is whose,
+          what is pending, what pockets are open next door and who took them. */}
+      {loopV2 && rigStatusRows.length > 0 && (
+        <div style={{ marginTop: 10, fontSize: 10, fontFamily: "'Share Tech Mono', monospace", color: theme.text, lineHeight: 1.5 }}>
+          <div style={{ color: theme.muted, marginBottom: 2 }}>RIG STATUS · {rigStatusRows.length} on the board · lateral-extract queue in order</div>
+          {rigStatusRows.map((r) => (
+            <div key={r.id} style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap", padding: "3px 0", borderTop: `1px solid ${theme.border}` }}>
+              <button
+                onClick={() => { handleSelectX(r.col); handleSliceY(r.row); }}
+                title="select this plot on the survey map"
+                style={{ ...styles.paramBtn, ...(selectedX === r.col && sliceY === r.row ? styles.paramBtnActive : {}), minWidth: 0 }}
+              >({r.col + 1}, {r.row + 1})</button>
+              <span style={{ color: r.isBot ? theme.accent : theme.text, fontWeight: 700 }}>{r.name}</span>
+              <span style={{ color: theme.muted }}>L{r.depth}/{DEPTH_Z}</span>
+              <span>{r.pendingText}</span>
+              <span style={{ color: theme.muted }}>{r.ordersText}</span>
+              {r.openText && <span style={{ color: "#ffd75e" }}>{r.openText}</span>}
+              {r.takenText && <span style={{ color: "#ffb84d" }}>{r.takenText}</span>}
+              {r.extractedText && <span style={{ color: "#37f07a" }}>{r.extractedText}</span>}
+            </div>
+          ))}
         </div>
       )}
     </div>
