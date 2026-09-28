@@ -8950,12 +8950,11 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					underwaterOverlay.style.backgroundColor = 'rgba(0, 100, 200, ' + _a.toFixed(3) + ')';
 				}
 
-				// Floor-projected caustics advance every frame (heightmap is bound below).
-				// They read right only from ABOVE the surface; fade them to zero whenever
-				// the view is underwater — coin-cam (phase) OR free-look (camera height) —
-				// and back in for the normal above-water view.
-				const _causTarget = (cameraPhase === 'none' && !_camUnderwater)
-					? (window.floorCausticOnStrength ?? floorCausticOnStrength) : 0.0;
+				// Floor-projected caustics advance every frame (light map is bound below).
+				// The map is where the sun physically lands on the floor, so it reads right
+				// from every viewpoint: keep it on underwater too (coin-cam and free-look),
+				// where the floor is seen directly and the dancing light is the main cue.
+				const _causTarget = (window.floorCausticOnStrength ?? floorCausticOnStrength);
 				for (let fi = 0; fi < floorCausticMats.length; fi++) {
 					const sh = floorCausticMats[fi].userData.causticShader;
 					if (sh) {
