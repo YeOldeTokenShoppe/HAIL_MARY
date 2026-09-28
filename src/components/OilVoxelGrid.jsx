@@ -2287,8 +2287,8 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           return { id, text, pos: [c.x, c.y, c.z], size: h };
         };
         setPanelLabels([
-          plate(lampRefs.current.N || toggleRefs.current.N?.mesh, "SALVAGE", "N", 1.15),
-          plate(keyRef.current?.mesh, "AUTOPILOT", "KEY", 1.1),
+          plate(lampRefs.current.N || toggleRefs.current.N?.mesh, "LATERAL EXTRACT", "N", 1.15),
+          plate(keyRef.current?.mesh, "", "KEY", 1.1), // text comes from the key's position at render
         ].filter(Boolean));
       }
       // v2: pose the switches from the rig doc (see the orders effect below).
@@ -4050,9 +4050,11 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         flashPress(passButtonRef.current);
         playSfx(BUTTON_SFX, { volume: 0.8 });
         disarmPass();
-        // v2: the page's listener turns this into the PASS decision for this rig
-        // (it checks plotId against the player's own plot and a core on the table).
-        window.dispatchEvent(new CustomEvent("hm:pass-confirm", { detail: { plotId } }));
+        // ONE BUTTON (Michelle, 2026-09-28): under v2 the caged button IS EXTRACT —
+        // the cage guards the spend. Doing nothing hands the layer to the crew's
+        // orders. The page's listener checks plotId + a core on the table.
+        // (v1 keeps the old pass-confirm event; nothing listens.)
+        window.dispatchEvent(new CustomEvent(decideMode === "v2" ? "hm:extract-confirm" : "hm:pass-confirm", { detail: { plotId } }));
       } else if (!passArmedRef.current) {
         armPass();
       }
@@ -4122,13 +4124,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         return;
       }
       if (clickedButton === "red") { flashPress(redButtonRef.current); playSfx(BUTTON_SFX, { volume: 0.8 }); }
-      // v2 (extract-or-pass): the red button is EXTRACT. No tank drain — the page's
-      // listener fires the layer decision for this rig; the tank empties when the
-      // server resolves it and the snapshot lands.
-      if (clickedButton === "red" && decideMode === "v2") {
-        window.dispatchEvent(new CustomEvent("hm:extract-confirm", { detail: { plotId } }));
-        return;
-      }
+      // v2: the uncaged button is DEAD (one button — the caged EXTRACT is the
+      // verb). It flashes so a tap is acknowledged, and does nothing. Never the
+      // v1 tank drain.
+      if (clickedButton === "red" && decideMode === "v2") return;
       // Already zoomed in: only RedButton drains the tank (v1).
       if (clickedButton === "red" && !drainingRef.current && tankFillRef.current > 0) {
         drainingRef.current = true;
@@ -4274,8 +4273,8 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         <group key={l.id} position={l.pos} quaternion={panelXform.quat} userData={PANEL_PART_USERDATA}>
           <group rotation={PANEL_MESH_ROT}>
             <group position={[0, 0, PANEL_TEXT_LIFT]}>
-              <Text fontSize={Math.max(0.004, l.size * 0.42)} anchorX="center" anchorY="middle" letterSpacing={0.14} color="#e8d9b8" font={undefined} renderOrder={999}>
-                {l.text}
+              <Text fontSize={Math.max(0.004, l.size * (l.id === "KEY" ? 0.42 : 0.3))} anchorX="center" anchorY="middle" letterSpacing={0.14} color="#e8d9b8" font={undefined} renderOrder={999}>
+                {l.id === "KEY" ? (orders?.autopilot ? "AUTO-PILOT" : "ORDERS") : l.text}
                 <meshBasicMaterial attach="material" color="#e8d9b8" toneMapped={false} transparent opacity={0.92} depthWrite={false} side={THREE.DoubleSide} />
               </Text>
             </group>

@@ -154,6 +154,7 @@ export default function OilCoreSampleV3({
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [thrDraft, setThrDraft] = useState(null);
   const [seeAll, setSeeAll] = useState(false);
+  const [passArm, setPassArm] = useState(false); // "let it go now" is two taps — pass is final
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     if (!cadence?.latestMs) return undefined;
@@ -262,9 +263,26 @@ export default function OilCoreSampleV3({
         {stat(dry ? "DRY" : `${fmtBtr(oil)} BTR`, `on the table · L${pending.layer + 1}`, dry ? muted : gold)}
         {stat(`${chargesRemaining}/${chargesCap}`, "charges", chargesRemaining > 0 ? cream : theme.red)}
       </div>
+      {/* ONE BUTTON (Michelle, 2026-09-28): EXTRACT keeps it now. Doing nothing
+          hands the layer to the crew's orders at the next strike (the CREW row
+          says which way). "Let it go now" is the explicit pass for the one case
+          the line can't express — above the line but you want the charge for
+          next door — and it takes two taps because pass is final. */}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         {cta("Extract −1⚡", theme.green, busy || chargesRemaining <= 0, () => run(() => onDecide("extract"), (d) => oil > 0 ? `✔ extracted — ${fmtBtr(oil)} BTR banked${d?.inclusion ? " · inclusion → ARTIFACTS" : ""}` : d?.inclusion ? "✔ dug it up — inclusion → ARTIFACTS" : "✔ extracted — the layer was dry"), true)}
-        {cta("Pass · final", theme.red, busy, () => run(() => onDecide("pass"), "↷ passed — final"), false)}
+      </div>
+      <div style={{ marginTop: 6, textAlign: "center" }}>
+        {!passArm ? (
+          <button onClick={() => setPassArm(true)} disabled={busy} style={{ background: "none", border: "none", cursor: "pointer", ...meta, color: muted }}>
+            [ let it go now ]
+          </button>
+        ) : (
+          <span style={mono({ color: muted, fontSize: 10 })}>
+            Pass is final — it opens to your neighbours.{" "}
+            <button onClick={() => { setPassArm(false); run(() => onDecide("pass"), "↷ passed — final"); }} disabled={busy} style={{ background: "none", border: `1px solid ${theme.red}`, borderRadius: 2, cursor: "pointer", ...mono({ color: theme.red, fontSize: 10, letterSpacing: "0.12em" }), padding: "2px 8px" }}>yes, pass</button>{" "}
+            <button onClick={() => setPassArm(false)} style={{ background: "none", border: "none", cursor: "pointer", ...meta, color: muted }}>keep deciding</button>
+          </span>
+        )}
       </div>
     </>
   ) : (
@@ -432,7 +450,7 @@ export default function OilCoreSampleV3({
       {/* crew orders — behind a link */}
       <div style={{ marginTop: 10, textAlign: "center" }}>
         <button onClick={() => setOrdersOpen((o) => !o)} style={{ background: "none", border: "none", cursor: "pointer", ...meta, color: muted }}>
-          [ crew orders · extract ≥ {fmtBtr(T)} BTR · salvage {orders?.salvage ? "on" : "off"} · autopilot {orders?.autopilot ? "on" : "off"} {ordersOpen ? "▴" : "▾"} ]
+          [ crew orders · extract ≥ {fmtBtr(T)} BTR · lateral extract {orders?.salvage ? "on" : "off"} · {orders?.autopilot ? "auto-pilot" : "orders"} {ordersOpen ? "▴" : "▾"} ]
         </button>
         {ordersOpen && (
           <div style={{ display: "flex", gap: 6, alignItems: "center", justifyContent: "center", marginTop: 6 }}>
@@ -447,8 +465,8 @@ export default function OilCoreSampleV3({
         {ordersOpen && onSetOrders && (
           <div style={{ marginTop: 8, textAlign: "left" }}>
             {[
-              ["salvage", "SALVAGE", `take a neighbour's passed layer at or above your line, for 1 charge. Neighbours with the order take turns — longest wait goes first.`],
-              ["autopilot", "AUTOPILOT", "extract everything once your charges cover every layer left in your column."],
+              ["salvage", "LATERAL EXTRACT", `take a neighbour's passed layer at or above your line, for 1 charge. Neighbours with the order take turns — longest wait goes first.`],
+              ["autopilot", "AUTO-PILOT", "once you can afford every layer left in your column, the crew keeps each wet one as it comes up, above your line or not. Dry layers still pass free. Off = ORDERS: the crew follows your line on every layer, and runs lateral extract if it's on. Nothing more."],
             ].map(([key, name, desc]) => (
               <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "6px 0", borderTop: `1px solid ${theme.border || muted}` }}>
                 <div style={{ minWidth: 0 }}>
