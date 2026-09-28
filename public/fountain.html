@@ -3140,14 +3140,14 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			// clip). Separate full-scene pass (shows in the perf HUD draws), desktop-only,
 			// 'R' toggles it. This is the true reflection; refraction is the see-through.
 			const REFLECTION_ENABLED = true;   // EXPERIMENT: un-gated for mobile too (was !isMobileDevice). Revert if perf suffers.
-			let reflectionStrength = 0.25;  // 0..1+ overall strength (0 = off → hides the reflector, skipping its pass)
+			let reflectionStrength = 0.01;  // 0..1+ overall strength (0 = off → hides the reflector, skipping its pass)
 			let waterReflector = null;
 			let _reflLastOn = reflectionStrength > 0 ? reflectionStrength : 0.5;   // remembers tuned strength across the 'R' toggle
 			window.reflectionStrength = reflectionStrength;   // live tuning
 			window.reflectDistort = 0.06;     // how much the reflection ripples with the water surface (0 = flat mirror)
 			window.reflectEveryN = (typeof isMobileDevice !== 'undefined' && isMobileDevice) ? 3 : 1;  // re-render the mirror every Nth frame (↑ = cheaper, staler)
 			window.splashDropScale = 2.2;     // coin-splash droplet COUNT multiplier (Water FX panel)
-			window.splashDropSize  = 0.045;   // coin-splash droplet world size
+			window.splashDropSize  = 0.025;   // coin-splash droplet world size
 			window.splashDropLaunch = 1.0;    // coin-splash droplet launch height/strength (lower = gentler arc)
 			window.splashDropOpacity = 0.35;  // coin-splash droplet opacity
 			window.minRestFaceY = 0.8;        // coins only rest on faces flatter than this (↑ = slide off steeper slopes)
@@ -3222,8 +3222,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			let curtainRefract = 0.25;            // 0 = classic tinted sheet, 1 = full see-through refraction (desktop)
 			let curtainSpec    = 0.2;             // sun glint strength on the sheet
 			let curtainOpacity = 0.65;            // overall sheet opacity multiplier
-			let curtainSplash  = 1.0;             // droplets leaping where the curtains land (0 = none)
-			let curtainMist    = 0.3;             // soft mist sprites on the main landing ring (0 = none; they bloom hard)
+			let curtainSplash  = 2.8;             // droplets leaping where the curtains land (0 = none)
+			let curtainMist    = 1.85;            // soft mist sprites on the main landing ring (0 = none)
 			window.curtainRefract = curtainRefract;   // live tuning (Water FX panel)
 			window.curtainSpec    = curtainSpec;
 			window.curtainOpacity = curtainOpacity;
@@ -3533,7 +3533,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			}
 			function updateDroplets(dt) {
 				if (!dropletPoints) return;
-				dropletPoints.material.size = (window.splashDropSize ?? 0.045);
+				dropletPoints.material.size = (window.splashDropSize ?? 0.025);
 				dropletPoints.material.opacity = (window.splashDropOpacity ?? 0.35);
 				let any = false;
 				for (let i = 0; i < DROP_MAX; i++) {
