@@ -4333,6 +4333,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           label={`LAYER ${String(drillDay > 0 ? drillDay : 7).padStart(2, "0")} · PSI`}
           captionFrac={0.24}
           glyphFrac={0.4}
+          nudge={[0, 0]}   // [x, y] fractions of the screen; negative y = down
           token={pressure.label}
           idleHex={pressure.hex}
           alarm={hellActive}
@@ -5781,7 +5782,7 @@ function WellGlowField({ positions }) {
 // changes to a positive value (depth uses oilStrike; pressure passes 0). When `alarm`
 // (a hell event) it overrides to a hard red strobe matching the alert beacon (~4 Hz).
 // Anchored to a screen's transform { pos, quat, w, h } when fromMesh, else docked.
-function PanelReadout({ pos, quat, w, h, fromMesh = false, token = "", label = "", idleHex = "#ffae00", flareKey = 0, alarm = false, captionFrac = 0.19, glyphFrac = PANEL_GLYPH_FRAC, offset = PANEL_READOUT_OFFSET }) {
+function PanelReadout({ pos, quat, w, h, fromMesh = false, token = "", label = "", idleHex = "#ffae00", flareKey = 0, alarm = false, captionFrac = 0.19, glyphFrac = PANEL_GLYPH_FRAC, nudge = [0, 0], offset = PANEL_READOUT_OFFSET }) {
   const matRef = useRef();
   const t = useRef(0);
   const prevFlare = useRef(flareKey);
@@ -5848,11 +5849,14 @@ function PanelReadout({ pos, quat, w, h, fromMesh = false, token = "", label = "
   // screen, so no generated backing). Orientation comes from the quad's quaternion.
   if (fromMesh) {
     const sh = h || 0.05;
+    const sw = w || 0.1;
+    // `nudge` = [x, y] as fractions of the screen's width / height, in the
+    // screen's own plane: [0, -0.06] moves the whole readout down a touch.
     return (
       <group position={pos} quaternion={quat} userData={PANEL_PART_USERDATA}>
         <group rotation={PANEL_MESH_ROT}>
           {/* lift inside the rotated frame so it pushes along the face normal */}
-          <group position={[0, 0, PANEL_TEXT_LIFT]}>
+          <group position={[(nudge[0] || 0) * sw, (nudge[1] || 0) * sh, PANEL_TEXT_LIFT]}>
             {caption(sh)}
             <group position={[0, label ? -sh * 0.1 : 0, 0]}>{digits}</group>
           </group>
