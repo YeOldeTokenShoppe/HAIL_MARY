@@ -3230,10 +3230,12 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			let curtainSpec    = 0.2;             // sun glint strength on the sheet
 			let curtainOpacity = 0.65;            // overall sheet opacity multiplier
 			let curtainSplash  = 1.0;             // droplets leaping where the curtains land (0 = none)
+			let curtainMist    = 0.3;             // soft mist sprites on the main landing ring (0 = none; they bloom hard)
 			window.curtainRefract = curtainRefract;   // live tuning (Water FX panel)
 			window.curtainSpec    = curtainSpec;
 			window.curtainOpacity = curtainOpacity;
 			window.curtainSplash  = curtainSplash;
+			window.curtainMist    = curtainMist;
 			// How far each curtain bells outward by its foot (vertex shader), and therefore
 			// the ring where it actually lands: the pool ripples, foam churn, splash mist and
 			// leaping droplets are all centred on these rings.
@@ -4163,6 +4165,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				wf.add( window, 'curtainSpec', 0, 3, 0.05 ).name( 'sun glints' ).listen();
 				wf.add( window, 'curtainOpacity', 0, 1, 0.05 ).name( 'opacity' ).listen();
 				wf.add( window, 'curtainSplash', 0, 3, 0.1 ).name( 'foot droplets' ).listen();
+				wf.add( window, 'curtainMist', 0, 2, 0.05 ).name( 'foot mist' ).listen();
 
 				const uw = fxGui.addFolder( 'Underwater tint' );
 				uw.add( window, 'underwaterMinAlpha', 0, 1, 0.01 ).name( 'min (at surface)' ).listen();
@@ -9377,15 +9380,20 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				updateDroplets(deltaTime);   // coin-splash droplet spray (arcs up + falls back)
 				
 				// Continuously emit particles at the water intersection
-				// Emit a few mist sprites each frame on the ring where the main curtain lands
-				if (Math.random() < 0.95) {
-					emitSplashParticles(
-						CURTAIN_FOOT.x,
-						CURTAIN_FOOT.z,
-						CURTAIN_FOOT.r,
-						Math.floor(2 + Math.random() * 6),
-						{ spread: 0.14 }
-					);
+				// A little mist on the ring where the main curtain lands. Kept small and sparse:
+				// these cloud sprites are large and bloom brightly, so the slider scales both
+				// how many appear and how big they are (Water FX: foot mist).
+				{
+					const mist = (window.curtainMist ?? curtainMist);
+					if (mist > 0 && Math.random() < 0.6 * Math.min(mist, 1)) {
+						emitSplashParticles(
+							CURTAIN_FOOT.x,
+							CURTAIN_FOOT.z,
+							CURTAIN_FOOT.r,
+							Math.max(1, Math.round((1 + Math.random() * 2) * mist)),
+							{ spread: 0.12, size: 0.35 + 0.45 * Math.min(mist, 1) }
+						);
+					}
 				}
 				// Droplets leaping where the two curtains hit their pools (Water FX: foot droplets)
 				{
