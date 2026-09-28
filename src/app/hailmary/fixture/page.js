@@ -19,6 +19,7 @@ import { useMemo, useState, useCallback } from "react";
 import { THEMES } from "@/lib/hailmaryThemes";
 import { PanelSection, PanelTitle } from "@/components/HailMaryPanel";
 import OilCoreSampleV2 from "@/components/OilCoreSampleV2";
+import OilCoreSampleV3 from "@/components/OilCoreSampleV3";
 import OilReckoning from "@/components/OilReckoning";
 import OilAwayRecap from "@/components/OilAwayRecap";
 import {
@@ -199,6 +200,7 @@ const mono = "'Share Tech Mono', monospace";
 
 export default function HailMaryV2FixturePage() {
   const [themeKey, setThemeKey] = useState("dark");
+  const [cardVersion, setCardVersion] = useState("v3"); // v3 = three tabs on the /space layout · v2 = the plain stack · both
   const [width, setWidth] = useState(360);
   const [world, setWorld] = useState(PLAYABLE_START);
   const [recap, setRecap] = useState(null); // null | "v2" | "v1"
@@ -220,12 +222,12 @@ export default function HailMaryV2FixturePage() {
   }), []);
 
   const noop = { onDecide: async () => ({}), onSetThreshold: async () => ({}), onLateral: async () => ({}), onWildcat: async () => ({}) };
-  const cardFor = (w, h = noop, key) => {
+  const cardFor = (w, h = noop, key, version = cardVersion) => {
     const b = deriveBoards(w);
-    return (
-      <OilCoreSampleV2 key={key} theme={theme} pending={w.drill.pending} chargesRemaining={b.chargesRemaining} chargesCap={b.cap}
-        threshold={w.drill.threshold} salvage={b.salvage} frontier={b.frontier} cadence={b.cadence} rack={b.rack} ledger={b.ledger} {...h} />
-    );
+    const props = { theme, pending: w.drill.pending, chargesRemaining: b.chargesRemaining, chargesCap: b.cap, threshold: w.drill.threshold,
+      salvage: b.salvage, frontier: b.frontier, cadence: b.cadence, rack: b.rack, ledger: b.ledger, ...h };
+    if (version === "both") return (<div key={key} style={{ display: "flex", gap: 12, flexWrap: "wrap" }}><div style={{ width, maxWidth: "100%" }}><OilCoreSampleV3 {...props} /></div><div style={{ width, maxWidth: "100%" }}><OilCoreSampleV2 {...props} /></div></div>);
+    return version === "v2" ? <OilCoreSampleV2 key={key} {...props} /> : <OilCoreSampleV3 key={key} {...props} />;
   };
   const recapObj = {
     awayMs: 5 * H, fromDepth: 4, toDepth: 7, strikes: [{ layer: 5, oil: 1200 }, { layer: 6, oil: 300 }], oilGained: 1500, hellHit: false,
@@ -254,6 +256,7 @@ export default function HailMaryV2FixturePage() {
           {Object.keys(THEMES).map((k) => <option key={k} value={k}>{k}</option>)}
         </select>
         {[360, 420, 560].map((w) => <button key={w} style={{ ...btn, ...(width === w ? { borderColor: theme.gold, color: theme.gold } : {}) }} onClick={() => setWidth(w)}>{w}px</button>)}
+        {[["v3", "V3 · three tabs"], ["v2", "V2 · plain stack"], ["both", "side by side"]].map(([v, l]) => <button key={v} style={{ ...btn, ...(cardVersion === v ? { borderColor: theme.gold, color: theme.gold } : {}) }} onClick={() => setCardVersion(v)}>{l}</button>)}
         <span style={label}>static data · same builders as the live page · nothing here touches the game</span>
       </div>
 
@@ -268,7 +271,7 @@ export default function HailMaryV2FixturePage() {
           <button style={btn} onClick={() => setRecap("v1")}>… (v1, for contrast)</button>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
-          <div style={{ width, maxWidth: "100%" }}>{cardFor(world, handlers, "playable")}</div>
+          <div style={{ width: cardVersion === "both" ? "auto" : width, maxWidth: "100%" }}>{cardFor(world, handlers, "playable")}</div>
           {world.ended && <div style={{ width, maxWidth: "100%" }}><OilReckoning theme={theme} reckoning={reckoningFor(world)} col={world.plot.col} row={world.plot.row} /></div>}
           <div style={{ ...label, minWidth: 200, flex: 1 }}>
             <div style={{ color: theme.textStrong, letterSpacing: "0.14em" }}>LOG</div>
@@ -282,7 +285,7 @@ export default function HailMaryV2FixturePage() {
       <PanelSection theme={theme} style={{ marginBottom: 18, borderRadius: 4, border: `1px solid ${theme.border}` }}>
         <PanelTitle theme={theme}>CORE SAMPLE · STATES</PanelTitle>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
-          {CARD_SCENARIOS.map((s) => frame(s.name, s.trigger, cardFor(s.world(), noop, s.key), s.key))}
+          {CARD_SCENARIOS.map((s) => frame(s.name, s.trigger, cardFor(s.world(), noop, s.key, cardVersion === "both" ? "v3" : cardVersion), s.key))}
         </div>
       </PanelSection>
 

@@ -23,7 +23,7 @@ panel, and the wording *within* the copy rule.
 
 | # | Surface | Where it lives | Status | File |
 |---|---|---|---|---|
-| A | **Core Sample card** — the decision surface: charges, cadence line, core rack, the pending layer with EXTRACT / PASS, salvage board, frontier board, ledger, standing order, WALK | Sidebar YOUR RIG card (desktop); the panels under the 3D tab (phone) | Functionally complete, **plain chrome** | `src/components/OilCoreSampleV2.jsx` |
+| A | **Core Sample card** — the decision surface. **Two builds, same props:** `OilCoreSampleV2` (everything on one surface — Michelle: "too dense", 2026-09-28) and **`OilCoreSampleV3`** (the /space module layout, one decision per screen: CORE · NEXT DOOR · LEDGER tabs, the core cylinder as the rack, two big stats, one CTA row, crew orders behind a link; wall colour schema). V3 is the design-pass base; V2 stays for comparison on the fixture | Sidebar YOUR RIG card (desktop); the panels under the 3D tab (phone) | V3 built plain 2026-09-28, not yet mounted on the live page | `src/components/OilCoreSampleV3.jsx`, `OilCoreSampleV2.jsx` |
 | B | **In-world machine panel** on the player's rig — pressure gauge, panel screen, free-standing DEPTH board, the PASS cover Michelle built 2026-09-08 (press feedback works; **the physical PASS is not yet wired to the decide route**), crew who walk to the button on a decision | Desktop: click the rig; phone: the MACHINE PANEL chip zooms to it | Built as theatre; verbs not wired | `src/components/OilVoxelGrid.jsx` (~1880–2000, 336), `RigCrew.jsx` (`hm:decide`) |
 | C | **Strata wall** — the earth block as public game-state voxels: passes, extractions, wildcat scars, tunnel bars for salvage | 3D scene, loopV2 seasons | Built (promoted from the `?strata=1` mock) | `src/components/StrataVoxels.jsx` |
 | D | **Alerts** — push + Telegram on every strike (`CORE ASSAY — LAYER n` with the cost-model body), hell breach, tonic cap, artifact, dry layer | Phone lock screen, Telegram | Built, copy follows the rule | `oil-strike-tick/route.js` ~530–665, `lib/oilLoopV2.assayAlertBody` |
@@ -240,7 +240,8 @@ from what exists. Sizes: the card is ~330 lines of plain JSX; the reckoning ~110
   sim: EXTRACT / PASS / TAKE / WILDCAT mutate mock docs the way the routes do, NEXT STRIKE
   resolves by the standing order and reveals the next layer, END SEASON hands the same world
   to the Reckoning. Static data, same builders as the live page, nothing touches the game.
-  Not indexed. Design here; regressions show here first.
+  Not indexed. Design here; regressions show here first. **V3 / V2 / side-by-side** switch at the top
+  (2026-09-28): V3 is the three-tab /space layout; V2 the plain stack.
 
 ## 10. Hand-back
 
