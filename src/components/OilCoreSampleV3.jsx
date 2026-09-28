@@ -167,6 +167,12 @@ export default function OilCoreSampleV3({
   const columnDone = cadence != null && cadence.remainingLayers <= 0;
   const revealedCount = rack.filter((c) => c.state !== "undrilled").length;
   const deadline = !cadence || seasonOver || clockOut || columnDone ? null : { at: clockOf(cadence.latestMs), until: untilCopy(cadence.latestMs, nowMs) };
+  // How far into the current reveal window we are (0..1). The strike lands
+  // somewhere inside it; full = the latest it can land. Shown as a thin bar,
+  // never as digits counting down — the moment stays unguessable.
+  const windowFrac = cadence && cadence.latestMs && cadence.windowStartMs != null && cadence.latestMs > cadence.windowStartMs
+    ? Math.min(1, Math.max(0, (nowMs - cadence.windowStartMs) / (cadence.latestMs - cadence.windowStartMs))) : null;
+  const nextCoreLive = cadence && !seasonOver && !clockOut && !columnDone;
   const cadenceLine = seasonOver ? "season closed"
     : !cadence ? null
     : clockOut ? "season clock has run out · the buzzer settles what is on the table"
@@ -263,8 +269,8 @@ export default function OilCoreSampleV3({
         <div style={{ flex: 1, minWidth: 0, paddingTop: 4 }}>
           {dataRow("BORE HEAD", `L${revealedCount} of ${rack.length || 20}`, gold)}
           {dataRow("TABLE", "nothing on it", muted)}
-          {cadence && !seasonOver && !clockOut && !columnDone && dataRow("NEXT CORE", `before ${clockOf(cadence.latestMs)} · ${untilCopy(cadence.latestMs, nowMs)}`)}
-          {cadence && !seasonOver && !clockOut && !columnDone && dataRow("PACE", `a core every ${fmtSpan(cadence.intervalMs)}`)}
+          {dataRow("BANKED", `${fmtBtr(ledger?.banked || 0)} BTR`)}
+          {nextCoreLive && dataRow("PACE", `a core every ${fmtSpan(cadence.intervalMs)}`)}
         </div>
       </div>
       <div style={{ marginTop: 8 }}>
@@ -274,9 +280,16 @@ export default function OilCoreSampleV3({
           : ["The next strike pulls a core.", "Away? The crew follows your orders."]).map(noteLine)}
       </div>
       <div style={{ display: "flex", gap: 12, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${theme.border || muted}` }}>
-        {stat(`${fmtBtr(ledger?.banked || 0)} BTR`, "banked")}
+        {nextCoreLive
+          ? stat(cadence.latestMs - nowMs > 60000 ? `≤ ${fmtSpan(cadence.latestMs - nowMs)}` : "any moment", `next core · before ${clockOf(cadence.latestMs)}`)
+          : stat(`${fmtBtr(ledger?.banked || 0)} BTR`, "banked")}
         {stat(`${chargesRemaining}/${chargesCap}`, "charges", chargesRemaining > 0 ? cream : theme.red)}
       </div>
+      {nextCoreLive && windowFrac != null && (
+        <div title="the reveal window — the next core lands somewhere in here, no later than the end" style={{ marginTop: 8, height: 3, background: theme.barBg || "rgba(128,128,128,0.2)", borderRadius: 2, overflow: "hidden" }}>
+          <div style={{ width: `${Math.round(windowFrac * 100)}%`, height: "100%", background: gold, opacity: 0.85, transition: "width 1s linear" }} />
+        </div>
+      )}
     </>
   );
 
