@@ -178,5 +178,12 @@ t("buildReckoning: empty rig → zeros, no NaN; a leftover pending is flagged", 
   assert.ok(!/NaN/.test(reckoningText(r)));
 });
 
+t("reached depth is the deeper of plot.drillDay and drill.drillDay", () => {
+  const rack = buildColumnRack({ plot: { drillDay: 0, revealed: {} }, drill: { drillDay: 3 }, depthZ: 5 });
+  assert.deepEqual(rack.map((r) => r.state), ["revealed", "revealed", "revealed", "undrilled", "undrilled"]);
+  const r = buildReckoning({ plot: { drillDay: 0 }, drill: { drillDay: 3 }, allPlots: {}, userId: "me", column: null, depthZ: 5 });
+  assert.equal(r.reached, 3); assert.equal(r.neverReachedLayers, 2);
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

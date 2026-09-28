@@ -8133,7 +8133,10 @@ export default function OilPage() {
       default: return { label: String(drillStatus).toUpperCase(), color: theme.muted };
     }
   })();
-  const gaugesPanel = showGauges && (
+  // v2: the CORE SAMPLE card carries depth (the cylinder) and the last layer's
+  // assay, so the v1 gauge trio is redundant there. The one unique signal —
+  // hell proximity (AREA SCAN) — is a follow-up for the card's meta line.
+  const gaugesPanel = showGauges && !loopV2 && (
     <DrillGeode
       embedded
       drillEvent={drillEvent}
@@ -8178,6 +8181,7 @@ export default function OilPage() {
         cadence={revealCadence}
         rack={columnRack}
         ledger={rigLedger}
+        ended={gameEnded}
         onWalk={introComplete ? () => setWalkMode(true) : undefined}
       />
     </PanelSection>

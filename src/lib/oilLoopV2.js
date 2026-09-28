@@ -82,6 +82,9 @@ export function buildColumnRack({ plot, drill, depthZ = 20 }) {
   const p = plot || {};
   const d = drill || {};
   const pending = d.pending && typeof d.pending.layer === "number" ? d.pending : null;
+  // Reached depth: the plot doc is authoritative, but a rig doc can carry it
+  // too (legacy / optimistic paths) — take the deeper of the two.
+  const reached = Math.max(Number(p.drillDay) || 0, Number(d.drillDay) || 0);
   const out = [];
   for (let z = 0; z < depthZ; z++) {
     const inclusion = !!(p.inclusionFlags?.[z] || p.passedInclusions?.[z]);
@@ -105,7 +108,7 @@ export function buildColumnRack({ plot, drill, depthZ = 20 }) {
       out.push({ layer: z, state, oil: oil || 0, hasInclusion: inclusion, takenBy });
       continue;
     }
-    if (p.revealed?.[z] !== undefined || z < (p.drillDay || 0)) {
+    if (p.revealed?.[z] !== undefined || z < reached) {
       out.push({ layer: z, state: "revealed", oil: p.revealed?.[z] || 0, hasInclusion: inclusion, takenBy: null });
       continue;
     }
@@ -184,7 +187,7 @@ export function buildReckoning({ plot, drill, allPlots = {}, userId, column = nu
   const p = plot || {};
   const d = drill || {};
   const ledger = buildLedger({ plot: p, drill: d, allPlots, userId });
-  const reached = Math.max(0, Math.min(depthZ, Number(p.drillDay) || 0));
+  const reached = Math.max(0, Math.min(depthZ, Math.max(Number(p.drillDay) || 0, Number(d.drillDay) || 0)));
   const colHell = new Set((column && column.hell) || []);
 
   let columnTotal = 0, unknownLayers = 0, neverReachedOil = 0, hellLayers = 0, hellCapped = 0;
