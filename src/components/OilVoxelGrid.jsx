@@ -6395,7 +6395,7 @@ function MergedRigField({ nightStrength = 0, scene, items, allPumpConfigs, pumpC
   );
 }
 
-function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, peakDepthMap = {}, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, envMapPreset = "warehouse", skyEnv = null, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherEvents = [], plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null, cameraViewable = true, onFocusObject }) {
+function PumpjackInstances({ loopV2 = false, gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, peakDepthMap = {}, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, envMapPreset = "warehouse", skyEnv = null, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherEvents = [], plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null, cameraViewable = true, onFocusObject }) {
   // ?stock=1 — every rig unpainted (see STOCK_RIGS).
   if (STOCK_RIGS) { pumpConfig = null; allPumpConfigs = {}; }
   // Cells with a live gusher event. Each renders a full animated rig (instead of
@@ -8033,6 +8033,7 @@ export default function OilVoxelGrid({
 
         <group position={[0, worldH / 2, 0]}>
           <PumpjackInstances
+            loopV2={loopV2}
             gridX={gridX}
             gridY={gridY}
             cellSize={cellSize}
