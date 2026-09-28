@@ -3140,7 +3140,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			// clip). Separate full-scene pass (shows in the perf HUD draws), desktop-only,
 			// 'R' toggles it. This is the true reflection; refraction is the see-through.
 			const REFLECTION_ENABLED = true;   // EXPERIMENT: un-gated for mobile too (was !isMobileDevice). Revert if perf suffers.
-			let reflectionStrength = 1.4;   // 0..1+ overall strength (0 = off → hides the reflector, skipping its pass)
+			let reflectionStrength = 0.25;  // 0..1+ overall strength (0 = off → hides the reflector, skipping its pass)
 			let waterReflector = null;
 			let _reflLastOn = reflectionStrength > 0 ? reflectionStrength : 0.5;   // remembers tuned strength across the 'R' toggle
 			window.reflectionStrength = reflectionStrength;   // live tuning
@@ -3219,12 +3219,19 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			// bent by its ripples (with sun glints on top) instead of a flat tinted tube.
 			const fallingWaterTime = { value: 0.0 };
 			const curtainMeshes = [];             // filled when the GLB callback builds the two curtains
-			let curtainRefract = 1.0;             // 0 = classic tinted sheet, 1 = full see-through refraction (desktop)
-			let curtainSpec    = 1.0;             // sun glint strength on the sheet
-			let curtainOpacity = 1.0;             // overall sheet opacity multiplier
+			let curtainRefract = 0.25;            // 0 = classic tinted sheet, 1 = full see-through refraction (desktop)
+			let curtainSpec    = 0.2;             // sun glint strength on the sheet
+			let curtainOpacity = 0.65;            // overall sheet opacity multiplier
+			let curtainSplash  = 1.0;             // droplets leaping where the curtains land (0 = none)
 			window.curtainRefract = curtainRefract;   // live tuning (Water FX panel)
 			window.curtainSpec    = curtainSpec;
 			window.curtainOpacity = curtainOpacity;
+			window.curtainSplash  = curtainSplash;
+			// How far each curtain bells outward by its foot (vertex shader), and therefore
+			// the ring where it actually lands: the pool ripples, foam churn, splash mist and
+			// leaping droplets are all centred on these rings.
+			const CURTAIN_LIP = 0.07, SPILL_LIP = 0.035;
+			const CURTAIN_FOOT = { x: 0.052, z: -0.01, r: 0.32 + CURTAIN_LIP, y: WATER_SURFACE_Y };   // main column → main pool
 			const _curtainSunDir = new THREE.Vector3( 0, 1, 0 );
 			function makeCurtainUniforms( o ) {
 				return {
@@ -3465,7 +3472,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			// spray ported from the petri-dish water.js. Burst size + launch speed scale
 			// with the coin's impact velocity (see the emit at water entry), so a higher
 			// toss makes a bigger splash. Tunable live via the Water FX panel.
-			const DROP_MAX = 180;
+			const DROP_MAX = 420;   // coin splashes + the continuous curtain-foot droplets
 			const _dropPos  = new Float32Array(DROP_MAX * 3);
 			const _dropVel  = new Float32Array(DROP_MAX * 3);
 			const _dropLife = new Float32Array(DROP_MAX);
@@ -3494,10 +3501,10 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				scene.add(dropletPoints);
 			}
 			// emit `count` droplets from (x,y,z); `power` scales their launch speed.
-			function emitDroplets(x, y, z, count, power) {
+			function emitDroplets(x, y, z, count, power, scale) {
 				if (!dropletPoints) return;
 				power = power == null ? 1 : power;
-				count = Math.round(count * (window.splashDropScale ?? 1));
+				count = Math.round(count * (scale ?? window.splashDropScale ?? 1));
 				for (let n = 0; n < count; n++) {
 					const i = _dropHead; _dropHead = (_dropHead + 1) % DROP_MAX;
 					const a = Math.random() * Math.PI * 2, r = Math.random();
@@ -3511,6 +3518,15 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					_dropPos[i * 3 + 2] = z;
 					_dropY0[i]          = y;
 					_dropLife[i]        = 0.4 + Math.random() * 0.45;
+				}
+			}
+			// Continuous small hops where a curtain lands: `rate` droplets per frame (fractional
+			// rates emit probabilistically) at random points on the ring of radius r.
+			function emitFootDroplets(cx, cz, r, y, rate, power) {
+				let n = Math.floor(rate); if (Math.random() < rate - n) n++;
+				for (let i = 0; i < n; i++) {
+					const a = Math.random() * Math.PI * 2, rr = r + (Math.random() - 0.5) * 0.05;
+					emitDroplets(cx + Math.cos(a) * rr, y, cz + Math.sin(a) * rr, 1, power, 1);
 				}
 			}
 			function updateDroplets(dt) {
@@ -4139,6 +4155,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				wf.add( window, 'curtainRefract', 0, 1, 0.05 ).name( 'see-through  (0 = tinted)' ).listen();
 				wf.add( window, 'curtainSpec', 0, 3, 0.05 ).name( 'sun glints' ).listen();
 				wf.add( window, 'curtainOpacity', 0, 1, 0.05 ).name( 'opacity' ).listen();
+				wf.add( window, 'curtainSplash', 0, 3, 0.1 ).name( 'foot droplets' ).listen();
 
 				const uw = fxGui.addFolder( 'Underwater tint' );
 				uw.add( window, 'underwaterMinAlpha', 0, 1, 0.01 ).name( 'min (at surface)' ).listen();
@@ -5335,7 +5352,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                     uniforms: makeCurtainUniforms({
                         cx: 0.052, cz: -0.01, topY: bowlExitY, height: fallHeight, radius: fallRadius,
                         poolY: WATER_SURFACE_Y,           // lands on the main pool
-                        lip: 0.07,                        // bell flare by the foot
+                        lip: CURTAIN_LIP,                 // bell flare by the foot
                         streaks: Math.round(fallRadius * 56)   // ≈18: same streak density per unit of rim as the small spill
                     }),
                     vertexShader: fallingWaterVertexShader,
@@ -5369,7 +5386,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                         cx: TOP_BOWL_SPILL.centerX, cz: TOP_BOWL_SPILL.centerZ, topY: TOP_BOWL_SPILL.topY,
                         height: TOP_BOWL_SPILL.height, radius: TOP_BOWL_SPILL.radius,
                         poolY: TOP_BOWL_SPILL.excludeYLow,   // the coin-bowl water surface it lands on
-                        lip: 0.035,
+                        lip: SPILL_LIP,
                         streaks: Math.round(TOP_BOWL_SPILL.radius * 56)
                     }),
                     vertexShader: fallingWaterVertexShader,
@@ -6136,6 +6153,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				heightmapVariable.material.uniforms[ 'fallingWaterCenter' ] = { value: new THREE.Vector2( 0.052, -0.01 ) };
 				heightmapVariable.material.uniforms[ 'fallingWaterSize' ] = { value: 0.1 };
 				heightmapVariable.material.uniforms[ 'fallingWaterDeep' ] = { value: 0.001 };
+				heightmapVariable.material.uniforms[ 'fallingWaterRing' ] = { value: CURTAIN_FOOT.r };   // main column's landing ring
+				heightmapVariable.material.uniforms[ 'fallingWaterTurb' ] = { value: 0.0022 };
 				heightmapVariable.material.defines.BOUNDS = BOUNDS.toFixed( 1 );
 
 				const error = gpuCompute.init(); 
@@ -9097,17 +9116,23 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				updateDroplets(deltaTime);   // coin-splash droplet spray (arcs up + falls back)
 				
 				// Continuously emit particles at the water intersection
-				const fallingWaterCenter = heightmapVariable.material.uniforms['fallingWaterCenter'].value;
-				const fallingWaterRadius = heightmapVariable.material.uniforms['fallingWaterSize'].value;
-				
-				// Emit a few particles each frame
-				if (Math.random() < 0.95) { // 80% chance each frame
+				// Emit a few mist sprites each frame on the ring where the main curtain lands
+				if (Math.random() < 0.95) {
 					emitSplashParticles(
-						fallingWaterCenter.x,
-						fallingWaterCenter.y,
-						fallingWaterRadius,
-						Math.floor(2 + Math.random() * 6) // 2-4 particles per emission
+						CURTAIN_FOOT.x,
+						CURTAIN_FOOT.z,
+						CURTAIN_FOOT.r,
+						Math.floor(2 + Math.random() * 6),
+						{ spread: 0.14 }
 					);
+				}
+				// Droplets leaping where the two curtains hit their pools (Water FX: foot droplets)
+				{
+					const cs = (window.curtainSplash ?? curtainSplash);
+					if (cs > 0) {
+						emitFootDroplets(CURTAIN_FOOT.x, CURTAIN_FOOT.z, CURTAIN_FOOT.r, CURTAIN_FOOT.y, 2.2 * cs, 0.3);
+						emitFootDroplets(TOP_BOWL_SPILL.centerX, TOP_BOWL_SPILL.centerZ, TOP_BOWL_SPILL.radius + SPILL_LIP, TOP_BOWL_SPILL.excludeYLow, 0.7 * cs, 0.18);
+					}
 				}
 
 				// Splash where the top-bowl spill curtain meets the coin-bowl water:
@@ -9119,7 +9144,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						emitSplashParticles(
 							TOP_BOWL_SPILL.centerX,
 							TOP_BOWL_SPILL.centerZ,
-							TOP_BOWL_SPILL.radius,
+							TOP_BOWL_SPILL.radius + SPILL_LIP,
 							Math.floor(1 + Math.random() * sp.count),
 							{ y: TOP_BOWL_SPILL.topY - TOP_BOWL_SPILL.height, up: sp.up, spread: sp.spread, speed: sp.speed, size: sp.size }
 						);
@@ -10030,6 +10055,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					this.addParameter( 'heightmap', null );
 					this.addParameter( 'waterTime', 0 );
 					this.addParameter( 'uCalm', 0 ); // 1 = drop the concentric bullseye foam rings
+					this.addParameter( 'uFootR', CURTAIN_FOOT.r ); // radius of the ring where the curtain lands (foam churn centre)
 
 					// Refraction: GLSL compiled in only on desktop; the render() pre-pass
 					// feeds these each frame (uRefractMix 0 = no-op, even when compiled in).
@@ -10103,6 +10129,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				uniform vec2 fallingWaterCenter;
 				uniform float fallingWaterSize;
 				uniform float fallingWaterDeep;
+				uniform float fallingWaterRing;   // radius of the ring where the curtain lands (0 = point source)
+				uniform float fallingWaterTurb;   // churning turbulence strength on that ring
 
 				// Simple pseudo-random function (hash)
 				float hash(vec2 p) {
@@ -10160,24 +10188,31 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					// --- Falling water continuous splash ---
 					vec2 worldPos = (uv - vec2(0.5)) * BOUNDS;
   float distToCenter = length(worldPos - fallingWaterCenter);
+  // The curtain lands on a ring around the pedestal, so everything radiates from
+  // the distance to that RING (both inward and outward), not from the centre.
+  float distToFoot = abs(distToCenter - fallingWaterRing);
 
-  // Create expanding ripples from center
+  // Create expanding ripples from the landing ring
   float rippleSpeed = 4.0; // How fast ripples expand
   float rippleFrequency = 15.0; // How many ripples
   float rippleDecay = 2.0; // How quickly ripples fade with distance
 
   // Create outward moving ripples
-  float ripplePhase = distToCenter * rippleFrequency - time * rippleSpeed;
-  float rippleAmplitude = exp(-distToCenter * rippleDecay) * fallingWaterDeep;
+  float ripplePhase = distToFoot * rippleFrequency - time * rippleSpeed;
+  float rippleAmplitude = exp(-distToFoot * rippleDecay) * fallingWaterDeep;
 
   // Single clean ripple pattern
   float ripple = sin(ripplePhase) * rippleAmplitude;
 
-  // Only apply ripples within a certain radius
-  float maxRadius = 1.2; // Maximum ripple distance
-  ripple *= smoothstep(maxRadius, 0.0, distToCenter);
+  // Only apply ripples within a certain distance of the ring
+  float maxRadius = 0.7; // Maximum ripple distance
+  ripple *= smoothstep(maxRadius, 0.0, distToFoot);
 
-  newHeight += ripple;
+  // Churning turbulence right where the water hits: fast, fine noise in a narrow band
+  float footBand = smoothstep(0.10, 0.0, distToFoot);
+  float turb = (noise(worldPos * 38.0 + vec2(time * 2.7, -time * 3.1)) - 0.5) * fallingWaterTurb * footBand;
+
+  newHeight += ripple + turb;
 					// --- END falling water splash ---
 
 					// Update height history
@@ -10210,6 +10245,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				`,
 				common_frag: /* glsl */`				#include <common>
 				uniform float waterTime;
+				uniform float uFootR;            // ring where the falling curtain lands
 				uniform sampler2D heightmap;     // live wave height — drives depth tint, crest glow & caustic focus
 				#ifdef USE_REFRACTION
 				uniform sampler2D uRefract;      // scene rendered with the water hidden (the "under-water" view)
@@ -10359,18 +10395,21 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				//     falling-water column lands (adapted from the water-splash shader, MIT). ---
 				{
 					vec2 wp = ( vUv - 0.5 ) * BOUNDS;
-					vec2 dd = wp - vec2( 0.052, -0.01 );          // impact centre (matches heightmap)
+					vec2 dd = wp - vec2( 0.052, -0.01 );          // curtain centre (matches heightmap)
 					float r = length( dd );
 					float ang = atan( dd.y, dd.x );
-					float radial = smoothstep( 1.15, 0.0, r );    // strong near the impact, gone by the rim
+					// The curtain lands on a RING (uFootR): rings ripple out from it both ways and
+					// the churn is a band along it, not a blob at the centre under the pedestal.
+					float rf = abs( r - uFootR );
+					float radial = smoothstep( 0.6, 0.0, rf );    // strong at the landing ring, gone by the rim
 					vec2 vor = voronoi( dd * 11.0, 0.5, waterTime * 0.9 );
 					// Break the perfect circles: wobble each ring radius by angle + voronoi turbulence,
 					// so they read as irregular surface waves rather than a clean bullseye.
 					float wob = sin( ang * 5.0 + waterTime * 1.3 ) * 0.5 + sin( ang * 9.0 - waterTime * 0.7 ) * 0.3;
-					float rr = r + wob * 0.05 + ( vor.y - 0.45 ) * 0.10;
+					float rr = abs( r + wob * 0.05 + ( vor.y - 0.45 ) * 0.10 - uFootR );
 					float rings = 0.5 + 0.5 * sin( rr * 22.0 - waterTime * 3.2 );
 					rings = smoothstep( 0.5, 0.92, rings );
-					float churn = smoothstep( 0.45, 0.0, vor.x ) * smoothstep( 0.5, 0.0, r );
+					float churn = smoothstep( 0.45, 0.0, vor.x ) * smoothstep( 0.16, 0.0, rf );
 					float foam = clamp( rings * radial * 0.6 + churn * 0.7, 0.0, 1.0 ) * ( 1.0 - uCalm );
 					gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( 0.95, 0.99, 1.0 ), foam * 0.8 );
 				}
