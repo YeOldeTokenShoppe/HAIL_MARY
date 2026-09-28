@@ -355,7 +355,7 @@ const PANEL_SCREEN_H = 0.05;               // backing height (along Y)
 // in Blender, set MESH_ROT back to [0,0,0] so the digits stay coplanar with it.
 // LIFT pushes the digits off the quad face (flip sign if they render behind it);
 // GLYPH_FRAC = digit height as a fraction of the quad's shorter side.
-const PANEL_TEXT_LIFT = 0.003;
+const PANEL_TEXT_LIFT = 0.0005;
 // v2 label plates (LATERAL EXTRACT under the switch, ORDERS/AUTO-PILOT under the
 // key) — OFF since Michelle's 2026-09-28 re-export bakes the labels into the
 // model. Flip on for a rig GLB without them.
@@ -4331,7 +4331,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           h={pressureXform.h}
           fromMesh={pressureXform.fromMesh}
           label={`LAYER ${String(drillDay > 0 ? drillDay : 7).padStart(2, "0")} · PSI`}
-          captionFrac={0.24}
+          captionFrac={0.14}
           glyphFrac={0.4}
           token={pressure.label}
           idleHex={pressure.hex}
@@ -5134,7 +5134,7 @@ const KEY_TURN = Math.PI / 2;
 // The key turns about one of ITS OWN local axes, like the toggles (Michelle
 // moved it to the front of the box, 2026-09-28, and named X). Flip these two if
 // it turns the wrong way; or try live: window.__hmKey.axis("y") / .sign(-1).
-const KEY_AXIS = "x";   // "x" | "y" | "z" — the key mesh's local axis
+const KEY_AXIS = "y";   // "x" | "y" | "z" — the key mesh's local axis
 const KEY_SIGN = 1;     // +1 | -1
 const KEY_STORE_KEY = "hm:autopilot";
 // Synty gauge (2026-09-08): the needle is authored at 12 o'clock and the wedges run yellow
