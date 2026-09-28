@@ -29,7 +29,7 @@ import OilWelcomeModal from "@/components/OilWelcomeModal";
 import VendorSitePalHost from "@/components/VendorSitePalHost";
 import { setVendorGreetingContext } from "@/lib/vendorSitePal";
 import OilOverlayModal from "@/components/OilOverlayModal";
-import OilCoreSampleV2 from "@/components/OilCoreSampleV2";
+import OilCoreSampleV3 from "@/components/OilCoreSampleV3";
 import OilReckoning from "@/components/OilReckoning";
 import PlayerWalker from "@/components/PlayerWalker";
 import { chargesCapFor, buildColumnRack, buildLedger, buildReckoning, resolvePendingDecision } from "@/lib/oilLoopV2";
@@ -8231,7 +8231,7 @@ export default function OilPage() {
       </PanelTitle>
       {drillButton}
       {loopV2 && userDrill && userDrill.col != null && (
-        <OilCoreSampleV2
+        <OilCoreSampleV3
           theme={theme}
           pending={userDrill.pending}
           chargesRemaining={Math.max(0, chargesCapFor(userDrill, { passiveCharges }, DEPTH_Z) - (userDrill.chargesSpent || 0))}
