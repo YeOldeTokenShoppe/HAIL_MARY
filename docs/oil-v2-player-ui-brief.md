@@ -58,6 +58,7 @@ misses one will show plain chrome there.
 | Salvage board | ≥ 1 open pocket next door | first-lateral-wins framing, TAKE −1⚡, +N more |
 | Frontier board | ≥ 1 unclaimed neighbour in reach | "blind · assay unknown", WILDCAT −1⚡ |
 | Ledger | empty / populated | totals always; rows behind a toggle today (open question §8.5) |
+| Spectator · no rig | viewer has no claim (2026-09-28) | the same card, read-only, on the SELECTED plot as the field sees it: owner, revealed, extracted, open pockets, hell; "claim a plot to drill your own"; no verbs, no tabs |
 
 **Core rack cell states (9):** undrilled · pending · extracted · passed (open) · salvaged
 (a neighbour took it) · dry · hell · hell capped · revealed (neutral). Plain chrome uses

@@ -120,6 +120,10 @@ export default function OilCoreSampleV3({
   onDecide, onSetThreshold, salvage = [], onLateral, frontier = [], onWildcat, onWalk,
   cadence = null, rack = [], ledger = null,
   ended = false,      // settings.gameEnded — the ONLY thing that says "season closed"
+  // SPECTATOR: a viewer with no rig looks at the SELECTED plot as the field
+  // sees it — the public column (reveals, extractions, open pockets, hell),
+  // read-only, no verbs, with a nudge to claim. { col, row, owner } | null.
+  spectator = null,
 }) {
   const [tab, setTab] = useState("core"); // core | next | ledger
   const [busy, setBusy] = useState(false);
@@ -317,6 +321,45 @@ export default function OilCoreSampleV3({
       </div>
     </>
   );
+
+  if (spectator) {
+    const sp = spectator;
+    const extractedN = rack.filter((c) => c.state === "extracted").length;
+    const openN = rack.filter((c) => c.state === "passed").length;
+    const takenN = rack.filter((c) => c.state === "salvaged").length;
+    const hellN = rack.filter((c) => c.state === "hell" || c.state === "hell_capped").length;
+    const hasPlot = sp.col != null && sp.row != null;
+    return (
+      <div style={{ position: "relative", border: `1px solid ${theme.border || muted}`, background: theme.panelBg || "rgba(0,0,0,0.2)", padding: "12px 14px 12px", margin: "8px 0" }}>
+        {["tl", "tr", "bl", "br"].map((p) => <Bracket key={p} pos={p} color={gold} />)}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <span style={meta}>{String(revealedCount).padStart(2, "0")}/{rack.length || 20} // field view</span>
+          <span style={{ ...meta, color: seasonOver ? muted : theme.green }}>● {seasonOver ? "closed" : "live"}</span>
+        </div>
+        <div style={{ fontFamily: DISPLAY, fontSize: 15, fontWeight: 700, letterSpacing: "0.12em", color: cream, marginTop: 6, lineHeight: 1.15 }}>HAIL MARY<br />PROSPECTING CO.</div>
+        <div style={{ ...meta, color: gold, marginTop: 4 }}>{hasPlot ? `plot (${sp.col + 1},${sp.row + 1}) · ${sp.owner ? sp.owner : "unclaimed"}` : "select a plot on the field"}</div>
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 12 }}>
+          <CoreCylinder rack={rack} pending={null} theme={theme} />
+          <div style={{ flex: 1, minWidth: 0, paddingTop: 4 }}>
+            {dataRow("OWNER", hasPlot ? (sp.owner || "nobody yet") : "—", sp.owner ? theme.text : muted)}
+            {dataRow("REVEALED", `${revealedCount} of ${rack.length || 20}`)}
+            {dataRow("EXTRACTED", `${extractedN} layer${extractedN === 1 ? "" : "s"}`)}
+            {dataRow("OPEN", `${openN} pocket${openN === 1 ? "" : "s"}${takenN ? ` · ${takenN} taken` : ""}`, openN ? WALL.goo : theme.text)}
+            {hellN > 0 && dataRow("HELL", `${hellN} pocket${hellN === 1 ? "" : "s"}`, WALL.hell)}
+            <div style={{ marginTop: 8 }}>
+              {(hasPlot
+                ? ["This is the field's view of the column.", "Open pockets are what a neighbour could salvage.", "Claim a plot to drill your own."]
+                : ["Tap a plot to read its column.", "Claim one to drill your own."]).map(noteLine)}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 12, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${theme.border || muted}` }}>
+          {stat(`${revealedCount}/${rack.length || 20}`, "revealed", cream)}
+          {stat(String(openN), "open pockets", openN ? WALL.goo : muted)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ position: "relative", border: `1px solid ${theme.border || muted}`, background: theme.panelBg || "rgba(0,0,0,0.2)", padding: "12px 14px 12px", margin: "8px 0" }}>
