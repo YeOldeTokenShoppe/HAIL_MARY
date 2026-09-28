@@ -8158,7 +8158,51 @@ export default function OilPage() {
   // CORE SAMPLE panel for anyone with a rig on a loopV2 board. Admin / report /
   // test views keep the per-plot inspector (CoreSamplePanel) unless the admin
   // flips VIEW AS PLAYER. Rendered in the inspector's slot on both layouts.
-  const coreSampleCard = loopV2 && userDrill && userDrill.col != null && !isReport && !isTest && (!isAdmin || previewAsPlayer) && (
+  const v2Viewer = loopV2 && !isReport && !isTest && (!isAdmin || previewAsPlayer);
+  const spectatorPlot = (v2Viewer && !(userDrill && userDrill.col != null) && selectedX !== null) ? (allPlotsMap[`${selectedX}_${sliceY}`] || null) : null;
+  // Plain computation, NOT a hook: this sits below the page's early returns
+  // (settings loading, lobby), where a hook would change the hook order
+  // between renders. Twenty cells — cheaper than the memo would be.
+  const spectatorRack = spectatorPlot || v2Viewer ? buildColumnRack({ plot: spectatorPlot, drill: null, depthZ: DEPTH_Z }) : [];
+  // CLAIM from the spectator card — only when the server would accept it
+  // (oil-claim: real players during registration pre-anchor; testers while
+  // testingEnabled, incl. the active phase). Same handler as STAKE YOUR CLAIM.
+  const spectatorClaim = (() => {
+    if (!v2Viewer || (userDrill && userDrill.col != null) || selectedX === null) return { claim: null, claimNote: null };
+    if (!user?.id) return { claim: null, claimNote: "sign in to claim a plot" };
+    if (spectatorPlot?.currentOwnerId != null) return { claim: null, claimNote: null };
+    const registrationOpen = gamePhase === "ticket_sale" && !anchorBlockHash;
+    const testerOpen = gamePhase === "active" && testingEnabled;
+    if (registrationOpen || testerOpen) {
+      return {
+        claim: {
+          label: `Claim this plot (${selectedX + 1},${sliceY + 1})`,
+          note: registrationOpen ? "registration is open — first come, first served" : "testing is on — claims allowed mid-season",
+          onClaim: handleClaimActivePlot,
+        },
+        claimNote: null,
+      };
+    }
+    return { claim: null, claimNote: gameEnded ? "the season is over — join the next one from the lobby" : "claims are closed for this season — join the next-season waitlist from the lobby" };
+  })();
+  // No rig: the same card, read-only, on the SELECTED plot as the field sees it.
+  const coreSampleSpectator = v2Viewer && !(userDrill && userDrill.col != null) && (
+    <PanelSection theme={theme} isMobile={isMobile} tint id="core-sample-v2">
+      <PanelTitle
+        theme={theme} isMobile={isMobile} icon={PANEL_ICONS.core}
+        right={selectedX !== null ? <span style={{ color: theme.muted, letterSpacing: "0.08em", fontWeight: 400 }}>PLOT ({selectedX + 1}, {sliceY + 1})</span> : null}
+      >
+        CORE SAMPLE
+      </PanelTitle>
+      <OilCoreSampleV3
+        theme={theme} pending={null} chargesRemaining={0} chargesCap={0} threshold={0}
+        onDecide={async () => {}} onSetThreshold={async () => {}} onLateral={async () => {}} onWildcat={async () => {}}
+        rack={spectatorRack} ended={gameEnded}
+        spectator={{ col: selectedX !== null ? selectedX : null, row: selectedX !== null ? sliceY : null, owner: spectatorPlot?.username || (spectatorPlot?.currentOwnerId ? "a prospector" : null), ...spectatorClaim }}
+      />
+    </PanelSection>
+  );
+  const coreSampleCard = (v2Viewer && userDrill && userDrill.col != null && (
     <PanelSection theme={theme} isMobile={isMobile} tint id="core-sample-v2">
       <PanelTitle
         theme={theme} isMobile={isMobile} icon={PANEL_ICONS.core}
@@ -8185,12 +8229,12 @@ export default function OilPage() {
         onWalk={introComplete ? () => setWalkMode(true) : undefined}
       />
     </PanelSection>
-  );
+  )) || coreSampleSpectator;
 
   // Why the v2 card is not showing (loopV2 on, inspector visible): one line
   // above the inspector so nobody has to guess — admin without VIEW AS PLAYER,
   // signed out, or no rig on this board.
-  const coreSampleHint = loopV2 && !coreSampleCard && !isTest && !isReport && (
+  const coreSampleHint = loopV2 && !coreSampleCard && !isTest && !isReport && isAdmin && !previewAsPlayer && (
     <div style={{ padding: "6px 14px", fontFamily: "'Share Tech Mono', monospace", fontSize: 10, letterSpacing: "0.08em", lineHeight: 1.6, color: theme.muted, borderBottom: `1px solid ${theme.border}` }}>
       LOOP V2 is on · {isAdmin && !previewAsPlayer
         ? "turn VIEW AS PLAYER on to see the player's CORE SAMPLE card"
