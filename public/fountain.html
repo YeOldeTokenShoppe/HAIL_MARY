@@ -3212,11 +3212,40 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
             let underwaterOverlay = null;
             let previouslyVisibleElements = new Map(); // Track which elements were visible
 
-			const fallingWaterUniforms = {
-        iTime: { value: 0.0 }
-        // We might add a noise texture sampler here later if needed
-        // WN_TEX: { value: null }
-    };
+			// --- Waterfall curtains (main column + top-bowl spill) ---------------------
+			// Both curtains share the clock and the shader; everything about placement is a
+			// per-curtain uniform (see makeCurtainUniforms). The curtains are hidden from the
+			// refraction pre-pass and then SAMPLE it, so each sheet shows the scene behind it
+			// bent by its ripples (with sun glints on top) instead of a flat tinted tube.
+			const fallingWaterTime = { value: 0.0 };
+			const curtainMeshes = [];             // filled when the GLB callback builds the two curtains
+			let curtainRefract = 1.0;             // 0 = classic tinted sheet, 1 = full see-through refraction (desktop)
+			let curtainSpec    = 1.0;             // sun glint strength on the sheet
+			let curtainOpacity = 1.0;             // overall sheet opacity multiplier
+			window.curtainRefract = curtainRefract;   // live tuning (Water FX panel)
+			window.curtainSpec    = curtainSpec;
+			window.curtainOpacity = curtainOpacity;
+			const _curtainSunDir = new THREE.Vector3( 0, 1, 0 );
+			function makeCurtainUniforms( o ) {
+				return {
+					iTime:        fallingWaterTime,
+					uCenter:      { value: new THREE.Vector2( o.cx, o.cz ) },
+					uTopY:        { value: o.topY },      // rim the water spills from
+					uHeight:      { value: o.height },    // geometric drop of the cylinder
+					uRadius:      { value: o.radius },
+					uPoolY:       { value: o.poolY },     // surface it lands on (foam band there, cut below)
+					uLip:         { value: o.lip },       // how far the bell flares outward by the foot
+					uStreaks:     { value: o.streaks },   // integer streak count around the circumference
+					uRefract:     { value: null },
+					uRefractDepth:{ value: null },
+					uRefrOn:      { value: 0.0 },
+					uRefrAmt:     { value: 0.045 },
+					uSunDir:      { value: _curtainSunDir },
+					uSunColor:    { value: new THREE.Color( 1.0, 0.62, 0.35 ) },
+					uSpec:        { value: 1.0 },
+					uOpacity:     { value: 1.0 }
+				};
+			}
 
 			// --- Top-bowl spill (third water shader) -------------------------------
 			// A decorative water curtain spilling from the small raised central bowl
@@ -3256,25 +3285,46 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			            // --- NEW: Falling Water Shaders ---
 
 						const fallingWaterVertexShader = `
+                uniform vec2 uCenter;
+                uniform float uTopY, uHeight, uLip;
                 varying vec2 vUv;
                 varying vec3 vWorldPosition; // Pass world position to fragment shader
-                varying vec3 vWorldNormal;   // World-space normal for fresnel rim
+                varying vec3 vWorldNormal;   // World-space normal for lighting / fresnel
+                varying vec4 vClip;          // clip position → screen uv for the refraction sample
 
                 void main() {
                     vUv = uv;
-                    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                    vec3 p = position;   // cylinder is pre-translated into world space
+                    vec2 radial = p.xz - uCenter;
+                    radial /= max( length( radial ), 1e-4 );
+                    float drop = clamp( ( uTopY - p.y ) / uHeight, 0.0, 1.0 );
+                    // Spill parabola: water leaves the rim moving outward and gravity bends it
+                    // down, so the sheet bells out toward the foot instead of hanging straight.
+                    p.xz += radial * uLip * sqrt( drop );
+                    // surface of revolution r(y): normal tilts up the flare
+                    float tilt = min( uLip * 0.5 / ( uHeight * sqrt( max( drop, 0.02 ) ) ), 1.5 );
+                    vec3 n = normalize( vec3( radial.x, tilt, radial.y ) );
+                    vec4 worldPosition = modelMatrix * vec4( p, 1.0 );
                     vWorldPosition = worldPosition.xyz;
-                    vWorldNormal = normalize(mat3(modelMatrix) * normal);
+                    vWorldNormal = normalize( mat3( modelMatrix ) * n );
                     gl_Position = projectionMatrix * viewMatrix * worldPosition;
+                    vClip = gl_Position;
                 }
             `;
 
             const fallingWaterFragmentShader = `
                 uniform float iTime;
+                uniform vec2 uCenter;
+                uniform float uTopY, uHeight, uRadius, uPoolY, uStreaks;
+                uniform float uRefrOn, uRefrAmt, uSpec, uOpacity;
+                uniform vec3 uSunDir, uSunColor;
+                uniform sampler2D uRefract;       // scene rendered with the water + curtains hidden
+                uniform sampler2D uRefractDepth;  // its depth: never bend something in FRONT of the sheet
 
                 varying vec2 vUv;
                 varying vec3 vWorldPosition;
                 varying vec3 vWorldNormal;
+                varying vec4 vClip;
 
                 float hash( vec2 p ) {
                     return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453123);
@@ -3314,46 +3364,96 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 }
 
                 void main() {
-                    // Falling coordinate: world height scrolled by time, so features move DOWN the sheet
-                    float fall = vWorldPosition.y * 5.0 + iTime * 2.4;
+                    vec3 P = vWorldPosition;
+                    float drop = clamp( ( uTopY - P.y ) / uHeight, 0.0, 1.0 );   // 0 at the rim, 1 at the foot
 
-                    // Noise sampled in world space around the column (vWorldPosition has no
-                    // seam at the UV wrap, unlike vUv.x)
-                    float n1 = vnoise(vec2(vWorldPosition.x * 9.0 + vWorldPosition.z * 3.0, fall));
-                    float n2 = vnoise(vec2(vWorldPosition.z * 14.0 - vWorldPosition.x * 5.0, fall * 1.6 + 7.3));
+                    // --- Gravity: a feature that left the rim has fallen 0.5*g*t^2, so its age is
+                    //     sqrt(2*drop/g). Sampling the streak field by release time (now - age)
+                    //     makes features accelerate and stretch on the way down. g in scene units.
+                    float age  = sqrt( ( drop * uHeight + 0.04 ) * 2.0 / 5.0 );
+                    float fall = ( iTime - age ) * 2.6;
 
-                    // Vertical streaks around the circumference (integer count wraps cleanly),
-                    // wobbled by the falling noise so they shimmer on the way down
-                    float streak = sin(vUv.x * 6.2831853 * 18.0 + n1 * 5.0) * 0.5 + 0.5;
+                    vec2 d = P.xz - uCenter;
+                    float ang = atan( d.y, d.x );
+
+                    // Noise sampled in world space around the column (no UV-wrap seam)
+                    float n1 = vnoise(vec2(P.x * 9.0 + P.z * 3.0, fall));
+                    float n2 = vnoise(vec2(P.z * 14.0 - P.x * 5.0, fall * 1.6 + 7.3));
+
+                    // Vertical streaks (integer count wraps cleanly), wobbled by the falling noise
+                    float streak = sin( ang * uStreaks + n1 * 5.0 ) * 0.5 + 0.5;
                     float pattern = streak * 0.55 + n1 * 0.45 + n2 * 0.45;
 
-                    // Voronoi "churn": animated cells tumbling DOWN the sheet (fall scrolls
-                    // them), sampled in world space like the noise above so there's no UV seam.
-                    // vor.x = distance to nearest cell centre, vor.y = a soft cell field.
-                    vec2 vor = voronoi(vec2(vWorldPosition.x * 13.0 + vWorldPosition.z * 5.0, fall * 0.7), 0.5, iTime * 0.6);
+                    // Voronoi "churn": animated cells tumbling DOWN the sheet
+                    vec2 vor = voronoi(vec2(P.x * 13.0 + P.z * 5.0, fall * 0.7), 0.5, iTime * 0.6);
                     float foam = smoothstep(0.22, 0.02, vor.x);   // bright crests where cells clump
                     pattern = pattern * (0.7 + 0.4 * vor.y) + foam * 0.45;
 
-                    vec3 baseColor = vec3(0.6, 0.8, 0.95);
-                    baseColor = mix(baseColor, vec3(0.93, 0.98, 1.0), foam * 0.6);  // white foam tint
-                    float finalAlpha = 0.42 * smoothstep(0.25, 1.0, pattern);
-                    finalAlpha = max(finalAlpha, foam * 0.22);     // foam crests stay visible
+                    // --- Break-up: as the sheet speeds up it thins into ropes and drops, so the
+                    //     coverage threshold rises with the drop (gaps show the real scene behind)
+                    float breakup = smoothstep( 0.35, 1.0, drop );
+                    float cover = smoothstep( 0.25 + 0.35 * breakup, 1.0 + 0.15 * breakup, pattern );
+                    cover = max( cover, foam * 0.5 );
 
-                    // Fresnel rim: the sheet reads thicker at grazing angles and picks up
-                    // a warm edge from the sunset
-                    vec3 viewDir = normalize(cameraPosition - vWorldPosition);
-                    float facing = abs(dot(viewDir, normalize(vWorldNormal)));
-                    float fresnel = pow(1.0 - facing, 2.0);
-                    finalAlpha = min(finalAlpha + fresnel * 0.25, 0.7);
-                    baseColor += fresnel * vec3(0.35, 0.25, 0.12);
+                    // --- Foot: white churn where the sheet meets the pool, then cut just below it
+                    float abovePool = P.y - uPoolY;
+                    float foot = 1.0 - smoothstep( 0.0, 0.07, abovePool );
+                    float churn = 0.55 + 0.45 * vnoise( vec2( ang * uRadius * 40.0, iTime * 3.0 + P.y * 24.0 ) );
+                    foam  = max( foam, foot * churn * 0.7 );
+                    cover = max( cover, foot * churn * 0.8 );
 
-                    // Soft fades where the sheet leaves the bowl (top) and meets the pool (bottom)
-                    float edgeFade = smoothstep(0.0, 0.22, vUv.y) * (1.0 - smoothstep(0.85, 1.0, vUv.y));
-                    finalAlpha *= edgeFade;
+                    // --- Ripple normal from the streak field (cheap finite differences), used
+                    //     for the sun glints and to bend the refraction sample
+                    vec3 V  = normalize( cameraPosition - P );
+                    vec3 Ng = normalize( vWorldNormal );
+                    if ( dot( Ng, V ) < 0.0 ) Ng = -Ng;                 // double-sided sheet: face the viewer
+                    float e = 0.02;
+                    float gx = vnoise(vec2((P.x + e) * 9.0 + P.z * 3.0, fall)) - vnoise(vec2((P.x - e) * 9.0 + P.z * 3.0, fall));
+                    float gy = vnoise(vec2(P.x * 9.0 + P.z * 3.0, fall + 0.25)) - vnoise(vec2(P.x * 9.0 + P.z * 3.0, fall - 0.25));
+                    vec3 T = normalize( cross( vec3( 0.0, 1.0, 0.0 ), Ng ) );  // around the circumference
+                    vec3 N = normalize( Ng + T * gx * 3.0 + vec3( 0.0, gy * 1.5, 0.0 ) );
 
-                    if (finalAlpha < 0.02) discard;
+                    // --- Lighting: sun glints on the ripples + a sky rim at grazing angles
+                    vec3 L = normalize( uSunDir );
+                    vec3 H = normalize( V + L );
+                    float nh = max( dot( N, H ), 0.0 );
+                    float spec = ( pow( nh, 90.0 ) * 0.9 + pow( nh, 14.0 ) * 0.08 ) * uSpec;
+                    float fres = pow( 1.0 - max( dot( N, V ), 0.0 ), 3.0 );
 
-                    gl_FragColor = vec4(baseColor, finalAlpha);
+                    vec3 tint = vec3( 0.6, 0.8, 0.95 );
+                    vec3 foamCol = vec3( 0.93, 0.98, 1.0 );
+
+                    // --- Classic tinted sheet (mobile / refraction off)
+                    vec3 flatCol = mix( tint, foamCol, foam * 0.6 );
+                    float flatA  = max( 0.42 * cover, foam * 0.22 );
+                    flatA = min( flatA + fres * 0.25, 0.7 );
+                    flatCol += fres * vec3( 0.35, 0.25, 0.12 );
+
+                    // --- See-through sheet: the scene behind, bent by the ripples and tinted by
+                    //     how much water is here; the gaps are fully transparent (real background)
+                    vec2 suv = vClip.xy / vClip.w * 0.5 + 0.5;
+                    vec3 nv  = mat3( viewMatrix ) * ( N - Ng );          // bend from the ripples only, not the sheet's own curve
+                    vec2 ouv = clamp( suv + nv.xy * uRefrAmt * ( 0.5 + cover ), 0.002, 0.998 );
+                    if ( texture2D( uRefractDepth, ouv ).x < gl_FragCoord.z ) ouv = suv;   // bent onto foreground → straighten
+                    vec3 behind = texture2D( uRefract, ouv ).rgb;
+                    vec3 seeCol = mix( behind, behind * tint * 1.08, 0.55 * cover );
+                    seeCol = mix( seeCol, foamCol, foam * 0.55 );
+                    float seeA = clamp( cover * 0.85 + foam * 0.25 + fres * 0.15, 0.0, 0.95 );
+
+                    vec3 col = mix( flatCol, seeCol, uRefrOn );
+                    float alpha = mix( flatA, seeA, uRefrOn );
+                    col += uSunColor * spec * ( 0.4 + 0.6 * cover );
+                    col += vec3( 0.55, 0.62, 0.72 ) * fres * 0.2;
+
+                    alpha *= smoothstep( 0.0, 0.05, drop );                    // ease off the rim
+                    alpha *= smoothstep( -0.04, 0.0, abovePool );              // gone once under the pool surface
+                    alpha *= uOpacity;
+
+                    if ( alpha < 0.02 ) discard;
+
+                    gl_FragColor = vec4( col, alpha );
+                    #include <tonemapping_fragment>
+                    #include <colorspace_fragment>
                 }
             `;
             // --- END NEW ---
@@ -3513,7 +3613,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						}
 					`,
 					blending: THREE.NormalBlending,
-  depthWrite: true,
+  depthWrite: false,   // soft sprites must not carve holes in the curtain / pool drawn after them
   depthTest: true,
   transparent: true,
   opacity: 0.1,
@@ -3521,6 +3621,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				});
 				
 				splashParticleSystem = new THREE.Points(particleGeometry, particleMaterial);
+				splashParticleSystem.renderOrder = 1;   // after the curtains (0) so they blend over the sheet, not clip against it
 				scene.add(splashParticleSystem);
 			}
 			
@@ -4033,6 +4134,11 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				fc.add( window, 'floorCausticOnStrength', 0, 1.5, 0.05 ).name( 'strength' ).listen();
 				fc.add( window, 'causticSlopeGain', 0, 3, 0.05 ).name( 'slope gain' ).listen();
 				fc.add( window, 'causticFloorDepth', 0.05, 1.2, 0.01 ).name( 'floor depth' ).listen();
+
+				const wf = fxGui.addFolder( 'Waterfall curtains' );
+				wf.add( window, 'curtainRefract', 0, 1, 0.05 ).name( 'see-through  (0 = tinted)' ).listen();
+				wf.add( window, 'curtainSpec', 0, 3, 0.05 ).name( 'sun glints' ).listen();
+				wf.add( window, 'curtainOpacity', 0, 1, 0.05 ).name( 'opacity' ).listen();
 
 				const uw = fxGui.addFolder( 'Underwater tint' );
 				uw.add( window, 'underwaterMinAlpha', 0, 1, 0.01 ).name( 'min (at surface)' ).listen();
@@ -5226,7 +5332,12 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 fallingWaterGeometry.translate(0.052, bowlExitY - fallHeight / 2, -0.01); // Center it vertically
 
                 const fallingWaterMaterial = new THREE.ShaderMaterial({
-                    uniforms: fallingWaterUniforms, // Use the uniforms we defined earlier
+                    uniforms: makeCurtainUniforms({
+                        cx: 0.052, cz: -0.01, topY: bowlExitY, height: fallHeight, radius: fallRadius,
+                        poolY: WATER_SURFACE_Y,           // lands on the main pool
+                        lip: 0.07,                        // bell flare by the foot
+                        streaks: Math.round(fallRadius * 56)   // ≈18: same streak density per unit of rim as the small spill
+                    }),
                     vertexShader: fallingWaterVertexShader,
                     fragmentShader: fallingWaterFragmentShader,
                     transparent: true, // Needed for alpha
@@ -5243,6 +5354,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 fallingWaterMesh.receiveShadow = true; // Or false if preferred
 
                 scene.add(fallingWaterMesh);
+                curtainMeshes.push(fallingWaterMesh);
 
                 // --- Third water shader: spill from the small raised top bowl into
                 // the coin bowl. Same look as the main curtain (shares its shader +
@@ -5253,7 +5365,13 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 topSpillGeometry.translate(
                     TOP_BOWL_SPILL.centerX, TOP_BOWL_SPILL.topY - TOP_BOWL_SPILL.height / 2, TOP_BOWL_SPILL.centerZ);
                 const topSpillMaterial = new THREE.ShaderMaterial({
-                    uniforms: fallingWaterUniforms, // shares the falling-water time/look
+                    uniforms: makeCurtainUniforms({
+                        cx: TOP_BOWL_SPILL.centerX, cz: TOP_BOWL_SPILL.centerZ, topY: TOP_BOWL_SPILL.topY,
+                        height: TOP_BOWL_SPILL.height, radius: TOP_BOWL_SPILL.radius,
+                        poolY: TOP_BOWL_SPILL.excludeYLow,   // the coin-bowl water surface it lands on
+                        lip: 0.035,
+                        streaks: Math.round(TOP_BOWL_SPILL.radius * 56)
+                    }),
                     vertexShader: fallingWaterVertexShader,
                     fragmentShader: fallingWaterFragmentShader,
                     transparent: true,
@@ -5263,6 +5381,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 topBowlSpillMesh.castShadow = false;
                 topBowlSpillMesh.receiveShadow = true;
                 scene.add(topBowlSpillMesh);
+                curtainMeshes.push(topBowlSpillMesh);
                 window.topBowlSpillMesh = topBowlSpillMesh; // exposed for quick console tuning
 
 						// --- Adjust position, scale, rotation as needed ---
@@ -8911,7 +9030,12 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 				// No need to check in animation loop anymore - assets are tracked properly
 				
-				fallingWaterUniforms.iTime.value = performance.now() / 1000.0; // Pass time in seconds
+				fallingWaterTime.value = performance.now() / 1000.0; // curtain clock (seconds)
+				if (sun) _curtainSunDir.copy(sun.position).sub(sun.target.position).normalize();
+				for (const m of curtainMeshes) {
+					m.material.uniforms.uSpec.value    = (window.curtainSpec ?? curtainSpec);
+					m.material.uniforms.uOpacity.value = (window.curtainOpacity ?? curtainOpacity);
+				}
                 // --- END NEW ---
 				if (heightmapVariable) { // Check if initialized
                     heightmapVariable.material.uniforms['time'].value = performance.now() / 1000.0;
@@ -9782,7 +9906,9 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				// under-water view bent by the ripple normals. Desktop-only + gated by mix.
 				const _rMix = REFRACTION_ENABLED ? (window.refractionMix ?? refractionMix) : 0.0;
 				const _waterMeshes = [waterMesh, upperWaterMesh, topBowlWaterMesh].filter(Boolean);
-				if (_rMix > 0 && _waterMeshes.length) {
+				const _cRef = REFRACTION_ENABLED ? (window.curtainRefract ?? curtainRefract) : 0.0;
+				let _curtainFed = false;
+				if ((_rMix > 0 || _cRef > 0) && _waterMeshes.length) {
 					renderer.getDrawingBufferSize(_refractSize);
 					const _rw = Math.max(2, Math.floor(_refractSize.x * 0.6));   // low-res: refraction is soft anyway
 					const _rh = Math.max(2, Math.floor(_refractSize.y * 0.6));
@@ -9794,12 +9920,21 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					}
 					_refractRes.set(_rw, _rh);
 					for (const m of _waterMeshes) m.visible = false;
+					for (const m of curtainMeshes) m.visible = false;      // the curtains sample this pass, so they can't be in it
 					if (waterReflector) waterReflector.visible = false;   // keep the mirror plane out of the refraction (re-gated below)
 					const _prevRT = renderer.getRenderTarget();
 					renderer.setRenderTarget(refractRT);
 					renderer.render(scene, camera);          // "everything under the water"
 					renderer.setRenderTarget(_prevRT);
 					for (const m of _waterMeshes) m.visible = true;
+					for (const m of curtainMeshes) {
+						m.visible = true;
+						const u = m.material.uniforms;
+						u.uRefract.value = refractRT.texture;
+						u.uRefractDepth.value = refractRT.depthTexture;
+						u.uRefrOn.value = _cRef;
+					}
+					_curtainFed = true;
 					for (const m of _waterMeshes) {
 						m.material.uRefract = refractRT.texture;
 						m.material.uRefractRes = _refractRes;
@@ -9812,6 +9947,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					}
 				}
 				for (const m of _waterMeshes) { if (m.material && ('uRefractMix' in m.material)) m.material.uRefractMix = _rMix; }
+				if (!_curtainFed) for (const m of curtainMeshes) m.material.uniforms.uRefrOn.value = 0.0;   // no pass this frame → tinted sheet
 
 				// Planar reflection: update strength + gate. Hiding the reflector when off
 				// skips its onBeforeRender (the mirror pass) entirely. When on, it renders
