@@ -90,7 +90,8 @@ order: *"if you're away, the crew follows your standing order (extract ≥ 800) 
 |---|---|---|
 | charge (⚡) | drill, bonus drill | a charge is what you spend; the bore drills by itself |
 | standing order | threshold, line, limit, price | see above |
-| EXTRACT / PASS | bank, keep, skip | extraction *is* banking in v2; BANK is v1 |
+| EXTRACT (the one button); "let it go now" for an explicit pass | bank, keep, skip, PASS as a big button | one button (2026-09-28): doing nothing = the crew's orders |
+| LATERAL EXTRACT (the switch) · ORDERS / AUTO-PILOT (the key) | SALVAGE as a control name, MANUAL | the crew is always active; the key sets how much initiative it takes |
 | salvage · taken | poach, steal | a lateral takes what its owner discarded; the race is between rivals |
 | frontier · wildcat | claim-jump, raid | unclaimed ground, drilled blind |
 | core · assay · BTR | oil amount, score | the number is exact; the ambiguity lives only in the inclusion ping |

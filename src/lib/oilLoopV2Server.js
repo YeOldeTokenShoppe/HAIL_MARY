@@ -108,7 +108,13 @@ export function applyLateralTake(t, {
     laterals: FieldValue.increment(1),
     updatedAt: FieldValue.serverTimestamp(),
   };
-  if (viaOrder) drillUpdate.lateralsByOrder = FieldValue.increment(1);
+  if (viaOrder) {
+    drillUpdate.lateralsByOrder = FieldValue.increment(1);
+    // QUEUE (Michelle, 2026-09-28): an order that fires goes to the back —
+    // re-stamped now, so the next contested pocket goes to whoever has
+    // waited longest. Earliest order still wins the first one.
+    drillUpdate.orders = { salvageSetAt: Date.now() };
+  }
   if (hasInclusion && inclusionArtifact) {
     drillUpdate.artifacts = { [inclusionItemKey(inclusionArtifact)]: FieldValue.increment(1) };
     drillUpdate.artifactFinds = FieldValue.increment(1);

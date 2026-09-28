@@ -4752,11 +4752,11 @@ export default function OilPage() {
     return data;
   }, [oilApiFetch]);
   // The rig's MACHINE PANEL acts too (Michelle, 2026-09-28: both surfaces, same
-  // handlers). The pumpjack fires window events on a confirmed press — the caged
-  // PASS (hm:pass-confirm) and, under v2, the red button as EXTRACT
-  // (hm:extract-confirm) — each carrying the rig's plotId. Only the player's own
-  // rig with a core on the table acts; anything else is ignored. A server
-  // refusal (no charges, no pending) changes nothing and is logged.
+  // handlers). ONE BUTTON: the caged button is EXTRACT (hm:extract-confirm with
+  // the rig's plotId); doing nothing hands the layer to the crew's orders. Only
+  // the player's own rig with a core on the table acts; anything else is
+  // ignored. A server refusal (no charges, no pending) changes nothing and is
+  // logged. The card keeps a small "let it go now" for an explicit pass.
   useEffect(() => {
     if (!loopV2) return undefined;
     const onConfirm = (action) => (e) => {
@@ -4765,21 +4765,20 @@ export default function OilPage() {
       if (plotId && plotId !== `${userDrill.col}_${userDrill.row}`) return;
       handleLayerDecide(action).catch((err) => console.warn(`[rig panel] ${action} failed:`, err.message));
     };
-    const onPass = onConfirm("pass"), onExtract = onConfirm("extract");
-    // Panel orders: the key = AUTOPILOT; the first toggle (N) = SALVAGE (option B —
-    // toggles are orders, not neighbours; the other three are dead for now).
+    const onExtract = onConfirm("extract");
+    // Panel orders: the key = ORDERS / AUTO-PILOT; the first toggle (N) = LATERAL
+    // EXTRACT (option B — toggles are orders, not neighbours; the rest are dead).
     const own = userDrill && userDrill.col != null;
     const onKey = (e) => { if (own) handleSetOrders({ autopilot: !!e?.detail?.on }).catch((err) => console.warn("[rig panel] autopilot failed:", err.message)); };
     const onToggle = (e) => {
       if (!own || e?.detail?.dir !== "N") return;
       handleSetOrders({ salvage: !!e?.detail?.on }).catch((err) => console.warn("[rig panel] salvage order failed:", err.message));
     };
-    window.addEventListener("hm:pass-confirm", onPass);
     window.addEventListener("hm:extract-confirm", onExtract);
     window.addEventListener("hm:autopilot", onKey);
     window.addEventListener("hm:lateral-toggle", onToggle);
     return () => {
-      window.removeEventListener("hm:pass-confirm", onPass); window.removeEventListener("hm:extract-confirm", onExtract);
+      window.removeEventListener("hm:extract-confirm", onExtract);
       window.removeEventListener("hm:autopilot", onKey); window.removeEventListener("hm:lateral-toggle", onToggle);
     };
   }, [loopV2, userDrill, handleLayerDecide, handleSetOrders]);
