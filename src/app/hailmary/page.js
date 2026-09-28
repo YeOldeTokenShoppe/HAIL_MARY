@@ -5436,6 +5436,25 @@ export default function OilPage() {
           if (!r?.ok) throw new Error(r?.error || "failed");
           return `✓ claimed (${selectedX + 1}, ${sliceY + 1}) ${user?.id ? "for you" : "as admin_test"} — now FORCE STRIKE to drill it`;
         })}>CLAIM SELECTED</button>
+        {/* TEST BOTS (2026-09-28): rigs with no human, for the lateral-extract queue.
+            PASSER: its line is 1e9, so every wet layer it reveals passes at the next
+            strike. TAKER n: line 0 + lateral extract ON, stamped n ms apart so the
+            queue order is known (TAKER 1 goes first). Claim a passer, two takers next
+            to it, FORCE STRIKE twice, watch the pocket move — then again for the turn. */}
+        <button disabled={toolBusy || selectedX === null} style={styles.btn} onClick={() => runTool("Claiming passer bot", async () => {
+          if (selectedX === null) throw new Error("select a plot first");
+          const r = await fetch("/api/oil-admin-claim", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: adminPassword, userId: "bot_passer", username: "PASSER BOT", col: selectedX, row: sliceY, threshold: 1e9, autopilot: false, orders: { salvage: false } }) }).then((x) => x.json());
+          if (!r?.ok) throw new Error(r?.error || "failed");
+          return `✓ PASSER BOT on (${selectedX + 1}, ${sliceY + 1}) — its line is 1e9, so it passes every wet layer at the next strike`;
+        })}>CLAIM AS PASSER BOT</button>
+        {[1, 2].map((n) => (
+          <button key={n} disabled={toolBusy || selectedX === null} style={styles.btn} onClick={() => runTool(`Claiming taker bot ${n}`, async () => {
+            if (selectedX === null) throw new Error("select a plot first");
+            const r = await fetch("/api/oil-admin-claim", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: adminPassword, userId: `bot_taker_${n}`, username: `TAKER BOT ${n}`, col: selectedX, row: sliceY, threshold: 0, autopilot: false, orders: { salvage: true, salvageSetAt: 1700000000000 + n } }) }).then((x) => x.json());
+            if (!r?.ok) throw new Error(r?.error || "failed");
+            return `✓ TAKER BOT ${n} on (${selectedX + 1}, ${sliceY + 1}) — lateral extract ON, line 0, queue slot ${n}`;
+          })}>CLAIM AS TAKER BOT {n}</button>
+        ))}
         <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Forcing strike", async () => {
           let url = `/api/oil-strike-tick?password=${encodeURIComponent(adminPassword)}&force=1&deep=${toolDeep}`;
           let scope = " (all rigs)";

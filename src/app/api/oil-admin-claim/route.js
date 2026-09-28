@@ -5,7 +5,11 @@ import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
 // so you can edit/test your own rig (e.g. sign uploads). Password-gated.
 export async function POST(req) {
   try {
-    const { password, userId, username, col, row } = await req.json();
+    // `threshold` / `orders` / `autopilot` are optional — TEST BOTS use them:
+    // a PASSER bot (threshold 1e9 → its line passes every wet layer) and TAKER
+    // bots (threshold 0 + orders.salvage) exercise the lateral-extract queue
+    // from one admin account (Michelle, 2026-09-28).
+    const { password, userId, username, col, row, threshold, orders, autopilot } = await req.json();
 
     if (!process.env.ADMIN_PASSWORD || password !== process.env.ADMIN_PASSWORD) {
       return NextResponse.json({ ok: false }, { status: 401 });
@@ -32,6 +36,15 @@ export async function POST(req) {
       drillDay: 0,
       revealed: FieldValue.delete(),
       hellLayers: FieldValue.delete(),
+      hellCapped: FieldValue.delete(),
+      // v2 state — a re-claimed plot starts clean (no stale passes/takes)
+      extracted: FieldValue.delete(),
+      passed: FieldValue.delete(),
+      passedInclusions: FieldValue.delete(),
+      lateralTaken: FieldValue.delete(),
+      lateralByOrder: FieldValue.delete(),
+      wildcatTaken: FieldValue.delete(),
+      inclusionFlags: FieldValue.delete(),
       ownerHistory: FieldValue.arrayUnion({
         userId,
         claimedAt: new Date().toISOString(),
@@ -50,6 +63,17 @@ export async function POST(req) {
       armed: true,
       rigDepleted: false,
       username: username || "admin",
+      // v2 decision state starts clean (banked totalCollected is left alone —
+      // ZERO SCORES is the tool for money)
+      pending: null,
+      chargesSpent: 0,
+      layersExtracted: {},
+      layersPassed: {},
+      ...(typeof threshold === "number" && Number.isFinite(threshold) && threshold >= 0 ? { threshold } : {}),
+      ...(typeof autopilot === "boolean" ? { autopilot } : {}),
+      ...(orders && typeof orders === "object"
+        ? { orders: { salvage: orders.salvage === true, salvageSetAt: orders.salvage === true ? (Number.isFinite(orders.salvageSetAt) ? orders.salvageSetAt : Date.now()) : null } }
+        : {}),
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
 
