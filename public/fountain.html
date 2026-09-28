@@ -3095,7 +3095,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			let topBowlWaterMesh;
 			let floorCausticMats = [];   // Fountain_Floor materials patched with wave caustics (top-level so animate()/render() can update them)
 			window.floorCausticMats = floorCausticMats;   // live tuning: floorCausticMats[0].userData.causticShader.uniforms.uCausStrength.value = 0..1.5
-			let floorCausticOnStrength = 0.3;   // caustic light-map brightness on the basin floor (tuned live via /fountain?fx)
+			let floorCausticOnStrength = 0.2;   // caustic light-map brightness on the basin floor (tuned live via /fountain?fx)
 			window.floorCausticOnStrength = floorCausticOnStrength;   // live tuning: window.floorCausticOnStrength = 0..1.5
 			const WATER_SURFACE_Y = -0.5;   // main pool surface; camera eye below this = "underwater" (blue filter on, caustics off) even in free-look
 			window.WATER_SURFACE_Y = WATER_SURFACE_Y;   // live tuning of the trigger depth
