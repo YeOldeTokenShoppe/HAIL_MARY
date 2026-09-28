@@ -8602,6 +8602,7 @@ export default function OilPage() {
                       config={ownConfig}
                       plot={own}
                       loopV2={loopV2}
+                      orders={loopV2 && userDrill ? { salvage: userDrill.orders?.salvage === true, autopilot: userDrill.autopilot === true } : null}
                       gridSize={gridSize}
                       blockHash={blockHash}
                       numberOfDeposits={numberOfDeposits}
@@ -9189,6 +9190,7 @@ export default function OilPage() {
               <OilVoxelGrid
                 strataLivePlots={loopV2 ? allPlotsMap : null}
                 loopV2={loopV2}
+                orders={loopV2 && userDrill ? { salvage: userDrill.orders?.salvage === true, autopilot: userDrill.autopilot === true } : null}
                 blockHash={blockHash}
                 numberOfDeposits={numberOfDeposits}
                 numberOfHellPockets={numberOfHellPockets}
