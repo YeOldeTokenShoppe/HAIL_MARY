@@ -237,13 +237,18 @@ export default function FountainPage() {
   return (
     <div style={{
       backgroundColor: "#000000",
-      height: "100vh",
+      // Anchor to top AND bottom instead of height:100vh. On iOS Safari 100vh is
+      // the toolbar-collapsed height, so a 100vh box (and the fountain iframe that
+      // fills it) ran under the bottom toolbar and hid anything the iframe pinned
+      // to its bottom edge (the coin pocket). top/bottom resolve to the visible
+      // viewport, the same way the fixed camera button below does.
       width: "100vw",
       margin: 0,
       padding: 0,
       position: "fixed",
       left: 0,
       top: 0,
+      bottom: 0,
       overflow: "hidden",
     }}>
       <style jsx global>{`

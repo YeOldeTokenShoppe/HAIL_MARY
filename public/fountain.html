@@ -10880,12 +10880,11 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				animation: chipNudge 0.4s ease;
 			}
 			@media (max-width: 768px) {
-				/* This document fills a 100vh box in the parent's iframe, and on phones
-				   100vh runs under the browser's bottom toolbar, so anything pinned to
-				   the bottom edge is hidden behind it (#info lifts itself 22vh for the
-				   same reason). Lift the pocket clear of the toolbar + home indicator. */
+				/* The parent sizes this iframe to the VISIBLE viewport (top/bottom
+				   anchored, not 100vh), so a small lift is enough to clear the edge;
+				   the phone's home indicator sits inside the browser toolbar below. */
 				.coin-pocket {
-					bottom: calc(13vh + env(safe-area-inset-bottom, 0px));
+					bottom: calc(22px + env(safe-area-inset-bottom, 0px));
 				}
 				.coin-pocket-hint {
 					font-size: 11px;
