@@ -114,8 +114,13 @@ const FIELD_FOG = typeof window !== "undefined"
 // Phase-0 spike: ?strata=1 swaps the painted earth block for live game-state
 // voxels (see StrataVoxels.jsx) fed by a MOCK season simulated from the real
 // seeded field. A/B by toggling the flag. Keys: ,/. day · [/] slice · x x-ray.
-const STRATA_SPIKE = typeof window !== "undefined"
-  && new URLSearchParams(window.location.search).get("strata") === "1";
+// ?strata=1 → the wall (LIVE field when settings.loopV2 is on — empty until real
+// strikes land — else the mock). ?strata=mock → always the 90-second MOCK season
+// with its PLAY / +1 DAY / PLAY AS controls, for design review on a live board.
+const STRATA_PARAM = typeof window !== "undefined"
+  ? new URLSearchParams(window.location.search).get("strata") : null;
+const STRATA_SPIKE = STRATA_PARAM === "1" || STRATA_PARAM === "mock";
+const STRATA_FORCE_MOCK = STRATA_PARAM === "mock";
 const FOG_NEAR = 6;   // within this distance: no haze (keeps the selected plot clear)
 const FOG_FAR = 24;   // full haze by here (back of the grid recedes)
 // Horizon-haze color per environment — distant rigs fade toward this, so it should
@@ -8001,7 +8006,7 @@ export default function OilVoxelGrid({
           palette={groundPalette}
           blockHash={blockHash}
           onGroundClick={handleGroundClick}
-          livePlots={strataLivePlots}
+          livePlots={STRATA_FORCE_MOCK ? null : strataLivePlots}
         />
       )}
 

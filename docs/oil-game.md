@@ -69,6 +69,14 @@ Each item has a done-test. If it can't be tested on a phone by someone who isn't
 - **Salvage depth prerequisite:** decided by rule for season one, not by build — default **no** (salvage stays reactive; simplest, and it keeps the decision game legible). Revisit with data.
 - Full 3×3 territories (v3).
 
+### Decisions logged 2026-09-28 (Michelle, in the UI-brief doc)
+
+- **Cell-state colour language: the strata wall's schema wins** (gold = pending, dark = extracted, green = passed/open, amber = taken by a neighbour, red = hell, grey stub = dry wildcat). Apply to the core rack, the ledger and the reckoning; the plain rack's green-for-extracted is wrong and gets fixed in the pass.
+- **Desktop decision surface: both act (option c)** — the in-world machine panel and the Core Sample card call the same handlers; the player picks. So the rig's PASS cover and an EXTRACT control get wired to `onDecide`.
+- **Core rack: vertical.** Direction: the `/space` CORE SAMPLE module's core-cylinder infographic (tube with depth ticks, callouts, the ANOM marker) is the vertical core; fit on the phone as the `/space` panel does — tube left, data right. The `/space` module family (header, tabs, typed data lines, two big stats, one CTA, gold corner brackets, HUD palette) is the visual source for the v2 card design pass.
+- **Strata voxels: not the default look.** Michelle prefers the image-texture earth block (`LandGradient2.webp` sides). Proposal for the pass: the textured block stays; the voxel wall becomes an on-demand X-RAY overlay (dirt hidden, events only) rather than replacing the block. `?strata=1` under `loopV2` shows the LIVE field (empty until strikes); `?strata=mock` forces the 90-second mock season for design review (added 2026-09-28).
+- Still to confirm after clarification (asked 2026-09-28): reckoning as the share card; the v2 away recap; ledger always open; countdown loudness (it is the pending layer's auto-resolve deadline, not a season timer).
+
 ### Decisions Michelle owns (blocking for season one)
 
 1. Season parameters: grid, season length, deposits, charges, pot size and sponsor.

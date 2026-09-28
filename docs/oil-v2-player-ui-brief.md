@@ -230,8 +230,10 @@ from what exists. Sizes: the card is ~330 lines of plain JSX; the reckoning ~110
   LAYER stepper reveals; EXTRACT / PASS / LATERAL controls and a threshold field are on the
   v2 build list and should be added if not present — one-line ask to whoever picks this
   up). `settings.loopV2 = true` on the dev season.
-- **The wall's mock season:** `/hailmary?strata=1` runs a 90-second v2 season on the real
-  seeded field — the fastest way to watch pending → resolve → salvage rhythm.
+- **The wall's mock season:** `/hailmary?strata=mock` runs a 90-second v2 season on the real
+  seeded field with PLAY / +1 DAY / PLAY AS controls — the fastest way to watch pending →
+  resolve → salvage rhythm. (`?strata=1` shows the LIVE field when the v2 flag is on, which
+  is empty until real strikes land — that is what Michelle saw on 2026-09-28.)
 - **Every state on one page (not built):** a `?v2fixture=1` page that mounts the card and
   the reckoning in each §3 state with static props would make the pass and later
   regressions cheap. Recommended as the first build ticket of the pass.
