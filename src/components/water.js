@@ -164,45 +164,41 @@
 	dish.renderOrder = 12;
 	scene.add(dish);
 
-	// dish floor with animated caustics — the dancing light that makes it read as water.
-	// caustics are driven by the real wave-height field (uHeight) so ripples cast moving light.
+	// dish floor lit by REAL caustics: a separate pass refracts the key light through
+	// the actual water surface (swell + ripples) and measures where the light bunches
+	// up on the floor (see causticMat below). uCaustic holds that light map.
+	const FLOOR_Y = BASE_Y + 0.004;
 	const floorMat = new THREE.ShaderMaterial({
 		uniforms: {
-			uTime: { value: 0 },
-			uHeight: { value: null },
-			uUvR: { value: UV_R },
+			uCaustic: { value: null },
+			uFloorR: { value: DISH_IN },
+			uFloorY: { value: FLOOR_Y },
+			uWaterY: { value: WATER_Y },
 			uWorldR: { value: WATER_R },
+			uCausticGain: { value: 0.22 }, // brightness of the light map on the floor
+			uKeyDir: keyDir,
 			uAmb: ambLight
 		},
-		vertexShader: `varying vec2 vP; void main(){ vP=position.xy; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+		vertexShader: `varying vec3 vWp; void main(){ vWp=(modelMatrix*vec4(position,1.0)).xyz; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
 		fragmentShader: `
     precision highp float;
-    uniform float uTime, uUvR, uWorldR; uniform sampler2D uHeight; uniform vec3 uAmb;
-    varying vec2 vP;
-    // classic procedural caustic (TDM) — the fine dancing net of light
-    float caustic(vec2 uv){
-      vec2 p = mod(uv*6.28318, 6.28318) - 250.0;
-      vec2 i = p; float c = 1.0; float inten = 0.005;
-      for (int n=0;n<5;n++){
-        float t = uTime*0.55*(1.0 - (3.5/float(n+1)));
-        i = p + vec2(cos(t-i.x)+sin(t+i.y), sin(t-i.y)+cos(t+i.x));
-        c += 1.0/length(vec2(p.x/(sin(i.x+t)/inten), p.y/(cos(i.y+t)/inten)));
-      }
-      c /= 5.0; c = 1.17 - pow(c, 1.4);
-      return pow(abs(c), 8.0);
-    }
+    uniform sampler2D uCaustic; uniform float uFloorR, uFloorY, uWaterY, uWorldR, uCausticGain;
+    uniform vec3 uKeyDir, uAmb;
+    varying vec3 vWp;
     void main(){
-      float r = length(vP)/${DISH_IN.toFixed(2)};
+      vec2 xz = vWp.xz;
+      float r = length(xz)/uFloorR;
       vec3 base = mix(vec3(0.10,0.23,0.29), vec3(0.03,0.10,0.16), smoothstep(0.0,1.05,r));
-      // wave-driven focusing: troughs (concave) concentrate light → bright bands that travel
-      vec2 uv = vec2(0.5) + (vP/uWorldR)*uUvR;
-      float tx = 1.0/256.0;
-      float h  = texture2D(uHeight, uv).r;
-      float lap = texture2D(uHeight,uv+vec2(tx,0.)).r + texture2D(uHeight,uv-vec2(tx,0.)).r
-                + texture2D(uHeight,uv+vec2(0.,tx)).r + texture2D(uHeight,uv-vec2(0.,tx)).r - 4.0*h;
-      float focus = clamp(1.0 + lap*9.0, 0.4, 2.2);
-      float ca = caustic(vP*0.32) * focus;
-      base += vec3(0.45,0.72,0.82) * ca * 1.05 * (1.0 - r*0.25);
+      // the caustic map is rendered in floor space: world xz over the floor radius
+      float ca = texture2D(uCaustic, xz/uFloorR*0.5 + 0.5).r;
+      // light entering through the water disc lands on the floor shifted downlight by the
+      // refracted key ray; outside that footprint the map is empty, so fade to a soft, even
+      // glow there instead of a hard shadow edge (the glass wall lets light in anyway)
+      vec3 fr = refract(-normalize(uKeyDir), vec3(0.0,1.0,0.0), 1.0/1.333);
+      vec2 shift = fr.xz * ((uFloorY - uWaterY)/fr.y);
+      float cov = 1.0 - smoothstep(uWorldR*0.90, uWorldR*0.995, length(xz - shift));
+      ca = mix(0.85, ca, cov) * uCausticGain;
+      base += vec3(0.45,0.72,0.82) * ca * (1.0 - r*0.25);
       gl_FragColor = vec4(base * max(uAmb, vec3(0.05)), 1.0);   // dish floor follows day→night
     }`
 	});
@@ -211,7 +207,7 @@
 		floorMat
 	);
 	floorDisc.rotation.x = -Math.PI / 2;
-	floorDisc.position.y = BASE_Y + 0.004;
+	floorDisc.position.y = FLOOR_Y;
 	scene.add(floorDisc);
 
 	// off-screen target holding "everything under the water" for refraction
@@ -397,6 +393,48 @@
 		)},${w.amp.toFixed(4)},${w.steep.toFixed(3)},xz,disp,nrm,J);`;
 	}).join("\n      ");
 
+	/* the displaced water surface, shared by the water mesh and the caustics pass so
+	   the light on the floor is bent by exactly the surface you see */
+	const SURFACE_GLSL = /* glsl */ `
+    uniform sampler2D uHeight; uniform float uTime, uWaterY, uChop, uSpeed, uDispSim, uWorldR, uWindAngle, uTide, uTexel, uUvR;
+    uniform vec2 uTideDir;
+    void gerstner(vec2 D, float len, float amp, float steep, vec2 xz, inout vec3 disp, inout vec3 nrm, inout vec3 J){
+      float ca=cos(uWindAngle), sa=sin(uWindAngle);
+      D = vec2(D.x*ca - D.y*sa, D.x*sa + D.y*ca);     // steer the swell with the wind
+      float k = 6.2831853/len;
+      float c = sqrt(9.8/k);
+      float A = amp*uChop;
+      float Q = steep/(k*A*8.0 + 1e-5);
+      float ph = k*dot(D,xz) - c*uTime*uSpeed;
+      float cph=cos(ph), sph=sin(ph);
+      disp.x += Q*A*D.x*cph;  disp.z += Q*A*D.y*cph;  disp.y += A*sph;
+      nrm.x -= D.x*k*A*cph;   nrm.z -= D.y*k*A*cph;    nrm.y -= Q*k*A*sph;
+      J.x -= Q*D.x*D.x*k*A*sph;  J.y -= Q*D.y*D.y*k*A*sph;  J.z -= Q*D.x*D.y*k*A*sph;
+    }
+    // surface point p (swell + poke ripples + moon tide), its un-normalised normal, the
+    // Gerstner Jacobian J and the swell height, for the grid vertex at (pos, uv)
+    void surfaceAt(vec3 pos, vec2 uv, out vec3 p, out vec3 nrm, out vec3 J, out float swellH){
+      vec2 xz = pos.xz;
+      float damp = 1.0 - smoothstep(uWorldR*0.82, uWorldR*0.995, length(xz)); // calm at the glass
+      vec3 disp = vec3(0.0); nrm = vec3(0.0,1.0,0.0); J = vec3(1.0,1.0,0.0);
+      ${GERSTNER_CALLS}
+      disp *= damp; nrm.x *= damp; nrm.z *= damp;
+      float sh = texture2D(uHeight, uv).r * uDispSim;       // interactive poke ripples on top
+      float tide = uTide * dot(xz, uTideDir) * damp;        // moon tilts the surface toward its azimuth
+      p = pos + disp;
+      p.y = uWaterY + clamp(disp.y, -0.8, 0.8) + sh + tide;
+      nrm.x -= uTide*uTideDir.x; nrm.z -= uTide*uTideDir.y; // tilt the normal so light/streak follows
+      swellH = disp.y;
+    }
+    // slope of the poke-ripple field, scaled like the water fragment shader does it
+    vec2 simSlope(vec2 uv){
+      float hl=texture2D(uHeight,uv-vec2(uTexel,0.)).r, hr=texture2D(uHeight,uv+vec2(uTexel,0.)).r;
+      float hd=texture2D(uHeight,uv-vec2(0.,uTexel)).r, hu=texture2D(uHeight,uv+vec2(0.,uTexel)).r;
+      float scs = uDispSim/(uTexel*uWorldR/uUvR);
+      return vec2(hr-hl, hu-hd)*scs;
+    }
+`;
+
 	const waterMat = new THREE.ShaderMaterial({
 		side: THREE.DoubleSide, // polar-grid winding faces down; view is from above
 		uniforms: Object.assign(envU(), {
@@ -413,39 +451,20 @@
 			uWindAngle: { value: 0.6 },
 			uRefract,
 			uResolution,
-			uRefractAmt: { value: 0.055 },
+			uProj: { value: camera.projectionMatrix }, // fragment needs it to re-project the refracted hit
+			uFloorY: { value: FLOOR_Y },
+			uRefractStr: { value: 1.0 }, // 0 = look straight through, 1 = full Snell bending
 			uTideDir: { value: new THREE.Vector2(1, 0) },
 			uTide: { value: 0.0 }
 		}),
-		vertexShader: /* glsl */ `
-    uniform sampler2D uHeight; uniform float uTime, uWaterY, uChop, uSpeed, uDispSim, uWorldR, uWindAngle, uTide;
-    uniform vec2 uTideDir;
+		vertexShader:
+			SURFACE_GLSL +
+			/* glsl */ `
     varying vec2 vUv; varying vec3 vW; varying vec3 vGN; varying float vJac; varying float vH;
-    void gerstner(vec2 D, float len, float amp, float steep, vec2 xz, inout vec3 disp, inout vec3 nrm, inout vec3 J){
-      float ca=cos(uWindAngle), sa=sin(uWindAngle);
-      D = vec2(D.x*ca - D.y*sa, D.x*sa + D.y*ca);     // steer the swell with the wind
-      float k = 6.2831853/len;
-      float c = sqrt(9.8/k);
-      float A = amp*uChop;
-      float Q = steep/(k*A*8.0 + 1e-5);
-      float ph = k*dot(D,xz) - c*uTime*uSpeed;
-      float cph=cos(ph), sph=sin(ph);
-      disp.x += Q*A*D.x*cph;  disp.z += Q*A*D.y*cph;  disp.y += A*sph;
-      nrm.x -= D.x*k*A*cph;   nrm.z -= D.y*k*A*cph;    nrm.y -= Q*k*A*sph;
-      J.x -= Q*D.x*D.x*k*A*sph;  J.y -= Q*D.y*D.y*k*A*sph;  J.z -= Q*D.x*D.y*k*A*sph;
-    }
     void main(){
-      vec2 xz = position.xz;
-      float damp = 1.0 - smoothstep(uWorldR*0.82, uWorldR*0.995, length(xz)); // calm at the glass
-      vec3 disp = vec3(0.0); vec3 nrm = vec3(0.0,1.0,0.0); vec3 J = vec3(1.0,1.0,0.0);
-      ${GERSTNER_CALLS}
-      disp *= damp; nrm.x *= damp; nrm.z *= damp;
-      float sh = texture2D(uHeight, uv).r * uDispSim;       // interactive poke ripples on top
-      float tide = uTide * dot(xz, uTideDir) * damp;        // moon tilts the surface toward its azimuth
-      vec3 p = position + disp;
-      p.y = uWaterY + clamp(disp.y, -0.8, 0.8) + sh + tide;
-      nrm.x -= uTide*uTideDir.x; nrm.z -= uTide*uTideDir.y; // tilt the normal so light/streak follows
-      vUv = uv; vGN = nrm; vJac = J.x*J.y - J.z*J.z; vH = disp.y;
+      vec3 p, nrm, J; float swellH;
+      surfaceAt(position, uv, p, nrm, J, swellH);
+      vUv = uv; vGN = nrm; vJac = J.x*J.y - J.z*J.z; vH = swellH;
       vec4 w = modelMatrix*vec4(p,1.0); vW = w.xyz;
       gl_Position = projectionMatrix*viewMatrix*w;
     }`,
@@ -453,7 +472,8 @@
 			COMMON +
 			/* glsl */ `
     uniform sampler2D uHeight, uRefract; uniform vec2 uWindDir, uResolution;
-    uniform float uTexel, uTime, uWorldR, uUvR, uRefractAmt, uDispSim;
+    uniform float uTexel, uTime, uWorldR, uUvR, uRefractStr, uDispSim, uFloorY, uWaterY;
+    uniform mat4 uProj;
     varying vec2 vUv; varying vec3 vW; varying vec3 vGN; varying float vJac; varying float vH;
     void main(){
       vec3 N = normalize(vGN);
@@ -472,13 +492,25 @@
       // near-matte: barely any sky mirror, even at grazing angles → you see through
       float fres = mix(0.008, 0.075, pow(1.0-max(dot(N,V),0.0), 5.0));
 
-      // CLEAR water: see through to the caustic-lit bottom, bent by the ripples and
-      // tinted by depth (Beer-Lambert) — deep troughs go teal, crests stay clear
-      vec2 suv = gl_FragCoord.xy/uResolution;
-      vec3 bottom = texture2D(uRefract, clamp(suv + N.xz*uRefractAmt,0.002,0.998)).rgb * 1.28;
+      // CLEAR water: see through to the caustic-lit bottom. The view ray is bent by
+      // Snell's law at the surface and followed down to the floor plane; that hit point
+      // is re-projected to the screen and the under-water render is sampled there, so
+      // the floor lenses and slides with real parallax (the hull rides along with it).
+      vec2 suv0 = gl_FragCoord.xy/uResolution;
+      vec3 T = refract(-V, N, 1.0/1.333);
+      T.y = min(T.y, -0.08);                             // never let the ray skim the surface
+      float tHit = (uFloorY - vW.y)/T.y;                 // distance travelled through the water
+      vec4 hitC = uProj * viewMatrix * vec4(vW + T*tHit, 1.0);
+      vec2 suvR = hitC.xy/hitC.w*0.5 + 0.5;
+      // by the glass the refracted ray would hit the wall, not the floor: ease back to straight-through
+      float rimEase = 1.0 - smoothstep(uWorldR*0.86, uWorldR*0.99, length(vW.xz));
+      vec2 suv = mix(suv0, suvR, uRefractStr*rimEase);
+      vec3 bottom = texture2D(uRefract, clamp(suv,0.002,0.998)).rgb * 1.28;
       vec3 waterTint = vec3(0.84,0.93,0.97);            // almost clear, the faintest aqua
       vec3 deepCol   = vec3(0.03,0.18,0.25);
-      float depth = clamp(0.05 - vH*0.13, 0.008, 0.20); // crystal clear — floor + hull read through
+      // Beer-Lambert over the real path length: grazing views travel further → a touch more teal
+      float pathK = clamp(tHit/(uWaterY - uFloorY), 0.7, 2.0);
+      float depth = clamp((0.05 - vH*0.13)*pathK, 0.008, 0.22); // crystal clear — floor + hull read through
       vec3 base = mix(bottom*waterTint, deepCol, depth);
 
       // subtle subsurface glow on the crests
@@ -516,6 +548,97 @@
 	water.position.y = 0;
 	water.renderOrder = 2;
 	scene.add(water);
+
+	/* ================================================================= caustics
+   Physically derived light map for the dish floor (after Evan Wallace's WebGL Water):
+   every triangle of a dense surface grid is pushed to where the key light, refracted
+   through THAT patch of surface, lands on the floor. Where the patch shrinks the light
+   is concentrated (bright), where it stretches the light thins out (dark). Intensity is
+   the area ratio of the flat-water projection to the displaced one, read from screen-space
+   derivatives, accumulated additively into causticRT and sampled by the floor shader. */
+	const CAUSTIC_RES = isCoarse ? 512 : 1024;
+	const causticRT = new THREE.WebGLRenderTarget(CAUSTIC_RES, CAUSTIC_RES, {
+		type: THREE.HalfFloatType,
+		format: THREE.RGBAFormat,
+		minFilter: THREE.LinearFilter,
+		magFilter: THREE.LinearFilter,
+		wrapS: THREE.ClampToEdgeWrapping,
+		wrapT: THREE.ClampToEdgeWrapping,
+		depthBuffer: false,
+		stencilBuffer: false
+	});
+	floorMat.uniforms.uCaustic.value = causticRT.texture;
+	const wu = waterMat.uniforms; // share the surface uniforms so knobs drive both passes
+	const causticMat = new THREE.ShaderMaterial({
+		side: THREE.DoubleSide, // projected triangles may flip winding
+		depthTest: false,
+		depthWrite: false,
+		blending: THREE.AdditiveBlending,
+		extensions: { derivatives: true },
+		uniforms: {
+			uHeight: wu.uHeight,
+			uTexel: wu.uTexel,
+			uTime: wu.uTime,
+			uWaterY: wu.uWaterY,
+			uWorldR: wu.uWorldR,
+			uUvR: wu.uUvR,
+			uChop: wu.uChop,
+			uSpeed: wu.uSpeed,
+			uDispSim: wu.uDispSim,
+			uWindAngle: wu.uWindAngle,
+			uTideDir: wu.uTideDir,
+			uTide: wu.uTide,
+			uKeyDir: keyDir,
+			uFloorY: { value: FLOOR_Y },
+			uFloorR: { value: DISH_IN },
+			uSlopeGain: { value: 1.6 } // >1 exaggerates surface slope: crisper caustics in a shallow dish
+		},
+		vertexShader:
+			SURFACE_GLSL +
+			/* glsl */ `
+    uniform vec3 uKeyDir; uniform float uFloorY, uFloorR, uSlopeGain;
+    varying vec3 vOld; varying vec3 vNew;
+    void main(){
+      vec3 p, nrm, J; float swellH;
+      surfaceAt(position, uv, p, nrm, J, swellH);
+      vec2 ss = simSlope(uv);
+      nrm.x -= ss.x; nrm.z -= ss.y;
+      nrm.xz *= uSlopeGain;
+      vec3 N = normalize(nrm);
+      vec3 L = normalize(uKeyDir);
+      vec3 flatR = refract(-L, vec3(0.0,1.0,0.0), 1.0/1.333);   // light through flat water
+      vec3 R = refract(-L, N, 1.0/1.333);                        // light through THIS patch
+      if (R.y > -0.05) R = flatR;
+      vec3 s0 = vec3(position.x, uWaterY, position.z);
+      vOld = s0 + flatR * ((uFloorY - s0.y)/flatR.y);            // where it would land, flat
+      vNew = p  + R     * ((uFloorY - p.y)/R.y);                 // where it actually lands
+      gl_Position = vec4(vNew.xz/uFloorR, 0.0, 1.0);             // floor space → light map
+    }`,
+		fragmentShader: /* glsl */ `
+    precision highp float;
+    varying vec3 vOld; varying vec3 vNew;
+    void main(){
+      float oldA = length(dFdx(vOld))*length(dFdy(vOld));
+      float newA = length(dFdx(vNew))*length(dFdy(vNew));
+      float it = oldA/max(newA, 1e-6);           // light concentrates where the patch shrank
+      gl_FragColor = vec4(clamp(it, 0.0, 4.0), 1.0, 0.0, 1.0);
+    }`
+	});
+	const causticScene = new THREE.Scene();
+	const causticCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+	const causticMesh = new THREE.Mesh(waterGrid(WATER_R, 140, 280), causticMat);
+	causticMesh.frustumCulled = false; // gl_Position is set directly; skip the bounds test
+	causticScene.add(causticMesh);
+	const _cc = new THREE.Color();
+	function renderCaustics() {
+		const prevA = renderer.getClearAlpha();
+		renderer.getClearColor(_cc);
+		renderer.setClearColor(0x000000, 0);
+		renderer.setRenderTarget(causticRT); // autoClear wipes it to black each frame
+		renderer.render(causticScene, causticCam);
+		renderer.setRenderTarget(null);
+		renderer.setClearColor(_cc, prevA);
+	}
 
 	/* ================================================================ boat asset
    Loads a .glb and floats it on the Gerstner ocean (height + tilt sampled in JS). */
@@ -2842,9 +2965,8 @@
 
 	// render the scene: first the underwater view (no water) → refractRT, then the full frame
 	function renderScene() {
-		waterMat.uniforms.uHeight.value = rtA.texture;
-		floorMat.uniforms.uHeight.value = rtA.texture;
-		floorMat.uniforms.uTime.value = simTime;
+		waterMat.uniforms.uHeight.value = rtA.texture; // (shared with the caustics pass)
+		renderCaustics(); // light map for the floor from the current surface
 		// (boat is positioned by stepBoat() in the frame loop)
 		// refraction pass: hide only the water. The boat STAYS visible so its
 		// submerged hull shows through the surface (a strong "clear water" cue).

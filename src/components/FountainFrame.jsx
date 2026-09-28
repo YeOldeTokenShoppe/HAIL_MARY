@@ -12,7 +12,7 @@ const FountainFrame = forwardRef(({ onFullyLoaded, onDonateClick }, ref) => {
     const base =
       process.env.NODE_ENV === 'development'
         ? `/fountain.html?dev=${Date.now()}`
-        : '/fountain.html?v=20260915';
+        : '/fountain.html?v=20260927';
     // Forward the dev tuning gates (/fountain?lights, /fountain?fx, /fountain?perf,
     // /fountain?coins) into the iframe doc — the inner HTML reads its OWN
     // location.search, which otherwise only has dev/v. ?fx opens the live Water FX
@@ -37,11 +37,10 @@ const FountainFrame = forwardRef(({ onFullyLoaded, onDonateClick }, ref) => {
           onFullyLoaded();
         }
       }
-      // Handle donation trigger from iframe
+      // Handle donation trigger from iframe (single recipient — no
+      // charity key rides along any more)
       if (event.data?.type === 'openDonation') {
-        if (onDonateClick) {
-          onDonateClick(event.data?.charity || null);
-        }
+        if (onDonateClick) onDonateClick();
       }
     };
 

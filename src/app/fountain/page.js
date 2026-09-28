@@ -35,7 +35,6 @@ export default function FountainPage() {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showDonationModal, setShowDonationModal] = useState(false);
-  const [preselectedCharity, setPreselectedCharity] = useState(null);
   const [showBuyModal, setShowBuyModal] = useState(false);
   // The Coin Guide panel lives inside the fountain iframe; these social icons live
   // here on the parent page. A z-index inside the iframe can't stack above them, so
@@ -238,13 +237,18 @@ export default function FountainPage() {
   return (
     <div style={{
       backgroundColor: "#000000",
-      height: "100vh",
+      // Anchor to top AND bottom instead of height:100vh. On iOS Safari 100vh is
+      // the toolbar-collapsed height, so a 100vh box (and the fountain iframe that
+      // fills it) ran under the bottom toolbar and hid anything the iframe pinned
+      // to its bottom edge (the coin pocket). top/bottom resolve to the visible
+      // viewport, the same way the fixed camera button below does.
       width: "100vw",
       margin: 0,
       padding: 0,
       position: "fixed",
       left: 0,
       top: 0,
+      bottom: 0,
       overflow: "hidden",
     }}>
       <style jsx global>{`
@@ -313,10 +317,7 @@ export default function FountainPage() {
       <FountainFrame
         ref={iframeRef}
         onFullyLoaded={handleFountainReady}
-        onDonateClick={(charity) => {
-          setPreselectedCharity(charity);
-          setShowDonationModal(true);
-        }}
+        onDonateClick={() => setShowDonationModal(true)}
       />
 
       {/* UI Overlay - Our Lady of Perpetual Profit Logo (Desktop) / RL80 (Mobile) */}
@@ -611,11 +612,7 @@ export default function FountainPage() {
       {/* Donation Modal */}
       <FountainDonationModal
         isOpen={showDonationModal}
-        onClose={() => {
-          setShowDonationModal(false);
-          setPreselectedCharity(null);
-        }}
-        preselectedCharity={preselectedCharity}
+        onClose={() => setShowDonationModal(false)}
         onDonationComplete={(donation) => {
           // Optionally notify the iframe about the successful donation
           if (iframeRef.current) {

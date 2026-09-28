@@ -2,12 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { useWalletAuth } from './WalletAuthProvider';
-import { CHARITY_WALLETS, DEV_WALLET, USDC_ADDRESS } from '@/lib/contracts';
+import { DEV_WALLET, USDC_ADDRESS } from '@/lib/contracts';
+
+// The fountain gives to ONE recipient: the site wallet (rl80.eth). The
+// charity options were retired 2026-09-27. 'DEV' is the recipient key the
+// API route writes to fountain_donations and the fountain iframe renders.
+const RECIPIENT_KEY = 'DEV';
+const recipient = DEV_WALLET;
 import { useWriteContract, useSendTransaction, useBalance, useReadContract } from 'wagmi';
 import { erc20Abi, parseEther, parseUnits, formatUnits } from 'viem';
 
-const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselectedCharity = null }) => {
-  const [selectedCharity, setSelectedCharity] = useState(null);
+const FountainDonationModal = ({ isOpen, onClose, onDonationComplete }) => {
   const [amount, setAmount] = useState('');
   // Optional public one-liner carried by the golden coin — shown in the
   // fountain's donation feed (server sanitizes + caps it).
@@ -15,7 +20,7 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
   // Optional self-claimed donor name shown on the coin (server sanitizes +
   // caps it; NOT chain-verified, so it's always paired with the address).
   const [name, setName] = useState('');
-  const [step, setStep] = useState('select'); // 'select', 'amount', 'confirm', 'processing', 'success', 'error'
+  const [step, setStep] = useState('amount'); // 'amount', 'confirm', 'processing', 'success', 'error'
   const [error, setError] = useState(null);
   const [txHash, setTxHash] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -33,9 +38,8 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
   const { sendTransactionAsync } = useSendTransaction();
 
-  // ALL fountain giving — charities and the dev tip alike — is
-  // denominated in ETH or USDC (USDC default: donations are dollar
-  // amounts). RL80 donations were retired 2026-06-11: pools holding the
+  // Fountain support is denominated in ETH or USDC (USDC default:
+  // donations are dollar amounts). RL80 donations were retired 2026-06-11: pools holding the
   // project's own token needed a conversion step before forwarding and
   // invited "team wallet dumping" optics when they sold.
   const [payCurrency, setPayCurrency] = useState('USDC');
@@ -79,26 +83,9 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
       setError(null);
       setTxHash(null);
       setPendingDonation(null);
-
-      // If charity is preselected from toggle, skip to amount step
-      // ('DEV' = the coffee tip pseudo-charity from the fountain toggle)
-      if (
-        preselectedCharity &&
-        (preselectedCharity === 'DEV' || CHARITY_WALLETS[preselectedCharity])
-      ) {
-        setSelectedCharity(preselectedCharity);
-        setStep('amount');
-      } else {
-        setSelectedCharity(null);
-        setStep('select');
-      }
+      setStep('amount'); // single recipient — no select step
     }
-  }, [isOpen, preselectedCharity]);
-
-  const handleCharitySelect = (charityKey) => {
-    setSelectedCharity(charityKey);
-    setStep('amount');
-  };
+  }, [isOpen]);
 
   // Close modal and trigger coin toss animation
   const handleWatchCoin = () => {
@@ -135,22 +122,18 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
   };
 
   const handleDonate = async () => {
-    if (!walletAddress || !selectedCharity || !amount) return;
+    if (!walletAddress || !amount) return;
 
     setStep('processing');
     setError(null);
     setIsTransactionPending(true);
 
     try {
-      const isDev = selectedCharity === 'DEV';
-      const charity = isDev ? DEV_WALLET : CHARITY_WALLETS[selectedCharity];
-
-      // One payment path for every recipient: direct ETH send or USDC
-      // transfer (6 decimals). Recipients differ, mechanics don't.
+      // Direct ETH send or USDC transfer (6 decimals) to the site wallet.
       let txHashValue;
       if (payCurrency === 'ETH') {
         txHashValue = await sendTransactionAsync({
-          to: charity.address,
+          to: recipient.address,
           value: parseEther(amount),
           chainId: 8453,
         });
@@ -160,7 +143,7 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
           address: USDC_ADDRESS,
           abi: erc20Abi,
           functionName: 'transfer',
-          args: [charity.address, units],
+          args: [recipient.address, units],
           chainId: 8453,
         });
       }
@@ -194,7 +177,7 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
       // Everything the fountain needs to arm the golden coin in hand
       // (tossed by the user's next water tap).
       setPendingDonation({
-        charity: selectedCharity,
+        charity: RECIPIENT_KEY,
         amount,
         currency: payCurrency,
         wish: trimmedWish || null,
@@ -215,464 +198,390 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
 
   if (!isOpen) return null;
 
-  const isDevTip = selectedCharity === 'DEV';
-  const charity = selectedCharity
-    ? isDevTip
-      ? DEV_WALLET
-      : CHARITY_WALLETS[selectedCharity]
-    : null;
   const displayCurrency = payCurrency;
+
+  const presets = payCurrency === 'USDC' ? ['2', '5', '10'] : ['0.001', '0.002', '0.005'];
+  const shortAddr = `${recipient.address.slice(0, 6)}…${recipient.address.slice(-4)}`;
 
   return (
     <>
       <style jsx>{`
-        @keyframes modalGlitch {
-          0%, 100% { transform: translate(0); filter: hue-rotate(0deg); }
-          10% { transform: translate(-2px, 2px); filter: hue-rotate(90deg); }
-          20% { transform: translate(-2px, -2px); filter: hue-rotate(180deg); }
-          30% { transform: translate(2px, 2px); filter: hue-rotate(270deg); }
-          40% { transform: translate(2px, -2px); filter: hue-rotate(360deg); }
+        /* Same visual system as the fountain's Coin Guide panel: twilight-plum
+           glass, gold rim, lemon-gold accents, neon magenta/violet glow. The
+           title is the site's blackletter (Grenze Gotisch, loaded in layout.js);
+           everything else is the Coin Guide's system sans. */
+        .fdm-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 100000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 16px;
+          background: radial-gradient(120% 120% at 50% 40%, rgba(40, 18, 52, 0.55) 0%, rgba(20, 8, 28, 0.78) 100%);
+          backdrop-filter: blur(10px) saturate(120%);
+          -webkit-backdrop-filter: blur(10px) saturate(120%);
         }
-
-        @keyframes textGlitch {
-          0%, 100% { text-shadow: 2px 2px #FFD700, -2px -2px #00f5d4, 0 0 20px rgba(255, 215, 0, 0.8); }
-          25% { text-shadow: -2px 2px #00f5d4, 2px -2px #FFD700, 0 0 30px rgba(0, 245, 212, 0.8); }
-          50% { text-shadow: 2px -2px #ff6b6b, -2px 2px #FFD700, 0 0 25px rgba(255, 107, 107, 0.8); }
-          75% { text-shadow: -2px -2px #00f5d4, 2px 2px #ff6b6b, 0 0 35px rgba(0, 245, 212, 0.8); }
-        }
-
-        @keyframes coinSpin {
-          0% { transform: rotateY(0deg); }
-          100% { transform: rotateY(360deg); }
-        }
-
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-
-
-        .coin-spin { animation: coinSpin 2s linear infinite; }
-        .pulse { animation: pulse 1.5s ease-in-out infinite; }
-
-        .charity-card {
-          background: rgba(20, 20, 30, 0.9);
-          border: 1px solid rgba(255, 215, 0, 0.3);
-          border-radius: 12px;
-          padding: 1rem;
-          cursor: pointer;
-          transition: all 0.3s ease;
-        }
-
-        .charity-card:hover {
-          border-color: #FFD700;
-          box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
-          transform: translateY(-2px);
-        }
-
-        .charity-card.selected {
-          border-color: #00f5d4;
-          box-shadow: 0 0 25px rgba(0, 245, 212, 0.4);
-        }
-
-        .amount-input {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 215, 0, 0.3);
-          border-radius: 12px;
-          padding: 0.75rem;
-          color: #fff;
-          font-size: 0.9rem;
-          font-family: 'Orbitron', monospace;
-          text-align: center;
+        .fdm-card {
+          position: relative;
           width: 100%;
-          outline: none;
-          transition: all 0.3s ease;
+          max-width: 400px;
+          max-height: calc(100vh - 32px);
+          overflow-y: auto;
+          padding: 26px 24px 22px;
+          box-sizing: border-box;
+          color: rgba(255, 255, 255, 0.92);
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+          font-size: 14px;
+          line-height: 1.4;
+          text-align: left;
+          background: linear-gradient(155deg, rgba(34, 20, 52, 0.94) 0%, rgba(52, 20, 58, 0.94) 52%, rgba(44, 16, 40, 0.95) 100%);
+          border: 1.5px solid rgba(212, 175, 55, 0.6);
+          border-radius: 18px;
+          box-shadow: 0 16px 44px rgba(0, 0, 0, 0.5), 0 0 46px rgba(224, 64, 158, 0.26), 0 0 90px rgba(130, 60, 210, 0.16);
         }
-
-        .amount-input:focus {
-          border-color: #FFD700;
-          background: rgba(255, 215, 0, 0.05);
+        .fdm-card p { text-align: inherit; margin: 0; }
+        .fdm-close {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          width: 30px;
+          height: 30px;
+          border-radius: 50%;
+          border: 1px solid rgba(255, 255, 255, 0.18);
+          background: rgba(0, 0, 0, 0.25);
+          color: rgba(255, 255, 255, 0.8);
+          font-size: 15px;
+          line-height: 1;
+          cursor: pointer;
         }
-
-        .donate-btn {
-          background: linear-gradient(135deg, #FFD700, #FFA500);
-          border: none;
-          border-radius: 50px;
-          padding: 0.875rem;
-          color: #000;
-          font-family: 'Orbitron', monospace;
+        .fdm-close:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+        .fdm-title {
+          margin: 0;
+          color: #ffe93d;
+          font-family: 'Grenze Gotisch', 'UnifrakturMaguntia', Georgia, serif;
           font-weight: 600;
-          font-size: 0.9rem;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          width: 100%;
+          font-size: 40px;
+          line-height: 1;
+          text-align: center;
+          text-shadow: 0 2px 10px rgba(42, 25, 91, 0.6), 0 0 22px rgba(255, 233, 61, 0.25);
         }
-
-        .donate-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);
-        }
-
-        .donate-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        .back-btn {
-          background: transparent;
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          border-radius: 6px;
-          padding: 0.5rem 1rem;
+        .fdm-card .fdm-sub {
+          margin: 8px 0 0;
           color: rgba(255, 255, 255, 0.7);
-          font-family: 'Orbitron', monospace;
-          font-size: 0.8rem;
-          cursor: pointer;
-          transition: all 0.3s ease;
+          font-size: 13px;
+          text-align: center;
         }
-
-        .back-btn:hover {
-          border-color: rgba(255, 255, 255, 0.6);
+        .fdm-section { margin-top: 18px; }
+        .fdm-recipient {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 10px 12px;
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .fdm-recipient-icon { font-size: 22px; line-height: 1; }
+        .fdm-recipient-name { color: #ffe93d; font-weight: 800; font-size: 14px; line-height: 1.15; }
+        .fdm-recipient-desc { color: rgba(255, 255, 255, 0.68); font-size: 12px; margin-top: 2px; }
+        .fdm-label {
+          display: block;
+          margin: 0 0 6px;
+          color: rgba(255, 255, 255, 0.8);
+          font-size: 12px;
+          font-weight: 700;
+        }
+        .fdm-label small { font-weight: 500; color: rgba(255, 255, 255, 0.55); }
+        /* The amount field is the one big element: a wide gold-rimmed well with
+           the currency choice living inside it. */
+        .fdm-amount {
+          display: flex;
+          align-items: stretch;
+          border-radius: 14px;
+          border: 1.5px solid rgba(212, 175, 55, 0.45);
+          background: rgba(0, 0, 0, 0.28);
+          overflow: hidden;
+          transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .fdm-amount:focus-within {
+          border-color: #ffe93d;
+          box-shadow: 0 0 0 3px rgba(255, 233, 61, 0.18);
+        }
+        .fdm-amount input {
+          flex: 1;
+          min-width: 0;
+          padding: 12px 14px;
+          border: 0;
+          background: transparent;
           color: #fff;
+          font: inherit;
+          font-size: 30px;
+          font-weight: 700;
+          font-variant-numeric: tabular-nums;
+          outline: none;
+          -moz-appearance: textfield;
+        }
+        .fdm-amount input::-webkit-outer-spin-button,
+        .fdm-amount input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .fdm-amount input::placeholder { color: rgba(255, 255, 255, 0.28); }
+        .fdm-currency {
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 4px;
+          padding: 6px;
+          border-left: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(255, 255, 255, 0.03);
+        }
+        .fdm-currency button {
+          padding: 5px 10px;
+          border-radius: 8px;
+          border: 1px solid transparent;
+          background: transparent;
+          color: rgba(255, 255, 255, 0.55);
+          font: inherit;
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+        .fdm-currency button[aria-pressed='true'] {
+          color: #3a2c00;
+          background: linear-gradient(135deg, #ffd700, #ffb700);
+        }
+        .fdm-presets { display: flex; gap: 8px; margin-top: 10px; }
+        .fdm-chip {
+          flex: 1;
+          padding: 8px 0;
+          border-radius: 999px;
+          border: 1px solid rgba(212, 175, 55, 0.45);
+          background: rgba(255, 215, 0, 0.06);
+          color: #ffe93d;
+          font: inherit;
+          font-size: 13px;
+          font-weight: 700;
+          font-variant-numeric: tabular-nums;
+          cursor: pointer;
+        }
+        .fdm-chip:hover, .fdm-chip[aria-pressed='true'] { background: rgba(255, 215, 0, 0.16); border-color: #ffe93d; }
+        .fdm-balance {
+          margin-top: 8px;
+          color: rgba(255, 255, 255, 0.55);
+          font-size: 12px;
+          text-align: right;
+          font-variant-numeric: tabular-nums;
+        }
+        .fdm-input {
+          width: 100%;
+          box-sizing: border-box;
+          padding: 10px 12px;
+          border-radius: 10px;
+          border: 1px solid rgba(255, 255, 255, 0.14);
+          background: rgba(0, 0, 0, 0.25);
+          color: #fff;
+          font: inherit;
+          font-size: 14px;
+          outline: none;
+        }
+        .fdm-input:focus { border-color: #ffe93d; box-shadow: 0 0 0 3px rgba(255, 233, 61, 0.15); }
+        .fdm-input::placeholder { color: rgba(255, 255, 255, 0.35); }
+        .fdm-error {
+          margin-top: 12px;
+          padding: 9px 12px;
+          border-radius: 10px;
+          background: rgba(255, 96, 96, 0.12);
+          border: 1px solid rgba(255, 138, 128, 0.4);
+          color: #ffb3ab;
+          font-size: 13px;
+        }
+        .fdm-primary {
+          display: block;
+          width: 100%;
+          margin-top: 18px;
+          padding: 13px 16px;
+          border: 0;
+          border-radius: 12px;
+          background: linear-gradient(135deg, #ffd700, #ffb700);
+          color: #3a2c00;
+          font: inherit;
+          font-size: 15px;
+          font-weight: 800;
+          letter-spacing: 0.2px;
+          cursor: pointer;
+          box-shadow: 0 6px 18px rgba(255, 183, 0, 0.25);
+          transition: transform 0.12s, box-shadow 0.12s, filter 0.12s;
+        }
+        .fdm-primary:hover:not(:disabled) { filter: brightness(1.05); box-shadow: 0 8px 24px rgba(255, 183, 0, 0.35); }
+        .fdm-primary:active:not(:disabled) { transform: translateY(1px); }
+        .fdm-primary:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+        .fdm-primary:focus-visible, .fdm-chip:focus-visible, .fdm-close:focus-visible,
+        .fdm-ghost:focus-visible, .fdm-currency button:focus-visible {
+          outline: 2px solid #ffe93d;
+          outline-offset: 2px;
+        }
+        .fdm-ghost {
+          padding: 9px 16px;
+          border-radius: 10px;
+          border: 1px solid rgba(255, 255, 255, 0.22);
+          background: transparent;
+          color: rgba(255, 255, 255, 0.85);
+          font: inherit;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+        .fdm-ghost:hover { border-color: rgba(255, 255, 255, 0.5); color: #fff; }
+        .fdm-back {
+          display: inline-block;
+          margin-bottom: 4px;
+          padding: 0;
+          border: 0;
+          background: none;
+          color: rgba(255, 255, 255, 0.6);
+          font: inherit;
+          font-size: 13px;
+          cursor: pointer;
+        }
+        .fdm-back:hover { color: #ffe93d; }
+        .fdm-summary {
+          display: grid;
+          grid-template-columns: auto 1fr;
+          gap: 8px 16px;
+          padding: 12px 14px;
+          border-radius: 12px;
+          background: rgba(0, 0, 0, 0.25);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          font-size: 13px;
+        }
+        .fdm-summary dt { color: rgba(255, 255, 255, 0.6); margin: 0; }
+        .fdm-summary dd { margin: 0; text-align: right; color: #fff; overflow-wrap: anywhere; }
+        .fdm-summary dd.gold { color: #ffe93d; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .fdm-summary dd.addr { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: rgba(255, 255, 255, 0.8); }
+        .fdm-note { margin-top: 12px; color: rgba(255, 255, 255, 0.62); font-size: 12px; }
+        .fdm-center { text-align: center; }
+        .fdm-center p { text-align: center; }
+        .fdm-heading {
+          margin: 0 0 8px;
+          color: #ffe93d;
+          font-family: 'Grenze Gotisch', 'UnifrakturMaguntia', Georgia, serif;
+          font-weight: 600;
+          font-size: 28px;
+          line-height: 1.05;
+          text-align: center;
+        }
+        .fdm-link { color: #ffe93d; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+        .fdm-foot {
+          margin-top: 18px;
+          padding-top: 12px;
+          border-top: 1px solid rgba(255, 255, 255, 0.14);
+          color: rgba(255, 255, 255, 0.55);
+          font-size: 11.5px;
+          line-height: 1.35;
+        }
+        .fdm-spinner {
+          width: 34px;
+          height: 34px;
+          margin: 0 auto 14px;
+          border-radius: 50%;
+          border: 3px solid rgba(255, 233, 61, 0.2);
+          border-top-color: #ffe93d;
+          animation: fdmSpin 0.9s linear infinite;
+        }
+        @keyframes fdmSpin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) {
+          .fdm-spinner { animation: none; }
+          .fdm-primary { transition: none; }
+        }
+        @media (max-width: 420px) {
+          .fdm-card { padding: 22px 18px 18px; }
+          .fdm-title { font-size: 34px; }
+          .fdm-amount input { font-size: 26px; }
         }
       `}</style>
 
-      {/* Modal Backdrop */}
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.95)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          zIndex: 100000,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-        onClick={onClose}
-      >
-        {/* Modal Content */}
+      <div className="fdm-backdrop" onClick={onClose}>
         <div
-       
-          style={{
-            position: 'relative',
-            background: 'linear-gradient(135deg, #1a1a2e, #16213e)',
-            border: '2px solid rgba(255, 215, 0, 0.3)',
-            borderRadius: '16px',
-            padding: '1.5rem',
-            maxWidth: '480px',
-            width: '90%',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-            boxShadow: '0 0 40px rgba(255, 215, 0, 0.2), 0 0 80px rgba(0, 245, 212, 0.1)',
-          }}
+          className="fdm-card"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="fdm-title"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Close Button */}
-          <button
-            onClick={onClose}
-            style={{
-              position: 'absolute',
-              top: '10px',
-              right: '10px',
-              background: 'rgba(0, 0, 0, 0.5)',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              color: '#fff',
-              fontSize: '1.2rem',
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-              e.currentTarget.style.transform = 'scale(1.1)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.5)';
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-          >
-            ✕
-          </button>
+          <button type="button" className="fdm-close" onClick={onClose} aria-label="Close">✕</button>
 
-          {/* Title */}
-          <h2  style={{
-            color: '#FFD700',
-            textAlign: 'center',
-            marginBottom: '0.5rem',
-            fontSize: '1.4rem',
-            fontFamily: "'Orbitron', monospace",
-            textTransform: 'uppercase',
-            letterSpacing: '2px',
-          }}>
-            Toss a Coin
-          </h2>
+          <h2 id="fdm-title" className="fdm-title">Toss a coin</h2>
+          <p className="fdm-sub">A golden coin for the fountain.</p>
 
-          <p style={{
-            color: 'rgba(255, 255, 255, 0.6)',
-            textAlign: 'center',
-            marginBottom: '1rem',
-            fontSize: '0.85rem',
-            fontFamily: "'Orbitron', monospace",
-          }}>
-            for
-          </p>
-
-          {/* Not Connected State */}
+          {/* Not connected */}
           {!isWalletConnected && (
-            <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
-              <p style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: '1.5rem', fontFamily: "'Orbitron', monospace" }}>
-                Connect your wallet to toss a coin for charity
+            <div className="fdm-section fdm-center">
+              <p style={{ color: 'rgba(255,255,255,0.8)' }}>
+                Connect a wallet to send a golden coin.
               </p>
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <button
-                  onClick={() => connectWallet()}
-                  style={{
-                    background: 'linear-gradient(135deg, #FFD700, #FFA500)',
-                    color: '#000',
-                    fontFamily: "'Orbitron', monospace",
-                    fontWeight: 'bold',
-                    fontSize: '1rem',
-                    padding: '1rem 2rem',
-                    borderRadius: '8px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '2px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                  }}
-                >
-                  Connect Wallet
-                </button>
-              </div>
+              <button type="button" className="fdm-primary" onClick={() => connectWallet()}>
+                Connect wallet
+              </button>
             </div>
           )}
 
-          {/* Step: Select Charity */}
-          {isWalletConnected && step === 'select' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <p style={{
-                color: 'rgba(255, 255, 255, 0.8)',
-                textAlign: 'center',
-                fontSize: '0.8rem',
-                marginBottom: '0.25rem',
-              }}>
-                Choose a charity to support:
-              </p>
-
-              {Object.entries(CHARITY_WALLETS).map(([key, charity]) => (
-                <div
-                  key={key}
-                  className="charity-card"
-                  onClick={() => handleCharitySelect(key)}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ flex: 1 }}>
-                      <h3 style={{
-                        color: '#FFD700',
-                        fontSize: '0.95rem',
-                        fontFamily: "'Orbitron', monospace",
-                        marginBottom: '0.25rem',
-                      }}>
-                        {charity.shortName}
-                      </h3>
-                      <p style={{
-                        color: 'rgba(255, 255, 255, 0.6)',
-                        fontSize: '0.75rem',
-                        fontStyle: 'italic',
-                      }}>
-                        {charity.description}
-                      </p>
-                    </div>
-                  </div>
-                  <a
-                    href={charity.givingBlockUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      display: 'block',
-                      color: '#00f5d4',
-                      fontSize: '0.65rem',
-                      marginTop: '0.75rem',
-                      textDecoration: 'underline',
-                    }}
-                  >
-                    Learn more at The Giving Block →
-                  </a>
+          {/* Step: amount */}
+          {isWalletConnected && step === 'amount' && (
+            <div>
+              <div className="fdm-section fdm-recipient">
+                <span className="fdm-recipient-icon" aria-hidden="true">{recipient.icon}</span>
+                <div>
+                  <div className="fdm-recipient-name">{recipient.shortName}</div>
+                  <div className="fdm-recipient-desc">{recipient.description}</div>
                 </div>
-              ))}
+              </div>
 
-              {/* Dev tip jar — deliberately styled as the humble last
-                  option below the charities, and denominated in
-                  ETH/USDC rather than RL80 (see DEV_WALLET). */}
-              <p style={{
-                color: 'rgba(255, 255, 255, 0.4)',
-                textAlign: 'center',
-                fontSize: '0.7rem',
-                margin: '0.25rem 0',
-              }}>
-                — or —
-              </p>
-              <div
-                className="charity-card"
-                onClick={() => handleCharitySelect('DEV')}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{ flex: 1 }}>
-                    <h3 style={{
-                      color: '#FFD700',
-                      fontSize: '0.95rem',
-                      fontFamily: "'Orbitron', monospace",
-                      marginBottom: '0.25rem',
-                    }}>
-                      {DEV_WALLET.icon} {DEV_WALLET.shortName}
-                    </h3>
-                    <p style={{
-                      color: 'rgba(255, 255, 255, 0.6)',
-                      fontSize: '0.75rem',
-                      fontStyle: 'italic',
-                    }}>
-                      {DEV_WALLET.description}
-                    </p>
+              <div className="fdm-section">
+                <label className="fdm-label" htmlFor="fdm-amount">Amount</label>
+                <div className="fdm-amount">
+                  <input
+                    id="fdm-amount"
+                    type="number"
+                    inputMode="decimal"
+                    value={amount}
+                    onChange={(e) => { setAmount(e.target.value); setError(null); }}
+                    placeholder="0"
+                    min="0"
+                    step="any"
+                  />
+                  <div className="fdm-currency" role="group" aria-label="Currency">
+                    {['USDC', 'ETH'].map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        aria-pressed={payCurrency === c}
+                        onClick={() => { setPayCurrency(c); setAmount(''); setError(null); }}
+                      >
+                        {c}
+                      </button>
+                    ))}
                   </div>
                 </div>
-                <a
-                  href={`https://basescan.org/address/${DEV_WALLET.address}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    display: 'block',
-                    color: '#00f5d4',
-                    fontSize: '0.65rem',
-                    marginTop: '0.75rem',
-                    textDecoration: 'underline',
-                  }}
-                >
-                  {DEV_WALLET.ens} · verify on BaseScan →
-                </a>
-              </div>
-            </div>
-          )}
-
-          {/* Step: Enter Amount */}
-          {isWalletConnected && step === 'amount' && charity && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {/* <button className="back-btn" onClick={() => setStep('select')}>
-                ← Back
-              </button> */}
-
-              <div style={{ textAlign: 'center' }}>
-                <h3 style={{
-                  color: '#FFD700',
-                  fontFamily: "'Orbitron', monospace",
-                  marginTop: '0.5rem',
-                  fontSize: '1.1rem',
-                }}>
-                  {charity.shortName}
-                </h3>
-              </div>
-
-              {/* Everything is given in USDC or ETH — charities and dev
-                  tips alike */}
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                {['USDC', 'ETH'].map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className="back-btn"
-                    onClick={() => {
-                      setPayCurrency(c);
-                      setAmount('');
-                      setError(null);
-                    }}
-                    style={
-                      payCurrency === c
-                        ? { borderColor: '#FFD700', color: '#FFD700' }
-                        : undefined
-                    }
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-
-              <div>
-                <label style={{
-                  display: 'block',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontSize: '0.75rem',
-                  marginBottom: '0.5rem',
-                  fontFamily: "'Orbitron', monospace",
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                }}>
-                  Amount ({payCurrency})
-                </label>
-                <input
-                  type="number"
-                  className="amount-input"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0"
-                  min="0"
-                  step="any"
-                />
-                <div style={{
-                  display: 'flex',
-                  gap: '0.5rem',
-                  justifyContent: 'center',
-                  marginTop: '0.5rem',
-                }}>
-                  {/* Coffee-sized presets for the dev, a bit more generous
-                      for the charities */}
-                  {(payCurrency === 'USDC'
-                    ? isDevTip
-                      ? ['2', '5', '10']
-                      : ['5', '10', '25']
-                    : isDevTip
-                      ? ['0.001', '0.002', '0.005']
-                      : ['0.002', '0.005', '0.01']
-                  ).map((v) => (
+                <div className="fdm-presets">
+                  {presets.map((v) => (
                     <button
                       key={v}
                       type="button"
-                      className="back-btn"
-                      onClick={() => setAmount(v)}
+                      className="fdm-chip"
+                      aria-pressed={amount === v}
+                      onClick={() => { setAmount(v); setError(null); }}
                     >
-                      {v}
+                      {v} {payCurrency}
                     </button>
                   ))}
                 </div>
-                <p style={{
-                  color: 'rgba(255, 255, 255, 0.5)',
-                  fontSize: '0.7rem',
-                  marginTop: '0.5rem',
-                  textAlign: 'right',
-                }}>
-                  Available: {payBalanceDisplay} {payCurrency}
-                </p>
+                <div className="fdm-balance">Available: {payBalanceDisplay} {payCurrency}</div>
               </div>
 
-              {error && (
-                <p style={{ color: '#ff6b6b', fontSize: '0.85rem', textAlign: 'center' }}>
-                  {error}
-                </p>
-              )}
+              {error && <div className="fdm-error" role="alert">{error}</div>}
 
               <button
-                className="donate-btn"
+                type="button"
+                className="fdm-primary"
                 onClick={handleAmountSubmit}
                 disabled={!amount || parseFloat(amount) <= 0}
               >
@@ -681,234 +590,116 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
             </div>
           )}
 
-          {/* Step: Confirm */}
-          {isWalletConnected && step === 'confirm' && charity && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <button className="back-btn" onClick={() => setStep('amount')}>
-                ← Back
-              </button>
+          {/* Step: confirm */}
+          {isWalletConnected && step === 'confirm' && (
+            <div className="fdm-section">
+              <button type="button" className="fdm-back" onClick={() => setStep('amount')}>← Change amount</button>
 
-              <div style={{
-                background: 'rgba(0, 0, 0, 0.4)',
-                border: '1px solid rgba(255, 215, 0, 0.2)',
-                borderRadius: '12px',
-                padding: '1rem',
-              }}>
-                <h3 style={{
-                  color: '#FFD700',
-                  fontFamily: "'Orbitron', monospace",
-                  fontSize: '0.9rem',
-                  marginBottom: '1rem',
-                  textAlign: 'center',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                }}>
-                  Confirm Your Donation
-                </h3>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.85rem' }}>{isDevTip ? 'Recipient:' : 'Charity:'}</span>
-                    <span style={{ color: '#fff', fontSize: '0.85rem' }}>{charity.shortName}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.85rem' }}>Amount:</span>
-                    <span style={{ color: '#FFD700', fontWeight: 'bold', fontSize: '0.85rem' }}>{amount} {displayCurrency}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.85rem' }}>To:</span>
-                    <span style={{ color: '#00f5d4', fontSize: '0.75rem' }}>
-                      {isDevTip
-                        ? `${charity.ens} (${charity.address.slice(0, 6)}...${charity.address.slice(-4)})`
-                        : `${charity.address.slice(0, 6)}...${charity.address.slice(-4)}`}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <p style={{
-                color: 'rgba(255, 255, 255, 0.5)',
-                fontSize: '0.7rem',
-                textAlign: 'center',
-                lineHeight: 1.5,
-              }}>
-                {isDevTip
-                  ? 'Goes directly to the dev’s wallet. A voluntary tip — no perks, no promises, just thanks. ☕'
-                  : 'Donations pool in the charity wallet and are forwarded via The Giving Block once the pool reaches ~100 USDC in value (or the ETH equivalent).'}
+              <dl className="fdm-summary">
+                <dt>Sending</dt>
+                <dd className="gold">{amount} {displayCurrency}</dd>
+                <dt>To</dt>
+                <dd>{recipient.shortName}</dd>
+                <dt>Wallet</dt>
+                <dd className="addr">{recipient.ens} · {shortAddr}</dd>
+              </dl>
+              <p className="fdm-note">
+                Goes straight to the site wallet. A voluntary contribution: no perks, no promises, just thanks.
               </p>
 
-              <div style={{ marginBottom: '0.9rem' }}>
-                <label style={{
-                  display: 'block',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontSize: '0.7rem',
-                  marginBottom: '0.4rem',
-                  fontFamily: "'Orbitron', monospace",
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                }}>
-                  Your name <span style={{ opacity: 0.6, textTransform: 'none' }}>(optional · shown on your coin)</span>
+              <div className="fdm-section">
+                <label className="fdm-label" htmlFor="fdm-name">
+                  Your name <small>(optional, shown on your coin)</small>
                 </label>
                 <input
+                  id="fdm-name"
                   type="text"
-                  className="amount-input"
-                  style={{ textAlign: 'left', fontSize: '0.8rem' }}
+                  className="fdm-input"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   maxLength={24}
-                  placeholder="how you'd like to be credited…"
+                  placeholder="How you'd like to be credited"
                 />
               </div>
-
-              <div>
-                <label style={{
-                  display: 'block',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontSize: '0.7rem',
-                  marginBottom: '0.4rem',
-                  fontFamily: "'Orbitron', monospace",
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                }}>
-                  Attach a wish <span style={{ opacity: 0.6, textTransform: 'none' }}>(optional · shown publicly)</span>
+              <div className="fdm-section" style={{ marginTop: 12 }}>
+                <label className="fdm-label" htmlFor="fdm-wish">
+                  A wish <small>(optional, shown publicly)</small>
                 </label>
                 <input
+                  id="fdm-wish"
                   type="text"
-                  className="amount-input"
-                  style={{ textAlign: 'left', fontSize: '0.8rem' }}
+                  className="fdm-input"
                   value={wish}
                   onChange={(e) => setWish(e.target.value)}
                   maxLength={80}
-                  placeholder="carried into the fountain by your golden coin…"
+                  placeholder="Carried into the fountain by your golden coin"
                 />
               </div>
 
               <button
-                className="donate-btn"
+                type="button"
+                className="fdm-primary"
                 onClick={handleDonate}
                 disabled={isTransactionPending}
               >
-                {isTransactionPending ? 'Processing...' : 'Mint Your Golden Coin'}
+                {isTransactionPending ? 'Waiting for your wallet…' : `Send ${amount} ${displayCurrency}`}
               </button>
             </div>
           )}
 
-          {/* Step: Processing - minimal UI, user sees wallet popup */}
+          {/* Step: processing */}
           {step === 'processing' && (
-            <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
-              <p style={{
-                color: 'rgba(255, 255, 255, 0.8)',
-                fontSize: '0.9rem',
-              }}>
-                Confirm in your wallet...
-              </p>
+            <div className="fdm-section fdm-center">
+              <div className="fdm-spinner" aria-hidden="true" />
+              <p style={{ color: 'rgba(255,255,255,0.85)' }}>Confirm the transaction in your wallet.</p>
             </div>
           )}
 
-          {/* Step: Success */}
-          {step === 'success' && charity && (
-            <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
-              <h3 style={{
-                color: '#00f5d4',
-                fontFamily: "'Orbitron', monospace",
-                fontSize: '1.2rem',
-                marginBottom: '0.75rem',
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
-              }}>
-                Thank You!
-              </h3>
-              <p style={{
-                color: 'rgba(255, 255, 255, 0.8)',
-                fontSize: '0.85rem',
-                marginBottom: '1rem',
-              }}>
-                {isDevTip ? (
-                  <>Your <span style={{ color: '#FFD700' }}>{amount} {payCurrency}</span> coffee is on its way to the dev. ☕</>
-                ) : (
-                  <>Your donation of <span style={{ color: '#FFD700' }}>{amount} {payCurrency}</span> to {charity.shortName} has been sent.</>
-                )}
-                {' '}A golden coin is waiting in your hand — tap the water to toss it in.
+          {/* Step: success */}
+          {step === 'success' && (
+            <div className="fdm-section fdm-center">
+              <h3 className="fdm-heading">Thank you</h3>
+              <p style={{ color: 'rgba(255,255,255,0.85)' }}>
+                Your <strong style={{ color: '#ffe93d' }}>{amount} {payCurrency}</strong> is on its way to the site.
+                A golden coin is waiting in your hand. Tap the water to toss it in.
               </p>
-
               {txHash && (
-                <a
-                  href={`https://basescan.org/tx/${txHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-block',
-                    color: '#00f5d4',
-                    fontSize: '0.75rem',
-                    marginBottom: '1rem',
-                    textDecoration: 'underline',
-                  }}
-                >
-                  View transaction →
-                </a>
+                <p style={{ marginTop: 10, fontSize: 13 }}>
+                  <a
+                    className="fdm-link"
+                    href={`https://basescan.org/tx/${txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    View the transaction on BaseScan
+                  </a>
+                </p>
               )}
-
-              <button
-                className="donate-btn"
-                onClick={handleWatchCoin}
-                style={{ marginTop: '0.5rem' }}
-              >
-                🥇 Take Your Golden Coin
+              <button type="button" className="fdm-primary" onClick={handleWatchCoin}>
+                Take your golden coin
               </button>
             </div>
           )}
 
-          {/* Step: Error */}
+          {/* Step: error */}
           {step === 'error' && (
-            <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
-              <h3 style={{
-                color: '#ff6b6b',
-                fontFamily: "'Orbitron', monospace",
-                fontSize: '1.1rem',
-                marginBottom: '0.75rem',
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
-              }}>
-                Something went wrong
-              </h3>
-              <p style={{
-                color: 'rgba(255, 255, 255, 0.7)',
-                fontSize: '0.85rem',
-                marginBottom: '1.5rem',
-              }}>
-                {error || 'Transaction failed. Please try again.'}
-              </p>
-
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-                <button className="back-btn" onClick={() => setStep('confirm')}>
-                  Try Again
-                </button>
-                <button className="back-btn" onClick={onClose}>
-                  Close
-                </button>
+            <div className="fdm-section fdm-center">
+              <h3 className="fdm-heading">That didn’t go through</h3>
+              <div className="fdm-error" style={{ textAlign: 'left' }}>
+                {error || 'The transaction failed. Nothing was sent.'}
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16 }}>
+                <button type="button" className="fdm-ghost" onClick={() => setStep('confirm')}>Try again</button>
+                <button type="button" className="fdm-ghost" onClick={onClose}>Close</button>
               </div>
             </div>
           )}
 
-          {/* Footer - Transparency Info */}
-          {isWalletConnected && ['select', 'amount', 'confirm'].includes(step) && (
-            <div style={{
-              marginTop: '1.5rem',
-              paddingTop: '0.75rem',
-              borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-            }}>
-              <p style={{
-                color: 'rgba(255, 255, 255, 0.4)',
-                fontSize: '0.65rem',
-                textAlign: 'center',
-                lineHeight: 1.5,
-              }}>
-                100% of charity donations go to charity (pooled, then forwarded
-                via The Giving Block at ~100 USDC in value, or the ETH
-                equivalent). Dev tips go straight to rl80.eth.
-                All transactions are publicly verifiable on-chain.
-              </p>
-            </div>
+          {/* Footer */}
+          {isWalletConnected && ['amount', 'confirm'].includes(step) && (
+            <p className="fdm-foot">
+              Sent directly to {recipient.ens} on Base. Every transaction is public and verifiable.
+            </p>
           )}
         </div>
       </div>

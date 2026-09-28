@@ -1,6 +1,6 @@
 // app/api/fountain-donation/route.js
 //
-// Logs a fountain donation (charity or dev tip) to the public
+// Logs a fountain donation (site support) to the public
 // `fountain_donations` feed — the toasts and the "Total Given" counter
 // in fountain.html read from it. That collection is `write: if false`
 // for clients, so this route is its ONLY writer (admin SDK), and it
@@ -14,9 +14,11 @@
 // donation requires beating the donor's own immediate POST.
 //
 // Verifies either form a donation can take:
-//   - USDC: an ERC-20 Transfer to a known recipient wallet
-//   - ETH:  a native send to a known recipient wallet
-// Recipients = CHARITY_WALLETS + DEV_WALLET from lib/contracts.js.
+//   - USDC: an ERC-20 Transfer to the site wallet
+//   - ETH:  a native send to the site wallet
+// The sole recipient is DEV_WALLET (rl80.eth) from lib/contracts.js —
+// the charity wallets were retired 2026-09-27. Docs keep the 'DEV'
+// recipient key so the existing feed renders unchanged.
 //
 // Doc id = tx hash, created with create() — natural idempotency, so a
 // client retry can't double-count the counter or re-toast.
@@ -26,21 +28,17 @@ import { erc20Abi, parseEventLogs, formatUnits } from 'viem';
 import { publicClient } from '@/lib/viemClient';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { CHARITY_WALLETS, DEV_WALLET, USDC_ADDRESS } from '@/lib/contracts';
+import { DEV_WALLET, USDC_ADDRESS } from '@/lib/contracts';
 
 // Older transfers can't be resurrected as brand-new toasts.
 const MAX_DONATION_AGE_MS = 2 * 60 * 60 * 1000;
 
 // address (lowercase) → { key, name } for every wallet the fountain
-// gives to.
-const RECIPIENTS = (() => {
-  const map = {};
-  for (const [key, c] of Object.entries(CHARITY_WALLETS)) {
-    map[c.address.toLowerCase()] = { key, name: c.name };
-  }
-  map[DEV_WALLET.address.toLowerCase()] = { key: 'DEV', name: DEV_WALLET.name };
-  return map;
-})();
+// gives to. One entry today; kept as a map so the on-chain matching
+// below stays recipient-agnostic.
+const RECIPIENTS = {
+  [DEV_WALLET.address.toLowerCase()]: { key: 'DEV', name: DEV_WALLET.name },
+};
 
 export async function POST(request) {
   try {
