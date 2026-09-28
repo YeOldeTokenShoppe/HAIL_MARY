@@ -45,10 +45,14 @@ function Bracket({ pos, color }) {
 
 /* The core cylinder — the claim's column as a core sample. One band per layer,
    L1 at the top. Fed by buildColumnRack(); callouts for the layer on the table. */
-function CoreCylinder({ rack, pending, theme, width = 118, height = 236 }) {
+function CoreCylinder({ rack, pending, theme, width = 104, height = 236 }) {
   const n = rack.length || 20;
-  const tubeX = 30, tubeY = 8, tubeW = 40, tubeH = height - 16;
+  const tubeX = 26, tubeY = 8, tubeW = 34, tubeH = height - 16;
   const bandH = tubeH / n;
+  // Bore head = the deepest layer the rig has reached; everything below is
+  // still ground. The marker is what makes "where am I" instant.
+  const reached = rack.reduce((m, c) => (c.state !== "undrilled" ? Math.max(m, c.layer + 1) : m), 0);
+  const headY = tubeY + bandH * reached;
   const fillFor = (c) => c.state === "pending" ? WALL.pending
     : c.state === "extracted" ? WALL.bore
     : c.state === "passed" ? WALL.goo
@@ -65,15 +69,15 @@ function CoreCylinder({ rack, pending, theme, width = 118, height = 236 }) {
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true" style={{ display: "block", flex: "0 0 auto" }}>
       <defs>
         <pattern id="v3-strata" width="6" height="4" patternUnits="userSpaceOnUse">
-          <rect width="6" height="4" fill="rgba(255,255,255,0.03)" />
-          <rect width="6" height="1" fill="rgba(255,255,255,0.06)" />
+          <rect width="6" height="4" fill="rgba(128,128,128,0.06)" />
+          <rect width="6" height="1" fill="rgba(128,128,128,0.10)" />
         </pattern>
         <clipPath id="v3-clip"><rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={9} /></clipPath>
         <filter id="v3-glow" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="1.6" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
       </defs>
-      <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={9} fill="rgba(0,0,0,0.35)" />
+      <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={9} fill="rgba(0,0,0,0.18)" />
       <g clipPath="url(#v3-clip)">
         {rack.map((c) => (
           <rect key={c.layer} x={tubeX} y={tubeY + bandH * c.layer} width={tubeW} height={bandH + 0.5} fill={fillFor(c)}
@@ -88,6 +92,13 @@ function CoreCylinder({ rack, pending, theme, width = 118, height = 236 }) {
       </g>
       <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={9} fill="none" stroke={theme.gold} strokeWidth="1" opacity="0.7" />
       <rect x={tubeX + 3} y={tubeY + 4} width={5} height={tubeH - 8} rx={2.5} fill="rgba(255,255,255,0.06)" />
+      {/* bore head — where the rig is now */}
+      {reached > 0 && reached < n && (
+        <g>
+          <line x1={tubeX - 3} y1={headY} x2={tubeX + tubeW + 3} y2={headY} stroke={theme.gold} strokeWidth="1.5" />
+          <polygon points={`${tubeX - 9},${headY - 3.5} ${tubeX - 9},${headY + 3.5} ${tubeX - 3.5},${headY}`} fill={theme.gold} />
+        </g>
+      )}
       {/* depth ticks, in layers */}
       <g fontFamily={MONO} fontSize="7" fill={theme.muted} letterSpacing="0.05em">
         {ticks.map((z) => {
@@ -95,6 +106,13 @@ function CoreCylinder({ rack, pending, theme, width = 118, height = 236 }) {
           return (<g key={z}><line x1={tubeX - 5} y1={y} x2={tubeX} y2={y} stroke={theme.muted} strokeWidth="0.8" opacity="0.6" /><text x={tubeX - 8} y={y + 2.5} textAnchor="end">L{z + 1}</text></g>);
         })}
       </g>
+      {/* bore head label — when a pending callout is not already saying which layer */}
+      {!p && reached > 0 && (
+        <g fontFamily={MONO} letterSpacing="0.08em">
+          <text x={tubeX + tubeW + 8} y={headY - 3} fontSize="9" fill={theme.gold} fontWeight="700">L{reached}</text>
+          <text x={tubeX + tubeW + 8} y={headY + 7} fontSize="6.5" fill={theme.muted} letterSpacing="0.14em">BORE HEAD</text>
+        </g>
+      )}
       {/* the layer on the table: leader + label + ANOM dot */}
       {p && (
         <g fontFamily={MONO} letterSpacing="0.08em">
@@ -174,10 +192,12 @@ export default function OilCoreSampleV3({
   const gold = theme.gold, cream = theme.textStrong || theme.text, muted = theme.muted, warn = theme.warn || "#e87a2b";
   const mono = (extra) => ({ fontFamily: MONO, fontSize: 11, letterSpacing: "0.06em", lineHeight: 1.7, color: theme.text, ...extra });
   const meta = mono({ fontSize: 9, letterSpacing: "0.22em", color: muted, textTransform: "uppercase" });
+  // Label over value: the right column next to the cylinder is ~200px on a
+  // phone, so side-by-side rows wrapped word by word (Michelle, 2026-09-28).
   const dataRow = (k, v, color) => (
-    <div key={k} style={{ display: "flex", gap: 10 }}>
-      <span style={mono({ color: muted, minWidth: 64, flex: "0 0 auto" })}>{k}</span>
-      <span style={mono({ color: color || theme.text })}>{v}</span>
+    <div key={k} style={{ marginBottom: 5 }}>
+      <div style={mono({ color: muted, fontSize: 9, letterSpacing: "0.18em", lineHeight: 1.3 })}>{k}</div>
+      <div style={mono({ color: color || theme.text, lineHeight: 1.35 })}>{v}</div>
     </div>
   );
   const noteLine = (s, i) => <div key={i} style={mono({ color: muted, fontSize: 10, lineHeight: 1.6 })}>{s}</div>;
@@ -218,14 +238,14 @@ export default function OilCoreSampleV3({
           {pending.hasInclusion && dataRow("FLAG", "anomalous inclusion", warn)}
           {dataRow("CREW", `would ${crewWould}`, crewWould === "EXTRACT" ? theme.green : theme.text)}
           {deadline ? dataRow("BY", `${deadline.at} · ${deadline.until}`) : dataRow("BY", columnDone || seasonOver || clockOut ? "the buzzer" : "the next strike")}
-          {pending.hasInclusion && <div style={{ ...mono({ color: warn, letterSpacing: "0.14em" }), marginTop: 8 }}>!! ANOMALOUS INCLUSION !!</div>}
-          <div style={{ marginTop: 8 }}>
-            {(dry
-              ? ["Dry — passing is free.", "Extracting nothing would waste a charge.", "Do nothing: the crew passes."]
-              : [`Extract banks the full ${fmtBtr(oil)} BTR for 1 charge.`, "Pass is free but final — opens to neighbours.", `Do nothing: the crew ${crewWould === "EXTRACT" ? "extracts" : "passes"}.`]
-            ).concat(pending.hasInclusion ? ["The inclusion is only recovered on extract."] : []).map(noteLine)}
-          </div>
+          {pending.hasInclusion && <div style={{ ...mono({ color: warn, letterSpacing: "0.14em" }), marginTop: 6 }}>!! ANOMALOUS INCLUSION !!</div>}
         </div>
+      </div>
+      <div style={{ marginTop: 8 }}>
+        {(dry
+          ? ["Dry — passing is free.", "Extracting nothing would waste a charge.", "Do nothing: the crew passes."]
+          : [`Extract banks the full ${fmtBtr(oil)} BTR for 1 charge.`, "Pass is free but final — opens to neighbours.", `Do nothing: the crew ${crewWould === "EXTRACT" ? "extracts" : "passes"}.`]
+        ).concat(pending.hasInclusion ? ["The inclusion is only recovered on extract."] : []).map(noteLine)}
       </div>
       <div style={{ display: "flex", gap: 12, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${theme.border || muted}` }}>
         {stat(dry ? "DRY" : `${fmtBtr(oil)} BTR`, `on the table · L${pending.layer + 1}`, dry ? muted : gold)}
@@ -241,17 +261,17 @@ export default function OilCoreSampleV3({
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
         <CoreCylinder rack={rack} pending={null} theme={theme} />
         <div style={{ flex: 1, minWidth: 0, paddingTop: 4 }}>
+          {dataRow("BORE HEAD", `L${revealedCount} of ${rack.length || 20}`, gold)}
           {dataRow("TABLE", "nothing on it", muted)}
           {cadence && !seasonOver && !clockOut && !columnDone && dataRow("NEXT CORE", `before ${clockOf(cadence.latestMs)} · ${untilCopy(cadence.latestMs, nowMs)}`)}
           {cadence && !seasonOver && !clockOut && !columnDone && dataRow("PACE", `a core every ${fmtSpan(cadence.intervalMs)}`)}
-          {dataRow("REVEALED", `${revealedCount} of ${rack.length || 20}`)}
-          <div style={{ marginTop: 8 }}>
-            {(seasonOver ? ["Season closed. The reckoning is below."]
-              : clockOut ? ["The season clock has run out.", "The buzzer settles anything on the table."]
-              : columnDone ? ["Your column is fully revealed.", "Charges left still work next door."]
-              : ["The next strike pulls a core.", "Away? The crew follows your orders."]).map(noteLine)}
-          </div>
         </div>
+      </div>
+      <div style={{ marginTop: 8 }}>
+        {(seasonOver ? ["Season closed. The reckoning is below."]
+          : clockOut ? ["The season clock has run out.", "The buzzer settles anything on the table."]
+          : columnDone ? ["Your column is fully revealed.", "Charges left still work next door."]
+          : ["The next strike pulls a core.", "Away? The crew follows your orders."]).map(noteLine)}
       </div>
       <div style={{ display: "flex", gap: 12, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${theme.border || muted}` }}>
         {stat(`${fmtBtr(ledger?.banked || 0)} BTR`, "banked")}
@@ -346,12 +366,12 @@ export default function OilCoreSampleV3({
             {dataRow("EXTRACTED", `${extractedN} layer${extractedN === 1 ? "" : "s"}`)}
             {dataRow("OPEN", `${openN} pocket${openN === 1 ? "" : "s"}${takenN ? ` · ${takenN} taken` : ""}`, openN ? WALL.goo : theme.text)}
             {hellN > 0 && dataRow("HELL", `${hellN} pocket${hellN === 1 ? "" : "s"}`, WALL.hell)}
-            <div style={{ marginTop: 8 }}>
-              {(hasPlot
-                ? ["This is the field's view of the column.", "Open pockets are what a neighbour could salvage.", "Claim a plot to drill your own."]
-                : ["Tap a plot to read its column.", "Claim one to drill your own."]).map(noteLine)}
-            </div>
           </div>
+        </div>
+        <div style={{ marginTop: 8 }}>
+          {(hasPlot
+            ? ["This is the field's view of the column.", "Open pockets are what a neighbour could salvage.", "Claim a plot to drill your own."]
+            : ["Tap a plot to read its column.", "Claim one to drill your own."]).map(noteLine)}
         </div>
         <div style={{ display: "flex", gap: 12, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${theme.border || muted}` }}>
           {stat(`${revealedCount}/${rack.length || 20}`, "revealed", cream)}
