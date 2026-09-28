@@ -234,9 +234,13 @@ from what exists. Sizes: the card is ~330 lines of plain JSX; the reckoning ~110
   seeded field with PLAY / +1 DAY / PLAY AS controls — the fastest way to watch pending →
   resolve → salvage rhythm. (`?strata=1` shows the LIVE field when the v2 flag is on, which
   is empty until real strikes land — that is what Michelle saw on 2026-09-28.)
-- **Every state on one page (not built):** a `?v2fixture=1` page that mounts the card and
-  the reckoning in each §3 state with static props would make the pass and later
-  regressions cheap. Recommended as the first build ticket of the pass.
+- **Every state on one page — BUILT 2026-09-28: `/hailmary/fixture`.** Mounts the Core Sample
+  card in every §3 state, the Reckoning in its four states, and the away recap (v2 and v1),
+  in any of the six themes at 360 / 420 / 560 px. The PLAYABLE card at the top is a local
+  sim: EXTRACT / PASS / TAKE / WILDCAT mutate mock docs the way the routes do, NEXT STRIKE
+  resolves by the standing order and reveals the next layer, END SEASON hands the same world
+  to the Reckoning. Static data, same builders as the live page, nothing touches the game.
+  Not indexed. Design here; regressions show here first.
 
 ## 10. Hand-back
 
