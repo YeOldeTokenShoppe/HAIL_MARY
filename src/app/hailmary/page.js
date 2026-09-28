@@ -4737,6 +4737,25 @@ export default function OilPage() {
     });
     return data;
   }, [oilApiFetch]);
+  // The rig's MACHINE PANEL acts too (Michelle, 2026-09-28: both surfaces, same
+  // handlers). The pumpjack fires window events on a confirmed press — the caged
+  // PASS (hm:pass-confirm) and, under v2, the red button as EXTRACT
+  // (hm:extract-confirm) — each carrying the rig's plotId. Only the player's own
+  // rig with a core on the table acts; anything else is ignored. A server
+  // refusal (no charges, no pending) changes nothing and is logged.
+  useEffect(() => {
+    if (!loopV2) return undefined;
+    const onConfirm = (action) => (e) => {
+      const plotId = e?.detail?.plotId;
+      if (!userDrill || userDrill.col == null || !userDrill.pending) return;
+      if (plotId && plotId !== `${userDrill.col}_${userDrill.row}`) return;
+      handleLayerDecide(action).catch((err) => console.warn(`[rig panel] ${action} failed:`, err.message));
+    };
+    const onPass = onConfirm("pass"), onExtract = onConfirm("extract");
+    window.addEventListener("hm:pass-confirm", onPass);
+    window.addEventListener("hm:extract-confirm", onExtract);
+    return () => { window.removeEventListener("hm:pass-confirm", onPass); window.removeEventListener("hm:extract-confirm", onExtract); };
+  }, [loopV2, userDrill, handleLayerDecide]);
   const handleSetThreshold = useCallback(async (btr) => {
     const res = await oilApiFetch("/api/oil-threshold", { method: "POST", body: JSON.stringify({ btr }) });
     const data = await res.json().catch(() => ({}));
@@ -8553,6 +8572,7 @@ export default function OilPage() {
                     <RigScene
                       config={ownConfig}
                       plot={own}
+                      loopV2={loopV2}
                       gridSize={gridSize}
                       blockHash={blockHash}
                       numberOfDeposits={numberOfDeposits}
@@ -9139,6 +9159,7 @@ export default function OilPage() {
             <group position={[0, 5, 0]}>
               <OilVoxelGrid
                 strataLivePlots={loopV2 ? allPlotsMap : null}
+                loopV2={loopV2}
                 blockHash={blockHash}
                 numberOfDeposits={numberOfDeposits}
                 numberOfHellPockets={numberOfHellPockets}

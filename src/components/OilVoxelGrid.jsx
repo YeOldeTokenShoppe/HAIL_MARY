@@ -1879,7 +1879,10 @@ function PlotPoop() {
   );
 }
 
-function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, depositLayer = -1, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, gusherTier = "gusher", hasMessages = false, onEnvelopeClick, hellActive = false, worldW = 10, worldD = 10, cameraViewable = true, onFocusObject, panelZoomed = null, onPanelTap = null, yaw = 0, crewEnabled = null, plotId = null }) {
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, depositLayer = -1, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, gusherTier = "gusher", hasMessages = false, onEnvelopeClick, hellActive = false, worldW = 10, worldD = 10, cameraViewable = true, onFocusObject, panelZoomed = null, onPanelTap = null, yaw = 0, crewEnabled = null, plotId = null, decideMode = null }) {
+  // `decideMode` = "v2" on the player's own rig in an extract-or-pass season: the
+  // panel's verbs then fire the layer decision (window events the page listens
+  // to, each carrying `plotId`) instead of the v1 tank drain. null = v1 rules.
   // `panelZoomed` (phone, RigScene): the report's MACHINE PANEL chip has already
   // glided the camera to the control box, so the panel buttons work without the
   // desktop's select-then-zoom dance — true = buttons live, false = inert, null = desktop rules.
@@ -4008,7 +4011,9 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         flashPress(passButtonRef.current);
         playSfx(BUTTON_SFX, { volume: 0.8 });
         disarmPass();
-        window.dispatchEvent(new CustomEvent("hm:pass-confirm"));
+        // v2: the page's listener turns this into the PASS decision for this rig
+        // (it checks plotId against the player's own plot and a core on the table).
+        window.dispatchEvent(new CustomEvent("hm:pass-confirm", { detail: { plotId } }));
       } else if (!passArmedRef.current) {
         armPass();
       }
@@ -4072,7 +4077,14 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         return;
       }
       if (clickedButton === "red") { flashPress(redButtonRef.current); playSfx(BUTTON_SFX, { volume: 0.8 }); }
-      // Already zoomed in: only RedButton drains the tank.
+      // v2 (extract-or-pass): the red button is EXTRACT. No tank drain — the page's
+      // listener fires the layer decision for this rig; the tank empties when the
+      // server resolves it and the snapshot lands.
+      if (clickedButton === "red" && decideMode === "v2") {
+        window.dispatchEvent(new CustomEvent("hm:extract-confirm", { detail: { plotId } }));
+        return;
+      }
+      // Already zoomed in: only RedButton drains the tank (v1).
       if (clickedButton === "red" && !drainingRef.current && tankFillRef.current > 0) {
         drainingRef.current = true;
         drainFillRef.current = Math.min(tankFillRef.current, 1.0);
@@ -6557,6 +6569,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
             drillProximity={isSelected ? drillProximity : 0}
             tankFill={isSelected ? tankFill : 0}
             onTankDrain={isSelected ? onTankDrain : undefined}
+            decideMode={isSelected && loopV2 ? "v2" : null}
             envPreset={envPreset}
             parabolum={parabolum}
             forceStrikeGusher={forceStrikeGusher}
@@ -7753,6 +7766,7 @@ export default function OilVoxelGrid({
   blockHash = "0x8a3f7b2c91d4e6f5a0b3c8d7e2f1a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0",
   gridX = 10,
   gridY = 10,
+  loopV2 = false,          // v2 season: the selected (own) rig's panel verbs decide the layer
   depthZ = 20,
   cellSize = 1,
   numberOfDeposits = 5,
