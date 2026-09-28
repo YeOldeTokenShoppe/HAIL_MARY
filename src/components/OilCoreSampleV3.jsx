@@ -447,7 +447,7 @@ export default function OilCoreSampleV3({
         {ordersOpen && onSetOrders && (
           <div style={{ marginTop: 8, textAlign: "left" }}>
             {[
-              ["salvage", "SALVAGE", `take a neighbour's passed layer at or above your line, for 1 charge. Earliest order on a pocket wins.`],
+              ["salvage", "SALVAGE", `take a neighbour's passed layer at or above your line, for 1 charge. Neighbours with the order take turns — longest wait goes first.`],
               ["autopilot", "AUTOPILOT", "extract everything once your charges cover every layer left in your column."],
             ].map(([key, name, desc]) => (
               <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "6px 0", borderTop: `1px solid ${theme.border || muted}` }}>

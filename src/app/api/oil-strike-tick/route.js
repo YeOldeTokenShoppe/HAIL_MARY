@@ -696,8 +696,10 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
 // SALVAGE standing orders (docs/oil-game.md → standing orders, 2026-09-28).
 // For every passed pocket nobody has taken, the four orthogonal neighbours with
 // a SALVAGE order, a charge to spend, and a line at or below the pocket's oil
-// are candidates; the one whose order was set earliest takes it (a live player
-// can still TAKE by hand between ticks — the sweep runs on the cron cadence).
+// are candidates; the one whose order has WAITED LONGEST takes it and goes to
+// the back of the queue (its stamp is renewed on the take), so contested
+// pockets rotate over a season instead of belonging to whoever flipped the
+// switch first. A live player can still TAKE by hand between ticks.
 // Each take is its own transaction through applyLateralTake, the same writes
 // as a manual lateral. Returns the number of pockets taken this tick.
 async function runSalvageOrders(db, { settings, depthZ, gridSize, artifactsByKey }) {
@@ -745,7 +747,9 @@ async function runSalvageOrders(db, { settings, depthZ, gridSize, artifactsByKey
       if (result.error) continue; // raced by a manual TAKE or the order just turned off — fine
       taken++;
       // Keep the in-memory rig current so one rig cannot overspend within a tick.
-      for (const v of rigByCell.values()) if (v.id === winner.userId) v.chargesSpent = (v.chargesSpent || 0) + 1;
+      // Keep the in-memory rigs current within this tick: the taker spent a
+      // charge and went to the back of the queue (re-stamped in the txn).
+      for (const v of rigByCell.values()) if (v.id === winner.userId) { v.chargesSpent = (v.chargesSpent || 0) + 1; v.orders = { ...(v.orders || {}), salvageSetAt: Date.now() }; }
       try {
         await logTimeline(db, { type: "lateral", username: result.username, userId: winner.userId, detail: "crew salvaged a neighbour's discard (standing order)" });
         await sendPlayerAlert(db, winner.userId, {

@@ -254,8 +254,9 @@ export function reckoningText(r, { col, row } = {}) {
 // neighbour passes a layer at or above my line, take it with a charge";
 // AUTOPILOT = the existing opt-in extract-all rule. The server sweeps open
 // pockets on its tick; when several neighbours hold a SALVAGE order for the
-// same pocket, the EARLIEST-SET order wins ("first lateral wins", placed in
-// advance). The crew never gambles: inclusion-only pockets are left alone.
+// same pocket, the order that has WAITED LONGEST wins and then goes to the
+// back (the server re-stamps it on the take) — a queue, not a season-long
+// ranking. The crew never gambles: inclusion-only pockets are left alone.
 export function pickSalvageOrder(pocket, candidates = []) {
   const oil = Number(pocket && pocket.oil) || 0;
   if (oil <= 0) return null;
