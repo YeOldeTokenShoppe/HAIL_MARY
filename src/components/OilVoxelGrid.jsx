@@ -1940,15 +1940,49 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const keyRef = useRef(null);          // { mesh, rest, axisLocal }
   const autopilotRef = useRef(false);
   const needleAxisRef = useRef(null);   // dial normal in the needle's local frame (Synty)
-  const poseKey = useCallback(() => {
+  const keyAxisRef = useRef({ axis: KEY_AXIS, sign: KEY_SIGN });
+  // The key TURNS in its lock (Michelle, 2026-09-28: "it should rotate, not flip
+  // like a switch"): the angle eases toward its target every frame. poseKey()
+  // snaps only on first pose (mount / traverse); everything else animates.
+  const keyAngleRef = useRef(0);
+  const keyTarget = () => (autopilotRef.current ? keyAxisRef.current.sign * KEY_TURN : 0);
+  const applyKeyAngle = (k, a) => {
+    k.mesh.quaternion.copy(k.rest);
+    const { axis } = keyAxisRef.current;
+    if (axis === "y") k.mesh.rotateY(a); else if (axis === "z") k.mesh.rotateZ(a); else k.mesh.rotateX(a);
+  };
+  const poseKey = useCallback((instant = true) => {
+    const k = keyRef.current;
+    if (!k || !instant) return; // not instant → the frame loop eases it there
+    keyAngleRef.current = keyTarget();
+    applyKeyAngle(k, keyAngleRef.current);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useFrame((_, dt) => {
     const k = keyRef.current;
     if (!k) return;
-    k.mesh.quaternion.copy(k.rest);
-    if (autopilotRef.current) k.mesh.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(k.axisLocal, KEY_TURN));
-  }, []);
+    const target = keyTarget();
+    const cur = keyAngleRef.current;
+    if (Math.abs(cur - target) < 0.0005) return;
+    const step = Math.min(1, (dt || 0.016) * 8); // ~0.35 s turn, eased
+    const next = cur + (target - cur) * step;
+    keyAngleRef.current = Math.abs(next - target) < 0.0005 ? target : next;
+    applyKeyAngle(k, keyAngleRef.current);
+  });
+  // Dev hook: try the key's axis/direction on the live rig without a rebuild.
+  useEffect(() => {
+    if (typeof window === "undefined" || !(highlighted || panelZoomed === true)) return;
+    const hook = {
+      axis: (axis) => { keyAxisRef.current.axis = axis; poseKey(); },
+      sign: (sign) => { keyAxisRef.current.sign = sign; poseKey(); },
+      turn: () => { autopilotRef.current = !autopilotRef.current; poseKey(false); },
+      state: () => ({ ...keyAxisRef.current, on: autopilotRef.current }),
+    };
+    window.__hmKey = hook;
+    return () => { if (window.__hmKey === hook) delete window.__hmKey; };
+  }, [highlighted, panelZoomed, poseKey]);
   const turnKey = useCallback(() => {
     autopilotRef.current = !autopilotRef.current;
-    poseKey();
+    poseKey(false); // the frame loop turns it
     try { localStorage.setItem(KEY_STORE_KEY, autopilotRef.current ? "1" : "0"); } catch {}
     playSfx(TOGGLE_SFX, { volume: 0.7, rate: 0.85 });
     window.dispatchEvent(new CustomEvent("hm:autopilot", { detail: { on: autopilotRef.current } }));
@@ -2078,7 +2112,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   useEffect(() => {
     if (decideMode !== "v2" || !orders) return;
     for (const d of TOGGLE_DIRS) { toggleOnRef.current[d] = d === "N" ? !!orders.salvage : false; poseToggle(d); setLamp(d, toggleOnRef.current[d]); }
-    autopilotRef.current = !!orders.autopilot; poseKey();
+    autopilotRef.current = !!orders.autopilot; poseKey(false); // eases to the server's state
   }, [decideMode, orders?.salvage, orders?.autopilot]); // eslint-disable-line react-hooks/exhaustive-deps
   const [pressureXform, setPressureXform] = useState(null); // pressure screen transform
   const [pressure, setPressure] = useState({ label: "LOW", hex: "#33dd66" });
@@ -2294,19 +2328,6 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           plate(lampRefs.current.N || toggleRefs.current.N?.mesh, "LATERAL EXTRACT", "N", 1.15),
           plate(keyRef.current?.mesh, "", "KEY", 1.1), // text comes from the key's position at render
         ].filter(Boolean));
-        // KEY TURN AXIS = the panel face's normal, wherever the key sits (Michelle
-        // moved it to the front of the box, 2026-09-28). The rest pose was captured
-        // in the traverse; here the world normal is expressed in the key's local
-        // frame so poseKey() turns it about the face. Falls back to the old
-        // world-Z guess when no face is known.
-        if (keyRef.current?.mesh) {
-          const normalLocal = new THREE.Vector3(0, 0, 1).applyQuaternion(faceQ);
-          const gq = new THREE.Quaternion(); group.getWorldQuaternion(gq);
-          const normalWorld = normalLocal.applyQuaternion(gq).normalize();
-          const kq = keyRef.current.mesh.getWorldQuaternion(new THREE.Quaternion()).invert();
-          keyRef.current.axisLocal = normalWorld.applyQuaternion(kq).normalize();
-          poseKey();
-        }
       }
       // v2: pose the switches from the rig doc (see the orders effect below).
       if (decideMode === "v2" && ordersRef.current) {
@@ -4310,7 +4331,8 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           h={pressureXform.h}
           fromMesh={pressureXform.fromMesh}
           label={`LAYER ${String(drillDay > 0 ? drillDay : 7).padStart(2, "0")} · PSI`}
-          captionFrac={0.15}
+          captionFrac={0.24}
+          glyphFrac={0.4}
           token={pressure.label}
           idleHex={pressure.hex}
           alarm={hellActive}
@@ -5109,6 +5131,11 @@ const COVER_SFX = "/audio/creak.mp3";                   // the PASS cover openin
 // axis (Blender +Y → page −Z), so the turn is about page +Z: positive reads clockwise to
 // someone facing the key.
 const KEY_TURN = Math.PI / 2;
+// The key turns about one of ITS OWN local axes, like the toggles (Michelle
+// moved it to the front of the box, 2026-09-28, and named X). Flip these two if
+// it turns the wrong way; or try live: window.__hmKey.axis("y") / .sign(-1).
+const KEY_AXIS = "x";   // "x" | "y" | "z" — the key mesh's local axis
+const KEY_SIGN = 1;     // +1 | -1
 const KEY_STORE_KEY = "hm:autopilot";
 // Synty gauge (2026-09-08): the needle is authored at 12 o'clock and the wedges run yellow
 // (~1) → orange (~2) → red (~4). LOW sits at 8 o'clock, HIGH at 4: a 240° sweep offset −120°
@@ -5754,7 +5781,7 @@ function WellGlowField({ positions }) {
 // changes to a positive value (depth uses oilStrike; pressure passes 0). When `alarm`
 // (a hell event) it overrides to a hard red strobe matching the alert beacon (~4 Hz).
 // Anchored to a screen's transform { pos, quat, w, h } when fromMesh, else docked.
-function PanelReadout({ pos, quat, w, h, fromMesh = false, token = "", label = "", idleHex = "#ffae00", flareKey = 0, alarm = false, captionFrac = 0.19, offset = PANEL_READOUT_OFFSET }) {
+function PanelReadout({ pos, quat, w, h, fromMesh = false, token = "", label = "", idleHex = "#ffae00", flareKey = 0, alarm = false, captionFrac = 0.19, glyphFrac = PANEL_GLYPH_FRAC, offset = PANEL_READOUT_OFFSET }) {
   const matRef = useRef();
   const t = useRef(0);
   const prevFlare = useRef(flareKey);
@@ -5786,7 +5813,7 @@ function PanelReadout({ pos, quat, w, h, fromMesh = false, token = "", label = "
   });
   const digits = (
     <Text
-      fontSize={fromMesh ? (h || 0.05) * PANEL_GLYPH_FRAC : PANEL_READOUT_SIZE}
+      fontSize={fromMesh ? (h || 0.05) * glyphFrac : PANEL_READOUT_SIZE}
       maxWidth={fromMesh ? (w || 0.1) * 0.94 : undefined}
       anchorX="center"
       anchorY="middle"
