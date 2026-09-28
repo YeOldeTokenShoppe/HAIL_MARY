@@ -2055,7 +2055,16 @@ export default function OilPage() {
   const [revealedSeed, setRevealedSeed] = useState(null);
   // Admin testing: when on, render the reveal-only PLAYER view (hide seed data)
   // even in admin/report/test, so you can watch reveal-on-drill without a 2nd tab.
-  const [previewAsPlayer, setPreviewAsPlayer] = useState(false);
+  // Admin's VIEW AS PLAYER — remembered per browser (2026-09-28): it used to
+  // reset on every reload, so a dev-server restart silently dropped the
+  // admin back to the inspector view mid-review. The button still shows the
+  // state plainly, so a persisted ON is never a surprise.
+  const [previewAsPlayer, setPreviewAsPlayer] = useState(() => {
+    try { return typeof window !== "undefined" && localStorage.getItem("oil_preview_player") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("oil_preview_player", previewAsPlayer ? "1" : "0"); } catch { /* private mode */ }
+  }, [previewAsPlayer]);
   const [isRevealed, setIsRevealed] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [introComplete, setIntroComplete] = useState(false);
