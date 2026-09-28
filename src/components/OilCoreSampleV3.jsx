@@ -357,6 +357,19 @@ export default function OilCoreSampleV3({
           {stat(`${revealedCount}/${rack.length || 20}`, "revealed", cream)}
           {stat(String(openN), "open pockets", openN ? WALL.goo : muted)}
         </div>
+        {/* CLAIM — present only when the page says the server would accept it
+            (registration pre-anchor for players; testers while testing is on).
+            Same handler as STAKE YOUR CLAIM. Otherwise one line says why not. */}
+        {sp.claim && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              {cta(sp.claim.label || "Claim this plot", gold, busy || !!sp.claim.disabled, () => run(() => sp.claim.onClaim(), "✔ claimed — your rig is going up"), true)}
+            </div>
+            {sp.claim.note && <div style={{ ...mono({ color: muted, fontSize: 10 }), marginTop: 4, textAlign: "center" }}>{sp.claim.note}</div>}
+          </div>
+        )}
+        {!sp.claim && sp.claimNote && <div style={{ ...mono({ color: muted, fontSize: 10 }), marginTop: 10, textAlign: "center" }}>{sp.claimNote}</div>}
+        {note && <div style={{ ...mono({ color: gold, fontSize: 10 }), marginTop: 6 }}>{note}</div>}
       </div>
     );
   }

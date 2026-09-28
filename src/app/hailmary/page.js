@@ -8160,7 +8160,31 @@ export default function OilPage() {
   // flips VIEW AS PLAYER. Rendered in the inspector's slot on both layouts.
   const v2Viewer = loopV2 && !isReport && !isTest && (!isAdmin || previewAsPlayer);
   const spectatorPlot = (v2Viewer && !(userDrill && userDrill.col != null) && selectedX !== null) ? (allPlotsMap[`${selectedX}_${sliceY}`] || null) : null;
-  const spectatorRack = useMemo(() => buildColumnRack({ plot: spectatorPlot, drill: null, depthZ: DEPTH_Z }), [spectatorPlot]);
+  // Plain computation, NOT a hook: this sits below the page's early returns
+  // (settings loading, lobby), where a hook would change the hook order
+  // between renders. Twenty cells — cheaper than the memo would be.
+  const spectatorRack = spectatorPlot || v2Viewer ? buildColumnRack({ plot: spectatorPlot, drill: null, depthZ: DEPTH_Z }) : [];
+  // CLAIM from the spectator card — only when the server would accept it
+  // (oil-claim: real players during registration pre-anchor; testers while
+  // testingEnabled, incl. the active phase). Same handler as STAKE YOUR CLAIM.
+  const spectatorClaim = (() => {
+    if (!v2Viewer || (userDrill && userDrill.col != null) || selectedX === null) return { claim: null, claimNote: null };
+    if (!user?.id) return { claim: null, claimNote: "sign in to claim a plot" };
+    if (spectatorPlot?.currentOwnerId != null) return { claim: null, claimNote: null };
+    const registrationOpen = gamePhase === "ticket_sale" && !anchorBlockHash;
+    const testerOpen = gamePhase === "active" && testingEnabled;
+    if (registrationOpen || testerOpen) {
+      return {
+        claim: {
+          label: `Claim this plot (${selectedX + 1},${sliceY + 1})`,
+          note: registrationOpen ? "registration is open — first come, first served" : "testing is on — claims allowed mid-season",
+          onClaim: handleClaimActivePlot,
+        },
+        claimNote: null,
+      };
+    }
+    return { claim: null, claimNote: gameEnded ? "the season is over — join the next one from the lobby" : "claims are closed for this season — join the next-season waitlist from the lobby" };
+  })();
   // No rig: the same card, read-only, on the SELECTED plot as the field sees it.
   const coreSampleSpectator = v2Viewer && !(userDrill && userDrill.col != null) && (
     <PanelSection theme={theme} isMobile={isMobile} tint id="core-sample-v2">
@@ -8174,7 +8198,7 @@ export default function OilPage() {
         theme={theme} pending={null} chargesRemaining={0} chargesCap={0} threshold={0}
         onDecide={async () => {}} onSetThreshold={async () => {}} onLateral={async () => {}} onWildcat={async () => {}}
         rack={spectatorRack} ended={gameEnded}
-        spectator={{ col: selectedX !== null ? selectedX : null, row: selectedX !== null ? sliceY : null, owner: spectatorPlot?.username || (spectatorPlot?.currentOwnerId ? "a prospector" : null) }}
+        spectator={{ col: selectedX !== null ? selectedX : null, row: selectedX !== null ? sliceY : null, owner: spectatorPlot?.username || (spectatorPlot?.currentOwnerId ? "a prospector" : null), ...spectatorClaim }}
       />
     </PanelSection>
   );
