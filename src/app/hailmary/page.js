@@ -8151,6 +8151,38 @@ export default function OilPage() {
       drillingActive={drillingActive}
     />
   );
+  // v2 CORE SAMPLE — the three-tab decision card (OilCoreSampleV3) IS the
+  // CORE SAMPLE panel for anyone with a rig on a loopV2 board. Admin / report /
+  // test views keep the per-plot inspector (CoreSamplePanel) unless the admin
+  // flips VIEW AS PLAYER. Rendered in the inspector's slot on both layouts.
+  const coreSampleCard = loopV2 && userDrill && userDrill.col != null && !isReport && !isTest && (!isAdmin || previewAsPlayer) && (
+    <PanelSection theme={theme} isMobile={isMobile} tint id="core-sample-v2">
+      <PanelTitle
+        theme={theme} isMobile={isMobile} icon={PANEL_ICONS.core}
+        right={<span style={{ color: theme.muted, letterSpacing: "0.08em", fontWeight: 400 }}>PLOT ({userDrill.col + 1}, {userDrill.row + 1})</span>}
+      >
+        CORE SAMPLE
+      </PanelTitle>
+      <OilCoreSampleV3
+        theme={theme}
+        pending={userDrill.pending}
+        chargesRemaining={Math.max(0, chargesCapFor(userDrill, { passiveCharges }, DEPTH_Z) - (userDrill.chargesSpent || 0))}
+        chargesCap={chargesCapFor(userDrill, { passiveCharges }, DEPTH_Z)}
+        threshold={userDrill.threshold}
+        onDecide={handleLayerDecide}
+        onSetThreshold={handleSetThreshold}
+        salvage={salvagePockets}
+        onLateral={handleLateral}
+        frontier={frontierTargets}
+        onWildcat={handleWildcat}
+        cadence={revealCadence}
+        rack={columnRack}
+        ledger={rigLedger}
+        onWalk={introComplete ? () => setWalkMode(true) : undefined}
+      />
+    </PanelSection>
+  );
+
   const yourRigCard = (drillButton || gaugesPanel || rigDetails) && (
     <PanelSection theme={theme} isMobile={isMobile} tint id="your-rig">
       <PanelTitle
@@ -8230,27 +8262,6 @@ export default function OilPage() {
         )}
       </PanelTitle>
       {drillButton}
-      {loopV2 && userDrill && userDrill.col != null && (
-        <OilCoreSampleV3
-          theme={theme}
-          pending={userDrill.pending}
-          chargesRemaining={Math.max(0, chargesCapFor(userDrill, { passiveCharges }, DEPTH_Z) - (userDrill.chargesSpent || 0))}
-          chargesCap={chargesCapFor(userDrill, { passiveCharges }, DEPTH_Z)}
-          threshold={userDrill.threshold}
-          onDecide={handleLayerDecide}
-          onSetThreshold={handleSetThreshold}
-          salvage={salvagePockets}
-          onLateral={handleLateral}
-          frontier={frontierTargets}
-          onWildcat={handleWildcat}
-          cadence={revealCadence}
-          rack={columnRack}
-          ledger={rigLedger}
-          // No WALK during the intro fly-in — CameraFlyIn drives the camera
-          // until introComplete, and two camera drivers = the shake.
-          onWalk={introComplete ? () => setWalkMode(true) : undefined}
-        />
-      )}
       {gaugesPanel}
       {rigDetails}
     </PanelSection>
@@ -8739,6 +8750,7 @@ export default function OilPage() {
           {/* Live first: the rig, its core, its finds, then the field. */}
           {yourRigCard}
           {gusherShutoffPanel}
+          {coreSampleCard || (
           <CoreSamplePanel
             theme={theme}
             grid3D={displayGrid3D}
@@ -8754,6 +8766,7 @@ export default function OilPage() {
             hellPockets={displayHellPockets}
             artifactMarks={revealedArtifactsByPlot[`${selectedX}_${sliceY}`] || []}
           />
+          )}
           <MuseumPanel
             theme={theme}
             inventory={userDrill?.artifacts || {}}
@@ -9349,6 +9362,7 @@ export default function OilPage() {
             {/* Live first: the rig, its core, its finds, then the field. */}
             {yourRigCard}
             {gusherShutoffPanel}
+            {coreSampleCard || (
             <CoreSamplePanel
               theme={theme}
               grid3D={displayGrid3D}
@@ -9363,6 +9377,7 @@ export default function OilPage() {
               hellPockets={displayHellPockets}
               artifactMarks={revealedArtifactsByPlot[`${selectedX}_${sliceY}`] || []}
             />
+            )}
             <MuseumPanel
               theme={theme}
               inventory={userDrill?.artifacts || {}}
