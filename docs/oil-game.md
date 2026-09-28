@@ -4,7 +4,7 @@ A 3D oil exploration game where players claim land on a fixed 10x10 grid and dri
 
 ## Economy & Timing Model (Proposed)
 
-> **Status: BUILT (2026-06-07).** The pacing/depth model, the uncapped local tank, the depth levers, and the fixed-rate prize economics in this section are implemented and tested — see *TIMING FRAMEWORK* and *Depth levers* below for specifics and file pointers. Older descriptive sections (Core Mechanics, Game Phase Flow, Data Model) have been reconciled to match. **Still proposal-only:** the *contested-capture* theft rework in **Rogue Characters → Consequences v2** — the dino still takes un-banked tank oil today.
+> **Status: BUILT (2026-06-07).** The pacing/depth model, the uncapped local tank, the depth levers, and the fixed-rate prize economics in this section are implemented and tested — see *TIMING FRAMEWORK* and *Depth levers* below for specifics and file pointers. Older descriptive sections (Core Mechanics, Game Phase Flow, Data Model) have been reconciled to match. **Still proposal-only:** the *contested-capture* theft rework in **Rogue Characters → Consequences v2** (in code the dino's consequence is `delete_addon`; tank theft was never built — corrected 2026-09-28).
 
 ## SEASON ONE — SHIP SCOPE (drafted 2026-09-27 · PROPOSAL, for Michelle to cut)
 
@@ -75,7 +75,11 @@ Each item has a done-test. If it can't be tested on a phone by someone who isn't
 - **Desktop decision surface: both act (option c)** — the in-world machine panel and the Core Sample card call the same handlers; the player picks. So the rig's PASS cover and an EXTRACT control get wired to `onDecide`.
 - **Core rack: vertical.** Direction: the `/space` CORE SAMPLE module's core-cylinder infographic (tube with depth ticks, callouts, the ANOM marker) is the vertical core; fit on the phone as the `/space` panel does — tube left, data right. The `/space` module family (header, tabs, typed data lines, two big stats, one CTA, gold corner brackets, HUD palette) is the visual source for the v2 card design pass.
 - **Strata voxels: not the default look.** Michelle prefers the image-texture earth block (`LandGradient2.webp` sides). Proposal for the pass: the textured block stays; the voxel wall becomes an on-demand X-RAY overlay (dirt hidden, events only) rather than replacing the block. `?strata=1` under `loopV2` shows the LIVE field (empty until strikes); `?strata=mock` forces the 90-second mock season for design review (added 2026-09-28).
-- Still to confirm after clarification (asked 2026-09-28): reckoning as the share card; the v2 away recap; ledger always open; countdown loudness (it is the pending layer's auto-resolve deadline, not a season timer).
+- **Reckoning replaces FINAL HAUL as the season-end share — provisional (Michelle, 2026-09-28).** Her mental model is a big HUD of totals (the `/space` two-big-stats block is that); she will modify once she sees it rendered. Seeing it needs a fixture page or a finished mock season — the fixture page is the first ticket of the pass.
+- **Countdown: a quiet line, not a timer (Michelle, 2026-09-28).**
+- **Ledger: always open (Michelle, 2026-09-28).**
+- **Away recap: the animated rig crew can deliver it (Michelle, 2026-09-28)** — RigCrew already briefs the player; the v2 recap's content (what struck, what the crew resolved, what neighbours took, what is on the table) becomes the crew's briefing rather than a bare overlay. Design in the pass.
+- **Dino: not a season-one question.** Correction to the header note above — in code the dinosaur rogue's consequence is `delete_addon`, not tank theft (theft was Consequences v2, never built), and rogues deploy only by admin (auto-deploy unbuilt). Michelle (2026-09-28): the dino belongs to the **relics & artifacts** design, which is still to be written — e.g. a sequenced fossil that comes to life and runs amok is a field EVENT sourced from the ground, the same shape as the demon from a hell pocket and the cache from the map. That design (relic presentation, the appraiser, field events that keep a season interesting) is the next design session after the UI pass; nothing about it is in season-one scope beyond what Substrate phases 1–3 already do.
 
 ### Decisions Michelle owns (blocking for season one)
 
