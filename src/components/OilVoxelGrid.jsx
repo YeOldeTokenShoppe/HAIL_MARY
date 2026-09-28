@@ -1941,23 +1941,40 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const autopilotRef = useRef(false);
   const needleAxisRef = useRef(null);   // dial normal in the needle's local frame (Synty)
   const keyAxisRef = useRef({ axis: KEY_AXIS, sign: KEY_SIGN });
-  const poseKey = useCallback(() => {
+  // The key TURNS in its lock (Michelle, 2026-09-28: "it should rotate, not flip
+  // like a switch"): the angle eases toward its target every frame. poseKey()
+  // snaps only on first pose (mount / traverse); everything else animates.
+  const keyAngleRef = useRef(0);
+  const keyTarget = () => (autopilotRef.current ? keyAxisRef.current.sign * KEY_TURN : 0);
+  const applyKeyAngle = (k, a) => {
+    k.mesh.quaternion.copy(k.rest);
+    const { axis } = keyAxisRef.current;
+    if (axis === "y") k.mesh.rotateY(a); else if (axis === "z") k.mesh.rotateZ(a); else k.mesh.rotateX(a);
+  };
+  const poseKey = useCallback((instant = true) => {
+    const k = keyRef.current;
+    if (!k || !instant) return; // not instant → the frame loop eases it there
+    keyAngleRef.current = keyTarget();
+    applyKeyAngle(k, keyAngleRef.current);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useFrame((_, dt) => {
     const k = keyRef.current;
     if (!k) return;
-    k.mesh.quaternion.copy(k.rest);
-    if (autopilotRef.current) {
-      const { axis, sign } = keyAxisRef.current;
-      const a = sign * KEY_TURN;
-      if (axis === "y") k.mesh.rotateY(a); else if (axis === "z") k.mesh.rotateZ(a); else k.mesh.rotateX(a);
-    }
-  }, []);
+    const target = keyTarget();
+    const cur = keyAngleRef.current;
+    if (Math.abs(cur - target) < 0.0005) return;
+    const step = Math.min(1, (dt || 0.016) * 8); // ~0.35 s turn, eased
+    const next = cur + (target - cur) * step;
+    keyAngleRef.current = Math.abs(next - target) < 0.0005 ? target : next;
+    applyKeyAngle(k, keyAngleRef.current);
+  });
   // Dev hook: try the key's axis/direction on the live rig without a rebuild.
   useEffect(() => {
     if (typeof window === "undefined" || !(highlighted || panelZoomed === true)) return;
     const hook = {
       axis: (axis) => { keyAxisRef.current.axis = axis; poseKey(); },
       sign: (sign) => { keyAxisRef.current.sign = sign; poseKey(); },
-      turn: () => { autopilotRef.current = !autopilotRef.current; poseKey(); },
+      turn: () => { autopilotRef.current = !autopilotRef.current; poseKey(false); },
       state: () => ({ ...keyAxisRef.current, on: autopilotRef.current }),
     };
     window.__hmKey = hook;
@@ -1965,7 +1982,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   }, [highlighted, panelZoomed, poseKey]);
   const turnKey = useCallback(() => {
     autopilotRef.current = !autopilotRef.current;
-    poseKey();
+    poseKey(false); // the frame loop turns it
     try { localStorage.setItem(KEY_STORE_KEY, autopilotRef.current ? "1" : "0"); } catch {}
     playSfx(TOGGLE_SFX, { volume: 0.7, rate: 0.85 });
     window.dispatchEvent(new CustomEvent("hm:autopilot", { detail: { on: autopilotRef.current } }));
@@ -2095,7 +2112,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   useEffect(() => {
     if (decideMode !== "v2" || !orders) return;
     for (const d of TOGGLE_DIRS) { toggleOnRef.current[d] = d === "N" ? !!orders.salvage : false; poseToggle(d); setLamp(d, toggleOnRef.current[d]); }
-    autopilotRef.current = !!orders.autopilot; poseKey();
+    autopilotRef.current = !!orders.autopilot; poseKey(false); // eases to the server's state
   }, [decideMode, orders?.salvage, orders?.autopilot]); // eslint-disable-line react-hooks/exhaustive-deps
   const [pressureXform, setPressureXform] = useState(null); // pressure screen transform
   const [pressure, setPressure] = useState({ label: "LOW", hex: "#33dd66" });
