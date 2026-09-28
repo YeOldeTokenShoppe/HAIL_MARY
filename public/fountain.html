@@ -3095,7 +3095,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			let topBowlWaterMesh;
 			let floorCausticMats = [];   // Fountain_Floor materials patched with wave caustics (top-level so animate()/render() can update them)
 			window.floorCausticMats = floorCausticMats;   // live tuning: floorCausticMats[0].userData.causticShader.uniforms.uCausStrength.value = 0..1.5
-			let floorCausticOnStrength = 0.6;   // caustic brightness in the normal (above-water) view; faded to 0 while the coin-cam is underwater
+			let floorCausticOnStrength = 0.3;   // caustic light-map brightness on the basin floor (tuned live via /fountain?fx)
 			window.floorCausticOnStrength = floorCausticOnStrength;   // live tuning: window.floorCausticOnStrength = 0..1.5
 			const WATER_SURFACE_Y = -0.5;   // main pool surface; camera eye below this = "underwater" (blue filter on, caustics off) even in free-look
 			window.WATER_SURFACE_Y = WATER_SURFACE_Y;   // live tuning of the trigger depth
@@ -3128,7 +3128,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			const CAUSTIC_SPAN = BOUNDS * 1.3;   // world extent of the light map (pool + the sun's sideways shift)
 			let causticRT = null, causticMat = null, causticScene = null, causticCam = null;
 			let causticFloorDepth = 0.28;        // basin floor below the surface (matches COIN_STREAM.restDepth)
-			let causticSlopeGain  = 1.0;         // >1 exaggerates surface slope for crisper bands
+			let causticSlopeGain  = 0.55;        // <1 softens the surface slope the light map sees; >1 gives crisper bands
 			window.causticFloorDepth = causticFloorDepth;   // live tuning
 			window.causticSlopeGain  = causticSlopeGain;    // live tuning
 			const _causLightDir = new THREE.Vector3( 0, 1, 0 );
@@ -3146,7 +3146,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			window.reflectionStrength = reflectionStrength;   // live tuning
 			window.reflectDistort = 0.06;     // how much the reflection ripples with the water surface (0 = flat mirror)
 			window.reflectEveryN = (typeof isMobileDevice !== 'undefined' && isMobileDevice) ? 3 : 1;  // re-render the mirror every Nth frame (↑ = cheaper, staler)
-			window.splashDropScale = 1.0;     // coin-splash droplet COUNT multiplier (Water FX panel)
+			window.splashDropScale = 2.2;     // coin-splash droplet COUNT multiplier (Water FX panel)
 			window.splashDropSize  = 0.045;   // coin-splash droplet world size
 			window.splashDropLaunch = 1.0;    // coin-splash droplet launch height/strength (lower = gentler arc)
 			window.splashDropOpacity = 0.35;  // coin-splash droplet opacity
@@ -4972,7 +4972,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						shader.uniforms.uCausBounds   = { value: BOUNDS };
 						shader.uniforms.uCausSpan     = { value: CAUSTIC_SPAN };
 						shader.uniforms.uCausShift    = { value: _causShift };   // where flat-water light lands, relative to the surface point
-						shader.uniforms.uCausStrength = { value: 0.6 };   // brightness knob
+						shader.uniforms.uCausStrength = { value: floorCausticOnStrength };   // brightness knob (eased toward the live value each frame)
 
 						// world position → for the light-map lookup
 						shader.vertexShader = 'varying vec3 vCausWorld;\n' + shader.vertexShader;
