@@ -356,6 +356,10 @@ const PANEL_SCREEN_H = 0.05;               // backing height (along Y)
 // LIFT pushes the digits off the quad face (flip sign if they render behind it);
 // GLYPH_FRAC = digit height as a fraction of the quad's shorter side.
 const PANEL_TEXT_LIFT = 0.003;
+// v2 label plates (LATERAL EXTRACT under the switch, ORDERS/AUTO-PILOT under the
+// key) — OFF since Michelle's 2026-09-28 re-export bakes the labels into the
+// model. Flip on for a rig GLB without them.
+const SHOW_V2_PLATES = false;
 const PANEL_MESH_ROT = [-Math.PI / 2, 0, 0];
 const PANEL_GLYPH_FRAC = 0.6;
 const _PANEL_MESH_ROT_INV = new THREE.Quaternion().setFromEuler(new THREE.Euler(...PANEL_MESH_ROT)).invert();
@@ -2290,6 +2294,19 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           plate(lampRefs.current.N || toggleRefs.current.N?.mesh, "LATERAL EXTRACT", "N", 1.15),
           plate(keyRef.current?.mesh, "", "KEY", 1.1), // text comes from the key's position at render
         ].filter(Boolean));
+        // KEY TURN AXIS = the panel face's normal, wherever the key sits (Michelle
+        // moved it to the front of the box, 2026-09-28). The rest pose was captured
+        // in the traverse; here the world normal is expressed in the key's local
+        // frame so poseKey() turns it about the face. Falls back to the old
+        // world-Z guess when no face is known.
+        if (keyRef.current?.mesh) {
+          const normalLocal = new THREE.Vector3(0, 0, 1).applyQuaternion(faceQ);
+          const gq = new THREE.Quaternion(); group.getWorldQuaternion(gq);
+          const normalWorld = normalLocal.applyQuaternion(gq).normalize();
+          const kq = keyRef.current.mesh.getWorldQuaternion(new THREE.Quaternion()).invert();
+          keyRef.current.axisLocal = normalWorld.applyQuaternion(kq).normalize();
+          poseKey();
+        }
       }
       // v2: pose the switches from the rig doc (see the orders effect below).
       if (decideMode === "v2" && ordersRef.current) {
@@ -4269,7 +4286,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       )}
       {/* v2 plates: SALVAGE under the first toggle's lamp, AUTOPILOT under the key —
           the panel says what its controls mean (Michelle, 2026-09-28). */}
-      {decideMode === "v2" && (highlighted || panelZoomed === true) && panelXform?.fromMesh && panelLabels.map((l) => (
+      {SHOW_V2_PLATES && decideMode === "v2" && (highlighted || panelZoomed === true) && panelXform?.fromMesh && panelLabels.map((l) => (
         <group key={l.id} position={l.pos} quaternion={panelXform.quat} userData={PANEL_PART_USERDATA}>
           <group rotation={PANEL_MESH_ROT}>
             <group position={[0, 0, PANEL_TEXT_LIFT]}>
