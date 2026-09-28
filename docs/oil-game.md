@@ -4,7 +4,7 @@ A 3D oil exploration game where players claim land on a fixed 10x10 grid and dri
 
 ## Economy & Timing Model (Proposed)
 
-> **Status: BUILT (2026-06-07).** The pacing/depth model, the uncapped local tank, the depth levers, and the fixed-rate prize economics in this section are implemented and tested — see *TIMING FRAMEWORK* and *Depth levers* below for specifics and file pointers. Older descriptive sections (Core Mechanics, Game Phase Flow, Data Model) have been reconciled to match. **Still proposal-only:** the *contested-capture* theft rework in **Rogue Characters → Consequences v2** (in code the dino's consequence is `delete_addon`; tank theft was never built — corrected 2026-09-28).
+> **Status: BUILT (2026-06-07).** The pacing/depth model, the uncapped local tank, the depth levers, and the fixed-rate prize economics in this section are implemented and tested — see *TIMING FRAMEWORK* and *Depth levers* below for specifics and file pointers. Older descriptive sections (Core Mechanics, Game Phase Flow, Data Model) have been reconciled to match. **Retired 2026-09-28 (Michelle): no rogue ever steals oil or liquid.** The *contested-capture* theft rework and the Consequences-v2 "dinosaur steals tank oil" row are dropped; in code the dino's consequence is `delete_addon` and theft was never built. Rogue consequences stay cosmetic/repairable; the dino's future is the relics & artifacts design.
 
 ## SEASON ONE — SHIP SCOPE (drafted 2026-09-27 · PROPOSAL, for Michelle to cut)
 
@@ -79,7 +79,7 @@ Each item has a done-test. If it can't be tested on a phone by someone who isn't
 - **Countdown: a quiet line, not a timer (Michelle, 2026-09-28).**
 - **Ledger: always open (Michelle, 2026-09-28).**
 - **Away recap: the animated rig crew can deliver it (Michelle, 2026-09-28)** — RigCrew already briefs the player; the v2 recap's content (what struck, what the crew resolved, what neighbours took, what is on the table) becomes the crew's briefing rather than a bare overlay. Design in the pass.
-- **Dino: not a season-one question.** Correction to the header note above — in code the dinosaur rogue's consequence is `delete_addon`, not tank theft (theft was Consequences v2, never built), and rogues deploy only by admin (auto-deploy unbuilt). Michelle (2026-09-28): the dino belongs to the **relics & artifacts** design, which is still to be written — e.g. a sequenced fossil that comes to life and runs amok is a field EVENT sourced from the ground, the same shape as the demon from a hell pocket and the cache from the map. That design (relic presentation, the appraiser, field events that keep a season interesting) is the next design session after the UI pass; nothing about it is in season-one scope beyond what Substrate phases 1–3 already do.
+- **Dino: no theft, ever (Michelle, 2026-09-28) — and not a season-one question.** In code the dinosaur rogue's consequence is `delete_addon`; the planned tank theft is retired (see the Rogue table), and rogues deploy only by admin (auto-deploy unbuilt). Michelle (2026-09-28): the dino belongs to the **relics & artifacts** design, which is still to be written — e.g. a sequenced fossil that comes to life and runs amok is a field EVENT sourced from the ground, the same shape as the demon from a hell pocket and the cache from the map. That design (relic presentation, the appraiser, field events that keep a season interesting) is the next design session after the UI pass; nothing about it is in season-one scope beyond what Substrate phases 1–3 already do.
 
 ### Decisions Michelle owns (blocking for season one)
 
@@ -1176,7 +1176,7 @@ Rogues create engagement hooks that pull players back to the game. Most conseque
 | Crudingo (bird) | Poops on plot | Cosmetic | Visit UI → tap to clean |
 | Troll | Graffiti on pad | Cosmetic | Visit UI → tap to clean |
 | Blue Demon | Damages an addon (visual degradation, not deletion) | Moderate | Visit UI → tap to repair |
-| Dinosaur | **Steals 20-30% of stored tank oil** | Real loss | Cannot undo — the oil is gone |
+| Dinosaur | ~~Steals 20-30% of stored tank oil~~ **RETIRED 2026-09-28 — no rogue steals oil or liquid, ever (Michelle).** Today: `delete_addon`. Future: a field event from the relics & artifacts design (e.g. a sequenced fossil comes to life) | Attention, not loss | Repair / react |
 
 Design principles:
 - **Without camera**: player doesn't know damage happened until they visit
