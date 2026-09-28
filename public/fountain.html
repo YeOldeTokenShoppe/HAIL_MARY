@@ -7859,12 +7859,13 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 pocket.classList.toggle('sticky', coinSticky);
                 pocket.classList.toggle('gold', !!heldGoldCoin);
                 btn.setAttribute('aria-pressed', String(coinArmed));
+                const compact = window.innerWidth <= 480; // phone widths: keep the pill short
                 let text;
                 if (flying) text = 'Coin in the air…';
                 else if (!coinArmed) text = heldGoldCoin ? 'Pick up your offering' : 'Pick up a coin';
-                else if (coinSticky) text = 'Holding coins · tap to put away';
+                else if (coinSticky) text = compact ? 'Holding · tap to put away' : 'Holding coins · tap to put away';
                 else if (heldGoldCoin) text = 'Tap the water to cast it';
-                else text = 'Tap where to toss · tap here to put back';
+                else text = compact ? 'Tap where to toss' : 'Tap where to toss · tap here to put back';
                 if (hint.textContent !== text) hint.textContent = text;
                 btn.setAttribute('aria-label', text);
             }
@@ -10877,6 +10878,18 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			}
 			.coin-pocket.pulse .coin-pocket-btn {
 				animation: chipNudge 0.4s ease;
+			}
+			@media (max-width: 768px) {
+				/* This document fills a 100vh box in the parent's iframe, and on phones
+				   100vh runs under the browser's bottom toolbar, so anything pinned to
+				   the bottom edge is hidden behind it (#info lifts itself 22vh for the
+				   same reason). Lift the pocket clear of the toolbar + home indicator. */
+				.coin-pocket {
+					bottom: calc(13vh + env(safe-area-inset-bottom, 0px));
+				}
+				.coin-pocket-hint {
+					font-size: 11px;
+				}
 			}
 
 			/* ===== Coin chip + tray ===== */
