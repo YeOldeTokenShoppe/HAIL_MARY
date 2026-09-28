@@ -3591,18 +3591,21 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					uniforms: {
 						color: { value: new THREE.Color(0xffffff) },
 						opacity: { value: 0.3 },
-						pointTexture: { value: new THREE.TextureLoader().load('/images/cloud.png', 
-							() => {
-								assetsToLoad.cloudTexture = true;
-								checkAllAssetsLoaded();
-							},
-							undefined,
-							(error) => {
-								console.error('[Fountain] Error loading cloud texture:', error);
-								assetsToLoad.cloudTexture = true; // Mark as loaded anyway to not block
-								checkAllAssetsLoaded();
-							}
-						) }
+						// Soft round mist puff drawn in code (the old /images/cloud.png had alpha that
+						// was denser at its corners than its centre, so every sprite read as a square).
+						pointTexture: { value: (() => {
+							const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+							const cx = cv.getContext('2d');
+							const grad = cx.createRadialGradient(32, 32, 0, 32, 32, 32);
+							grad.addColorStop(0.0, 'rgba(255,255,255,0.9)');
+							grad.addColorStop(0.45, 'rgba(255,255,255,0.45)');
+							grad.addColorStop(1.0, 'rgba(255,255,255,0)');
+							cx.fillStyle = grad; cx.fillRect(0, 0, 64, 64);
+							const tex = new THREE.CanvasTexture(cv);
+							assetsToLoad.cloudTexture = true;   // nothing to download any more
+							checkAllAssetsLoaded();
+							return tex;
+						})() }
 					},
 					vertexShader: `
 						attribute float size;
