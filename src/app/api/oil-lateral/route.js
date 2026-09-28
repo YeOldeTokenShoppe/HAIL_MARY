@@ -5,7 +5,7 @@ import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistributio
 import { generateArtifactDistribution3D, artifactKey } from "@/lib/artifactDistribution";
 import { PASSIVE_DRILLS } from "@/lib/oilStrikeClock";
 import { chargesRemainingFor } from "@/lib/oilLoopV2";
-import { inclusionItemKey } from "@/lib/oilLoopV2Server";
+import { applyLateralTake } from "@/lib/oilLoopV2Server";
 import { logTimeline } from "@/lib/oilTimeline";
 import { sendPlayerAlert } from "@/lib/oilAlerts";
 
@@ -74,54 +74,12 @@ export async function POST(req) {
 
     const result = await db.runTransaction(async (t) => {
       const drillNow = (await t.get(drillRef)).data();
-      if (!drillNow || drillNow.col == null) return { error: "no rig" };
-      // Orthogonal adjacency only — the reach that makes the field social.
-      if (Math.abs(drillNow.col - col) + Math.abs(drillNow.row - row) !== 1) {
-        return { error: "not adjacent to your claim" };
-      }
-      if (chargesRemainingFor(drillNow, settings, depthZ) <= 0) {
-        return { error: "no charges remaining" };
-      }
-      const target = (await t.get(targetRef)).data() || {};
-      const pocketOil = target.passed?.[layer];
-      const hasInclusion = !!target.passedInclusions?.[layer];
-      if (pocketOil === undefined || (pocketOil <= 0 && !hasInclusion)) {
-        return { error: "nothing open at that layer" };
-      }
-      if (target.lateralTaken?.[layer] !== undefined) {
-        return { error: "already taken — first lateral wins" };
-      }
-
-      const oil = Math.max(0, pocketOil || 0);
-      const drillUpdate = {
-        chargesSpent: (drillNow.chargesSpent || 0) + 1,
-        totalCollected: (drillNow.totalCollected || 0) + oil,
-        laterals: FieldValue.increment(1),
-        updatedAt: FieldValue.serverTimestamp(),
-      };
-      if (hasInclusion && inclusionArtifact) {
-        drillUpdate.artifacts = { [inclusionItemKey(inclusionArtifact)]: FieldValue.increment(1) };
-        drillUpdate.artifactFinds = FieldValue.increment(1);
-      }
-      t.set(drillRef, drillUpdate, { merge: true });
-      if (oil > 0) {
-        t.set(communityRef, {
-          totalOil: FieldValue.increment(oil),
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
-      }
-      const targetUpdate = { lateralTaken: { [layer]: userId } };
-      if (hasInclusion && inclusionArtifact) {
-        const { x, y, z, ...payload } = inclusionArtifact;
-        targetUpdate.revealedArtifacts = { [layer]: payload };
-      }
-      t.set(targetRef, targetUpdate, { merge: true });
-      return {
-        ok: true, oil, layer,
-        inclusion: hasInclusion ? inclusionArtifact?.type ?? true : null,
-        ownerId: target.currentOwnerId || null,
-        username: drillNow.username || null,
-      };
+      const target = { col, row, ...((await t.get(targetRef)).data() || {}) };
+      return applyLateralTake(t, {
+        FieldValue, drillRef, targetRef, communityRef,
+        drillNow, target, userId, layer, inclusionArtifact,
+        chargesRemaining: drillNow ? chargesRemainingFor(drillNow, settings, depthZ) : 0,
+      });
     });
 
     if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });

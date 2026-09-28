@@ -138,6 +138,11 @@ export default function OilCoreSampleV3({
   onDecide, onSetThreshold, salvage = [], onLateral, frontier = [], onWildcat, onWalk,
   cadence = null, rack = [], ledger = null,
   ended = false,      // settings.gameEnded — the ONLY thing that says "season closed"
+  // CREW ORDERS (option B, 2026-09-28): SALVAGE = auto-take a neighbour's pass at
+  // or above the line; AUTOPILOT = extract everything once charges cover the
+  // layers left. Same settings the rig panel's first toggle and key flip.
+  orders = { autopilot: false, salvage: false },
+  onSetOrders = null, // async ({ salvage?: bool, autopilot?: bool }) => void
   // SPECTATOR: a viewer with no rig looks at the SELECTED plot as the field
   // sees it — the public column (reveals, extractions, open pockets, hell),
   // read-only, no verbs, with a nudge to claim. { col, row, owner } | null.
@@ -167,6 +172,12 @@ export default function OilCoreSampleV3({
   const columnDone = cadence != null && cadence.remainingLayers <= 0;
   const revealedCount = rack.filter((c) => c.state !== "undrilled").length;
   const deadline = !cadence || seasonOver || clockOut || columnDone ? null : { at: clockOf(cadence.latestMs), until: untilCopy(cadence.latestMs, nowMs) };
+  // How far into the current reveal window we are (0..1). The strike lands
+  // somewhere inside it; full = the latest it can land. Shown as a thin bar,
+  // never as digits counting down — the moment stays unguessable.
+  const windowFrac = cadence && cadence.latestMs && cadence.windowStartMs != null && cadence.latestMs > cadence.windowStartMs
+    ? Math.min(1, Math.max(0, (nowMs - cadence.windowStartMs) / (cadence.latestMs - cadence.windowStartMs))) : null;
+  const nextCoreLive = cadence && !seasonOver && !clockOut && !columnDone;
   const cadenceLine = seasonOver ? "season closed"
     : !cadence ? null
     : clockOut ? "season clock has run out · the buzzer settles what is on the table"
@@ -263,8 +274,8 @@ export default function OilCoreSampleV3({
         <div style={{ flex: 1, minWidth: 0, paddingTop: 4 }}>
           {dataRow("BORE HEAD", `L${revealedCount} of ${rack.length || 20}`, gold)}
           {dataRow("TABLE", "nothing on it", muted)}
-          {cadence && !seasonOver && !clockOut && !columnDone && dataRow("NEXT CORE", `before ${clockOf(cadence.latestMs)} · ${untilCopy(cadence.latestMs, nowMs)}`)}
-          {cadence && !seasonOver && !clockOut && !columnDone && dataRow("PACE", `a core every ${fmtSpan(cadence.intervalMs)}`)}
+          {dataRow("BANKED", `${fmtBtr(ledger?.banked || 0)} BTR`)}
+          {nextCoreLive && dataRow("PACE", `a core every ${fmtSpan(cadence.intervalMs)}`)}
         </div>
       </div>
       <div style={{ marginTop: 8 }}>
@@ -274,9 +285,16 @@ export default function OilCoreSampleV3({
           : ["The next strike pulls a core.", "Away? The crew follows your orders."]).map(noteLine)}
       </div>
       <div style={{ display: "flex", gap: 12, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${theme.border || muted}` }}>
-        {stat(`${fmtBtr(ledger?.banked || 0)} BTR`, "banked")}
+        {nextCoreLive
+          ? stat(cadence.latestMs - nowMs > 60000 ? `≤ ${fmtSpan(cadence.latestMs - nowMs)}` : "any moment", `next core · before ${clockOf(cadence.latestMs)}`)
+          : stat(`${fmtBtr(ledger?.banked || 0)} BTR`, "banked")}
         {stat(`${chargesRemaining}/${chargesCap}`, "charges", chargesRemaining > 0 ? cream : theme.red)}
       </div>
+      {nextCoreLive && windowFrac != null && (
+        <div title="the reveal window — the next core lands somewhere in here, no later than the end" style={{ marginTop: 8, height: 3, background: theme.barBg || "rgba(128,128,128,0.2)", borderRadius: 2, overflow: "hidden" }}>
+          <div style={{ width: `${Math.round(windowFrac * 100)}%`, height: "100%", background: gold, opacity: 0.85, transition: "width 1s linear" }} />
+        </div>
+      )}
     </>
   );
 
@@ -414,7 +432,7 @@ export default function OilCoreSampleV3({
       {/* crew orders — behind a link */}
       <div style={{ marginTop: 10, textAlign: "center" }}>
         <button onClick={() => setOrdersOpen((o) => !o)} style={{ background: "none", border: "none", cursor: "pointer", ...meta, color: muted }}>
-          [ crew orders · extract ≥ {fmtBtr(T)} BTR {ordersOpen ? "▴" : "▾"} ]
+          [ crew orders · extract ≥ {fmtBtr(T)} BTR · salvage {orders?.salvage ? "on" : "off"} · autopilot {orders?.autopilot ? "on" : "off"} {ordersOpen ? "▴" : "▾"} ]
         </button>
         {ordersOpen && (
           <div style={{ display: "flex", gap: 6, alignItems: "center", justifyContent: "center", marginTop: 6 }}>
@@ -424,6 +442,25 @@ export default function OilCoreSampleV3({
             <span style={mono({ color: muted, fontSize: 10 })}>BTR</span>
             <button style={smallBtn(gold, busy || thrDraft == null)} disabled={busy || thrDraft == null}
               onClick={() => { const v = Number(thrDraft); if (!Number.isFinite(v) || v < 0) return; run(() => onSetThreshold(v).then(() => setThrDraft(null)), `✔ crew orders set: extract ≥ ${fmtBtr(v)}`); }}>Set</button>
+          </div>
+        )}
+        {ordersOpen && onSetOrders && (
+          <div style={{ marginTop: 8, textAlign: "left" }}>
+            {[
+              ["salvage", "SALVAGE", `take a neighbour's passed layer at or above your line, for 1 charge. Earliest order on a pocket wins.`],
+              ["autopilot", "AUTOPILOT", "extract everything once your charges cover every layer left in your column."],
+            ].map(([key, name, desc]) => (
+              <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "6px 0", borderTop: `1px solid ${theme.border || muted}` }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={mono({ letterSpacing: "0.16em", fontSize: 10, color: orders?.[key] ? gold : theme.text })}>{name} · {orders?.[key] ? "ON" : "OFF"}</div>
+                  <div style={mono({ color: muted, fontSize: 10, lineHeight: 1.4 })}>{desc}</div>
+                </div>
+                <button style={smallBtn(orders?.[key] ? theme.red : gold, busy)} disabled={busy}
+                  onClick={() => run(() => onSetOrders({ [key]: !orders?.[key] }), `✔ ${name.toLowerCase()} ${orders?.[key] ? "off" : "on"}`)}>
+                  {orders?.[key] ? "Turn off" : "Turn on"}
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>

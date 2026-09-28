@@ -328,6 +328,7 @@ export default function RigScene({
   view = "rig",                  // "rig" | "panel" — the report's MACHINE PANEL chip glides the camera
   onPanelTap = null,             // a tap on the panel in the rig view → the page switches to the panel view
   loopV2 = false,                // v2 season: the panel's PASS cage / red button decide the layer
+  orders = null,                 // { salvage, autopilot } — poses the first toggle + the key
 }) {
   const { scene, animations } = useGLTF(RIG_GLB);
   const controlsRef = useRef(null);
@@ -384,6 +385,7 @@ export default function RigScene({
           tankFill={tankFill}
           onTankDrain={onTankDrain}
           decideMode={loopV2 ? "v2" : null}
+          orders={orders}
           envPreset={envPreset}
           parabolum={parabolum}
           forceStrikeGusher={forceStrikeGusher}

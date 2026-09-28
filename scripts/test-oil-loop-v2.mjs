@@ -7,7 +7,7 @@ const load = async (rel) => {
   const src = readFileSync(new URL(rel, import.meta.url), "utf8");
   return import("data:text/javascript;charset=utf-8," + encodeURIComponent(src));
 };
-const { PASSIVE_CHARGES, chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, fmtSpan, buildColumnRack, buildLedger, buildReckoning, reckoningText } =
+const { PASSIVE_CHARGES, chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, fmtSpan, buildColumnRack, buildLedger, buildReckoning, reckoningText, pickSalvageOrder } =
   await load("../src/lib/oilLoopV2.js");
 
 let pass = 0, fail = 0;
@@ -183,6 +183,18 @@ t("reached depth is the deeper of plot.drillDay and drill.drillDay", () => {
   assert.deepEqual(rack.map((r) => r.state), ["revealed", "revealed", "revealed", "undrilled", "undrilled"]);
   const r = buildReckoning({ plot: { drillDay: 0 }, drill: { drillDay: 3 }, allPlots: {}, userId: "me", column: null, depthZ: 5 });
   assert.equal(r.reached, 3); assert.equal(r.neverReachedLayers, 2);
+});
+
+t("pickSalvageOrder: earliest-set order wins; line, charges and dry pockets filter", () => {
+  const c = (userId, setAt, extra = {}) => ({ userId, salvage: true, setAt, chargesRemaining: 3, threshold: 500, ...extra });
+  assert.equal(pickSalvageOrder({ oil: 900 }, [c("late", 200), c("early", 100)]).userId, "early");
+  assert.equal(pickSalvageOrder({ oil: 900 }, [c("a", 100), c("b", 100)]).userId, "a");                 // tie → stable by id
+  assert.equal(pickSalvageOrder({ oil: 900 }, [c("unset", undefined), c("set", 999)]).userId, "set");   // never-stamped loses
+  assert.equal(pickSalvageOrder({ oil: 400 }, [c("x", 1)]), null);                                       // below the line
+  assert.equal(pickSalvageOrder({ oil: 900 }, [c("x", 1, { chargesRemaining: 0 })]), null);              // no charge
+  assert.equal(pickSalvageOrder({ oil: 900 }, [c("x", 1, { salvage: false })]), null);                   // order off
+  assert.equal(pickSalvageOrder({ oil: 0, hasInclusion: true }, [c("x", 1, { threshold: 0 })]), null);   // crew never gambles
+  assert.equal(pickSalvageOrder({ oil: 900 }, []), null);
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

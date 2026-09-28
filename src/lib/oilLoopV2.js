@@ -248,3 +248,22 @@ export function reckoningText(r, { col, row } = {}) {
   ];
   return lines.join("\n");
 }
+
+// ── Standing orders (decided 2026-09-28, option B) ───────────────────────────
+// Orders are per RIG, not per neighbour: SALVAGE = "when any orthogonal
+// neighbour passes a layer at or above my line, take it with a charge";
+// AUTOPILOT = the existing opt-in extract-all rule. The server sweeps open
+// pockets on its tick; when several neighbours hold a SALVAGE order for the
+// same pocket, the EARLIEST-SET order wins ("first lateral wins", placed in
+// advance). The crew never gambles: inclusion-only pockets are left alone.
+export function pickSalvageOrder(pocket, candidates = []) {
+  const oil = Number(pocket && pocket.oil) || 0;
+  if (oil <= 0) return null;
+  const eligible = candidates.filter((c) => c && c.salvage === true
+    && (Number(c.chargesRemaining) || 0) > 0
+    && oil >= (Number(c.threshold) || 0));
+  if (eligible.length === 0) return null;
+  const setAt = (c) => (Number.isFinite(Number(c.setAt)) ? Number(c.setAt) : Number.POSITIVE_INFINITY);
+  eligible.sort((a, b) => (setAt(a) - setAt(b)) || String(a.userId).localeCompare(String(b.userId)));
+  return eligible[0];
+}

@@ -79,3 +79,55 @@ export function applyV2Resolution(t, {
   if (oil > 0 || pending.hasInclusion) t.set(plotRef, plotUpdate, { merge: true });
   return { decision, layer, oil, inclusion: null };
 }
+
+/**
+ * Take a PASSED pocket by lateral, inside an open transaction. Shared by the
+ * oil-lateral route (a player's TAKE) and the strike tick's standing-order
+ * sweep (SALVAGE order), so the two can never drift. Caller has read
+ * `drillNow` (the taker's rig) and `target` (the passer's plot) in this txn.
+ * Returns { error } or { ok, oil, layer, inclusion, ownerId, username }.
+ */
+export function applyLateralTake(t, {
+  FieldValue, drillRef, targetRef, communityRef,
+  drillNow, target, userId, layer, inclusionArtifact, chargesRemaining, viaOrder = false,
+}) {
+  if (!drillNow || drillNow.col == null) return { error: "no rig" };
+  if (Math.abs(drillNow.col - target.col) + Math.abs(drillNow.row - target.row) !== 1) {
+    return { error: "not adjacent to your claim" };
+  }
+  if ((Number(chargesRemaining) || 0) <= 0) return { error: "no charges remaining" };
+  const pocketOil = target.passed?.[layer];
+  const hasInclusion = !!target.passedInclusions?.[layer];
+  if (pocketOil === undefined || (pocketOil <= 0 && !hasInclusion)) return { error: "nothing open at that layer" };
+  if (target.lateralTaken?.[layer] !== undefined) return { error: "already taken — first lateral wins" };
+
+  const oil = Math.max(0, pocketOil || 0);
+  const drillUpdate = {
+    chargesSpent: (drillNow.chargesSpent || 0) + 1,
+    totalCollected: (drillNow.totalCollected || 0) + oil,
+    laterals: FieldValue.increment(1),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  if (viaOrder) drillUpdate.lateralsByOrder = FieldValue.increment(1);
+  if (hasInclusion && inclusionArtifact) {
+    drillUpdate.artifacts = { [inclusionItemKey(inclusionArtifact)]: FieldValue.increment(1) };
+    drillUpdate.artifactFinds = FieldValue.increment(1);
+  }
+  t.set(drillRef, drillUpdate, { merge: true });
+  if (oil > 0) {
+    t.set(communityRef, { totalOil: FieldValue.increment(oil), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  }
+  const targetUpdate = { lateralTaken: { [layer]: userId } };
+  if (viaOrder) targetUpdate.lateralByOrder = { [layer]: true };
+  if (hasInclusion && inclusionArtifact) {
+    const { x, y, z, ...payload } = inclusionArtifact;
+    targetUpdate.revealedArtifacts = { [layer]: payload };
+  }
+  t.set(targetRef, targetUpdate, { merge: true });
+  return {
+    ok: true, oil, layer,
+    inclusion: hasInclusion ? inclusionArtifact?.type ?? true : null,
+    ownerId: target.currentOwnerId || null,
+    username: drillNow.username || null,
+  };
+}

@@ -1879,10 +1879,14 @@ function PlotPoop() {
   );
 }
 
-function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, depositLayer = -1, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, gusherTier = "gusher", hasMessages = false, onEnvelopeClick, hellActive = false, worldW = 10, worldD = 10, cameraViewable = true, onFocusObject, panelZoomed = null, onPanelTap = null, yaw = 0, crewEnabled = null, plotId = null, decideMode = null }) {
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, depositLayer = -1, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, gusherTier = "gusher", hasMessages = false, onEnvelopeClick, hellActive = false, worldW = 10, worldD = 10, cameraViewable = true, onFocusObject, panelZoomed = null, onPanelTap = null, yaw = 0, crewEnabled = null, plotId = null, decideMode = null, orders = null }) {
   // `decideMode` = "v2" on the player's own rig in an extract-or-pass season: the
   // panel's verbs then fire the layer decision (window events the page listens
   // to, each carrying `plotId`) instead of the v1 tank drain. null = v1 rules.
+  // `orders` = { salvage, autopilot } from the rig doc (v2): the first toggle
+  // and the key POSE from it — the server is the source of truth, not
+  // localStorage — and toggles E/S/W are dead (option B, 2026-09-28).
+  const ordersRef = useRef(orders); ordersRef.current = orders;
   // `panelZoomed` (phone, RigScene): the report's MACHINE PANEL chip has already
   // glided the camera to the control box, so the panel buttons work without the
   // desktop's select-then-zoom dance — true = buttons live, false = inert, null = desktop rules.
@@ -2063,6 +2067,15 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const controlBoxRef = useRef(null); // PressurePanel — now the pressure LED screen
   const panel2Ref = useRef(null);     // PressurePanel2 — the depth LED screen
   const [panelXform, setPanelXform] = useState(null);       // depth screen transform
+  const [panelLabels, setPanelLabels] = useState([]);       // v2 plates: SALVAGE under toggle 1, AUTOPILOT under the key
+  // Orders changed (the card flipped them, or the snapshot confirmed a panel
+  // press): re-pose. On mount the traversal effect applies the same thing once
+  // the meshes exist.
+  useEffect(() => {
+    if (decideMode !== "v2" || !orders) return;
+    for (const d of TOGGLE_DIRS) { toggleOnRef.current[d] = d === "N" ? !!orders.salvage : false; poseToggle(d); setLamp(d, toggleOnRef.current[d]); }
+    autopilotRef.current = !!orders.autopilot; poseKey();
+  }, [decideMode, orders?.salvage, orders?.autopilot]); // eslint-disable-line react-hooks/exhaustive-deps
   const [pressureXform, setPressureXform] = useState(null); // pressure screen transform
   const [pressure, setPressure] = useState({ label: "LOW", hex: "#33dd66" });
   const pressureLevelRef = useRef("LOW"); // debounces the level setState in useFrame
@@ -2256,7 +2269,33 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     // but it is a decision, so it lives in the UI card, not on a sign (Michelle, 2026-09-08;
     // the corner-board experiment is PANEL_READOUT_OFFSET_SYNTY if it ever comes back).
     if (panel2Ref.current) {
-      setPanelXform(screenXform(panel2Ref.current));
+      const xf = screenXform(panel2Ref.current);
+      setPanelXform(xf);
+      // v2 plates: anchored under the first toggle's lamp and under the key, in
+      // the same face frame as the readout, so they sit flat on the panel.
+      if (xf && group) {
+        const faceQ = new THREE.Quaternion(...xf.quat).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...PANEL_MESH_ROT)));
+        const down = new THREE.Vector3(0, -1, 0).applyQuaternion(faceQ).normalize();
+        const plate = (mesh, text, id, gap) => {
+          if (!mesh) return null;
+          const box = new THREE.Box3().setFromObject(mesh);
+          const size = box.getSize(new THREE.Vector3());
+          const c = box.getCenter(new THREE.Vector3());
+          group.worldToLocal(c);
+          const h = Math.max(size.x, size.y, size.z);
+          c.addScaledVector(down, h * gap);
+          return { id, text, pos: [c.x, c.y, c.z], size: h };
+        };
+        setPanelLabels([
+          plate(lampRefs.current.N || toggleRefs.current.N?.mesh, "SALVAGE", "N", 1.15),
+          plate(keyRef.current?.mesh, "AUTOPILOT", "KEY", 1.1),
+        ].filter(Boolean));
+      }
+      // v2: pose the switches from the rig doc (see the orders effect below).
+      if (decideMode === "v2" && ordersRef.current) {
+        for (const d of TOGGLE_DIRS) { toggleOnRef.current[d] = d === "N" ? !!ordersRef.current.salvage : false; poseToggle(d); setLamp(d, toggleOnRef.current[d]); }
+        autopilotRef.current = !!ordersRef.current.autopilot; poseKey();
+      }
     } else if (controlBoxRef.current && group && !RIG_IS_SYNTY) {
       const pos = new THREE.Vector3();
       controlBoxRef.current.getWorldPosition(pos);
@@ -4024,7 +4063,13 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     for (let b = e.object; b; b = b.parent) {
       if (typeof b.name === "string" && b.name.startsWith("Toggle_") && TOGGLE_DIRS.includes(b.name[7])) { toggleDir = b.name[7]; break; }
     }
-    if (toggleDir && passLive) { if (passArmedRef.current) disarmPass(); flipToggle(toggleDir); return; }
+    if (toggleDir && passLive) {
+      if (passArmedRef.current) disarmPass();
+      // v2 (option B): only the first toggle is an order (SALVAGE); the other
+      // three are dead until an order needs them — a dull click, no flip.
+      if (decideMode === "v2" && toggleDir !== "N") { playSfx(TOGGLE_SFX, { volume: 0.35, rate: 0.7 }); return; }
+      flipToggle(toggleDir); return;
+    }
     // Key switch — autopilot opt-in; a tap on the key or its housing turns it (same gate).
     let keyHit = false;
     for (let b = e.object; b; b = b.parent) { if (b.name === "KeySwitch" || b.name === "Key_Housing") { keyHit = true; break; } }
@@ -4223,6 +4268,20 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           alarm={hellActive}
         />
       )}
+      {/* v2 plates: SALVAGE under the first toggle's lamp, AUTOPILOT under the key —
+          the panel says what its controls mean (Michelle, 2026-09-28). */}
+      {decideMode === "v2" && (highlighted || panelZoomed === true) && panelXform?.fromMesh && panelLabels.map((l) => (
+        <group key={l.id} position={l.pos} quaternion={panelXform.quat} userData={PANEL_PART_USERDATA}>
+          <group rotation={PANEL_MESH_ROT}>
+            <group position={[0, 0, PANEL_TEXT_LIFT]}>
+              <Text fontSize={Math.max(0.004, l.size * 0.42)} anchorX="center" anchorY="middle" letterSpacing={0.14} color="#e8d9b8" font={undefined} renderOrder={999}>
+                {l.text}
+                <meshBasicMaterial attach="material" color="#e8d9b8" toneMapped={false} transparent opacity={0.92} depthWrite={false} side={THREE.DoubleSide} />
+              </Text>
+            </group>
+          </group>
+        </group>
+      ))}
       {/* The Synty plot has ONE screen (PressurePanel). Until the v2 readout is written it
           shows the pending layer as a caption over the needle-driven pressure word. The
           layer is DUMMY DATA when there is no live drill (Michelle, 2026-09-07: "put some
@@ -6395,7 +6454,7 @@ function MergedRigField({ nightStrength = 0, scene, items, allPumpConfigs, pumpC
   );
 }
 
-function PumpjackInstances({ loopV2 = false, gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, peakDepthMap = {}, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, envMapPreset = "warehouse", skyEnv = null, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherEvents = [], plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null, cameraViewable = true, onFocusObject }) {
+function PumpjackInstances({ loopV2 = false, orders = null, gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, peakDepthMap = {}, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, envMapPreset = "warehouse", skyEnv = null, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherEvents = [], plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null, cameraViewable = true, onFocusObject }) {
   // ?stock=1 — every rig unpainted (see STOCK_RIGS).
   if (STOCK_RIGS) { pumpConfig = null; allPumpConfigs = {}; }
   // Cells with a live gusher event. Each renders a full animated rig (instead of
@@ -6570,6 +6629,7 @@ function PumpjackInstances({ loopV2 = false, gridX, gridY, cellSize, worldW, wor
             tankFill={isSelected ? tankFill : 0}
             onTankDrain={isSelected ? onTankDrain : undefined}
             decideMode={isSelected && loopV2 ? "v2" : null}
+            orders={isSelected ? orders : null}
             envPreset={envPreset}
             parabolum={parabolum}
             forceStrikeGusher={forceStrikeGusher}
@@ -7767,6 +7827,7 @@ export default function OilVoxelGrid({
   gridX = 10,
   gridY = 10,
   loopV2 = false,          // v2 season: the selected (own) rig's panel verbs decide the layer
+  orders = null,           // { salvage, autopilot } for the selected (own) rig — poses toggle 1 + the key
   depthZ = 20,
   cellSize = 1,
   numberOfDeposits = 5,
@@ -8034,6 +8095,7 @@ export default function OilVoxelGrid({
         <group position={[0, worldH / 2, 0]}>
           <PumpjackInstances
             loopV2={loopV2}
+            orders={orders}
             gridX={gridX}
             gridY={gridY}
             cellSize={cellSize}
