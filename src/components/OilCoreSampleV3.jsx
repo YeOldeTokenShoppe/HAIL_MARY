@@ -149,6 +149,10 @@ export default function OilCoreSampleV3({
   // strike. Armed = the next layer is drilled behind steel, whatever it holds.
   casing = 0,
   casingArmed = false,
+  // "card" = standalone (meta row, corner brackets, shadow — the fixture);
+  // "section" = inside a page section whose title row already says CORE SAMPLE ·
+  // PLOT · 01/20 · LIVE (HudTitleStatus): no meta row, no brackets, flat.
+  chrome = "card",
   // SPECTATOR: a viewer with no rig looks at the SELECTED plot as the field
   // sees it — the public column (reveals, extractions, open pockets, hell),
   // read-only, no verbs, with a nudge to claim. { col, row, owner } | null.
@@ -398,10 +402,10 @@ export default function OilCoreSampleV3({
     const hellN = rack.filter((c) => c.state === "hell" || c.state === "hell_capped").length;
     const hasPlot = sp.col != null && sp.row != null;
     return (
-      <div style={{ margin: "8px 0" }}>
+      <div style={{ margin: chrome === "section" ? "0 0 4px" : "8px 0" }}>
         <HudKeyframes />
-        <HudPanel hud={hud}>
-          <HudMeta index={`${String(revealedCount).padStart(2, "0")}/${n}`} label="Field view" status={seasonOver ? "CLOSED" : "LIVE"} lamp={seasonOver ? hud.gold : hud.warn} blink={!seasonOver} />
+        <HudPanel hud={hud} brackets={chrome !== "section"} flat={chrome === "section"}>
+          {chrome !== "section" && <HudMeta index={`${String(revealedCount).padStart(2, "0")}/${n}`} label="Field view" status={seasonOver ? "CLOSED" : "LIVE"} lamp={seasonOver ? hud.gold : hud.warn} blink={!seasonOver} />}
           <HudTitle title={null} subtitle={hasPlot ? `Plot (${sp.col + 1},${sp.row + 1}) · ${sp.owner ? sp.owner : "unclaimed"}` : "Select a plot on the field"} />
           <HudDivider />
           <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
@@ -444,10 +448,10 @@ export default function OilCoreSampleV3({
   }
 
   return (
-    <div style={{ margin: "8px 0" }}>
+    <div style={{ margin: chrome === "section" ? "0 0 4px" : "8px 0" }}>
       <HudKeyframes />
-      <HudPanel hud={hud}>
-        <HudMeta index={`${String(revealedCount).padStart(2, "0")}/${n}`} label="Field extraction report" status={seasonOver ? "CLOSED" : "LIVE"} lamp={seasonOver ? hud.gold : hud.warn} blink={!seasonOver} />
+      <HudPanel hud={hud} brackets={chrome !== "section"} flat={chrome === "section"}>
+        {chrome !== "section" && <HudMeta index={`${String(revealedCount).padStart(2, "0")}/${n}`} label="Field extraction report" status={seasonOver ? "CLOSED" : "LIVE"} lamp={seasonOver ? hud.gold : hud.warn} blink={!seasonOver} />}
         <HudTitle title={null} subtitle={cadenceLine} />
         <HudTabs
           tabs={[{ id: "core", label: "Core sample" }, { id: "next", label: `Next door${nextDoor.length ? ` · ${nextDoor.length}` : ""}` }, { id: "ledger", label: "Ledger" }]}

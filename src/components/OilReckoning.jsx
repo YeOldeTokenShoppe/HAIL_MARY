@@ -37,7 +37,7 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 const stripColors = (hud) => ({ extracted: hud.green, taken: hud.violet, open: hud.gold, dry: "#4a4036", hell: hud.red, missed: "#7a5a3a", sealed: "#3a3140", cased: "#8fa3b8" });
 const STRIP_WORD = { extracted: "kept", taken: "taken", open: "left open", dry: "dry", hell: "hell", missed: "never reached", sealed: "sealed", cased: "cased" };
 
-export default function OilReckoning({ theme, reckoning: r, col, row }) {
+export default function OilReckoning({ theme, reckoning: r, col, row, chrome = "card" }) {
   const [note, setNote] = useState("");
   const [tab, setTab] = useState("card");
   const hud = hudFor(theme);
@@ -128,11 +128,11 @@ export default function OilReckoning({ theme, reckoning: r, col, row }) {
   );
 
   return (
-    <div style={{ padding: "10px 14px", borderBottom: `1px solid ${theme?.border || "transparent"}` }}>
+    <div style={chrome === "section" ? { margin: "0 0 4px" } : { padding: "10px 14px", borderBottom: `1px solid ${theme?.border || "transparent"}` }}>
       <HudKeyframes />
-      <HudPanel hud={hud}>
-        <HudMeta index="20/20" label="Season-end account" status="CLOSED" lamp={hud.gold} blink={false} />
-        <HudTitle title="THE RECKONING" subtitle={sealed ? "Season closed · seed not yet published" : "Season closed"} />
+      <HudPanel hud={hud} brackets={chrome !== "section"} flat={chrome === "section"}>
+        {chrome !== "section" && <HudMeta index="20/20" label="Season-end account" status="CLOSED" lamp={hud.gold} blink={false} />}
+        <HudTitle title={chrome === "section" ? null : "THE RECKONING"} subtitle={sealed ? "Season closed · seed not yet published" : "Season closed · the account"} />
         <HudTabs tabs={[{ id: "card", label: "Reckoning" }, { id: "account", label: "Full account" }]} active={tab} onSelect={setTab} />
         <HudDivider />
         <div style={{ minHeight: 140 }}>{tab === "card" ? cardBody : accountBody}</div>
