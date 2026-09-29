@@ -124,12 +124,13 @@ export function HudPanel({ children, style, solid = false, innerRef, hud: hudPro
 /* The status cluster for a page section's title row ("PLOT (6, 9) · 01/20 ● LIVE"):
    what the card's meta row used to say, moved up so the section has one title.
    Drawn in the page theme, not the HUD palette — it lives in the title row. */
-export function HudTitleStatus({ theme, plot, index, status = "LIVE", live = true }) {
+export function HudTitleStatus({ theme, plot, index, note, status = "LIVE", live = true }) {
   const lamp = live ? (theme?.warn || "#e87a2b") : (theme?.gold || "#d4a854");
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 8, color: theme?.muted, letterSpacing: "0.08em", fontWeight: 400, whiteSpace: "nowrap" }}>
       {plot && <span>{plot}</span>}
       {index && <span style={{ color: theme?.accent || theme?.text }}>{index}</span>}
+      {note && <span style={{ color: theme?.accent || theme?.text }}>{note}</span>}
       <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: theme?.gold }}>
         <span style={{ width: 6, height: 6, borderRadius: "50%", background: lamp, boxShadow: `0 0 4px ${lamp}`, animation: live ? "gooCursorBlink 1.6s ease-in-out infinite" : "none" }} />
         {status}
@@ -197,8 +198,27 @@ export function HudTitle({ title = <>HAIL MARY<br />PROSPECTING CO.</>, subtitle
 }
 
 /* Tab strip: [{ id, label }], active id, onSelect. */
-export function HudTabs({ tabs, active, onSelect, hud: hudProp }) {
+/* variant "boxed" = the /space strip; "underline" = document tabs (a hairline
+   under the row, the active tab underlined in the data colour) — the section
+   form on the page, where a boxed strip was the last boxed thing on the card. */
+export function HudTabs({ tabs, active, onSelect, hud: hudProp, variant = "boxed" }) {
   const hud = useHud(hudProp);
+  if (variant === "underline") {
+    return (
+      <div style={{ display: "flex", gap: "1.1rem", marginBottom: "0.7rem", borderBottom: `1px solid ${hud.goldFaint}`, fontFamily: HUD_MONO, fontSize: "0.58rem", letterSpacing: "0.18em", textTransform: "uppercase", userSelect: "none" }}>
+        {tabs.map((t) => {
+          const isActive = t.id === active;
+          return (
+            <button key={t.id} onClick={() => onSelect && onSelect(t.id)} style={{
+              padding: "0.35rem 0 0.45rem", border: "none", borderBottom: `2px solid ${isActive ? hud.data : "transparent"}`, marginBottom: -1,
+              background: "transparent", color: isActive ? hud.data : hud.muted, fontFamily: "inherit", fontSize: "inherit", letterSpacing: "inherit", textTransform: "inherit",
+              cursor: isActive ? "default" : "pointer", transition: "color 0.2s ease, border-color 0.2s ease", whiteSpace: "nowrap",
+            }}>{t.label}</button>
+          );
+        })}
+      </div>
+    );
+  }
   return (
     <div style={{ display: "flex", marginBottom: "0.7rem", border: `1px solid ${hud.goldFaint}`, fontFamily: HUD_MONO, fontSize: "0.58rem", letterSpacing: "0.18em", textTransform: "uppercase", userSelect: "none" }}>
       {tabs.map((t, i) => {

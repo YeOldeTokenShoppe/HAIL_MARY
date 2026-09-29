@@ -406,7 +406,8 @@ export default function OilCoreSampleV3({
         <HudKeyframes />
         <HudPanel hud={hud} brackets={chrome !== "section"} flat={chrome === "section"}>
           {chrome !== "section" && <HudMeta index={`${String(revealedCount).padStart(2, "0")}/${n}`} label="Field view" status={seasonOver ? "CLOSED" : "LIVE"} lamp={seasonOver ? hud.gold : hud.warn} blink={!seasonOver} />}
-          <HudTitle title={null} subtitle={hasPlot ? `Plot (${sp.col + 1},${sp.row + 1}) · ${sp.owner ? sp.owner : "unclaimed"}` : "Select a plot on the field"} />
+          {chrome !== "section" && <HudTitle title={null} subtitle={hasPlot ? `Plot (${sp.col + 1},${sp.row + 1}) · ${sp.owner ? sp.owner : "unclaimed"}` : "Select a plot on the field"} />}
+          {chrome === "section" && <HudLine type="label" text={hasPlot ? `${sp.owner ? sp.owner : "unclaimed"} · the field's view of this column` : "select a plot on the field"} />}
           <HudDivider />
           <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
             <CoreCylinder rack={rack} pending={null} hud={hud} />
@@ -452,11 +453,11 @@ export default function OilCoreSampleV3({
       <HudKeyframes />
       <HudPanel hud={hud} brackets={chrome !== "section"} flat={chrome === "section"}>
         {chrome !== "section" && <HudMeta index={`${String(revealedCount).padStart(2, "0")}/${n}`} label="Field extraction report" status={seasonOver ? "CLOSED" : "LIVE"} lamp={seasonOver ? hud.gold : hud.warn} blink={!seasonOver} />}
-        <HudTitle title={null} subtitle={cadenceLine} />
+        {chrome !== "section" && <HudTitle title={null} subtitle={cadenceLine} />}
         <HudTabs
           tabs={[{ id: "core", label: "Core sample" }, { id: "next", label: `Next door${nextDoor.length ? ` · ${nextDoor.length}` : ""}` }, { id: "ledger", label: "Ledger" }]}
-          active={tab} onSelect={setTab} />
-        <HudDivider />
+          active={tab} onSelect={setTab} variant={chrome === "section" ? "underline" : "boxed"} />
+        {chrome !== "section" && <HudDivider />}
         <div style={{ minHeight: 140 }}>
           {tab === "core" ? core : tab === "next" ? nextTab : ledgerTab}
         </div>

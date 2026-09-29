@@ -133,8 +133,8 @@ export default function OilReckoning({ theme, reckoning: r, col, row, chrome = "
       <HudPanel hud={hud} brackets={chrome !== "section"} flat={chrome === "section"}>
         {chrome !== "section" && <HudMeta index="20/20" label="Season-end account" status="CLOSED" lamp={hud.gold} blink={false} />}
         <HudTitle title={chrome === "section" ? null : "THE RECKONING"} subtitle={sealed ? "Season closed · seed not yet published" : "Season closed · the account"} />
-        <HudTabs tabs={[{ id: "card", label: "Reckoning" }, { id: "account", label: "Full account" }]} active={tab} onSelect={setTab} />
-        <HudDivider />
+        <HudTabs tabs={[{ id: "card", label: "Reckoning" }, { id: "account", label: "Full account" }]} active={tab} onSelect={setTab} variant={chrome === "section" ? "underline" : "boxed"} />
+        {chrome !== "section" && <HudDivider />}
         <div style={{ minHeight: 140 }}>{tab === "card" ? cardBody : accountBody}</div>
         <HudDivider margin="0.6rem 0 0.5rem" />
         <HudCaption>RIG ID: {where} — HAIL MARY FIELD</HudCaption>
