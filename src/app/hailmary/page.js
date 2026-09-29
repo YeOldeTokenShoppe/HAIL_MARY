@@ -5028,6 +5028,12 @@ export default function OilPage() {
   // (the card) and ✕. The card is the fallback when the crew cannot mount in
   // time (phone, low graphics, the rig off screen): the recap is never lost.
   const [recapDelivery, setRecapDelivery] = useState(null); // null | "crew" | "modal"
+  // Voice (Michelle, 2026-09-29: "use the SitePal sayText like it does when the character is
+  // tapped"): the briefing speaks when the browser will let audio start — the player has
+  // already clicked or tapped something on this page load (navigator.userActivation). A cold
+  // load has no gesture yet, so it starts by bubble and the chip offers HEAR IT, whose click is
+  // the gesture that restarts the briefing with the voice.
+  const [recapVoice, setRecapVoice] = useState(false);
   const recapDeliveryRef = useRef({ recap: null, timer: null });
   useEffect(() => {
     const d = recapDeliveryRef.current;
@@ -5045,7 +5051,9 @@ export default function OilPage() {
       const hook = window.__hmCrew;
       if (hook?.brief && hook.workers?.operator && window.__hmBriefing) {
         clearInterval(d.timer); d.timer = null;
-        if (!hook.briefing?.()) hook.brief({ voice: false, auto: true });
+        const voice = !!(navigator.userActivation && navigator.userActivation.hasBeenActive);
+        setRecapVoice(voice);
+        if (!hook.briefing?.()) hook.brief({ voice, auto: true });
       } else if (++tries > 24) { clearInterval(d.timer); d.timer = null; setRecapDelivery("modal"); }
     }, 250);
   }, [awayRecap, loopV2, isMobile, userDrill?.col, userDrill?.row]);
@@ -5057,6 +5065,14 @@ export default function OilPage() {
     window.addEventListener("hm:brief-end", onEnd);
     return () => window.removeEventListener("hm:brief-end", onEnd);
   }, [recapDelivery]);
+  // HEAR IT: this click is the audio gesture — restart the briefing with the voice.
+  const hearRecap = useCallback(() => {
+    const hook = typeof window !== "undefined" ? window.__hmCrew : null;
+    if (!hook?.brief) return;
+    if (hook.briefing?.()) hook.brief();
+    hook.brief({ voice: true, auto: true });
+    setRecapVoice(true);
+  }, []);
   const readRecapCard = useCallback(() => {
     const hook = typeof window !== "undefined" ? window.__hmCrew : null;
     if (hook?.briefing?.()) hook.brief();   // toggles the briefing off (hm:brief-end {stopped:true} — the card stays)
@@ -7298,6 +7314,7 @@ export default function OilPage() {
     }}>
       <span style={{ color: theme.gold }}>⚙ THE CREW HAS YOUR BRIEFING</span>
       <span style={{ color: "#9a8878" }}>{Math.max(1, Math.round((awayRecap.awayMs || 0) / 36e5))}h away</span>
+      {!recapVoice && <button onClick={hearRecap} style={{ background: `${theme.gold}22`, border: `1px solid ${theme.gold}`, borderRadius: 2, color: theme.gold, fontFamily: "inherit", fontSize: 10, letterSpacing: "0.14em", padding: "3px 8px", cursor: "pointer" }}>🔊 HEAR IT</button>}
       <button onClick={readRecapCard} style={{ background: "transparent", border: `1px solid ${theme.gold}`, borderRadius: 2, color: theme.gold, fontFamily: "inherit", fontSize: 10, letterSpacing: "0.14em", padding: "3px 8px", cursor: "pointer" }}>READ IT</button>
       <button onClick={() => setAwayRecap(null)} aria-label="Dismiss" style={{ background: "none", border: "none", color: "#9a8878", fontSize: 14, cursor: "pointer", padding: 0, lineHeight: 1 }}>✕</button>
     </div>
