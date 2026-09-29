@@ -29,7 +29,7 @@ async function handle(req) {
     const p = d.data();
     if (p.currentOwnerId != null || p.drillDay || p.revealed || p.hellLayers ||
         p.passed || p.inclusionFlags || p.passedInclusions || p.hellCapped ||
-        p.lastStrikeAt || p.extracted || p.lateralTaken || p.lateralByOrder || p.wildcatTaken || p.heat ||
+        p.lastStrikeAt || p.extracted || p.lateralTaken || p.lateralByOrder || p.wildcatTaken || p.heat || p.cased ||
         p.revealedArtifacts) {
       batch.set(d.ref, {
         currentOwnerId: null,
@@ -42,6 +42,7 @@ async function handle(req) {
         inclusionFlags: FieldValue.delete(),
         hellCapped: FieldValue.delete(),
         heat: FieldValue.delete(),
+        cased: FieldValue.delete(),
         revealedArtifacts: FieldValue.delete(),
         // strike/take history — lastStrikeAt alone keeps the "24H" gold border
         // on the survey map after a wipe (2026-09-28 bot test); the take maps
@@ -84,6 +85,7 @@ async function handle(req) {
         // crew on ORDERS and no lateral-extract queue stamp)
         orders: FieldValue.delete(),
         autopilot: FieldValue.delete(),
+        casingArmed: FieldValue.delete(),
         laterals: FieldValue.delete(),
         lateralsByOrder: FieldValue.delete(),
         wildcats: FieldValue.delete(),

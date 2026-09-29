@@ -2729,7 +2729,7 @@ export default function OilPage() {
       setDrillLoaded(true);
       if (snap.exists()) {
         const d = snap.data();
-        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0, tankOil: d.tankOil, lastStrikeAt: d.lastStrikeAt || null, lastStrikeOil: d.lastStrikeOil ?? null, lastStrikeDepth: d.lastStrikeDepth ?? null, lastStrikeHell: d.lastStrikeHell || false, armed: d.armed, rigDepleted: d.rigDepleted || false, bonusFromShares: d.bonusFromShares || 0, bonusFromHolding: d.bonusFromHolding || 0, artifacts: d.artifacts || {}, artifactFinds: d.artifactFinds || 0, lastStrikeArtifact: d.lastStrikeArtifact || null, supplies: d.supplies || {}, coupon: d.coupon || null, bonusClaimJumps: d.bonusClaimJumps || 0, bonusFromTickets: d.bonusFromTickets || 0, ticketStreak: d.ticketStreak || 0, pending: d.pending || null, chargesSpent: d.chargesSpent || 0, threshold: d.threshold ?? null, layersExtracted: d.layersExtracted || {}, layersPassed: d.layersPassed || {}, laterals: d.laterals || 0, wildcats: d.wildcats || 0, autopilot: d.autopilot === true, orders: d.orders || null });
+        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0, tankOil: d.tankOil, lastStrikeAt: d.lastStrikeAt || null, lastStrikeOil: d.lastStrikeOil ?? null, lastStrikeDepth: d.lastStrikeDepth ?? null, lastStrikeHell: d.lastStrikeHell || false, armed: d.armed, rigDepleted: d.rigDepleted || false, bonusFromShares: d.bonusFromShares || 0, bonusFromHolding: d.bonusFromHolding || 0, artifacts: d.artifacts || {}, artifactFinds: d.artifactFinds || 0, lastStrikeArtifact: d.lastStrikeArtifact || null, supplies: d.supplies || {}, coupon: d.coupon || null, bonusClaimJumps: d.bonusClaimJumps || 0, bonusFromTickets: d.bonusFromTickets || 0, ticketStreak: d.ticketStreak || 0, pending: d.pending || null, chargesSpent: d.chargesSpent || 0, threshold: d.threshold ?? null, layersExtracted: d.layersExtracted || {}, layersPassed: d.layersPassed || {}, laterals: d.laterals || 0, wildcats: d.wildcats || 0, autopilot: d.autopilot === true, orders: d.orders || null, casingArmed: d.casingArmed === true });
         if (d.username) setUsername(d.username);
       } else {
         setUserDrill(null);
@@ -3065,7 +3065,8 @@ export default function OilPage() {
         const oil = Number(revealed[L] ?? revealed[String(L)] ?? 0);
         const hell = !!(hells[L] || hells[String(L)]);
         let outcome = "sealed";
-        if (hell) outcome = "hell";
+        if (userPlotState.cased?.[L]) outcome = "cased";
+        else if (hell) outcome = "hell";
         else if (ext[L] !== undefined) outcome = "kept";
         else if (pas[L] !== undefined) outcome = takenBy[L] !== undefined ? "taken" : oil > 0 ? "open" : "dry";
         else if (cur.pendingLayer === L) outcome = "table";
@@ -4799,6 +4800,8 @@ export default function OilPage() {
       ...prev,
       ...(patch.autopilot !== undefined ? { autopilot: patch.autopilot === true } : {}),
       ...(patch.salvage !== undefined ? { orders: { ...(prev.orders || {}), salvage: patch.salvage === true } } : {}),
+      ...(patch.caseOnHeat !== undefined ? { orders: { ...(prev.orders || {}), ...(patch.salvage !== undefined ? { salvage: patch.salvage === true } : {}), caseOnHeat: patch.caseOnHeat === true } } : {}),
+      ...(patch.caseNext !== undefined ? { casingArmed: patch.caseNext === true } : {}),
       ...(patch.btr !== undefined ? { threshold: patch.btr } : {}),
     } : prev);
     return data;
@@ -4990,6 +4993,8 @@ export default function OilPage() {
         const up = a.cores.filter((c) => c.outcome !== "table");
         if (up.length) say(`${up.length} core${up.length === 1 ? "" : "s"} came up, L${up[0].layer + 1} to L${up[up.length - 1].layer + 1}.`, "yes");
         if (a.kept) say(`We kept ${a.kept}: ${n(a.keptOil)} BTR banked.`, "yes");
+        const cased = a.cores.filter((c) => c.outcome === "cased");
+        if (cased.length) say(`We cased through ${cased.length === 1 ? `L${cased[0].layer + 1}` : `${cased.length} layers`}${cased.some((c) => c.oil > 0) ? ` — ${n(cased.reduce((x, c) => x + c.oil, 0))} BTR behind steel` : ""}.`, "thoughtful");
         const dry = a.cores.filter((c) => c.outcome === "dry").length, hell = a.cores.filter((c) => c.outcome === "hell").length;
         const open = a.cores.filter((c) => c.outcome === "open"), taken = a.cores.filter((c) => c.outcome === "taken");
         if (open.length) say(`Passed ${open.length} wet — ${n(open.reduce((x, c) => x + c.oil, 0))} BTR still open next door.`, "thoughtful");
@@ -5008,7 +5013,11 @@ export default function OilPage() {
       // hell warning on the newest core (pending, else the last revealed)
       const heatNow = (userDrill?.pending?.heat && userDrill.pending.heat !== "nominal") ? userDrill.pending.heat
         : (userPlotState?.heat?.[(userPlotState?.drillDay || 0) - 1] || null);
-      if (heatNow === "high") say(`Hot zone right under the bit, boss. Hell, or the big one${(userDrill?.supplies?.tonic || 0) > 0 ? ". Tonic's ready if it's hell" : ". No tonic on the rig"}.`, "thoughtful");
+      if (heatNow === "high") {
+        const strings = Number(userDrill?.supplies?.casing) || 0;
+        say(`Hot zone right under the bit, boss. Hell, or the big one.`, "thoughtful");
+        say(userDrill?.casingArmed ? "Casing's armed. We drill through it sealed, whatever it is." : strings > 0 ? `${strings} casing string${strings === 1 ? "" : "s"} on the rig. Say the word and we seal it — or we ride it.` : "No casing on the rig. We ride it.", userDrill?.casingArmed ? "yes" : "thoughtful");
+      }
       else if (heatNow === "elevated") say("Something's hot down there, boss. Could be hell. Could be the big one. Could be next door.", "thoughtful");
       if (v) say(`${v.chargesRemaining} charge${v.chargesRemaining === 1 ? "" : "s"} left.`, v.chargesRemaining > 0 ? "yes" : "no");
       if (r) (r.fieldEvents || []).slice(0, 1).forEach((e) => { if (e?.username && e?.type) say(`${e.username}: ${e.type}.`, "thoughtful"); });
@@ -5033,7 +5042,7 @@ export default function OilPage() {
     // RigCrew compares ownerPlot with the plot its rig stands on and brushes off everyone else.
     window.__hmBriefing = { lines, tones, signedIn: !!user?.id, ownerPlot: userDrill?.col != null ? `${userDrill.col}_${userDrill.row}` : null };
     return () => { delete window.__hmBriefing; };
-  }, [drillStatus, hellActive, awayRecap, tankFill, user?.id, userDrill?.col, userDrill?.row, loopV2, awayRecapV2, userDrill?.pending?.heat, userDrill?.supplies?.tonic, userPlotState?.heat, userPlotState?.drillDay]);
+  }, [drillStatus, hellActive, awayRecap, tankFill, user?.id, userDrill?.col, userDrill?.row, loopV2, awayRecapV2, userDrill?.pending?.heat, userDrill?.supplies?.casing, userDrill?.casingArmed, userPlotState?.heat, userPlotState?.drillDay]);
 
   // ── The crew delivers the away recap (v2, desktop; Michelle 2026-09-28) ──────
   // On return with something to report, the page selects your rig so the crew
@@ -5664,6 +5673,15 @@ export default function OilPage() {
             return `✓ TAKER BOT ${n} on (${selectedX + 1}, ${sliceY + 1}) — lateral extract ON, line 0, queue slot ${n}`;
           })}>CLAIM AS TAKER BOT {n}</button>
         ))}
+        <button disabled={toolBusy || selectedX === null} style={styles.btn} onClick={() => runTool("Granting casing", async () => {
+          // One casing string to the rig on the selected plot (the hot-zone test:
+          // NEW TEST MAP → strike until Temp reads HIGH → arm the casing → strike).
+          const owner = allPlotsMap[`${selectedX}_${sliceY}`]?.currentOwnerId;
+          if (!owner) throw new Error("select a claimed plot first");
+          const r = await fetch(`/api/oil-strike-tick?password=${encodeURIComponent(adminPassword)}&supply=${encodeURIComponent(owner)}&item=casing&n=1`).then((x) => x.json());
+          if (!r?.ok) throw new Error(r?.error || "failed");
+          return `✓ casing ×${r.count} on the rig at (${selectedX + 1}, ${sliceY + 1})`;
+        })}>GRANT CASING</button>
         <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Forcing strike", async () => {
           let url = `/api/oil-strike-tick?password=${encodeURIComponent(adminPassword)}&force=1&deep=${toolDeep}`;
           let scope = " (all rigs)";
@@ -5694,7 +5712,7 @@ export default function OilPage() {
           // v2: say what the crews did — the strike itself is silent on the
           // board, so without this line a bot test looks like nothing happened.
           const v2Line = loopV2
-            ? ` · crews: ${r.extracted || 0} extracted, ${r.passedOpen || 0} passed open, ${r.passedDry || 0} passed dry, ${r.salvagedByOrder || 0} lateral-extracted`
+            ? ` · crews: ${r.extracted || 0} extracted, ${r.passedOpen || 0} passed open, ${r.passedDry || 0} passed dry, ${r.salvagedByOrder || 0} lateral-extracted${r.cased ? `, ${r.cased} cased` : ""}`
             : "";
           return `✓ struck ${r.struck}${scope} · skipped ${r.skipped}${reasons}${r.depleted ? ` · depleted ${r.depleted}` : ""}${r.demonsSummoned ? ` · demons ${r.demonsSummoned}` : ""}${v2Line}`;
         })}>FORCE STRIKE</button>
@@ -8561,7 +8579,9 @@ export default function OilPage() {
         rack={columnRack}
         ledger={rigLedger}
         ended={gameEnded}
-        orders={{ autopilot: userDrill.autopilot === true, salvage: userDrill.orders?.salvage === true }}
+        orders={{ autopilot: userDrill.autopilot === true, salvage: userDrill.orders?.salvage === true, caseOnHeat: userDrill.orders?.caseOnHeat === true }}
+        casing={Number(userDrill.supplies?.casing) || 0}
+        casingArmed={userDrill.casingArmed === true}
         onSetOrders={handleSetOrders}
         onWalk={introComplete ? () => setWalkMode(true) : undefined}
       />

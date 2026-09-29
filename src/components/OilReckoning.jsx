@@ -34,8 +34,8 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 // Strip colours: kept = green, taken = violet (a rival's mark), open = gold,
 // hell = red, dry = earth, missed = dim, sealed = hatched.
-const STRIP_COLOR = { extracted: HUD.green, taken: HUD.violet, open: HUD.gold, dry: "#4a4036", hell: HUD.red, missed: "#7a5a3a", sealed: "#3a3140" };
-const STRIP_WORD = { extracted: "kept", taken: "taken", open: "left open", dry: "dry", hell: "hell", missed: "never reached", sealed: "sealed" };
+const STRIP_COLOR = { extracted: HUD.green, taken: HUD.violet, open: HUD.gold, dry: "#4a4036", hell: HUD.red, missed: "#7a5a3a", sealed: "#3a3140", cased: "#8fa3b8" };
+const STRIP_WORD = { extracted: "kept", taken: "taken", open: "left open", dry: "dry", hell: "hell", missed: "never reached", sealed: "sealed", cased: "cased" };
 
 export default function OilReckoning({ theme, reckoning: r, col, row }) {
   const [note, setNote] = useState("");
@@ -76,7 +76,7 @@ export default function OilReckoning({ theme, reckoning: r, col, row }) {
         <span>{r.depthZ} layers · bore reached L{r.reached}</span>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", marginTop: 4, fontFamily: HUD_MONO, fontSize: "0.48rem", letterSpacing: "0.12em", color: HUD.muted, textTransform: "uppercase" }}>
-        {["extracted", "taken", "open", "hell", "missed", "sealed"].filter((k) => strip.some((c) => c.state === k)).map((k) => (
+        {["extracted", "taken", "open", "cased", "hell", "missed", "sealed"].filter((k) => strip.some((c) => c.state === k)).map((k) => (
           <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
             <span style={{ width: 7, height: 7, background: STRIP_COLOR[k], display: "inline-block" }} />{STRIP_WORD[k]}
           </span>
@@ -112,6 +112,7 @@ export default function OilReckoning({ theme, reckoning: r, col, row }) {
       {r.passedTotal > 0 && <HudLine type="data" label="· taken" text={`${btr(r.takenByRivals)} BTR by neighbours`} />}
       {r.passedTotal > 0 && <HudLine type="data" label="· left" text={`${btr(r.leftOpen)} BTR stayed in the ground`} />}
       {r.stranded > 0 && <HudLine type="data" label="Stranded" text={`${btr(r.stranded)} BTR never banked`} />}
+      {r.casedCount > 0 && <HudLine type="data" label="Cased" text={`${plural(r.casedCount, "layer")}${r.casedHell ? ` · ${plural(r.casedHell, "hell pocket")} sealed` : ""}${r.casedOff > 0 ? ` · ${btr(r.casedOff)} BTR cased off` : ""}`} />}
       <HudLine type="blank" />
       <HudLine type="data" label="Salvaged" text={`+${btr(r.salvagedIn)} BTR · ${plural(r.salvageCount, "lateral")}`} />
       <HudLine type="data" label="Wildcats" text={`+${btr(r.wildcatIn)} BTR · ${r.wildcatCount} dug${r.wildcatDry ? `, ${r.wildcatDry} dry` : ""}${r.wildcatHell ? `, ${r.wildcatHell} hell` : ""}`} />

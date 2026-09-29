@@ -38,6 +38,7 @@ export async function POST(req) {
       hellLayers: FieldValue.delete(),
       hellCapped: FieldValue.delete(),
       heat: FieldValue.delete(),
+      cased: FieldValue.delete(),
       // v2 state — a re-claimed plot starts clean (no stale passes/takes)
       extracted: FieldValue.delete(),
       passed: FieldValue.delete(),

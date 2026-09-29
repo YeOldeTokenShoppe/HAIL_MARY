@@ -64,8 +64,29 @@ export const HEAT_COPY = {
   elevated: { temp: "Elevated", warn: "!! HEAT RISING — SOMETHING HOT WITHIN REACH !!",
               alert: "🌡 Heat rising in the core: a hell pocket or a motherlode within two cells — under you or next door." },
   high:     { temp: "High",     warn: "!! HOT ZONE DIRECTLY BELOW — HELL OR THE MOTHERLODE !!",
-              alert: "🔥 Hot zone directly below the bit: the next layer is a hell pocket or a motherlode. A tonic in supply caps a breach." },
+              alert: "🔥 Hot zone directly below the bit: the next layer is a hell pocket or a motherlode. Arm the casing to seal it — whatever it is — or ride it." },
 };
+
+// ── Casing (step 2, Michelle 2026-09-29) ─────────────────────────────────────
+// The bore cannot skip a layer; it can drill THROUGH one with the hole sealed.
+// A casing string in supply (`supplies.casing`), armed before the strike
+// (`casingArmed`, one-shot) — or the standing order CASE ON HEAT when the last
+// core read HIGH — makes the tick case the next layer: no core on the table,
+// no charge, no breach if it was hell, and no oil if it was the motherlode —
+// cased off, never produced. The forfeit is what makes the reading a decision.
+export const casingCount = (drill) => Number(drill?.supplies?.casing) || 0;
+export function shouldCase({ armed = false, orders = null, lastHeat = null, casing = 0 } = {}) {
+  if (!(casing > 0)) return { case: false, via: null };
+  if (armed === true) return { case: true, via: "armed" };
+  if (orders?.caseOnHeat === true && lastHeat === "high") return { case: true, via: "order" };
+  return { case: false, via: null };
+}
+export function casedAlertBody({ col, row, layer, oil, hell }) {
+  const plot = `Plot (${col + 1}, ${row + 1})`;
+  if (hell) return `${plot} L${layer + 1}: the crew cased through a HELL POCKET. Sealed behind steel — no breach, no demon.`;
+  if (oil > 0) return `${plot} L${layer + 1}: the crew cased through ${Math.round(oil).toLocaleString()} BTR. Cased off — behind steel, never produced.`;
+  return `${plot} L${layer + 1}: the crew cased through dry shale. The string was spent on nothing.`;
+}
 const NEIGHBOUR_SETS = {
   all8: [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]],
   ortho4: [[1, 0], [-1, 0], [0, 1], [0, -1]],
@@ -130,6 +151,7 @@ export function fmtSpan(ms) {
 // The claim's column, layer by layer (the "core rack" — always visible).
 // States: undrilled · pending · extracted · passed (open next door) ·
 // salvaged (a neighbour took the pass) · dry (passed, nothing there) ·
+// cased (drilled through behind steel — the reveal says what it held) ·
 // hell · hell_capped · revealed (resolved outside the v2 maps — legacy data or
 // a buzzer sweep that left no map entry; shown as neutral, never as a choice).
 export function buildColumnRack({ plot, drill, depthZ = 20 }) {
@@ -148,6 +170,11 @@ export function buildColumnRack({ plot, drill, depthZ = 20 }) {
       : (p.heat?.[z] && p.heat[z] !== "nominal") ? p.heat[z] : null;
     if (pending && pending.layer === z) {
       out.push({ layer: z, state: "pending", oil: pending.oil || 0, hasInclusion: !!pending.hasInclusion || inclusion, takenBy: null, heat });
+      continue;
+    }
+    if (p.cased?.[z]) {
+      // cased through: sealed behind steel — the reveal says what was there
+      out.push({ layer: z, state: "cased", oil: Number(p.revealed?.[z]) || 0, hell: !!p.hellLayers?.[z], hasInclusion: false, takenBy: null, heat });
       continue;
     }
     if (p.hellLayers?.[z]) {
@@ -186,7 +213,13 @@ export function buildLedger({ plot, drill, allPlots = {}, userId }) {
   const d = drill || {};
   const rows = [];
   let extractedOwn = 0, passedTotal = 0, takenByRivals = 0, salvagedIn = 0, wildcatIn = 0, wildcatDry = 0, wildcatHell = 0;
+  let casedOff = 0, casedHell = 0, casedCount = 0;
 
+  for (const ls of Object.keys(p.cased || {})) {
+    const layer = Number(ls); const hell = !!p.hellLayers?.[layer]; const v = hell ? 0 : (Number(p.revealed?.[layer]) || 0);
+    casedCount += 1; if (hell) casedHell += 1; else casedOff += v;
+    rows.push({ kind: "cased", layer, oil: v, hell, charge: 0 });
+  }
   for (const [ls, oil] of Object.entries(d.layersExtracted || {})) {
     const layer = Number(ls); const v = Number(oil) || 0;
     extractedOwn += v;
@@ -230,6 +263,7 @@ export function buildLedger({ plot, drill, allPlots = {}, userId }) {
     chargesSpent: Number(d.chargesSpent) || 0,
     extractedOwn, salvagedIn, wildcatIn, wildcatDry, wildcatHell,
     passedTotal, takenByRivals, leftOpen: passedTotal - takenByRivals,
+    casedOff, casedHell, casedCount,
   };
 }
 
@@ -281,6 +315,7 @@ export function buildReckoning({ plot, drill, allPlots = {}, userId, column = nu
     wildcatIn: ledger.wildcatIn, wildcatDry: ledger.wildcatDry, wildcatHell: ledger.wildcatHell,
     wildcatCount: ledger.rows.filter((r) => r.kind === "wildcat").length,
     chargesSpent: ledger.chargesSpent, chargesCap: Number(chargesCap) || 0, chargesUnspent,
+    casedOff: ledger.casedOff, casedHell: ledger.casedHell, casedCount: ledger.casedCount,
     pendingUnresolved, reached, depthZ,
   };
 }
@@ -304,6 +339,7 @@ export function reckoningText(r, { col, row } = {}) {
     `Wildcats: +${btr(r.wildcatIn)} (${r.wildcatCount}${r.wildcatDry ? `, ${r.wildcatDry} dry` : ""}${r.wildcatHell ? `, ${r.wildcatHell} hell` : ""})`,
     `Charges: ${r.chargesSpent}/${r.chargesCap} spent${r.chargesUnspent ? ` · ${r.chargesUnspent} wasted` : ""}`,
   ];
+  if (r.casedCount > 0) lines.splice(5, 0, `Cased through ${r.casedCount} layer${r.casedCount === 1 ? "" : "s"}: ${r.casedHell ? `${r.casedHell} hell pocket${r.casedHell === 1 ? "" : "s"} sealed` : ""}${r.casedHell && r.casedOff > 0 ? ", " : ""}${r.casedOff > 0 ? `${btr(r.casedOff)} BTR cased off` : ""}`);
   return lines.join("\n");
 }
 
@@ -322,6 +358,8 @@ export function reckoningStory(r, { col, row } = {}) {
   if (r.takenByRivals > 0) rest.push(`neighbours took ${btr(r.takenByRivals)} BTR from layers I passed`);
   if (r.salvagedIn > 0) rest.push(`I took ${btr(r.salvagedIn)} BTR from next door`);
   if (r.wildcatIn > 0) rest.push(`my wildcats found ${btr(r.wildcatIn)} BTR`);
+  if (r.casedHell > 0) rest.push(`I cased through ${r.casedHell === 1 ? "a hell pocket" : `${r.casedHell} hell pockets`}`);
+  if (r.casedOff > 0) rest.push(`I cased off ${btr(r.casedOff)} BTR I never saw`);
   if (r.unknownLayers === 0 && r.stranded > 0) rest.push(`${btr(r.stranded)} BTR is still down there`);
   if (r.unknownLayers > 0) rest.push(`${r.unknownLayers} layer${r.unknownLayers === 1 ? " is" : "s are"} still sealed until the map is published`);
   if (rest.length === 0) return first;
@@ -343,12 +381,14 @@ export function reckoningShareText(r, { refCode = null, url = "rl80.com/hailmary
 export function reckoningStrip(r) {
   const byLayer = new Map();
   for (const row of (r.ledger && r.ledger.rows) || []) {
+    if (row.kind === "cased") byLayer.set(row.layer, "cased");
     if (row.kind === "extract") byLayer.set(row.layer, "extracted");
     else if (row.kind === "pass") byLayer.set(row.layer, row.takenBy ? "taken" : (row.oil > 0 ? "open" : "dry"));
   }
   return (r.layers || []).map((l) => {
-    if (l.hell) return { layer: l.layer, state: "hell", oil: 0 };
     const s = byLayer.get(l.layer);
+    if (s === "cased") return { layer: l.layer, state: "cased", oil: l.oil || 0 };
+    if (l.hell) return { layer: l.layer, state: "hell", oil: 0 };
     if (s) return { layer: l.layer, state: s, oil: l.oil || 0 };
     if (!l.reached) return { layer: l.layer, state: l.oil == null ? "sealed" : (l.oil > 0 ? "missed" : "dry"), oil: l.oil || 0 };
     return { layer: l.layer, state: l.oil > 0 ? "open" : "dry", oil: l.oil || 0 };

@@ -26,7 +26,7 @@ import { HUD, HUD_MONO, HudKeyframes, HudPanel, HudMeta, HudTitle, HudTabs, HudD
 
 const MONO = HUD_MONO;
 // taken = violet (2026-09-29, Michelle: amber sat too close to the pending gold).
-const WALL = { pending: "#ffd75e", pendingHi: "#efe0a8", bore: "#2a1d10", goo: "#37f07a", taken: "#c77dff", hell: "#ff3f1f", dry: "#4a4036", capped: "#a1793f" };
+const WALL = { pending: "#ffd75e", pendingHi: "#efe0a8", bore: "#2a1d10", goo: "#37f07a", taken: "#c77dff", hell: "#ff3f1f", dry: "#4a4036", capped: "#a1793f", cased: "#8fa3b8" };
 const fmtBtr = (n) => Math.round(n || 0).toLocaleString();
 const clockOf = (ms) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const untilCopy = (ms, now) => (ms - now > 60000 ? `in ${fmtSpan(ms - now)}` : "any moment now");
@@ -47,6 +47,7 @@ function CoreCylinder({ rack, pending, width = 104, height = 236 }) {
     : c.state === "salvaged" ? WALL.taken
     : c.state === "hell" ? WALL.hell
     : c.state === "hell_capped" ? WALL.capped
+    : c.state === "cased" ? WALL.cased
     : c.state === "dry" ? WALL.dry
     : c.state === "revealed" ? "rgba(255,255,255,0.10)"
     : "url(#v3-strata)";
@@ -141,8 +142,12 @@ export default function OilCoreSampleV3({
   // CREW ORDERS (option B, 2026-09-28): LATERAL EXTRACT = auto-take a neighbour's
   // pass at or above the line; AUTO-PILOT = keep everything once charges cover
   // the layers left. Same settings the rig panel's toggle and key flip.
-  orders = { autopilot: false, salvage: false },
-  onSetOrders = null, // async ({ salvage?: bool, autopilot?: bool }) => void
+  orders = { autopilot: false, salvage: false, caseOnHeat: false },
+  onSetOrders = null, // async ({ salvage?, autopilot?, caseNext?, caseOnHeat? }) => void
+  // CASING (2026-09-29): strings in supply and whether one is armed for the next
+  // strike. Armed = the next layer is drilled behind steel, whatever it holds.
+  casing = 0,
+  casingArmed = false,
   // SPECTATOR: a viewer with no rig looks at the SELECTED plot as the field
   // sees it — the public column (reveals, extractions, open pockets, hell),
   // read-only, no verbs, with a nudge to claim. { col, row, owner } | null.
@@ -214,6 +219,24 @@ export default function OilCoreSampleV3({
     </div>
   );
   const noteLineEl = note && <HudLine type="data" text={note} />;
+  // CASING: the hot-zone decision. Shown whenever a string is armed or the
+  // reading is hot; the button arms/disarms the next strike.
+  const casingBlock = (heat || casingArmed) && onSetOrders && !seasonOver && (
+    <div style={{ marginTop: "0.6rem", padding: "0.5rem 0.6rem", border: `1px solid ${casingArmed ? HUD.orange : HUD.goldFaint}`, background: casingArmed ? "rgba(232,122,43,0.08)" : "transparent" }}>
+      <HudLine type="label" pad={PAD} label="CASING" text={casingArmed ? "ARMED — the next layer is drilled behind steel" : casing > 0 ? `${casing} string${casing === 1 ? "" : "s"} on the rig` : "none on the rig"} />
+      <HudLine type="note" text={casingArmed
+        ? "Whatever the next layer holds is sealed off: hell never breaches, a motherlode is never produced. No charge, no core on the table."
+        : heat === "high" ? "Case the next layer and lose whatever it is. Or ride it: the motherlode, or a breach."
+        : "Casing seals the NEXT layer only. Arm it when the reading is HIGH — the hot cell is directly below then."} />
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: "0.35rem" }}>
+        <button style={hudSmallBtn(casingArmed ? HUD.red : HUD.orange, busy || (!casingArmed && casing <= 0))} disabled={busy || (!casingArmed && casing <= 0)}
+          onClick={() => run(() => onSetOrders({ caseNext: !casingArmed }), casingArmed ? "casing disarmed — the next layer comes to the table" : "✔ casing armed — the next layer is drilled behind steel")}>
+          {casingArmed ? "Disarm casing" : "Case the next layer"}
+        </button>
+        {orders?.caseOnHeat && <span style={noteText}>CASE ON HEAT is on: the crew arms it on a HIGH reading.</span>}
+      </div>
+    </div>
+  );
 
   // ── CORE SAMPLE tab ──
   const core = pending ? (
@@ -235,7 +258,8 @@ export default function OilCoreSampleV3({
       <HudLine type="warn" text={heatCopy.warn || (pending.hasInclusion ? "!! ANOMALOUS INCLUSION !!" : dry ? "!! DRY — NOTHING TO KEEP !!" : crewWould === "EXTRACT" ? "!! ABOVE YOUR LINE — CREW WOULD KEEP IT !!" : "!! BELOW YOUR LINE — CREW WOULD PASS !!")} />
       {heatCopy.warn && pending.hasInclusion && <HudLine type="warn" text="!! ANOMALOUS INCLUSION !!" />}
       <HudLine type="blank" />
-      {heat && <HudLine type="note" text={heat === "high" ? "The next layer is hot: a hell pocket or the motherlode. A tonic in supply caps a breach." : "Something hot within two cells — under you or next door. Hell, or the big one."} />}
+      {heat && <HudLine type="note" text={heat === "high" ? "The next layer is hot: a hell pocket or the motherlode." : "Something hot within two cells — under you or next door. Hell, or the big one."} />}
+      {casingBlock}
       {(dry
         ? ["Passing is free. Extracting nothing wastes a charge.", "Do nothing: the crew passes."]
         : [`Extract keeps the full ${fmtBtr(oil)} BTR for 1 charge.`, `Do nothing: the crew ${crewWould === "EXTRACT" ? "keeps it" : "passes it"} at the next strike.`, "A pass is final — it opens to next door."]
@@ -273,7 +297,8 @@ export default function OilCoreSampleV3({
       </div>
       <HudLine type="blank" />
       {(seasonOver ? ["!! SEASON CLOSED !!"] : clockOut ? ["!! SEASON CLOCK RUN OUT !!"] : columnDone ? ["!! COLUMN FULLY REVEALED !!"] : heatCopy.warn && !seasonOver ? [heatCopy.warn] : []).map((t) => <HudLine key={t} type="warn" text={t} />)}
-      {heat && !seasonOver && !clockOut && !columnDone && <HudLine type="note" text={heat === "high" ? "The next layer is hot: a hell pocket or the motherlode. A tonic in supply caps a breach." : "Something hot within two cells — under you or next door. Hell, or the big one."} />}
+      {heat && !seasonOver && !clockOut && !columnDone && <HudLine type="note" text={heat === "high" ? "The next layer is hot: a hell pocket or the motherlode." : "Something hot within two cells — under you or next door. Hell, or the big one."} />}
+      {!clockOut && !columnDone && casingBlock}
       {(seasonOver ? ["The reckoning is below."]
         : clockOut ? ["The buzzer settles anything on the table."]
         : columnDone ? ["Charges left still work next door."]
@@ -344,11 +369,12 @@ export default function OilCoreSampleV3({
               <span style={{ color: HUD.cream }}>
                 {r.kind === "extract" && `L${r.layer + 1} · extract`}
                 {r.kind === "pass" && `L${r.layer + 1} · pass${r.takenBy ? " · a neighbour took it" : r.oil > 0 ? " · still open" : " · dry"}`}
+                {r.kind === "cased" && `L${r.layer + 1} · cased through${r.hell ? " · hell, sealed" : r.oil > 0 ? " · a pay zone, cased off" : " · shale"}`}
                 {r.kind === "salvage" && `salvage (${r.col + 1},${r.row + 1}) L${r.layer + 1}`}
                 {r.kind === "wildcat" && `wildcat (${r.col + 1},${r.row + 1}) L${r.layer + 1}${r.hell ? " · hell" : r.oil > 0 ? "" : " · dry hole"}`}
               </span>
-              <span style={{ color: r.kind === "pass" ? (r.takenBy ? HUD.violet : HUD.muted) : r.oil > 0 ? HUD.green : HUD.muted, whiteSpace: "nowrap" }}>
-                {r.kind === "pass" ? `${fmtBtr(r.oil)} let go` : `${r.oil > 0 ? `+${fmtBtr(r.oil)}` : "+0"} · −${r.charge}⚡`}
+              <span style={{ color: r.kind === "cased" ? WALL.cased : r.kind === "pass" ? (r.takenBy ? HUD.violet : HUD.muted) : r.oil > 0 ? HUD.green : HUD.muted, whiteSpace: "nowrap" }}>
+                {r.kind === "cased" ? (r.hell ? "sealed" : `${fmtBtr(r.oil)} behind steel`) : r.kind === "pass" ? `${fmtBtr(r.oil)} let go` : `${r.oil > 0 ? `+${fmtBtr(r.oil)}` : "+0"} · −${r.charge}⚡`}
               </span>
             </div>
           ))}
@@ -387,6 +413,7 @@ export default function OilCoreSampleV3({
               <HudLine type="data" pad={PAD} label="Kept" text={`${extractedN} layer${extractedN === 1 ? "" : "s"}`} />
               <HudLine type="data" pad={PAD} label="Open" text={`${openN} pocket${openN === 1 ? "" : "s"}${takenN ? ` · ${takenN} taken` : ""}`} />
               {hellN > 0 && <HudLine type="data" pad={PAD} label="Hell" text={`${hellN} pocket${hellN === 1 ? "" : "s"}`} />}
+              {rack.some((c) => c.state === "cased") && <HudLine type="data" pad={PAD} label="Cased" text={`${rack.filter((c) => c.state === "cased").length} layer${rack.filter((c) => c.state === "cased").length === 1 ? "" : "s"}`} />}
             </div>
           </div>
           <HudLine type="blank" />
@@ -447,6 +474,7 @@ export default function OilCoreSampleV3({
             {onSetOrders && [
               ["salvage", "LATERAL EXTRACT", "take a neighbour's passed layer at or above your line, for 1 charge. Neighbours with the order take turns — longest wait goes first."],
               ["autopilot", "AUTO-PILOT", "once you can afford every layer left in your column, the crew keeps each wet one as it comes up, above your line or not. Dry layers still pass free. Off = ORDERS: the crew follows your line on every layer, and runs lateral extract if it's on. Nothing more."],
+              ["caseOnHeat", "CASE ON HEAT", "when a core reads HIGH (a hot cell directly below) and a casing string is on the rig, the crew drills the next layer behind steel. Hell never breaches; a motherlode is cased off. Off = you arm the casing yourself."],
             ].map(([key, name, desc]) => (
               <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "0.4rem 0", borderTop: `1px solid ${HUD.goldFaint}`, marginTop: "0.4rem" }}>
                 <div style={{ minWidth: 0 }}>

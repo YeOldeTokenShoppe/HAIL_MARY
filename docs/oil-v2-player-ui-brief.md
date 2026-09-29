@@ -53,7 +53,9 @@ misses one will show plain chrome there.
 | No charges left | `chargesRemaining == 0` | EXTRACT / TAKE / WILDCAT disabled, PASS live, CHARGES in red |
 | Column fully revealed | `remainingLayers == 0` | "nothing more comes up; the buzzer settles what's on the table"; charges still work next door |
 | Hot within reach (two down, or next door) | `pending.heat` / `plot.heat[layer]` = `elevated` | Temp elevated · "!! HEAT RISING — SOMETHING HOT WITHIN REACH !!" · glow under the bore head · note: hell or the big one, under you or next door |
-| Hot directly below | … = `high` | Temp high · "!! HOT ZONE DIRECTLY BELOW — HELL OR THE MOTHERLODE !!" · red tube outline · persists after the decision until the next strike · (step 2: CASE IT) |
+| Hot directly below | … = `high` | Temp high · "!! HOT ZONE DIRECTLY BELOW — HELL OR THE MOTHERLODE !!" · red tube outline · persists after the decision until the next strike · the CASING block: strings on the rig, CASE THE NEXT LAYER / DISARM, the forfeit spelled out |
+| Casing armed | `casingArmed` | orange CASING block: "ARMED — the next layer is drilled behind steel", disarm button; the crew line says so |
+| Cased layer | `plot.cased[layer]` | steel-blue band; ledger "cased through · a pay zone, cased off · N behind steel" / "hell, sealed"; reckoning Cased line + strip |
 | Season over | `gameEnded` (the flag, never the clock alone) | hand-off to the Reckoning |
 | Season clock run out, not ended | stale start date on a live board | "clock has run out · the buzzer settles what is on the table"; never "closed" |
 | No season clock | legacy settings | no cadence line at all (never a fake one) |
@@ -99,7 +101,7 @@ order: *"if you're away, the crew follows your standing order (extract ≥ 800) 
 |---|---|---|
 | charge (⚡) | drill, bonus drill | a charge is what you spend; the bore drills by itself |
 | standing order | threshold, line, limit, price | see above |
-| EXTRACT (the one button) | bank, keep, skip, PASS as a big button, "let it go now" | one button (2026-09-28): doing nothing = the crew's orders; no pass control at all (2026-09-29) |
+| EXTRACT (the one button); CASE THE NEXT LAYER only when the reading is hot | bank, keep, skip, PASS as a big button, "let it go now", cap it | one button (2026-09-28): doing nothing = the crew's orders; no pass control at all (2026-09-29); casing is the one other verb and it forfeits the layer |
 | LATERAL EXTRACT (the switch) · ORDERS / AUTO-PILOT (the key) | SALVAGE as a control name, MANUAL | the crew is always active; the key sets how much initiative it takes |
 | salvage · taken | poach, steal | a lateral takes what its owner discarded; the race is between rivals |
 | frontier · wildcat | claim-jump, raid | unclaimed ground, drilled blind |

@@ -235,8 +235,8 @@ export default function OilAwayRecap({
           </div>
         )}
         {v2 && recap.v2away && recap.v2away.cores.filter((c) => c.outcome !== "table").map((c) => {
-          const word = { kept: "kept", taken: `passed → ${c.takenBy ? "taken next door" : "taken"}`, open: "passed · still open", dry: "dry", hell: "hell pocket", sealed: "sealed" }[c.outcome] || c.outcome;
-          const color = c.outcome === "kept" ? green : c.outcome === "taken" ? "#c77dff" : c.outcome === "hell" ? red : c.outcome === "open" ? gold : muted;
+          const word = { kept: "kept", taken: `passed → ${c.takenBy ? "taken next door" : "taken"}`, open: "passed · still open", dry: "dry", hell: "hell pocket", cased: "cased through — behind steel", sealed: "sealed" }[c.outcome] || c.outcome;
+          const color = c.outcome === "kept" ? green : c.outcome === "taken" ? "#c77dff" : c.outcome === "hell" ? red : c.outcome === "open" ? gold : c.outcome === "cased" ? "#8fa3b8" : muted;
           return (
             <div key={c.layer} style={row}>
               <span style={{ color, minWidth: 12, textAlign: "center" }}>{c.outcome === "kept" ? "✔" : c.outcome === "hell" ? "▲" : "↷"}</span>
