@@ -4642,9 +4642,9 @@ export default function OilPage() {
     return {
       label: "CLAIM JUMP HERE",
       note: blocked
-        ? "No free jumps left — need a bonus drill"
+        ? `No free jumps left — need a bonus ${loopV2 ? "charge" : "drill"}`
         : costsBonus
-          ? "Costs 1 bonus drill"
+          ? `Costs 1 bonus ${loopV2 ? "charge" : "drill"}`
           : `${free} free jump${free === 1 ? "" : "s"} left`,
       disabled: blocked,
       onClaim: () => handleClaimJump(col, row),
@@ -7260,7 +7260,7 @@ export default function OilPage() {
         gap: isMobile ? 12 : 24,
         flexWrap: "wrap",
       }}>
-        <span>BOUNTY: {activeDemonBlockade.bountyAmount || 0} USDC + 3 BONUS DRILLS</span>
+        <span>BOUNTY: {activeDemonBlockade.bountyAmount || 0} USDC + 3 BONUS {loopV2 ? "CHARGES" : "DRILLS"}</span>
         <span>TARGET: ({(activeDemonBlockade.targetCol ?? 0) + 1}, {(activeDemonBlockade.targetRow ?? 0) + 1})</span>
       </div>
       {isSummonerStunned && (
@@ -7389,7 +7389,7 @@ export default function OilPage() {
           letterSpacing: "0.15em",
           color: "#aaddaa",
         }}>
-          BOUNTY CLAIMED: {bountyToast.bountyAmount} USDC + 3 BONUS DRILLS
+          BOUNTY CLAIMED: {bountyToast.bountyAmount} USDC + 3 BONUS {loopV2 ? "CHARGES" : "DRILLS"}
           {bountyToast.isYou && " — DRILLING RESUMED"}
         </div>
       )}
@@ -8294,7 +8294,7 @@ export default function OilPage() {
             REFERRALS: {userDrill.confirmedReferrals || 0} confirmed
           </span>
           <span style={{ fontSize: 10, letterSpacing: "0.1em", color: theme.gold }}>
-            +{bonusDrills} bonus drills
+            +{bonusDrills} bonus {loopV2 ? "charges" : "drills"}
           </span>
         </div>
       )}
@@ -8376,7 +8376,7 @@ export default function OilPage() {
           {claimJumpMode && (
             <div style={{ fontSize: 10, color: theme.gold, marginTop: 4, textAlign: "center" }}>
               Click an open plot on the map to jump
-              {(userDrill?.claimJumpsUsed ?? 0) >= FREE_CLAIM_JUMPS + (userDrill?.bonusClaimJumps ?? 0) && " (costs 1 bonus drill)"}
+              {(userDrill?.claimJumpsUsed ?? 0) >= FREE_CLAIM_JUMPS + (userDrill?.bonusClaimJumps ?? 0) && ` (costs 1 bonus ${loopV2 ? "charge" : "drill"})`}
             </div>
           )}
         </div>
@@ -9219,7 +9219,7 @@ export default function OilPage() {
           />
           {/* DAILY TICKET — one free scratch ticket a day (server-minted for players with a claim; local + dev controls in test mode), after the rig's own cards. */}
           {(isTest || (user && userDrill)) && (
-            <DailyTicketPanel theme={theme} isMobile={isMobile} darkMode={uiDark} selectedX={selectedX} selectedY={sliceY} devControls={isTest} live={!isTest} apiFetch={oilApiFetch} mintKey={seedCommitment} soundOn={fireworksSound} onJackpot={fireJackpotFireworks} onSettle={onTicketSettle} />
+            <DailyTicketPanel loopV2={loopV2} theme={theme} isMobile={isMobile} darkMode={uiDark} selectedX={selectedX} selectedY={sliceY} devControls={isTest} live={!isTest} apiFetch={oilApiFetch} mintKey={seedCommitment} soundOn={fireworksSound} onJackpot={fireJackpotFireworks} onSettle={onTicketSettle} />
           )}
           {timelineSection}
           {leaderboardSection}
@@ -9833,7 +9833,7 @@ export default function OilPage() {
             />
             {/* DAILY TICKET — one free scratch ticket a day (server-minted for players with a claim; local + dev controls in test mode), after the rig's own cards. */}
             {(isTest || (user && userDrill)) && (
-              <DailyTicketPanel theme={theme} isMobile={isMobile} darkMode={uiDark} selectedX={selectedX} selectedY={sliceY} devControls={isTest} live={!isTest} apiFetch={oilApiFetch} mintKey={seedCommitment} soundOn={fireworksSound} onJackpot={fireJackpotFireworks} onSettle={onTicketSettle} />
+              <DailyTicketPanel loopV2={loopV2} theme={theme} isMobile={isMobile} darkMode={uiDark} selectedX={selectedX} selectedY={sliceY} devControls={isTest} live={!isTest} apiFetch={oilApiFetch} mintKey={seedCommitment} soundOn={fireworksSound} onJackpot={fireJackpotFireworks} onSettle={onTicketSettle} />
             )}
             {timelineSection}
             {leaderboardSection}

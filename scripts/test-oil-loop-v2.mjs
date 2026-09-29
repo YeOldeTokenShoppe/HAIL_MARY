@@ -19,8 +19,10 @@ const t = (name, fn) => {
 t("charges cap = passive + bonus, capped at depth", () => {
   assert.equal(chargesCapFor({ bonusDrills: 0 }, {}, 20), PASSIVE_CHARGES);
   assert.equal(chargesCapFor({ bonusDrills: 5 }, {}, 20), PASSIVE_CHARGES + 5);
-  assert.equal(chargesCapFor({ bonusDrills: 99 }, {}, 20), 20);
+  assert.equal(chargesCapFor({ bonusDrills: 99 }, {}, 20), PASSIVE_CHARGES + 99);   // the bonus is capped where it is granted (MAX_BONUS_DRILLS), not here
   assert.equal(chargesCapFor({ bonusDrills: 0 }, { passiveCharges: 10 }, 20), 10);
+  assert.equal(chargesCapFor({ bonusDrills: 3 }, { passiveCharges: 20 }, 20), 23);   // bonus sits on top of the column (2026-09-29)
+  assert.equal(chargesCapFor({ bonusDrills: 3 }, { passiveCharges: 40 }, 20), 23);   // passive alone is capped at the column
 });
 
 t("charges remaining subtracts spent, floors at 0", () => {

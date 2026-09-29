@@ -29,10 +29,12 @@ export const TICKET_SYMBOLS = ["pickaxe", "derrick", "coin", "gusher", "barrel",
 export const COUPON_PCT = 25;
 export const COUPON_DAYS = 7;
 export const TICKET_PRIZES = [
-  { sym: "gusher",  tier: "jackpot", p: 1 / 60, prize: "JACKPOT · 3 BONUS DRILLS + A CLAIM JUMP",    short: "JACKPOT",  bonusDrills: 3, claimJumps: 1 },
+  // prizeV2 / shortV2: the same prize in the extract-or-pass season's words
+  // (a bonus drill IS a bonus charge; the tonic is legacy there — casing is the seal).
+  { sym: "gusher",  tier: "jackpot", p: 1 / 60, prize: "JACKPOT · 3 BONUS DRILLS + A CLAIM JUMP",    short: "JACKPOT",  bonusDrills: 3, claimJumps: 1, prizeV2: "JACKPOT · 3 BONUS CHARGES + A CLAIM JUMP" },
   { sym: "coin",    tier: "medium",  p: 1 / 24, prize: `STALL COUPON · ${COUPON_PCT}% OFF ONE UPGRADE`, short: "COUPON",   coupon: true },
   { sym: "derrick", tier: "medium",  p: 1 / 24, prize: "A TONIC · NEXT STRIKE DRILLS TWO LAYERS",      short: "TONIC",    supply: "tonic" },
-  { sym: "pickaxe", tier: "small",   p: 1 / 3,  prize: "+1 BONUS DRILL",                               short: "+1 DRILL", bonusDrills: 1 },
+  { sym: "pickaxe", tier: "small",   p: 1 / 3,  prize: "+1 BONUS DRILL",                               short: "+1 DRILL", bonusDrills: 1, prizeV2: "+1 BONUS CHARGE", shortV2: "+1 CHARGE" },
 ];
 export const TICKET_PRIZE_BY_SYM = Object.fromEntries(TICKET_PRIZES.map((p) => [p.sym, p]));
 export const TICKET_WIN_RATE = TICKET_PRIZES.reduce((s, p) => s + p.p, 0);

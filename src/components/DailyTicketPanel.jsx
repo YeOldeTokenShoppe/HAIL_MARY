@@ -140,13 +140,16 @@ function Em({ e, size = 32 }) {
   return <span aria-hidden="true" style={{ fontSize: Math.round(size * 0.9), lineHeight: 1, flexShrink: 0 }}>{e}</span>;
 }
 
-export default function DailyTicketPanel({
+export default function DailyTicketPanel({ loopV2 = false, 
   theme, isMobile = false, darkMode = true, selectedX = null, selectedY = null, devControls = false,
   live = false, apiFetch,   // live: mint/settle through the server with the page's authenticated fetch
   mintKey = null,           // live: anything that should make the panel ask the server again (the season commitment)
   soundOn = true, onJackpot,
   onSettle, // ({ ticketNo, win, sym, symName, tier, prize }) — test mode: the page records the prize and posts the feed line
 }) {
+  // v2 season: the prize in charges, not drills (lib/oilTicket prizeV2 / shortV2).
+  const prizeText = (pz) => (pz ? ((loopV2 && pz.prizeV2) || pz.prize) : null);
+  const shortText = (pz) => (pz ? ((loopV2 && pz.shortV2) || pz.short) : null);
   const t = theme;
   const K = useMemo(() => ticketPalette(t, darkMode), [t, darkMode]);
   const reduceMotion = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -238,7 +241,7 @@ export default function DailyTicketPanel({
     const kind = won ? ticket.win.tier : "lose";
     setFx({ id: ticketId, kind });
     setHistory((h) => [{ id: ticketId, no: ticketNo, sym: won ? winSym : null, tier: won ? ticket.win.tier : null }, ...h.filter((x) => x.id !== ticketId)].slice(0, 30));
-    onSettle?.({ ticketNo, win: won, sym: won ? winSym : null, symName: won ? SYMBOLS[winSym].name : null, tier: won ? ticket.win.tier : null, prize: won ? ticket.win.prize : null });
+    onSettle?.({ ticketNo, win: won, sym: won ? winSym : null, symName: won ? SYMBOLS[winSym].name : null, tier: won ? ticket.win.tier : null, prize: won ? prizeText(ticket.win) : null });
     if (live && apiFetch) {
       // The server recomputes the outcome from the stored cells and applies
       // the prize; the streak it returns is the one that counts.
@@ -306,7 +309,7 @@ export default function DailyTicketPanel({
       )
       : (
         <button onClick={() => setOpen(true)} style={{ ...barBase, justifyContent: "space-between", cursor: "pointer", border: `1px solid ${t.border}`, background: t.btnBg, color: muted, fontSize: 9, letterSpacing: "0.12em" }}>
-          <span style={{ color: won ? K.win : muted, fontWeight: 700, whiteSpace: "nowrap" }}>{won ? `✓ ${ticket.win.short}` : "— No match"}</span>
+          <span style={{ color: won ? K.win : muted, fontWeight: 700, whiteSpace: "nowrap" }}>{won ? `✓ ${shortText(ticket.win)}` : "— No match"}</span>
           <span style={{ whiteSpace: "nowrap" }}>Next ticket in {nextIn}</span>
         </button>
       );
@@ -355,7 +358,7 @@ export default function DailyTicketPanel({
           </div>
 
           {band(won
-            ? `Match ${MATCH} — ${ticket.win.prize}`
+            ? `Match ${MATCH} — ${prizeText(ticket.win)}`
             : complete ? "No match — new ticket tomorrow" : `Tap the 💰 · match ${MATCH} & win`, won ? "win" : undefined)}
 
           {/* the 3×3 (60px discs) — with the headline and the NO MATCH stamp layered over it */}
@@ -407,7 +410,7 @@ export default function DailyTicketPanel({
           {/* result line */}
           <div style={{ marginTop: 8, minHeight: 14, fontFamily: MONO, fontSize: 9, letterSpacing: "0.12em", color: resultColor, textAlign: "center", textTransform: "uppercase", fontWeight: settled ? 700 : 400 }}>
             {won
-              ? `Three ${SYMBOLS[winSym].name}s — ${ticket.win.prize}${complete ? "" : ` · ${CELLS - count} left to tap`}`
+              ? `Three ${SYMBOLS[winSym].name}s — ${prizeText(ticket.win)}${complete ? "" : ` · ${CELLS - count} left to tap`}`
               : complete ? `Nothing matched · streak ${streak}` : `${count} / ${CELLS} revealed`}
           </div>
 
@@ -419,10 +422,10 @@ export default function DailyTicketPanel({
               <div style={{ marginTop: 8, paddingTop: 7, borderTop: `1px dotted ${K.rule}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 4 }}>
                   {PRIZES.map((pz) => (
-                    <span key={pz.sym} title={`Three ${SYMBOLS[pz.sym].name}s — ${pz.prize}`} style={{ display: "inline-flex", alignItems: "center", gap: 3, fontFamily: MONO, fontSize: 7, letterSpacing: "0.06em", color: K.label, textTransform: "uppercase", whiteSpace: "nowrap", minWidth: 0 }}>
+                    <span key={pz.sym} title={`Three ${SYMBOLS[pz.sym].name}s — ${prizeText(pz)}`} style={{ display: "inline-flex", alignItems: "center", gap: 3, fontFamily: MONO, fontSize: 7, letterSpacing: "0.06em", color: K.label, textTransform: "uppercase", whiteSpace: "nowrap", minWidth: 0 }}>
                       <Em e={SYMBOLS[pz.sym].emoji} size={12} />
                       <span style={{ color: K.ink }}>×3</span>
-                      <span>{pz.short}</span>
+                      <span>{shortText(pz)}</span>
                     </span>
                   ))}
                 </div>
