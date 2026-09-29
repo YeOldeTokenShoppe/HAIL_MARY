@@ -92,6 +92,8 @@ const CHAT_TURN = [8, 12];          // seconds each talker holds the floor
 const WALK_SPEED = 0.518;           // rig units/s: crew_walk is in place; this is the stance foot's slide speed measured in Blender (32 f at 30 fps)
 const WALK_MIN = 0.12;              // moves shorter than this stay a glide (a shuffle, not a walk)
 const BRIEF_LINE_S = 3.2;
+const BRIEF_FOCUS_DIST = 0.7;       // auto-briefing (the away recap, page.js): camera distance from the briefer's head — the whole worker and the bubble in frame (tune; 0.16 is the face-only tune shot)
+const BRIEF_FOCUS_MIN_DIST = 0.3;
 const BRIEF_GREET_S = 2.2;          // the operator waves at the boss this long before the first line (or until the opener is spoken)
 // How long a phrase may take to START playing before the briefing gives up on the voice and
 // paces by timer alone (2026-09-12). ElevenLabs through SitePal can take 3–6 s to synthesize a
@@ -413,8 +415,12 @@ function CrewInner({ sighting, forceScene, rigScene, scale, plotKey, plotId, env
   const hellWas = useRef(!!hellActive);
   useEffect(() => { if (hellActive && !hellWas.current) crew.cowerUntil = Date.now() + HELL_COWER_MS; hellWas.current = !!hellActive; }, [hellActive, crew]);
   // Briefing: a tap on any worker starts (or stops) the operator's briefing.
-  const toggleBrief = useCallback(() => {
-    if (crew.brief) { crew.brief = null; deactivateVendorSitePal(); return; }
+  // opts (2026-09-29, the crew delivers the away recap): { voice:false } briefs by bubble only
+  // (no SitePal — an auto-start has no user gesture for audio), { auto:true } also flies the
+  // camera to the briefer (hm:crew-face at BRIEF_FOCUS_DIST) and announces hm:brief-end.
+  const toggleBrief = useCallback((opts) => {
+    const o = opts && typeof opts === "object" ? opts : {};
+    if (crew.brief) { crew.brief = null; deactivateVendorSitePal(); try { window.dispatchEvent(new CustomEvent("hm:brief-end", { detail: { stopped: true } })); } catch (e) {} return; }
     const info = window.__hmBriefing;
     // The boss treatment is for the claim owner at their own rig (page.js publishes who is
     // signed in and where their claim is; plotId is the plot this rig stands on). Everyone
@@ -433,12 +439,12 @@ function CrewInner({ sighting, forceScene, rigScene, scale, plotKey, plotId, env
       lastRude = [pickLine(R.openers, lastRude[0]), pickLine(R.lines, lastRude[1]), pickLine(R.closers, lastRude[2])];
       opener = R.openers[lastRude[0]]; lines = [R.lines[lastRude[1]], R.closers[lastRude[2]]]; tones = ["rude", "rude"];
     }
-    crew.brief = { talker, lines, tones, opener, rude: !boss, i: 0, nextLineAt: 0, until: 0, speaking: false, talkSeen: false, now: 0 };
+    crew.brief = { talker, lines, tones, opener, rude: !boss, i: 0, nextLineAt: 0, until: 0, speaking: false, talkSeen: false, now: 0, voice: o.voice !== false, auto: !!o.auto, faced: false };
     // The briefer talks through SitePal (scene "crew" in the vendor registry, projected onto its
     // Face2). This runs inside the tap — the one user gesture we get for audio unlock + embed.
-    if (VENDOR_SITEPAL_CONFIG.crew) activateVendorSitePal("crew");   // the phone counts as low-gfx yet is where the vendors already talk; the host embeds lazily there
+    if (VENDOR_SITEPAL_CONFIG.crew && crew.brief.voice) activateVendorSitePal("crew");   // the phone counts as low-gfx yet is where the vendors already talk; the host embeds lazily there
   }, [crew, assignments]);
-  useEffect(() => { const hook = devHook(); if (hook) { hook.brief = toggleBrief; hook.plotId = plotId; } return () => { if (hook) { delete hook.brief; delete hook.plotId; } }; }, [toggleBrief, plotId]);
+  useEffect(() => { const hook = devHook(); if (hook) { hook.brief = toggleBrief; hook.briefing = () => !!crew.brief; hook.plotId = plotId; } return () => { if (hook) { delete hook.brief; delete hook.briefing; delete hook.plotId; } }; }, [toggleBrief, plotId, crew]);
   // SitePal's talk callbacks pace the briefing: a line's gesture and bubble go up when speech
   // starts, the next line follows when it ends. Without callbacks the BRIEF_LINE_S timer runs.
   useEffect(() => onVendorTalk((vendorId, talking) => {
@@ -724,7 +730,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     }
     else if (mode === "brief") {                                            // greet (the opener is spoken with the wave), then each line brings its own gesture (modeTick)
       const b = crew.brief; startAct(b.rude ? "scold" : "wave", now); setBubble(b.opener || "Hey, boss."); b.i = 0; b.nextLineAt = now + BRIEF_GREET_S;   // a stranger gets a scolding, not a wave
-      b.talkSeen = false; b.noVoice = false; b.speaking = speakVendorText("crew", b.opener || "Hey, boss."); b.speakDeadline = now + SPEECH_START_S + 1.5;   // +1.5: the opener also waits out the activation's greeting delay
+      b.talkSeen = false; b.noVoice = !b.voice; b.speaking = b.voice ? speakVendorText("crew", b.opener || "Hey, boss.") : false; b.speakDeadline = now + SPEECH_START_S + 1.5;   // +1.5: the opener also waits out the activation's greeting delay
     }
     else if (mode === "listen") { startAct(Math.random() < 0.5 && actionsRef.current["crew_neutralIdle"] ? "neutralIdle" : "idle", now, 999); s.nextGesture = Infinity; s.yawAim = null; s.noticeAt = now + rand(0.5, 1.4); }   // the other worker just notices the boss: no body turn, no gestures, head only (Michelle, 2026-09-12)
     else if (mode === "chatListen") { startAct("idle", now, 999); s.nextGesture = now + rand(2, 5); }
@@ -801,9 +807,16 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
       const c = state.camera.position; faceWorld(c.x, c.y, c.z);          // turn to the player
       const b = crew.brief; if (!b) return;
       b.now = now;
+      // An auto-briefing (the away recap) brings the camera to the briefer once its head is
+      // placed — the highlighted rig flies in on hm:crew-face, the same move as the panel zoom.
+      if (b.auto && !b.faced && s.frames > 2 && headBone) {
+        b.faced = true;
+        const f = _tmp.copy(state.camera.position).sub(s.head); f.y = 0; if (f.lengthSq() < 1e-6) f.set(1, 0, 0); f.normalize();
+        try { window.dispatchEvent(new CustomEvent("hm:crew-face", { detail: { center: s.head.toArray(), front: f.toArray(), dist: BRIEF_FOCUS_DIST, minDist: BRIEF_FOCUS_MIN_DIST } })); } catch (e) {}
+      }
       if (b.speaking && !b.talkSeen && now >= b.speakDeadline) { b.speaking = false; b.noVoice = true; }   // no host, no audio, or SitePal never started this phrase: the timer paces from here on
       if (now >= b.nextLineAt && !b.speaking) {
-        if (b.i >= b.lines.length) { crew.brief = null; deactivateVendorSitePal(); return; }
+        if (b.i >= b.lines.length) { crew.brief = null; deactivateVendorSitePal(); try { window.dispatchEvent(new CustomEvent("hm:brief-end", { detail: { stopped: false } })); } catch (e) {} return; }
         const line = b.lines[b.i];
         setBubble(line); startAct(briefGesture(b.tones?.[b.i], line), now); b.i += 1; b.nextLineAt = now + BRIEF_LINE_S;
         b.talkSeen = false; b.speaking = !b.noVoice && speakVendorText("crew", line); b.speakDeadline = now + SPEECH_START_S;

@@ -238,6 +238,11 @@ export default function HailMaryV2FixturePage() {
   const recapObj = {
     awayMs: 5 * H, fromDepth: 4, toDepth: 7, strikes: [{ layer: 5, oil: 1200 }, { layer: 6, oil: 300 }], oilGained: 1500, hellHit: false,
     artifactsFound: [], tank: 300, tankDelta: 300, bankedDelta: 900, fieldEvents: [{ type: "gusher", username: "DustyDan", detail: "" }], fieldEventCount: 1, unreadCount: 0,
+    // v2: what became of each core while away (the crew's account)
+    v2away: {
+      cores: [{ layer: 4, oil: 0, outcome: "dry" }, { layer: 5, oil: 1200, outcome: "kept" }, { layer: 6, oil: 300, outcome: "taken", takenBy: RIVAL }],
+      kept: 1, keptOil: 1200, passed: 2, takenN: 1, takenOil: 300, crewTakes: 1,
+    },
   };
   const recapV2 = {
     pending: world.drill.pending, latestMs: boards.cadence?.latestMs ?? null, threshold: world.drill.threshold, chargesRemaining: boards.chargesRemaining,
@@ -278,7 +283,7 @@ export default function HailMaryV2FixturePage() {
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
           <div style={{ width: cardVersion === "both" ? "auto" : width, maxWidth: "100%" }}>{cardFor(world, handlers, "playable")}</div>
-          {world.ended && <div style={{ width, maxWidth: "100%" }}><OilReckoning theme={theme} reckoning={reckoningFor(world)} col={world.plot.col} row={world.plot.row} refCode="FIXTURE" /></div>}
+          {world.ended && <div style={{ width, maxWidth: "100%" }}><OilReckoning theme={theme} reckoning={reckoningFor(world)} col={world.plot.col} row={world.plot.row} /></div>}
           <div style={{ ...label, minWidth: 200, flex: 1 }}>
             <div style={{ color: theme.textStrong, letterSpacing: "0.14em" }}>LOG</div>
             {log.length === 0 ? <div>— press a button —</div> : log.map((l, i) => <div key={i}>{l}</div>)}
@@ -299,7 +304,7 @@ export default function HailMaryV2FixturePage() {
       <PanelSection theme={theme} style={{ marginBottom: 18, borderRadius: 4, border: `1px solid ${theme.border}` }}>
         <PanelTitle theme={theme}>THE RECKONING · STATES</PanelTitle>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
-          {RECKONING_SCENARIOS.map((s) => { const w = s.world(); return frame(s.name, s.trigger, <OilReckoning theme={theme} reckoning={reckoningFor(w)} col={w.plot.col} row={w.plot.row} refCode="FIXTURE" />, s.key); })}
+          {RECKONING_SCENARIOS.map((s) => { const w = s.world(); return frame(s.name, s.trigger, <OilReckoning theme={theme} reckoning={reckoningFor(w)} col={w.plot.col} row={w.plot.row} />, s.key); })}
         </div>
       </PanelSection>
 
