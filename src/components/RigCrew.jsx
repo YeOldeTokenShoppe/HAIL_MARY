@@ -33,6 +33,9 @@
  *               crew_talking is reserved for crew-to-crew chat.
  *   chat      — a paired sighting: two workers at facing spots, taking turns talking
  *   music     — window.__hmMusicOn (page.js, the music player): crew_musicListening
+ *   photo     — window.__hmCrew.photo({variant, hold}) (page.js, the season polaroid): both turn to
+ *               the camera and hold crew_ThumbsUp / crew_ThumbsUp2 / crew_HeartHands; the camera
+ *               flies to frame them, then hm:crew-photo-ready fires the shutter
  *
  * Events: `hm:decide` {detail:{action}} → the operator, if at the panel, sidesteps to
  * that button's station and plays crew_push. `hm-demon-attack` → cower.
@@ -50,7 +53,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { VENDOR_SITEPAL_CONFIG, activateVendorSitePal, deactivateVendorSitePal, speakVendorText, onVendorTalk, getVendorSitePalSource } from "@/lib/vendorSitePal";
 import { createProjectionState, disposeProjectionState, updateProjection } from "@/lib/sitepalFace";
 
-export const CREW_GLB = "/models/crew_goblin.glb?v=16";
+export const CREW_GLB = "/models/crew_goblin.glb?v=17";   // v17: crew_ThumbsUp / crew_ThumbsUp2 / crew_HeartHands (the season-photo poses)
 useGLTF.preload(CREW_GLB);
 
 const CLIMB_RISE_FALLBACK = 0.219;  // crew_climb is in place; world rise per cycle (rig-GLB units) unless the
@@ -173,7 +176,20 @@ const ACTS = {
   throw:       { clip: "crew_throw",          once: true },
   music:       { clip: "crew_musicListening", dwell: [9, 18] },
   valve:       { clip: "crew_valve",          once: true },   // three pulls on the riser handwheel (6.5 s); the wheel itself turns in useFrame
+  // Season-photo poses (Michelle's clips, 2026-09-29): held for the polaroid. Fallbacks keep
+  // the shot working on a GLB without them (stale cache, older export).
+  thumbsUp:    { clip: "crew_ThumbsUp",       dwell: [10, 14], look: true, fallback: "victory1" },
+  thumbsUp2:   { clip: "crew_ThumbsUp2",      dwell: [10, 14], look: true, fallback: "thumbsUp" },
+  heartHands:  { clip: "crew_HeartHands",     dwell: [10, 14], look: true, fallback: "clap" },
 };
+// The season photo (docs/oil-game.md → SEASON POLAROID): the crew turn to the camera and hold a
+// pose; the camera flies to frame them (hm:crew-face at PHOTO_FOCUS_DIST, centred between the
+// two heads); after PHOTO_SETTLE_S the page hears hm:crew-photo-ready and fires the polaroid.
+const PHOTO_POSES = [["thumbsUp", "heartHands"], ["heartHands", "thumbsUp2"], ["thumbsUp2", "thumbsUp"]];   // [operator, the other]
+const PHOTO_FOCUS_DIST = 1.0;      // camera distance from the point between the two heads (tune)
+const PHOTO_FOCUS_MIN_DIST = 0.45;
+const PHOTO_SETTLE_S = 1.8;        // camera flight + pose blend before the shutter
+const PHOTO_HOLD_S = 12;           // the crew hold the pose this long, then go back to work
 
 // crew_valve turns the rig's handwheel with the hands: three pulls of 35°, clockwise as the worker
 // sees it (left hand rises), each a 0.8 s smoothstep. Windows are the clip's frame plan (frames
@@ -380,7 +396,7 @@ function CrewInner({ sighting, forceScene, rigScene, scale, plotKey, plotId, env
   const gates = useMemo(() => ({ night: envPreset === "night", hell: !!hellActive, stalled: !!pausedRef?.current }), [envPreset, hellActive, pausedRef]);
   // Shared crew state: worker registry (head positions for "partner" looks), the chat and
   // briefing scenes, the cower timer, the rig's world position, and the fireball pool.
-  const crew = useRef({ workers: {}, chat: null, brief: null, cowerUntil: 0, rigPos: new THREE.Vector3(), gusher: false, gusherTier: null, wellPos: new THREE.Vector3(), hasWell: false, fire: null }).current;
+  const crew = useRef({ workers: {}, chat: null, brief: null, photo: null, cowerUntil: 0, rigPos: new THREE.Vector3(), gusher: false, gusherTier: null, wellPos: new THREE.Vector3(), hasWell: false, fire: null }).current;
   // crew.gusher / gusherTier are written every frame below from the rig's LIVE eruption, not at
   // render: a render landing mid-gusher must not blink the flag and restart everyone's reaction.
   const wellNodes = useMemo(() => ({ straw: rigScene?.getObjectByName("Straw") || null, head: rigScene?.getObjectByName("Head_Pump") || null }), [rigScene]);
@@ -444,7 +460,17 @@ function CrewInner({ sighting, forceScene, rigScene, scale, plotKey, plotId, env
     // Face2). This runs inside the tap — the one user gesture we get for audio unlock + embed.
     if (VENDOR_SITEPAL_CONFIG.crew && crew.brief.voice) activateVendorSitePal("crew");   // the phone counts as low-gfx yet is where the vendors already talk; the host embeds lazily there
   }, [crew, assignments]);
-  useEffect(() => { const hook = devHook(); if (hook) { hook.brief = toggleBrief; hook.briefing = () => !!crew.brief; hook.plotId = plotId; } return () => { if (hook) { delete hook.brief; delete hook.briefing; delete hook.plotId; } }; }, [toggleBrief, plotId, crew]);
+  // The season photo: window.__hmCrew.photo({ variant, hold }) → the crew pose for the camera.
+  const startPhoto = useCallback((opts) => {
+    const o = opts && typeof opts === "object" ? opts : {};
+    const pair = PHOTO_POSES[((Number(o.variant) || 0) % PHOTO_POSES.length + PHOTO_POSES.length) % PHOTO_POSES.length];
+    const nowS = performance.now() / 1000;
+    crew.brief = null; deactivateVendorSitePal();
+    crew.photo = { poses: { operator: pair[0], other: pair[1] }, startedAt: nowS, readyAt: nowS + PHOTO_SETTLE_S, until: nowS + (Number(o.hold) || PHOTO_HOLD_S), faced: false, announced: false };
+    return crew.photo.poses;
+  }, [crew]);
+  const stopPhoto = useCallback(() => { crew.photo = null; }, [crew]);
+  useEffect(() => { const hook = devHook(); if (hook) { hook.brief = toggleBrief; hook.briefing = () => !!crew.brief; hook.photo = startPhoto; hook.photoStop = stopPhoto; hook.posing = () => !!crew.photo; hook.plotId = plotId; } return () => { if (hook) { delete hook.brief; delete hook.briefing; delete hook.photo; delete hook.photoStop; delete hook.posing; delete hook.plotId; } }; }, [toggleBrief, startPhoto, stopPhoto, plotId, crew]);
   // SitePal's talk callbacks pace the briefing: a line's gesture and bubble go up when speech
   // starts, the next line follows when it ends. Without callbacks the BRIEF_LINE_S timer runs.
   useEffect(() => onVendorTalk((vendorId, talking) => {
@@ -704,6 +730,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
   const wantMode = (now) => {
     const f = devHook()?.force || {};
     if (crew.cowerUntil > Date.now() || f.hell) return "cower";
+    if (crew.photo && now < crew.photo.until) return "photo";
     if (demonNear()) return "defend";
     if (gates.hell) return "alert";
     if (crew.gusher || f.celebrate) return "celebrate";
@@ -727,6 +754,10 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
       s.celebrateTier = crew.gusherTier || "gusher"; s.celebrateSeq = 0;
       if (s.celebrateTier === "strike" || s.act === "getUp" || s.act === "uncower") celebrateNext(now);   // a seep, or a worker who already scrambled up: no flinch
       else startAct("nervous", now, rand(0.6, 1.1));
+    }
+    else if (mode === "photo") {                                            // the season photo: hold the pose for the camera
+      const pose = crew.photo?.poses?.[role.briefs ? "operator" : "other"] || "thumbsUp";
+      startAct(pose, now, 999); s.actEnds = Infinity; s.nextGesture = Infinity; setBubble(null);
     }
     else if (mode === "brief") {                                            // greet (the opener is spoken with the wave), then each line brings its own gesture (modeTick)
       const b = crew.brief; startAct(b.rude ? "scold" : "wave", now); setBubble(b.opener || "Hey, boss."); b.i = 0; b.nextLineAt = now + BRIEF_GREET_S;   // a stranger gets a scolding, not a wave
@@ -802,6 +833,21 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
           groupRef.current.getWorldPosition(_tmp);
           if (Math.hypot(S.x - _tmp.x, S.z - _tmp.z) <= CREW_HIT_RANGE) { s.counted = (s.counted || 0) + 1; window.dispatchEvent(new CustomEvent("hm-shoot", { detail: { x: _tmp.x, y: _tmp.y, z: _tmp.z, source: "crew" } })); }
         }
+      }
+    } else if (mode === "photo") {
+      const c = state.camera.position; faceWorld(c.x, c.y, c.z);          // both turn to the camera
+      const ph = crew.photo; if (!ph) return;
+      if (ph.until <= now) { crew.photo = null; try { window.dispatchEvent(new CustomEvent("hm:crew-photo-end")); } catch (e) {} return; }
+      if (role.briefs) {
+        // frame the pair: the point between the two heads, seen from where the camera already is
+        if (!ph.faced && s.frames > 2 && headBone) {
+          ph.faced = true;
+          const heads = Object.values(crew.workers).map((w) => w.head).filter(Boolean);
+          const centre = heads.length ? heads.reduce((a, h) => a.add(h), new THREE.Vector3()).multiplyScalar(1 / heads.length) : s.head.clone();
+          const f = _tmp.copy(state.camera.position).sub(centre); f.y = 0; if (f.lengthSq() < 1e-6) f.set(1, 0, 0); f.normalize();
+          try { window.dispatchEvent(new CustomEvent("hm:crew-face", { detail: { center: centre.toArray(), front: f.toArray(), dist: PHOTO_FOCUS_DIST, minDist: PHOTO_FOCUS_MIN_DIST } })); } catch (e) {}
+        }
+        if (!ph.announced && now >= ph.readyAt) { ph.announced = true; try { window.dispatchEvent(new CustomEvent("hm:crew-photo-ready", { detail: { poses: ph.poses } })); } catch (e) {} }
       }
     } else if (mode === "brief") {
       const c = state.camera.position; faceWorld(c.x, c.y, c.z);          // turn to the player
@@ -993,7 +1039,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     if (tuneHold) lookAt = "camera";
     else if (s.mode === "defend") lookAt = "demon";
     else if (s.mode === "celebrate" || s.mode === "alert") lookAt = crew.hasWell ? "well" : "head_pump";   // watch the column (or the hellhole)
-    else if (s.mode === "brief") lookAt = "camera";
+    else if (s.mode === "brief" || s.mode === "photo") lookAt = "camera";
     else if (s.mode === "listen") lookAt = s.now >= (s.noticeAt || 0) ? "camera" : null;   // a beat, then it notices the boss
     else if (s.mode === "chat" || s.mode === "chatListen") lookAt = "partner";
     else if (s.mode === null && ACTS[s.act]?.look) lookAt = MENU[s.spot]?.look || null;

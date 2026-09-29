@@ -37,7 +37,7 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 const stripColors = (hud) => ({ extracted: hud.green, taken: hud.violet, open: hud.gold, dry: "#4a4036", hell: hud.red, missed: "#7a5a3a", sealed: "#3a3140", cased: "#8fa3b8" });
 const STRIP_WORD = { extracted: "kept", taken: "taken", open: "left open", dry: "dry", hell: "hell", missed: "never reached", sealed: "sealed", cased: "cased" };
 
-export default function OilReckoning({ theme, reckoning: r, col, row, chrome = "card" }) {
+export default function OilReckoning({ theme, reckoning: r, col, row, chrome = "card", onPhoto = null }) {
   const [note, setNote] = useState("");
   const [tab, setTab] = useState("card");
   const hud = hudFor(theme);
@@ -142,10 +142,12 @@ export default function OilReckoning({ theme, reckoning: r, col, row, chrome = "
           { value: `${btr(r.banked)} BTR`, label: "banked", color: hud.cyan },
           { value: paid ? usd(r.payoutUsd) : "DRY", label: paid ? "USDC paid" : "season", color: paid ? hud.orange : hud.muted },
         ]} />
+        {/* The share is the SEASON PHOTO (the crew posing on your rig, one line, the
+            referral link — PolaroidSnapshot); the report is the text copy under it. */}
         <div style={{ marginTop: "0.9rem", display: "flex", justifyContent: "center" }}>
-          <HudButton onClick={copy}>Copy Report</HudButton>
+          {onPhoto ? <HudButton onClick={onPhoto}>Season photo?</HudButton> : <HudButton onClick={copy}>Copy Report</HudButton>}
         </div>
-        <HudHint>{note || "[ your season, in plain text ]"}</HudHint>
+        <HudHint onClick={onPhoto ? copy : undefined}>{note || (onPhoto ? "[ the crew pose on your rig · or copy the report as text ]" : "[ your season, in plain text ]")}</HudHint>
       </HudPanel>
     </div>
   );

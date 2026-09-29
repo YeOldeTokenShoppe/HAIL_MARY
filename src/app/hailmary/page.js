@@ -4949,6 +4949,51 @@ export default function OilPage() {
     }) : null,
   [loopV2, gameEnded, userDrill, ownPlotV2, allPlotsMap, user?.id, reckoningColumn, oilUsdRate, passiveCharges]);
 
+  // ── The SEASON PHOTO (Michelle, 2026-09-29): the end-of-season share ──────
+  // Select your rig so the crew mounts, ask them to pose (RigCrew photo mode:
+  // both turn to the camera, hold a pose, the camera flies to frame them),
+  // and when the crew says ready, fire the polaroid with the season's one line
+  // and the referral link (PolaroidSnapshot does the frame, the caption, the
+  // share). No crew within 6 s → the shutter fires on the field as it is.
+  const seasonPhotoRef = useRef({ timer: null, onReady: null });
+  const seasonPhotoLabel = useCallback(() => {
+    const plot = userDrill?.col != null ? `plot (${userDrill.col + 1}, ${userDrill.row + 1})` : "the field";
+    if (reckoning && gameEnded) {
+      return reckoning.banked > 0
+        ? `Paid $${(reckoning.payoutUsd || 0).toFixed(2)} by a pumpjack.`
+        : `The crew of ${plot} wishes you were here.`;
+    }
+    const banked = Math.round(userDrill?.totalCollected || 0).toLocaleString();
+    return `Season one · ${plot} · ${banked} BTR banked`;
+  }, [userDrill?.col, userDrill?.row, userDrill?.totalCollected, reckoning, gameEnded]);
+  const takeSeasonPhoto = useCallback(() => {
+    if (typeof window === "undefined" || userDrill?.col == null) return;
+    const d = seasonPhotoRef.current;
+    if (d.timer) { clearInterval(d.timer); d.timer = null; }
+    if (d.onReady) { window.removeEventListener("hm:crew-photo-ready", d.onReady); d.onReady = null; }
+    const label = seasonPhotoLabel();
+    const shutter = () => {
+      captureMetaRef.current = null;
+      setCaptureMeta({ label });
+      setBoothPhoto(null);
+      setSnapshotTrigger(true);
+    };
+    setIntroComplete(true);
+    setSelectedX(userDrill.col); setSliceY(userDrill.row); setDrillDepth(0);
+    let tries = 0;
+    d.timer = setInterval(() => {
+      const hook = window.__hmCrew;
+      if (hook?.photo && hook.workers?.operator) {
+        clearInterval(d.timer); d.timer = null;
+        d.onReady = () => { window.removeEventListener("hm:crew-photo-ready", d.onReady); d.onReady = null; shutter(); };
+        window.addEventListener("hm:crew-photo-ready", d.onReady);
+        hook.photo({ variant: (userDrill.col + userDrill.row) % 3 });
+      } else if (++tries > 24) { clearInterval(d.timer); d.timer = null; shutter(); }
+    }, 250);
+  }, [userDrill?.col, userDrill?.row, seasonPhotoLabel]);
+  useEffect(() => () => { const d = seasonPhotoRef.current; if (d.timer) clearInterval(d.timer); if (d.onReady) window.removeEventListener("hm:crew-photo-ready", d.onReady); }, []);
+
+
   // WHILE YOU WERE AWAY under v2: the recap drops the tank/BANK block and
   // shows the core on the table with its deadline + the crew's call instead.
   const awayRecapV2 = useMemo(() => {
@@ -5674,6 +5719,7 @@ export default function OilPage() {
             return `✓ TAKER BOT ${n} on (${selectedX + 1}, ${sliceY + 1}) — lateral extract ON, line 0, queue slot ${n}`;
           })}>CLAIM AS TAKER BOT {n}</button>
         ))}
+        <button disabled={userDrill?.col == null} style={styles.btn} title="the season polaroid: your crew pose on your rig, the camera frames them, the shutter fires with the season's line" onClick={takeSeasonPhoto}>CREW PHOTO</button>
         <button disabled={toolBusy || selectedX === null} style={styles.btn} onClick={() => runTool("Granting casing", async () => {
           // One casing string to the rig on the selected plot (the hot-zone test:
           // NEW TEST MAP → strike until Temp reads HIGH → arm the casing → strike).
@@ -7611,7 +7657,7 @@ export default function OilPage() {
       >
         THE RECKONING
       </PanelTitle>
-      <OilReckoning chrome="section" theme={theme} reckoning={reckoning} col={userDrill.col} row={userDrill.row} />
+      <OilReckoning chrome="section" theme={theme} reckoning={reckoning} col={userDrill.col} row={userDrill.row} onPhoto={!isMobile ? takeSeasonPhoto : null} />
     </PanelSection>
   );
 
