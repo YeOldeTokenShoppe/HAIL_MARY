@@ -4333,7 +4333,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           label={`LAYER ${String(drillDay > 0 ? drillDay : 7).padStart(2, "0")} · PSI`}
           captionFrac={0.14}
           glyphFrac={0.4}
-          nudge={[0, 0]}   // [x, y] fractions of the screen; negative y = down
+          nudge={[0, -0.05]}   // [x, y] fractions of the screen; negative y = down
           token={pressure.label}
           idleHex={pressure.hex}
           alarm={hellActive}
@@ -6710,7 +6710,7 @@ const FIELD_RIG_GLB = (() => {
   const v = RIG_VARIANT;
   if (v === "2") return "/models/oilJack_fancy_allProps2.glb";
   if (v === "3") return "/models/oilJack_fancy_allProps3.glb?v=3";
-  return "/models/oilJack_fancy_allProps4.glb?v=31";
+  return "/models/oilJack_fancy_allProps4.glb?v=32";
 })();
 useGLTF.preload(FIELD_RIG_GLB);
 

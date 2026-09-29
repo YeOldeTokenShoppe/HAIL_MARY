@@ -69,8 +69,8 @@ export const PUMP_ZONES = [
   // object; the upper service deck is separate too (2026-09-08).
   { id: "safetyRails",   label: "SAFETY RAILS",    meshes: ["Safety_Rails"] },
   { id: "platform",      label: "SERVICE PLATFORM", meshes: ["Service_Platform"] },
-  // The post retains its A-frame and ladder, with its own structural paint.
-  { id: "post",          label: "SAMSON POST",    meshes: ["Samson_Post"] },
+  // The post keeps its own structural paint; its ladder is a separate mesh since 2026-09-28.
+  { id: "post",          label: "SAMSON POST",    meshes: ["Samson_Post", "Ladder"] }, // ladder split off the post 2026-09-28; paints with it
   { id: "motorBox",      label: "MOTOR BOX",      meshes: ["Cube", "Wheel_Box", "Under_Pump", "Motor_Pulley"] },
   // Synty plot, 2026-09-07: Michelle split the motor box so its pipe run paints with the
   // pipes and its small control panel with the machine panel; the well curb gets its own
