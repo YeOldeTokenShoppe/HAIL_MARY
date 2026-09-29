@@ -278,7 +278,7 @@ export default function HailMaryV2FixturePage() {
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
           <div style={{ width: cardVersion === "both" ? "auto" : width, maxWidth: "100%" }}>{cardFor(world, handlers, "playable")}</div>
-          {world.ended && <div style={{ width, maxWidth: "100%" }}><OilReckoning theme={theme} reckoning={reckoningFor(world)} col={world.plot.col} row={world.plot.row} /></div>}
+          {world.ended && <div style={{ width, maxWidth: "100%" }}><OilReckoning theme={theme} reckoning={reckoningFor(world)} col={world.plot.col} row={world.plot.row} refCode="FIXTURE" /></div>}
           <div style={{ ...label, minWidth: 200, flex: 1 }}>
             <div style={{ color: theme.textStrong, letterSpacing: "0.14em" }}>LOG</div>
             {log.length === 0 ? <div>— press a button —</div> : log.map((l, i) => <div key={i}>{l}</div>)}
@@ -299,7 +299,7 @@ export default function HailMaryV2FixturePage() {
       <PanelSection theme={theme} style={{ marginBottom: 18, borderRadius: 4, border: `1px solid ${theme.border}` }}>
         <PanelTitle theme={theme}>THE RECKONING · STATES</PanelTitle>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
-          {RECKONING_SCENARIOS.map((s) => { const w = s.world(); return frame(s.name, s.trigger, <OilReckoning theme={theme} reckoning={reckoningFor(w)} col={w.plot.col} row={w.plot.row} />, s.key); })}
+          {RECKONING_SCENARIOS.map((s) => { const w = s.world(); return frame(s.name, s.trigger, <OilReckoning theme={theme} reckoning={reckoningFor(w)} col={w.plot.col} row={w.plot.row} refCode="FIXTURE" />, s.key); })}
         </div>
       </PanelSection>
 

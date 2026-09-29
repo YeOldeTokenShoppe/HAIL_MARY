@@ -28,8 +28,8 @@ panel, and the wording *within* the copy rule.
 | C | **Strata wall** — the earth block as public game-state voxels: passes, extractions, wildcat scars, tunnel bars for salvage | 3D scene, loopV2 seasons | Built (promoted from the `?strata=1` mock) | `src/components/StrataVoxels.jsx` |
 | D | **Alerts** — push + Telegram on every strike (`CORE ASSAY — LAYER n` with the cost-model body), hell breach, tonic cap, artifact, dry layer | Phone lock screen, Telegram | Built, copy follows the rule | `oil-strike-tick/route.js` ~530–665, `lib/oilLoopV2.assayAlertBody` |
 | E | **While-you-were-away recap** | Landing overlay for a returning player | **Still v1**: shows TANK · UNBANKED and a BANK action; needs a v2 version (pending layer, what the crew resolved, what neighbours took) | `src/components/OilAwayRecap.jsx` |
-| F | **The Reckoning** — the per-player season-end account | Above the FINAL HAUL share card, both layouts, every v2 rig | Functionally complete, **plain chrome** | `src/components/OilReckoning.jsx` |
-| G | **FINAL HAUL share card** (PNG capture + tweet) | Same spot, score > 0 only | Built, v1 numbers (banked + tank) | `hailmary/page.js` ~7290 |
+| F | **The Reckoning** — the per-player season-end **share card** (2026-09-29: replaces FINAL HAUL under v2) | The season-end slot, both layouts, every v2 rig, dry included | Built: fixed-palette card (big banked number, USDC line, four totals, 20-cell column strip) + SHARE (PNG → native sheet / clipboard + X compose with referral link) + COPY REPORT + THE FULL ACCOUNT toggle | `src/components/OilReckoning.jsx`, `lib/oilLoopV2.js` (`reckoningShareText`, `reckoningStrip`) |
+| G | **FINAL HAUL share card** (PNG capture + tweet) | v1 only now (`!loopV2`) | Built, v1 numbers (banked + tank) | `hailmary/page.js` `finalHaulCard` |
 | H | **Walk mode** — stand on a frontier cell, press E to wildcat | 3D, desktop | Built (beta) | `src/components/PlayerWalker.jsx` |
 | I | **Onboarding** — welcome modal saints, intro video, how-to-play | First visit | **Still says BANK** ("Bank what you find", "Bank often") | `OilWelcomeModal.jsx`, intro video |
 
@@ -146,7 +146,7 @@ of scope for season one).
 
 **`OilReckoning`**
 ```
-theme, col, row,
+theme, col, row, refCode (referral code for the share link), shareUrl ("rl80.com/hailmary"),
 reckoning: { banked, payoutUsd, usdRate,
              columnTotal, unknownLayers, hellLayers, hellCapped,
              extractedOwn, captureRate | null,
@@ -213,8 +213,7 @@ from what exists. Sizes: the card is ~330 lines of plain JSX; the reckoning ~110
    and the MACHINE PANEL chip exists to reach it. Options: (a) rig panel is primary,
    card becomes ledger + boards; (b) card is primary, rig panel mirrors state only;
    (c) both act, same handlers. Phone is card-only either way.
-3. **Does the Reckoning replace the FINAL HAUL card as the share?** Lean yes: one card,
-   the reckoning's words, PNG-captured in the fixed palette, dry players included.
+3. ~~**Does the Reckoning replace the FINAL HAUL card as the share?**~~ **Yes (Michelle, 2026-09-28; built 2026-09-29).** One card, PNG-captured in the fixed palette, dry players included. The card's composition (which four totals, the strip, the words) is provisional — Michelle modifies on the fixture.
 4. **The away recap for v2.** Redesign brief in §3·E. It is the payoff of the check-back
    loop and today it still talks about the tank.
 5. **Ledger: totals + toggle, or always-open list?** Rows have no times; a "timeline"

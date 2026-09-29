@@ -7371,7 +7371,9 @@ export default function OilPage() {
   // Season-end FINAL HAUL — the player-facing result + payout receipt share.
   // Fixed dark palette (not theme tokens) so the captured PNG always looks
   // right regardless of the player's UI theme.
-  const finalHaulCard = gameEnded && !isAdmin && !isReport && !isTest && user && playerScore > 0 && (
+  // Under loopV2 THE RECKONING below is the share card (decided 2026-09-28) and
+  // this card does not render; FINAL HAUL remains the v1 (tank/BANK) season end.
+  const finalHaulCard = !loopV2 && gameEnded && !isAdmin && !isReport && !isTest && user && playerScore > 0 && (
     <div style={{ padding: "10px 14px", borderBottom: `1px solid ${theme.border}`, background: theme.tintBg }}>
       <div
         ref={finalHaulRef}
@@ -7413,11 +7415,12 @@ export default function OilPage() {
     </div>
   );
 
-  // THE RECKONING — every v2 rig gets one at the buzzer, dry or not (the
-  // FINAL HAUL card below only appears with a score). Plain chrome; see
-  // OilReckoning.jsx.
+  // THE RECKONING — the v2 season-end share card (replaces FINAL HAUL under
+  // loopV2; 2026-09-29). Every v2 rig gets one at the buzzer, dry or not. The
+  // SHARE button captures the card to PNG and posts with the referral link,
+  // the same acquisition moment FINAL HAUL served. See OilReckoning.jsx.
   const reckoningCard = loopV2 && gameEnded && !isAdmin && !isReport && !isTest && user && reckoning && userDrill?.col != null && (
-    <OilReckoning theme={theme} reckoning={reckoning} col={userDrill.col} row={userDrill.row} />
+    <OilReckoning theme={theme} reckoning={reckoning} col={userDrill.col} row={userDrill.row} refCode={userDrill?.referralCode || null} />
   );
 
   // Rig state block — CTA + status copy for the player's rig, one branch per

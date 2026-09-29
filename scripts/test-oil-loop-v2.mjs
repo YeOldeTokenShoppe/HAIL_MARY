@@ -7,7 +7,7 @@ const load = async (rel) => {
   const src = readFileSync(new URL(rel, import.meta.url), "utf8");
   return import("data:text/javascript;charset=utf-8," + encodeURIComponent(src));
 };
-const { PASSIVE_CHARGES, chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, fmtSpan, buildColumnRack, buildLedger, buildReckoning, reckoningText, pickSalvageOrder } =
+const { PASSIVE_CHARGES, chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, fmtSpan, buildColumnRack, buildLedger, buildReckoning, reckoningText, reckoningShareText, reckoningStrip, pickSalvageOrder } =
   await load("../src/lib/oilLoopV2.js");
 
 let pass = 0, fail = 0;
@@ -169,6 +169,20 @@ t("buildReckoning: seed unknown → unreached layers are sealed, not zero", () =
   assert.equal(r.stranded, 0);
   assert.match(reckoningText(r, { col: 0, row: 0 }), /3 layers still sealed/);
   assert.match(reckoningText(r, { col: 0, row: 0 }), /plot \(1,1\)/);
+});
+
+t("reckoningShareText / reckoningStrip: share line + per-layer strip", () => {
+  const plot = { col: 0, row: 0, drillDay: 4, revealed: { 0: 100, 1: 0, 2: 300, 3: 50 }, extracted: { 0: 100 }, passed: { 2: 300, 3: 50 }, lateralTaken: { 2: "rival" }, hellLayers: {} };
+  const drill = { totalCollected: 100, chargesSpent: 1, layersExtracted: { 0: 100 }, layersPassed: { 1: 0, 2: 300, 3: 50 } };
+  const r = buildReckoning({ plot, drill, allPlots: {}, userId: "me", column: { oil: [100, 0, 300, 50, 700, 0], hell: [5] }, depthZ: 6, usdRate: 0.01, chargesCap: 8 });
+  const txt = reckoningShareText(r, { refCode: "ABC" });
+  assert.match(txt, /banked 100 BTR ≈ \$1\.00 USDC/);
+  assert.match(txt, /% of my column/);
+  assert.match(txt, /rl80\.com\/hailmary\?ref=ABC$/);
+  assert.equal(reckoningStrip(r).map((x) => x.state).join(","), "extracted,dry,taken,open,missed,hell");
+  const dry = buildReckoning({ plot: { col: 0, row: 0, drillDay: 2, revealed: { 0: 0, 1: 0 } }, drill: { totalCollected: 0, layersPassed: { 0: 0, 1: 0 } }, allPlots: {}, userId: "me", column: null, depthZ: 3 });
+  assert.match(reckoningShareText(dry), /banked nothing — dry season/);
+  assert.equal(reckoningStrip(dry)[2].state, "sealed");
 });
 
 t("buildReckoning: empty rig → zeros, no NaN; a leftover pending is flagged", () => {

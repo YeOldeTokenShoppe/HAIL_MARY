@@ -249,6 +249,43 @@ export function reckoningText(r, { col, row } = {}) {
   return lines.join("\n");
 }
 
+// One-line share text for the reckoning card (the post that rides the PNG).
+// Pure so the wording is testable. The link carries the player's referral
+// code — the season-end result is the game's best acquisition creative.
+export function reckoningShareText(r, { refCode = null, url = "rl80.com/hailmary" } = {}) {
+  const btr = (n) => Math.round(n || 0).toLocaleString();
+  const usd = (n) => `$${(n || 0).toFixed(2)}`;
+  const bits = [];
+  if (r.captureRate != null && r.extractedOwn > 0) bits.push(`${Math.round(r.captureRate * 100)}% of my column`);
+  if (r.salvagedIn > 0) bits.push(`+${btr(r.salvagedIn)} salvaged next door`);
+  if (r.wildcatIn > 0) bits.push(`+${btr(r.wildcatIn)} from wildcats`);
+  if (r.banked <= 0) bits.push(r.columnTotal > 0 && r.unknownLayers === 0 ? `${btr(r.columnTotal)} BTR was under me` : "dry season");
+  const head = r.banked > 0
+    ? `The Reckoning: banked ${btr(r.banked)} BTR ≈ ${usd(r.payoutUsd)} USDC`
+    : "The Reckoning: banked nothing";
+  const tail = bits.length ? ` — ${bits.join(", ")}` : "";
+  return `${head}${tail} ⛏ Hail Mary Prospecting Co.\n\nNext season: ${url}${refCode ? `?ref=${refCode}` : ""}`;
+}
+
+// Per-layer state for the reckoning's column strip (top → bottom), from the
+// reckoning's layers + ledger rows. States: extracted · taken (a neighbour
+// took your pass) · open (passed, still in the ground) · dry (passed, 0) ·
+// hell · missed (never reached, oil known) · sealed (never reached, unknown).
+export function reckoningStrip(r) {
+  const byLayer = new Map();
+  for (const row of (r.ledger && r.ledger.rows) || []) {
+    if (row.kind === "extract") byLayer.set(row.layer, "extracted");
+    else if (row.kind === "pass") byLayer.set(row.layer, row.takenBy ? "taken" : (row.oil > 0 ? "open" : "dry"));
+  }
+  return (r.layers || []).map((l) => {
+    if (l.hell) return { layer: l.layer, state: "hell", oil: 0 };
+    const s = byLayer.get(l.layer);
+    if (s) return { layer: l.layer, state: s, oil: l.oil || 0 };
+    if (!l.reached) return { layer: l.layer, state: l.oil == null ? "sealed" : (l.oil > 0 ? "missed" : "dry"), oil: l.oil || 0 };
+    return { layer: l.layer, state: l.oil > 0 ? "open" : "dry", oil: l.oil || 0 };
+  });
+}
+
 // ── Standing orders (decided 2026-09-28, option B) ───────────────────────────
 // Orders are per RIG, not per neighbour: SALVAGE = "when any orthogonal
 // neighbour passes a layer at or above my line, take it with a charge";
