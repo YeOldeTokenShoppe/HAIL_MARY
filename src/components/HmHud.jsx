@@ -90,28 +90,51 @@ export function Bracket({ position, size = 12, thickness = 2, hud: hudProp }) {
 
 /* The glass panel with its four brackets. `solid` swaps the glass for the
    capture background (html2canvas cannot rasterise backdrop-filter). */
-export function HudPanel({ children, style, solid = false, innerRef, hud: hudProp }) {
+/* `brackets={false}` + `flat` = the SECTION form (Michelle, 2026-09-29): inside a
+   page section that already has a title row, the card drops its corner brackets
+   and its floating shadow and sits as a quiet inset — one title, not two. */
+export function HudPanel({ children, style, solid = false, innerRef, hud: hudProp, brackets = true, flat = false }) {
   const hud = useHud(hudProp);
   return (
     <HudCtx.Provider value={hud}>
     <div ref={innerRef} style={{
       position: "relative",
-      padding: "0.95rem 1.1rem 0.85rem",
+      padding: flat ? "0.8rem 0.95rem 0.75rem" : "0.95rem 1.1rem 0.85rem",
       background: solid ? hud.panelSolid : (hud.panel || hud.panelBg),
       border: `1px solid ${hud.goldFaint}`,
+      borderRadius: flat ? 3 : 0,
       backdropFilter: solid ? undefined : "blur(6px) saturate(140%)",
       WebkitBackdropFilter: solid ? undefined : "blur(6px) saturate(140%)",
-      boxShadow: hud.light
-        ? `0 1px 0 ${hud.goldFaint}, 0 10px 24px -14px rgba(60,40,10,0.35), inset 0 1px 0 rgba(255,255,255,0.5)`
-        : `0 0 0 1px rgba(0,0,0,0.35), 0 20px 40px -10px rgba(0,0,0,0.45), inset 0 1px 0 ${hud.goldFaint}`,
+      boxShadow: flat
+        ? (hud.light ? "inset 0 1px 0 rgba(255,255,255,0.45)" : `inset 0 1px 0 ${hud.goldFaint}`)
+        : hud.light
+          ? `0 1px 0 ${hud.goldFaint}, 0 10px 24px -14px rgba(60,40,10,0.35), inset 0 1px 0 rgba(255,255,255,0.5)`
+          : `0 0 0 1px rgba(0,0,0,0.35), 0 20px 40px -10px rgba(0,0,0,0.45), inset 0 1px 0 ${hud.goldFaint}`,
       transform: "translateZ(0)",
       isolation: "isolate",
       ...style,
     }}>
-      <Bracket position="tl" /><Bracket position="tr" /><Bracket position="bl" /><Bracket position="br" />
+      {brackets && <><Bracket position="tl" /><Bracket position="tr" /><Bracket position="bl" /><Bracket position="br" /></>}
       {children}
     </div>
     </HudCtx.Provider>
+  );
+}
+
+/* The status cluster for a page section's title row ("PLOT (6, 9) · 01/20 ● LIVE"):
+   what the card's meta row used to say, moved up so the section has one title.
+   Drawn in the page theme, not the HUD palette — it lives in the title row. */
+export function HudTitleStatus({ theme, plot, index, status = "LIVE", live = true }) {
+  const lamp = live ? (theme?.warn || "#e87a2b") : (theme?.gold || "#d4a854");
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 8, color: theme?.muted, letterSpacing: "0.08em", fontWeight: 400, whiteSpace: "nowrap" }}>
+      {plot && <span>{plot}</span>}
+      {index && <span style={{ color: theme?.accent || theme?.text }}>{index}</span>}
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: theme?.gold }}>
+        <span style={{ width: 6, height: 6, borderRadius: "50%", background: lamp, boxShadow: `0 0 4px ${lamp}`, animation: live ? "gooCursorBlink 1.6s ease-in-out infinite" : "none" }} />
+        {status}
+      </span>
+    </span>
   );
 }
 

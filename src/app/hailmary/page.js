@@ -24,6 +24,7 @@ import DemonArena, { WEAPONS } from "@/components/DemonArena";
 import VendorStage, { BoardwalkStrip, VendorCart, stepUpVendor, stepBackVendor, warmBoardwalk } from "@/components/VendorStage";
 import { playSfx, startSfxLoop } from "@/lib/uiSfx";
 import { panelChrome, PanelSection, PanelTitle, PANEL_ICONS } from "@/components/HailMaryPanel";
+import { HudTitleStatus } from "@/components/HmHud";
 import DailyTicketPanel from "@/components/DailyTicketPanel";
 import OilWelcomeModal from "@/components/OilWelcomeModal";
 import VendorSitePalHost from "@/components/VendorSitePalHost";
@@ -7603,7 +7604,15 @@ export default function OilPage() {
   // NOT the share: that is the SEASON POLAROID (open thread — the crew posing
   // on the player's rig via PolaroidSnapshot, one line, the referral link).
   const reckoningCard = loopV2 && gameEnded && !isAdmin && !isReport && !isTest && user && reckoning && userDrill?.col != null && (
-    <OilReckoning theme={theme} reckoning={reckoning} col={userDrill.col} row={userDrill.row} />
+    <PanelSection theme={theme} isMobile={isMobile} tint id="reckoning">
+      <PanelTitle
+        theme={theme} isMobile={isMobile} icon={PANEL_ICONS.core}
+        right={<HudTitleStatus theme={theme} plot={`PLOT (${userDrill.col + 1}, ${userDrill.row + 1})`} index={`${reckoning.reached}/${DEPTH_Z}`} status="CLOSED" live={false} />}
+      >
+        THE RECKONING
+      </PanelTitle>
+      <OilReckoning chrome="section" theme={theme} reckoning={reckoning} col={userDrill.col} row={userDrill.row} />
+    </PanelSection>
   );
 
   // Rig state block — CTA + status copy for the player's rig, one branch per
@@ -8543,11 +8552,12 @@ export default function OilPage() {
     <PanelSection theme={theme} isMobile={isMobile} tint id="core-sample-v2">
       <PanelTitle
         theme={theme} isMobile={isMobile} icon={PANEL_ICONS.core}
-        right={selectedX !== null ? <span style={{ color: theme.muted, letterSpacing: "0.08em", fontWeight: 400 }}>PLOT ({selectedX + 1}, {sliceY + 1})</span> : null}
+        right={<HudTitleStatus theme={theme} plot={selectedX !== null ? `PLOT (${selectedX + 1}, ${sliceY + 1})` : null} index={selectedX !== null ? `${String(spectatorRack.filter((c) => c.state !== "undrilled").length).padStart(2, "0")}/${DEPTH_Z}` : null} status={gameEnded ? "CLOSED" : "LIVE"} live={!gameEnded} />}
       >
         CORE SAMPLE
       </PanelTitle>
       <OilCoreSampleV3
+        chrome="section"
         theme={theme} pending={null} chargesRemaining={0} chargesCap={0} threshold={0}
         onDecide={async () => {}} onSetThreshold={async () => {}} onLateral={async () => {}} onWildcat={async () => {}}
         rack={spectatorRack} ended={gameEnded}
@@ -8559,11 +8569,12 @@ export default function OilPage() {
     <PanelSection theme={theme} isMobile={isMobile} tint id="core-sample-v2">
       <PanelTitle
         theme={theme} isMobile={isMobile} icon={PANEL_ICONS.core}
-        right={<span style={{ color: theme.muted, letterSpacing: "0.08em", fontWeight: 400 }}>PLOT ({userDrill.col + 1}, {userDrill.row + 1})</span>}
+        right={<HudTitleStatus theme={theme} plot={`PLOT (${userDrill.col + 1}, ${userDrill.row + 1})`} index={`${String(columnRack.filter((c) => c.state !== "undrilled").length).padStart(2, "0")}/${DEPTH_Z}`} status={gameEnded ? "CLOSED" : "LIVE"} live={!gameEnded} />}
       >
         CORE SAMPLE
       </PanelTitle>
       <OilCoreSampleV3
+        chrome="section"
         theme={theme}
         pending={userDrill.pending}
         chargesRemaining={Math.max(0, chargesCapFor(userDrill, { passiveCharges }, DEPTH_Z) - (userDrill.chargesSpent || 0))}
