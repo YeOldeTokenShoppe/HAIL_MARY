@@ -4973,10 +4973,19 @@ export default function OilPage() {
     const lines = []; const tones = [];
     const say = (line, tone) => { lines.push(line); tones.push(tone); };
     const n = (v) => Math.round(v || 0).toLocaleString();
+    // Spoken by SitePal too, so no abbreviations the voice would drop ("26h" was read as
+    // "26" — Michelle, 2026-09-29): hours and days in words.
+    const spanWords = (ms) => {
+      const h = Math.round((ms || 0) / 36e5);
+      if (h < 1) return null;
+      if (h < 24) return `${h} hour${h === 1 ? "" : "s"}`;
+      const d = Math.floor(h / 24), rem = h % 24;
+      return `${d} day${d === 1 ? "" : "s"}${rem ? ` and ${rem} hour${rem === 1 ? "" : "s"}` : ""}`;
+    };
     const r = awayRecap;
     if (loopV2) {
       const a = r?.v2away;
-      if (r) { const h = Math.round((r.awayMs || 0) / 36e5); if (h >= 1) say(`You were gone ${h}h.`, "thoughtful"); }
+      if (r) { const span = spanWords(r.awayMs); if (span) say(`You were gone ${span}.`, "thoughtful"); }
       if (a && a.cores.length) {
         const up = a.cores.filter((c) => c.outcome !== "table");
         if (up.length) say(`${up.length} core${up.length === 1 ? "" : "s"} came up, L${up[0].layer + 1} to L${up[up.length - 1].layer + 1}.`, "yes");
@@ -5003,8 +5012,8 @@ export default function OilPage() {
     } else {
       say(`Rig ${status}.`, ["pumping", "ready"].includes(status) ? "yes" : ["signed out", "no claim", "pre-season", "caught up"].includes(status) ? "no" : "thoughtful");
       if (r) {
-        const h = Math.round((r.awayMs || 0) / 36e5);
-        if (h >= 1) say(`You were away ${h}h.`, "thoughtful");
+        const span = spanWords(r.awayMs);
+        if (span) say(`You were away ${span}.`, "thoughtful");
         if (r.toDepth > r.fromDepth) say(`Drilled ${r.fromDepth} to ${r.toDepth}.`, "yes");
         if (r.strikes?.length) say(`${r.strikes.length} strike${r.strikes.length === 1 ? "" : "s"}, +${Math.round(r.oilGained || 0)} BTR.`, "yes");
         if (r.hellHit) say("We hit a hell pocket.", "thoughtful");
