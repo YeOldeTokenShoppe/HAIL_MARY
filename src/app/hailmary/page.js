@@ -33,7 +33,7 @@ import OilOverlayModal from "@/components/OilOverlayModal";
 import OilCoreSampleV3 from "@/components/OilCoreSampleV3";
 import OilReckoning from "@/components/OilReckoning";
 import PlayerWalker from "@/components/PlayerWalker";
-import { chargesCapFor, buildColumnRack, buildLedger, buildReckoning, resolvePendingDecision } from "@/lib/oilLoopV2";
+import { chargesCapFor, buildColumnRack, buildLedger, buildReckoning, resolvePendingDecision, fmtSpan } from "@/lib/oilLoopV2";
 import { seasonClock, revealWindow } from "@/lib/oilStrikeClock";
 import { THEMES } from "@/lib/hailmaryThemes";
 import { useUser, useClerk } from "@clerk/nextjs";
@@ -8565,11 +8565,23 @@ export default function OilPage() {
       />
     </PanelSection>
   );
+  // The section title carries the cadence (Michelle, 2026-09-29: the gold
+  // line inside the card read as a second title): "next core in 6.5 h", or why
+  // there is none. The card's own header line renders only on the fixture.
+  const coreTitleNote = (() => {
+    if (gameEnded) return "season closed";
+    const c = revealCadence;
+    if (!c) return null;
+    if (c.seasonEndMs != null && Date.now() >= c.seasonEndMs) return "clock run out";
+    if (c.remainingLayers <= 0) return "column revealed";
+    const left = c.latestMs - Date.now();
+    return left > 60000 ? `next core in ${fmtSpan(left)}` : "next core any moment";
+  })();
   const coreSampleCard = (v2Viewer && userDrill && userDrill.col != null && (
     <PanelSection theme={theme} isMobile={isMobile} tint id="core-sample-v2">
       <PanelTitle
         theme={theme} isMobile={isMobile} icon={PANEL_ICONS.core}
-        right={<HudTitleStatus theme={theme} plot={`PLOT (${userDrill.col + 1}, ${userDrill.row + 1})`} index={`${String(columnRack.filter((c) => c.state !== "undrilled").length).padStart(2, "0")}/${DEPTH_Z}`} status={gameEnded ? "CLOSED" : "LIVE"} live={!gameEnded} />}
+        right={<HudTitleStatus theme={theme} plot={`PLOT (${userDrill.col + 1}, ${userDrill.row + 1})`} note={coreTitleNote} status={gameEnded ? "CLOSED" : "LIVE"} live={!gameEnded} />}
       >
         CORE SAMPLE
       </PanelTitle>
