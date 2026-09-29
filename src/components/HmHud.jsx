@@ -127,11 +127,13 @@ export function HudPanel({ children, style, solid = false, innerRef, hud: hudPro
 export function HudTitleStatus({ theme, plot, index, note, status = "LIVE", live = true }) {
   const lamp = live ? (theme?.warn || "#e87a2b") : (theme?.gold || "#d4a854");
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 8, color: theme?.muted, letterSpacing: "0.08em", fontWeight: 400, whiteSpace: "nowrap" }}>
-      {plot && <span>{plot}</span>}
-      {index && <span style={{ color: theme?.accent || theme?.text }}>{index}</span>}
-      {note && <span style={{ color: theme?.accent || theme?.text }}>{note}</span>}
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: theme?.gold }}>
+    // Wraps piece by piece when the column is narrow (the row overlapped the
+    // title on a phone-width column, 2026-09-29); each piece stays whole.
+    <span style={{ display: "inline-flex", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end", rowGap: 2, columnGap: 8, color: theme?.muted, letterSpacing: "0.08em", fontWeight: 400, minWidth: 0 }}>
+      {plot && <span style={{ whiteSpace: "nowrap" }}>{plot}</span>}
+      {index && <span style={{ color: theme?.accent || theme?.text, whiteSpace: "nowrap" }}>{index}</span>}
+      {note && <span style={{ color: theme?.accent || theme?.text, whiteSpace: "nowrap" }}>{note}</span>}
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: theme?.gold, whiteSpace: "nowrap" }}>
         <span style={{ width: 6, height: 6, borderRadius: "50%", background: lamp, boxShadow: `0 0 4px ${lamp}`, animation: live ? "gooCursorBlink 1.6s ease-in-out infinite" : "none" }} />
         {status}
       </span>
