@@ -26,7 +26,7 @@
 
 import { useState } from "react";
 import { reckoningText, reckoningStory, reckoningStrip } from "@/lib/oilLoopV2";
-import { HUD, HUD_MONO, HudKeyframes, HudPanel, HudMeta, HudTitle, HudTabs, HudDivider, HudLine, HudCaption, HudStats, HudButton, HudHint } from "@/components/HmHud";
+import { HUD_MONO, hudFor, HudKeyframes, HudPanel, HudMeta, HudTitle, HudTabs, HudDivider, HudLine, HudCaption, HudStats, HudButton, HudHint } from "@/components/HmHud";
 
 const btr = (n) => Math.round(n || 0).toLocaleString();
 const usd = (n) => `$${(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -34,12 +34,14 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 // Strip colours: kept = green, taken = violet (a rival's mark), open = gold,
 // hell = red, dry = earth, missed = dim, sealed = hatched.
-const STRIP_COLOR = { extracted: HUD.green, taken: HUD.violet, open: HUD.gold, dry: "#4a4036", hell: HUD.red, missed: "#7a5a3a", sealed: "#3a3140", cased: "#8fa3b8" };
+const stripColors = (hud) => ({ extracted: hud.green, taken: hud.violet, open: hud.gold, dry: "#4a4036", hell: hud.red, missed: "#7a5a3a", sealed: "#3a3140", cased: "#8fa3b8" });
 const STRIP_WORD = { extracted: "kept", taken: "taken", open: "left open", dry: "dry", hell: "hell", missed: "never reached", sealed: "sealed", cased: "cased" };
 
 export default function OilReckoning({ theme, reckoning: r, col, row }) {
   const [note, setNote] = useState("");
   const [tab, setTab] = useState("card");
+  const hud = hudFor(theme);
+  const STRIP_COLOR = stripColors(hud);
   if (!r) return null;
 
   const flash = (s, ms = 2500) => { setNote(s); setTimeout(() => setNote(""), ms); };
@@ -66,16 +68,16 @@ export default function OilReckoning({ theme, reckoning: r, col, row }) {
           <div key={c.layer} title={`L${c.layer + 1} · ${STRIP_WORD[c.state]}${c.oil ? ` · ${btr(c.oil)} BTR` : ""}`} style={{
             flex: 1, height: 12, background: STRIP_COLOR[c.state],
             opacity: c.state === "dry" || c.state === "sealed" ? 0.7 : 1,
-            boxShadow: c.state === "extracted" ? `0 0 6px ${HUD.green}55` : c.state === "taken" ? `0 0 6px ${HUD.violet}55` : "none",
+            boxShadow: c.state === "extracted" ? `0 0 6px ${hud.green}55` : c.state === "taken" ? `0 0 6px ${hud.violet}55` : "none",
             backgroundImage: c.state === "sealed" ? "repeating-linear-gradient(135deg, rgba(255,255,255,0.12) 0 2px, transparent 2px 5px)" : "none",
           }} />
         ))}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: HUD_MONO, fontSize: "0.48rem", letterSpacing: "0.2em", color: HUD.goldDim, textTransform: "uppercase", marginTop: 4 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: HUD_MONO, fontSize: "0.48rem", letterSpacing: "0.2em", color: hud.goldDim, textTransform: "uppercase", marginTop: 4 }}>
         <span>surface</span>
         <span>{r.depthZ} layers · bore reached L{r.reached}</span>
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", marginTop: 4, fontFamily: HUD_MONO, fontSize: "0.48rem", letterSpacing: "0.12em", color: HUD.muted, textTransform: "uppercase" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", marginTop: 4, fontFamily: HUD_MONO, fontSize: "0.48rem", letterSpacing: "0.12em", color: hud.muted, textTransform: "uppercase" }}>
         {["extracted", "taken", "open", "cased", "hell", "missed", "sealed"].filter((k) => strip.some((c) => c.state === k)).map((k) => (
           <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
             <span style={{ width: 7, height: 7, background: STRIP_COLOR[k], display: "inline-block" }} />{STRIP_WORD[k]}
@@ -128,8 +130,8 @@ export default function OilReckoning({ theme, reckoning: r, col, row }) {
   return (
     <div style={{ padding: "10px 14px", borderBottom: `1px solid ${theme?.border || "transparent"}` }}>
       <HudKeyframes />
-      <HudPanel>
-        <HudMeta index="20/20" label="Season-end account" status="CLOSED" lamp={HUD.gold} blink={false} />
+      <HudPanel hud={hud}>
+        <HudMeta index="20/20" label="Season-end account" status="CLOSED" lamp={hud.gold} blink={false} />
         <HudTitle subtitle="The Reckoning" />
         <HudTabs tabs={[{ id: "card", label: "Reckoning" }, { id: "account", label: "Full account" }]} active={tab} onSelect={setTab} />
         <HudDivider />
@@ -137,8 +139,8 @@ export default function OilReckoning({ theme, reckoning: r, col, row }) {
         <HudDivider margin="0.6rem 0 0.5rem" />
         <HudCaption>RIG ID: {where} — HAIL MARY FIELD</HudCaption>
         <HudStats stats={[
-          { value: `${btr(r.banked)} BTR`, label: "banked", color: HUD.cyan },
-          { value: paid ? usd(r.payoutUsd) : "DRY", label: paid ? "USDC paid" : "season", color: paid ? HUD.orange : HUD.muted },
+          { value: `${btr(r.banked)} BTR`, label: "banked", color: hud.cyan },
+          { value: paid ? usd(r.payoutUsd) : "DRY", label: paid ? "USDC paid" : "season", color: paid ? hud.orange : hud.muted },
         ]} />
         <div style={{ marginTop: "0.9rem", display: "flex", justifyContent: "center" }}>
           <HudButton onClick={copy}>Copy Report</HudButton>

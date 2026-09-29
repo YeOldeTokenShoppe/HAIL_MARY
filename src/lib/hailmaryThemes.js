@@ -139,3 +139,48 @@ export const THEMES = {
     cornerBorder: "rgba(164,92,255,0.3)",
   },
 };
+
+// ── HUD palettes: the /space telemetry-panel look, tuned per theme ───────────
+// (Michelle, 2026-09-29: the fixed /space palette clashed with the light
+// consoles.) The card stays a dark "instrument screen" on every theme — that is
+// the vibrancy — but its glass is the theme's own ink, the brackets are the
+// theme's gold, and the data colour is a bright that belongs to the theme
+// (teal on the warm paper consoles, echoing the survey map's BTR swatch; cyan
+// on the blue consoles; mint on the violet one). `hudFor(theme)` in HmHud.jsx
+// merges these over the /space defaults, so a theme without a block still
+// renders. Keys: panel (glass), panelSolid (capture background), cream (text),
+// muted, data, dataDim (glow), warn, green, violet (a rival's mark), red, gold,
+// goldDim, goldFaint.
+export const THEME_HUD = {
+  light: {
+    panel: "rgba(46,32,16,0.92)", panelSolid: "#2e2010", cream: "#f5efe6", muted: "#b9a88e",
+    data: "#5fd3c4", dataDim: "rgba(95,211,196,0.7)", warn: "#ff9a3c", green: "#7fe07a", violet: "#d3a0ff", red: "#ff5e4a",
+    gold: "#d4a854", goldDim: "rgba(212,168,84,0.6)", goldFaint: "rgba(212,168,84,0.22)",
+  },
+  duskLight: {
+    panel: "rgba(46,30,26,0.92)", panelSolid: "#2e1e1a", cream: "#f4e6d6", muted: "#bfa593",
+    data: "#6fd6c5", dataDim: "rgba(111,214,197,0.7)", warn: "#ff8a4a", green: "#86e07f", violet: "#d9a3ff", red: "#ff5e4a",
+    gold: "#d49a4a", goldDim: "rgba(212,154,74,0.6)", goldFaint: "rgba(212,154,74,0.22)",
+  },
+  Geode: {
+    panel: "rgba(18,10,22,0.65)", panelSolid: "#150c1c", cream: "#e8d9b8", muted: "#9a8878",
+    data: "#6bc7d1", dataDim: "rgba(107,199,209,0.7)", warn: "#e87a2b", green: "#37f07a", violet: "#c77dff", red: "#ff3f1f",
+    gold: "#d4a854", goldDim: "rgba(212,168,84,0.55)", goldFaint: "rgba(212,168,84,0.18)",
+  },
+  dark: {
+    panel: "rgba(18,22,28,0.85)", panelSolid: "#12161c", cream: "#d4dce4", muted: "#8a96a2",
+    data: "#6bc7d1", dataDim: "rgba(107,199,209,0.7)", warn: "#e87a2b", green: "#6adf8a", violet: "#c77dff", red: "#ff5a5a",
+    gold: "#d4a854", goldDim: "rgba(212,168,84,0.55)", goldFaint: "rgba(212,168,84,0.18)",
+  },
+  solsticeLight: {
+    panel: "rgba(36,27,12,0.92)", panelSolid: "#241b0c", cream: "#f6edce", muted: "#b8a887",
+    data: "#4fd1e0", dataDim: "rgba(79,209,224,0.7)", warn: "#ffb347", green: "#7fe08a", violet: "#d3a0ff", red: "#ff5e4a",
+    gold: "#e0ad3c", goldDim: "rgba(224,173,60,0.6)", goldFaint: "rgba(224,173,60,0.22)",
+  },
+  parabolumDark: {
+    panel: "rgba(14,8,26,0.85)", panelSolid: "#0e081a", cream: "#e6d4ff", muted: "#8f7aac",
+    data: "#5ad6b0", dataDim: "rgba(90,214,176,0.7)", warn: "#e0913c", green: "#5ad6b0", violet: "#ff5c93", red: "#ff3f1f",
+    gold: "#c79bff", goldDim: "rgba(199,155,255,0.6)", goldFaint: "rgba(199,155,255,0.22)",
+  },
+};
+

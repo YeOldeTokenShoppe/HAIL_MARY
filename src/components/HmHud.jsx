@@ -27,10 +27,33 @@ export const HUD = {
   green: "#37f07a",
   violet: "#c77dff",
   red: "#ff3f1f",
+  // aliases the themed blocks use (THEME_HUD): the /space values by default
+  panel: "rgba(18, 10, 22, 0.65)",
+  data: "#6bc7d1",
+  dataDim: "rgba(107, 199, 209, 0.7)",
+  warn: "#e87a2b",
 };
 
 export const HUD_MONO = '"Share Tech Mono", monospace';
 export const HUD_DISPLAY = '"Orbitron", sans-serif';
+
+// ── Theme-tuned palettes (2026-09-29) ─────────────────────────────────────────
+// The kit no longer hard-codes the /space colours: `hudFor(theme)` merges the
+// theme's HUD block (THEME_HUD in lib/hailmaryThemes.js — a theme is matched
+// by identity or by its `bg`) over the defaults above, and every piece reads
+// the palette from context, so a card wraps itself in <HudPanel hud={…}> and
+// the rest follows. Pass `hud` explicitly to a piece to override.
+import { createContext, useContext } from "react";
+import { THEMES, THEME_HUD } from "@/lib/hailmaryThemes";
+const HudCtx = createContext(null);
+export const useHud = (override) => override || useContext(HudCtx) || HUD;
+export function hudFor(theme) {
+  if (!theme) return HUD;
+  let key = theme.hudKey || null;
+  if (!key) for (const [k, t] of Object.entries(THEMES)) { if (t === theme || (t.bg && t.bg === theme.bg)) { key = k; break; } }
+  const block = (key && THEME_HUD[key]) || theme.hud || null;
+  return block ? { ...HUD, ...block } : HUD;
+}
 
 /* The lamp blink the meta row uses (the /space page defines it in its own
    <style>); render once per card so the name resolves on /hailmary too. */
@@ -39,16 +62,18 @@ export function HudKeyframes() {
 }
 
 /* Small bordered action ("Take −1⚡", "Set", "Turn on") in the HUD voice. */
-export function hudSmallBtn(accent = HUD.gold, disabled = false) {
+export function hudSmallBtn(accent, disabled = false, hud = HUD) {
+  accent = accent || hud.gold;
   return {
     fontFamily: HUD_MONO, fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", padding: "0.3rem 0.6rem", borderRadius: 2,
-    cursor: disabled ? "default" : "pointer", background: "transparent", color: disabled ? HUD.muted : accent, border: `1px solid ${disabled ? HUD.muted : accent}`, opacity: disabled ? 0.5 : 1,
+    cursor: disabled ? "default" : "pointer", background: "transparent", color: disabled ? hud.muted : accent, border: `1px solid ${disabled ? hud.muted : accent}`, opacity: disabled ? 0.5 : 1,
     whiteSpace: "nowrap",
   };
 }
 
 /* Gold corner bracket — positioned absolutely inside the panel. */
-export function Bracket({ position, size = 12, thickness = 2 }) {
+export function Bracket({ position, size = 12, thickness = 2, hud: hudProp }) {
+  const hud = useHud(hudProp);
   const posStyle = {
     tl: { top: -1, left: -1 }, tr: { top: -1, right: -1 },
     bl: { bottom: -1, left: -1 }, br: { bottom: -1, right: -1 },
@@ -57,24 +82,26 @@ export function Bracket({ position, size = 12, thickness = 2 }) {
   const isLeft = position.endsWith("l");
   return (
     <span style={{ position: "absolute", width: size, height: size, pointerEvents: "none", ...posStyle }}>
-      <span style={{ position: "absolute", [isTop ? "top" : "bottom"]: 0, [isLeft ? "left" : "right"]: 0, width: size, height: thickness, background: HUD.gold }} />
-      <span style={{ position: "absolute", [isTop ? "top" : "bottom"]: 0, [isLeft ? "left" : "right"]: 0, width: thickness, height: size, background: HUD.gold }} />
+      <span style={{ position: "absolute", [isTop ? "top" : "bottom"]: 0, [isLeft ? "left" : "right"]: 0, width: size, height: thickness, background: hud.gold }} />
+      <span style={{ position: "absolute", [isTop ? "top" : "bottom"]: 0, [isLeft ? "left" : "right"]: 0, width: thickness, height: size, background: hud.gold }} />
     </span>
   );
 }
 
 /* The glass panel with its four brackets. `solid` swaps the glass for the
    capture background (html2canvas cannot rasterise backdrop-filter). */
-export function HudPanel({ children, style, solid = false, innerRef }) {
+export function HudPanel({ children, style, solid = false, innerRef, hud: hudProp }) {
+  const hud = useHud(hudProp);
   return (
+    <HudCtx.Provider value={hud}>
     <div ref={innerRef} style={{
       position: "relative",
       padding: "0.95rem 1.1rem 0.85rem",
-      background: solid ? HUD.panelSolid : HUD.panelBg,
-      border: `1px solid ${HUD.goldFaint}`,
+      background: solid ? hud.panelSolid : (hud.panel || hud.panelBg),
+      border: `1px solid ${hud.goldFaint}`,
       backdropFilter: solid ? undefined : "blur(6px) saturate(140%)",
       WebkitBackdropFilter: solid ? undefined : "blur(6px) saturate(140%)",
-      boxShadow: "0 0 0 1px rgba(0,0,0,0.4), 0 20px 40px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(212,168,84,0.08)",
+      boxShadow: `0 0 0 1px rgba(0,0,0,0.35), 0 20px 40px -10px rgba(0,0,0,0.45), inset 0 1px 0 ${hud.goldFaint}`,
       transform: "translateZ(0)",
       isolation: "isolate",
       ...style,
@@ -82,24 +109,41 @@ export function HudPanel({ children, style, solid = false, innerRef }) {
       <Bracket position="tl" /><Bracket position="tr" /><Bracket position="bl" /><Bracket position="br" />
       {children}
     </div>
+    </HudCtx.Provider>
+  );
+}
+
+/* Label over value — for the narrow column beside the core cylinder, where a
+   padded "SAMPLE    L1 of 20" line wraps word by word (Michelle, 2026-09-28/29).
+   voice: "label" (gold caption, cream value) | "data" (cream caption, bright value). */
+export function HudField({ label, value, voice = "data", color, hud: hudProp }) {
+  const hud = useHud(hudProp);
+  const valueColor = color || (voice === "data" ? hud.data : hud.cream);
+  return (
+    <div style={{ marginBottom: "0.32rem", minWidth: 0 }}>
+      <div style={{ fontFamily: HUD_MONO, fontSize: "0.48rem", letterSpacing: "0.2em", textTransform: "uppercase", color: voice === "data" ? hud.muted : hud.goldDim, lineHeight: 1.3 }}>{label}</div>
+      <div style={{ fontFamily: HUD_MONO, fontSize: "0.66rem", letterSpacing: "0.04em", lineHeight: 1.3, color: valueColor, textShadow: voice === "data" && !color ? `0 0 6px ${hud.dataDim}` : "none", overflowWrap: "anywhere" }}>{value}</div>
+    </div>
   );
 }
 
 /* Meta row: "07/47 // SPECIMEN ANALYSIS" left, a status lamp right. */
-export function HudMeta({ index, label, status = "LIVE", lamp = HUD.orange, blink = true }) {
+export function HudMeta({ index, label, status = "LIVE", lamp, blink = true, hud: hudProp }) {
+  const hud = useHud(hudProp);
+  const lampColor = lamp || hud.orange || hud.warn;
   return (
     <div style={{
       display: "flex", justifyContent: "space-between", alignItems: "center",
-      fontFamily: HUD_MONO, fontSize: "0.52rem", letterSpacing: "0.18em", color: HUD.goldDim, textTransform: "uppercase",
-      paddingBottom: "0.55rem", marginBottom: "0.7rem", borderBottom: `1px solid ${HUD.goldFaint}`,
+      fontFamily: HUD_MONO, fontSize: "0.52rem", letterSpacing: "0.18em", color: hud.goldDim, textTransform: "uppercase",
+      paddingBottom: "0.55rem", marginBottom: "0.7rem", borderBottom: `1px solid ${hud.goldFaint}`,
     }}>
       <span>
-        {index && <span style={{ color: HUD.cyan, textShadow: `0 0 6px ${HUD.cyanDim}` }}>{index}</span>}
+        {index && <span style={{ color: hud.data, textShadow: `0 0 6px ${hud.dataDim}` }}>{index}</span>}
         {index ? " // " : ""}{label}
       </span>
       {status && (
-        <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", color: HUD.gold }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: lamp, boxShadow: `0 0 4px ${lamp}, 0 0 8px ${lamp}80`, animation: blink ? "gooCursorBlink 1.6s ease-in-out infinite" : "none" }} />
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", color: hud.gold }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: lampColor, boxShadow: `0 0 4px ${lampColor}, 0 0 8px ${lampColor}80`, animation: blink ? "gooCursorBlink 1.6s ease-in-out infinite" : "none" }} />
           {status}
         </span>
       )}
@@ -108,30 +152,32 @@ export function HudMeta({ index, label, status = "LIVE", lamp = HUD.orange, blin
 }
 
 /* Title + subtitle. */
-export function HudTitle({ title = <>HAIL MARY<br />PROSPECTING CO.</>, subtitle }) {
+export function HudTitle({ title = <>HAIL MARY<br />PROSPECTING CO.</>, subtitle, hud: hudProp }) {
+  const hud = useHud(hudProp);
   return (
     <>
-      <h2 style={{ margin: "0 0 0.35rem", fontFamily: HUD_DISPLAY, fontWeight: 800, fontSize: "1.05rem", lineHeight: 1.15, letterSpacing: "0.08em", color: HUD.cream, textShadow: "0 0 14px rgba(212,168,84,0.2)" }}>
+      <h2 style={{ margin: "0 0 0.35rem", fontFamily: HUD_DISPLAY, fontWeight: 800, fontSize: "1.05rem", lineHeight: 1.15, letterSpacing: "0.08em", color: hud.cream, textShadow: `0 0 14px ${hud.goldFaint}` }}>
         {title}
       </h2>
       {subtitle && (
-        <div style={{ fontFamily: HUD_MONO, fontSize: "0.58rem", letterSpacing: "0.15em", color: HUD.gold, textTransform: "uppercase", marginBottom: "0.7rem" }}>{subtitle}</div>
+        <div style={{ fontFamily: HUD_MONO, fontSize: "0.58rem", letterSpacing: "0.15em", color: hud.gold, textTransform: "uppercase", marginBottom: "0.7rem" }}>{subtitle}</div>
       )}
     </>
   );
 }
 
 /* Tab strip: [{ id, label }], active id, onSelect. */
-export function HudTabs({ tabs, active, onSelect }) {
+export function HudTabs({ tabs, active, onSelect, hud: hudProp }) {
+  const hud = useHud(hudProp);
   return (
-    <div style={{ display: "flex", marginBottom: "0.7rem", border: `1px solid ${HUD.goldFaint}`, fontFamily: HUD_MONO, fontSize: "0.58rem", letterSpacing: "0.18em", textTransform: "uppercase", userSelect: "none" }}>
+    <div style={{ display: "flex", marginBottom: "0.7rem", border: `1px solid ${hud.goldFaint}`, fontFamily: HUD_MONO, fontSize: "0.58rem", letterSpacing: "0.18em", textTransform: "uppercase", userSelect: "none" }}>
       {tabs.map((t, i) => {
         const isActive = t.id === active;
         return (
           <button key={t.id} onClick={() => onSelect && onSelect(t.id)} style={{
-            flex: 1, padding: "0.4rem 0", border: "none", borderRight: i < tabs.length - 1 ? `1px solid ${HUD.goldFaint}` : "none",
-            background: isActive ? "rgba(107,199,209,0.14)" : "transparent", color: isActive ? HUD.cyan : HUD.muted,
-            textShadow: isActive ? `0 0 6px ${HUD.cyanDim}` : "none", fontFamily: "inherit", fontSize: "inherit", letterSpacing: "inherit", textTransform: "inherit",
+            flex: 1, padding: "0.4rem 0", border: "none", borderRight: i < tabs.length - 1 ? `1px solid ${hud.goldFaint}` : "none",
+            background: isActive ? `${hud.data}24` : "transparent", color: isActive ? hud.data : hud.muted,
+            textShadow: isActive ? `0 0 6px ${hud.dataDim}` : "none", fontFamily: "inherit", fontSize: "inherit", letterSpacing: "inherit", textTransform: "inherit",
             cursor: isActive ? "default" : "pointer", transition: "background 0.25s ease, color 0.25s ease",
           }}>{t.label}</button>
         );
@@ -140,21 +186,24 @@ export function HudTabs({ tabs, active, onSelect }) {
   );
 }
 
-export function HudDivider({ margin = "0 0 0.6rem" }) {
-  return <div style={{ height: 1, background: `linear-gradient(to right, transparent, ${HUD.goldFaint} 15%, ${HUD.goldFaint} 85%, transparent)`, margin }} />;
+export function HudDivider({ margin = "0 0 0.6rem", hud: hudProp }) {
+  const hud = useHud(hudProp);
+  return <div style={{ height: 1, background: `linear-gradient(to right, transparent, ${hud.goldFaint} 15%, ${hud.goldFaint} 85%, transparent)`, margin }} />;
 }
 
 /* One typed-body line. type: label · data · warn · note · blank · plain.
    Labels are padded to `pad` characters so "SAMPLE    HM-GOO-7741" columns
    line up in the monospace face, exactly as the /space body does. */
-export function HudLine({ type = "data", label, text, pad = 10, children }) {
+export function HudLine({ type = "data", label, text, pad = 10, children, hud: hudProp }) {
+  const hud = useHud(hudProp);
   if (type === "blank") return <div style={{ height: 10 }} />;
+  const warnColor = hud.warn || hud.orange;
   const voice = {
-    label: { color: HUD.goldDim },
-    data: { color: HUD.cyan, textShadow: `0 0 6px ${HUD.cyanDim}` },
-    warn: { color: HUD.orange, fontWeight: "bold", textShadow: "0 0 8px rgba(232,122,43,0.5)" },
-    note: { color: HUD.muted, fontStyle: "italic" },
-    plain: { color: HUD.cream },
+    label: { color: hud.goldDim },
+    data: { color: hud.data, textShadow: `0 0 6px ${hud.dataDim}` },
+    warn: { color: warnColor, fontWeight: "bold", textShadow: `0 0 8px ${warnColor}80` },
+    note: { color: hud.muted, fontStyle: "italic" },
+    plain: { color: hud.cream },
   }[type] || {};
   const body = label != null ? `${String(label).padEnd(pad)}${text ?? ""}` : text;
   return (
@@ -165,20 +214,22 @@ export function HudLine({ type = "data", label, text, pad = 10, children }) {
 }
 
 /* Section caption above the stats ("RIG ID: HM-09 HORIZON — EXTRACTION BAY"). */
-export function HudCaption({ children }) {
-  return <div style={{ fontFamily: HUD_MONO, fontSize: "0.54rem", letterSpacing: "0.2em", color: HUD.goldDim, textTransform: "uppercase", marginBottom: "0.65rem" }}>{children}</div>;
+export function HudCaption({ children, hud: hudProp }) {
+  const hud = useHud(hudProp);
+  return <div style={{ fontFamily: HUD_MONO, fontSize: "0.54rem", letterSpacing: "0.2em", color: hud.goldDim, textTransform: "uppercase", marginBottom: "0.65rem" }}>{children}</div>;
 }
 
 /* Two (or more) big stats with a hairline between. stats: [{ value, label, color }] */
-export function HudStats({ stats }) {
+export function HudStats({ stats, hud: hudProp }) {
+  const hud = useHud(hudProp);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "0.9rem" }}>
       {stats.map((s, i) => (
         <div key={i} style={{ display: "contents" }}>
-          {i > 0 && <div style={{ width: 1, height: 22, background: HUD.goldFaint, flexShrink: 0 }} />}
+          {i > 0 && <div style={{ width: 1, height: 22, background: hud.goldFaint, flexShrink: 0 }} />}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: HUD_DISPLAY, fontWeight: 700, fontSize: "1rem", color: s.color || HUD.cyan, letterSpacing: "0.03em", lineHeight: 1, textShadow: `0 0 8px ${(s.color || HUD.cyan)}66`, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.value}</div>
-            <div style={{ fontFamily: HUD_MONO, fontSize: "0.5rem", letterSpacing: "0.22em", color: HUD.muted, textTransform: "uppercase", marginTop: "0.2rem" }}>{s.label}</div>
+            <div style={{ fontFamily: HUD_DISPLAY, fontWeight: 700, fontSize: "1rem", color: s.color || hud.data, letterSpacing: "0.03em", lineHeight: 1, textShadow: `0 0 8px ${(s.color || hud.data)}66`, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.value}</div>
+            <div style={{ fontFamily: HUD_MONO, fontSize: "0.5rem", letterSpacing: "0.22em", color: hud.muted, textTransform: "uppercase", marginTop: "0.2rem" }}>{s.label}</div>
           </div>
         </div>
       ))}
@@ -187,7 +238,9 @@ export function HudStats({ stats }) {
 }
 
 /* The clipped-corner gold button ("Open Claim?"). No external CSS. */
-export function HudButton({ children, onClick, disabled, accent = HUD.gold, style }) {
+export function HudButton({ children, onClick, disabled, accent, style, hud: hudProp }) {
+  const hud = useHud(hudProp);
+  accent = accent || hud.gold;
   const cut = 8;
   return (
     <button onClick={onClick} disabled={disabled} style={{
@@ -201,7 +254,7 @@ export function HudButton({ children, onClick, disabled, accent = HUD.gold, styl
         clipPath: `polygon(0 0, calc(100% - ${cut}px) 0, 100% ${cut}px, 100% 100%, ${cut}px 100%, 0 calc(100% - ${cut}px))`,
       }} />
       <span aria-hidden style={{
-        position: "absolute", inset: 1, background: HUD.panelSolid,
+        position: "absolute", inset: 1, background: hud.panelSolid,
         clipPath: `polygon(0 0, calc(100% - ${cut - 1}px) 0, 100% ${cut - 1}px, 100% 100%, ${cut - 1}px 100%, 0 calc(100% - ${cut - 1}px))`,
       }} />
       <span style={{ position: "relative" }}>{children}</span>
@@ -210,9 +263,10 @@ export function HudButton({ children, onClick, disabled, accent = HUD.gold, styl
 }
 
 /* The faint hint under a panel ("[ click panel to dismiss ]"). */
-export function HudHint({ children, onClick }) {
+export function HudHint({ children, onClick, hud: hudProp }) {
+  const hud = useHud(hudProp);
   return (
-    <div onClick={onClick} style={{ marginTop: "0.7rem", fontFamily: HUD_MONO, fontSize: "0.48rem", letterSpacing: "0.2em", color: HUD.goldDim, textAlign: "center", textTransform: "uppercase", opacity: 0.7, cursor: onClick ? "pointer" : "default" }}>
+    <div onClick={onClick} style={{ marginTop: "0.7rem", fontFamily: HUD_MONO, fontSize: "0.48rem", letterSpacing: "0.2em", color: hud.goldDim, textAlign: "center", textTransform: "uppercase", opacity: 0.7, cursor: onClick ? "pointer" : "default" }}>
       {children}
     </div>
   );
