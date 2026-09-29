@@ -17,12 +17,13 @@
 // 2026-09-29: moved onto the HmHud kit — the /space telemetry panel's chrome
 // (Michelle: "the displays from /space still look better"): dark glass, gold
 // brackets, Orbitron title, the four mono voices, two big stats, the clipped
-// button. FIXED PALETTE: the card no longer follows the six console themes
-// (`theme` is accepted for the drop-in signature and otherwise unused).
+// button. Same day: the palette is TUNED PER THEME (`hudFor(theme)` →
+// THEME_HUD in lib/hailmaryThemes.js) — still a dark instrument screen on
+// every console, but in the theme's own ink, gold and bright.
 
 import { useEffect, useMemo, useState } from "react";
 import { fmtSpan, HEAT_COPY } from "@/lib/oilLoopV2";
-import { HUD, HUD_MONO, HudKeyframes, HudPanel, HudMeta, HudTitle, HudTabs, HudDivider, HudLine, HudCaption, HudStats, HudButton, HudHint, hudSmallBtn } from "@/components/HmHud";
+import { HUD_MONO, hudFor, HudKeyframes, HudPanel, HudMeta, HudTitle, HudTabs, HudDivider, HudLine, HudField, HudCaption, HudStats, HudButton, HudHint, hudSmallBtn } from "@/components/HmHud";
 
 const MONO = HUD_MONO;
 // taken = violet (2026-09-29, Michelle: amber sat too close to the pending gold).
@@ -33,7 +34,7 @@ const untilCopy = (ms, now) => (ms - now > 60000 ? `in ${fmtSpan(ms - now)}` : "
 
 /* The core cylinder — the claim's column as a core sample. One band per layer,
    L1 at the top. Fed by buildColumnRack(); callouts for the layer on the table. */
-function CoreCylinder({ rack, pending, width = 104, height = 236 }) {
+function CoreCylinder({ rack, pending, hud, width = 104, height = 236 }) {
   const n = rack.length || 20;
   const tubeX = 26, tubeY = 8, tubeW = 34, tubeH = height - 16;
   const bandH = tubeH / n;
@@ -66,7 +67,7 @@ function CoreCylinder({ rack, pending, width = 104, height = 236 }) {
         </pattern>
         <clipPath id="v3-clip"><rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={9} /></clipPath>
         <linearGradient id="v3-heat" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={HUD.red} stopOpacity="0.9" /><stop offset="1" stopColor={HUD.orange} stopOpacity="0.15" />
+          <stop offset="0" stopColor={hud.red} stopOpacity="0.9" /><stop offset="1" stopColor={hud.warn} stopOpacity="0.15" />
         </linearGradient>
         <filter id="v3-glow" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="1.6" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
@@ -81,7 +82,7 @@ function CoreCylinder({ rack, pending, width = 104, height = 236 }) {
           </rect>
         ))}
         {rack.filter((c) => c.hasInclusion && c.state !== "pending").map((c) => (
-          <circle key={`i${c.layer}`} cx={tubeX + tubeW * 0.5} cy={tubeY + bandH * c.layer + bandH / 2} r="1.6" fill={HUD.orange} opacity="0.85" />
+          <circle key={`i${c.layer}`} cx={tubeX + tubeW * 0.5} cy={tubeY + bandH * c.layer + bandH / 2} r="1.6" fill={hud.warn} opacity="0.85" />
         ))}
       </g>
       {/* heat: the ground under the bore head glows — two bands for "elevated"
@@ -94,37 +95,37 @@ function CoreCylinder({ rack, pending, width = 104, height = 236 }) {
           </rect>
         </g>
       )}
-      <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={9} fill="none" stroke={heat === "high" ? HUD.red : HUD.gold} strokeWidth="1" opacity="0.7" />
+      <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={9} fill="none" stroke={heat === "high" ? hud.red : hud.gold} strokeWidth="1" opacity="0.7" />
       <rect x={tubeX + 3} y={tubeY + 4} width={5} height={tubeH - 8} rx={2.5} fill="rgba(255,255,255,0.06)" />
       {reached > 0 && reached < n && (
         <g>
-          <line x1={tubeX - 3} y1={headY} x2={tubeX + tubeW + 3} y2={headY} stroke={HUD.gold} strokeWidth="1.5" />
-          <polygon points={`${tubeX - 9},${headY - 3.5} ${tubeX - 9},${headY + 3.5} ${tubeX - 3.5},${headY}`} fill={HUD.gold} />
+          <line x1={tubeX - 3} y1={headY} x2={tubeX + tubeW + 3} y2={headY} stroke={hud.gold} strokeWidth="1.5" />
+          <polygon points={`${tubeX - 9},${headY - 3.5} ${tubeX - 9},${headY + 3.5} ${tubeX - 3.5},${headY}`} fill={hud.gold} />
         </g>
       )}
-      <g fontFamily={MONO} fontSize="7" fill={HUD.muted} letterSpacing="0.05em">
+      <g fontFamily={MONO} fontSize="7" fill={hud.muted} letterSpacing="0.05em">
         {ticks.map((z) => {
           const y = tubeY + bandH * z + bandH / 2;
-          return (<g key={z}><line x1={tubeX - 5} y1={y} x2={tubeX} y2={y} stroke={HUD.muted} strokeWidth="0.8" opacity="0.6" /><text x={tubeX - 8} y={y + 2.5} textAnchor="end">L{z + 1}</text></g>);
+          return (<g key={z}><line x1={tubeX - 5} y1={y} x2={tubeX} y2={y} stroke={hud.muted} strokeWidth="0.8" opacity="0.6" /><text x={tubeX - 8} y={y + 2.5} textAnchor="end">L{z + 1}</text></g>);
         })}
       </g>
       {!p && reached > 0 && (
         <g fontFamily={MONO} letterSpacing="0.08em">
-          <text x={tubeX + tubeW + 8} y={headY - 3} fontSize="9" fill={HUD.gold} fontWeight="700">L{reached}</text>
-          <text x={tubeX + tubeW + 8} y={headY + 7} fontSize="6.5" fill={HUD.muted} letterSpacing="0.14em">BORE HEAD</text>
+          <text x={tubeX + tubeW + 8} y={headY - 3} fontSize="9" fill={hud.gold} fontWeight="700">L{reached}</text>
+          <text x={tubeX + tubeW + 8} y={headY + 7} fontSize="6.5" fill={hud.muted} letterSpacing="0.14em">BORE HEAD</text>
         </g>
       )}
       {p && (
         <g fontFamily={MONO} letterSpacing="0.08em">
           <line x1={tubeX + tubeW} y1={py} x2={tubeX + tubeW + 10} y2={py} stroke={WALL.pending} strokeWidth="0.8" opacity="0.8" />
           <text x={tubeX + tubeW + 13} y={py - 2} fontSize="8" fill={WALL.pending}>L{p.layer + 1}</text>
-          <text x={tubeX + tubeW + 13} y={py + 8} fontSize="7" fill={HUD.cream}>{(p.oil || 0) > 0 ? `${fmtBtr(p.oil)} BTR` : "DRY"}</text>
+          <text x={tubeX + tubeW + 13} y={py + 8} fontSize="7" fill={hud.cream}>{(p.oil || 0) > 0 ? `${fmtBtr(p.oil)} BTR` : "DRY"}</text>
           {p.hasInclusion && (
             <g filter="url(#v3-glow)">
-              <circle cx={tubeX + tubeW * 0.5} cy={py} r="2.4" fill={HUD.orange}>
+              <circle cx={tubeX + tubeW * 0.5} cy={py} r="2.4" fill={hud.warn}>
                 <animate attributeName="r" values="2.4;3.4;2.4" dur="1.6s" repeatCount="indefinite" />
               </circle>
-              <text x={tubeX + tubeW + 13} y={py + 17} fontSize="6" fill={HUD.orange} letterSpacing="0.15em">ANOM</text>
+              <text x={tubeX + tubeW + 13} y={py + 17} fontSize="6" fill={hud.warn} letterSpacing="0.15em">ANOM</text>
             </g>
           )}
         </g>
@@ -134,7 +135,7 @@ function CoreCylinder({ rack, pending, width = 104, height = 236 }) {
 }
 
 export default function OilCoreSampleV3({
-  theme, // accepted for the drop-in signature; the card runs the fixed HUD palette
+  theme, // picks the HUD palette (hudFor → THEME_HUD): the theme's ink, gold and bright
   pending, chargesRemaining, chargesCap, threshold,
   onDecide, onSetThreshold, salvage = [], onLateral, frontier = [], onWildcat, onWalk,
   cadence = null, rack = [], ledger = null,
@@ -153,6 +154,7 @@ export default function OilCoreSampleV3({
   // read-only, no verbs, with a nudge to claim. { col, row, owner } | null.
   spectator = null,
 }) {
+  const hud = hudFor(theme); // the theme's HUD palette (lib/hailmaryThemes THEME_HUD)
   const [tab, setTab] = useState("core"); // core | next | ledger
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
@@ -211,25 +213,25 @@ export default function OilCoreSampleV3({
 
   // ── pieces ──
   const PAD = 8; // label column beside the cylinder: "SAMPLE  L5 of 20"
-  const meta = { fontFamily: MONO, fontSize: "0.5rem", letterSpacing: "0.22em", color: HUD.muted, textTransform: "uppercase", lineHeight: 1.5 };
-  const noteText = { fontFamily: MONO, fontSize: "0.6rem", letterSpacing: "0.05em", lineHeight: 1.55, color: HUD.muted };
+  const meta = { fontFamily: MONO, fontSize: "0.5rem", letterSpacing: "0.22em", color: hud.muted, textTransform: "uppercase", lineHeight: 1.5 };
+  const noteText = { fontFamily: MONO, fontSize: "0.6rem", letterSpacing: "0.05em", lineHeight: 1.55, color: hud.muted };
   const windowBar = nextCoreLive && windowFrac != null && (
-    <div title="the reveal window — the next core lands somewhere in here, no later than the end" style={{ marginTop: "0.5rem", height: 3, background: HUD.goldFaint, overflow: "hidden" }}>
-      <div style={{ width: `${Math.round(windowFrac * 100)}%`, height: "100%", background: HUD.gold, opacity: 0.85, transition: "width 1s linear" }} />
+    <div title="the reveal window — the next core lands somewhere in here, no later than the end" style={{ marginTop: "0.5rem", height: 3, background: hud.goldFaint, overflow: "hidden" }}>
+      <div style={{ width: `${Math.round(windowFrac * 100)}%`, height: "100%", background: hud.gold, opacity: 0.85, transition: "width 1s linear" }} />
     </div>
   );
   const noteLineEl = note && <HudLine type="data" text={note} />;
   // CASING: the hot-zone decision. Shown whenever a string is armed or the
   // reading is hot; the button arms/disarms the next strike.
   const casingBlock = (heat || casingArmed) && onSetOrders && !seasonOver && (
-    <div style={{ marginTop: "0.6rem", padding: "0.5rem 0.6rem", border: `1px solid ${casingArmed ? HUD.orange : HUD.goldFaint}`, background: casingArmed ? "rgba(232,122,43,0.08)" : "transparent" }}>
+    <div style={{ marginTop: "0.6rem", padding: "0.5rem 0.6rem", border: `1px solid ${casingArmed ? hud.warn : hud.goldFaint}`, background: casingArmed ? "rgba(232,122,43,0.08)" : "transparent" }}>
       <HudLine type="label" pad={PAD} label="CASING" text={casingArmed ? "ARMED — the next layer is drilled behind steel" : casing > 0 ? `${casing} string${casing === 1 ? "" : "s"} on the rig` : "none on the rig"} />
       <HudLine type="note" text={casingArmed
         ? "Whatever the next layer holds is sealed off: hell never breaches, a motherlode is never produced. No charge, no core on the table."
         : heat === "high" ? "Case the next layer and lose whatever it is. Or ride it: the motherlode, or a breach."
         : "Casing seals the NEXT layer only. Arm it when the reading is HIGH — the hot cell is directly below then."} />
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: "0.35rem" }}>
-        <button style={hudSmallBtn(casingArmed ? HUD.red : HUD.orange, busy || (!casingArmed && casing <= 0))} disabled={busy || (!casingArmed && casing <= 0)}
+        <button style={hudSmallBtn(casingArmed ? hud.red : hud.warn, busy || (!casingArmed && casing <= 0), hud)} disabled={busy || (!casingArmed && casing <= 0)}
           onClick={() => run(() => onSetOrders({ caseNext: !casingArmed }), casingArmed ? "casing disarmed — the next layer comes to the table" : "✔ casing armed — the next layer is drilled behind steel")}>
           {casingArmed ? "Disarm casing" : "Case the next layer"}
         </button>
@@ -242,16 +244,15 @@ export default function OilCoreSampleV3({
   const core = pending ? (
     <>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-        <CoreCylinder rack={rack} pending={pending} />
+        <CoreCylinder rack={rack} pending={pending} hud={hud} />
         <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
-          <HudLine type="label" pad={PAD} label="SAMPLE" text={`L${pending.layer + 1} of ${n}`} />
-          <HudLine type="label" pad={PAD} label="CLASS" text={dry ? "Dry shale" : pending.hasInclusion ? "Wet · anomalous" : "Wet core"} />
-          <HudLine type="blank" />
-          <HudLine type="data" pad={PAD} label="Assay" text={dry ? "dry" : `${fmtBtr(oil)} BTR`} />
-          <HudLine type="data" pad={PAD} label="Temp" text={heatCopy.temp} />
-          <HudLine type="data" pad={PAD} label="Crew" text={`would ${crewWould.toLowerCase()}`} />
-          <HudLine type="data" pad={PAD} label="By" text={deadline ? `${deadline.at} · ${deadline.until}` : columnDone || seasonOver || clockOut ? "the buzzer" : "the next strike"} />
-          <HudLine type="data" pad={PAD} label="Charges" text={`${chargesRemaining} of ${chargesCap}`} />
+          <HudField voice="label" label="Sample" value={`L${pending.layer + 1} of ${n}`} />
+          <HudField voice="label" label="Class" value={dry ? "Dry shale" : pending.hasInclusion ? "Wet · anomalous" : "Wet core"} />
+          <HudField label="Assay" value={dry ? "dry" : `${fmtBtr(oil)} BTR`} color={dry ? hud.muted : undefined} />
+          <HudField label="Temp" value={heatCopy.temp} color={heat === "high" ? hud.red : heat ? hud.warn : undefined} />
+          <HudField label="Crew" value={`would ${crewWould.toLowerCase()}`} color={crewWould === "EXTRACT" ? hud.green : undefined} />
+          <HudField label="By" value={deadline ? `${deadline.at} · ${deadline.until}` : columnDone || seasonOver || clockOut ? "the buzzer" : "the next strike"} />
+          <HudField label="Charges" value={`${chargesRemaining} of ${chargesCap}`} color={chargesRemaining > 0 ? undefined : hud.red} />
         </div>
       </div>
       <HudLine type="blank" />
@@ -268,14 +269,14 @@ export default function OilCoreSampleV3({
       <HudDivider margin="0.6rem 0 0.5rem" />
       <HudCaption>ON THE TABLE · L{pending.layer + 1}</HudCaption>
       <HudStats stats={[
-        { value: dry ? "DRY" : `${fmtBtr(oil)} BTR`, label: "assay", color: dry ? HUD.muted : HUD.cyan },
-        { value: `${chargesRemaining}/${chargesCap}`, label: "charges", color: chargesRemaining > 0 ? HUD.orange : HUD.red },
+        { value: dry ? "DRY" : `${fmtBtr(oil)} BTR`, label: "assay", color: dry ? hud.muted : hud.cyan },
+        { value: `${chargesRemaining}/${chargesCap}`, label: "charges", color: chargesRemaining > 0 ? hud.warn : hud.red },
       ]} />
       {/* ONE BUTTON (Michelle, 2026-09-28): EXTRACT keeps it now. Doing nothing
           hands the layer to the crew's orders at the next strike. No pass
           control on the card (2026-09-29). */}
       <div style={{ marginTop: "0.9rem", display: "flex", justifyContent: "center" }}>
-        <HudButton accent={HUD.green} disabled={busy || chargesRemaining <= 0}
+        <HudButton accent={hud.green} disabled={busy || chargesRemaining <= 0}
           onClick={() => run(() => onDecide("extract"), (d) => oil > 0 ? `✔ extracted — ${fmtBtr(oil)} BTR banked${d?.inclusion ? " · inclusion → ARTIFACTS" : ""}` : d?.inclusion ? "✔ dug it up — inclusion → ARTIFACTS" : "✔ extracted — the layer was dry")}>
           Extract −1⚡
         </HudButton>
@@ -284,15 +285,14 @@ export default function OilCoreSampleV3({
   ) : (
     <>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-        <CoreCylinder rack={rack} pending={null} />
+        <CoreCylinder rack={rack} pending={null} hud={hud} />
         <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
-          <HudLine type="label" pad={PAD} label="BORE" text={`L${revealedCount} of ${n}`} />
-          <HudLine type="label" pad={PAD} label="TABLE" text="nothing on it" />
-          <HudLine type="blank" />
-          <HudLine type="data" pad={PAD} label="Banked" text={`${fmtBtr(ledger?.banked || 0)} BTR`} />
-          {heat && <HudLine type="data" pad={PAD} label="Temp" text={heatCopy.temp} />}
-          {nextCoreLive && <HudLine type="data" pad={PAD} label="Pace" text={`a core every ${fmtSpan(cadence.intervalMs)}`} />}
-          <HudLine type="data" pad={PAD} label="Charges" text={`${chargesRemaining} of ${chargesCap}`} />
+          <HudField voice="label" label="Bore head" value={`L${revealedCount} of ${n}`} />
+          <HudField voice="label" label="Table" value="nothing on it" color={hud.muted} />
+          <HudField label="Banked" value={`${fmtBtr(ledger?.banked || 0)} BTR`} />
+          {heat && <HudField label="Temp" value={heatCopy.temp} color={heat === "high" ? hud.red : hud.warn} />}
+          {nextCoreLive && <HudField label="Pace" value={`a core every ${fmtSpan(cadence.intervalMs)}`} />}
+          <HudField label="Charges" value={`${chargesRemaining} of ${chargesCap}`} color={chargesRemaining > 0 ? undefined : hud.red} />
         </div>
       </div>
       <HudLine type="blank" />
@@ -308,9 +308,9 @@ export default function OilCoreSampleV3({
       <HudCaption>{nextCoreLive ? `NEXT CORE · BEFORE ${clockOf(cadence.latestMs)}` : "YOUR RIG"}</HudCaption>
       <HudStats stats={[
         nextCoreLive
-          ? { value: cadence.latestMs - nowMs > 60000 ? `≤ ${fmtSpan(cadence.latestMs - nowMs)}` : "ANY MOMENT", label: "next core", color: HUD.cyan }
-          : { value: `${fmtBtr(ledger?.banked || 0)} BTR`, label: "banked", color: HUD.cyan },
-        { value: `${chargesRemaining}/${chargesCap}`, label: "charges", color: chargesRemaining > 0 ? HUD.orange : HUD.red },
+          ? { value: cadence.latestMs - nowMs > 60000 ? `≤ ${fmtSpan(cadence.latestMs - nowMs)}` : "ANY MOMENT", label: "next core", color: hud.cyan }
+          : { value: `${fmtBtr(ledger?.banked || 0)} BTR`, label: "banked", color: hud.cyan },
+        { value: `${chargesRemaining}/${chargesCap}`, label: "charges", color: chargesRemaining > 0 ? hud.warn : hud.red },
       ]} />
       {windowBar}
     </>
@@ -324,14 +324,14 @@ export default function OilCoreSampleV3({
       <HudLine type="blank" />
       {nextDoor.length === 0 && <HudLine type="plain" text="Nothing open next door yet. Passed layers and unclaimed ground in reach show here." />}
       {shown.map((r) => (
-        <div key={`${r.kind}_${r.col}_${r.row}_${r.layer}`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "0.35rem 0", borderBottom: `1px solid ${HUD.goldFaint}` }}>
+        <div key={`${r.kind}_${r.col}_${r.row}_${r.layer}`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "0.35rem 0", borderBottom: `1px solid ${hud.goldFaint}` }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ ...meta, color: r.kind === "salvage" ? HUD.green : HUD.gold }}>{r.kind === "salvage" ? "SALVAGE" : "WILDCAT"} · ({r.col + 1},{r.row + 1}) · L{r.layer + 1}</div>
-            <div style={{ fontFamily: MONO, fontSize: "0.64rem", letterSpacing: "0.05em", color: HUD.cyan, textShadow: `0 0 6px ${HUD.cyanDim}` }}>
-              {r.kind === "salvage" ? (r.oil > 0 ? `${fmtBtr(r.oil)} BTR` : "dry") : "assay unknown"}{r.hasInclusion && <span style={{ color: HUD.orange }}> · inclusion</span>}
+            <div style={{ ...meta, color: r.kind === "salvage" ? hud.green : hud.gold }}>{r.kind === "salvage" ? "SALVAGE" : "WILDCAT"} · ({r.col + 1},{r.row + 1}) · L{r.layer + 1}</div>
+            <div style={{ fontFamily: MONO, fontSize: "0.64rem", letterSpacing: "0.05em", color: hud.cyan, textShadow: `0 0 6px ${hud.cyanDim}` }}>
+              {r.kind === "salvage" ? (r.oil > 0 ? `${fmtBtr(r.oil)} BTR` : "dry") : "assay unknown"}{r.hasInclusion && <span style={{ color: hud.warn }}> · inclusion</span>}
             </div>
           </div>
-          <button style={hudSmallBtn(r.kind === "salvage" ? HUD.green : HUD.gold, busy || chargesRemaining <= 0)} disabled={busy || chargesRemaining <= 0}
+          <button style={hudSmallBtn(r.kind === "salvage" ? hud.green : hud.gold, busy || chargesRemaining <= 0, hud)} disabled={busy || chargesRemaining <= 0}
             onClick={() => r.kind === "salvage"
               ? run(() => onLateral(r), (x) => `✔ salvaged (${r.col + 1},${r.row + 1}) L${r.layer + 1}${x?.inclusion ? " · inclusion → ARTIFACTS" : r.oil > 0 ? ` — ${fmtBtr(r.oil)} BTR banked` : ""}`)
               : run(() => onWildcat(r), (x) => x?.hell ? (x.tonicCapped ? "☠ hit hell — tonic capped it" : "☠ woke a demon") : x?.oil > 0 ? `✔ struck — ${fmtBtr(x.oil)} BTR banked` : x?.inclusion ? "✔ dry… but an inclusion → ARTIFACTS" : "✗ dry hole — the charge is spent")}>
@@ -340,15 +340,15 @@ export default function OilCoreSampleV3({
         </div>
       ))}
       {nextDoor.length > 2 && (
-        <button style={{ ...hudSmallBtn(HUD.muted, false), marginTop: "0.5rem" }} onClick={() => setSeeAll((v) => !v)}>{seeAll ? "Show fewer" : `See all (${nextDoor.length})`}</button>
+        <button style={{ ...hudSmallBtn(hud.muted, false, hud), marginTop: "0.5rem" }} onClick={() => setSeeAll((v) => !v)}>{seeAll ? "Show fewer" : `See all (${nextDoor.length})`}</button>
       )}
-      {onWalk && <div style={{ marginTop: "0.6rem", display: "flex", alignItems: "center", gap: 8 }}><button style={hudSmallBtn(HUD.gold, busy)} onClick={onWalk}>🥾 Walk the field</button><span style={noteText}>E digs frontier · ESC returns</span></div>}
+      {onWalk && <div style={{ marginTop: "0.6rem", display: "flex", alignItems: "center", gap: 8 }}><button style={hudSmallBtn(hud.gold, busy, hud)} onClick={onWalk}>🥾 Walk the field</button><span style={noteText}>E digs frontier · ESC returns</span></div>}
       {noteLineEl}
       <HudDivider margin="0.6rem 0 0.5rem" />
       <HudCaption>BEYOND YOUR FENCE</HudCaption>
       <HudStats stats={[
-        { value: String(salvage.length), label: "open pockets", color: salvage.length ? HUD.green : HUD.muted },
-        { value: String(frontier.length), label: "frontier in reach", color: frontier.length ? HUD.cyan : HUD.muted },
+        { value: String(salvage.length), label: "open pockets", color: salvage.length ? hud.green : hud.muted },
+        { value: String(frontier.length), label: "frontier in reach", color: frontier.length ? hud.cyan : hud.muted },
       ]} />
     </>
   );
@@ -362,18 +362,18 @@ export default function OilCoreSampleV3({
       {L.salvagedIn > 0 && <HudLine type="data" pad={10} label="Salvaged" text={`+${fmtBtr(L.salvagedIn)} BTR next door`} />}
       {(L.wildcatIn > 0 || L.wildcatDry > 0 || L.wildcatHell > 0) && <HudLine type="data" pad={10} label="Wildcats" text={`+${fmtBtr(L.wildcatIn)} BTR${L.wildcatDry ? ` · ${L.wildcatDry} dry` : ""}${L.wildcatHell ? ` · ${L.wildcatHell} hell` : ""}`} />}
       <HudLine type="blank" />
-      <div style={{ borderTop: `1px solid ${HUD.goldFaint}`, paddingTop: "0.35rem" }}>
+      <div style={{ borderTop: `1px solid ${hud.goldFaint}`, paddingTop: "0.35rem" }}>
         {L.rows.length === 0 ? <HudLine type="note" text="Nothing yet — the first strike puts a core on the table." />
           : L.rows.map((r, i) => (
             <div key={`${r.kind}_${r.col ?? "o"}_${r.row ?? "o"}_${r.layer}_${i}`} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontFamily: MONO, fontSize: "0.6rem", letterSpacing: "0.05em", lineHeight: 1.6 }}>
-              <span style={{ color: HUD.cream }}>
+              <span style={{ color: hud.cream }}>
                 {r.kind === "extract" && `L${r.layer + 1} · extract`}
                 {r.kind === "pass" && `L${r.layer + 1} · pass${r.takenBy ? " · a neighbour took it" : r.oil > 0 ? " · still open" : " · dry"}`}
                 {r.kind === "cased" && `L${r.layer + 1} · cased through${r.hell ? " · hell, sealed" : r.oil > 0 ? " · a pay zone, cased off" : " · shale"}`}
                 {r.kind === "salvage" && `salvage (${r.col + 1},${r.row + 1}) L${r.layer + 1}`}
                 {r.kind === "wildcat" && `wildcat (${r.col + 1},${r.row + 1}) L${r.layer + 1}${r.hell ? " · hell" : r.oil > 0 ? "" : " · dry hole"}`}
               </span>
-              <span style={{ color: r.kind === "cased" ? WALL.cased : r.kind === "pass" ? (r.takenBy ? HUD.violet : HUD.muted) : r.oil > 0 ? HUD.green : HUD.muted, whiteSpace: "nowrap" }}>
+              <span style={{ color: r.kind === "cased" ? WALL.cased : r.kind === "pass" ? (r.takenBy ? hud.violet : hud.muted) : r.oil > 0 ? hud.green : hud.muted, whiteSpace: "nowrap" }}>
                 {r.kind === "cased" ? (r.hell ? "sealed" : `${fmtBtr(r.oil)} behind steel`) : r.kind === "pass" ? `${fmtBtr(r.oil)} let go` : `${r.oil > 0 ? `+${fmtBtr(r.oil)}` : "+0"} · −${r.charge}⚡`}
               </span>
             </div>
@@ -383,8 +383,8 @@ export default function OilCoreSampleV3({
       <HudDivider margin="0.6rem 0 0.5rem" />
       <HudCaption>SEASON TO DATE</HudCaption>
       <HudStats stats={[
-        { value: `${fmtBtr(L.banked)} BTR`, label: "banked", color: HUD.cyan },
-        { value: `${L.chargesSpent}/${chargesCap}`, label: "charges spent", color: HUD.orange },
+        { value: `${fmtBtr(L.banked)} BTR`, label: "banked", color: hud.cyan },
+        { value: `${L.chargesSpent}/${chargesCap}`, label: "charges spent", color: hud.warn },
       ]} />
     </>
   );
@@ -400,20 +400,19 @@ export default function OilCoreSampleV3({
     return (
       <div style={{ margin: "8px 0" }}>
         <HudKeyframes />
-        <HudPanel>
-          <HudMeta index={`${String(revealedCount).padStart(2, "0")}/${n}`} label="Field view" status={seasonOver ? "CLOSED" : "LIVE"} lamp={seasonOver ? HUD.gold : HUD.orange} blink={!seasonOver} />
+        <HudPanel hud={hud}>
+          <HudMeta index={`${String(revealedCount).padStart(2, "0")}/${n}`} label="Field view" status={seasonOver ? "CLOSED" : "LIVE"} lamp={seasonOver ? hud.gold : hud.warn} blink={!seasonOver} />
           <HudTitle subtitle={hasPlot ? `Plot (${sp.col + 1},${sp.row + 1}) · ${sp.owner ? sp.owner : "unclaimed"}` : "Select a plot on the field"} />
           <HudDivider />
           <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-            <CoreCylinder rack={rack} pending={null} />
+            <CoreCylinder rack={rack} pending={null} hud={hud} />
             <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
-              <HudLine type="label" pad={PAD} label="OWNER" text={hasPlot ? (sp.owner || "nobody yet") : "—"} />
-              <HudLine type="label" pad={PAD} label="BORE" text={`L${revealedCount} of ${n}`} />
-              <HudLine type="blank" />
-              <HudLine type="data" pad={PAD} label="Kept" text={`${extractedN} layer${extractedN === 1 ? "" : "s"}`} />
-              <HudLine type="data" pad={PAD} label="Open" text={`${openN} pocket${openN === 1 ? "" : "s"}${takenN ? ` · ${takenN} taken` : ""}`} />
-              {hellN > 0 && <HudLine type="data" pad={PAD} label="Hell" text={`${hellN} pocket${hellN === 1 ? "" : "s"}`} />}
-              {rack.some((c) => c.state === "cased") && <HudLine type="data" pad={PAD} label="Cased" text={`${rack.filter((c) => c.state === "cased").length} layer${rack.filter((c) => c.state === "cased").length === 1 ? "" : "s"}`} />}
+              <HudField voice="label" label="Owner" value={hasPlot ? (sp.owner || "nobody yet") : "—"} />
+              <HudField voice="label" label="Bore head" value={`L${revealedCount} of ${n}`} />
+              <HudField label="Kept" value={`${extractedN} layer${extractedN === 1 ? "" : "s"}`} />
+              <HudField label="Open" value={`${openN} pocket${openN === 1 ? "" : "s"}${takenN ? ` · ${takenN} taken` : ""}`} color={openN ? hud.green : undefined} />
+              {hellN > 0 && <HudField label="Hell" value={`${hellN} pocket${hellN === 1 ? "" : "s"}`} color={hud.red} />}
+              {rack.some((c) => c.state === "cased") && <HudField label="Cased" value={`${rack.filter((c) => c.state === "cased").length} layer${rack.filter((c) => c.state === "cased").length === 1 ? "" : "s"}`} color={WALL.cased} />}
             </div>
           </div>
           <HudLine type="blank" />
@@ -426,8 +425,8 @@ export default function OilCoreSampleV3({
           <HudDivider margin="0.6rem 0 0.5rem" />
           <HudCaption>{hasPlot ? `PLOT (${sp.col + 1},${sp.row + 1}) — HAIL MARY FIELD` : "HAIL MARY FIELD"}</HudCaption>
           <HudStats stats={[
-            { value: `${revealedCount}/${n}`, label: "revealed", color: HUD.cyan },
-            { value: String(openN), label: "open pockets", color: openN ? HUD.green : HUD.muted },
+            { value: `${revealedCount}/${n}`, label: "revealed", color: hud.cyan },
+            { value: String(openN), label: "open pockets", color: openN ? hud.green : hud.muted },
           ]} />
           {/* CLAIM — present only when the page says the server would accept it
               (registration pre-anchor for players; testers while testing is on).
@@ -447,8 +446,8 @@ export default function OilCoreSampleV3({
   return (
     <div style={{ margin: "8px 0" }}>
       <HudKeyframes />
-      <HudPanel>
-        <HudMeta index={`${String(revealedCount).padStart(2, "0")}/${n}`} label="Field extraction report" status={seasonOver ? "CLOSED" : "LIVE"} lamp={seasonOver ? HUD.gold : HUD.orange} blink={!seasonOver} />
+      <HudPanel hud={hud}>
+        <HudMeta index={`${String(revealedCount).padStart(2, "0")}/${n}`} label="Field extraction report" status={seasonOver ? "CLOSED" : "LIVE"} lamp={seasonOver ? hud.gold : hud.warn} blink={!seasonOver} />
         <HudTitle subtitle={cadenceLine} />
         <HudTabs
           tabs={[{ id: "core", label: "Core sample" }, { id: "next", label: `Next door${nextDoor.length ? ` · ${nextDoor.length}` : ""}` }, { id: "ledger", label: "Ledger" }]}
@@ -462,13 +461,13 @@ export default function OilCoreSampleV3({
           [ crew orders · keep ≥ {fmtBtr(T)} BTR · lateral extract {orders?.salvage ? "on" : "off"} · {orders?.autopilot ? "auto-pilot" : "orders"} {ordersOpen ? "▴" : "▾"} ]
         </HudHint>
         {ordersOpen && (
-          <div style={{ marginTop: "0.5rem", borderTop: `1px solid ${HUD.goldFaint}`, paddingTop: "0.5rem" }}>
+          <div style={{ marginTop: "0.5rem", borderTop: `1px solid ${hud.goldFaint}`, paddingTop: "0.5rem" }}>
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
               <span style={noteText}>while you&apos;re away, keep anything ≥</span>
               <input value={thrDraft ?? String(Math.round(T))} inputMode="numeric" onChange={(e) => setThrDraft(e.target.value.replace(/[^\d]/g, ""))}
-                style={{ fontFamily: MONO, fontSize: "0.64rem", width: 64, padding: "3px 5px", background: "rgba(0,0,0,0.35)", color: HUD.cyan, border: `1px solid ${HUD.goldFaint}`, borderRadius: 2 }} />
+                style={{ fontFamily: MONO, fontSize: "0.64rem", width: 64, padding: "3px 5px", background: "rgba(0,0,0,0.35)", color: hud.cyan, border: `1px solid ${hud.goldFaint}`, borderRadius: 2 }} />
               <span style={noteText}>BTR</span>
-              <button style={hudSmallBtn(HUD.gold, busy || thrDraft == null)} disabled={busy || thrDraft == null}
+              <button style={hudSmallBtn(hud.gold, busy || thrDraft == null, hud)} disabled={busy || thrDraft == null}
                 onClick={() => { const v = Number(thrDraft); if (!Number.isFinite(v) || v < 0) return; run(() => onSetThreshold(v).then(() => setThrDraft(null)), `✔ crew orders set: keep ≥ ${fmtBtr(v)}`); }}>Set</button>
             </div>
             {onSetOrders && [
@@ -476,12 +475,12 @@ export default function OilCoreSampleV3({
               ["autopilot", "AUTO-PILOT", "once you can afford every layer left in your column, the crew keeps each wet one as it comes up, above your line or not. Dry layers still pass free. Off = ORDERS: the crew follows your line on every layer, and runs lateral extract if it's on. Nothing more."],
               ["caseOnHeat", "CASE ON HEAT", "when a core reads HIGH (a hot cell directly below) and a casing string is on the rig, the crew drills the next layer behind steel. Hell never breaches; a motherlode is cased off. Off = you arm the casing yourself."],
             ].map(([key, name, desc]) => (
-              <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "0.4rem 0", borderTop: `1px solid ${HUD.goldFaint}`, marginTop: "0.4rem" }}>
+              <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "0.4rem 0", borderTop: `1px solid ${hud.goldFaint}`, marginTop: "0.4rem" }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ ...meta, color: orders?.[key] ? HUD.gold : HUD.cream }}>{name} · {orders?.[key] ? "ON" : "OFF"}</div>
+                  <div style={{ ...meta, color: orders?.[key] ? hud.gold : hud.cream }}>{name} · {orders?.[key] ? "ON" : "OFF"}</div>
                   <div style={noteText}>{desc}</div>
                 </div>
-                <button style={hudSmallBtn(orders?.[key] ? HUD.red : HUD.gold, busy)} disabled={busy}
+                <button style={hudSmallBtn(orders?.[key] ? hud.red : hud.gold, busy, hud)} disabled={busy}
                   onClick={() => run(() => onSetOrders({ [key]: !orders?.[key] }), `✔ ${name.toLowerCase()} ${orders?.[key] ? "off" : "on"}`)}>
                   {orders?.[key] ? "Turn off" : "Turn on"}
                 </button>

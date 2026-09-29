@@ -126,7 +126,7 @@ order: *"if you're away, the crew follows your standing order (extract ≥ 800) 
 - **Six theme palettes** ship: `light`, `duskLight`, `Geode`, `dark`, `solsticeLight`,
   `parabolumDark` (`hailmary/page.js` ~258–400). Components receive `theme` tokens
   (`text`, `muted`, `gold`, `green`, `red`, `warn`, `border`, `accent`); a design must
-  hold in all six. **Superseded 2026-09-29 for the v2 cards:** the V3 core sample, the spectator card and the reckoning run the `HmHud` fixed palette (the /space panel) in every theme; the page chrome around them still follows the six. The FINAL HAUL card is the older exception (fixed dark palette for PNG
+  hold in all six. **2026-09-29:** the V3 core sample, the spectator card and the reckoning run the `HmHud` kit (the /space panel) — a dark instrument screen on every console, **tuned per theme** (`THEME_HUD` in `lib/hailmaryThemes.js`, merged by `hudFor(theme)`): the glass is the theme's own ink, the brackets its gold, the data colour a bright that belongs to it (teal on the paper consoles, echoing the survey map's BTR swatch; cyan on the blue ones; mint on the violet). Michelle: the fixed /space palette clashed with the light consoles; this keeps the vibrancy and matches. The column beside the cylinder uses label-over-value fields (`HudField`), not padded lines — they wrapped word by word. The FINAL HAUL card is the older exception (fixed dark palette for PNG
   capture).
 - **Phone first**: the card lives in a panel column under the 3D tab; 16 px gutters, no
   horizontal scroll; the rack is 20 cells wide on a ~360 px column.
