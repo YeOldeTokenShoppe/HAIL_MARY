@@ -50,7 +50,7 @@ function CoreCylinder({ rack, pending, hud, width = 104, height = 236 }) {
     : c.state === "hell_capped" ? WALL.capped
     : c.state === "cased" ? WALL.cased
     : c.state === "dry" ? WALL.dry
-    : c.state === "revealed" ? "rgba(255,255,255,0.10)"
+    : c.state === "revealed" ? (hud.light ? "rgba(60,40,10,0.14)" : "rgba(255,255,255,0.10)")
     : "url(#v3-strata)";
   const p = pending && typeof pending.layer === "number" ? pending : null;
   const py = p ? tubeY + bandH * p.layer + bandH / 2 : null;
@@ -73,7 +73,7 @@ function CoreCylinder({ rack, pending, hud, width = 104, height = 236 }) {
           <feGaussianBlur stdDeviation="1.6" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
       </defs>
-      <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={9} fill="rgba(0,0,0,0.28)" />
+      <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={9} fill={hud.light ? "rgba(60,40,10,0.12)" : "rgba(0,0,0,0.28)"} />
       <g clipPath="url(#v3-clip)">
         {rack.map((c) => (
           <rect key={c.layer} x={tubeX} y={tubeY + bandH * c.layer} width={tubeW} height={bandH + 0.5} fill={fillFor(c)}
@@ -402,7 +402,7 @@ export default function OilCoreSampleV3({
         <HudKeyframes />
         <HudPanel hud={hud}>
           <HudMeta index={`${String(revealedCount).padStart(2, "0")}/${n}`} label="Field view" status={seasonOver ? "CLOSED" : "LIVE"} lamp={seasonOver ? hud.gold : hud.warn} blink={!seasonOver} />
-          <HudTitle subtitle={hasPlot ? `Plot (${sp.col + 1},${sp.row + 1}) · ${sp.owner ? sp.owner : "unclaimed"}` : "Select a plot on the field"} />
+          <HudTitle title={null} subtitle={hasPlot ? `Plot (${sp.col + 1},${sp.row + 1}) · ${sp.owner ? sp.owner : "unclaimed"}` : "Select a plot on the field"} />
           <HudDivider />
           <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
             <CoreCylinder rack={rack} pending={null} hud={hud} />
@@ -448,7 +448,7 @@ export default function OilCoreSampleV3({
       <HudKeyframes />
       <HudPanel hud={hud}>
         <HudMeta index={`${String(revealedCount).padStart(2, "0")}/${n}`} label="Field extraction report" status={seasonOver ? "CLOSED" : "LIVE"} lamp={seasonOver ? hud.gold : hud.warn} blink={!seasonOver} />
-        <HudTitle subtitle={cadenceLine} />
+        <HudTitle title={null} subtitle={cadenceLine} />
         <HudTabs
           tabs={[{ id: "core", label: "Core sample" }, { id: "next", label: `Next door${nextDoor.length ? ` · ${nextDoor.length}` : ""}` }, { id: "ledger", label: "Ledger" }]}
           active={tab} onSelect={setTab} />

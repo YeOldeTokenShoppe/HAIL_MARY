@@ -101,7 +101,9 @@ export function HudPanel({ children, style, solid = false, innerRef, hud: hudPro
       border: `1px solid ${hud.goldFaint}`,
       backdropFilter: solid ? undefined : "blur(6px) saturate(140%)",
       WebkitBackdropFilter: solid ? undefined : "blur(6px) saturate(140%)",
-      boxShadow: `0 0 0 1px rgba(0,0,0,0.35), 0 20px 40px -10px rgba(0,0,0,0.45), inset 0 1px 0 ${hud.goldFaint}`,
+      boxShadow: hud.light
+        ? `0 1px 0 ${hud.goldFaint}, 0 10px 24px -14px rgba(60,40,10,0.35), inset 0 1px 0 rgba(255,255,255,0.5)`
+        : `0 0 0 1px rgba(0,0,0,0.35), 0 20px 40px -10px rgba(0,0,0,0.45), inset 0 1px 0 ${hud.goldFaint}`,
       transform: "translateZ(0)",
       isolation: "isolate",
       ...style,
@@ -122,7 +124,7 @@ export function HudField({ label, value, voice = "data", color, hud: hudProp }) 
   return (
     <div style={{ marginBottom: "0.32rem", minWidth: 0 }}>
       <div style={{ fontFamily: HUD_MONO, fontSize: "0.48rem", letterSpacing: "0.2em", textTransform: "uppercase", color: voice === "data" ? hud.muted : hud.goldDim, lineHeight: 1.3 }}>{label}</div>
-      <div style={{ fontFamily: HUD_MONO, fontSize: "0.66rem", letterSpacing: "0.04em", lineHeight: 1.3, color: valueColor, textShadow: voice === "data" && !color ? `0 0 6px ${hud.dataDim}` : "none", overflowWrap: "anywhere" }}>{value}</div>
+      <div style={{ fontFamily: HUD_MONO, fontSize: "0.66rem", letterSpacing: "0.04em", lineHeight: 1.3, color: valueColor, textShadow: voice === "data" && !color && !hud.light ? `0 0 6px ${hud.dataDim}` : "none", overflowWrap: "anywhere" }}>{value}</div>
     </div>
   );
 }
@@ -138,7 +140,7 @@ export function HudMeta({ index, label, status = "LIVE", lamp, blink = true, hud
       paddingBottom: "0.55rem", marginBottom: "0.7rem", borderBottom: `1px solid ${hud.goldFaint}`,
     }}>
       <span>
-        {index && <span style={{ color: hud.data, textShadow: `0 0 6px ${hud.dataDim}` }}>{index}</span>}
+        {index && <span style={{ color: hud.data, textShadow: hud.light ? "none" : `0 0 6px ${hud.dataDim}` }}>{index}</span>}
         {index ? " // " : ""}{label}
       </span>
       {status && (
@@ -152,15 +154,20 @@ export function HudMeta({ index, label, status = "LIVE", lamp, blink = true, hud
 }
 
 /* Title + subtitle. */
+/* Title + subtitle. `title={null}` drops the heading (Michelle, 2026-09-29:
+   the company name on every card was noise — the page section already names
+   the card), leaving the gold line as the card's one heading. */
 export function HudTitle({ title = <>HAIL MARY<br />PROSPECTING CO.</>, subtitle, hud: hudProp }) {
   const hud = useHud(hudProp);
   return (
     <>
-      <h2 style={{ margin: "0 0 0.35rem", fontFamily: HUD_DISPLAY, fontWeight: 800, fontSize: "1.05rem", lineHeight: 1.15, letterSpacing: "0.08em", color: hud.cream, textShadow: `0 0 14px ${hud.goldFaint}` }}>
-        {title}
-      </h2>
+      {title && (
+        <h2 style={{ margin: "0 0 0.35rem", fontFamily: HUD_DISPLAY, fontWeight: 800, fontSize: "1.05rem", lineHeight: 1.15, letterSpacing: "0.08em", color: hud.cream, textShadow: hud.light ? "none" : `0 0 14px ${hud.goldFaint}` }}>
+          {title}
+        </h2>
+      )}
       {subtitle && (
-        <div style={{ fontFamily: HUD_MONO, fontSize: "0.58rem", letterSpacing: "0.15em", color: hud.gold, textTransform: "uppercase", marginBottom: "0.7rem" }}>{subtitle}</div>
+        <div style={{ fontFamily: HUD_MONO, fontSize: title ? "0.58rem" : "0.66rem", letterSpacing: "0.15em", color: hud.gold, textTransform: "uppercase", marginBottom: "0.7rem", lineHeight: 1.4 }}>{subtitle}</div>
       )}
     </>
   );
@@ -177,7 +184,7 @@ export function HudTabs({ tabs, active, onSelect, hud: hudProp }) {
           <button key={t.id} onClick={() => onSelect && onSelect(t.id)} style={{
             flex: 1, padding: "0.4rem 0", border: "none", borderRight: i < tabs.length - 1 ? `1px solid ${hud.goldFaint}` : "none",
             background: isActive ? `${hud.data}24` : "transparent", color: isActive ? hud.data : hud.muted,
-            textShadow: isActive ? `0 0 6px ${hud.dataDim}` : "none", fontFamily: "inherit", fontSize: "inherit", letterSpacing: "inherit", textTransform: "inherit",
+            textShadow: isActive && !hud.light ? `0 0 6px ${hud.dataDim}` : "none", fontFamily: "inherit", fontSize: "inherit", letterSpacing: "inherit", textTransform: "inherit",
             cursor: isActive ? "default" : "pointer", transition: "background 0.25s ease, color 0.25s ease",
           }}>{t.label}</button>
         );
@@ -200,8 +207,8 @@ export function HudLine({ type = "data", label, text, pad = 10, children, hud: h
   const warnColor = hud.warn || hud.orange;
   const voice = {
     label: { color: hud.goldDim },
-    data: { color: hud.data, textShadow: `0 0 6px ${hud.dataDim}` },
-    warn: { color: warnColor, fontWeight: "bold", textShadow: `0 0 8px ${warnColor}80` },
+    data: { color: hud.data, textShadow: hud.light ? "none" : `0 0 6px ${hud.dataDim}` },
+    warn: { color: warnColor, fontWeight: "bold", textShadow: hud.light ? "none" : `0 0 8px ${warnColor}80` },
     note: { color: hud.muted, fontStyle: "italic" },
     plain: { color: hud.cream },
   }[type] || {};
@@ -228,7 +235,7 @@ export function HudStats({ stats, hud: hudProp }) {
         <div key={i} style={{ display: "contents" }}>
           {i > 0 && <div style={{ width: 1, height: 22, background: hud.goldFaint, flexShrink: 0 }} />}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: HUD_DISPLAY, fontWeight: 700, fontSize: "1rem", color: s.color || hud.data, letterSpacing: "0.03em", lineHeight: 1, textShadow: `0 0 8px ${(s.color || hud.data)}66`, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.value}</div>
+            <div style={{ fontFamily: HUD_DISPLAY, fontWeight: 700, fontSize: "1rem", color: s.color || hud.data, letterSpacing: "0.03em", lineHeight: 1, textShadow: hud.light ? "none" : `0 0 8px ${(s.color || hud.data)}66`, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.value}</div>
             <div style={{ fontFamily: HUD_MONO, fontSize: "0.5rem", letterSpacing: "0.22em", color: hud.muted, textTransform: "uppercase", marginTop: "0.2rem" }}>{s.label}</div>
           </div>
         </div>
@@ -246,7 +253,7 @@ export function HudButton({ children, onClick, disabled, accent, style, hud: hud
     <button onClick={onClick} disabled={disabled} style={{
       position: "relative", minWidth: 170, padding: "0.65rem 1.4rem", cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.55 : 1,
       background: "transparent", border: "none", color: accent, fontFamily: HUD_DISPLAY, fontWeight: 700, fontSize: "0.8rem", letterSpacing: "0.14em", textTransform: "uppercase",
-      textShadow: `0 0 8px ${accent}66`, ...style,
+      textShadow: hud.light ? "none" : `0 0 8px ${accent}66`, ...style,
     }}>
       {/* border drawn as a clipped backdrop so the corners read cut, like .cyber-btn */}
       <span aria-hidden style={{
