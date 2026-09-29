@@ -42,29 +42,57 @@ export function resolvePendingDecision({ pending, threshold = 0, chargesRemainin
 // Copy-rule strings (docs/oil-game.md → "Copy rule"): the cost model is always
 // explicit, and the threshold is always phrased as the crew's standing order —
 // never a bare number (a bare "your line: 764" was read as a price).
-// ── Hell warning: heat + sulphur on the assay (Michelle, 2026-09-29) ─────────
-// The strike tick knows the column; each revealed core carries a coarse,
-// honest reading of how close the next hell pocket is BELOW the bore head:
-// two layers away = "elevated" (temp elevated, sulphur traces), one layer away
-// = "high" (the next strike cracks it), otherwise "nominal". Deterministic —
-// the instrument never lies — and public on the plot (`heat[layer]`), so the
-// column glows for neighbours and spectators too. The only counterplay is a
-// tonic in supply before the next strike; wildcats and salvage takes are
-// instant reveals with no run-up and stay blind.
-export const HEAT_LOOKAHEAD = 2;
+// ── Heat on the assay — a distance, not a diagnosis (Michelle, 2026-09-29) ──
+// The strike tick knows the map; each revealed core carries a coarse, honest
+// reading of the nearest HOT BODY within reach of the bit: a hell pocket or a
+// motherlode (the season's top tier, ≥ 85% of the richest cell). Intensity
+// encodes distance only, never kind, never whose column:
+//   high      the cell directly below the bore head (next layer)
+//   elevated  two layers below, or a neighbouring column at the next layer or
+//             two (HEAT_NEIGHBOURS: the 8 around, the 4 orthogonal, or none)
+//   nominal   nothing hot within reach — silent
+// So a reading has honest rivals: hell under you, riches under you, hell next
+// door, riches next door. Only `level` is published (pending.heat on the rig,
+// plot.heat[layer] on the plot, public); the breakdown this returns is for the
+// tick, the tests and the tuning script — never written anywhere a client reads.
+// Counterplay (step 2): casing through the next layer seals whatever it holds.
+export const HEAT_LOOKAHEAD = 2;         // layers below the bore head that read
+export const HEAT_NEIGHBOURS = "all8";   // "all8" | "ortho4" | "none" — tune with scripts/oil-heat-rate.mjs
+export const HEAT_LODE_FRACTION = 0.85;  // motherlode = this share of the field's richest cell (strike-tick tier)
 export const HEAT_COPY = {
-  nominal:  { temp: "Ambient",  sulphur: "None",   warn: null },
-  elevated: { temp: "Elevated", sulphur: "Traces", warn: "!! SULPHUR TRACES — HEAT RISING !!", alert: "🌡 Heat rising, sulphur traces in the core: a hell pocket within 2 layers. A tonic in supply caps it." },
-  high:     { temp: "High",     sulphur: "Heavy",  warn: "!! HELL POCKET BELOW — CAP IT OR CRACK IT !!", alert: "🔥 Hell pocket directly below. The next strike cracks it unless a tonic is in supply." },
+  nominal:  { temp: "Ambient",  warn: null },
+  elevated: { temp: "Elevated", warn: "!! HEAT RISING — SOMETHING HOT WITHIN REACH !!",
+              alert: "🌡 Heat rising in the core: a hell pocket or a motherlode within two cells — under you or next door." },
+  high:     { temp: "High",     warn: "!! HOT ZONE DIRECTLY BELOW — HELL OR THE MOTHERLODE !!",
+              alert: "🔥 Hot zone directly below the bit: the next layer is a hell pocket or a motherlode. A tonic in supply caps a breach." },
 };
-// isHellAt(z) → boolean for this column. Returns the reading for the core at `layer`.
-export function hellHeat(isHellAt, layer, depthZ = 20, lookahead = HEAT_LOOKAHEAD) {
+const NEIGHBOUR_SETS = {
+  all8: [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]],
+  ortho4: [[1, 0], [-1, 0], [0, 1], [0, -1]],
+  none: [],
+};
+// isHellAt(c, r, z) · oilAt(c, r, z) → number · motherlodeMin: oil at or above = a lode (0 disables).
+export function heatReading({ isHellAt, oilAt, motherlodeMin = 0, col, row, layer, depthZ = 20, gridSize = 10, lookahead = HEAT_LOOKAHEAD, neighbours = HEAT_NEIGHBOURS }) {
+  const hot = (c, r, z) => {
+    if (c < 0 || r < 0 || c >= gridSize || r >= gridSize || z >= depthZ) return null;
+    if (isHellAt(c, r, z)) return "hell";
+    if (motherlodeMin > 0 && (Number(oilAt(c, r, z)) || 0) >= motherlodeMin) return "lode";
+    return null;
+  };
+  // directly below first (the only "high"), then the rest of the box
+  const below = hot(col, row, layer + 1);
+  if (below) return { level: "high", kind: below, layersDown: 1, lateral: false };
+  let best = null;
   for (let k = 1; k <= lookahead; k++) {
     const z = layer + k;
-    if (z >= depthZ) break;
-    if (isHellAt(z)) return { level: k === 1 ? "high" : "elevated", layersToHell: k };
+    if (k > 1) { const own = hot(col, row, z); if (own) { best = { level: "elevated", kind: own, layersDown: k, lateral: false }; break; } }
+    for (const [dc, dr] of (NEIGHBOUR_SETS[neighbours] || [])) {
+      const h = hot(col + dc, row + dr, z);
+      if (h) { best = { level: "elevated", kind: h, layersDown: k, lateral: true }; break; }
+    }
+    if (best) break;
   }
-  return { level: "nominal", layersToHell: null };
+  return best || { level: "nominal", kind: null, layersDown: null, lateral: false };
 }
 
 export function assayAlertBody({ col, row, layer, oil, threshold, chargesRemaining, hasInclusion, heat = "nominal" }) {

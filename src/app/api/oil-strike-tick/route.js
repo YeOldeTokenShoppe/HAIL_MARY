@@ -8,7 +8,7 @@ import { sendPlayerAlert } from "@/lib/oilAlerts";
 import {
   PASSIVE_DRILLS, MAX_DEPTH, depthCapFor, seasonClock, strikeTargetMs,
 } from "@/lib/oilStrikeClock";
-import { chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, pickSalvageOrder, hellHeat } from "@/lib/oilLoopV2";
+import { chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, pickSalvageOrder, heatReading } from "@/lib/oilLoopV2";
 import { applyV2Resolution, applyLateralTake } from "@/lib/oilLoopV2Server";
 
 export const runtime = "nodejs";
@@ -395,10 +395,15 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
             const v2oil = grid?.[col]?.[row]?.[li] ?? 0;
             const v2art = artifactsByKey[artifactKey(col, row, li)] || null;
             const plotUpdate = { col, row, drillDay: li + 1, lastStrikeAt: FieldValue.serverTimestamp() };
-            // Hell warning (2026-09-29): heat + sulphur on this core from the next
-            // hell pocket below the bore head (two layers of notice). Public on the
-            // plot so the column glows for everyone; the pending core carries it too.
-            const heat = hellHeat((z) => hellSet.has(`${col}_${row}_${z}`), li, depthZ);
+            // Heat on the assay (2026-09-29): the nearest hot body within reach of the
+            // bit — a hell pocket or a motherlode, under you or next door; intensity
+            // is distance only (lib heatReading). Only the level is written — public
+            // on the plot so the column glows for everyone; the pending core carries it.
+            const heat = heatReading({
+              isHellAt: (c, r, z) => hellSet.has(`${c}_${r}_${z}`),
+              oilAt: (c, r, z) => grid?.[c]?.[r]?.[z] ?? 0,
+              motherlodeMin: motherlodeThreshold, col, row, layer: li, depthZ, gridSize,
+            });
             if (heat.level !== "nominal") plotUpdate.heat = { [li]: heat.level };
             const drillUpdate = {
               userId,

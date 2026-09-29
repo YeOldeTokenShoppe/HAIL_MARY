@@ -5008,8 +5008,8 @@ export default function OilPage() {
       // hell warning on the newest core (pending, else the last revealed)
       const heatNow = (userDrill?.pending?.heat && userDrill.pending.heat !== "nominal") ? userDrill.pending.heat
         : (userPlotState?.heat?.[(userPlotState?.drillDay || 0) - 1] || null);
-      if (heatNow === "high") say(`Hell's right under the bit, boss. The next strike cracks it${(userDrill?.supplies?.tonic || 0) > 0 ? ", but we've got a tonic ready" : " unless we get a tonic"}.`, "thoughtful");
-      else if (heatNow === "elevated") say("Something's cooking down there, boss. Sulphur in the last core.", "thoughtful");
+      if (heatNow === "high") say(`Hot zone right under the bit, boss. Hell, or the big one${(userDrill?.supplies?.tonic || 0) > 0 ? ". Tonic's ready if it's hell" : ". No tonic on the rig"}.`, "thoughtful");
+      else if (heatNow === "elevated") say("Something's hot down there, boss. Could be hell. Could be the big one. Could be next door.", "thoughtful");
       if (v) say(`${v.chargesRemaining} charge${v.chargesRemaining === 1 ? "" : "s"} left.`, v.chargesRemaining > 0 ? "yes" : "no");
       if (r) (r.fieldEvents || []).slice(0, 1).forEach((e) => { if (e?.username && e?.type) say(`${e.username}: ${e.type}.`, "thoughtful"); });
       if (r?.unreadCount) say(`${r.unreadCount} unread message${r.unreadCount === 1 ? "" : "s"}.`, "yes");

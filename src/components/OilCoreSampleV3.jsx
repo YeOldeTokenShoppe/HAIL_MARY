@@ -83,8 +83,9 @@ function CoreCylinder({ rack, pending, width = 104, height = 236 }) {
           <circle key={`i${c.layer}`} cx={tubeX + tubeW * 0.5} cy={tubeY + bandH * c.layer + bandH / 2} r="1.6" fill={HUD.orange} opacity="0.85" />
         ))}
       </g>
-      {/* hell warning: the ground under the bore head glows — two bands for
-          "elevated", one hot band for "high" (the next strike cracks it) */}
+      {/* heat: the ground under the bore head glows — two bands for "elevated"
+          (hot within reach, under you or next door), one hot band for "high" (the
+          next layer itself: hell or the motherlode) */}
       {heat && reached > 0 && reached < n && (
         <g clipPath="url(#v3-clip)">
           <rect x={tubeX} y={headY} width={tubeW} height={bandH * (heat === "high" ? 1 : 2)} fill="url(#v3-heat)" opacity={heat === "high" ? 0.95 : 0.7}>
@@ -225,7 +226,6 @@ export default function OilCoreSampleV3({
           <HudLine type="blank" />
           <HudLine type="data" pad={PAD} label="Assay" text={dry ? "dry" : `${fmtBtr(oil)} BTR`} />
           <HudLine type="data" pad={PAD} label="Temp" text={heatCopy.temp} />
-          <HudLine type="data" pad={PAD} label="Sulphur" text={heatCopy.sulphur} />
           <HudLine type="data" pad={PAD} label="Crew" text={`would ${crewWould.toLowerCase()}`} />
           <HudLine type="data" pad={PAD} label="By" text={deadline ? `${deadline.at} · ${deadline.until}` : columnDone || seasonOver || clockOut ? "the buzzer" : "the next strike"} />
           <HudLine type="data" pad={PAD} label="Charges" text={`${chargesRemaining} of ${chargesCap}`} />
@@ -235,7 +235,7 @@ export default function OilCoreSampleV3({
       <HudLine type="warn" text={heatCopy.warn || (pending.hasInclusion ? "!! ANOMALOUS INCLUSION !!" : dry ? "!! DRY — NOTHING TO KEEP !!" : crewWould === "EXTRACT" ? "!! ABOVE YOUR LINE — CREW WOULD KEEP IT !!" : "!! BELOW YOUR LINE — CREW WOULD PASS !!")} />
       {heatCopy.warn && pending.hasInclusion && <HudLine type="warn" text="!! ANOMALOUS INCLUSION !!" />}
       <HudLine type="blank" />
-      {heat && <HudLine type="note" text={heat === "high" ? "The next strike cracks a hell pocket. A tonic in supply caps it — Remedies, on the strip." : "A hell pocket lies within two layers. Stock a tonic before the bore reaches it."} />}
+      {heat && <HudLine type="note" text={heat === "high" ? "The next layer is hot: a hell pocket or the motherlode. A tonic in supply caps a breach." : "Something hot within two cells — under you or next door. Hell, or the big one."} />}
       {(dry
         ? ["Passing is free. Extracting nothing wastes a charge.", "Do nothing: the crew passes."]
         : [`Extract keeps the full ${fmtBtr(oil)} BTR for 1 charge.`, `Do nothing: the crew ${crewWould === "EXTRACT" ? "keeps it" : "passes it"} at the next strike.`, "A pass is final — it opens to next door."]
@@ -267,14 +267,13 @@ export default function OilCoreSampleV3({
           <HudLine type="blank" />
           <HudLine type="data" pad={PAD} label="Banked" text={`${fmtBtr(ledger?.banked || 0)} BTR`} />
           {heat && <HudLine type="data" pad={PAD} label="Temp" text={heatCopy.temp} />}
-          {heat && <HudLine type="data" pad={PAD} label="Sulphur" text={heatCopy.sulphur} />}
           {nextCoreLive && <HudLine type="data" pad={PAD} label="Pace" text={`a core every ${fmtSpan(cadence.intervalMs)}`} />}
           <HudLine type="data" pad={PAD} label="Charges" text={`${chargesRemaining} of ${chargesCap}`} />
         </div>
       </div>
       <HudLine type="blank" />
       {(seasonOver ? ["!! SEASON CLOSED !!"] : clockOut ? ["!! SEASON CLOCK RUN OUT !!"] : columnDone ? ["!! COLUMN FULLY REVEALED !!"] : heatCopy.warn && !seasonOver ? [heatCopy.warn] : []).map((t) => <HudLine key={t} type="warn" text={t} />)}
-      {heat && !seasonOver && !clockOut && !columnDone && <HudLine type="note" text={heat === "high" ? "The next strike cracks a hell pocket. A tonic in supply caps it — Remedies, on the strip." : "A hell pocket lies within two layers. Stock a tonic before the bore reaches it."} />}
+      {heat && !seasonOver && !clockOut && !columnDone && <HudLine type="note" text={heat === "high" ? "The next layer is hot: a hell pocket or the motherlode. A tonic in supply caps a breach." : "Something hot within two cells — under you or next door. Hell, or the big one."} />}
       {(seasonOver ? ["The reckoning is below."]
         : clockOut ? ["The buzzer settles anything on the table."]
         : columnDone ? ["Charges left still work next door."]

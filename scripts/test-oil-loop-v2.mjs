@@ -7,7 +7,7 @@ const load = async (rel) => {
   const src = readFileSync(new URL(rel, import.meta.url), "utf8");
   return import("data:text/javascript;charset=utf-8," + encodeURIComponent(src));
 };
-const { PASSIVE_CHARGES, chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, fmtSpan, buildColumnRack, buildLedger, buildReckoning, reckoningText, reckoningStory, reckoningShareText, reckoningStrip, pickSalvageOrder, hellHeat, HEAT_COPY } =
+const { PASSIVE_CHARGES, chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, fmtSpan, buildColumnRack, buildLedger, buildReckoning, reckoningText, reckoningStory, reckoningShareText, reckoningStrip, pickSalvageOrder, heatReading, HEAT_COPY } =
   await load("../src/lib/oilLoopV2.js");
 
 let pass = 0, fail = 0;
@@ -189,15 +189,24 @@ t("reckoningShareText / reckoningStrip: share line + per-layer strip", () => {
   assert.equal(reckoningStrip(dry)[2].state, "sealed");
 });
 
-t("hellHeat: two layers of notice, honest, stops at the floor", () => {
-  const hellAt = (set) => (z) => set.has(z);
-  assert.deepEqual(hellHeat(hellAt(new Set([7])), 5), { level: "elevated", layersToHell: 2 });
-  assert.deepEqual(hellHeat(hellAt(new Set([7])), 6), { level: "high", layersToHell: 1 });
-  assert.deepEqual(hellHeat(hellAt(new Set([7])), 4), { level: "nominal", layersToHell: null });
-  assert.deepEqual(hellHeat(hellAt(new Set([7])), 7), { level: "nominal", layersToHell: null }); // the hell core itself reads nothing below
-  assert.deepEqual(hellHeat(hellAt(new Set([20])), 19, 20), { level: "nominal", layersToHell: null }); // never past the floor
-  assert.match(assayAlertBody({ col: 0, row: 0, layer: 5, oil: 0, threshold: 100, chargesRemaining: 3, heat: "high" }), /Hell pocket directly below/);
-  assert.doesNotMatch(assayAlertBody({ col: 0, row: 0, layer: 5, oil: 0, threshold: 100, chargesRemaining: 3 }), /Hell pocket/);
+t("heatReading: distance not diagnosis — below = high, two down or next door = elevated, lode counts", () => {
+  const rd = (hell, lode, col, row, layer, extra = {}) => heatReading({
+    isHellAt: (c, r, z) => hell.has(`${c}_${r}_${z}`), oilAt: (c, r, z) => (lode.has(`${c}_${r}_${z}`) ? 1000 : 10),
+    motherlodeMin: 850, col, row, layer, depthZ: 20, gridSize: 10, ...extra });
+  const H = (k) => new Set([k]), none = new Set();
+  assert.deepEqual(rd(H("5_5_7"), none, 5, 5, 6), { level: "high", kind: "hell", layersDown: 1, lateral: false });
+  assert.deepEqual(rd(none, H("5_5_7"), 5, 5, 6), { level: "high", kind: "lode", layersDown: 1, lateral: false });
+  assert.deepEqual(rd(H("5_5_7"), none, 5, 5, 5), { level: "elevated", kind: "hell", layersDown: 2, lateral: false });
+  assert.deepEqual(rd(H("6_5_7"), none, 5, 5, 6), { level: "elevated", kind: "hell", layersDown: 1, lateral: true });   // next door, next layer
+  assert.deepEqual(rd(H("6_6_8"), none, 5, 5, 6), { level: "elevated", kind: "hell", layersDown: 2, lateral: true });   // diagonal, two down
+  assert.equal(rd(H("6_6_8"), none, 5, 5, 6, { neighbours: "ortho4" }).level, "nominal");                                // diagonals off
+  assert.equal(rd(H("6_5_7"), none, 5, 5, 6, { neighbours: "none" }).level, "nominal");
+  assert.equal(rd(H("5_5_7"), none, 5, 5, 4).level, "nominal");                                                          // three down: silent
+  assert.equal(rd(H("5_5_7"), none, 5, 5, 7).level, "nominal");                                                          // the hot core itself reads what is below it
+  assert.equal(rd(none, H("5_5_20"), 5, 5, 19).level, "nominal");                                                        // never past the floor
+  assert.equal(rd(none, H("5_5_7"), 5, 5, 6, { motherlodeMin: 0 }).level, "nominal");                                    // lode source disabled
+  assert.match(assayAlertBody({ col: 0, row: 0, layer: 5, oil: 0, threshold: 100, chargesRemaining: 3, heat: "high" }), /Hot zone directly below/);
+  assert.doesNotMatch(assayAlertBody({ col: 0, row: 0, layer: 5, oil: 0, threshold: 100, chargesRemaining: 3 }), /Hot zone/);
   const rack = buildColumnRack({ plot: { drillDay: 6, revealed: { 4: 100, 5: 0 }, heat: { 4: "elevated" } }, drill: { drillDay: 6, layersExtracted: { 4: 100 }, pending: { layer: 5, oil: 0, heat: "high" } }, depthZ: 8 });
   assert.equal(rack[4].heat, "elevated"); assert.equal(rack[5].heat, "high"); assert.equal(rack[3].heat, null);
   assert.ok(HEAT_COPY.high.warn && HEAT_COPY.elevated.warn && !HEAT_COPY.nominal.warn);
