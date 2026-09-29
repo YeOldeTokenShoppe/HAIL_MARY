@@ -52,7 +52,7 @@ Each item has a done-test. If it can't be tested on a phone by someone who isn't
 5. **Tuning locked before COMMIT.** From the field-tuning sim: ~30 deposits, 8 passive charges, bonuses to 20; grid sized 2–4× confirmed signups (6×6 unless demand says otherwise); 8-day season. Re-run `sim-v2-ring-capture.mjs` at the chosen numbers and record the bind rate. Anchor knobs (deposits, radius band, artifact knobs) move only pre-commit. *Done:* the numbers are written in `oilGame/settings` and in this doc before the commit step.
 6. **The full dress rehearsal** (exit criterion, checklist below): admin runbook end to end on a compressed clock with ≥ 6 non-dev testers on phones.
 7. **Prod ops verified:** strike-tick cron firing on prod at the intended cadence; Telegram and web push arriving on iOS and Android; `testingEnabled` off; Firestore rules deny-by-default confirmed against a non-admin session.
-8. **Onboarding speaks v2.** Welcome modal, intro video copy, away recap and the how-to-play say *charges*, *standing order*, *extract / pass*, *salvage*, *frontier* — never BANK or "in tank · at risk". *Done:* a grep for BANK in player-facing strings returns only admin/test tools. **Swept 2026-09-27 (flag-gated on `loopV2`):** how-to-play steps 3–5 have v2 versions (`HOW_TO_PLAY_STEPS_V2`); the welcome modal uses them and carries a one-line season note over the verbatim intro transcript; the away recap drops the tank/BANK block for the core on the table + the crew's call; the YOUR RIG payout block hides "IN TANK · AT RISK" and the BANK button. **Still v1 wording:** the recorded intro video itself (re-record per *Re-recording the intro*; the transcript must stay in sync with the audio, so it was left verbatim). **Economy guard found on the way:** `oil-tank-drain` had no v2 guard — under v2 the tank holds the pending layer, so a BANK press would have banked it without a charge and left `pending` for the next strike to pay again; the route now refuses with 409 when `loopV2` is on.
+8. **Onboarding speaks v2.** Welcome modal, intro video copy, away recap and the how-to-play say *charges*, *standing order*, *extract / pass*, *salvage*, *frontier* — never BANK or "in tank · at risk". *Done:* a grep for BANK in player-facing strings returns only admin/test tools. **Swept 2026-09-27 (flag-gated on `loopV2`):** how-to-play steps 3–5 have v2 versions (`HOW_TO_PLAY_STEPS_V2`); the welcome modal uses them and carries a one-line season note over the verbatim intro transcript; the away recap drops the tank/BANK block for the core on the table + the crew's call; the YOUR RIG payout block hides "IN TANK · AT RISK" and the BANK button. **Still v1 wording:** the recorded intro video itself. **Script rewritten 2026-09-29 (Michelle)** — 15 lines, staged in the studio, the archive and the modal (`INTRO_VERSION` switch); record per *Re-recording the intro*, drop the v2 files in `public/`, flip the switch. **Economy guard found on the way:** `oil-tank-drain` had no v2 guard — under v2 the tank holds the pending layer, so a BANK press would have banked it without a charge and left `pending` for the next strike to pay again; the route now refuses with 409 when `loopV2` is on.
 9. **Admin cheatsheet updated** for v2 (EXTRACT / PASS / LATERAL test tools, the flag, the reckoning).
 10. **Season-one strip rule applied** (below): every stall has its one-line answer; nothing new is added to the strip before the rehearsal passes.
 
@@ -1474,10 +1474,43 @@ What actually ships is a **pre-recorded MP4**, not a live avatar — see "Why a 
 
 ### What's mounted
 
-`OilWelcomeModal.jsx` plays a plain `<video controls playsInline preload="metadata">`:
+`OilWelcomeModal.jsx` plays a plain `<video controls playsInline preload="metadata">`,
+selected by `INTRO_VERSION` in that file (the transcript travels with the recording):
 
-- Video: `public/HMPC_Intro.web.mp4` (served at `/HMPC_Intro.web.mp4`)
-- Poster: `public/HMPC_Intro_poster.jpg`
+- **v1 (mounted):** `public/HMPC_Intro.web.mp4` + `public/HMPC_Intro_poster.jpg` — the 2026-06
+  recording; says "bank". Under `loopV2` the modal shows a one-line season note over it.
+- **v2 (to record):** `public/HMPC_Intro_v2.web.mp4` + `public/HMPC_Intro_v2_poster.jpg` —
+  Michelle's 2026-09-29 script for the extract-or-pass season (below). Flip `INTRO_VERSION`
+  to 2 once both files exist; the transcript and the season note switch with it.
+
+### The v2 script (Michelle, 2026-09-29)
+
+Fifteen lines — GR80 ×8 (SitePal TTS; the studio speaks "R-Lady" for RL80), Connor ×7
+(uploaded tracks `connor2_01`..`connor2_07`). Already in `studio/page.js`,
+`HowToPlayDialogue.jsx` and the modal's `INTRO_TRANSCRIPT_V2`:
+
+1. **St. GR80:** Welcome, prospector. Before the first claim is staked, the field’s fortunes are sealed beneath the earth—hidden from everyone, including us. Provably fair.
+2. **Connor:** Which means nobody knows where the big strike hides. Not you. Not us. Delicious, isn’t it?
+3. **St. GR80:** Hold a little RL80, and you have your key to the field. Nothing is spent. Sell whenever you wish.
+4. **Connor:** But why would you leave? Stake your claim, hire your crew, and let’s see what providence buried beneath your feet.
+5. **St. GR80:** Once your claim is staked, the rig goes to work. Day and night, it pulls core samples from the earth and lays them on your table.
+6. **Connor:** Rich deposits. Dusty shale. Occasionally something that should have remained buried.
+7. **St. GR80:** Keep a core, and it becomes yours—for one charge. You have twenty for the season. Choose carefully.
+8. **Connor:** Or pass. Passing costs nothing. Just remember: what you leave behind becomes fair game for your neighbors.
+9. **St. GR80:** Your crew can work while you are away. Set your line, and they will keep any core that clears it. Set them to salvage, and they will collect what others leave behind.
+10. **Connor:** And do keep an eye on those samples. Strange things have been known to surface. Ignore the warning signs and you may inadvertently unleash hell.
+11. **St. GR80:** When the season ends, the reckoning begins. The value of everything you kept is paid in real USDC, directly to your wallet.
+12. **Connor:** And everything you passed over? Gone. Left beneath the earth for eternity. Try not to think about what it might have been worth.
+13. **St. GR80:** The field is sealed. The rigs are waiting. Drill wisely, prospector.
+14. **Connor:** Or don’t.
+15. **St. GR80:** Welcome to Hail Mary Prospecting.
+
+Fact check against the build (2026-09-29): sealed map, the RL80 stake on claim, the
+fill-the-season strike clock, one charge per keep, twenty charges at the cap (passive 8 +
+bonus — "twenty" goes stale if tuning lock changes it), free and final passes, lateral
+extract as the crew's salvage order, the reckoning and the fixed-rate USDC payout — all true.
+Connor's "ignore the warning signs and you may unleash hell" is flavour: a hell pocket is a
+layer the bore reaches, not something a player can read and avoid (the tonic caps it).
 
 Tap-to-play with sound. No SitePal / WebGL at runtime, so it's bulletproof on mobile.
 
@@ -1510,6 +1543,8 @@ studio enforces a shared timeline so the two clips alternate correctly.
    each duration, and saves them to `localStorage["hm_gr80_durations"]`. Do everything afterward
    in the **same browser** so the saved timeline is used. (John's durations are hard-coded from
    `afinfo` on the MP3s; estimates are used for GR80 if uncalibrated.)
+   (v2: eight GR80 lines, so a fresh calibration is required — the stored v1 durations
+   have seven entries and are ignored.)
 2. **Record GR80:** open `/hailmary/studio?c=monk`. Start your screen recorder, click
    **Start Take**. A white **sync flash** plays at t=0, then GR80 speaks on his turns and idles
    during John's. Stop recording at "Take complete."
@@ -1568,10 +1603,12 @@ the game). Update these only in `HowToPlayDialogue.jsx` and `src/app/hailmary/st
 
 - **GR80** speaks via SitePal TTS: `sayText(text, "9", 1, 7, "T", 3)` (voice 9 "Gilbert", engine 7
   Acapela, reverb).
-- **John** speaks uploaded audio tracks `john_01`..`john_06` (in the account's Audio Manager) via
-  `sayAudio(name)`. The same clips also exist at `public/audio/john_0X.mp3`. SitePal can only
-  speak audio it hosts — a `/public` URL or `sayMP3audio(url)` did **not** work; tracks must be
-  uploaded by name.
+- **Connor** speaks uploaded audio tracks via `sayAudio(name)`: v1 `john_01`..`john_06`
+  (also at `public/audio/john_0X.mp3`), v2 `connor2_01`..`connor2_07` (record, upload by those
+  names in the account's Audio Manager, then put each track's `afinfo` length into
+  `JOHN_DUR_SEC` in `studio/page.js` — the estimates there are word-count guesses). SitePal can
+  only speak audio it hosts — a `/public` URL or `sayMP3audio(url)` did **not** work; tracks
+  must be uploaded by name.
 
 ### Key files
 

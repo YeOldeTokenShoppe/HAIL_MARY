@@ -53,32 +53,38 @@ const GAZE = {
   centerAmp: 0,                     // face the camera while speaking
 };
 
-// John's exact track lengths (sec), measured with afinfo.
+// Connor's v2 tracks (connor2_01..07 in the account's Audio Manager). ESTIMATES
+// from word count until the tracks exist — replace with `afinfo` values (sec),
+// or the takes drift: too short overlaps the next line, too long leaves a gap.
 const JOHN_DUR_SEC = {
-  john_01: 7.00, john_02: 4.44, john_03: 9.09, john_04: 9.48, john_05: 4.36, john_06: 1.07,
+  connor2_01: 8.0, connor2_02: 9.6, connor2_03: 5.4, connor2_04: 7.9, connor2_05: 11.6, connor2_06: 10.4, connor2_07: 1.6,
 };
 
-// Generous fallback estimates (sec) for GR80's lines, in order, used until a
-// calibration pass measures the real values. Better too long (a small pause)
-// than too short (the clips would overlap).
-const GR80_EST_SEC = [7.6, 6.8, 7.2, 9.2, 8.8, 2.4, 2.6];
+// Generous fallback estimates (sec) for GR80's eight v2 lines, in order, used
+// until a calibration pass (?c=monk&cal=1) measures the real values. Better too
+// long (a small pause) than too short (the clips would overlap).
+const GR80_EST_SEC = [14.2, 9.6, 12.8, 9.2, 16.0, 11.0, 6.5, 3.3];
 
 const LS_KEY = "hm_gr80_durations";
 
+// v2 script (Michelle, 2026-09-29) — the extract-or-pass season. 15 lines: GR80 ×8
+// (TTS; "R-Lady" is how SitePal says RL80), Connor ×7 (uploaded tracks connor2_01..07).
 const SCRIPT = [
-  { who: "monk", text: "Welcome prospector! The field is sealed before anyone plays — its riches hidden even from us. Provably fair." },
-  { who: "john", audioName: "john_01" },
-  { who: "monk", text: "Hold a little R-Lady — that is your key. No spending. Sell whenever you wish." },
-  { who: "john", audioName: "john_02" },
-  { who: "monk", text: "Your rig drills on its own, day and night. It strikes when the earth decides. Patience." },
-  { who: "john", audioName: "john_03" },
-  { who: "monk", text: "The deeper you go, the richer the ground. Bank what you find, and it is yours — safe, and counted." },
-  { who: "john", audioName: "john_04" },
-  { who: "monk", text: "Should one breach, the whole field freezes — and hunters race for the bounty. Keep your cameras watching. Bank often." },
-  { who: "john", audioName: "john_05" },
-  { who: "monk", text: "Drill wisely prospector." },
-  { who: "john", audioName: "john_06" },
-  { who: "monk", text: "Welcome to Hail Mary." },
+  { who: "monk", text: "Welcome, prospector. Before the first claim is staked, the field's fortunes are sealed beneath the earth, hidden from everyone, including us. Provably fair." },
+  { who: "john", audioName: "connor2_01" },
+  { who: "monk", text: "Hold a little R-Lady, and you have your key to the field. Nothing is spent. Sell whenever you wish." },
+  { who: "john", audioName: "connor2_02" },
+  { who: "monk", text: "Once your claim is staked, the rig goes to work. Day and night, it pulls core samples from the earth and lays them on your table." },
+  { who: "john", audioName: "connor2_03" },
+  { who: "monk", text: "Keep a core, and it becomes yours, for one charge. You have twenty for the season. Choose carefully." },
+  { who: "john", audioName: "connor2_04" },
+  { who: "monk", text: "Your crew can work while you are away. Set your line, and they will keep any core that clears it. Set them to salvage, and they will collect what others leave behind." },
+  { who: "john", audioName: "connor2_05" },
+  { who: "monk", text: "When the season ends, the reckoning begins. The value of everything you kept is paid in real USDC, directly to your wallet." },
+  { who: "john", audioName: "connor2_06" },
+  { who: "monk", text: "The field is sealed. The rigs are waiting. Drill wisely, prospector." },
+  { who: "john", audioName: "connor2_07" },
+  { who: "monk", text: "Welcome to Hail Mary Prospecting." },
 ];
 
 function loadSitePalScriptOnce() {
