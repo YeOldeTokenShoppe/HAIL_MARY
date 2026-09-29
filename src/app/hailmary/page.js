@@ -9512,6 +9512,7 @@ export default function OilPage() {
             ) : (<>
             <group position={[0, 5, 0]}>
               <OilVoxelGrid
+                hazeColor={env.fog || env.skyBottom || env.sky}
                 strataLivePlots={loopV2 ? allPlotsMap : null}
                 loopV2={loopV2}
                 orders={loopV2 && userDrill ? { salvage: userDrill.orders?.salvage === true, autopilot: userDrill.autopilot === true } : null}
