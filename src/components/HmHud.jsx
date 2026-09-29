@@ -280,7 +280,9 @@ export function HudStats({ stats, hud: hudProp }) {
         <div key={i} style={{ display: "contents" }}>
           {i > 0 && <div style={{ width: 1, height: 22, background: hud.goldFaint, flexShrink: 0 }} />}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: HUD_DISPLAY, fontWeight: 700, fontSize: "1rem", color: s.color || hud.data, letterSpacing: "0.03em", lineHeight: 1, textShadow: hud.light ? "none" : `0 0 8px ${(s.color || hud.data)}66`, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.value}</div>
+            {/* paper consoles: Orbitron regular with a touch more tracking — the bold
+                weight sat heavy next to the survey map's numerals (2026-09-29) */}
+            <div style={{ fontFamily: HUD_DISPLAY, fontWeight: hud.light ? 400 : 700, fontSize: "1rem", color: s.color || hud.data, letterSpacing: hud.light ? "0.06em" : "0.03em", lineHeight: 1, textShadow: hud.light ? "none" : `0 0 8px ${(s.color || hud.data)}66`, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.value}</div>
             <div style={{ fontFamily: HUD_MONO, fontSize: "0.5rem", letterSpacing: "0.22em", color: hud.muted, textTransform: "uppercase", marginTop: "0.2rem" }}>{s.label}</div>
           </div>
         </div>

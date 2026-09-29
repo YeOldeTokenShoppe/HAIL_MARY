@@ -2,18 +2,25 @@
 // unit-testable in isolation and shared by the strike tick, the decide route,
 // and sims (mirrors the oilStrikeClock.js pattern).
 //
-// Vocabulary: a CHARGE is the extraction budget (passive + bonusDrills, capped
-// at the field depth). The bore itself is no longer gated by charges — it
-// reveals every layer over the season; charges decide what you KEEP.
-// BTR only ever flows toward the player; charges only ever flow away.
+// Vocabulary: a CHARGE is the extraction budget. The bore itself is no longer
+// gated by charges — it reveals every layer over the season; charges decide
+// what you KEEP. BTR only ever flows toward the player; charges only ever
+// flow away.
+//
+// Cap (Michelle, 2026-09-29): passive charges are capped at the column depth
+// (20 = enough to keep every layer under you); BONUS charges sit ON TOP —
+// they are the extra you spend next door (laterals, wildcats), so a rig on a
+// board with passive 20 still sees its ticket and referral bonuses. The bonus
+// itself is capped where it is granted (MAX_BONUS_DRILLS = 10 in
+// lib/oilBonusMath.js), so the most a rig ever holds is depthZ + 10.
 
 export const PASSIVE_CHARGES = 8;
 
 // Total charges this rig can ever spend this season.
 export function chargesCapFor(drill, settings = {}, depthZ = 20) {
   const passive = Number(settings.passiveCharges ?? PASSIVE_CHARGES);
-  const bonus = (drill && drill.bonusDrills) || 0;
-  return Math.min(passive + bonus, depthZ);
+  const bonus = Math.max(0, (drill && drill.bonusDrills) || 0);
+  return Math.min(passive, depthZ) + bonus;
 }
 
 export function chargesRemainingFor(drill, settings = {}, depthZ = 20) {
