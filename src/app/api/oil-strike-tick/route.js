@@ -8,7 +8,7 @@ import { sendPlayerAlert } from "@/lib/oilAlerts";
 import {
   PASSIVE_DRILLS, MAX_DEPTH, depthCapFor, seasonClock, strikeTargetMs,
 } from "@/lib/oilStrikeClock";
-import { chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, pickSalvageOrder } from "@/lib/oilLoopV2";
+import { chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, pickSalvageOrder, hellHeat } from "@/lib/oilLoopV2";
 import { applyV2Resolution, applyLateralTake } from "@/lib/oilLoopV2Server";
 
 export const runtime = "nodejs";
@@ -395,6 +395,11 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
             const v2oil = grid?.[col]?.[row]?.[li] ?? 0;
             const v2art = artifactsByKey[artifactKey(col, row, li)] || null;
             const plotUpdate = { col, row, drillDay: li + 1, lastStrikeAt: FieldValue.serverTimestamp() };
+            // Hell warning (2026-09-29): heat + sulphur on this core from the next
+            // hell pocket below the bore head (two layers of notice). Public on the
+            // plot so the column glows for everyone; the pending core carries it too.
+            const heat = hellHeat((z) => hellSet.has(`${col}_${row}_${z}`), li, depthZ);
+            if (heat.level !== "nominal") plotUpdate.heat = { [li]: heat.level };
             const drillUpdate = {
               userId,
               lastStrikeDate: today,
@@ -423,7 +428,7 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
               // §Multi-element core: flag the inclusion, keep its identity
               // hidden until extraction (the anti-lottery guard).
               if (v2art) plotUpdate.inclusionFlags = { [li]: true };
-              drillUpdate.pending = { layer: li, oil: v2oil, hasInclusion: !!v2art, revealedAt: Date.now() };
+              drillUpdate.pending = { layer: li, oil: v2oil, hasInclusion: !!v2art, heat: heat.level, revealedAt: Date.now() };
               drillUpdate.tankOil = v2oil; // decision buffer: full = a decision is waiting
               drillUpdate.lastStrikeOil = v2oil;
               drillUpdate.lastStrikeHell = false;
@@ -433,7 +438,7 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
             return {
               status: "struck", v2: true, oil: v2oil, depth: li + 1,
               isHell: isHellL && !tonicCapped, tonicCapped,
-              resolved, hasInclusion: !!v2art,
+              resolved, hasInclusion: !!v2art, heat: heat.level,
               threshold, chargesRemaining,
               username: drillNow.username || null,
               newTank: v2oil,
@@ -619,7 +624,7 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
               const body = assayAlertBody({
                 col, row, layer: outcome.depth - 1, oil: outcome.oil,
                 threshold: outcome.threshold, chargesRemaining: outcome.chargesRemaining,
-                hasInclusion: outcome.hasInclusion,
+                hasInclusion: outcome.hasInclusion, heat: outcome.heat,
               }) + resolvedLine;
               await sendPlayerAlert(db, userId, {
                 title: "⛏ CORE ASSAY — LAYER " + outcome.depth,
@@ -627,7 +632,7 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
                 tag: "hmpc-strike",
                 // Dry, no-inclusion assays go Telegram-only, same signal-value
                 // rule as v1 dry layers.
-                ...(outcome.oil <= 0 && !outcome.hasInclusion ? { channels: { telegram: true, push: false } } : {}),
+                ...(outcome.oil <= 0 && !outcome.hasInclusion && outcome.heat !== "high" ? { channels: { telegram: true, push: false } } : {}),
                 telegramHtml: `⛏ <b>CORE ASSAY — LAYER ${outcome.depth}</b>\n${body}`,
               });
             }

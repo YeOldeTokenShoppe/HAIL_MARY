@@ -7,7 +7,7 @@ const load = async (rel) => {
   const src = readFileSync(new URL(rel, import.meta.url), "utf8");
   return import("data:text/javascript;charset=utf-8," + encodeURIComponent(src));
 };
-const { PASSIVE_CHARGES, chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, fmtSpan, buildColumnRack, buildLedger, buildReckoning, reckoningText, reckoningStory, reckoningShareText, reckoningStrip, pickSalvageOrder } =
+const { PASSIVE_CHARGES, chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, fmtSpan, buildColumnRack, buildLedger, buildReckoning, reckoningText, reckoningStory, reckoningShareText, reckoningStrip, pickSalvageOrder, hellHeat, HEAT_COPY } =
   await load("../src/lib/oilLoopV2.js");
 
 let pass = 0, fail = 0;
@@ -187,6 +187,20 @@ t("reckoningShareText / reckoningStrip: share line + per-layer strip", () => {
   const dry = buildReckoning({ plot: { col: 0, row: 0, drillDay: 2, revealed: { 0: 0, 1: 0 } }, drill: { totalCollected: 0, layersPassed: { 0: 0, 1: 0 } }, allPlots: {}, userId: "me", column: null, depthZ: 3 });
   assert.match(reckoningStory(dry), /banked nothing\. 1 layer is still sealed/);
   assert.equal(reckoningStrip(dry)[2].state, "sealed");
+});
+
+t("hellHeat: two layers of notice, honest, stops at the floor", () => {
+  const hellAt = (set) => (z) => set.has(z);
+  assert.deepEqual(hellHeat(hellAt(new Set([7])), 5), { level: "elevated", layersToHell: 2 });
+  assert.deepEqual(hellHeat(hellAt(new Set([7])), 6), { level: "high", layersToHell: 1 });
+  assert.deepEqual(hellHeat(hellAt(new Set([7])), 4), { level: "nominal", layersToHell: null });
+  assert.deepEqual(hellHeat(hellAt(new Set([7])), 7), { level: "nominal", layersToHell: null }); // the hell core itself reads nothing below
+  assert.deepEqual(hellHeat(hellAt(new Set([20])), 19, 20), { level: "nominal", layersToHell: null }); // never past the floor
+  assert.match(assayAlertBody({ col: 0, row: 0, layer: 5, oil: 0, threshold: 100, chargesRemaining: 3, heat: "high" }), /Hell pocket directly below/);
+  assert.doesNotMatch(assayAlertBody({ col: 0, row: 0, layer: 5, oil: 0, threshold: 100, chargesRemaining: 3 }), /Hell pocket/);
+  const rack = buildColumnRack({ plot: { drillDay: 6, revealed: { 4: 100, 5: 0 }, heat: { 4: "elevated" } }, drill: { drillDay: 6, layersExtracted: { 4: 100 }, pending: { layer: 5, oil: 0, heat: "high" } }, depthZ: 8 });
+  assert.equal(rack[4].heat, "elevated"); assert.equal(rack[5].heat, "high"); assert.equal(rack[3].heat, null);
+  assert.ok(HEAT_COPY.high.warn && HEAT_COPY.elevated.warn && !HEAT_COPY.nominal.warn);
 });
 
 t("buildReckoning: empty rig → zeros, no NaN; a leftover pending is flagged", () => {

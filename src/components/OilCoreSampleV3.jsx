@@ -21,7 +21,7 @@
 // (`theme` is accepted for the drop-in signature and otherwise unused).
 
 import { useEffect, useMemo, useState } from "react";
-import { fmtSpan } from "@/lib/oilLoopV2";
+import { fmtSpan, HEAT_COPY } from "@/lib/oilLoopV2";
 import { HUD, HUD_MONO, HudKeyframes, HudPanel, HudMeta, HudTitle, HudTabs, HudDivider, HudLine, HudCaption, HudStats, HudButton, HudHint, hudSmallBtn } from "@/components/HmHud";
 
 const MONO = HUD_MONO;
@@ -52,6 +52,9 @@ function CoreCylinder({ rack, pending, width = 104, height = 236 }) {
     : "url(#v3-strata)";
   const p = pending && typeof pending.layer === "number" ? pending : null;
   const py = p ? tubeY + bandH * p.layer + bandH / 2 : null;
+  // the warning read on the newest core (the pending one, else the last revealed)
+  const headCell = rack.find((c) => c.layer === reached - 1);
+  const heat = (p && p.heat && p.heat !== "nominal") ? p.heat : headCell?.heat || null;
   const ticks = [0, 4, 9, 14, 19].filter((z) => z < n);
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true" style={{ display: "block", flex: "0 0 auto" }}>
@@ -61,6 +64,9 @@ function CoreCylinder({ rack, pending, width = 104, height = 236 }) {
           <rect width="6" height="1" fill="rgba(212,168,84,0.10)" />
         </pattern>
         <clipPath id="v3-clip"><rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={9} /></clipPath>
+        <linearGradient id="v3-heat" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={HUD.red} stopOpacity="0.9" /><stop offset="1" stopColor={HUD.orange} stopOpacity="0.15" />
+        </linearGradient>
         <filter id="v3-glow" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="1.6" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
@@ -77,7 +83,16 @@ function CoreCylinder({ rack, pending, width = 104, height = 236 }) {
           <circle key={`i${c.layer}`} cx={tubeX + tubeW * 0.5} cy={tubeY + bandH * c.layer + bandH / 2} r="1.6" fill={HUD.orange} opacity="0.85" />
         ))}
       </g>
-      <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={9} fill="none" stroke={HUD.gold} strokeWidth="1" opacity="0.7" />
+      {/* hell warning: the ground under the bore head glows — two bands for
+          "elevated", one hot band for "high" (the next strike cracks it) */}
+      {heat && reached > 0 && reached < n && (
+        <g clipPath="url(#v3-clip)">
+          <rect x={tubeX} y={headY} width={tubeW} height={bandH * (heat === "high" ? 1 : 2)} fill="url(#v3-heat)" opacity={heat === "high" ? 0.95 : 0.7}>
+            <animate attributeName="opacity" values={heat === "high" ? "0.95;0.5;0.95" : "0.7;0.35;0.7"} dur={heat === "high" ? "1.1s" : "2.2s"} repeatCount="indefinite" />
+          </rect>
+        </g>
+      )}
+      <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={9} fill="none" stroke={heat === "high" ? HUD.red : HUD.gold} strokeWidth="1" opacity="0.7" />
       <rect x={tubeX + 3} y={tubeY + 4} width={5} height={tubeH - 8} rx={2.5} fill="rgba(255,255,255,0.06)" />
       {reached > 0 && reached < n && (
         <g>
@@ -156,6 +171,10 @@ export default function OilCoreSampleV3({
   const columnDone = cadence != null && cadence.remainingLayers <= 0;
   const n = rack.length || 20;
   const revealedCount = rack.filter((c) => c.state !== "undrilled").length;
+  // Hell warning on the newest core: the pending one, else the deepest revealed.
+  const reachedZ = rack.reduce((m, c) => (c.state !== "undrilled" ? Math.max(m, c.layer + 1) : m), 0);
+  const heat = (pending?.heat && pending.heat !== "nominal") ? pending.heat : (rack.find((c) => c.layer === reachedZ - 1)?.heat || null);
+  const heatCopy = HEAT_COPY[heat || "nominal"];
   const deadline = !cadence || seasonOver || clockOut || columnDone ? null : { at: clockOf(cadence.latestMs), until: untilCopy(cadence.latestMs, nowMs) };
   // How far into the current reveal window we are (0..1). The strike lands
   // somewhere inside it; full = the latest it can land. Shown as a thin bar,
@@ -205,14 +224,18 @@ export default function OilCoreSampleV3({
           <HudLine type="label" pad={PAD} label="CLASS" text={dry ? "Dry shale" : pending.hasInclusion ? "Wet · anomalous" : "Wet core"} />
           <HudLine type="blank" />
           <HudLine type="data" pad={PAD} label="Assay" text={dry ? "dry" : `${fmtBtr(oil)} BTR`} />
+          <HudLine type="data" pad={PAD} label="Temp" text={heatCopy.temp} />
+          <HudLine type="data" pad={PAD} label="Sulphur" text={heatCopy.sulphur} />
           <HudLine type="data" pad={PAD} label="Crew" text={`would ${crewWould.toLowerCase()}`} />
           <HudLine type="data" pad={PAD} label="By" text={deadline ? `${deadline.at} · ${deadline.until}` : columnDone || seasonOver || clockOut ? "the buzzer" : "the next strike"} />
           <HudLine type="data" pad={PAD} label="Charges" text={`${chargesRemaining} of ${chargesCap}`} />
         </div>
       </div>
       <HudLine type="blank" />
-      <HudLine type="warn" text={pending.hasInclusion ? "!! ANOMALOUS INCLUSION !!" : dry ? "!! DRY — NOTHING TO KEEP !!" : crewWould === "EXTRACT" ? "!! ABOVE YOUR LINE — CREW WOULD KEEP IT !!" : "!! BELOW YOUR LINE — CREW WOULD PASS !!"} />
+      <HudLine type="warn" text={heatCopy.warn || (pending.hasInclusion ? "!! ANOMALOUS INCLUSION !!" : dry ? "!! DRY — NOTHING TO KEEP !!" : crewWould === "EXTRACT" ? "!! ABOVE YOUR LINE — CREW WOULD KEEP IT !!" : "!! BELOW YOUR LINE — CREW WOULD PASS !!")} />
+      {heatCopy.warn && pending.hasInclusion && <HudLine type="warn" text="!! ANOMALOUS INCLUSION !!" />}
       <HudLine type="blank" />
+      {heat && <HudLine type="note" text={heat === "high" ? "The next strike cracks a hell pocket. A tonic in supply caps it — Remedies, on the strip." : "A hell pocket lies within two layers. Stock a tonic before the bore reaches it."} />}
       {(dry
         ? ["Passing is free. Extracting nothing wastes a charge.", "Do nothing: the crew passes."]
         : [`Extract keeps the full ${fmtBtr(oil)} BTR for 1 charge.`, `Do nothing: the crew ${crewWould === "EXTRACT" ? "keeps it" : "passes it"} at the next strike.`, "A pass is final — it opens to next door."]
@@ -243,12 +266,15 @@ export default function OilCoreSampleV3({
           <HudLine type="label" pad={PAD} label="TABLE" text="nothing on it" />
           <HudLine type="blank" />
           <HudLine type="data" pad={PAD} label="Banked" text={`${fmtBtr(ledger?.banked || 0)} BTR`} />
+          {heat && <HudLine type="data" pad={PAD} label="Temp" text={heatCopy.temp} />}
+          {heat && <HudLine type="data" pad={PAD} label="Sulphur" text={heatCopy.sulphur} />}
           {nextCoreLive && <HudLine type="data" pad={PAD} label="Pace" text={`a core every ${fmtSpan(cadence.intervalMs)}`} />}
           <HudLine type="data" pad={PAD} label="Charges" text={`${chargesRemaining} of ${chargesCap}`} />
         </div>
       </div>
       <HudLine type="blank" />
-      {(seasonOver ? ["!! SEASON CLOSED !!"] : clockOut ? ["!! SEASON CLOCK RUN OUT !!"] : columnDone ? ["!! COLUMN FULLY REVEALED !!"] : []).map((t) => <HudLine key={t} type="warn" text={t} />)}
+      {(seasonOver ? ["!! SEASON CLOSED !!"] : clockOut ? ["!! SEASON CLOCK RUN OUT !!"] : columnDone ? ["!! COLUMN FULLY REVEALED !!"] : heatCopy.warn && !seasonOver ? [heatCopy.warn] : []).map((t) => <HudLine key={t} type="warn" text={t} />)}
+      {heat && !seasonOver && !clockOut && !columnDone && <HudLine type="note" text={heat === "high" ? "The next strike cracks a hell pocket. A tonic in supply caps it — Remedies, on the strip." : "A hell pocket lies within two layers. Stock a tonic before the bore reaches it."} />}
       {(seasonOver ? ["The reckoning is below."]
         : clockOut ? ["The buzzer settles anything on the table."]
         : columnDone ? ["Charges left still work next door."]
@@ -365,6 +391,7 @@ export default function OilCoreSampleV3({
             </div>
           </div>
           <HudLine type="blank" />
+          {heatCopy.warn && <HudLine type="warn" text={heatCopy.warn} />}
           {openN > 0 && <HudLine type="warn" text={`!! ${openN} POCKET${openN === 1 ? "" : "S"} OPEN TO NEIGHBOURS !!`} />}
           {(hasPlot
             ? ["This is the field's view of the column.", "Open pockets are what a neighbour could salvage.", "Claim a plot to drill your own."]

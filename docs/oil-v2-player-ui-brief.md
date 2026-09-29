@@ -52,6 +52,8 @@ misses one will show plain chrome there.
 | Pending · inclusion flagged | `hasInclusion` | the anomalous-inclusion ping; "only recovered on EXTRACT — the crew never gambles on it" |
 | No charges left | `chargesRemaining == 0` | EXTRACT / TAKE / WILDCAT disabled, PASS live, CHARGES in red |
 | Column fully revealed | `remainingLayers == 0` | "nothing more comes up; the buzzer settles what's on the table"; charges still work next door |
+| Hell two layers below | `pending.heat` / `plot.heat[layer]` = `elevated` | Temp elevated · Sulphur traces · warn line · glow under the bore head · "stock a tonic" note |
+| Hell one layer below | … = `high` | Temp high · Sulphur heavy · "!! HELL POCKET BELOW — CAP IT OR CRACK IT !!" · red tube outline · the warning persists after the decision until the next strike |
 | Season over | `gameEnded` (the flag, never the clock alone) | hand-off to the Reckoning |
 | Season clock run out, not ended | stale start date on a live board | "clock has run out · the buzzer settles what is on the table"; never "closed" |
 | No season clock | legacy settings | no cadence line at all (never a fake one) |

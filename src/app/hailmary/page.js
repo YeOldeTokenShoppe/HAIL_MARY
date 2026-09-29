@@ -5005,6 +5005,11 @@ export default function OilPage() {
         say(oil > 0 ? `L${v.pending.layer + 1} is on the table: ${n(oil)} BTR.` : `L${v.pending.layer + 1} is on the table. Dry.`, oil > 0 ? "yes" : "no");
         say(`Your line says ${v.crewWould === "EXTRACT" ? "keep it" : "pass"}${v.latestMs ? ` — by ${new Date(v.latestMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}.`, "thoughtful");
       } else if (!["signed out", "no claim", "pre-season"].includes(status)) say("Nothing on the table.", "no");
+      // hell warning on the newest core (pending, else the last revealed)
+      const heatNow = (userDrill?.pending?.heat && userDrill.pending.heat !== "nominal") ? userDrill.pending.heat
+        : (userPlotState?.heat?.[(userPlotState?.drillDay || 0) - 1] || null);
+      if (heatNow === "high") say(`Hell's right under the bit, boss. The next strike cracks it${(userDrill?.supplies?.tonic || 0) > 0 ? ", but we've got a tonic ready" : " unless we get a tonic"}.`, "thoughtful");
+      else if (heatNow === "elevated") say("Something's cooking down there, boss. Sulphur in the last core.", "thoughtful");
       if (v) say(`${v.chargesRemaining} charge${v.chargesRemaining === 1 ? "" : "s"} left.`, v.chargesRemaining > 0 ? "yes" : "no");
       if (r) (r.fieldEvents || []).slice(0, 1).forEach((e) => { if (e?.username && e?.type) say(`${e.username}: ${e.type}.`, "thoughtful"); });
       if (r?.unreadCount) say(`${r.unreadCount} unread message${r.unreadCount === 1 ? "" : "s"}.`, "yes");
@@ -5028,7 +5033,7 @@ export default function OilPage() {
     // RigCrew compares ownerPlot with the plot its rig stands on and brushes off everyone else.
     window.__hmBriefing = { lines, tones, signedIn: !!user?.id, ownerPlot: userDrill?.col != null ? `${userDrill.col}_${userDrill.row}` : null };
     return () => { delete window.__hmBriefing; };
-  }, [drillStatus, hellActive, awayRecap, tankFill, user?.id, userDrill?.col, userDrill?.row, loopV2, awayRecapV2]);
+  }, [drillStatus, hellActive, awayRecap, tankFill, user?.id, userDrill?.col, userDrill?.row, loopV2, awayRecapV2, userDrill?.pending?.heat, userDrill?.supplies?.tonic, userPlotState?.heat, userPlotState?.drillDay]);
 
   // ── The crew delivers the away recap (v2, desktop; Michelle 2026-09-28) ──────
   // On return with something to report, the page selects your rig so the crew

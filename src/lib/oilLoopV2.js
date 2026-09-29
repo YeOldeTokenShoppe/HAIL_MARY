@@ -42,18 +42,44 @@ export function resolvePendingDecision({ pending, threshold = 0, chargesRemainin
 // Copy-rule strings (docs/oil-game.md → "Copy rule"): the cost model is always
 // explicit, and the threshold is always phrased as the crew's standing order —
 // never a bare number (a bare "your line: 764" was read as a price).
-export function assayAlertBody({ col, row, layer, oil, threshold, chargesRemaining, hasInclusion }) {
+// ── Hell warning: heat + sulphur on the assay (Michelle, 2026-09-29) ─────────
+// The strike tick knows the column; each revealed core carries a coarse,
+// honest reading of how close the next hell pocket is BELOW the bore head:
+// two layers away = "elevated" (temp elevated, sulphur traces), one layer away
+// = "high" (the next strike cracks it), otherwise "nominal". Deterministic —
+// the instrument never lies — and public on the plot (`heat[layer]`), so the
+// column glows for neighbours and spectators too. The only counterplay is a
+// tonic in supply before the next strike; wildcats and salvage takes are
+// instant reveals with no run-up and stay blind.
+export const HEAT_LOOKAHEAD = 2;
+export const HEAT_COPY = {
+  nominal:  { temp: "Ambient",  sulphur: "None",   warn: null },
+  elevated: { temp: "Elevated", sulphur: "Traces", warn: "!! SULPHUR TRACES — HEAT RISING !!", alert: "🌡 Heat rising, sulphur traces in the core: a hell pocket within 2 layers. A tonic in supply caps it." },
+  high:     { temp: "High",     sulphur: "Heavy",  warn: "!! HELL POCKET BELOW — CAP IT OR CRACK IT !!", alert: "🔥 Hell pocket directly below. The next strike cracks it unless a tonic is in supply." },
+};
+// isHellAt(z) → boolean for this column. Returns the reading for the core at `layer`.
+export function hellHeat(isHellAt, layer, depthZ = 20, lookahead = HEAT_LOOKAHEAD) {
+  for (let k = 1; k <= lookahead; k++) {
+    const z = layer + k;
+    if (z >= depthZ) break;
+    if (isHellAt(z)) return { level: k === 1 ? "high" : "elevated", layersToHell: k };
+  }
+  return { level: "nominal", layersToHell: null };
+}
+
+export function assayAlertBody({ col, row, layer, oil, threshold, chargesRemaining, hasInclusion, heat = "nominal" }) {
   const plot = `Plot (${col + 1}, ${row + 1})`;
   const incl = hasInclusion ? "\n🏺 Anomalous inclusion detected — extract to recover it." : "";
+  const hot = HEAT_COPY[heat]?.alert ? `\n${HEAT_COPY[heat].alert}` : "";
   if (oil <= 0) {
-    return `${plot} L${layer + 1}: dry — passes free at the next strike.${incl}`;
+    return `${plot} L${layer + 1}: dry — passes free at the next strike.${incl}${hot}`;
   }
   const would = resolvePendingDecision({ pending: { layer, oil }, threshold, chargesRemaining, depthZ: 20 }) === "extract"
     ? "EXTRACT" : "PASS";
   return `${plot} L${layer + 1} assays ${Math.round(oil).toLocaleString()} BTR.\n` +
     `EXTRACT banks the full amount for 1 charge · PASS is free but final (opens to neighbours).\n` +
     `If you're away, the crew follows your standing order ("extract ≥ ${Math.round(threshold).toLocaleString()}") → would ${would}. ` +
-    `Charges: ${chargesRemaining}.${incl}`;
+    `Charges: ${chargesRemaining}.${incl}${hot}`;
 }
 
 // ── Decision-surface data builders (plain-chrome plumbing, 2026-09-27) ───────
@@ -88,31 +114,35 @@ export function buildColumnRack({ plot, drill, depthZ = 20 }) {
   const out = [];
   for (let z = 0; z < depthZ; z++) {
     const inclusion = !!(p.inclusionFlags?.[z] || p.passedInclusions?.[z]);
+    // heat: the hell warning read on this core (plot.heat is public; the
+    // pending core carries its own copy) — "elevated" | "high" | null
+    const heat = (pending && pending.layer === z && pending.heat && pending.heat !== "nominal") ? pending.heat
+      : (p.heat?.[z] && p.heat[z] !== "nominal") ? p.heat[z] : null;
     if (pending && pending.layer === z) {
-      out.push({ layer: z, state: "pending", oil: pending.oil || 0, hasInclusion: !!pending.hasInclusion || inclusion, takenBy: null });
+      out.push({ layer: z, state: "pending", oil: pending.oil || 0, hasInclusion: !!pending.hasInclusion || inclusion, takenBy: null, heat });
       continue;
     }
     if (p.hellLayers?.[z]) {
-      out.push({ layer: z, state: p.hellCapped?.[z] ? "hell_capped" : "hell", oil: 0, hasInclusion: false, takenBy: null });
+      out.push({ layer: z, state: p.hellCapped?.[z] ? "hell_capped" : "hell", oil: 0, hasInclusion: false, takenBy: null, heat });
       continue;
     }
     if (d.layersExtracted?.[z] !== undefined || p.extracted?.[z] !== undefined) {
       const oil = d.layersExtracted?.[z] ?? p.extracted?.[z] ?? 0;
-      out.push({ layer: z, state: "extracted", oil: oil || 0, hasInclusion: inclusion, takenBy: null });
+      out.push({ layer: z, state: "extracted", oil: oil || 0, hasInclusion: inclusion, takenBy: null, heat });
       continue;
     }
     if (d.layersPassed?.[z] !== undefined || p.passed?.[z] !== undefined) {
       const oil = d.layersPassed?.[z] ?? p.passed?.[z] ?? 0;
       const takenBy = p.lateralTaken?.[z] ?? null;
       const state = takenBy != null ? "salvaged" : (oil || 0) > 0 ? "passed" : "dry";
-      out.push({ layer: z, state, oil: oil || 0, hasInclusion: inclusion, takenBy });
+      out.push({ layer: z, state, oil: oil || 0, hasInclusion: inclusion, takenBy, heat });
       continue;
     }
     if (p.revealed?.[z] !== undefined || z < reached) {
-      out.push({ layer: z, state: "revealed", oil: p.revealed?.[z] || 0, hasInclusion: inclusion, takenBy: null });
+      out.push({ layer: z, state: "revealed", oil: p.revealed?.[z] || 0, hasInclusion: inclusion, takenBy: null, heat });
       continue;
     }
-    out.push({ layer: z, state: "undrilled", oil: 0, hasInclusion: false, takenBy: null });
+    out.push({ layer: z, state: "undrilled", oil: 0, hasInclusion: false, takenBy: null, heat });
   }
   return out;
 }
