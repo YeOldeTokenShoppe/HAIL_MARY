@@ -32,6 +32,21 @@ export const HUD = {
 export const HUD_MONO = '"Share Tech Mono", monospace';
 export const HUD_DISPLAY = '"Orbitron", sans-serif';
 
+/* The lamp blink the meta row uses (the /space page defines it in its own
+   <style>); render once per card so the name resolves on /hailmary too. */
+export function HudKeyframes() {
+  return <style>{`@keyframes gooCursorBlink { 0%, 100% { opacity: 1 } 50% { opacity: 0.35 } }`}</style>;
+}
+
+/* Small bordered action ("Take −1⚡", "Set", "Turn on") in the HUD voice. */
+export function hudSmallBtn(accent = HUD.gold, disabled = false) {
+  return {
+    fontFamily: HUD_MONO, fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", padding: "0.3rem 0.6rem", borderRadius: 2,
+    cursor: disabled ? "default" : "pointer", background: "transparent", color: disabled ? HUD.muted : accent, border: `1px solid ${disabled ? HUD.muted : accent}`, opacity: disabled ? 0.5 : 1,
+    whiteSpace: "nowrap",
+  };
+}
+
 /* Gold corner bracket — positioned absolutely inside the panel. */
 export function Bracket({ position, size = 12, thickness = 2 }) {
   const posStyle = {

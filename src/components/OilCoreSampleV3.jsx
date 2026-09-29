@@ -1,52 +1,39 @@
 "use client";
 
-// ── v3 CORE SAMPLE — the /space module layout, one decision per screen ───────
+// ── v3 CORE SAMPLE — the /space module, one decision per screen ──────────────
 // (docs/oil-v2-player-ui-brief.md; structure agreed with Michelle 2026-09-28.)
-// Same props as OilCoreSampleV2 — a drop-in — but the data is layered instead
-// of stacked:
-//   CORE       the core on the table and nothing else: cylinder, assay, two big
-//              stats, EXTRACT / PASS. When nothing is on the table: the cylinder,
-//              the cadence line and the two stats. Quiet.
-//   NEXT DOOR  salvage + frontier merged into one short list, best two shown.
-//   LEDGER     banked, charges, and every move so far — always open.
+// Same props as OilCoreSampleV2 — a drop-in — but the data is layered:
+//   CORE SAMPLE  the core on the table and nothing else: cylinder, assay lines,
+//                notes, two big stats, EXTRACT. Nothing on the table: the
+//                cylinder, the pace, the two stats. Quiet.
+//   NEXT DOOR    salvage + frontier merged into one short list, best two shown.
+//   LEDGER       banked, charges, and every move so far — always open.
 // The standing order lives behind a small CREW ORDERS link, not on the screen.
 // The core cylinder IS the rack — no glyph strip, no legend. Bands use the
 // strata wall's colour schema (decided 2026-09-28): gold = on the table,
-// dark = extracted, green = passed (open), amber = a neighbour took it,
+// dark = extracted, green = passed (open), violet = a neighbour took it,
 // red = hell, grey = dry; undrilled = faint strata hatch.
 //
-// Still a plain build: the /space skeleton (meta line, title, tabs, typed data
-// lines, warn line, notes, big stats, one CTA row, gold corner brackets) in the
-// page's theme tokens, with no motion beyond the pending pulse. Colour, type
-// weight and motion are the design pass.
+// 2026-09-29: moved onto the HmHud kit — the /space telemetry panel's chrome
+// (Michelle: "the displays from /space still look better"): dark glass, gold
+// brackets, Orbitron title, the four mono voices, two big stats, the clipped
+// button. FIXED PALETTE: the card no longer follows the six console themes
+// (`theme` is accepted for the drop-in signature and otherwise unused).
 
 import { useEffect, useMemo, useState } from "react";
 import { fmtSpan } from "@/lib/oilLoopV2";
+import { HUD, HUD_MONO, HudKeyframes, HudPanel, HudMeta, HudTitle, HudTabs, HudDivider, HudLine, HudCaption, HudStats, HudButton, HudHint, hudSmallBtn } from "@/components/HmHud";
 
-const MONO = "'Share Tech Mono', monospace";
-const DISPLAY = "'Orbitron', 'Share Tech Mono', monospace";
+const MONO = HUD_MONO;
 // taken = violet (2026-09-29, Michelle: amber sat too close to the pending gold).
 const WALL = { pending: "#ffd75e", pendingHi: "#efe0a8", bore: "#2a1d10", goo: "#37f07a", taken: "#c77dff", hell: "#ff3f1f", dry: "#4a4036", capped: "#a1793f" };
 const fmtBtr = (n) => Math.round(n || 0).toLocaleString();
 const clockOf = (ms) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const untilCopy = (ms, now) => (ms - now > 60000 ? `in ${fmtSpan(ms - now)}` : "any moment now");
 
-/* Gold corner bracket (from /space). */
-function Bracket({ pos, color }) {
-  const s = 12, t = 2;
-  const top = pos[0] === "t", left = pos[1] === "l";
-  const at = { [top ? "top" : "bottom"]: -1, [left ? "left" : "right"]: -1 };
-  return (
-    <span style={{ position: "absolute", width: s, height: s, pointerEvents: "none", ...at }}>
-      <span style={{ position: "absolute", [top ? "top" : "bottom"]: 0, [left ? "left" : "right"]: 0, width: s, height: t, background: color }} />
-      <span style={{ position: "absolute", [top ? "top" : "bottom"]: 0, [left ? "left" : "right"]: 0, width: t, height: s, background: color }} />
-    </span>
-  );
-}
-
 /* The core cylinder — the claim's column as a core sample. One band per layer,
    L1 at the top. Fed by buildColumnRack(); callouts for the layer on the table. */
-function CoreCylinder({ rack, pending, theme, width = 104, height = 236 }) {
+function CoreCylinder({ rack, pending, width = 104, height = 236 }) {
   const n = rack.length || 20;
   const tubeX = 26, tubeY = 8, tubeW = 34, tubeH = height - 16;
   const bandH = tubeH / n;
@@ -70,15 +57,15 @@ function CoreCylinder({ rack, pending, theme, width = 104, height = 236 }) {
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true" style={{ display: "block", flex: "0 0 auto" }}>
       <defs>
         <pattern id="v3-strata" width="6" height="4" patternUnits="userSpaceOnUse">
-          <rect width="6" height="4" fill="rgba(128,128,128,0.06)" />
-          <rect width="6" height="1" fill="rgba(128,128,128,0.10)" />
+          <rect width="6" height="4" fill="rgba(212,168,84,0.05)" />
+          <rect width="6" height="1" fill="rgba(212,168,84,0.10)" />
         </pattern>
         <clipPath id="v3-clip"><rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={9} /></clipPath>
         <filter id="v3-glow" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="1.6" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
       </defs>
-      <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={9} fill="rgba(0,0,0,0.18)" />
+      <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={9} fill="rgba(0,0,0,0.28)" />
       <g clipPath="url(#v3-clip)">
         {rack.map((c) => (
           <rect key={c.layer} x={tubeX} y={tubeY + bandH * c.layer} width={tubeW} height={bandH + 0.5} fill={fillFor(c)}
@@ -86,46 +73,41 @@ function CoreCylinder({ rack, pending, theme, width = 104, height = 236 }) {
             {c.state === "pending" && <animate attributeName="opacity" values="1;0.55;1" dur="1.6s" repeatCount="indefinite" />}
           </rect>
         ))}
-        {/* inclusion flags on non-pending layers: a small dot */}
         {rack.filter((c) => c.hasInclusion && c.state !== "pending").map((c) => (
-          <circle key={`i${c.layer}`} cx={tubeX + tubeW * 0.5} cy={tubeY + bandH * c.layer + bandH / 2} r="1.6" fill={theme.warn || "#e87a2b"} opacity="0.8" />
+          <circle key={`i${c.layer}`} cx={tubeX + tubeW * 0.5} cy={tubeY + bandH * c.layer + bandH / 2} r="1.6" fill={HUD.orange} opacity="0.85" />
         ))}
       </g>
-      <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={9} fill="none" stroke={theme.gold} strokeWidth="1" opacity="0.7" />
+      <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={9} fill="none" stroke={HUD.gold} strokeWidth="1" opacity="0.7" />
       <rect x={tubeX + 3} y={tubeY + 4} width={5} height={tubeH - 8} rx={2.5} fill="rgba(255,255,255,0.06)" />
-      {/* bore head — where the rig is now */}
       {reached > 0 && reached < n && (
         <g>
-          <line x1={tubeX - 3} y1={headY} x2={tubeX + tubeW + 3} y2={headY} stroke={theme.gold} strokeWidth="1.5" />
-          <polygon points={`${tubeX - 9},${headY - 3.5} ${tubeX - 9},${headY + 3.5} ${tubeX - 3.5},${headY}`} fill={theme.gold} />
+          <line x1={tubeX - 3} y1={headY} x2={tubeX + tubeW + 3} y2={headY} stroke={HUD.gold} strokeWidth="1.5" />
+          <polygon points={`${tubeX - 9},${headY - 3.5} ${tubeX - 9},${headY + 3.5} ${tubeX - 3.5},${headY}`} fill={HUD.gold} />
         </g>
       )}
-      {/* depth ticks, in layers */}
-      <g fontFamily={MONO} fontSize="7" fill={theme.muted} letterSpacing="0.05em">
+      <g fontFamily={MONO} fontSize="7" fill={HUD.muted} letterSpacing="0.05em">
         {ticks.map((z) => {
           const y = tubeY + bandH * z + bandH / 2;
-          return (<g key={z}><line x1={tubeX - 5} y1={y} x2={tubeX} y2={y} stroke={theme.muted} strokeWidth="0.8" opacity="0.6" /><text x={tubeX - 8} y={y + 2.5} textAnchor="end">L{z + 1}</text></g>);
+          return (<g key={z}><line x1={tubeX - 5} y1={y} x2={tubeX} y2={y} stroke={HUD.muted} strokeWidth="0.8" opacity="0.6" /><text x={tubeX - 8} y={y + 2.5} textAnchor="end">L{z + 1}</text></g>);
         })}
       </g>
-      {/* bore head label — when a pending callout is not already saying which layer */}
       {!p && reached > 0 && (
         <g fontFamily={MONO} letterSpacing="0.08em">
-          <text x={tubeX + tubeW + 8} y={headY - 3} fontSize="9" fill={theme.gold} fontWeight="700">L{reached}</text>
-          <text x={tubeX + tubeW + 8} y={headY + 7} fontSize="6.5" fill={theme.muted} letterSpacing="0.14em">BORE HEAD</text>
+          <text x={tubeX + tubeW + 8} y={headY - 3} fontSize="9" fill={HUD.gold} fontWeight="700">L{reached}</text>
+          <text x={tubeX + tubeW + 8} y={headY + 7} fontSize="6.5" fill={HUD.muted} letterSpacing="0.14em">BORE HEAD</text>
         </g>
       )}
-      {/* the layer on the table: leader + label + ANOM dot */}
       {p && (
         <g fontFamily={MONO} letterSpacing="0.08em">
           <line x1={tubeX + tubeW} y1={py} x2={tubeX + tubeW + 10} y2={py} stroke={WALL.pending} strokeWidth="0.8" opacity="0.8" />
           <text x={tubeX + tubeW + 13} y={py - 2} fontSize="8" fill={WALL.pending}>L{p.layer + 1}</text>
-          <text x={tubeX + tubeW + 13} y={py + 8} fontSize="7" fill={theme.text}>{(p.oil || 0) > 0 ? `${fmtBtr(p.oil)} BTR` : "DRY"}</text>
+          <text x={tubeX + tubeW + 13} y={py + 8} fontSize="7" fill={HUD.cream}>{(p.oil || 0) > 0 ? `${fmtBtr(p.oil)} BTR` : "DRY"}</text>
           {p.hasInclusion && (
             <g filter="url(#v3-glow)">
-              <circle cx={tubeX + tubeW * 0.5} cy={py} r="2.4" fill={theme.warn || "#e87a2b"}>
+              <circle cx={tubeX + tubeW * 0.5} cy={py} r="2.4" fill={HUD.orange}>
                 <animate attributeName="r" values="2.4;3.4;2.4" dur="1.6s" repeatCount="indefinite" />
               </circle>
-              <text x={tubeX + tubeW + 13} y={py + 17} fontSize="6" fill={theme.warn || "#e87a2b"} letterSpacing="0.15em">ANOM</text>
+              <text x={tubeX + tubeW + 13} y={py + 17} fontSize="6" fill={HUD.orange} letterSpacing="0.15em">ANOM</text>
             </g>
           )}
         </g>
@@ -135,13 +117,14 @@ function CoreCylinder({ rack, pending, theme, width = 104, height = 236 }) {
 }
 
 export default function OilCoreSampleV3({
-  theme, pending, chargesRemaining, chargesCap, threshold,
+  theme, // accepted for the drop-in signature; the card runs the fixed HUD palette
+  pending, chargesRemaining, chargesCap, threshold,
   onDecide, onSetThreshold, salvage = [], onLateral, frontier = [], onWildcat, onWalk,
   cadence = null, rack = [], ledger = null,
   ended = false,      // settings.gameEnded — the ONLY thing that says "season closed"
-  // CREW ORDERS (option B, 2026-09-28): SALVAGE = auto-take a neighbour's pass at
-  // or above the line; AUTOPILOT = extract everything once charges cover the
-  // layers left. Same settings the rig panel's first toggle and key flip.
+  // CREW ORDERS (option B, 2026-09-28): LATERAL EXTRACT = auto-take a neighbour's
+  // pass at or above the line; AUTO-PILOT = keep everything once charges cover
+  // the layers left. Same settings the rig panel's toggle and key flip.
   orders = { autopilot: false, salvage: false },
   onSetOrders = null, // async ({ salvage?: bool, autopilot?: bool }) => void
   // SPECTATOR: a viewer with no rig looks at the SELECTED plot as the field
@@ -171,6 +154,7 @@ export default function OilCoreSampleV3({
   const seasonOver = !!ended;
   const clockOut = !ended && cadence?.seasonEndMs != null && nowMs >= cadence.seasonEndMs;
   const columnDone = cadence != null && cadence.remainingLayers <= 0;
+  const n = rack.length || 20;
   const revealedCount = rack.filter((c) => c.state !== "undrilled").length;
   const deadline = !cadence || seasonOver || clockOut || columnDone ? null : { at: clockOf(cadence.latestMs), until: untilCopy(cadence.latestMs, nowMs) };
   // How far into the current reveal window we are (0..1). The strike lands
@@ -179,11 +163,11 @@ export default function OilCoreSampleV3({
   const windowFrac = cadence && cadence.latestMs && cadence.windowStartMs != null && cadence.latestMs > cadence.windowStartMs
     ? Math.min(1, Math.max(0, (nowMs - cadence.windowStartMs) / (cadence.latestMs - cadence.windowStartMs))) : null;
   const nextCoreLive = cadence && !seasonOver && !clockOut && !columnDone;
-  const cadenceLine = seasonOver ? "season closed"
-    : !cadence ? null
-    : clockOut ? "season clock has run out · the buzzer settles what is on the table"
-    : columnDone ? "column fully revealed"
-    : `next core lands before ${clockOf(cadence.latestMs)} · ${untilCopy(cadence.latestMs, nowMs)}`;
+  const cadenceLine = seasonOver ? "Season closed"
+    : !cadence ? "Field extraction report"
+    : clockOut ? "Season clock run out · the buzzer settles the table"
+    : columnDone ? "Column fully revealed"
+    : `Next core before ${clockOf(cadence.latestMs)} · ${untilCopy(cadence.latestMs, nowMs)}`;
 
   const run = async (fn, okNote) => {
     if (busy) return;
@@ -200,171 +184,161 @@ export default function OilCoreSampleV3({
   ], [salvage, frontier]);
   const shown = seeAll ? nextDoor : nextDoor.slice(0, 2);
 
-  // ── styles (theme tokens; the /space HUD proportions) ──
-  const gold = theme.gold, cream = theme.textStrong || theme.text, muted = theme.muted, warn = theme.warn || "#e87a2b";
-  const mono = (extra) => ({ fontFamily: MONO, fontSize: 11, letterSpacing: "0.06em", lineHeight: 1.7, color: theme.text, ...extra });
-  const meta = mono({ fontSize: 9, letterSpacing: "0.22em", color: muted, textTransform: "uppercase" });
-  // Label over value: the right column next to the cylinder is ~200px on a
-  // phone, so side-by-side rows wrapped word by word (Michelle, 2026-09-28).
-  const dataRow = (k, v, color) => (
-    <div key={k} style={{ marginBottom: 5 }}>
-      <div style={mono({ color: muted, fontSize: 9, letterSpacing: "0.18em", lineHeight: 1.3 })}>{k}</div>
-      <div style={mono({ color: color || theme.text, lineHeight: 1.35 })}>{v}</div>
+  // ── pieces ──
+  const PAD = 8; // label column beside the cylinder: "SAMPLE  L5 of 20"
+  const meta = { fontFamily: MONO, fontSize: "0.5rem", letterSpacing: "0.22em", color: HUD.muted, textTransform: "uppercase", lineHeight: 1.5 };
+  const noteText = { fontFamily: MONO, fontSize: "0.6rem", letterSpacing: "0.05em", lineHeight: 1.55, color: HUD.muted };
+  const windowBar = nextCoreLive && windowFrac != null && (
+    <div title="the reveal window — the next core lands somewhere in here, no later than the end" style={{ marginTop: "0.5rem", height: 3, background: HUD.goldFaint, overflow: "hidden" }}>
+      <div style={{ width: `${Math.round(windowFrac * 100)}%`, height: "100%", background: HUD.gold, opacity: 0.85, transition: "width 1s linear" }} />
     </div>
   );
-  const noteLine = (s, i) => <div key={i} style={mono({ color: muted, fontSize: 10, lineHeight: 1.6 })}>{s}</div>;
-  const stat = (value, label, color) => (
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontFamily: DISPLAY, fontSize: 22, fontWeight: 700, color: color || gold, lineHeight: 1.1, letterSpacing: "0.04em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
-      <div style={meta}>{label}</div>
-    </div>
-  );
-  const cta = (text, accent, disabled, onClick, filled) => (
-    <button disabled={disabled} onClick={onClick} style={{
-      flex: 1, fontFamily: MONO, fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", padding: "11px 10px",
-      borderRadius: 2, cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.45 : 1,
-      background: filled ? `${accent}22` : "transparent", color: accent, border: `1px solid ${accent}`,
-      boxShadow: filled && !disabled ? `inset 0 0 0 1px ${accent}55` : "none",
-    }}>{text}</button>
-  );
-  const tabBtn = (id, label) => (
-    <button key={id} onClick={() => setTab(id)} style={{
-      flex: 1, fontFamily: MONO, fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", padding: "8px 4px",
-      background: tab === id ? `${gold}1f` : "transparent", color: tab === id ? cream : muted,
-      border: `1px solid ${tab === id ? gold : theme.border || muted}`, cursor: "pointer",
-    }}>{label}</button>
-  );
-  const smallBtn = (accent, disabled) => ({
-    fontFamily: MONO, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", padding: "5px 10px", borderRadius: 2,
-    cursor: disabled ? "default" : "pointer", background: "transparent", color: disabled ? muted : accent, border: `1px solid ${disabled ? muted : accent}`, opacity: disabled ? 0.5 : 1,
-  });
+  const noteLineEl = note && <HudLine type="data" text={note} />;
 
-  // ── CORE tab ──
+  // ── CORE SAMPLE tab ──
   const core = pending ? (
     <>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-        <CoreCylinder rack={rack} pending={pending} theme={theme} />
-        <div style={{ flex: 1, minWidth: 0, paddingTop: 4 }}>
-          {dataRow("SAMPLE", `L${pending.layer + 1} of ${rack.length || 20}`)}
-          {dataRow("ASSAY", dry ? "dry" : `${fmtBtr(oil)} BTR`, dry ? muted : cream)}
-          {pending.hasInclusion && dataRow("FLAG", "anomalous inclusion", warn)}
-          {dataRow("CREW", `would ${crewWould}`, crewWould === "EXTRACT" ? theme.green : theme.text)}
-          {deadline ? dataRow("BY", `${deadline.at} · ${deadline.until}`) : dataRow("BY", columnDone || seasonOver || clockOut ? "the buzzer" : "the next strike")}
-          {pending.hasInclusion && <div style={{ ...mono({ color: warn, letterSpacing: "0.14em" }), marginTop: 6 }}>!! ANOMALOUS INCLUSION !!</div>}
+        <CoreCylinder rack={rack} pending={pending} />
+        <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
+          <HudLine type="label" pad={PAD} label="SAMPLE" text={`L${pending.layer + 1} of ${n}`} />
+          <HudLine type="label" pad={PAD} label="CLASS" text={dry ? "Dry shale" : pending.hasInclusion ? "Wet · anomalous" : "Wet core"} />
+          <HudLine type="blank" />
+          <HudLine type="data" pad={PAD} label="Assay" text={dry ? "dry" : `${fmtBtr(oil)} BTR`} />
+          <HudLine type="data" pad={PAD} label="Crew" text={`would ${crewWould.toLowerCase()}`} />
+          <HudLine type="data" pad={PAD} label="By" text={deadline ? `${deadline.at} · ${deadline.until}` : columnDone || seasonOver || clockOut ? "the buzzer" : "the next strike"} />
+          <HudLine type="data" pad={PAD} label="Charges" text={`${chargesRemaining} of ${chargesCap}`} />
         </div>
       </div>
-      <div style={{ marginTop: 8 }}>
-        {(dry
-          ? ["Dry — passing is free.", "Extracting nothing would waste a charge.", "Do nothing: the crew passes."]
-          : [`Extract banks the full ${fmtBtr(oil)} BTR for 1 charge.`, "Pass is free but final — opens to neighbours.", `Do nothing: the crew ${crewWould === "EXTRACT" ? "extracts" : "passes"}.`]
-        ).concat(pending.hasInclusion ? ["The inclusion is only recovered on extract."] : []).map(noteLine)}
-      </div>
-      <div style={{ display: "flex", gap: 12, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${theme.border || muted}` }}>
-        {stat(dry ? "DRY" : `${fmtBtr(oil)} BTR`, `on the table · L${pending.layer + 1}`, dry ? muted : gold)}
-        {stat(`${chargesRemaining}/${chargesCap}`, "charges", chargesRemaining > 0 ? cream : theme.red)}
-      </div>
+      <HudLine type="blank" />
+      <HudLine type="warn" text={pending.hasInclusion ? "!! ANOMALOUS INCLUSION !!" : dry ? "!! DRY — NOTHING TO KEEP !!" : crewWould === "EXTRACT" ? "!! ABOVE YOUR LINE — CREW WOULD KEEP IT !!" : "!! BELOW YOUR LINE — CREW WOULD PASS !!"} />
+      <HudLine type="blank" />
+      {(dry
+        ? ["Passing is free. Extracting nothing wastes a charge.", "Do nothing: the crew passes."]
+        : [`Extract keeps the full ${fmtBtr(oil)} BTR for 1 charge.`, `Do nothing: the crew ${crewWould === "EXTRACT" ? "keeps it" : "passes it"} at the next strike.`, "A pass is final — it opens to next door."]
+      ).concat(pending.hasInclusion ? ["The inclusion is only recovered on extract."] : []).map((t, i) => <HudLine key={i} type="note" text={t} />)}
+      {noteLineEl}
+      <HudDivider margin="0.6rem 0 0.5rem" />
+      <HudCaption>ON THE TABLE · L{pending.layer + 1}</HudCaption>
+      <HudStats stats={[
+        { value: dry ? "DRY" : `${fmtBtr(oil)} BTR`, label: "assay", color: dry ? HUD.muted : HUD.cyan },
+        { value: `${chargesRemaining}/${chargesCap}`, label: "charges", color: chargesRemaining > 0 ? HUD.orange : HUD.red },
+      ]} />
       {/* ONE BUTTON (Michelle, 2026-09-28): EXTRACT keeps it now. Doing nothing
-          hands the layer to the crew's orders at the next strike (the CREW row
-          says which way). There is no pass control on the card at all
-          (2026-09-29: a text-link pass under the one button read as noise);
-          "leave it for next door" is what a raised line + LATERAL EXTRACT do. */}
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        {cta("Extract −1⚡", theme.green, busy || chargesRemaining <= 0, () => run(() => onDecide("extract"), (d) => oil > 0 ? `✔ extracted — ${fmtBtr(oil)} BTR banked${d?.inclusion ? " · inclusion → ARTIFACTS" : ""}` : d?.inclusion ? "✔ dug it up — inclusion → ARTIFACTS" : "✔ extracted — the layer was dry"), true)}
+          hands the layer to the crew's orders at the next strike. No pass
+          control on the card (2026-09-29). */}
+      <div style={{ marginTop: "0.9rem", display: "flex", justifyContent: "center" }}>
+        <HudButton accent={HUD.green} disabled={busy || chargesRemaining <= 0}
+          onClick={() => run(() => onDecide("extract"), (d) => oil > 0 ? `✔ extracted — ${fmtBtr(oil)} BTR banked${d?.inclusion ? " · inclusion → ARTIFACTS" : ""}` : d?.inclusion ? "✔ dug it up — inclusion → ARTIFACTS" : "✔ extracted — the layer was dry")}>
+          Extract −1⚡
+        </HudButton>
       </div>
     </>
   ) : (
     <>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-        <CoreCylinder rack={rack} pending={null} theme={theme} />
-        <div style={{ flex: 1, minWidth: 0, paddingTop: 4 }}>
-          {dataRow("BORE HEAD", `L${revealedCount} of ${rack.length || 20}`, gold)}
-          {dataRow("TABLE", "nothing on it", muted)}
-          {dataRow("BANKED", `${fmtBtr(ledger?.banked || 0)} BTR`)}
-          {nextCoreLive && dataRow("PACE", `a core every ${fmtSpan(cadence.intervalMs)}`)}
+        <CoreCylinder rack={rack} pending={null} />
+        <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
+          <HudLine type="label" pad={PAD} label="BORE" text={`L${revealedCount} of ${n}`} />
+          <HudLine type="label" pad={PAD} label="TABLE" text="nothing on it" />
+          <HudLine type="blank" />
+          <HudLine type="data" pad={PAD} label="Banked" text={`${fmtBtr(ledger?.banked || 0)} BTR`} />
+          {nextCoreLive && <HudLine type="data" pad={PAD} label="Pace" text={`a core every ${fmtSpan(cadence.intervalMs)}`} />}
+          <HudLine type="data" pad={PAD} label="Charges" text={`${chargesRemaining} of ${chargesCap}`} />
         </div>
       </div>
-      <div style={{ marginTop: 8 }}>
-        {(seasonOver ? ["Season closed. The reckoning is below."]
-          : clockOut ? ["The season clock has run out.", "The buzzer settles anything on the table."]
-          : columnDone ? ["Your column is fully revealed.", "Charges left still work next door."]
-          : ["The next strike pulls a core.", "Away? The crew follows your orders."]).map(noteLine)}
-      </div>
-      <div style={{ display: "flex", gap: 12, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${theme.border || muted}` }}>
-        {nextCoreLive
-          ? stat(cadence.latestMs - nowMs > 60000 ? `≤ ${fmtSpan(cadence.latestMs - nowMs)}` : "any moment", `next core · before ${clockOf(cadence.latestMs)}`)
-          : stat(`${fmtBtr(ledger?.banked || 0)} BTR`, "banked")}
-        {stat(`${chargesRemaining}/${chargesCap}`, "charges", chargesRemaining > 0 ? cream : theme.red)}
-      </div>
-      {nextCoreLive && windowFrac != null && (
-        <div title="the reveal window — the next core lands somewhere in here, no later than the end" style={{ marginTop: 8, height: 3, background: theme.barBg || "rgba(128,128,128,0.2)", borderRadius: 2, overflow: "hidden" }}>
-          <div style={{ width: `${Math.round(windowFrac * 100)}%`, height: "100%", background: gold, opacity: 0.85, transition: "width 1s linear" }} />
-        </div>
-      )}
+      <HudLine type="blank" />
+      {(seasonOver ? ["!! SEASON CLOSED !!"] : clockOut ? ["!! SEASON CLOCK RUN OUT !!"] : columnDone ? ["!! COLUMN FULLY REVEALED !!"] : []).map((t) => <HudLine key={t} type="warn" text={t} />)}
+      {(seasonOver ? ["The reckoning is below."]
+        : clockOut ? ["The buzzer settles anything on the table."]
+        : columnDone ? ["Charges left still work next door."]
+        : ["The next strike pulls a core.", "Away? The crew follows your orders."]).map((t, i) => <HudLine key={i} type="note" text={t} />)}
+      {noteLineEl}
+      <HudDivider margin="0.6rem 0 0.5rem" />
+      <HudCaption>{nextCoreLive ? `NEXT CORE · BEFORE ${clockOf(cadence.latestMs)}` : "YOUR RIG"}</HudCaption>
+      <HudStats stats={[
+        nextCoreLive
+          ? { value: cadence.latestMs - nowMs > 60000 ? `≤ ${fmtSpan(cadence.latestMs - nowMs)}` : "ANY MOMENT", label: "next core", color: HUD.cyan }
+          : { value: `${fmtBtr(ledger?.banked || 0)} BTR`, label: "banked", color: HUD.cyan },
+        { value: `${chargesRemaining}/${chargesCap}`, label: "charges", color: chargesRemaining > 0 ? HUD.orange : HUD.red },
+      ]} />
+      {windowBar}
     </>
   );
 
   // ── NEXT DOOR tab ──
   const nextTab = (
     <>
-      {[ "Salvage takes a layer a neighbour passed — first lateral wins.", "Wildcat drills unclaimed ground blind, at your bore's reach." ].map(noteLine)}
-      <div style={{ marginTop: 8 }}>
-        {nextDoor.length === 0 && <div style={mono({ color: muted })}>Nothing open next door yet. Passed layers and unclaimed ground in reach show here.</div>}
-        {shown.map((r) => (
-          <div key={`${r.kind}_${r.col}_${r.row}_${r.layer}`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: `1px solid ${theme.border || muted}` }}>
-            <span style={mono({})}>
-              <span style={{ color: r.kind === "salvage" ? WALL.goo : gold, letterSpacing: "0.14em", fontSize: 9 }}>{r.kind === "salvage" ? "SALVAGE" : "WILDCAT"}</span>
-              {" "}({r.col + 1},{r.row + 1}) · L{r.layer + 1} · {r.kind === "salvage" ? (r.oil > 0 ? `${fmtBtr(r.oil)} BTR` : "dry") : "assay unknown"}
-              {r.hasInclusion && <span style={{ color: warn }}> · inclusion</span>}
-            </span>
-            <button style={smallBtn(r.kind === "salvage" ? theme.green : gold, busy || chargesRemaining <= 0)} disabled={busy || chargesRemaining <= 0}
-              onClick={() => r.kind === "salvage"
-                ? run(() => onLateral(r), (x) => `✔ salvaged (${r.col + 1},${r.row + 1}) L${r.layer + 1}${x?.inclusion ? " · inclusion → ARTIFACTS" : r.oil > 0 ? ` — ${fmtBtr(r.oil)} BTR banked` : ""}`)
-                : run(() => onWildcat(r), (x) => x?.hell ? (x.tonicCapped ? "☠ hit hell — tonic capped it" : "☠ woke a demon") : x?.oil > 0 ? `✔ struck — ${fmtBtr(x.oil)} BTR banked` : x?.inclusion ? "✔ dry… but an inclusion → ARTIFACTS" : "✗ dry hole — the charge is spent")}>
-              {r.kind === "salvage" ? "Take −1⚡" : "Wildcat −1⚡"}
-            </button>
+      <HudLine type="note" text="Salvage takes a layer a neighbour passed — first lateral wins." />
+      <HudLine type="note" text="Wildcat drills unclaimed ground blind, at your bore's reach." />
+      <HudLine type="blank" />
+      {nextDoor.length === 0 && <HudLine type="plain" text="Nothing open next door yet. Passed layers and unclaimed ground in reach show here." />}
+      {shown.map((r) => (
+        <div key={`${r.kind}_${r.col}_${r.row}_${r.layer}`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "0.35rem 0", borderBottom: `1px solid ${HUD.goldFaint}` }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ ...meta, color: r.kind === "salvage" ? HUD.green : HUD.gold }}>{r.kind === "salvage" ? "SALVAGE" : "WILDCAT"} · ({r.col + 1},{r.row + 1}) · L{r.layer + 1}</div>
+            <div style={{ fontFamily: MONO, fontSize: "0.64rem", letterSpacing: "0.05em", color: HUD.cyan, textShadow: `0 0 6px ${HUD.cyanDim}` }}>
+              {r.kind === "salvage" ? (r.oil > 0 ? `${fmtBtr(r.oil)} BTR` : "dry") : "assay unknown"}{r.hasInclusion && <span style={{ color: HUD.orange }}> · inclusion</span>}
+            </div>
           </div>
-        ))}
-        {nextDoor.length > 2 && (
-          <button style={{ ...smallBtn(muted, false), marginTop: 8 }} onClick={() => setSeeAll((v) => !v)}>{seeAll ? "Show fewer" : `See all (${nextDoor.length})`}</button>
-        )}
-      </div>
-      {onWalk && <div style={{ marginTop: 10 }}><button style={smallBtn(gold, busy)} onClick={onWalk}>🥾 Walk the field</button><span style={mono({ color: muted, marginLeft: 8, fontSize: 10 })}>E digs frontier · ESC returns</span></div>}
+          <button style={hudSmallBtn(r.kind === "salvage" ? HUD.green : HUD.gold, busy || chargesRemaining <= 0)} disabled={busy || chargesRemaining <= 0}
+            onClick={() => r.kind === "salvage"
+              ? run(() => onLateral(r), (x) => `✔ salvaged (${r.col + 1},${r.row + 1}) L${r.layer + 1}${x?.inclusion ? " · inclusion → ARTIFACTS" : r.oil > 0 ? ` — ${fmtBtr(r.oil)} BTR banked` : ""}`)
+              : run(() => onWildcat(r), (x) => x?.hell ? (x.tonicCapped ? "☠ hit hell — tonic capped it" : "☠ woke a demon") : x?.oil > 0 ? `✔ struck — ${fmtBtr(x.oil)} BTR banked` : x?.inclusion ? "✔ dry… but an inclusion → ARTIFACTS" : "✗ dry hole — the charge is spent")}>
+            {r.kind === "salvage" ? "Take −1⚡" : "Wildcat −1⚡"}
+          </button>
+        </div>
+      ))}
+      {nextDoor.length > 2 && (
+        <button style={{ ...hudSmallBtn(HUD.muted, false), marginTop: "0.5rem" }} onClick={() => setSeeAll((v) => !v)}>{seeAll ? "Show fewer" : `See all (${nextDoor.length})`}</button>
+      )}
+      {onWalk && <div style={{ marginTop: "0.6rem", display: "flex", alignItems: "center", gap: 8 }}><button style={hudSmallBtn(HUD.gold, busy)} onClick={onWalk}>🥾 Walk the field</button><span style={noteText}>E digs frontier · ESC returns</span></div>}
+      {noteLineEl}
+      <HudDivider margin="0.6rem 0 0.5rem" />
+      <HudCaption>BEYOND YOUR FENCE</HudCaption>
+      <HudStats stats={[
+        { value: String(salvage.length), label: "open pockets", color: salvage.length ? HUD.green : HUD.muted },
+        { value: String(frontier.length), label: "frontier in reach", color: frontier.length ? HUD.cyan : HUD.muted },
+      ]} />
     </>
   );
 
   // ── LEDGER tab ──
   const L = ledger;
-  const ledgerTab = !L ? <div style={mono({ color: muted })}>No ledger yet.</div> : (
+  const ledgerTab = !L ? <HudLine type="plain" text="No ledger yet." /> : (
     <>
-      <div style={{ display: "flex", gap: 12 }}>
-        {stat(`${fmtBtr(L.banked)} BTR`, "banked")}
-        {stat(`${L.chargesSpent}/${chargesCap}`, "charges spent", cream)}
-      </div>
-      <div style={{ marginTop: 10 }}>
-        {dataRow("EXTRACTED", `${fmtBtr(L.extractedOwn)} BTR from your column`)}
-        {dataRow("PASSED", `${fmtBtr(L.passedTotal)} BTR${L.passedTotal > 0 ? ` — neighbours took ${fmtBtr(L.takenByRivals)}, ${fmtBtr(L.leftOpen)} still open` : ""}`)}
-        {L.salvagedIn > 0 && dataRow("SALVAGED", `+${fmtBtr(L.salvagedIn)} BTR next door`, theme.green)}
-        {(L.wildcatIn > 0 || L.wildcatDry > 0 || L.wildcatHell > 0) && dataRow("WILDCATS", `+${fmtBtr(L.wildcatIn)} BTR${L.wildcatDry ? ` · ${L.wildcatDry} dry` : ""}${L.wildcatHell ? ` · ${L.wildcatHell} hell` : ""}`)}
-      </div>
-      <div style={{ marginTop: 10, borderTop: `1px solid ${theme.border || muted}`, paddingTop: 6 }}>
-        {L.rows.length === 0 ? <div style={mono({ color: muted })}>Nothing yet — the first strike puts a core on the table.</div>
+      <HudLine type="data" pad={10} label="Extracted" text={`${fmtBtr(L.extractedOwn)} BTR from your column`} />
+      <HudLine type="data" pad={10} label="Passed" text={`${fmtBtr(L.passedTotal)} BTR${L.passedTotal > 0 ? ` — ${fmtBtr(L.takenByRivals)} taken, ${fmtBtr(L.leftOpen)} open` : ""}`} />
+      {L.salvagedIn > 0 && <HudLine type="data" pad={10} label="Salvaged" text={`+${fmtBtr(L.salvagedIn)} BTR next door`} />}
+      {(L.wildcatIn > 0 || L.wildcatDry > 0 || L.wildcatHell > 0) && <HudLine type="data" pad={10} label="Wildcats" text={`+${fmtBtr(L.wildcatIn)} BTR${L.wildcatDry ? ` · ${L.wildcatDry} dry` : ""}${L.wildcatHell ? ` · ${L.wildcatHell} hell` : ""}`} />}
+      <HudLine type="blank" />
+      <div style={{ borderTop: `1px solid ${HUD.goldFaint}`, paddingTop: "0.35rem" }}>
+        {L.rows.length === 0 ? <HudLine type="note" text="Nothing yet — the first strike puts a core on the table." />
           : L.rows.map((r, i) => (
-            <div key={`${r.kind}_${r.col ?? "o"}_${r.row ?? "o"}_${r.layer}_${i}`} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-              <span style={mono({ fontSize: 10 })}>
+            <div key={`${r.kind}_${r.col ?? "o"}_${r.row ?? "o"}_${r.layer}_${i}`} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontFamily: MONO, fontSize: "0.6rem", letterSpacing: "0.05em", lineHeight: 1.6 }}>
+              <span style={{ color: HUD.cream }}>
                 {r.kind === "extract" && `L${r.layer + 1} · extract`}
                 {r.kind === "pass" && `L${r.layer + 1} · pass${r.takenBy ? " · a neighbour took it" : r.oil > 0 ? " · still open" : " · dry"}`}
                 {r.kind === "salvage" && `salvage (${r.col + 1},${r.row + 1}) L${r.layer + 1}`}
                 {r.kind === "wildcat" && `wildcat (${r.col + 1},${r.row + 1}) L${r.layer + 1}${r.hell ? " · hell" : r.oil > 0 ? "" : " · dry hole"}`}
               </span>
-              <span style={mono({ fontSize: 10, color: r.kind === "pass" ? muted : r.oil > 0 ? theme.green : muted, whiteSpace: "nowrap" })}>
+              <span style={{ color: r.kind === "pass" ? (r.takenBy ? HUD.violet : HUD.muted) : r.oil > 0 ? HUD.green : HUD.muted, whiteSpace: "nowrap" }}>
                 {r.kind === "pass" ? `${fmtBtr(r.oil)} let go` : `${r.oil > 0 ? `+${fmtBtr(r.oil)}` : "+0"} · −${r.charge}⚡`}
               </span>
             </div>
           ))}
       </div>
+      {noteLineEl}
+      <HudDivider margin="0.6rem 0 0.5rem" />
+      <HudCaption>SEASON TO DATE</HudCaption>
+      <HudStats stats={[
+        { value: `${fmtBtr(L.banked)} BTR`, label: "banked", color: HUD.cyan },
+        { value: `${L.chargesSpent}/${chargesCap}`, label: "charges spent", color: HUD.orange },
+      ]} />
     </>
   );
 
+  // ── SPECTATOR ──
   if (spectator) {
     const sp = spectator;
     const extractedN = rack.filter((c) => c.state === "extracted").length;
@@ -373,94 +347,87 @@ export default function OilCoreSampleV3({
     const hellN = rack.filter((c) => c.state === "hell" || c.state === "hell_capped").length;
     const hasPlot = sp.col != null && sp.row != null;
     return (
-      <div style={{ position: "relative", border: `1px solid ${theme.border || muted}`, background: theme.panelBg || "rgba(0,0,0,0.2)", padding: "12px 14px 12px", margin: "8px 0" }}>
-        {["tl", "tr", "bl", "br"].map((p) => <Bracket key={p} pos={p} color={gold} />)}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <span style={meta}>{String(revealedCount).padStart(2, "0")}/{rack.length || 20} // field view</span>
-          <span style={{ ...meta, color: seasonOver ? muted : theme.green }}>● {seasonOver ? "closed" : "live"}</span>
-        </div>
-        <div style={{ fontFamily: DISPLAY, fontSize: 15, fontWeight: 700, letterSpacing: "0.12em", color: cream, marginTop: 6, lineHeight: 1.15 }}>HAIL MARY<br />PROSPECTING CO.</div>
-        <div style={{ ...meta, color: gold, marginTop: 4 }}>{hasPlot ? `plot (${sp.col + 1},${sp.row + 1}) · ${sp.owner ? sp.owner : "unclaimed"}` : "select a plot on the field"}</div>
-        <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 12 }}>
-          <CoreCylinder rack={rack} pending={null} theme={theme} />
-          <div style={{ flex: 1, minWidth: 0, paddingTop: 4 }}>
-            {dataRow("OWNER", hasPlot ? (sp.owner || "nobody yet") : "—", sp.owner ? theme.text : muted)}
-            {dataRow("REVEALED", `${revealedCount} of ${rack.length || 20}`)}
-            {dataRow("EXTRACTED", `${extractedN} layer${extractedN === 1 ? "" : "s"}`)}
-            {dataRow("OPEN", `${openN} pocket${openN === 1 ? "" : "s"}${takenN ? ` · ${takenN} taken` : ""}`, openN ? WALL.goo : theme.text)}
-            {hellN > 0 && dataRow("HELL", `${hellN} pocket${hellN === 1 ? "" : "s"}`, WALL.hell)}
+      <div style={{ margin: "8px 0" }}>
+        <HudKeyframes />
+        <HudPanel>
+          <HudMeta index={`${String(revealedCount).padStart(2, "0")}/${n}`} label="Field view" status={seasonOver ? "CLOSED" : "LIVE"} lamp={seasonOver ? HUD.gold : HUD.orange} blink={!seasonOver} />
+          <HudTitle subtitle={hasPlot ? `Plot (${sp.col + 1},${sp.row + 1}) · ${sp.owner ? sp.owner : "unclaimed"}` : "Select a plot on the field"} />
+          <HudDivider />
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <CoreCylinder rack={rack} pending={null} />
+            <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
+              <HudLine type="label" pad={PAD} label="OWNER" text={hasPlot ? (sp.owner || "nobody yet") : "—"} />
+              <HudLine type="label" pad={PAD} label="BORE" text={`L${revealedCount} of ${n}`} />
+              <HudLine type="blank" />
+              <HudLine type="data" pad={PAD} label="Kept" text={`${extractedN} layer${extractedN === 1 ? "" : "s"}`} />
+              <HudLine type="data" pad={PAD} label="Open" text={`${openN} pocket${openN === 1 ? "" : "s"}${takenN ? ` · ${takenN} taken` : ""}`} />
+              {hellN > 0 && <HudLine type="data" pad={PAD} label="Hell" text={`${hellN} pocket${hellN === 1 ? "" : "s"}`} />}
+            </div>
           </div>
-        </div>
-        <div style={{ marginTop: 8 }}>
+          <HudLine type="blank" />
+          {openN > 0 && <HudLine type="warn" text={`!! ${openN} POCKET${openN === 1 ? "" : "S"} OPEN TO NEIGHBOURS !!`} />}
           {(hasPlot
             ? ["This is the field's view of the column.", "Open pockets are what a neighbour could salvage.", "Claim a plot to drill your own."]
-            : ["Tap a plot to read its column.", "Claim one to drill your own."]).map(noteLine)}
-        </div>
-        <div style={{ display: "flex", gap: 12, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${theme.border || muted}` }}>
-          {stat(`${revealedCount}/${rack.length || 20}`, "revealed", cream)}
-          {stat(String(openN), "open pockets", openN ? WALL.goo : muted)}
-        </div>
-        {/* CLAIM — present only when the page says the server would accept it
-            (registration pre-anchor for players; testers while testing is on).
-            Same handler as STAKE YOUR CLAIM. Otherwise one line says why not. */}
-        {sp.claim && (
-          <div style={{ marginTop: 12 }}>
-            <div style={{ display: "flex", gap: 8 }}>
-              {cta(sp.claim.label || "Claim this plot", gold, busy || !!sp.claim.disabled, () => run(() => sp.claim.onClaim(), "✔ claimed — your rig is going up"), true)}
+            : ["Tap a plot to read its column.", "Claim one to drill your own."]).map((t, i) => <HudLine key={i} type="note" text={t} />)}
+          {noteLineEl}
+          <HudDivider margin="0.6rem 0 0.5rem" />
+          <HudCaption>{hasPlot ? `PLOT (${sp.col + 1},${sp.row + 1}) — HAIL MARY FIELD` : "HAIL MARY FIELD"}</HudCaption>
+          <HudStats stats={[
+            { value: `${revealedCount}/${n}`, label: "revealed", color: HUD.cyan },
+            { value: String(openN), label: "open pockets", color: openN ? HUD.green : HUD.muted },
+          ]} />
+          {/* CLAIM — present only when the page says the server would accept it
+              (registration pre-anchor for players; testers while testing is on).
+              Same handler as STAKE YOUR CLAIM. Otherwise one line says why not. */}
+          {sp.claim && (
+            <div style={{ marginTop: "0.9rem", display: "flex", justifyContent: "center" }}>
+              <HudButton disabled={busy || !!sp.claim.disabled} onClick={() => run(() => sp.claim.onClaim(), "✔ claimed — your rig is going up")}>{sp.claim.label || "Claim this plot?"}</HudButton>
             </div>
-            {sp.claim.note && <div style={{ ...mono({ color: muted, fontSize: 10 }), marginTop: 4, textAlign: "center" }}>{sp.claim.note}</div>}
-          </div>
-        )}
-        {!sp.claim && sp.claimNote && <div style={{ ...mono({ color: muted, fontSize: 10 }), marginTop: 10, textAlign: "center" }}>{sp.claimNote}</div>}
-        {note && <div style={{ ...mono({ color: gold, fontSize: 10 }), marginTop: 6 }}>{note}</div>}
+          )}
+          {sp.claim?.note && <HudHint>{sp.claim.note}</HudHint>}
+          {!sp.claim && sp.claimNote && <HudHint>{sp.claimNote}</HudHint>}
+        </HudPanel>
       </div>
     );
   }
 
   return (
-    <div style={{ position: "relative", border: `1px solid ${theme.border || muted}`, background: theme.panelBg || "rgba(0,0,0,0.2)", padding: "12px 14px 12px", margin: "8px 0" }}>
-      {["tl", "tr", "bl", "br"].map((p) => <Bracket key={p} pos={p} color={gold} />)}
-      {/* meta line */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <span style={meta}>{String(revealedCount).padStart(2, "0")}/{rack.length || 20} // field extraction report</span>
-        <span style={{ ...meta, color: seasonOver ? muted : theme.green }}>● {seasonOver ? "closed" : "live"}</span>
-      </div>
-      <div style={{ fontFamily: DISPLAY, fontSize: 15, fontWeight: 700, letterSpacing: "0.12em", color: cream, marginTop: 6, lineHeight: 1.15 }}>HAIL MARY<br />PROSPECTING CO.</div>
-      {cadenceLine && <div style={{ ...meta, color: gold, marginTop: 4 }}>{cadenceLine}</div>}
-      <div style={{ display: "flex", gap: 0, marginTop: 10 }}>
-        {tabBtn("core", "Core")}{tabBtn("next", `Next door${nextDoor.length ? ` · ${nextDoor.length}` : ""}`)}{tabBtn("ledger", "Ledger")}
-      </div>
-      <div style={{ marginTop: 12 }}>
-        {tab === "core" ? core : tab === "next" ? nextTab : ledgerTab}
-      </div>
-      {note && <div style={{ ...mono({ color: gold, fontSize: 10 }), marginTop: 8 }}>{note}</div>}
-      {/* crew orders — behind a link */}
-      <div style={{ marginTop: 10, textAlign: "center" }}>
-        <button onClick={() => setOrdersOpen((o) => !o)} style={{ background: "none", border: "none", cursor: "pointer", ...meta, color: muted }}>
-          [ crew orders · extract ≥ {fmtBtr(T)} BTR · lateral extract {orders?.salvage ? "on" : "off"} · {orders?.autopilot ? "auto-pilot" : "orders"} {ordersOpen ? "▴" : "▾"} ]
-        </button>
+    <div style={{ margin: "8px 0" }}>
+      <HudKeyframes />
+      <HudPanel>
+        <HudMeta index={`${String(revealedCount).padStart(2, "0")}/${n}`} label="Field extraction report" status={seasonOver ? "CLOSED" : "LIVE"} lamp={seasonOver ? HUD.gold : HUD.orange} blink={!seasonOver} />
+        <HudTitle subtitle={cadenceLine} />
+        <HudTabs
+          tabs={[{ id: "core", label: "Core sample" }, { id: "next", label: `Next door${nextDoor.length ? ` · ${nextDoor.length}` : ""}` }, { id: "ledger", label: "Ledger" }]}
+          active={tab} onSelect={setTab} />
+        <HudDivider />
+        <div style={{ minHeight: 140 }}>
+          {tab === "core" ? core : tab === "next" ? nextTab : ledgerTab}
+        </div>
+        {/* crew orders — behind a hint line */}
+        <HudHint onClick={() => setOrdersOpen((o) => !o)}>
+          [ crew orders · keep ≥ {fmtBtr(T)} BTR · lateral extract {orders?.salvage ? "on" : "off"} · {orders?.autopilot ? "auto-pilot" : "orders"} {ordersOpen ? "▴" : "▾"} ]
+        </HudHint>
         {ordersOpen && (
-          <div style={{ display: "flex", gap: 6, alignItems: "center", justifyContent: "center", marginTop: 6 }}>
-            <span style={mono({ color: muted, fontSize: 10 })}>if you&apos;re away, extract anything ≥</span>
-            <input value={thrDraft ?? String(Math.round(T))} inputMode="numeric" onChange={(e) => setThrDraft(e.target.value.replace(/[^\d]/g, ""))}
-              style={{ fontFamily: MONO, fontSize: 11, width: 64, padding: "3px 5px", background: theme.inputBg || "rgba(0,0,0,0.3)", color: theme.text, border: `1px solid ${theme.border || muted}`, borderRadius: 2 }} />
-            <span style={mono({ color: muted, fontSize: 10 })}>BTR</span>
-            <button style={smallBtn(gold, busy || thrDraft == null)} disabled={busy || thrDraft == null}
-              onClick={() => { const v = Number(thrDraft); if (!Number.isFinite(v) || v < 0) return; run(() => onSetThreshold(v).then(() => setThrDraft(null)), `✔ crew orders set: extract ≥ ${fmtBtr(v)}`); }}>Set</button>
-          </div>
-        )}
-        {ordersOpen && onSetOrders && (
-          <div style={{ marginTop: 8, textAlign: "left" }}>
-            {[
-              ["salvage", "LATERAL EXTRACT", `take a neighbour's passed layer at or above your line, for 1 charge. Neighbours with the order take turns — longest wait goes first.`],
+          <div style={{ marginTop: "0.5rem", borderTop: `1px solid ${HUD.goldFaint}`, paddingTop: "0.5rem" }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={noteText}>while you&apos;re away, keep anything ≥</span>
+              <input value={thrDraft ?? String(Math.round(T))} inputMode="numeric" onChange={(e) => setThrDraft(e.target.value.replace(/[^\d]/g, ""))}
+                style={{ fontFamily: MONO, fontSize: "0.64rem", width: 64, padding: "3px 5px", background: "rgba(0,0,0,0.35)", color: HUD.cyan, border: `1px solid ${HUD.goldFaint}`, borderRadius: 2 }} />
+              <span style={noteText}>BTR</span>
+              <button style={hudSmallBtn(HUD.gold, busy || thrDraft == null)} disabled={busy || thrDraft == null}
+                onClick={() => { const v = Number(thrDraft); if (!Number.isFinite(v) || v < 0) return; run(() => onSetThreshold(v).then(() => setThrDraft(null)), `✔ crew orders set: keep ≥ ${fmtBtr(v)}`); }}>Set</button>
+            </div>
+            {onSetOrders && [
+              ["salvage", "LATERAL EXTRACT", "take a neighbour's passed layer at or above your line, for 1 charge. Neighbours with the order take turns — longest wait goes first."],
               ["autopilot", "AUTO-PILOT", "once you can afford every layer left in your column, the crew keeps each wet one as it comes up, above your line or not. Dry layers still pass free. Off = ORDERS: the crew follows your line on every layer, and runs lateral extract if it's on. Nothing more."],
             ].map(([key, name, desc]) => (
-              <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "6px 0", borderTop: `1px solid ${theme.border || muted}` }}>
+              <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "0.4rem 0", borderTop: `1px solid ${HUD.goldFaint}`, marginTop: "0.4rem" }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={mono({ letterSpacing: "0.16em", fontSize: 10, color: orders?.[key] ? gold : theme.text })}>{name} · {orders?.[key] ? "ON" : "OFF"}</div>
-                  <div style={mono({ color: muted, fontSize: 10, lineHeight: 1.4 })}>{desc}</div>
+                  <div style={{ ...meta, color: orders?.[key] ? HUD.gold : HUD.cream }}>{name} · {orders?.[key] ? "ON" : "OFF"}</div>
+                  <div style={noteText}>{desc}</div>
                 </div>
-                <button style={smallBtn(orders?.[key] ? theme.red : gold, busy)} disabled={busy}
+                <button style={hudSmallBtn(orders?.[key] ? HUD.red : HUD.gold, busy)} disabled={busy}
                   onClick={() => run(() => onSetOrders({ [key]: !orders?.[key] }), `✔ ${name.toLowerCase()} ${orders?.[key] ? "off" : "on"}`)}>
                   {orders?.[key] ? "Turn off" : "Turn on"}
                 </button>
@@ -468,7 +435,7 @@ export default function OilCoreSampleV3({
             ))}
           </div>
         )}
-      </div>
+      </HudPanel>
     </div>
   );
 }

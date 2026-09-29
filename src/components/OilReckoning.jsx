@@ -26,7 +26,7 @@
 
 import { useState } from "react";
 import { reckoningText, reckoningStory, reckoningStrip } from "@/lib/oilLoopV2";
-import { HUD, HUD_MONO, HudPanel, HudMeta, HudTitle, HudTabs, HudDivider, HudLine, HudCaption, HudStats, HudButton, HudHint } from "@/components/HmHud";
+import { HUD, HUD_MONO, HudKeyframes, HudPanel, HudMeta, HudTitle, HudTabs, HudDivider, HudLine, HudCaption, HudStats, HudButton, HudHint } from "@/components/HmHud";
 
 const btr = (n) => Math.round(n || 0).toLocaleString();
 const usd = (n) => `$${(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -126,7 +126,7 @@ export default function OilReckoning({ theme, reckoning: r, col, row }) {
 
   return (
     <div style={{ padding: "10px 14px", borderBottom: `1px solid ${theme?.border || "transparent"}` }}>
-      <style>{`@keyframes gooCursorBlink { 0%, 100% { opacity: 1 } 50% { opacity: 0.35 } }`}</style>
+      <HudKeyframes />
       <HudPanel>
         <HudMeta index="20/20" label="Season-end account" status="CLOSED" lamp={HUD.gold} blink={false} />
         <HudTitle subtitle="The Reckoning" />
