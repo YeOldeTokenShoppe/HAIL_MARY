@@ -4807,6 +4807,79 @@ function MesaApron({ worldW, worldD, worldH, cellSize, materials }) {
     </group>
   );
 }
+// ── The mesa's surround (Michelle, 2026-09-29: "ground it without turning it
+// into a landscape") ──────────────────────────────────────────────────────────
+// Three pieces, no terrain system:
+//   shelf  a slab of mesa at block-top level under the commercial strip's deck
+//          on the −Z edge, so the midway is a town at the field's edge rather
+//          than a pier over nothing (the deck's struts vanish into it);
+//   apron  a wide plain APRON_DROP of the block's height below the top — the
+//          block reads as a mesa rising out of it, its strata faces still the
+//          cross-section. Its colour runs from the ground tone near the block
+//          to the haze colour far out, so it has a horizon without scene fog
+//          (FIELD_FOG stays off: it hazed the rigs);
+//   haze   a ring at the horizon, haze colour at the plain fading to nothing
+//          above, hiding the apron's far edge and the sky seam.
+// ?apron=0 hides all three to A/B the floating block.
+const APRON_ON = typeof window === "undefined" || new URLSearchParams(window.location.search).get("apron") !== "0";
+const APRON_DROP = 0.45;       // fraction of the block's height the plain sits below the top
+const APRON_RADIUS = 160;      // world units; the sky sphere is 300, the camera's reach 45
+const APRON_HAZE_INNER = 1.4;  // haze starts this many block-widths from the centre…
+const APRON_HAZE_OUTER = 9.0;  // …and is complete by here
+const HAZE_RING_HEIGHT = 30;   // world units above the plain the horizon haze reaches
+const SHELF_BEYOND_DECK = 0.8; // cells of mesa past the strip's deck (DECK_DEPTH 1.2 + this)
+const apronShader = {
+  vertexShader: `
+    varying vec2 vUv; varying vec3 vWorld;
+    void main() { vUv = uv; vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+  fragmentShader: `
+    uniform vec3 uGround; uniform vec3 uHaze; uniform float uInner; uniform float uOuter; uniform sampler2D uMap; uniform float uRepeat;
+    varying vec2 vUv; varying vec3 vWorld;
+    void main() {
+      float d = length(vWorld.xz);
+      float t = smoothstep(uInner, uOuter, d);
+      float tex = texture2D(uMap, vUv * uRepeat).r;            // the topo map as a faint relief
+      vec3 ground = uGround * (0.92 + 0.16 * tex);
+      gl_FragColor = vec4(mix(ground, uHaze, t), 1.0);
+    }`,
+};
+const hazeRingShader = {
+  vertexShader: `
+    varying float vH;
+    void main() { vH = uv.y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform vec3 uHaze; varying float vH;
+    void main() { float a = 1.0 - smoothstep(0.0, 1.0, vH); a = a * a; gl_FragColor = vec4(uHaze, a * 0.95); }`,
+};
+function MesaSurround({ worldW, worldD, worldH, cellSize, materials, topoTex, palette, hazeColor, shelf = true }) {
+  const haze = useMemo(() => new THREE.Color(hazeColor), [hazeColor]);
+  const ground = useMemo(() => new THREE.Color(palette.top).multiplyScalar(0.9), [palette.top]);
+  const apronUniforms = useMemo(() => ({
+    uGround: { value: ground }, uHaze: { value: haze },
+    uInner: { value: worldW * APRON_HAZE_INNER }, uOuter: { value: worldW * APRON_HAZE_OUTER },
+    uMap: { value: topoTex }, uRepeat: { value: APRON_RADIUS / 6 },
+  }), [ground, haze, worldW, topoTex]);
+  const ringUniforms = useMemo(() => ({ uHaze: { value: haze } }), [haze]);
+  const plainY = -worldH * APRON_DROP;
+  const deckD = (1.2 + SHELF_BEYOND_DECK) * cellSize; // CommercialStrip DECK_DEPTH + margin
+  return (
+    <group>
+      {shelf && (
+        <mesh position={[0, -worldH / 2, -worldD / 2 - deckD / 2]} material={materials}>
+          <boxGeometry args={[worldW + 0.8 * cellSize, worldH, deckD]} />
+        </mesh>
+      )}
+      <mesh position={[0, plainY, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={-2}>
+        <circleGeometry args={[APRON_RADIUS, 96]} />
+        <shaderMaterial key={hazeColor + palette.top} vertexShader={apronShader.vertexShader} fragmentShader={apronShader.fragmentShader} uniforms={apronUniforms} />
+      </mesh>
+      <mesh position={[0, plainY + HAZE_RING_HEIGHT / 2, 0]} renderOrder={-1}>
+        <cylinderGeometry args={[APRON_RADIUS * 0.94, APRON_RADIUS * 0.94, HAZE_RING_HEIGHT, 64, 1, true]} />
+        <shaderMaterial key={`ring${hazeColor}`} side={THREE.BackSide} transparent depthWrite={false} vertexShader={hazeRingShader.vertexShader} fragmentShader={hazeRingShader.fragmentShader} uniforms={ringUniforms} />
+      </mesh>
+    </group>
+  );
+}
 // ?towerspot=edge (dev, 2026-09-06): the tower stands OFF the grid, past the +X
 // edge at mid-field, so no claim sits under its legs (the strip holds the -Z edge).
 const TOWER_SPOT = (() => {
@@ -7940,6 +8013,9 @@ export default function OilVoxelGrid({
   // strata wall from the mock season to the real field (loopV2 seasons only;
   // the page passes null otherwise).
   strataLivePlots = null,
+  // Horizon haze colour for the mesa's surround (the page passes its sky
+  // preset's fog or sky-bottom colour); falls back to the fog palette.
+  hazeColor = null,
 }) {
   const matRef = useRef();
   const groundMatsRef = useRef([]);
@@ -8109,6 +8185,11 @@ export default function OilVoxelGrid({
         );
       })}
 
+      {/* The mesa's surround: shelf under the midway, the plain, the horizon haze */}
+      {APRON_ON && !DEV_NO_GROUND && (
+        <MesaSurround worldW={worldW} worldD={worldD} worldH={worldH} cellSize={cellSize} materials={groundMaterials}
+          topoTex={topoTex} palette={groundPalette} hazeColor={hazeColor || fogColorFor(envPreset, parabolum)} />
+      )}
       {/* The refinery complex's apron: mesa beyond the +Z and +X edges, always
           present so the complex never hangs off the cliff */}
       {TOWER_VARIANT === "complex" && <MesaApron worldW={worldW} worldD={worldD} worldH={worldH} cellSize={cellSize} materials={groundMaterials} />}
