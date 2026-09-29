@@ -4297,7 +4297,7 @@ export default function OilPage() {
   const [toolStatus, setToolStatus] = useState("");
   const [toolBusy, setToolBusy] = useState(false);
   const [intelTab, setIntelTab] = useState("claims"); // FIELD INTEL panel tab
-  const [toolDeep, setToolDeep] = useState(3);
+  const [toolDeep, setToolDeep] = useState(1); // layers per FORCE STRIKE (1 = one reveal per strike, like the real clock)
   const runTool = useCallback(async (label, fn) => {
     if (!adminPassword) { setToolStatus("✗ no admin password"); return; }
     setToolBusy(true);
@@ -5453,6 +5453,28 @@ export default function OilPage() {
           loadFeed(); // dispatch feed was wiped server-side — refresh the accordion
           return `✓ released ${r.plotsCleared} plot(s) · cleared ${r.rigsCleared} rig(s) · ${r.feedCleared ?? 0} dispatch(es) · fairness wiped — run COMMIT before the next season`;
         })}>RESET BOARD</button>
+        {/* NEW TEST MAP (2026-09-29): after RESET BOARD there is no seed, so every
+            FORCE STRIKE idles with "no_seed". This is COMMIT (lead 1 block) then
+            ANCHOR as soon as that block is mined — the same two calls the fairness
+            console makes, minus the wait. A real season still uses the console
+            with a long lead so players can watch the countdown. */}
+        <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Minting test map", async () => {
+          const call = (action, extra = {}) => fetch("/api/oil-fairness", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ adminPassword, action, ...extra }),
+          }).then((x) => x.json());
+          const c = await call("commit", { lead: 1 });
+          if (!c?.ok) throw new Error(c?.error || "commit failed");
+          let a = null;
+          for (let i = 0; i < 12; i++) {
+            await new Promise((res) => setTimeout(res, 2500));
+            setToolStatus(`Minting test map… waiting for Base block #${c.anchorBlock} (${i + 1})`);
+            a = await call("anchor");
+            if (a?.ok || !/not mined yet/.test(a?.error || "")) break;
+          }
+          if (!a?.ok) throw new Error(a?.error || "anchor failed");
+          return `✓ new map — committed + anchored on Base block #${c.anchorBlock}. Claim bots, then FORCE STRIKE`;
+        })}>NEW TEST MAP</button>
         <button disabled={toolBusy} style={{ ...styles.btn, borderColor: theme.red, color: theme.red }} onClick={() => runTool("Zeroing scores", async () => {
           // Deliberately separate from RESET BOARD (which preserves banked
           // score so a mid-season glitch wipe can't erase earned money) —
@@ -5516,6 +5538,8 @@ export default function OilPage() {
           }
           const r = await fetch(url).then(r => r.json());
           if (!r?.ok) throw new Error(r?.error || "failed");
+          if (r.skipped === "no_seed") throw new Error("no map yet — RESET BOARD wipes the seed. Click NEW TEST MAP (or COMMIT then ANCHOR in the fairness console), then strike again");
+          if (typeof r.struck !== "number") throw new Error(`tick idled: ${r.skipped || JSON.stringify(r)}`);
           // Break skipped down by reason (no_plot is the usual one right after a
           // board reset). Targeted strikes auto-claim, so you shouldn't see it.
           const reasons = r.skipReasons && Object.keys(r.skipReasons).length
@@ -5538,7 +5562,7 @@ export default function OilPage() {
             ? `✓ banked ${r.delta.toLocaleString()} → community · rig total ${r.newTotal.toLocaleString()}`
             : `nothing to bank (tank empty) @(${selectedX + 1}, ${sliceY + 1})`;
         })}>BANK TANK</button>
-        <span style={{ fontSize: 10, color: theme.muted }}>depth</span>
+        <span style={{ fontSize: 10, color: theme.muted }} title="layers revealed per FORCE STRIKE — keep 1 under v2 so each strike is one decision">layers/strike</span>
         {[1, 3, 5, 10, 11, 20].map((n) => (
           <button key={n} onClick={() => setToolDeep(n)} style={{ ...styles.paramBtn, ...(toolDeep === n ? styles.paramBtnActive : {}) }}>{n}</button>
         ))}
