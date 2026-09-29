@@ -142,25 +142,30 @@ export const THEMES = {
 
 // ── HUD palettes: the /space telemetry-panel look, tuned per theme ───────────
 // (Michelle, 2026-09-29: the fixed /space palette clashed with the light
-// consoles.) The card stays a dark "instrument screen" on every theme — that is
-// the vibrancy — but its glass is the theme's own ink, the brackets are the
-// theme's gold, and the data colour is a bright that belongs to the theme
-// (teal on the warm paper consoles, echoing the survey map's BTR swatch; cyan
-// on the blue consoles; mint on the violet one). `hudFor(theme)` in HmHud.jsx
+// consoles.) Dark consoles keep the dark "instrument screen" in their own ink
+// and bright (cyan on the blue consoles; mint on the violet one). Paper
+// consoles put the card ON the paper: the page tone one shade deeper, ink
+// text, a deep teal for data (the survey map's BTR swatch), darker gold
+// brackets. `hudFor(theme)` in HmHud.jsx
 // merges these over the /space defaults, so a theme without a block still
 // renders. Keys: panel (glass), panelSolid (capture background), cream (text),
 // muted, data, dataDim (glow), warn, green, violet (a rival's mark), red, gold,
 // goldDim, goldFaint.
 export const THEME_HUD = {
+  // Paper consoles (Michelle, 2026-09-29, second pass): a dark screen still
+  // fought the page, so the card sits ON the paper — its glass is the page's
+  // own tone one shade deeper, ink for text, a deep teal for data (the survey
+  // map's BTR swatch), the darker gold for brackets so they read on cream.
+  // `light: true` softens the drop shadow and the glows.
   light: {
-    panel: "rgba(46,32,16,0.92)", panelSolid: "#2e2010", cream: "#f5efe6", muted: "#b9a88e",
-    data: "#5fd3c4", dataDim: "rgba(95,211,196,0.7)", warn: "#ff9a3c", green: "#7fe07a", violet: "#d3a0ff", red: "#ff5e4a",
-    gold: "#d4a854", goldDim: "rgba(212,168,84,0.6)", goldFaint: "rgba(212,168,84,0.22)",
+    light: true, panel: "#ede4d4", panelSolid: "#ede4d4", cream: "#2e2010", muted: "#7a6a56",
+    data: "#1f6f7a", dataDim: "rgba(31,111,122,0.22)", warn: "#b8481c", green: "#2f7a1c", violet: "#7a3fbf", red: "#b03030",
+    gold: "#b8922e", goldDim: "rgba(184,146,46,0.8)", goldFaint: "rgba(184,146,46,0.3)",
   },
   duskLight: {
-    panel: "rgba(46,30,26,0.92)", panelSolid: "#2e1e1a", cream: "#f4e6d6", muted: "#bfa593",
-    data: "#6fd6c5", dataDim: "rgba(111,214,197,0.7)", warn: "#ff8a4a", green: "#86e07f", violet: "#d9a3ff", red: "#ff5e4a",
-    gold: "#d49a4a", goldDim: "rgba(212,154,74,0.6)", goldFaint: "rgba(212,154,74,0.22)",
+    light: true, panel: "#ecdac6", panelSolid: "#ecdac6", cream: "#2e1e1a", muted: "#7f6559",
+    data: "#1f6f7a", dataDim: "rgba(31,111,122,0.22)", warn: "#a83e18", green: "#2f7a22", violet: "#7a3fbf", red: "#b03a28",
+    gold: "#b8823a", goldDim: "rgba(184,130,58,0.8)", goldFaint: "rgba(184,130,58,0.3)",
   },
   Geode: {
     panel: "rgba(18,10,22,0.65)", panelSolid: "#150c1c", cream: "#e8d9b8", muted: "#9a8878",
@@ -173,9 +178,9 @@ export const THEME_HUD = {
     gold: "#d4a854", goldDim: "rgba(212,168,84,0.55)", goldFaint: "rgba(212,168,84,0.18)",
   },
   solsticeLight: {
-    panel: "rgba(36,27,12,0.92)", panelSolid: "#241b0c", cream: "#f6edce", muted: "#b8a887",
-    data: "#4fd1e0", dataDim: "rgba(79,209,224,0.7)", warn: "#ffb347", green: "#7fe08a", violet: "#d3a0ff", red: "#ff5e4a",
-    gold: "#e0ad3c", goldDim: "rgba(224,173,60,0.6)", goldFaint: "rgba(224,173,60,0.22)",
+    light: true, panel: "#efe3bd", panelSolid: "#efe3bd", cream: "#241b0c", muted: "#7a6c4e",
+    data: "#0c7786", dataDim: "rgba(12,119,134,0.22)", warn: "#b46618", green: "#2f8f55", violet: "#7a3fbf", red: "#b64230",
+    gold: "#b98218", goldDim: "rgba(185,130,24,0.8)", goldFaint: "rgba(185,130,24,0.3)",
   },
   parabolumDark: {
     panel: "rgba(14,8,26,0.85)", panelSolid: "#0e081a", cream: "#e6d4ff", muted: "#8f7aac",

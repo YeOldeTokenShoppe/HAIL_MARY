@@ -132,7 +132,7 @@ export default function OilReckoning({ theme, reckoning: r, col, row }) {
       <HudKeyframes />
       <HudPanel hud={hud}>
         <HudMeta index="20/20" label="Season-end account" status="CLOSED" lamp={hud.gold} blink={false} />
-        <HudTitle subtitle="The Reckoning" />
+        <HudTitle title="THE RECKONING" subtitle={sealed ? "Season closed · seed not yet published" : "Season closed"} />
         <HudTabs tabs={[{ id: "card", label: "Reckoning" }, { id: "account", label: "Full account" }]} active={tab} onSelect={setTab} />
         <HudDivider />
         <div style={{ minHeight: 140 }}>{tab === "card" ? cardBody : accountBody}</div>
