@@ -28,7 +28,7 @@ panel, and the wording *within* the copy rule.
 | C | **Strata wall** — the earth block as public game-state voxels: passes, extractions, wildcat scars, tunnel bars for salvage | 3D scene, loopV2 seasons | Built (promoted from the `?strata=1` mock) | `src/components/StrataVoxels.jsx` |
 | D | **Alerts** — push + Telegram on every strike (`CORE ASSAY — LAYER n` with the cost-model body), hell breach, tonic cap, artifact, dry layer | Phone lock screen, Telegram | Built, copy follows the rule | `oil-strike-tick/route.js` ~530–665, `lib/oilLoopV2.assayAlertBody` |
 | E | **While-you-were-away recap** | Landing overlay for a returning player | **Still v1**: shows TANK · UNBANKED and a BANK action; needs a v2 version (pending layer, what the crew resolved, what neighbours took) | `src/components/OilAwayRecap.jsx` |
-| F | **The Reckoning** — the per-player season-end **share card** (2026-09-29: replaces FINAL HAUL under v2) | The season-end slot, both layouts, every v2 rig, dry included | Built: fixed-palette card (big banked number, USDC line, four totals, 20-cell column strip) + SHARE (PNG → native sheet / clipboard + X compose with referral link) + COPY REPORT + THE FULL ACCOUNT toggle | `src/components/OilReckoning.jsx`, `lib/oilLoopV2.js` (`reckoningShareText`, `reckoningStrip`) |
+| F | **The Reckoning** — the per-player season-end **share card** (2026-09-29: replaces FINAL HAUL under v2) | The season-end slot, both layouts, every v2 rig, dry included | Built in the **/space telemetry-panel language** (Michelle, 2026-09-29: "the displays from /space still look better") on the shared **`HmHud`** kit: dark glass + gold brackets, Orbitron title, RECKONING / FULL ACCOUNT tabs, plain-English story line, 20-cell column strip, label/data/warn/note body, two big stats, "Share the Reckoning?" button (PNG → native sheet / clipboard + X compose with referral link), text-copy hint | `src/components/OilReckoning.jsx`, `src/components/HmHud.jsx`, `lib/oilLoopV2.js` (`reckoningStory`, `reckoningShareText`, `reckoningStrip`) |
 | G | **FINAL HAUL share card** (PNG capture + tweet) | v1 only now (`!loopV2`) | Built, v1 numbers (banked + tank) | `hailmary/page.js` `finalHaulCard` |
 | H | **Walk mode** — stand on a frontier cell, press E to wildcat | 3D, desktop | Built (beta) | `src/components/PlayerWalker.jsx` |
 | I | **Onboarding** — welcome modal saints, intro video, how-to-play | First visit | **Still says BANK** ("Bank what you find", "Bank often") | `OilWelcomeModal.jsx`, intro video |
@@ -90,7 +90,7 @@ order: *"if you're away, the crew follows your standing order (extract ≥ 800) 
 |---|---|---|
 | charge (⚡) | drill, bonus drill | a charge is what you spend; the bore drills by itself |
 | standing order | threshold, line, limit, price | see above |
-| EXTRACT (the one button); "let it go now" for an explicit pass | bank, keep, skip, PASS as a big button | one button (2026-09-28): doing nothing = the crew's orders |
+| EXTRACT (the one button) | bank, keep, skip, PASS as a big button, "let it go now" | one button (2026-09-28): doing nothing = the crew's orders; no pass control at all (2026-09-29) |
 | LATERAL EXTRACT (the switch) · ORDERS / AUTO-PILOT (the key) | SALVAGE as a control name, MANUAL | the crew is always active; the key sets how much initiative it takes |
 | salvage · taken | poach, steal | a lateral takes what its owner discarded; the race is between rivals |
 | frontier · wildcat | claim-jump, raid | unclaimed ground, drilled blind |
