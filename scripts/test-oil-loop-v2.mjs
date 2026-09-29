@@ -7,7 +7,7 @@ const load = async (rel) => {
   const src = readFileSync(new URL(rel, import.meta.url), "utf8");
   return import("data:text/javascript;charset=utf-8," + encodeURIComponent(src));
 };
-const { PASSIVE_CHARGES, chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, fmtSpan, buildColumnRack, buildLedger, buildReckoning, reckoningText, reckoningShareText, reckoningStrip, pickSalvageOrder } =
+const { PASSIVE_CHARGES, chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, fmtSpan, buildColumnRack, buildLedger, buildReckoning, reckoningText, reckoningStory, reckoningShareText, reckoningStrip, pickSalvageOrder } =
   await load("../src/lib/oilLoopV2.js");
 
 let pass = 0, fail = 0;
@@ -175,13 +175,17 @@ t("reckoningShareText / reckoningStrip: share line + per-layer strip", () => {
   const plot = { col: 0, row: 0, drillDay: 4, revealed: { 0: 100, 1: 0, 2: 300, 3: 50 }, extracted: { 0: 100 }, passed: { 2: 300, 3: 50 }, lateralTaken: { 2: "rival" }, hellLayers: {} };
   const drill = { totalCollected: 100, chargesSpent: 1, layersExtracted: { 0: 100 }, layersPassed: { 1: 0, 2: 300, 3: 50 } };
   const r = buildReckoning({ plot, drill, allPlots: {}, userId: "me", column: { oil: [100, 0, 300, 50, 700, 0], hell: [5] }, depthZ: 6, usdRate: 0.01, chargesCap: 8 });
-  const txt = reckoningShareText(r, { refCode: "ABC" });
-  assert.match(txt, /banked 100 BTR ≈ \$1\.00 USDC/);
-  assert.match(txt, /% of my column/);
+  const story = reckoningStory(r, { col: 0, row: 0 });
+  assert.match(story, /^I ran a rig on plot \(1,1\) of the Hail Mary oil field/);
+  assert.match(story, /brought up 100 BTR and I was paid \$1\.00 in USDC/);
+  assert.match(story, /neighbours took 300 BTR/);
+  assert.match(story, /750 BTR is still down there\.$/);
+  const txt = reckoningShareText(r, { refCode: "ABC", col: 0, row: 0 });
+  assert.ok(txt.startsWith(story));
   assert.match(txt, /rl80\.com\/hailmary\?ref=ABC$/);
   assert.equal(reckoningStrip(r).map((x) => x.state).join(","), "extracted,dry,taken,open,missed,hell");
   const dry = buildReckoning({ plot: { col: 0, row: 0, drillDay: 2, revealed: { 0: 0, 1: 0 } }, drill: { totalCollected: 0, layersPassed: { 0: 0, 1: 0 } }, allPlots: {}, userId: "me", column: null, depthZ: 3 });
-  assert.match(reckoningShareText(dry), /banked nothing — dry season/);
+  assert.match(reckoningStory(dry), /banked nothing\. 1 layer is still sealed/);
   assert.equal(reckoningStrip(dry)[2].state, "sealed");
 });
 

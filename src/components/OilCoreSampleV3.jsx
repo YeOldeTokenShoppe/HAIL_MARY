@@ -25,7 +25,8 @@ import { fmtSpan } from "@/lib/oilLoopV2";
 
 const MONO = "'Share Tech Mono', monospace";
 const DISPLAY = "'Orbitron', 'Share Tech Mono', monospace";
-const WALL = { pending: "#ffd75e", pendingHi: "#efe0a8", bore: "#2a1d10", goo: "#37f07a", taken: "#ffb84d", hell: "#ff3f1f", dry: "#4a4036", capped: "#a1793f" };
+// taken = violet (2026-09-29, Michelle: amber sat too close to the pending gold).
+const WALL = { pending: "#ffd75e", pendingHi: "#efe0a8", bore: "#2a1d10", goo: "#37f07a", taken: "#c77dff", hell: "#ff3f1f", dry: "#4a4036", capped: "#a1793f" };
 const fmtBtr = (n) => Math.round(n || 0).toLocaleString();
 const clockOf = (ms) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const untilCopy = (ms, now) => (ms - now > 60000 ? `in ${fmtSpan(ms - now)}` : "any moment now");
@@ -265,20 +266,21 @@ export default function OilCoreSampleV3({
       </div>
       {/* ONE BUTTON (Michelle, 2026-09-28): EXTRACT keeps it now. Doing nothing
           hands the layer to the crew's orders at the next strike (the CREW row
-          says which way). "Let it go now" is the explicit pass for the one case
+          says which way). "Pass it now" is the explicit pass for the one case
           the line can't express — above the line but you want the charge for
-          next door — and it takes two taps because pass is final. */}
+          next door — and it takes two taps because pass is final. Copy made
+          literal 2026-09-29 ("let it go now" read as nothing to Michelle). */}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         {cta("Extract −1⚡", theme.green, busy || chargesRemaining <= 0, () => run(() => onDecide("extract"), (d) => oil > 0 ? `✔ extracted — ${fmtBtr(oil)} BTR banked${d?.inclusion ? " · inclusion → ARTIFACTS" : ""}` : d?.inclusion ? "✔ dug it up — inclusion → ARTIFACTS" : "✔ extracted — the layer was dry"), true)}
       </div>
       <div style={{ marginTop: 6, textAlign: "center" }}>
         {!passArm ? (
           <button onClick={() => setPassArm(true)} disabled={busy} style={{ background: "none", border: "none", cursor: "pointer", ...meta, color: muted }}>
-            [ let it go now ]
+            or pass it now — no charge, it opens to next door
           </button>
         ) : (
           <span style={mono({ color: muted, fontSize: 10 })}>
-            Pass is final — it opens to your neighbours.{" "}
+            Passing leaves L{pending.layer + 1} in the ground for your neighbours to take. No charge spent, no waiting for the next strike. Pass is final.{" "}
             <button onClick={() => { setPassArm(false); run(() => onDecide("pass"), "↷ passed — final"); }} disabled={busy} style={{ background: "none", border: `1px solid ${theme.red}`, borderRadius: 2, cursor: "pointer", ...mono({ color: theme.red, fontSize: 10, letterSpacing: "0.12em" }), padding: "2px 8px" }}>yes, pass</button>{" "}
             <button onClick={() => setPassArm(false)} style={{ background: "none", border: "none", cursor: "pointer", ...meta, color: muted }}>keep deciding</button>
           </span>

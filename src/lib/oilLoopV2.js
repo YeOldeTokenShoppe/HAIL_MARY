@@ -249,22 +249,33 @@ export function reckoningText(r, { col, row } = {}) {
   return lines.join("\n");
 }
 
+// The reckoning in plain English — the sentence a stranger can read on the
+// shared picture without knowing the game (Michelle, 2026-09-29: "just data
+// with no context" is not shareable). Pure; also the first line of the post.
+export function reckoningStory(r, { col, row } = {}) {
+  const btr = (n) => Math.round(n || 0).toLocaleString();
+  const usd = (n) => `$${(n || 0).toFixed(2)}`;
+  const where = col != null && row != null ? `plot (${col + 1},${row + 1}) of` : "a plot in";
+  const first = r.banked > 0
+    ? `I ran a rig on ${where} the Hail Mary oil field for a season. The crew brought up ${btr(r.banked)} BTR and I was paid ${usd(r.payoutUsd)} in USDC.`
+    : `I ran a rig on ${where} the Hail Mary oil field for a season and banked nothing.`;
+  const rest = [];
+  if (r.captureRate != null && r.extractedOwn > 0 && r.unknownLayers === 0) rest.push(`I kept ${Math.round(r.captureRate * 100)}% of what was under me`);
+  if (r.takenByRivals > 0) rest.push(`neighbours took ${btr(r.takenByRivals)} BTR from layers I passed`);
+  if (r.salvagedIn > 0) rest.push(`I took ${btr(r.salvagedIn)} BTR from next door`);
+  if (r.wildcatIn > 0) rest.push(`my wildcats found ${btr(r.wildcatIn)} BTR`);
+  if (r.unknownLayers === 0 && r.stranded > 0) rest.push(`${btr(r.stranded)} BTR is still down there`);
+  if (r.unknownLayers > 0) rest.push(`${r.unknownLayers} layer${r.unknownLayers === 1 ? " is" : "s are"} still sealed until the map is published`);
+  if (rest.length === 0) return first;
+  const tail = rest.length === 1 ? rest[0] : `${rest.slice(0, -1).join(", ")}, and ${rest[rest.length - 1]}`;
+  return `${first} ${tail.charAt(0).toUpperCase()}${tail.slice(1)}.`;
+}
+
 // One-line share text for the reckoning card (the post that rides the PNG).
 // Pure so the wording is testable. The link carries the player's referral
 // code — the season-end result is the game's best acquisition creative.
-export function reckoningShareText(r, { refCode = null, url = "rl80.com/hailmary" } = {}) {
-  const btr = (n) => Math.round(n || 0).toLocaleString();
-  const usd = (n) => `$${(n || 0).toFixed(2)}`;
-  const bits = [];
-  if (r.captureRate != null && r.extractedOwn > 0) bits.push(`${Math.round(r.captureRate * 100)}% of my column`);
-  if (r.salvagedIn > 0) bits.push(`+${btr(r.salvagedIn)} salvaged next door`);
-  if (r.wildcatIn > 0) bits.push(`+${btr(r.wildcatIn)} from wildcats`);
-  if (r.banked <= 0) bits.push(r.columnTotal > 0 && r.unknownLayers === 0 ? `${btr(r.columnTotal)} BTR was under me` : "dry season");
-  const head = r.banked > 0
-    ? `The Reckoning: banked ${btr(r.banked)} BTR ≈ ${usd(r.payoutUsd)} USDC`
-    : "The Reckoning: banked nothing";
-  const tail = bits.length ? ` — ${bits.join(", ")}` : "";
-  return `${head}${tail} ⛏ Hail Mary Prospecting Co.\n\nNext season: ${url}${refCode ? `?ref=${refCode}` : ""}`;
+export function reckoningShareText(r, { refCode = null, url = "rl80.com/hailmary", col, row } = {}) {
+  return `${reckoningStory(r, { col, row })} ⛏ Hail Mary Prospecting Co.\n\nNext season: ${url}${refCode ? `?ref=${refCode}` : ""}`;
 }
 
 // Per-layer state for the reckoning's column strip (top → bottom), from the

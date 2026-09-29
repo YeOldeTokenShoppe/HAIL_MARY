@@ -23,7 +23,7 @@
 // then the card says how many layers are still sealed rather than guessing.
 
 import { useRef, useState } from "react";
-import { reckoningText, reckoningShareText, reckoningStrip } from "@/lib/oilLoopV2";
+import { reckoningText, reckoningStory, reckoningShareText, reckoningStrip } from "@/lib/oilLoopV2";
 
 const MONO = "'Share Tech Mono', monospace";
 const DISPLAY = "'Orbitron', 'Share Tech Mono', monospace";
@@ -32,12 +32,12 @@ const usd = (n) => `$${(n || 0).toLocaleString(undefined, { minimumFractionDigit
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 // Card palette (fixed — see header). Same family as the core cylinder's wall
-// colours so the strip reads like the rack: kept = green, taken = amber,
+// colours so the strip reads like the rack: kept = green, taken = violet,
 // open = gold, hell = red, dry = earth, missed = dim, sealed = hatched grey.
 const CARD = {
   bg: "linear-gradient(180deg, #1c1024, #120a18)", edge: "rgba(212,168,84,0.5)",
   gold: "#d4a854", text: "#e8dcc8", muted: "#b8a890", dim: "#6e6050",
-  green: "#37f07a", amber: "#ffb84d", open: "#ffd75e", red: "#ff3f1f", dry: "#4a4036", missed: "#7a5a3a", sealed: "#3a3140",
+  green: "#37f07a", amber: "#c77dff", open: "#ffd75e", red: "#ff3f1f", dry: "#4a4036", missed: "#7a5a3a", sealed: "#3a3140",
 };
 const STRIP_COLOR = { extracted: CARD.green, taken: CARD.amber, open: CARD.open, dry: CARD.dry, hell: CARD.red, missed: CARD.missed, sealed: CARD.sealed };
 const STRIP_WORD = { extracted: "kept", taken: "taken", open: "left open", dry: "dry", hell: "hell", missed: "never reached", sealed: "sealed" };
@@ -57,7 +57,7 @@ export default function OilReckoning({ theme, reckoning: r, col, row, refCode = 
   const share = async () => {
     if (busy) return;
     setBusy(true);
-    const text = reckoningShareText(r, { refCode, url: shareUrl });
+    const text = reckoningShareText(r, { refCode, url: shareUrl, col, row });
     try {
       setNote("Capturing…");
       const { default: html2canvas } = await import("html2canvas");
@@ -129,6 +129,8 @@ export default function OilReckoning({ theme, reckoning: r, col, row, refCode = 
           {col != null && <span style={cMeta}>plot ({col + 1},{row + 1})</span>}
         </div>
         <div style={{ ...cMeta, color: CARD.gold, fontSize: 11, letterSpacing: "0.26em", marginTop: 6 }}>The Reckoning · season closed</div>
+        {/* the story: what happened, in words a stranger can read (2026-09-29) */}
+        <div style={{ fontFamily: MONO, fontSize: 11, lineHeight: 1.55, color: CARD.text, marginTop: 8 }}>{reckoningStory(r, { col, row })}</div>
 
         <div style={{ fontFamily: DISPLAY, fontSize: 40, fontWeight: 700, color: CARD.gold, lineHeight: 1.05, marginTop: 10, letterSpacing: "0.02em", textShadow: "0 0 18px rgba(212,168,84,0.28)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {btr(r.banked)}
