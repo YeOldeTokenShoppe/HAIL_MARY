@@ -56,17 +56,20 @@ export function PanelTitle({ theme, isMobile = false, icon, right, onToggle, ope
         ...c.title,
         margin: toggle && !open ? 0 : c.title.margin,
         justifyContent: "space-between",
+        // A long `right` (the v2 status cluster) drops under the title instead
+        // of overlapping it on a narrow column (2026-09-29).
+        flexWrap: "wrap", rowGap: 2, columnGap: 10,
         cursor: toggle ? "pointer" : undefined,
         userSelect: toggle ? "none" : undefined,
         ...style,
       }}
     >
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0, whiteSpace: "nowrap" }}>
         {icon && <PanelIcon path={icon} />}
         {children}
       </span>
       {(right || toggle) && (
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0, fontWeight: 400, letterSpacing: "0.08em", textTransform: "none" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 1, minWidth: 0, marginLeft: "auto", fontWeight: 400, letterSpacing: "0.08em", textTransform: "none" }}>
           {right}
           {toggle && <span style={{ fontSize: 10, color: theme.muted }}>{open ? "▴" : "▾"}</span>}
         </span>
