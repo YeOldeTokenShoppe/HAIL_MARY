@@ -13,8 +13,16 @@ import { useState, useEffect, useRef } from "react";
 // recap = {
 //   awayMs, fromDepth, toDepth, strikes: [{layer, oil}], oilGained, hellHit,
 //   tank, tankDelta, bankedDelta, fieldEvents: [{type, username, detail}],
-//   fieldEventCount, unreadCount, demo?
+//   fieldEventCount, unreadCount, demo?,
+//   v2away?: { cores: [{layer, oil, outcome: kept|taken|open|dry|hell|table|sealed, takenBy}],
+//              kept, keptOil, passed, takenN, takenOil, crewTakes }   (loopV2 only)
 // }
+//
+// v2 (2026-09-29): the crew delivers this on the desktop field (RigCrew briefing,
+// page.js recapDelivery); this card is READ IT and the phone/fallback. Under v2
+// the hero is what the crew BANKED while you were gone (extractions + takes),
+// the cores list says what became of each layer, and the share button is off —
+// the season-end share is the polaroid (open thread).
 
 function formatAway(ms) {
   const m = Math.floor(ms / 60000);
@@ -164,7 +172,7 @@ export default function OilAwayRecap({
               ⛏ WHILE YOU WERE AWAY
             </div>
             <div style={{ fontSize: 10, letterSpacing: "0.12em", color: muted, marginTop: 3, fontFamily: mono }}>
-              {formatAway(recap.awayMs)} ON THE CLOCK{recap.demo ? " · DEMO DATA" : ""}
+              {formatAway(recap.awayMs)} ON THE CLOCK{v2 ? " · THE CREW'S REPORT" : ""}{recap.demo ? " · DEMO DATA" : ""}
             </div>
           </div>
           <button
@@ -176,7 +184,22 @@ export default function OilAwayRecap({
 
         {/* Hero — the haul (or the honest dry read) */}
         <div style={{ textAlign: "center", margin: "16px 0 4px" }}>
-          {recap.oilGained > 0 ? (
+          {v2 ? (
+            recap.bankedDelta > 0 ? (
+              <>
+                <div style={{ fontSize: isMobile ? 44 : 42, fontWeight: 700, color: gold, fontFamily: mono, lineHeight: 1, textShadow: `0 0 18px ${gold}44` }}>
+                  +{recap.bankedDelta.toLocaleString()}<span style={{ fontSize: "0.42em", fontWeight: 400, marginLeft: 8, letterSpacing: "0.12em" }}>BTR</span>
+                </div>
+                <div style={{ fontSize: isMobile ? 11 : 10, letterSpacing: "0.25em", color: muted, marginTop: 5, fontFamily: mono }}>
+                  BANKED BY YOUR CREW {usd(recap.bankedDelta) ? `· ${usd(recap.bankedDelta)}` : ""}
+                </div>
+              </>
+            ) : (recap.v2away?.cores?.length || 0) > 0 ? (
+              <div style={{ fontSize: isMobile ? 13 : 12, color: muted, fontFamily: mono, fontStyle: "italic", lineHeight: 1.6 }}>
+                {recap.v2away.cores.length} core{recap.v2away.cores.length === 1 ? "" : "s"} came up —<br />nothing worth a charge yet.
+              </div>
+            ) : null
+          ) : recap.oilGained > 0 ? (
             <>
               <div style={{ fontSize: isMobile ? 44 : 42, fontWeight: 700, color: gold, fontFamily: mono, lineHeight: 1, textShadow: `0 0 18px ${gold}44` }}>
                 +{heroOil.toLocaleString()}<span style={{ fontSize: "0.42em", fontWeight: 400, marginLeft: 8, letterSpacing: "0.12em" }}>BTR</span>
@@ -211,7 +234,29 @@ export default function OilAwayRecap({
             <span>ground <b>{layersGround}</b> layer{layersGround === 1 ? "" : "s"} deeper — depth {recap.fromDepth} → <b>{recap.toDepth}</b></span>
           </div>
         )}
-        {recap.strikes.length > 0 && (
+        {v2 && recap.v2away && recap.v2away.cores.filter((c) => c.outcome !== "table").map((c) => {
+          const word = { kept: "kept", taken: `passed → ${c.takenBy ? "taken next door" : "taken"}`, open: "passed · still open", dry: "dry", hell: "hell pocket", sealed: "sealed" }[c.outcome] || c.outcome;
+          const color = c.outcome === "kept" ? green : c.outcome === "taken" ? "#c77dff" : c.outcome === "hell" ? red : c.outcome === "open" ? gold : muted;
+          return (
+            <div key={c.layer} style={row}>
+              <span style={{ color, minWidth: 12, textAlign: "center" }}>{c.outcome === "kept" ? "✔" : c.outcome === "hell" ? "▲" : "↷"}</span>
+              <span><b>L{c.layer + 1}</b> {c.oil > 0 ? <b style={{ color }}>{Math.round(c.oil).toLocaleString()} BTR</b> : <span style={{ color: muted }}>dry</span>} <span style={{ color: muted }}>— {word}</span></span>
+            </div>
+          );
+        })}
+        {v2 && recap.v2away?.takenN > 0 && (
+          <div style={row}>
+            <span style={{ color: "#c77dff" }}>▸</span>
+            <span>neighbours took <b style={{ color: "#c77dff" }}>{recap.v2away.takenN}</b> of your pockets — {Math.round(recap.v2away.takenOil).toLocaleString()} BTR</span>
+          </div>
+        )}
+        {v2 && recap.v2away?.crewTakes > 0 && (
+          <div style={row}>
+            <span style={{ color: green }}>▸</span>
+            <span>your crew took <b style={{ color: green }}>{recap.v2away.crewTakes}</b> pocket{recap.v2away.crewTakes === 1 ? "" : "s"} next door on your orders</span>
+          </div>
+        )}
+        {!v2 && recap.strikes.length > 0 && (
           <div style={row}>
             <span style={{ color: gold }}>▸</span>
             <span>
@@ -247,10 +292,10 @@ export default function OilAwayRecap({
             <span style={{ color: red }}>one of them was <b>cursed</b> — check the field before it spreads</span>
           </div>
         )}
-        {recap.bankedDelta > 0 && (
+        {!v2 && recap.bankedDelta > 0 && (
           <div style={row}>
             <span style={{ color: green }}>▸</span>
-            <span><b style={{ color: green }}>+{recap.bankedDelta.toLocaleString()} BTR</b> {v2 ? "extracted" : "banked"} while away {usd(recap.bankedDelta) ? `(${usd(recap.bankedDelta)})` : ""}</span>
+            <span><b style={{ color: green }}>+{recap.bankedDelta.toLocaleString()} BTR</b> banked while away {usd(recap.bankedDelta) ? `(${usd(recap.bankedDelta)})` : ""}</span>
           </div>
         )}
         {v2 && v2.pending && (
@@ -262,8 +307,8 @@ export default function OilAwayRecap({
               {v2.pending.hasInclusion ? <span style={{ fontWeight: 400, color: gold }}> · anomalous inclusion</span> : null}
             </span>
             <span style={{ color: muted, fontSize: 10 }}>
-              {(v2.pending.oil || 0) > 0 ? "EXTRACT banks it for 1 charge · PASS is free but final. " : "Dry — passing is free. "}
-              If you do nothing, the crew follows your standing order (extract ≥ {Math.round(v2.threshold || 0).toLocaleString()}){v2.latestMs ? ` before ${new Date(v2.latestMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : " at the next strike"} → would {v2.crewWould}. Charges: {v2.chargesRemaining}.
+              {(v2.pending.oil || 0) > 0 ? "EXTRACT keeps it for 1 charge. " : "Dry — nothing to keep. "}
+              Do nothing and the crew follows your line (keep ≥ {Math.round(v2.threshold || 0).toLocaleString()} BTR){v2.latestMs ? ` before ${new Date(v2.latestMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : " at the next strike"} → they would {v2.crewWould === "EXTRACT" ? "keep it" : "pass"}. Charges left: {v2.chargesRemaining}.
             </span>
           </div>
         )}
@@ -324,7 +369,7 @@ export default function OilAwayRecap({
         )}
 
         {/* Footer */}
-        {recap.oilGained > 0 && (
+        {!v2 && recap.oilGained > 0 && (
           <button
             onClick={shareStrike}
             disabled={!!shareNote}
@@ -341,7 +386,7 @@ export default function OilAwayRecap({
         <button
           onClick={onClose}
           style={{
-            width: "100%", marginTop: recap.oilGained > 0 ? 8 : 16, padding: "13px 12px",
+            width: "100%", marginTop: !v2 && recap.oilGained > 0 ? 8 : 16, padding: "13px 12px",
             background: `linear-gradient(180deg, ${gold}, #b8922e)`, border: `1px solid ${gold}`,
             borderRadius: 3, color: "#fff", fontFamily: mono, fontSize: 12, fontWeight: 700,
             letterSpacing: "0.15em", cursor: "pointer",

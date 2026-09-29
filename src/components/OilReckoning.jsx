@@ -1,8 +1,8 @@
 "use client";
 
-// ── THE RECKONING — the player's season-end share card ───────────────────────
+// ── THE RECKONING — the player's season-end account ─────────────────────────
 // (docs/oil-game.md → SEASON ONE → IN #3; decided 2026-09-28: the reckoning
-// REPLACES the FINAL HAUL card as the season-end share — provisional.)
+// takes the FINAL HAUL slot at the buzzer; NOT the share — see below.)
 //
 // 2026-09-29: rebuilt in the /space telemetry-panel language (Michelle: "the
 // displays from /space still look better") on the shared HmHud kit — dark
@@ -12,16 +12,20 @@
 //   divider · caption · stats · button · hint
 // Fixed palette by design: identical in every console theme and PNG-safe.
 //
-// SHARE captures the panel: native share sheet with the PNG on phones, else
-// clipboard + X compose with the referral link. The hint under the button
-// copies the plain-text report. The line-by-line account is the second tab.
+// NOT the share (Michelle, 2026-09-29): "people want a picture and a tagline".
+// The season-end share is the SEASON POLAROID — the crew posing on the
+// player's rig, one line, the referral link — an open thread (docs/oil-game.md
+// → SEASON ONE → open threads). This card is the account: COPY REPORT keeps
+// the text; the line-by-line account is the second tab. The PNG capture path
+// that used to live here is kept in git history (commit 1a65fb5) for the
+// polaroid work.
 //
 // Data: lib/oilLoopV2 buildReckoning(). The column total is only complete once
 // the page hands the builder the revealed seed's column (post-gameEnded); until
 // then the card says how many layers are still sealed rather than guessing.
 
-import { useRef, useState } from "react";
-import { reckoningText, reckoningStory, reckoningShareText, reckoningStrip } from "@/lib/oilLoopV2";
+import { useState } from "react";
+import { reckoningText, reckoningStory, reckoningStrip } from "@/lib/oilLoopV2";
 import { HUD, HUD_MONO, HudPanel, HudMeta, HudTitle, HudTabs, HudDivider, HudLine, HudCaption, HudStats, HudButton, HudHint } from "@/components/HmHud";
 
 const btr = (n) => Math.round(n || 0).toLocaleString();
@@ -33,10 +37,8 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 const STRIP_COLOR = { extracted: HUD.green, taken: HUD.violet, open: HUD.gold, dry: "#4a4036", hell: HUD.red, missed: "#7a5a3a", sealed: "#3a3140" };
 const STRIP_WORD = { extracted: "kept", taken: "taken", open: "left open", dry: "dry", hell: "hell", missed: "never reached", sealed: "sealed" };
 
-export default function OilReckoning({ theme, reckoning: r, col, row, refCode = null, shareUrl = "rl80.com/hailmary" }) {
-  const cardRef = useRef(null);
+export default function OilReckoning({ theme, reckoning: r, col, row }) {
   const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState("card");
   if (!r) return null;
 
@@ -45,38 +47,6 @@ export default function OilReckoning({ theme, reckoning: r, col, row, refCode = 
     try { await navigator.clipboard.writeText(reckoningText(r, { col, row })); flash("✔ report copied"); }
     catch { flash("✗ clipboard blocked"); }
   };
-  const share = async () => {
-    if (busy) return;
-    setBusy(true);
-    const text = reckoningShareText(r, { refCode, url: shareUrl, col, row });
-    try {
-      setNote("Capturing…");
-      const { default: html2canvas } = await import("html2canvas");
-      const canvas = await html2canvas(cardRef.current, { scale: 2, backgroundColor: HUD.panelSolid, useCORS: true });
-      const png = await new Promise((res) => canvas.toBlob(res, "image/png"));
-      if (png && typeof navigator !== "undefined" && navigator.share) {
-        const file = new File([png], "hail-mary-reckoning.png", { type: "image/png" });
-        if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-          try { await navigator.share({ files: [file], text }); setNote(""); setBusy(false); return; }
-          catch (e) { if (e && e.name === "AbortError") { setNote(""); setBusy(false); return; } }
-        }
-      }
-      let copied = false;
-      if (png && navigator.clipboard && window.ClipboardItem) {
-        try { await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]); copied = true; } catch { /* text share still works */ }
-      }
-      setNote(copied ? "✔ card copied — paste it into your post" : "");
-      if (copied) await new Promise((res) => setTimeout(res, 1200));
-      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, "_blank", "width=550,height=420");
-      setTimeout(() => setNote(""), 4000);
-    } catch (err) {
-      console.error("reckoning share failed:", err);
-      try { await navigator.clipboard.writeText(text); flash("✔ text copied (picture failed)"); } catch { flash("✗ share failed"); }
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const sealed = r.unknownLayers > 0;
   const pctText = r.captureRate != null ? `${Math.round(r.captureRate * 100)}%` : "—";
   const strip = reckoningStrip(r);
@@ -157,7 +127,7 @@ export default function OilReckoning({ theme, reckoning: r, col, row, refCode = 
   return (
     <div style={{ padding: "10px 14px", borderBottom: `1px solid ${theme?.border || "transparent"}` }}>
       <style>{`@keyframes gooCursorBlink { 0%, 100% { opacity: 1 } 50% { opacity: 0.35 } }`}</style>
-      <HudPanel innerRef={cardRef}>
+      <HudPanel>
         <HudMeta index="20/20" label="Season-end account" status="CLOSED" lamp={HUD.gold} blink={false} />
         <HudTitle subtitle="The Reckoning" />
         <HudTabs tabs={[{ id: "card", label: "Reckoning" }, { id: "account", label: "Full account" }]} active={tab} onSelect={setTab} />
@@ -170,9 +140,9 @@ export default function OilReckoning({ theme, reckoning: r, col, row, refCode = 
           { value: paid ? usd(r.payoutUsd) : "DRY", label: paid ? "USDC paid" : "season", color: paid ? HUD.orange : HUD.muted },
         ]} />
         <div style={{ marginTop: "0.9rem", display: "flex", justifyContent: "center" }}>
-          <HudButton onClick={share} disabled={busy}>{busy ? (note || "…") : "Share the Reckoning?"}</HudButton>
+          <HudButton onClick={copy}>Copy Report</HudButton>
         </div>
-        <HudHint onClick={busy ? undefined : copy}>{!busy && note ? note : "[ copy the report as text ]"}</HudHint>
+        <HudHint>{note || "[ your season, in plain text ]"}</HudHint>
       </HudPanel>
     </div>
   );

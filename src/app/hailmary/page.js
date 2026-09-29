@@ -3011,6 +3011,12 @@ export default function OilPage() {
       depth: userPlotState.drillDay || 0,
       tank: userDrill.tankOil ?? 0,
       banked: userDrill.totalCollected || 0,
+      // v2 (2026-09-29): what was on the table, which of my passes were already
+      // taken, and how many pockets my crew had taken — so the next visit can say
+      // what the crew resolved, what neighbours took, and what the crew took.
+      pendingLayer: typeof userDrill.pending?.layer === "number" ? userDrill.pending.layer : null,
+      takenLayers: Object.keys(userPlotState.lateralTaken || {}),
+      laterals: userDrill.laterals || 0,
     };
     const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cur)); } catch { /* private mode */ } };
     let prev = null;
@@ -3044,7 +3050,40 @@ export default function OilPage() {
     });
     const unreadCount = Object.keys(plotsWithMessages).length;
     const bankedDelta = Math.max(0, cur.banked - prev.banked);
-    const notable = strikes.length > 0 || artifactsFound.length > 0 || cur.depth > prev.depth || bankedDelta > 0 || fieldEvents.length > 0 || unreadCount > 0;
+
+    // v2: the cores that came up (or were settled) while away, each with what became
+    // of it — kept by the crew, passed (and taken next door, or still open), dry,
+    // hell, or still on the table — plus the neighbours' takes and the crew's own.
+    let v2away = null;
+    if (loopV2) {
+      const ext = userDrill.layersExtracted || {}, pas = userDrill.layersPassed || {};
+      const takenBy = userPlotState.lateralTaken || {};
+      const passedOil = userPlotState.passed || {};
+      const first = typeof prev.pendingLayer === "number" ? Math.min(prev.pendingLayer, prev.depth) : prev.depth;
+      const cores = [];
+      for (let L = first; L < cur.depth; L++) {
+        const oil = Number(revealed[L] ?? revealed[String(L)] ?? 0);
+        const hell = !!(hells[L] || hells[String(L)]);
+        let outcome = "sealed";
+        if (hell) outcome = "hell";
+        else if (ext[L] !== undefined) outcome = "kept";
+        else if (pas[L] !== undefined) outcome = takenBy[L] !== undefined ? "taken" : oil > 0 ? "open" : "dry";
+        else if (cur.pendingLayer === L) outcome = "table";
+        cores.push({ layer: L, oil, outcome, takenBy: takenBy[L] ?? null });
+      }
+      const prevTaken = new Set(Array.isArray(prev.takenLayers) ? prev.takenLayers : []);
+      const newTaken = Object.keys(takenBy).filter((k) => !prevTaken.has(k));
+      const takenOil = newTaken.reduce((sum, k) => sum + (Number(passedOil[k]) || 0), 0);
+      const crewTakes = Math.max(0, (userDrill.laterals || 0) - (Number(prev.laterals) || 0));
+      const kept = cores.filter((c) => c.outcome === "kept");
+      v2away = {
+        cores, kept: kept.length, keptOil: kept.reduce((a, c) => a + c.oil, 0),
+        passed: cores.filter((c) => ["taken", "open", "dry"].includes(c.outcome)).length,
+        takenN: newTaken.length, takenOil, crewTakes,
+      };
+    }
+    const notable = strikes.length > 0 || artifactsFound.length > 0 || cur.depth > prev.depth || bankedDelta > 0 || fieldEvents.length > 0 || unreadCount > 0
+      || !!(v2away && (v2away.cores.length || v2away.takenN || v2away.crewTakes));
 
     if (force === "1" || notable) {
       setAwayRecap({
@@ -3053,10 +3092,11 @@ export default function OilPage() {
         tank: cur.tank, tankDelta: cur.tank - prev.tank, bankedDelta,
         fieldEvents: fieldEvents.slice(0, 4).map(({ type, username, detail }) => ({ type, username, detail })),
         fieldEventCount: fieldEvents.length, unreadCount,
+        v2away,
       });
     }
     if (!force) save();
-  }, [settingsLoaded, drillLoaded, timelineLoaded, gamePhase, user?.id, userDrill, userPlotState, timelineEvents, plotsWithMessages, isAdmin, isTest, isReport, previewMode]);
+  }, [settingsLoaded, drillLoaded, timelineLoaded, gamePhase, user?.id, userDrill, userPlotState, timelineEvents, plotsWithMessages, isAdmin, isTest, isReport, previewMode, loopV2]);
 
   // ── Season-end FINAL HAUL share card ────────────────────────────────────────
   // The payout receipt moment: when the season ends, a player's result becomes
@@ -3726,35 +3766,6 @@ export default function OilPage() {
   // Tank fill: fraction of oil in tank relative to capacity (100K tokens)
   // Can exceed 1.0 — gusher fires when it first crosses 1.0
   const tankFill = useMemo(() => oilInTank / TANK_CAPACITY, [oilInTank]);
-  // Briefing lines for the rig crew (RigCrew.jsx): tap a worker and the operator reads
-  // these out. Real numbers only — the same sources as the status pill and the recap.
-  useEffect(() => {
-    const status = hellActive ? "breach" : ({ "auto-pumping": "pumping", ready: "ready", stunned: "incapacitated", blockade: "blockade", "pre-game": "pre-season",
-      "no-claim": "no claim", "max-depth": "max depth", "depth-ceiling": "caught up", "sign-in": "signed out", "wrong-claim": "pumping" }[drillStatus] || String(drillStatus));
-    // Each line carries a tone for the crew's reply gesture: "no" (nothing to report, head
-    // shake), "yes" (news, nod), "thoughtful" (something to weigh). RigCrew falls back to reading
-    // the line when a tone is missing.
-    const lines = []; const tones = [];
-    const say = (line, tone) => { lines.push(line); tones.push(tone); };
-    say(`Rig ${status}.`, ["pumping", "ready"].includes(status) ? "yes" : ["signed out", "no claim", "pre-season", "caught up"].includes(status) ? "no" : "thoughtful");
-    const r = awayRecap;
-    if (r) {
-      const h = Math.round((r.awayMs || 0) / 36e5);
-      if (h >= 1) say(`You were away ${h}h.`, "thoughtful");
-      if (r.toDepth > r.fromDepth) say(`Drilled ${r.fromDepth} to ${r.toDepth}.`, "yes");
-      if (r.strikes?.length) say(`${r.strikes.length} strike${r.strikes.length === 1 ? "" : "s"}, +${Math.round(r.oilGained || 0)} BTR.`, "yes");
-      if (r.hellHit) say("We hit a hell pocket.", "thoughtful");
-      (r.fieldEvents || []).slice(0, 2).forEach((e) => { if (e?.username && e?.type) say(`${e.username}: ${e.type}.`, "thoughtful"); });
-      if (r.unreadCount) say(`${r.unreadCount} unread message${r.unreadCount === 1 ? "" : "s"}.`, "yes");
-    }
-    const fillPct = Math.round((tankFill || 0) * 100);
-    say(`Tank ${fillPct}% full.`, fillPct >= 50 ? "yes" : fillPct > 0 ? "thoughtful" : "no");
-    if (lines.length === 2) { lines.splice(1, 0, "Nothing new since your last visit."); tones.splice(1, 0, "no"); }
-    // Who is asking (2026-09-11): only the claim owner at their own rig gets the boss treatment;
-    // RigCrew compares ownerPlot with the plot its rig stands on and brushes off everyone else.
-    window.__hmBriefing = { lines, tones, signedIn: !!user?.id, ownerPlot: userDrill?.col != null ? `${userDrill.col}_${userDrill.row}` : null };
-    return () => { delete window.__hmBriefing; };
-  }, [drillStatus, hellActive, awayRecap, tankFill, user?.id, userDrill?.col, userDrill?.row]);
 
 
   // Is the owner's own rig currently erupting? A live gusher event keeps the rig
@@ -4946,6 +4957,111 @@ export default function OilPage() {
       : null;
     return { pending: p, latestMs: revealCadence?.latestMs ?? null, crewWould, threshold, chargesRemaining };
   }, [loopV2, userDrill, passiveCharges, revealCadence]);
+
+  // Briefing lines for the rig crew (RigCrew.jsx): tap a worker and the operator reads
+  // these out. Real numbers only — the same sources as the status pill and the recap.
+  // Under v2 (2026-09-29) this IS the away recap: what came up while you were gone and
+  // what the crew did with it, what neighbours took, what is on the table and the
+  // crew's call on it, charges left. The page starts this briefing on return
+  // (recapDelivery "crew" below); a tap replays it.
+  useEffect(() => {
+    const status = hellActive ? "breach" : ({ "auto-pumping": "pumping", ready: "ready", stunned: "incapacitated", blockade: "blockade", "pre-game": "pre-season",
+      "no-claim": "no claim", "max-depth": "max depth", "depth-ceiling": "caught up", "sign-in": "signed out", "wrong-claim": "pumping" }[drillStatus] || String(drillStatus));
+    // Each line carries a tone for the crew's reply gesture: "no" (nothing to report, head
+    // shake), "yes" (news, nod), "thoughtful" (something to weigh). RigCrew falls back to reading
+    // the line when a tone is missing.
+    const lines = []; const tones = [];
+    const say = (line, tone) => { lines.push(line); tones.push(tone); };
+    const n = (v) => Math.round(v || 0).toLocaleString();
+    const r = awayRecap;
+    if (loopV2) {
+      const a = r?.v2away;
+      if (r) { const h = Math.round((r.awayMs || 0) / 36e5); if (h >= 1) say(`You were gone ${h}h.`, "thoughtful"); }
+      if (a && a.cores.length) {
+        const up = a.cores.filter((c) => c.outcome !== "table");
+        if (up.length) say(`${up.length} core${up.length === 1 ? "" : "s"} came up, L${up[0].layer + 1} to L${up[up.length - 1].layer + 1}.`, "yes");
+        if (a.kept) say(`We kept ${a.kept}: ${n(a.keptOil)} BTR banked.`, "yes");
+        const dry = a.cores.filter((c) => c.outcome === "dry").length, hell = a.cores.filter((c) => c.outcome === "hell").length;
+        const open = a.cores.filter((c) => c.outcome === "open"), taken = a.cores.filter((c) => c.outcome === "taken");
+        if (open.length) say(`Passed ${open.length} wet — ${n(open.reduce((x, c) => x + c.oil, 0))} BTR still open next door.`, "thoughtful");
+        if (taken.length) say(`${taken.length} of our passes got taken.`, "no");
+        if (dry) say(`${dry} came up dry.`, "no");
+        if (hell) say("We hit hell. Sealed it.", "thoughtful");
+      }
+      if (a?.takenN && !(a.cores || []).some((c) => c.outcome === "taken")) say(`Neighbours took ${a.takenN} of our old pockets, ${n(a.takenOil)} BTR.`, "no");
+      if (a?.crewTakes) say(`We took ${a.crewTakes} pocket${a.crewTakes === 1 ? "" : "s"} next door on your orders.`, "yes");
+      const v = awayRecapV2;
+      if (v?.pending) {
+        const oil = v.pending.oil || 0;
+        say(oil > 0 ? `L${v.pending.layer + 1} is on the table: ${n(oil)} BTR.` : `L${v.pending.layer + 1} is on the table. Dry.`, oil > 0 ? "yes" : "no");
+        say(`Your line says ${v.crewWould === "EXTRACT" ? "keep it" : "pass"}${v.latestMs ? ` — by ${new Date(v.latestMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}.`, "thoughtful");
+      } else if (!["signed out", "no claim", "pre-season"].includes(status)) say("Nothing on the table.", "no");
+      if (v) say(`${v.chargesRemaining} charge${v.chargesRemaining === 1 ? "" : "s"} left.`, v.chargesRemaining > 0 ? "yes" : "no");
+      if (r) (r.fieldEvents || []).slice(0, 1).forEach((e) => { if (e?.username && e?.type) say(`${e.username}: ${e.type}.`, "thoughtful"); });
+      if (r?.unreadCount) say(`${r.unreadCount} unread message${r.unreadCount === 1 ? "" : "s"}.`, "yes");
+      if (lines.length === 0) say(`Rig ${status}. Nothing new since your last visit.`, "no");
+    } else {
+      say(`Rig ${status}.`, ["pumping", "ready"].includes(status) ? "yes" : ["signed out", "no claim", "pre-season", "caught up"].includes(status) ? "no" : "thoughtful");
+      if (r) {
+        const h = Math.round((r.awayMs || 0) / 36e5);
+        if (h >= 1) say(`You were away ${h}h.`, "thoughtful");
+        if (r.toDepth > r.fromDepth) say(`Drilled ${r.fromDepth} to ${r.toDepth}.`, "yes");
+        if (r.strikes?.length) say(`${r.strikes.length} strike${r.strikes.length === 1 ? "" : "s"}, +${Math.round(r.oilGained || 0)} BTR.`, "yes");
+        if (r.hellHit) say("We hit a hell pocket.", "thoughtful");
+        (r.fieldEvents || []).slice(0, 2).forEach((e) => { if (e?.username && e?.type) say(`${e.username}: ${e.type}.`, "thoughtful"); });
+        if (r.unreadCount) say(`${r.unreadCount} unread message${r.unreadCount === 1 ? "" : "s"}.`, "yes");
+      }
+      const fillPct = Math.round((tankFill || 0) * 100);
+      say(`Tank ${fillPct}% full.`, fillPct >= 50 ? "yes" : fillPct > 0 ? "thoughtful" : "no");
+      if (lines.length === 2) { lines.splice(1, 0, "Nothing new since your last visit."); tones.splice(1, 0, "no"); }
+    }
+    // Who is asking (2026-09-11): only the claim owner at their own rig gets the boss treatment;
+    // RigCrew compares ownerPlot with the plot its rig stands on and brushes off everyone else.
+    window.__hmBriefing = { lines, tones, signedIn: !!user?.id, ownerPlot: userDrill?.col != null ? `${userDrill.col}_${userDrill.row}` : null };
+    return () => { delete window.__hmBriefing; };
+  }, [drillStatus, hellActive, awayRecap, tankFill, user?.id, userDrill?.col, userDrill?.row, loopV2, awayRecapV2]);
+
+  // ── The crew delivers the away recap (v2, desktop; Michelle 2026-09-28) ──────
+  // On return with something to report, the page selects your rig so the crew
+  // mounts, then starts a silent auto-briefing (bubble only — no gesture, no
+  // audio) that flies the camera to the operator. A gold chip offers READ IT
+  // (the card) and ✕. The card is the fallback when the crew cannot mount in
+  // time (phone, low graphics, the rig off screen): the recap is never lost.
+  const [recapDelivery, setRecapDelivery] = useState(null); // null | "crew" | "modal"
+  const recapDeliveryRef = useRef({ recap: null, timer: null });
+  useEffect(() => {
+    const d = recapDeliveryRef.current;
+    if (d.timer) { clearInterval(d.timer); d.timer = null; }
+    if (!awayRecap) { d.recap = null; setRecapDelivery(null); return; }
+    if (d.recap === awayRecap) return;
+    d.recap = awayRecap;
+    const wantCrew = loopV2 && !isMobile && !awayRecap.demo && userDrill?.col != null && typeof window !== "undefined";
+    if (!wantCrew) { setRecapDelivery("modal"); return; }
+    setRecapDelivery("crew");
+    setIntroComplete(true);
+    setSelectedX(userDrill.col); setSliceY(userDrill.row); setDrillDepth(0);
+    let tries = 0;
+    d.timer = setInterval(() => {
+      const hook = window.__hmCrew;
+      if (hook?.brief && hook.workers?.operator && window.__hmBriefing) {
+        clearInterval(d.timer); d.timer = null;
+        if (!hook.briefing?.()) hook.brief({ voice: false, auto: true });
+      } else if (++tries > 24) { clearInterval(d.timer); d.timer = null; setRecapDelivery("modal"); }
+    }, 250);
+  }, [awayRecap, loopV2, isMobile, userDrill?.col, userDrill?.row]);
+  useEffect(() => () => { const d = recapDeliveryRef.current; if (d.timer) clearInterval(d.timer); }, []);
+  // The briefing ran its course → the recap is delivered (the concretion modal waits on this).
+  useEffect(() => {
+    if (recapDelivery !== "crew") return;
+    const onEnd = (e) => { if (!e?.detail?.stopped) setAwayRecap(null); };
+    window.addEventListener("hm:brief-end", onEnd);
+    return () => window.removeEventListener("hm:brief-end", onEnd);
+  }, [recapDelivery]);
+  const readRecapCard = useCallback(() => {
+    const hook = typeof window !== "undefined" ? window.__hmCrew : null;
+    if (hook?.briefing?.()) hook.brief();   // toggles the briefing off (hm:brief-end {stopped:true} — the card stays)
+    setRecapDelivery("modal");
+  }, []);
 
   // Bounty claimed toast
   const [bountyToast, setBountyToast] = useState(null);
@@ -7169,6 +7285,24 @@ export default function OilPage() {
     </div>
   );
 
+  // Gold chip while the crew delivers the away recap (v2, desktop): who is
+  // talking, how long you were gone, READ IT for the card, ✕ to dismiss.
+  const crewBriefingChip = recapDelivery === "crew" && awayRecap && (
+    <div style={{
+      position: "fixed", top: 12, left: "50%", transform: "translateX(-50%)", zIndex: 9997,
+      zoom: "var(--hm-ui-scale, 1)", display: "flex", alignItems: "center", gap: 12,
+      padding: "8px 14px", borderRadius: 3, border: `1px solid ${theme.gold}`,
+      background: "rgba(18,10,22,0.82)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+      fontFamily: "'Share Tech Mono', monospace", fontSize: 11, letterSpacing: "0.12em", color: "#e8d9b8",
+      boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
+    }}>
+      <span style={{ color: theme.gold }}>⚙ THE CREW HAS YOUR BRIEFING</span>
+      <span style={{ color: "#9a8878" }}>{Math.max(1, Math.round((awayRecap.awayMs || 0) / 36e5))}h away</span>
+      <button onClick={readRecapCard} style={{ background: "transparent", border: `1px solid ${theme.gold}`, borderRadius: 2, color: theme.gold, fontFamily: "inherit", fontSize: 10, letterSpacing: "0.14em", padding: "3px 8px", cursor: "pointer" }}>READ IT</button>
+      <button onClick={() => setAwayRecap(null)} aria-label="Dismiss" style={{ background: "none", border: "none", color: "#9a8878", fontSize: 14, cursor: "pointer", padding: 0, lineHeight: 1 }}>✕</button>
+    </div>
+  );
+
   const bountyClaimedBanner = bountyToast && (
     <div style={{
       position: "fixed",
@@ -7415,12 +7549,12 @@ export default function OilPage() {
     </div>
   );
 
-  // THE RECKONING — the v2 season-end share card (replaces FINAL HAUL under
-  // loopV2; 2026-09-29). Every v2 rig gets one at the buzzer, dry or not. The
-  // SHARE button captures the card to PNG and posts with the referral link,
-  // the same acquisition moment FINAL HAUL served. See OilReckoning.jsx.
+  // THE RECKONING — the v2 season-end account (replaces FINAL HAUL's slot under
+  // loopV2; 2026-09-29). Every v2 rig gets one at the buzzer, dry or not. It is
+  // NOT the share: that is the SEASON POLAROID (open thread — the crew posing
+  // on the player's rig via PolaroidSnapshot, one line, the referral link).
   const reckoningCard = loopV2 && gameEnded && !isAdmin && !isReport && !isTest && user && reckoning && userDrill?.col != null && (
-    <OilReckoning theme={theme} reckoning={reckoning} col={userDrill.col} row={userDrill.row} refCode={userDrill?.referralCode || null} />
+    <OilReckoning theme={theme} reckoning={reckoning} col={userDrill.col} row={userDrill.row} />
   );
 
   // Rig state block — CTA + status copy for the player's rig, one branch per
@@ -9084,8 +9218,9 @@ export default function OilPage() {
           <ConcretionModal artifact={pendingConcretion} onDone={dismissConcretion} darkMode={uiDark} />
         )}
 
+        {crewBriefingChip}
         <OilAwayRecap
-          recap={awayRecap}
+          recap={recapDelivery === "modal" ? awayRecap : null}
           referralCode={userDrill?.referralCode || null}
           theme={theme}
           isMobile={isMobile}
@@ -9749,8 +9884,9 @@ export default function OilPage() {
         <ConcretionModal artifact={pendingConcretion} onDone={dismissConcretion} darkMode={uiDark} />
       )}
 
+      {crewBriefingChip}
       <OilAwayRecap
-        recap={awayRecap}
+        recap={recapDelivery === "modal" ? awayRecap : null}
         referralCode={userDrill?.referralCode || null}
         theme={theme}
         isMobile={isMobile}

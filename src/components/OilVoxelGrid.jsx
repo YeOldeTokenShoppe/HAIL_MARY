@@ -4064,7 +4064,8 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       const f = new THREE.Vector3().fromArray(d.front || [1, 0, 0]); f.y = 0;
       if (f.lengthSq() < 1e-6) f.set(1, 0, 0);
       f.normalize();
-      onFocusObject(c, f, CREW_FOCUS_DIST, CREW_FOCUS_MIN_DIST);
+      // An auto-briefing asks for a wider shot (RigCrew BRIEF_FOCUS_DIST); the tune tab's face-only default otherwise.
+      onFocusObject(c, f, Number.isFinite(d.dist) ? d.dist : CREW_FOCUS_DIST, Number.isFinite(d.minDist) ? d.minDist : CREW_FOCUS_MIN_DIST);
     };
     window.addEventListener("hm:crew-face", onFace);
     return () => window.removeEventListener("hm:crew-face", onFace);

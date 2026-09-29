@@ -27,7 +27,7 @@ panel, and the wording *within* the copy rule.
 | B | **In-world machine panel** on the player's rig — pressure gauge, panel screen, the caged PASS (2026-09-08), the red button, four toggles, a key switch, crew who walk to the button on a decision. **Wired 2026-09-28 (v2, own rig only):** caged PASS → pass; red button → EXTRACT; toggle 1 → SALVAGE order (plate under its lamp), toggles 2–4 dead; key → AUTOPILOT (plate under the key); switches pose from the rig doc | Desktop: click the rig; phone: the MACHINE PANEL chip zooms to it | Wired; styling of plates is the pass's | `src/components/OilVoxelGrid.jsx` (Pumpjack: `decideMode`, `orders`, `panelLabels`), `RigCrew.jsx` (`hm:decide`) |
 | C | **Strata wall** — the earth block as public game-state voxels: passes, extractions, wildcat scars, tunnel bars for salvage | 3D scene, loopV2 seasons | Built (promoted from the `?strata=1` mock) | `src/components/StrataVoxels.jsx` |
 | D | **Alerts** — push + Telegram on every strike (`CORE ASSAY — LAYER n` with the cost-model body), hell breach, tonic cap, artifact, dry layer | Phone lock screen, Telegram | Built, copy follows the rule | `oil-strike-tick/route.js` ~530–665, `lib/oilLoopV2.assayAlertBody` |
-| E | **While-you-were-away recap** | Landing overlay for a returning player | **Still v1**: shows TANK · UNBANKED and a BANK action; needs a v2 version (pending layer, what the crew resolved, what neighbours took) | `src/components/OilAwayRecap.jsx` |
+| E | **While-you-were-away recap** | v2 desktop: **the rig crew delivers it** — on return the page selects your rig, the operator starts a silent briefing (bubble lines), the camera flies to them, a gold chip offers READ IT / ✕. Phone, low graphics, or no crew in 6 s: the card. | **Built 2026-09-29**: `v2away` (per-core outcomes: kept · taken · open · dry · hell · table; neighbours' takes; the crew's takes) + the crew's v2 lines; card hero = BTR banked by the crew, per-core rows, no share (the share is the polaroid thread) | `src/components/OilAwayRecap.jsx`, `RigCrew.jsx` (`brief({voice:false, auto:true})`, `hm:brief-end`, `BRIEF_FOCUS_DIST`), `hailmary/page.js` (`v2away`, `recapDelivery`) |
 | F | **The Reckoning** — the per-player season-end **share card** (2026-09-29: replaces FINAL HAUL under v2) | The season-end slot, both layouts, every v2 rig, dry included | Built in the **/space telemetry-panel language** (Michelle, 2026-09-29: "the displays from /space still look better") on the shared **`HmHud`** kit: dark glass + gold brackets, Orbitron title, RECKONING / FULL ACCOUNT tabs, plain-English story line, 20-cell column strip, label/data/warn/note body, two big stats, "Share the Reckoning?" button (PNG → native sheet / clipboard + X compose with referral link), text-copy hint | `src/components/OilReckoning.jsx`, `src/components/HmHud.jsx`, `lib/oilLoopV2.js` (`reckoningStory`, `reckoningShareText`, `reckoningStrip`) |
 | G | **FINAL HAUL share card** (PNG capture + tweet) | v1 only now (`!loopV2`) | Built, v1 numbers (banked + tank) | `hailmary/page.js` `finalHaulCard` |
 | H | **Walk mode** — stand on a frontier cell, press E to wildcat | 3D, desktop | Built (beta) | `src/components/PlayerWalker.jsx` |
@@ -74,9 +74,16 @@ one glyph each and a legend; the wall already has a colour language for the same
 | Dry rig | banked 0 | the honest "here is what was under you" — this player deserves the best version of the card |
 | Core left on the table | `pendingUnresolved` | one line: the crew settles it by the standing order |
 
-**E · Away recap (to be designed for v2)** — what struck while away, what the crew
-resolved and how, what neighbours took from your passes, what is pending now and its
-deadline, charges left.
+**E · Away recap (built for v2, 2026-09-29)** — the crew's briefing on the desktop field,
+the card as READ IT and on the phone. Lines, in order: how long you were gone · N cores came
+up, L_a to L_b · we kept N, X BTR banked · passed N wet, X BTR still open next door · N of our
+passes got taken · N came up dry · we hit hell · neighbours took N of our old pockets · we took
+N pockets next door on your orders · L_n is on the table: X BTR · your line says keep it /
+pass — by HH:MM · N charges left · one field event · unread messages. Tones per line drive
+the crew's gesture (yes = nod, no = shake, thoughtful). The card mirrors it: hero = BTR
+banked by your crew, one row per core with its outcome, the neighbours' and the crew's
+takes, the core on the table with the crew's call. Tunables: `BRIEF_FOCUS_DIST` (camera
+distance to the briefer, 0.7) and `BRIEF_LINE_S` (3.2 s a line) in RigCrew.jsx.
 
 ## 4. The copy rule and the vocabulary
 
@@ -214,8 +221,9 @@ from what exists. Sizes: the card is ~330 lines of plain JSX; the reckoning ~110
    card becomes ledger + boards; (b) card is primary, rig panel mirrors state only;
    (c) both act, same handlers. Phone is card-only either way.
 3. ~~**Does the Reckoning replace the FINAL HAUL card as the share?**~~ **Yes (Michelle, 2026-09-28; built 2026-09-29).** One card, PNG-captured in the fixed palette, dry players included. The card's composition (which four totals, the strip, the words) is provisional — Michelle modifies on the fixture.
-4. **The away recap for v2.** Redesign brief in §3·E. It is the payoff of the check-back
-   loop and today it still talks about the tank.
+4. ~~**The away recap for v2.**~~ **Built 2026-09-29** — the crew delivers it (§3·E); the
+   card is the fallback. Open: whether the phone should also use the crew (RigScene mounts
+   one) once the camera framing is designed there.
 5. **Ledger: totals + toggle, or always-open list?** Rows have no times; a "timeline"
    look would promise ordering we don't have.
 6. **Rack orientation.** Horizontal strip (fits the phone column) vs a vertical core that
