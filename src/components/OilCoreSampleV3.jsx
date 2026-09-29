@@ -155,7 +155,6 @@ export default function OilCoreSampleV3({
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [thrDraft, setThrDraft] = useState(null);
   const [seeAll, setSeeAll] = useState(false);
-  const [passArm, setPassArm] = useState(false); // "let it go now" is two taps — pass is final
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     if (!cadence?.latestMs) return undefined;
@@ -266,25 +265,11 @@ export default function OilCoreSampleV3({
       </div>
       {/* ONE BUTTON (Michelle, 2026-09-28): EXTRACT keeps it now. Doing nothing
           hands the layer to the crew's orders at the next strike (the CREW row
-          says which way). "Pass it now" is the explicit pass for the one case
-          the line can't express — above the line but you want the charge for
-          next door — and it takes two taps because pass is final. Copy made
-          literal 2026-09-29 ("let it go now" read as nothing to Michelle). */}
+          says which way). There is no pass control on the card at all
+          (2026-09-29: a text-link pass under the one button read as noise);
+          "leave it for next door" is what a raised line + LATERAL EXTRACT do. */}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         {cta("Extract −1⚡", theme.green, busy || chargesRemaining <= 0, () => run(() => onDecide("extract"), (d) => oil > 0 ? `✔ extracted — ${fmtBtr(oil)} BTR banked${d?.inclusion ? " · inclusion → ARTIFACTS" : ""}` : d?.inclusion ? "✔ dug it up — inclusion → ARTIFACTS" : "✔ extracted — the layer was dry"), true)}
-      </div>
-      <div style={{ marginTop: 6, textAlign: "center" }}>
-        {!passArm ? (
-          <button onClick={() => setPassArm(true)} disabled={busy} style={{ background: "none", border: "none", cursor: "pointer", ...meta, color: muted }}>
-            or pass it now — no charge, it opens to next door
-          </button>
-        ) : (
-          <span style={mono({ color: muted, fontSize: 10 })}>
-            Passing leaves L{pending.layer + 1} in the ground for your neighbours to take. No charge spent, no waiting for the next strike. Pass is final.{" "}
-            <button onClick={() => { setPassArm(false); run(() => onDecide("pass"), "↷ passed — final"); }} disabled={busy} style={{ background: "none", border: `1px solid ${theme.red}`, borderRadius: 2, cursor: "pointer", ...mono({ color: theme.red, fontSize: 10, letterSpacing: "0.12em" }), padding: "2px 8px" }}>yes, pass</button>{" "}
-            <button onClick={() => setPassArm(false)} style={{ background: "none", border: "none", cursor: "pointer", ...meta, color: muted }}>keep deciding</button>
-          </span>
-        )}
       </div>
     </>
   ) : (
