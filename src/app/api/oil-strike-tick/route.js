@@ -8,7 +8,7 @@ import { sendPlayerAlert } from "@/lib/oilAlerts";
 import {
   PASSIVE_DRILLS, MAX_DEPTH, depthCapFor, seasonClock, strikeTargetMs,
 } from "@/lib/oilStrikeClock";
-import { chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, pickSalvageOrder } from "@/lib/oilLoopV2";
+import { chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, pickSalvageOrder, heatReading, shouldCase, casingCount, casedAlertBody } from "@/lib/oilLoopV2";
 import { applyV2Resolution, applyLateralTake } from "@/lib/oilLoopV2Server";
 
 export const runtime = "nodejs";
@@ -395,6 +395,16 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
             const v2oil = grid?.[col]?.[row]?.[li] ?? 0;
             const v2art = artifactsByKey[artifactKey(col, row, li)] || null;
             const plotUpdate = { col, row, drillDay: li + 1, lastStrikeAt: FieldValue.serverTimestamp() };
+            // Heat on the assay (2026-09-29): the nearest hot body within reach of the
+            // bit — a hell pocket or a motherlode, under you or next door; intensity
+            // is distance only (lib heatReading). Only the level is written — public
+            // on the plot so the column glows for everyone; the pending core carries it.
+            const heat = heatReading({
+              isHellAt: (c, r, z) => hellSet.has(`${c}_${r}_${z}`),
+              oilAt: (c, r, z) => grid?.[c]?.[r]?.[z] ?? 0,
+              motherlodeMin: motherlodeThreshold, col, row, layer: li, depthZ, gridSize,
+            });
+            if (heat.level !== "nominal") plotUpdate.heat = { [li]: heat.level };
             const drillUpdate = {
               userId,
               lastStrikeDate: today,
@@ -404,26 +414,40 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
               updatedAt: FieldValue.serverTimestamp(),
             };
             let tonicCapped = false;
-            if (isHellL) {
+            // CASING (step 2, 2026-09-29): armed before the strike, or the CASE ON
+            // HEAT order when the core just resolved read HIGH → drill through this
+            // layer behind steel. No core on the table, no charge; hell is sealed,
+            // oil is cased off (the reveal still records what was there — the
+            // verifier checks it, and the player learns what they gave up).
+            const casing = shouldCase({ armed: drillNow.casingArmed === true, orders: drillNow.orders, lastHeat: pending?.heat || null, casing: casingCount(drillNow) });
+            let cased = false;
+            if (casing.case) {
+              cased = true;
+              plotUpdate.cased = { [li]: true };
+              plotUpdate.revealed = { [li]: isHellL ? 0 : v2oil };
+              if (isHellL) plotUpdate.hellLayers = { [li]: true };
+              drillUpdate.pending = null;
+              drillUpdate.tankOil = 0;
+              drillUpdate.lastStrikeOil = 0;
+              drillUpdate.lastStrikeHell = false;
+              drillUpdate.casingArmed = false;
+              drillUpdate.supplies = { casing: FieldValue.increment(-1) };
+              drillUpdate.casingsUsed = FieldValue.increment(1);
+              drillUpdate.lastCasedAt = FieldValue.serverTimestamp();
+            } else if (isHellL) {
+              // v2: no tonic cap — casing is the only seal (Michelle, 2026-09-29)
               plotUpdate.hellLayers = { [li]: true };
               plotUpdate.revealed = { [li]: 0 };
               drillUpdate.pending = null;
               drillUpdate.tankOil = 0;
               drillUpdate.lastStrikeOil = 0;
               drillUpdate.lastStrikeHell = true;
-              if ((drillNow.supplies?.tonic || 0) > 0) {
-                tonicCapped = true;
-                plotUpdate.hellCapped = { [li]: true };
-                drillUpdate.supplies = { tonic: FieldValue.increment(-1) };
-                drillUpdate.tonicsUsed = FieldValue.increment(1);
-                drillUpdate.lastTonicAt = FieldValue.serverTimestamp();
-              }
             } else {
               plotUpdate.revealed = { [li]: v2oil };
               // §Multi-element core: flag the inclusion, keep its identity
               // hidden until extraction (the anti-lottery guard).
               if (v2art) plotUpdate.inclusionFlags = { [li]: true };
-              drillUpdate.pending = { layer: li, oil: v2oil, hasInclusion: !!v2art, revealedAt: Date.now() };
+              drillUpdate.pending = { layer: li, oil: v2oil, hasInclusion: !!v2art, heat: heat.level, revealedAt: Date.now() };
               drillUpdate.tankOil = v2oil; // decision buffer: full = a decision is waiting
               drillUpdate.lastStrikeOil = v2oil;
               drillUpdate.lastStrikeHell = false;
@@ -431,9 +455,10 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
             t.set(plotRef, plotUpdate, { merge: true });
             t.set(drillRef, drillUpdate, { merge: true });
             return {
-              status: "struck", v2: true, oil: v2oil, depth: li + 1,
-              isHell: isHellL && !tonicCapped, tonicCapped,
-              resolved, hasInclusion: !!v2art,
+              status: "struck", v2: true, oil: cased ? 0 : v2oil, depth: li + 1,
+              isHell: isHellL && !tonicCapped && !cased, tonicCapped,
+              cased, casedOil: cased && !isHellL ? v2oil : 0, casedHell: cased && isHellL, casedVia: casing.via,
+              resolved, hasInclusion: !!v2art, heat: heat.level,
               threshold, chargesRemaining,
               username: drillNow.username || null,
               newTank: v2oil,
@@ -516,6 +541,7 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
             const k = outcome.resolved.decision === "extract" ? "extracted" : (outcome.resolved.oil > 0 ? "passedOpen" : "passedDry");
             summary[k] = (summary[k] || 0) + 1;
           }
+          if (outcome.cased) summary.cased = (summary.cased || 0) + 1;
           if (outcome.tonicUsed) {
             summary.tonicsUsed = (summary.tonicsUsed || 0) + 1;
             await logTimeline(db, { type: "tonic", username: outcome.username, userId, detail: "two layers in one strike" });
@@ -615,11 +641,19 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
                 tag: "hmpc-strike",
                 telegramHtml: `🧪 <b>TONIC CAPPED A HELL POCKET</b>\nPlot (${col + 1}, ${row + 1}) L${outcome.depth}: the breach hit hell — your tonic sealed it. No demon, no halt.${resolvedLine}`,
               });
+            } else if (outcome.cased) {
+              const body = casedAlertBody({ col, row, layer: outcome.depth - 1, oil: outcome.casedOil, hell: outcome.casedHell }) + resolvedLine;
+              await sendPlayerAlert(db, userId, {
+                title: outcome.casedHell ? "🛠 CASED THROUGH HELL" : outcome.casedOil > 0 ? "🛠 CASED OFF A PAY ZONE" : "🛠 CASED THROUGH SHALE",
+                body, tag: "hmpc-strike",
+                telegramHtml: `🛠 <b>${outcome.casedHell ? "CASED THROUGH HELL" : outcome.casedOil > 0 ? "CASED OFF A PAY ZONE" : "CASED THROUGH SHALE"}</b>\n${body}`,
+              });
+              await logTimeline(db, { type: "system", username: outcome.username, userId, detail: outcome.casedHell ? "cased through a hell pocket — sealed" : "ran casing through the next layer" });
             } else if (!outcome.isHell) {
               const body = assayAlertBody({
                 col, row, layer: outcome.depth - 1, oil: outcome.oil,
                 threshold: outcome.threshold, chargesRemaining: outcome.chargesRemaining,
-                hasInclusion: outcome.hasInclusion,
+                hasInclusion: outcome.hasInclusion, heat: outcome.heat,
               }) + resolvedLine;
               await sendPlayerAlert(db, userId, {
                 title: "⛏ CORE ASSAY — LAYER " + outcome.depth,
@@ -627,7 +661,7 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
                 tag: "hmpc-strike",
                 // Dry, no-inclusion assays go Telegram-only, same signal-value
                 // rule as v1 dry layers.
-                ...(outcome.oil <= 0 && !outcome.hasInclusion ? { channels: { telegram: true, push: false } } : {}),
+                ...(outcome.oil <= 0 && !outcome.hasInclusion && outcome.heat !== "high" ? { channels: { telegram: true, push: false } } : {}),
                 telegramHtml: `⛏ <b>CORE ASSAY — LAYER ${outcome.depth}</b>\n${body}`,
               });
             }
@@ -856,6 +890,18 @@ async function scoutOil() {
 
 // Admin test helper: reset a single user's claim-jump counter (and re-arm the rig)
 // so a tester can keep relocating. Targeted by userId so it can't affect others.
+// Admin: hand a rig a consumable (TEST TOOLS → GRANT CASING). ?supply=<userId>&item=casing&n=1
+async function grantSupply(userId, item = "casing", n = 1) {
+  const db = getAdminDb();
+  const ref = db.collection("oilDrills").doc(userId);
+  const snap = await ref.get();
+  if (!snap.exists) return { ok: false, error: "no_drill_doc" };
+  if (!["casing", "tonic", "holyWater"].includes(item)) return { ok: false, error: "unknown_item" };
+  await ref.set({ supplies: { [item]: FieldValue.increment(Math.max(1, Math.min(20, n || 1))) }, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  const after = (await ref.get()).data()?.supplies?.[item] || 0;
+  return { ok: true, granted: userId, item, count: after };
+}
+
 async function grantJumps(userId) {
   const db = getAdminDb();
   const ref = db.collection("oilDrills").doc(userId);
@@ -880,7 +926,7 @@ function authorized(req) {
     const deep = Math.max(1, Math.min(parseInt(url.searchParams.get("deep") || "1", 10) || 1, 20));
     const targetCol = url.searchParams.has("col") ? parseInt(url.searchParams.get("col"), 10) : null;
     const targetRow = url.searchParams.has("row") ? parseInt(url.searchParams.get("row"), 10) : null;
-    return { ok: true, cron: false, force: url.searchParams.get("force") === "1", deep, scout: url.searchParams.get("scout") === "1", grant: url.searchParams.get("grant"), targetCol, targetRow };
+    return { ok: true, cron: false, force: url.searchParams.get("force") === "1", deep, scout: url.searchParams.get("scout") === "1", grant: url.searchParams.get("grant"), supply: url.searchParams.get("supply"), item: url.searchParams.get("item") || "casing", n: parseInt(url.searchParams.get("n") || "1", 10), targetCol, targetRow };
   }
   return { ok: false };
 }
@@ -889,7 +935,8 @@ async function handle(req) {
   const a = authorized(req);
   if (!a.ok) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   try {
-    const result = a.grant ? await grantJumps(a.grant)
+    const result = a.supply ? await grantSupply(a.supply, a.item, a.n)
+      : a.grant ? await grantJumps(a.grant)
       : a.scout ? await scoutOil()
       : await runTick({ force: a.force, deep: a.deep, targetCol: a.targetCol, targetRow: a.targetRow });
     return NextResponse.json(result);

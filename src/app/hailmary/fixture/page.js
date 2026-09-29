@@ -54,6 +54,7 @@ function mkWorld(o = {}) {
     revealed, extracted: { ...(o.extracted || {}) }, passed: { ...(o.passed || {}) },
     lateralTaken: { ...(o.lateralTaken || {}) }, hellLayers: {}, hellCapped: {},
     inclusionFlags: {}, passedInclusions: { ...(o.passedInclusions || {}) },
+    heat: { ...(o.heat || {}) }, cased: { ...(o.cased || {}) },
   };
   for (const z of COLUMN_HELL) if (z < drillDay) plot.hellLayers[z] = true;
   for (const z of INCLUSION_LAYERS) if (z < drillDay) plot.inclusionFlags[z] = true;
@@ -62,7 +63,7 @@ function mkWorld(o = {}) {
     threshold: o.threshold ?? 800, totalCollected: o.totalCollected ?? 0,
     layersExtracted: { ...(o.extracted || {}) }, layersPassed: { ...(o.layersPassed || o.passed || {}) },
     pending: o.pending ?? null, autopilot: false, lastStrikeAt: o.lastStrikeAt === undefined ? Date.now() - 2 * H : o.lastStrikeAt,
-    supplies: { tonic: o.tonic ?? 0 },
+    supplies: { tonic: o.tonic ?? 0, casing: o.casing ?? 0 }, casingArmed: !!o.casingArmed, orders: o.orders || { salvage: false, caseOnHeat: false },
   };
   const allPlots = { [`${col}_${row}`]: plot };
   for (const n of (o.neighbours || [])) allPlots[`${n.col}_${n.row}`] = n;
@@ -138,10 +139,14 @@ function simStrike(w) {
   n = structuredClone(n); const d = n.drill, p = n.plot;
   const z = p.drillDay || 0;
   if (z >= DEPTH_Z) return n;
+  const lastHeat = w.drill.pending?.heat || p.heat?.[z - 1] || null;
   p.drillDay = z + 1; d.lastStrikeAt = Date.now();
-  if (COLUMN_HELL.has(z)) {
+  const casing = (d.casingArmed || (d.orders?.caseOnHeat && lastHeat === "high")) && (d.supplies.casing || 0) > 0;
+  if (casing) {
+    p.cased[z] = true; p.revealed[z] = COLUMN_HELL.has(z) ? 0 : COLUMN[z]; if (COLUMN_HELL.has(z)) p.hellLayers[z] = true;
+    d.supplies.casing -= 1; d.casingArmed = false; d.pending = null;
+  } else if (COLUMN_HELL.has(z)) {
     p.hellLayers[z] = true; p.revealed[z] = 0;
-    if ((d.supplies.tonic || 0) > 0) { p.hellCapped[z] = true; d.supplies.tonic -= 1; }
     d.pending = null;
   } else {
     p.revealed[z] = COLUMN[z];
@@ -183,6 +188,11 @@ const CARD_SCENARIOS = [
   { key: "below", name: "Pending · wet · below the line", trigger: "300 BTR vs 800 — the decision moment", world: () => mkWorld({ drillDay: 7, extracted: { 1: 400, 3: 900 }, layersPassed: { 0: 0, 2: 0, 4: 0, 5: 1200 }, passed: { 5: 1200 }, chargesSpent: 2, totalCollected: 1300, pending: { layer: 6, oil: 300, hasInclusion: false, revealedAt: Date.now() - 40 * 60000 }, neighbours: NEIGHBOURS_FULL }) },
   { key: "dry", name: "Pending · dry", trigger: "oil 0 — passing is free", world: () => mkWorld({ drillDay: 3, extracted: { 1: 400 }, layersPassed: { 0: 0 }, chargesSpent: 1, totalCollected: 400, pending: { layer: 2, oil: 0, hasInclusion: false, revealedAt: Date.now() - 60000 } }) },
   { key: "incl", name: "Pending · inclusion flagged", trigger: "below the line, anomalous inclusion", world: () => mkWorld({ drillDay: 7, extracted: { 1: 400, 3: 900 }, layersPassed: { 0: 0, 2: 0, 4: 0, 5: 1200 }, passed: { 5: 1200 }, chargesSpent: 2, totalCollected: 1300, pending: { layer: 6, oil: 300, hasInclusion: true, revealedAt: Date.now() - 25 * 60000 } }) },
+  { key: "heat2", name: "Pending · heat rising", trigger: "something hot within reach — two down or next door; hell or the big one", world: () => mkWorld({ drillDay: 5, extracted: { 1: 400, 3: 900 }, layersPassed: { 0: 0, 2: 0 }, chargesSpent: 2, totalCollected: 1300, heat: { 4: "elevated" }, pending: { layer: 4, oil: 650, hasInclusion: false, heat: "elevated", revealedAt: Date.now() - 12 * 60000 } }) },
+  { key: "heat1", name: "Pending · hot zone below · casing on the rig", trigger: "HIGH — hell or the motherlode under the bit; one string in supply, the CASE decision", world: () => mkWorld({ drillDay: 6, extracted: { 1: 400, 3: 900, 4: 650 }, layersPassed: { 0: 0, 2: 0 }, chargesSpent: 3, totalCollected: 1950, casing: 1, heat: { 4: "elevated", 5: "high" }, pending: { layer: 5, oil: 0, hasInclusion: false, heat: "high", revealedAt: Date.now() - 3 * 60000 } }) },
+  { key: "armed", name: "Casing armed", trigger: "the next strike drills behind steel, whatever it holds", world: () => mkWorld({ drillDay: 6, extracted: { 1: 400, 3: 900, 4: 650 }, layersPassed: { 0: 0, 2: 0, 5: 0 }, chargesSpent: 3, totalCollected: 1950, casing: 1, casingArmed: true, heat: { 4: "elevated", 5: "high" } }) },
+  { key: "cased", name: "Cased through a pay zone", trigger: "L7 held 1,800 BTR — cased off, behind steel; the ledger says so", world: () => mkWorld({ drillDay: 8, extracted: { 1: 400, 3: 900, 4: 650 }, layersPassed: { 0: 0, 2: 0, 5: 0 }, chargesSpent: 3, totalCollected: 1950, heat: { 5: "high" }, cased: { 6: true }, pending: { layer: 7, oil: 120, hasInclusion: false, heat: "nominal", revealedAt: Date.now() - 60000 } }) },
+  { key: "heat-idle", name: "Nothing on the table · hell below", trigger: "the warning persists after the decision, until the next strike", world: () => mkWorld({ drillDay: 6, extracted: { 1: 400, 3: 900, 4: 650 }, layersPassed: { 0: 0, 2: 0, 5: 0 }, chargesSpent: 3, totalCollected: 1950, heat: { 4: "elevated", 5: "high" } }) },
   { key: "nocharges", name: "No charges left", trigger: "8/8 spent, wet layer pending", world: () => mkWorld({ drillDay: 12, extracted: { 1: 400, 3: 900, 5: 1200, 6: 300, 8: 650 }, layersPassed: { 0: 0, 2: 0, 4: 0, 7: 0, 10: 0 }, chargesSpent: 8, totalCollected: 3450, pending: { layer: 11, oil: 1800, hasInclusion: false, revealedAt: Date.now() - 10 * 60000 }, neighbours: NEIGHBOURS_FULL }) },
   { key: "done", name: "Column fully revealed", trigger: "20 layers up, season still live", world: () => mkWorld({ drillDay: 20, extracted: { 1: 400, 3: 900, 5: 1200, 11: 1800, 15: 2400, 19: 3100 }, layersPassed: { 0: 0, 2: 0, 4: 0, 6: 300, 7: 0, 8: 650, 10: 0, 12: 200, 13: 0, 14: 0, 16: 0, 17: 500, 18: 0 }, passed: { 6: 300, 8: 650, 12: 200, 17: 500 }, chargesSpent: 6, totalCollected: 9800, neighbours: NEIGHBOURS_FULL }) },
   { key: "clockout", name: "Season clock run out (not ended)", trigger: "stale start date, game still live — never says closed", world: () => mkWorld({ drillDay: 3, gameStartDate: dayStr(30 * D), layersPassed: { 0: 0, 1: 0 }, pending: { layer: 2, oil: 0, hasInclusion: false, revealedAt: Date.now() - 60000 } }) },
@@ -216,7 +226,7 @@ export default function HailMaryV2FixturePage() {
   const handlers = useMemo(() => ({
     onDecide: async (action) => { setWorld((w) => simDecide(w, action)); note(`${action.toUpperCase()} L${(world.drill.pending?.layer ?? 0) + 1}`); return { inclusion: action === "extract" && world.drill.pending?.hasInclusion ? "relic" : null }; },
     onSetThreshold: async (btr) => { setWorld((w) => ({ ...structuredClone(w), drill: { ...structuredClone(w.drill), threshold: btr } })); note(`standing order → ${btr}`); },
-    onSetOrders: async (patch) => { setWorld((w) => { const n = structuredClone(w); if (patch.autopilot !== undefined) n.drill.autopilot = !!patch.autopilot; if (patch.salvage !== undefined) n.drill.orders = { ...(n.drill.orders || {}), salvage: !!patch.salvage, salvageSetAt: patch.salvage ? Date.now() : null }; return n; }); note(`crew orders: ${Object.entries(patch).map(([k, v]) => `${k} ${v ? "on" : "off"}`).join(", ")}`); },
+    onSetOrders: async (patch) => { setWorld((w) => { const n = structuredClone(w); if (patch.autopilot !== undefined) n.drill.autopilot = !!patch.autopilot; if (patch.salvage !== undefined) n.drill.orders = { ...(n.drill.orders || {}), salvage: !!patch.salvage, salvageSetAt: patch.salvage ? Date.now() : null }; if (patch.caseOnHeat !== undefined) n.drill.orders = { ...(n.drill.orders || {}), caseOnHeat: !!patch.caseOnHeat }; if (patch.caseNext !== undefined) n.drill.casingArmed = !!patch.caseNext; return n; }); note(`crew orders: ${Object.entries(patch).map(([k, v]) => `${k} ${v ? "on" : "off"}`).join(", ")}`); },
     onLateral: async (t) => { setWorld((w) => simLateral(w, t)); note(`SALVAGE (${t.col + 1},${t.row + 1}) L${t.layer + 1}`); return { oil: world.allPlots[`${t.col}_${t.row}`]?.passed?.[t.layer] || 0 }; },
     onWildcat: async (t) => { const oil = frontierOil(t.col, t.row, t.layer); setWorld((w) => simWildcat(w, t)); note(`WILDCAT (${t.col + 1},${t.row + 1}) L${t.layer + 1} → ${oil || "dry"}`); return { oil, hell: false, inclusion: null }; },
   }), [world]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -231,7 +241,7 @@ export default function HailMaryV2FixturePage() {
     const b = deriveBoards(w);
     const props = { ...extra, theme, pending: w.drill.pending, chargesRemaining: b.chargesRemaining, chargesCap: b.cap, threshold: w.drill.threshold,
       salvage: b.salvage, frontier: b.frontier, cadence: b.cadence, rack: b.rack, ledger: b.ledger, ended: !!w.ended,
-      orders: { autopilot: !!w.drill.autopilot, salvage: !!w.drill.orders?.salvage }, ...h };
+      orders: { autopilot: !!w.drill.autopilot, salvage: !!w.drill.orders?.salvage, caseOnHeat: !!w.drill.orders?.caseOnHeat }, casing: w.drill.supplies?.casing || 0, casingArmed: !!w.drill.casingArmed, ...h };
     if (version === "both") return (<div key={key} style={{ display: "flex", gap: 12, flexWrap: "wrap" }}><div style={{ width, maxWidth: "100%" }}><OilCoreSampleV3 {...props} /></div><div style={{ width, maxWidth: "100%" }}><OilCoreSampleV2 {...props} /></div></div>);
     return version === "v2" ? <OilCoreSampleV2 key={key} {...props} /> : <OilCoreSampleV3 key={key} {...props} />;
   };

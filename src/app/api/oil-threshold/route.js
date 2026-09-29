@@ -37,7 +37,12 @@ export async function POST(req) {
         ? { salvage: true, salvageSetAt: cur.salvage === true && Number.isFinite(cur.salvageSetAt) ? cur.salvageSetAt : Date.now() }
         : { salvage: false, salvageSetAt: null };
     }
-    if (Object.keys(update).length === 1) return NextResponse.json({ error: "nothing to set (btr, autopilot, salvage)" }, { status: 400 });
+    // CASING (2026-09-29): caseNext arms the string for the next strike (one-shot,
+    // the tick clears it); caseOnHeat is the standing order — case the next layer
+    // whenever the core just read HIGH and a string is in supply.
+    if (body.caseNext !== undefined) update.casingArmed = body.caseNext === true;
+    if (body.caseOnHeat !== undefined) update.orders = { ...(update.orders || {}), caseOnHeat: body.caseOnHeat === true };
+    if (Object.keys(update).length === 1) return NextResponse.json({ error: "nothing to set (btr, autopilot, salvage, caseNext, caseOnHeat)" }, { status: 400 });
     await ref.set(update, { merge: true });
     const { updatedAt, ...echo } = update;
     return NextResponse.json({ ok: true, ...echo });

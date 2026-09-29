@@ -70,42 +70,43 @@ const FRAME = {
 const BG_COLOR = "0b0b0f";
 
 // The dialogue. Monk lines are SitePal TTS (`text`); John lines play his
-// uploaded SitePal audio tracks by name (`audioName` → john_01..john_06 in the
+// uploaded SitePal audio tracks by name (`audioName` → connor2_01..connor2_07 in the
 // account's Audio Manager).
 const SCRIPT = [
-  { who: "monk", text: "Welcome prospector! The field is sealed before anyone plays — its riches hidden even from us. Provably fair." },
-  { who: "john", audioName: "john_01" },
-  // "R-Lady" is the phonetic spelling of RL80 for TTS (SitePal reads "RL80" as
-  // "R-L-eighty"); the on-screen caption keeps the real spelling. Matches the
-  // studio recording script (hailmary/studio/page.js).
-  { who: "monk", text: "Hold a little R-Lady — that is your key. No spending. Sell whenever you wish." },
-  { who: "john", audioName: "john_02" },
-  { who: "monk", text: "Your rig drills on its own, day and night. It strikes when the earth decides. Patience." },
-  { who: "john", audioName: "john_03" },
-  { who: "monk", text: "The deeper you go, the richer the ground. Bank what you find, and it is yours — safe, and counted." },
-  { who: "john", audioName: "john_04" },
-  { who: "monk", text: "Should one breach, the whole field freezes — and hunters race for the bounty. Keep your cameras watching. Bank often." },
-  { who: "john", audioName: "john_05" },
-  { who: "monk", text: "Drill wisely prospector." },
-  { who: "john", audioName: "john_06" },
-  { who: "monk", text: "Welcome to Hail Mary." },
+  { who: "monk", text: "Welcome, prospector. Before the first claim is staked, the field's fortunes are sealed beneath the earth, hidden from everyone, including us. Provably fair." },
+  { who: "john", audioName: "connor2_01" },
+  { who: "monk", text: "Hold a little R-Lady, and you have your key to the field. Nothing is spent. Sell whenever you wish." },
+  { who: "john", audioName: "connor2_02" },
+  { who: "monk", text: "Once your claim is staked, the rig goes to work. Day and night, it pulls core samples from the earth and lays them on your table." },
+  { who: "john", audioName: "connor2_03" },
+  { who: "monk", text: "Keep a core, and it becomes yours, for one charge. You have twenty for the season. Choose carefully." },
+  { who: "john", audioName: "connor2_04" },
+  { who: "monk", text: "Your crew can work while you are away. Set your line, and they will keep any core that clears it. Set them to salvage, and they will collect what others leave behind." },
+  { who: "john", audioName: "connor2_05" },
+  { who: "monk", text: "When the season ends, the reckoning begins. The value of everything you kept is paid in real USDC, directly to your wallet." },
+  { who: "john", audioName: "connor2_06" },
+  { who: "monk", text: "The field is sealed. The rigs are waiting. Drill wisely, prospector." },
+  { who: "john", audioName: "connor2_07" },
+  { who: "monk", text: "Welcome to Hail Mary Prospecting." },
 ];
 
 // On-screen captions (John's lines are baked into his MP3s, shown here too).
 const CAPTIONS = [
-  "St. GR80: Welcome, prospector. The field is sealed before anyone plays — its riches hidden even from us. Provably fair.",
-  "Connor: Which means nobody knows where the big strike hides… not even you. Delicious, isn't it?",
-  "St. GR80: Hold a little RL80 — that is your key. No spending. Sell whenever you wish.",
-  "Connor: But why would you leave? Claim your plot, and the hunt begins.",
-  "St. GR80: Your rig drills on its own, day and night. It strikes when the earth decides. Patience.",
-  "Connor: Random. Unpredictable. You'll check back again… and again… and again.",
-  "St. GR80: The deeper you go, the richer the ground. Bank what you find, and it is yours — safe, and counted.",
-  "Connor: Or push deeper for the motherlode… and pray you don't crack a hell pocket. I do love when they crack a hell pocket.",
-  "St. GR80: Should one breach, the whole field freezes — and hunters race for the bounty. Keep your cameras watching. Bank often.",
-  "Connor: Or don't. Greedy hands make the best stories.",
-  "St. GR80: Drill wisely, prospector.",
-  "Connor: Push your luck.",
-  "St. GR80: Welcome to Hail Mary.",
+  "St. GR80: Welcome, prospector. Before the first claim is staked, the field’s fortunes are sealed beneath the earth—hidden from everyone, including us. Provably fair.",
+  "Connor: Which means nobody knows where the big strike hides. Not you. Not us. Delicious, isn’t it?",
+  "St. GR80: Hold a little RL80, and you have your key to the field. Nothing is spent. Sell whenever you wish.",
+  "Connor: But why would you leave? Stake your claim, hire your crew, and let’s see what providence buried beneath your feet.",
+  "St. GR80: Once your claim is staked, the rig goes to work. Day and night, it pulls core samples from the earth and lays them on your table.",
+  "Connor: Rich deposits. Dusty shale. Occasionally something that should have remained buried.",
+  "St. GR80: Keep a core, and it becomes yours—for one charge. You have twenty for the season. Choose carefully.",
+  "Connor: Or pass. Passing costs nothing. Just remember: what you leave behind becomes fair game for your neighbors.",
+  "St. GR80: Your crew can work while you are away. Set your line, and they will keep any core that clears it. Set them to salvage, and they will collect what others leave behind.",
+  "Connor: And do keep an eye on those samples. Strange things have been known to surface. Ignore the warning signs and you may inadvertently unleash hell.",
+  "St. GR80: When the season ends, the reckoning begins. The value of everything you kept is paid in real USDC, directly to your wallet.",
+  "Connor: And everything you passed over? Gone. Left beneath the earth for eternity. Try not to think about what it might have been worth.",
+  "St. GR80: The field is sealed. The rigs are waiting. Drill wisely, prospector.",
+  "Connor: Or don’t.",
+  "St. GR80: Welcome to Hail Mary Prospecting.",
 ];
 
 const sceneFor = (who) => (who === "monk" ? MONK : JOHN);

@@ -9,7 +9,7 @@ const OilVerifyExplainer = dynamic(() => import("./OilVerifyExplainer"), { ssr: 
 // Transcript of the intro video's spoken dialogue. Rendered as on-page text so
 // browsers' built-in page translation picks it up (a <video> <track> subtitle
 // file would NOT be auto-translated). Keep in sync with the recorded dialogue.
-const INTRO_TRANSCRIPT = [
+const INTRO_TRANSCRIPT_V1 = [
   { who: "St. GR80", text: "Welcome, prospector. The field is sealed before anyone plays — its riches hidden even from us. Provably fair." },
   { who: "Connor", text: "Which means nobody knows where the big strike hides… not even you. Delicious, isn't it?" },
   { who: "St. GR80", text: "Hold a little RL80 — that is your key. No spending. Sell whenever you wish." },
@@ -25,6 +25,36 @@ const INTRO_TRANSCRIPT = [
   { who: "St. GR80", text: "Welcome to Hail Mary." },
 ];
 
+const INTRO_TRANSCRIPT_V2 = [
+  { who: "St. GR80", text: "Welcome, prospector. Before the first claim is staked, the field’s fortunes are sealed beneath the earth—hidden from everyone, including us. Provably fair." },
+  { who: "Connor", text: "Which means nobody knows where the big strike hides. Not you. Not us. Delicious, isn’t it?" },
+  { who: "St. GR80", text: "Hold a little RL80, and you have your key to the field. Nothing is spent. Sell whenever you wish." },
+  { who: "Connor", text: "But why would you leave? Stake your claim, hire your crew, and let’s see what providence buried beneath your feet." },
+  { who: "St. GR80", text: "Once your claim is staked, the rig goes to work. Day and night, it pulls core samples from the earth and lays them on your table." },
+  { who: "Connor", text: "Rich deposits. Dusty shale. Occasionally something that should have remained buried." },
+  { who: "St. GR80", text: "Keep a core, and it becomes yours—for one charge. You have twenty for the season. Choose carefully." },
+  { who: "Connor", text: "Or pass. Passing costs nothing. Just remember: what you leave behind becomes fair game for your neighbors." },
+  { who: "St. GR80", text: "Your crew can work while you are away. Set your line, and they will keep any core that clears it. Set them to salvage, and they will collect what others leave behind." },
+  { who: "Connor", text: "And do keep an eye on those samples. Strange things have been known to surface. Ignore the warning signs and you may inadvertently unleash hell." },
+  { who: "St. GR80", text: "When the season ends, the reckoning begins. The value of everything you kept is paid in real USDC, directly to your wallet." },
+  { who: "Connor", text: "And everything you passed over? Gone. Left beneath the earth for eternity. Try not to think about what it might have been worth." },
+  { who: "St. GR80", text: "The field is sealed. The rigs are waiting. Drill wisely, prospector." },
+  { who: "Connor", text: "Or don’t." },
+  { who: "St. GR80", text: "Welcome to Hail Mary Prospecting." },
+];
+
+// ── INTRO VERSION ─────────────────────────────────────────────────────────────
+// The transcript MUST mirror the recorded audio, so the two travel together:
+// flip INTRO_VERSION to 2 once the re-recorded video is in public/ as
+// HMPC_Intro_v2.web.mp4 + HMPC_Intro_v2_poster.jpg (runbook: docs/oil-game.md →
+// "Re-recording the intro"). v1 is the 2026-06 recording (bank/tank wording);
+// v2 is Michelle's 2026-09-29 script for the extract-or-pass season.
+const INTRO_VERSION = 1;
+const INTRO = INTRO_VERSION === 2
+  ? { src: "/HMPC_Intro_v2.web.mp4", poster: "/HMPC_Intro_v2_poster.jpg", transcript: INTRO_TRANSCRIPT_V2, v2Wording: true }
+  : { src: "/HMPC_Intro.web.mp4", poster: "/HMPC_Intro_poster.jpg", transcript: INTRO_TRANSCRIPT_V1, v2Wording: false };
+
+
 // First-visit onboarding overlay for /hailmary. Shows a character greeting video
 // up top with the How-to-Play steps below. Re-openable via the "?" help button.
 export default function OilWelcomeModal({
@@ -36,8 +66,8 @@ export default function OilWelcomeModal({
   // Daily-ticket verification (per player): the page's authenticated fetch + sign-in state.
   apiFetch = null, signedIn = false,
   // v2 extract-or-pass season: the walkthrough swaps to the v2 steps. The
-  // intro transcript stays verbatim (it mirrors the recorded audio) with a
-  // one-line season note until the intro is re-recorded.
+  // intro transcript mirrors whichever recording INTRO_VERSION selects; the
+  // season note shows only while the v1 (bank-wording) recording is mounted.
   loopV2 = false,
 }) {
   // Close on Escape for keyboard users.
@@ -126,8 +156,8 @@ export default function OilWelcomeModal({
           overflow: "hidden",
         }}>
           <video
-            src="/HMPC_Intro.web.mp4"
-            poster="/HMPC_Intro_poster.jpg"
+            src={INTRO.src}
+            poster={INTRO.poster}
             controls
             playsInline
             preload="metadata"
@@ -145,7 +175,7 @@ export default function OilWelcomeModal({
             Transcript
           </summary>
           <div style={{ marginTop: 8 }}>
-            {INTRO_TRANSCRIPT.map((l, i) => (
+            {INTRO.transcript.map((l, i) => (
               <p key={i} style={{ margin: "0 0 9px", fontSize: 13, lineHeight: 1.5, color: c.muted }}>
                 <strong style={{ color: c.text }}>{l.who}:</strong> {l.text}
               </p>
@@ -167,7 +197,7 @@ export default function OilWelcomeModal({
           }}>
             Strike Betroleum — the only crude you can wager. Here's how it works.
           </p>
-          {loopV2 && (
+          {loopV2 && !INTRO.v2Wording && (
             <p style={{ margin: "6px 0 0", fontSize: 10, color: c.accent, letterSpacing: "0.04em", lineHeight: 1.5 }}>
               This season runs EXTRACT OR PASS. Where the intro says &quot;bank&quot;, read &quot;extract&quot; — the steps below are the current rules.
             </p>

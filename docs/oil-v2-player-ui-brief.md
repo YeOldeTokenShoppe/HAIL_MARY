@@ -23,7 +23,7 @@ panel, and the wording *within* the copy rule.
 
 | # | Surface | Where it lives | Status | File |
 |---|---|---|---|---|
-| A | **Core Sample card** — the decision surface. **Two builds, same props:** `OilCoreSampleV2` (everything on one surface — Michelle: "too dense", 2026-09-28) and **`OilCoreSampleV3`** (the /space module layout, one decision per screen: CORE · NEXT DOOR · LEDGER tabs, the core cylinder as the rack, two big stats, one CTA row, crew orders behind a link; wall colour schema). V3 is the design-pass base; V2 stays for comparison on the fixture | Sidebar YOUR RIG card (desktop); the panels under the 3D tab (phone) | V3 built plain 2026-09-28, not yet mounted on the live page | `src/components/OilCoreSampleV3.jsx`, `OilCoreSampleV2.jsx` |
+| A | **Core Sample card** — the decision surface. **Two builds, same props:** `OilCoreSampleV2` (everything on one surface — Michelle: "too dense", 2026-09-28) and **`OilCoreSampleV3`** (the /space module layout, one decision per screen: CORE · NEXT DOOR · LEDGER tabs, the core cylinder as the rack, two big stats, one CTA row, crew orders behind a link; wall colour schema). V3 is the design-pass base; V2 stays for comparison on the fixture | Sidebar YOUR RIG card (desktop); the panels under the 3D tab (phone) | V3 built plain 2026-09-28, not yet mounted on the live page | `src/components/OilCoreSampleV3.jsx`, `OilCoreSampleV2.jsx` — **2026-09-29: V3 moved onto the `HmHud` kit** (the /space panel chrome, fixed palette; `theme` prop now unused; tabs CORE SAMPLE / NEXT DOOR / LEDGER; each tab ends in a caption + two big stats; EXTRACT is the clipped-corner button; crew orders behind the hint line) |
 | B | **In-world machine panel** on the player's rig — pressure gauge, panel screen, the caged PASS (2026-09-08), the red button, four toggles, a key switch, crew who walk to the button on a decision. **Wired 2026-09-28 (v2, own rig only):** caged PASS → pass; red button → EXTRACT; toggle 1 → SALVAGE order (plate under its lamp), toggles 2–4 dead; key → AUTOPILOT (plate under the key); switches pose from the rig doc | Desktop: click the rig; phone: the MACHINE PANEL chip zooms to it | Wired; styling of plates is the pass's | `src/components/OilVoxelGrid.jsx` (Pumpjack: `decideMode`, `orders`, `panelLabels`), `RigCrew.jsx` (`hm:decide`) |
 | C | **Strata wall** — the earth block as public game-state voxels: passes, extractions, wildcat scars, tunnel bars for salvage | 3D scene, loopV2 seasons | Built (promoted from the `?strata=1` mock) | `src/components/StrataVoxels.jsx` |
 | D | **Alerts** — push + Telegram on every strike (`CORE ASSAY — LAYER n` with the cost-model body), hell breach, tonic cap, artifact, dry layer | Phone lock screen, Telegram | Built, copy follows the rule | `oil-strike-tick/route.js` ~530–665, `lib/oilLoopV2.assayAlertBody` |
@@ -52,6 +52,10 @@ misses one will show plain chrome there.
 | Pending · inclusion flagged | `hasInclusion` | the anomalous-inclusion ping; "only recovered on EXTRACT — the crew never gambles on it" |
 | No charges left | `chargesRemaining == 0` | EXTRACT / TAKE / WILDCAT disabled, PASS live, CHARGES in red |
 | Column fully revealed | `remainingLayers == 0` | "nothing more comes up; the buzzer settles what's on the table"; charges still work next door |
+| Hot within reach (two down, or next door) | `pending.heat` / `plot.heat[layer]` = `elevated` | Temp elevated · "!! HEAT RISING — SOMETHING HOT WITHIN REACH !!" · glow under the bore head · note: hell or the big one, under you or next door |
+| Hot directly below | … = `high` | Temp high · "!! HOT ZONE DIRECTLY BELOW — HELL OR THE MOTHERLODE !!" · red tube outline · persists after the decision until the next strike · the CASING block: strings on the rig, CASE THE NEXT LAYER / DISARM, the forfeit spelled out |
+| Casing armed | `casingArmed` | orange CASING block: "ARMED — the next layer is drilled behind steel", disarm button; the crew line says so |
+| Cased layer | `plot.cased[layer]` | steel-blue band; ledger "cased through · a pay zone, cased off · N behind steel" / "hell, sealed"; reckoning Cased line + strip |
 | Season over | `gameEnded` (the flag, never the clock alone) | hand-off to the Reckoning |
 | Season clock run out, not ended | stale start date on a live board | "clock has run out · the buzzer settles what is on the table"; never "closed" |
 | No season clock | legacy settings | no cadence line at all (never a fake one) |
@@ -97,7 +101,7 @@ order: *"if you're away, the crew follows your standing order (extract ≥ 800) 
 |---|---|---|
 | charge (⚡) | drill, bonus drill | a charge is what you spend; the bore drills by itself |
 | standing order | threshold, line, limit, price | see above |
-| EXTRACT (the one button) | bank, keep, skip, PASS as a big button, "let it go now" | one button (2026-09-28): doing nothing = the crew's orders; no pass control at all (2026-09-29) |
+| EXTRACT (the one button); CASE THE NEXT LAYER only when the reading is hot | bank, keep, skip, PASS as a big button, "let it go now", cap it | one button (2026-09-28): doing nothing = the crew's orders; no pass control at all (2026-09-29); casing is the one other verb and it forfeits the layer |
 | LATERAL EXTRACT (the switch) · ORDERS / AUTO-PILOT (the key) | SALVAGE as a control name, MANUAL | the crew is always active; the key sets how much initiative it takes |
 | salvage · taken | poach, steal | a lateral takes what its owner discarded; the race is between rivals |
 | frontier · wildcat | claim-jump, raid | unclaimed ground, drilled blind |
@@ -122,7 +126,7 @@ order: *"if you're away, the crew follows your standing order (extract ≥ 800) 
 - **Six theme palettes** ship: `light`, `duskLight`, `Geode`, `dark`, `solsticeLight`,
   `parabolumDark` (`hailmary/page.js` ~258–400). Components receive `theme` tokens
   (`text`, `muted`, `gold`, `green`, `red`, `warn`, `border`, `accent`); a design must
-  hold in all six. The FINAL HAUL card is the one exception (fixed dark palette for PNG
+  hold in all six. **Superseded 2026-09-29 for the v2 cards:** the V3 core sample, the spectator card and the reckoning run the `HmHud` fixed palette (the /space panel) in every theme; the page chrome around them still follows the six. The FINAL HAUL card is the older exception (fixed dark palette for PNG
   capture).
 - **Phone first**: the card lives in a panel column under the 3D tab; 16 px gutters, no
   horizontal scroll; the rack is 20 cells wide on a ~360 px column.

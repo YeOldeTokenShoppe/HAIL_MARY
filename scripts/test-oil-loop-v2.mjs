@@ -7,7 +7,7 @@ const load = async (rel) => {
   const src = readFileSync(new URL(rel, import.meta.url), "utf8");
   return import("data:text/javascript;charset=utf-8," + encodeURIComponent(src));
 };
-const { PASSIVE_CHARGES, chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, fmtSpan, buildColumnRack, buildLedger, buildReckoning, reckoningText, reckoningStory, reckoningShareText, reckoningStrip, pickSalvageOrder } =
+const { PASSIVE_CHARGES, chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, fmtSpan, buildColumnRack, buildLedger, buildReckoning, reckoningText, reckoningStory, reckoningShareText, reckoningStrip, pickSalvageOrder, heatReading, HEAT_COPY, shouldCase, casedAlertBody } =
   await load("../src/lib/oilLoopV2.js");
 
 let pass = 0, fail = 0;
@@ -187,6 +187,53 @@ t("reckoningShareText / reckoningStrip: share line + per-layer strip", () => {
   const dry = buildReckoning({ plot: { col: 0, row: 0, drillDay: 2, revealed: { 0: 0, 1: 0 } }, drill: { totalCollected: 0, layersPassed: { 0: 0, 1: 0 } }, allPlots: {}, userId: "me", column: null, depthZ: 3 });
   assert.match(reckoningStory(dry), /banked nothing\. 1 layer is still sealed/);
   assert.equal(reckoningStrip(dry)[2].state, "sealed");
+});
+
+t("heatReading: distance not diagnosis — below = high, two down or next door = elevated, lode counts", () => {
+  const rd = (hell, lode, col, row, layer, extra = {}) => heatReading({
+    isHellAt: (c, r, z) => hell.has(`${c}_${r}_${z}`), oilAt: (c, r, z) => (lode.has(`${c}_${r}_${z}`) ? 1000 : 10),
+    motherlodeMin: 850, col, row, layer, depthZ: 20, gridSize: 10, ...extra });
+  const H = (k) => new Set([k]), none = new Set();
+  assert.deepEqual(rd(H("5_5_7"), none, 5, 5, 6), { level: "high", kind: "hell", layersDown: 1, lateral: false });
+  assert.deepEqual(rd(none, H("5_5_7"), 5, 5, 6), { level: "high", kind: "lode", layersDown: 1, lateral: false });
+  assert.deepEqual(rd(H("5_5_7"), none, 5, 5, 5), { level: "elevated", kind: "hell", layersDown: 2, lateral: false });
+  assert.deepEqual(rd(H("6_5_7"), none, 5, 5, 6), { level: "elevated", kind: "hell", layersDown: 1, lateral: true });   // next door, next layer
+  assert.deepEqual(rd(H("6_6_8"), none, 5, 5, 6), { level: "elevated", kind: "hell", layersDown: 2, lateral: true });   // diagonal, two down
+  assert.equal(rd(H("6_6_8"), none, 5, 5, 6, { neighbours: "ortho4" }).level, "nominal");                                // diagonals off
+  assert.equal(rd(H("6_5_7"), none, 5, 5, 6, { neighbours: "none" }).level, "nominal");
+  assert.equal(rd(H("5_5_7"), none, 5, 5, 4).level, "nominal");                                                          // three down: silent
+  assert.equal(rd(H("5_5_7"), none, 5, 5, 7).level, "nominal");                                                          // the hot core itself reads what is below it
+  assert.equal(rd(none, H("5_5_20"), 5, 5, 19).level, "nominal");                                                        // never past the floor
+  assert.equal(rd(none, H("5_5_7"), 5, 5, 6, { motherlodeMin: 0 }).level, "nominal");                                    // lode source disabled
+  assert.match(assayAlertBody({ col: 0, row: 0, layer: 5, oil: 0, threshold: 100, chargesRemaining: 3, heat: "high" }), /Hot zone directly below/);
+  assert.doesNotMatch(assayAlertBody({ col: 0, row: 0, layer: 5, oil: 0, threshold: 100, chargesRemaining: 3 }), /Hot zone/);
+  const rack = buildColumnRack({ plot: { drillDay: 6, revealed: { 4: 100, 5: 0 }, heat: { 4: "elevated" } }, drill: { drillDay: 6, layersExtracted: { 4: 100 }, pending: { layer: 5, oil: 0, heat: "high" } }, depthZ: 8 });
+  assert.equal(rack[4].heat, "elevated"); assert.equal(rack[5].heat, "high"); assert.equal(rack[3].heat, null);
+  assert.ok(HEAT_COPY.high.warn && HEAT_COPY.elevated.warn && !HEAT_COPY.nominal.warn);
+});
+
+t("casing: shouldCase, the rack, the ledger and the reckoning agree on a cased layer", () => {
+  assert.deepEqual(shouldCase({ armed: true, casing: 1 }), { case: true, via: "armed" });
+  assert.deepEqual(shouldCase({ armed: true, casing: 0 }), { case: false, via: null });
+  assert.deepEqual(shouldCase({ orders: { caseOnHeat: true }, lastHeat: "high", casing: 2 }), { case: true, via: "order" });
+  assert.deepEqual(shouldCase({ orders: { caseOnHeat: true }, lastHeat: "elevated", casing: 2 }), { case: false, via: null });
+  assert.match(casedAlertBody({ col: 0, row: 0, layer: 6, oil: 0, hell: true }), /HELL POCKET.*Sealed/);
+  assert.match(casedAlertBody({ col: 0, row: 0, layer: 6, oil: 1800, hell: false }), /1,800 BTR.*never produced/);
+  const plot = { col: 0, row: 0, drillDay: 8, revealed: { 5: 0, 6: 1800, 7: 120 }, extracted: {}, passed: { 5: 0 }, cased: { 6: true }, hellLayers: {} };
+  const drill = { totalCollected: 0, chargesSpent: 0, layersPassed: { 5: 0 }, pending: { layer: 7, oil: 120 } };
+  const rack = buildColumnRack({ plot, drill, depthZ: 10 });
+  assert.equal(rack[6].state, "cased"); assert.equal(rack[6].oil, 1800);
+  const led = buildLedger({ plot, drill, allPlots: {}, userId: "me" });
+  assert.equal(led.casedOff, 1800); assert.equal(led.casedCount, 1); assert.ok(led.rows.some((r) => r.kind === "cased" && r.layer === 6));
+  const r = buildReckoning({ plot, drill, allPlots: {}, userId: "me", column: { oil: [0, 0, 0, 0, 0, 0, 1800, 120, 0, 0], hell: [] }, depthZ: 10, usdRate: 0.001, chargesCap: 8 });
+  assert.equal(r.casedOff, 1800);
+  assert.match(reckoningText(r, { col: 0, row: 0 }), /Cased through 1 layer: 1,800 BTR cased off/);
+  assert.match(reckoningStory(r, { col: 0, row: 0 }), /cased off 1,800 BTR I never saw/);
+  assert.equal(reckoningStrip(r)[6].state, "cased");
+  // a cased hell pocket is not a breach
+  const hp = { col: 0, row: 0, drillDay: 7, revealed: { 6: 0 }, cased: { 6: true }, hellLayers: { 6: true } };
+  const hl = buildLedger({ plot: hp, drill: {}, allPlots: {}, userId: "me" });
+  assert.equal(hl.casedHell, 1); assert.equal(buildColumnRack({ plot: hp, drill: {}, depthZ: 8 })[6].state, "cased");
 });
 
 t("buildReckoning: empty rig → zeros, no NaN; a leftover pending is flagged", () => {
