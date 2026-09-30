@@ -5004,7 +5004,7 @@ export default function OilPage() {
         const poses = hook.photo({ variant: (userDrill.col + userDrill.row) % 3 });
         log("crew posing:", poses, "· waiting for hm:crew-photo-ready");
         // the crew never said ready (no head bone yet, an old GLB…) → shoot anyway
-        d.safety = setTimeout(() => shutter("safety — the crew never signalled ready"), 5000);
+        d.safety = setTimeout(() => shutter("safety — the crew never signalled ready"), 9000);   // walk to the marks + flight + pose
       } else if (++tries > 24) {
         clearInterval(d.timer); d.timer = null;
         log("no crew after 6 s (hook:", !!hook, "photo:", !!hook?.photo, "workers:", Object.keys(hook?.workers || {}), ") → shooting the field as it is");

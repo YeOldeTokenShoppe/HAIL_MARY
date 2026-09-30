@@ -133,6 +133,11 @@ const STATIONS = {
   rail_doze:        { node: "Crew_Rail_Doze",        pos: [0.45, 0.236, -2.157],  yaw: -Math.PI / 2, seatBack: true }, // marker at the north walkway rail
   rail_doze_top:    { node: "Crew_Rail_Doze_Top",    pos: [0.35, 1.725, 0.369],   yaw: -Math.PI / 2, seatBack: true }, // marker on the platform's north rail (x 0.35 keeps the helmet out of the beam when standing up)
   rail_doze2:       { node: "Crew_Rail_Doze2",       pos: [-1.0, 0.236, -2.041],  yaw: 0.067,        seatBack: true }, // north-west corner, back to the west rail
+  // Season-photo marks (2026-09-30): where the two stand for the polaroid, side by side, local +X
+  // = the way they face (the camera flies round to that side). Author Crew_Photo_A / Crew_Photo_B
+  // empties on the rig; until then the two panel stations stand in.
+  photo_a:          { node: "Crew_Photo_A",          pos: [0.655, 0.245, 0.863],  yaw: 3.036 },
+  photo_b:          { node: "Crew_Photo_B",          pos: [0.655, 0.245, 1.035],  yaw: 3.036 },
   rail_doze3:       { node: "Crew_Rail_Doze3",       pos: [-0.131, 0.236, 0.122], yaw: -Math.PI / 2, seatBack: true }, // under the walking beam
   platform_lookout: { node: "Crew_Lookout",          pos: [0.363, 1.725, 0.653],  yaw: -Math.PI / 2 },
   valve:            { node: "Crew_Valve",            pos: [-1.05, 0, 2.44],       yaw: Math.PI / 2 },   // south of the riser handwheel (hub 0.55 up, rim 0.19 ahead), facing it
@@ -189,7 +194,7 @@ const PHOTO_POSES = [["thumbsUp", "heartHands"], ["heartHands", "thumbsUp2"], ["
 const PHOTO_FOCUS_DIST = 1.0;      // camera distance from the point between the two heads (tune)
 const PHOTO_FOCUS_MIN_DIST = 0.45;
 const PHOTO_SETTLE_S = 1.8;        // camera flight + pose blend before the shutter
-const PHOTO_HOLD_S = 12;           // the crew hold the pose this long, then go back to work
+const PHOTO_HOLD_S = 18;           // walk to the marks + pose; the page's safety shutter is 5 s after the crew are asked, so the mark walk should be short
 
 // crew_valve turns the rig's handwheel with the hands: three pulls of 35°, clockwise as the worker
 // sees it (left hand rises), each a 0.8 s smoothstep. Windows are the clip's frame plan (frames
@@ -756,7 +761,14 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
       if (s.celebrateTier === "strike" || s.act === "getUp" || s.act === "uncower") celebrateNext(now);   // a seep, or a worker who already scrambled up: no flinch
       else startAct("nervous", now, rand(0.6, 1.1));
     }
-    else if (mode === "photo") {                                            // the season photo: hold the pose for the camera
+    else if (mode === "photo") {                                            // the season photo: walk to the mark, then hold the pose for the camera
+      const mySpot = role.briefs ? "photo_a" : "photo_b";
+      if (s.spot !== mySpot) {                                              // not on the mark yet: walk there; the mode re-enters on arrival (wantMode still says photo)
+        s.mode = null; s.photoMoving = true; setBubble(null);
+        slideTo(mySpot, SLIDE_S, "idle");
+        return;
+      }
+      s.photoMoving = false;
       const pose = crew.photo?.poses?.[role.briefs ? "operator" : "other"] || "thumbsUp";
       startAct(pose, now, 999); s.actEnds = Infinity; s.nextGesture = Infinity; setBubble(null);
       console.info("[season-photo] crew:", role.id, "posing", pose, "→ clip", ACTS[s.act]?.clip, actionsRef.current[ACTS[s.act]?.clip] ? "(loaded)" : "(missing — fallback)");
@@ -845,16 +857,23 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
       const wall = performance.now() / 1000;
       if (ph.until <= wall) { crew.photo = null; try { window.dispatchEvent(new CustomEvent("hm:crew-photo-end")); } catch (e) {} return; }
       if (role.briefs) {
-        // frame the pair: the point between the two heads, seen from where the camera already is
-        if (!ph.faced && s.frames > 2 && headBone) {
-          ph.faced = true;
-          const heads = Object.values(crew.workers).map((w) => w.head).filter(Boolean);
+        // both on their marks and posing? (a worker mid-climb or mid-walk joins when it can)
+        const all = Object.values(crew.workers);
+        const onMarks = all.length > 0 && all.every((w) => (w.spot === "photo_a" || w.spot === "photo_b") && w.mode === "photo");
+        // frame the pair once they stand together: the point between the two heads, seen from the
+        // marks' FRONT (the way the photo stations face), so the rig never hides one of them
+        if (!ph.faced && onMarks && s.frames > 2 && headBone) {
+          ph.faced = true; ph.framedAt = wall;
+          const heads = all.map((w) => w.head).filter(Boolean);
           const centre = heads.length ? heads.reduce((a, h) => a.add(h), new THREE.Vector3()).multiplyScalar(1 / heads.length) : s.head.clone();
-          const f = _tmp.copy(state.camera.position).sub(centre); f.y = 0; if (f.lengthSq() < 1e-6) f.set(1, 0, 0); f.normalize();
-          console.info("[season-photo] crew: framing the pair at", centre.toArray().map((v) => +v.toFixed(2)), "dist", PHOTO_FOCUS_DIST);
+          const stn = resolveStation(rigScene, "photo_a");
+          const f = new THREE.Vector3(Math.cos(stn.yaw), 0, -Math.sin(stn.yaw));           // the mark's facing, rig-local…
+          const parent = groupRef.current?.parent; if (parent) f.applyQuaternion(parent.getWorldQuaternion(_q)); f.y = 0;   // …in world
+          if (f.lengthSq() < 1e-6) f.set(1, 0, 0); f.normalize();
+          console.info("[season-photo] crew: on their marks · framing at", centre.toArray().map((v) => +v.toFixed(2)), "from the marks' front, dist", PHOTO_FOCUS_DIST);
           try { window.dispatchEvent(new CustomEvent("hm:crew-face", { detail: { center: centre.toArray(), front: f.toArray(), dist: PHOTO_FOCUS_DIST, minDist: PHOTO_FOCUS_MIN_DIST } })); } catch (e) {}
         }
-        if (!ph.announced && wall >= ph.readyAt) { ph.announced = true; console.info("[season-photo] crew: ready"); try { window.dispatchEvent(new CustomEvent("hm:crew-photo-ready", { detail: { poses: ph.poses } })); } catch (e) {} }
+        if (!ph.announced && ph.faced && wall >= ph.framedAt + PHOTO_SETTLE_S) { ph.announced = true; console.info("[season-photo] crew: ready"); try { window.dispatchEvent(new CustomEvent("hm:crew-photo-ready", { detail: { poses: ph.poses } })); } catch (e) {} }
       }
     } else if (mode === "brief") {
       const c = state.camera.position; faceWorld(c.x, c.y, c.z);          // turn to the player
