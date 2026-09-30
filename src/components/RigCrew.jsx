@@ -917,10 +917,15 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
           const right = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0)).normalize();
           const halfW = Math.max(...heads.map((h) => Math.abs(_tmp.copy(h).sub(centre).dot(right)))) + 0.6 * headH;   // shoulders + a hand out
           const halfH = (top - bottom) / 2;
-          const tanHalf = Math.tan(THREE.MathUtils.degToRad((state.camera.fov || 50) / 2));  // the square crop is bounded by the canvas height → vertical fov
+          // The polaroid is a SQUARE cut from the canvas centre, sized by the canvas's shorter
+          // side: on a landscape desktop that is the height (the vertical fov), on a portrait
+          // phone it is the width — only aspect × the vertical view (2026-09-30: the phone's
+          // shot cut the top worker off). So the square's half-extent at distance d is
+          // d · tan(fov/2) · min(1, aspect).
+          const tanHalf = Math.tan(THREE.MathUtils.degToRad((state.camera.fov || 50) / 2)) * Math.min(1, state.camera.aspect || 1);
           const dist = Math.max(PHOTO_FOCUS_DIST, (Math.max(halfH, halfW) * PHOTO_FIT_PAD) / tanHalf);
           // (no tilt here: both cameras level the front and apply their own lift — page.js FOCUS_TILT on the field, RigScene CREW_FOCUS_LIFT on the phone)
-          console.info("[season-photo] crew: on their marks · framing at", centre.toArray().map((v) => +v.toFixed(2)), "from the marks' front, dist", +dist.toFixed(2), "· box h", +(top - bottom).toFixed(2), "w", +(2 * halfW).toFixed(2), "· head h", +headH.toFixed(2));
+          console.info("[season-photo] crew: on their marks · framing at", centre.toArray().map((v) => +v.toFixed(2)), "from the marks' front, dist", +dist.toFixed(2), "· box h", +(top - bottom).toFixed(2), "w", +(2 * halfW).toFixed(2), "· head h", +headH.toFixed(2), "· fov", state.camera.fov, "aspect", +(state.camera.aspect || 1).toFixed(2));
           try { window.dispatchEvent(new CustomEvent("hm:crew-face", { detail: { center: centre.toArray(), front: f.toArray(), dist, minDist: PHOTO_FOCUS_MIN_DIST } })); } catch (e) {}
         }
         // ready once settled — and, for up to PHOTO_FACE_WAIT_S more, once both faces are up (the smile)
