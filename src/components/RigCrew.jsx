@@ -184,7 +184,7 @@ const ACTS = {
   // Season-photo poses (Michelle's clips, 2026-09-29): held for the polaroid. Fallbacks keep
   // the shot working on a GLB without them (stale cache, older export).
   thumbsUp:    { clip: "crew_ThumbsUp",       dwell: [10, 14], look: true, fallback: "victory1" },
-  thumbsUp2:   { clip: "crew_ThumbsUp2",      dwell: [10, 14], look: true, fallback: "thumbsUp" },
+  thumbsUp2:   { clip: "crew_ThumbsUp2_Goblin", alt: ["crew_ThumbsUp2"], dwell: [10, 14], look: true, fallback: "thumbsUp" },   // her 2026-09-30 export names the track crew_ThumbsUp2_Goblin
   heartHands:  { clip: "crew_HeartHands",     dwell: [10, 14], look: true, fallback: "clap" },
 };
 // The season photo (docs/oil-game.md → SEASON POLAROID): the crew turn to the camera and hold a
@@ -197,7 +197,9 @@ const PHOTO_BLINK_S = 0.3;         // the crew are hidden this long while they c
 const PHOTO_CAM_TILT = -0.22;      // the framing direction's y: negative = the camera sits a little below the heads, looking up (Michelle, 2026-09-30: "lower the camera a bit")
 const PHOTO_EXPRESSION = ["OpenSmile", 0.9];   // the SitePal face's cue while the shutter is open (3D scenes only)
 const PHOTO_SETTLE_S = 1.8;        // camera flight + pose blend before the shutter
-const PHOTO_HOLD_S = 18;           // walk to the marks + pose; the page's safety shutter is 5 s after the crew are asked, so the mark walk should be short
+const PHOTO_FACE_WAIT_S = 3;       // after settling, wait up to this long more for the SitePal faces to fade in (the smile) before saying ready
+const PHOTO_HEAD_ABOVE = 0.45;     // where the heads sit in the square: this fraction of the way from the frame's centre to its top edge (0 = heads dead centre, which left the top half empty — Michelle, 2026-09-30)
+const PHOTO_HOLD_S = 18;           // the pose outlives the shutter; the page ends it 1.5 s after the capture (photoStop), and its safety shutter fires 9 s after the crew are asked
 
 // crew_valve turns the rig's handwheel with the hands: three pulls of 35°, clockwise as the worker
 // sees it (left hand rises), each a 0.8 s smoothstep. Windows are the clip's frame plan (frames
@@ -226,6 +228,8 @@ const MENU = {
   chat_b:           { acts: [["idle", 1]],                             look: "partner" },
   chat_c:           { acts: [["idle", 1]],                             look: "partner" },
   chat_d:           { acts: [["idle", 1]],                             look: "partner" },
+  photo_a:          { acts: [["idle", 1]],                             look: "camera" },   // the season-photo marks: only ever stood on in photo mode (enterMode cuts back to the pre-photo spot after), listed so menuAct never meets a spot without a menu
+  photo_b:          { acts: [["idle", 1]],                             look: "camera" },
 };
 // crew_neutralIdle (her 2026-09-11 clip): wherever a menu offers "idle" it now offers the square-
 // stance idle at the same weight — the Mixamo idles all shift their weight onto one leg.
@@ -671,9 +675,10 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     Object.entries(hats).forEach(([n, o]) => { o.visible = n === on; }); s.hat = on;
   };
   const startAct = (act, now, dwell) => {
-    while (ACTS[act] && !actionsRef.current[ACTS[act].clip] && ACTS[act].fallback) act = ACTS[act].fallback;   // stale GLB: never stand in the bind pose
+    const clipOf = (d) => (d && (actionsRef.current[d.clip] ? d.clip : (d.alt || []).find((c) => actionsRef.current[c]))) || null;   // the clip, or one of its alternate export names
+    while (ACTS[act] && !clipOf(ACTS[act]) && ACTS[act].fallback) act = ACTS[act].fallback;   // stale GLB: never stand in the bind pose
     const s = st.current; const def = ACTS[act] || ACTS.idle; s.turn = null;   // a new act cancels a step-turn in progress
-    s.act = act; s.phase = "act"; s.replayAt = 0; s.wheelBase = null; s.action = play(def.clip, { once: !!def.once, timeScale: def.reverse ? -1 : 1, fromEnd: !!def.reverse });
+    s.act = act; s.phase = "act"; s.replayAt = 0; s.wheelBase = null; s.action = play(clipOf(def) || def.clip, { once: !!def.once, timeScale: def.reverse ? -1 : 1, fromEnd: !!def.reverse });
     s.actEnds = def.once || def.forever ? Infinity : now + (dwell ?? rand(def.dwell[0], def.dwell[1]));
     showProps(act); showHat(!!def.offDuty);
   };
@@ -762,7 +767,11 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
   const enterMode = (mode, now) => {
     const s = st.current; const old = s.mode; s.mode = mode; s.yawAim = null;
     if (old === "brief") setBubble(null);
-    if (old === "photo" && s.blinkUntil) { s.blinkUntil = 0; if (groupRef.current) groupRef.current.visible = true; }
+    if (old === "photo" && s.photoReturn) {                                    // the photo is over: cut back to where the worker was (the marks have no chores; 2026-09-30 crash: menuAct on a mark)
+      const back = resolveStation(rigScene, s.photoReturn); s.spot = s.photoReturn; s.photoReturn = null;
+      s.pos.copy(back.pos); s.yaw = s.yawCur = back.yaw; s.phase = "act"; s.turn = null; s.topStay = 0;
+      s.blinkUntil = performance.now() / 1000 + PHOTO_BLINK_S; if (groupRef.current) groupRef.current.visible = false;
+    }
     if (old === "cower" && mode !== "cower") { startAct("uncower", now); return; }   // stand back up first
     if (s.act === "doze" && mode !== "cower") { wakeUp(now, mode); return; }         // caught napping: scramble, then do the thing
     if (mode === "cower") { startAct("cower", now); s.actEnds = Infinity; }
@@ -783,13 +792,13 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
         // shutter did not wait for. So: blink out, appear on the mark, blink in (PHOTO_BLINK_S);
         // the camera is flying round to the marks' front meanwhile, so it reads as a cut.
         const mark = resolveStation(rigScene, mySpot);
-        s.spot = mySpot; s.pos.copy(mark.pos); s.yaw = s.yawCur = mark.yaw; s.phase = "act"; s.topStay = 0; s.turn = null;
+        s.photoReturn = s.spot; s.spot = mySpot; s.pos.copy(mark.pos); s.yaw = s.yawCur = mark.yaw; s.phase = "act"; s.topStay = 0; s.turn = null;
         s.blinkUntil = performance.now() / 1000 + PHOTO_BLINK_S;
         if (groupRef.current) groupRef.current.visible = false;
       }
       const pose = crew.photo?.poses?.[role.briefs ? "operator" : "other"] || "thumbsUp";
       startAct(pose, now, 999); s.actEnds = Infinity; s.nextGesture = Infinity; setBubble(null);
-      console.info("[season-photo] crew:", role.id, "posing", pose, "→ clip", ACTS[s.act]?.clip, actionsRef.current[ACTS[s.act]?.clip] ? "(loaded)" : "(missing — fallback)");
+      console.info("[season-photo] crew:", role.id, "posing", pose, "→ clip", s.action?.getClip?.().name || ACTS[s.act]?.clip, s.act === pose ? "" : `(fallback for ${pose})`);
     }
     else if (mode === "brief") {                                            // greet (the opener is spoken with the wave), then each line brings its own gesture (modeTick)
       const b = crew.brief; startAct(b.rude ? "scold" : "wave", now); setBubble(b.opener || "Hey, boss."); b.i = 0; b.nextLineAt = now + BRIEF_GREET_S;   // a stranger gets a scolding, not a wave
@@ -869,7 +878,6 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     } else if (mode === "photo") {
       const c = state.camera.position; faceWorld(c.x, c.y, c.z);          // both turn to the camera
       const ph = crew.photo; if (!ph) return;
-      if (s.blinkUntil && performance.now() / 1000 >= s.blinkUntil) { s.blinkUntil = 0; if (groupRef.current) groupRef.current.visible = true; }
       // photo timestamps are wall-clock seconds (startPhoto runs outside the frame loop);
       // `now` here is this worker's own uptime, so compare against the wall clock (2026-09-30 fix:
       // the ready event never fired and the pose never ended).
@@ -895,6 +903,10 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
           ph.faced = true; ph.framedAt = wall;
           const heads = all.map((w) => w.head).filter(Boolean);
           const centre = heads.length ? heads.reduce((a, h) => a.add(h), new THREE.Vector3()).multiplyScalar(1 / heads.length) : s.head.clone();
+          // aim below the heads so the pair fill the square: the heads PHOTO_HEAD_ABOVE of the way
+          // up from the centre (the square crop is bounded by the canvas height → vertical fov)
+          const halfH = PHOTO_FOCUS_DIST * Math.tan(THREE.MathUtils.degToRad((state.camera.fov || 50) / 2));
+          centre.y -= PHOTO_HEAD_ABOVE * halfH;
           const stn = resolveStation(rigScene, "photo_a");
           const f = new THREE.Vector3(Math.cos(stn.yaw), 0, -Math.sin(stn.yaw));           // the mark's facing, rig-local…
           const parent = groupRef.current?.parent; if (parent) f.applyQuaternion(parent.getWorldQuaternion(_q)); f.y = 0;   // …in world
@@ -902,7 +914,12 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
           console.info("[season-photo] crew: on their marks · framing at", centre.toArray().map((v) => +v.toFixed(2)), "from the marks' front, dist", PHOTO_FOCUS_DIST);
           try { window.dispatchEvent(new CustomEvent("hm:crew-face", { detail: { center: centre.toArray(), front: f.toArray(), dist: PHOTO_FOCUS_DIST, minDist: PHOTO_FOCUS_MIN_DIST } })); } catch (e) {}
         }
-        if (!ph.announced && ph.faced && wall >= ph.framedAt + PHOTO_SETTLE_S) { ph.announced = true; console.info("[season-photo] crew: ready"); try { window.dispatchEvent(new CustomEvent("hm:crew-photo-ready", { detail: { poses: ph.poses } })); } catch (e) {} }
+        // ready once settled — and, for up to PHOTO_FACE_WAIT_S more, once both faces are up (the smile)
+        const facesUp = all.every((w) => (w.projFade || 0) >= 0.9);
+        if (!ph.announced && ph.faced && wall >= ph.framedAt + PHOTO_SETTLE_S && (facesUp || wall >= ph.framedAt + PHOTO_SETTLE_S + PHOTO_FACE_WAIT_S)) {
+          ph.announced = true; console.info("[season-photo] crew: ready · faces up:", facesUp, "· smile cued:", ph.smiled, "· fades", all.map((w) => +(w.projFade || 0).toFixed(2)));
+          try { window.dispatchEvent(new CustomEvent("hm:crew-photo-ready", { detail: { poses: ph.poses, facesUp } })); } catch (e) {}
+        }
       }
     } else if (mode === "brief") {
       const c = state.camera.position; faceWorld(c.x, c.y, c.z);          // turn to the player
@@ -966,8 +983,13 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
       if (s.trace.length > 40) s.trace.shift();
     }
     mixer.update(dt);
-    if (!g.visible && s.act) g.visible = true;                   // first posed frame: only now let the worker be seen
+    if (s.blinkUntil && performance.now() / 1000 >= s.blinkUntil) { s.blinkUntil = 0; g.visible = true; }   // a photo cut's blink is over (wall clock)
+    if (!g.visible && s.act && !s.blinkUntil) g.visible = true;   // first posed frame: only now let the worker be seen (not mid-blink — this line used to undo the blink on the very next frame)
     if (headBone) headBone.getWorldPosition(s.head);
+    // The season photo interrupts a scripted move: a worker up the ladder, or half way across the
+    // deck, cuts to its mark now instead of after the climb (2026-09-30: the shutter did not wait
+    // for the climb — mode changes are otherwise only taken up between moves).
+    if (crew.photo && s.mode !== "photo" && s.phase !== "act" && wantMode(now) === "photo") { s.turn = null; startAct("idle", now, 0); }
     if (s.act === "valve" && s.action) {                       // the handwheel turns with the hands; same node + axis as the click-to-spin
       if (s.wheelBase == null) {                                 // cleared by startAct: each valve act carries on from where the wheel is
         s.wheel = rigScene.getObjectByName("Wheel") || null;     // looked up per act — the rig scene can be re-cloned under us
