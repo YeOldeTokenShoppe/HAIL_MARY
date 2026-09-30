@@ -4955,7 +4955,7 @@ export default function OilPage() {
   // and when the crew says ready, fire the polaroid with the season's one line
   // and the referral link (PolaroidSnapshot does the frame, the caption, the
   // share). No crew within 6 s → the shutter fires on the field as it is.
-  const seasonPhotoRef = useRef({ timer: null, onReady: null });
+  const seasonPhotoRef = useRef({ timer: null, onReady: null, safety: null });
   const seasonPhotoLabel = useCallback(() => {
     const plot = userDrill?.col != null ? `plot (${userDrill.col + 1}, ${userDrill.row + 1})` : "the field";
     if (reckoning && gameEnded) {
@@ -4967,31 +4967,58 @@ export default function OilPage() {
     return `Season one · ${plot} · ${banked} BTR banked`;
   }, [userDrill?.col, userDrill?.row, userDrill?.totalCollected, reckoning, gameEnded]);
   const takeSeasonPhoto = useCallback(() => {
-    if (typeof window === "undefined" || userDrill?.col == null) return;
+    const log = (...a) => console.info("[season-photo]", ...a);
+    if (typeof window === "undefined") return;
+    if (userDrill?.col == null) { log("no rig on this account — nothing to photograph"); return; }
     const d = seasonPhotoRef.current;
     if (d.timer) { clearInterval(d.timer); d.timer = null; }
+    if (d.safety) { clearTimeout(d.safety); d.safety = null; }
     if (d.onReady) { window.removeEventListener("hm:crew-photo-ready", d.onReady); d.onReady = null; }
     const label = seasonPhotoLabel();
-    const shutter = () => {
+    let fired = false;
+    const shutter = (why) => {
+      if (fired) return; fired = true;
+      if (d.safety) { clearTimeout(d.safety); d.safety = null; }
+      if (d.onReady) { window.removeEventListener("hm:crew-photo-ready", d.onReady); d.onReady = null; }
+      log("shutter:", why, "·", label);
       captureMetaRef.current = null;
       setCaptureMeta({ label });
       setBoothPhoto(null);
-      setSnapshotTrigger(true);
+      // a fresh edge for PolaroidSnapshot's trigger effect, even if a previous
+      // capture left it true
+      setSnapshotTrigger(false);
+      setTimeout(() => setSnapshotTrigger(true), 30);
     };
+    log("start · plot", `(${userDrill.col + 1}, ${userDrill.row + 1})`, "· selecting the rig so the crew mount");
     setIntroComplete(true);
     setSelectedX(userDrill.col); setSliceY(userDrill.row); setDrillDepth(0);
     let tries = 0;
     d.timer = setInterval(() => {
       const hook = window.__hmCrew;
-      if (hook?.photo && hook.workers?.operator) {
+      const ready = !!(hook?.photo && hook.workers?.operator);
+      if (ready) {
         clearInterval(d.timer); d.timer = null;
-        d.onReady = () => { window.removeEventListener("hm:crew-photo-ready", d.onReady); d.onReady = null; shutter(); };
+        d.onReady = () => shutter("crew ready");
         window.addEventListener("hm:crew-photo-ready", d.onReady);
-        hook.photo({ variant: (userDrill.col + userDrill.row) % 3 });
-      } else if (++tries > 24) { clearInterval(d.timer); d.timer = null; shutter(); }
+        const poses = hook.photo({ variant: (userDrill.col + userDrill.row) % 3 });
+        log("crew posing:", poses, "· waiting for hm:crew-photo-ready");
+        // the crew never said ready (no head bone yet, an old GLB…) → shoot anyway
+        d.safety = setTimeout(() => shutter("safety — the crew never signalled ready"), 5000);
+      } else if (++tries > 24) {
+        clearInterval(d.timer); d.timer = null;
+        log("no crew after 6 s (hook:", !!hook, "photo:", !!hook?.photo, "workers:", Object.keys(hook?.workers || {}), ") → shooting the field as it is");
+        shutter("no crew");
+      } else if (tries === 1 || tries % 8 === 0) {
+        log("waiting for the crew… hook:", !!hook, "photo:", !!hook?.photo, "workers:", Object.keys(hook?.workers || {}));
+      }
     }, 250);
   }, [userDrill?.col, userDrill?.row, seasonPhotoLabel]);
-  useEffect(() => () => { const d = seasonPhotoRef.current; if (d.timer) clearInterval(d.timer); if (d.onReady) window.removeEventListener("hm:crew-photo-ready", d.onReady); }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.__hmSeasonPhoto = takeSeasonPhoto;   // dev: run it from the console
+    return () => { if (window.__hmSeasonPhoto === takeSeasonPhoto) delete window.__hmSeasonPhoto; };
+  }, [takeSeasonPhoto]);
+  useEffect(() => () => { const d = seasonPhotoRef.current; if (d.timer) clearInterval(d.timer); if (d.safety) clearTimeout(d.safety); if (d.onReady) window.removeEventListener("hm:crew-photo-ready", d.onReady); }, []);
 
 
   // WHILE YOU WERE AWAY under v2: the recap drops the tank/BANK block and

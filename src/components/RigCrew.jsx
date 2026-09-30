@@ -467,6 +467,7 @@ function CrewInner({ sighting, forceScene, rigScene, scale, plotKey, plotId, env
     const nowS = performance.now() / 1000;
     crew.brief = null; deactivateVendorSitePal();
     crew.photo = { poses: { operator: pair[0], other: pair[1] }, startedAt: nowS, readyAt: nowS + PHOTO_SETTLE_S, until: nowS + (Number(o.hold) || PHOTO_HOLD_S), faced: false, announced: false };
+    console.info("[season-photo] crew: photo mode set for", Object.keys(crew.workers), "poses", crew.photo.poses);
     return crew.photo.poses;
   }, [crew]);
   const stopPhoto = useCallback(() => { crew.photo = null; }, [crew]);
@@ -758,6 +759,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     else if (mode === "photo") {                                            // the season photo: hold the pose for the camera
       const pose = crew.photo?.poses?.[role.briefs ? "operator" : "other"] || "thumbsUp";
       startAct(pose, now, 999); s.actEnds = Infinity; s.nextGesture = Infinity; setBubble(null);
+      console.info("[season-photo] crew:", role.id, "posing", pose, "→ clip", ACTS[s.act]?.clip, actionsRef.current[ACTS[s.act]?.clip] ? "(loaded)" : "(missing — fallback)");
     }
     else if (mode === "brief") {                                            // greet (the opener is spoken with the wave), then each line brings its own gesture (modeTick)
       const b = crew.brief; startAct(b.rude ? "scold" : "wave", now); setBubble(b.opener || "Hey, boss."); b.i = 0; b.nextLineAt = now + BRIEF_GREET_S;   // a stranger gets a scolding, not a wave
@@ -849,9 +851,10 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
           const heads = Object.values(crew.workers).map((w) => w.head).filter(Boolean);
           const centre = heads.length ? heads.reduce((a, h) => a.add(h), new THREE.Vector3()).multiplyScalar(1 / heads.length) : s.head.clone();
           const f = _tmp.copy(state.camera.position).sub(centre); f.y = 0; if (f.lengthSq() < 1e-6) f.set(1, 0, 0); f.normalize();
+          console.info("[season-photo] crew: framing the pair at", centre.toArray().map((v) => +v.toFixed(2)), "dist", PHOTO_FOCUS_DIST);
           try { window.dispatchEvent(new CustomEvent("hm:crew-face", { detail: { center: centre.toArray(), front: f.toArray(), dist: PHOTO_FOCUS_DIST, minDist: PHOTO_FOCUS_MIN_DIST } })); } catch (e) {}
         }
-        if (!ph.announced && wall >= ph.readyAt) { ph.announced = true; try { window.dispatchEvent(new CustomEvent("hm:crew-photo-ready", { detail: { poses: ph.poses } })); } catch (e) {} }
+        if (!ph.announced && wall >= ph.readyAt) { ph.announced = true; console.info("[season-photo] crew: ready"); try { window.dispatchEvent(new CustomEvent("hm:crew-photo-ready", { detail: { poses: ph.poses } })); } catch (e) {} }
       }
     } else if (mode === "brief") {
       const c = state.camera.position; faceWorld(c.x, c.y, c.z);          // turn to the player
