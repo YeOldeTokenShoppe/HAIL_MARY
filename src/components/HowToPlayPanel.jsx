@@ -22,6 +22,7 @@ export const HOW_TO_PLAY_STEPS = [
 const V2_OVERRIDES = {
   "3": { title: "YOUR RIG DRILLS 24/7", desc: "No clicking required. Once the season is live, your bore reveals your column one layer at a time, at moments you can't predict — roughly evenly over the season. Every reveal is a core sample with an exact assay in BTR. Check back to decide what to do with it." },
   "4": { title: "EXTRACT OR PASS", desc: "Every revealed layer is a decision. EXTRACT banks the full amount for 1 charge — safe and final. PASS is free but final: the layer opens to your neighbours' lateral drills. You start with a season budget of charges; referrals and daily-ticket prizes add more. If you're away, your crew follows your standing order (\"extract anything ≥ 800 BTR\")." },
+  "8": { title: "CLAIM JUMP", desc: "Move to a different open plot anytime. Your first 2 jumps are free — each jump after costs 1 bonus charge." },
   "5": { title: "SALVAGE AND THE FRONTIER", desc: "Charges also work beyond your fence: take a layer a neighbour passed (first lateral wins), or wildcat an unclaimed column beside you — blind, at a depth your own bore has reached. Your payout is your banked Betroleum × a fixed rate: it depends only on your own haul, never on how many others play." },
 };
 export const HOW_TO_PLAY_STEPS_V2 = HOW_TO_PLAY_STEPS.map((s) => (V2_OVERRIDES[s.num] ? { ...s, ...V2_OVERRIDES[s.num] } : s));

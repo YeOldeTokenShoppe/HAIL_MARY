@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useEvmAccounts } from '@coinbase/cdp-hooks';
 import { useWalletAuth } from './WalletAuthProvider';
-import { db, doc, onSnapshot } from '@/lib/firebaseClient';
+import { db, doc, onSnapshot, getDoc } from '@/lib/firebaseClient';
 
 // Client-only — @coinbase/cdp-react reads localStorage at module init,
 // which throws during SSR. Mirrors the pattern in BuyModal/Providers.
@@ -267,6 +267,13 @@ function ReferralsTabContent({ ind, userId }) {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
+  // v2 EXTRACT-OR-PASS season (oilGame/settings.loopV2): a referral's bonus is
+  // charges, not depth. Copy only — this modal opens from every page, so it
+  // reads the flag itself rather than being told.
+  const [loopV2, setLoopV2] = useState(false);
+  useEffect(() => {
+    getDoc(doc(db, "oilGame", "settings")).then((s) => { if (s.exists() && typeof s.data().loopV2 === "boolean") setLoopV2(s.data().loopV2); }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!userId) { setLoading(false); return; }
@@ -374,7 +381,7 @@ function ReferralsTabContent({ ind, userId }) {
           margin: "8px auto 0", maxWidth: 280, color: muted, fontFamily: font,
           fontSize: ind ? 11 : 12, lineHeight: 1.6, letterSpacing: ind ? "0.06em" : "normal",
         }}>
-          Invite friends to stake a claim. When they join and qualify, you earn bonus drills.
+          Invite friends to stake a claim. When they join and qualify, you earn bonus {loopV2 ? "charges" : "drills"}.
         </p>
       </div>
 
@@ -453,7 +460,7 @@ function ReferralsTabContent({ ind, userId }) {
           <div style={{ display: "flex", gap: 8 }}>
             {[
               { value: confirmed, label: "Confirmed" },
-              { value: `+${bonus}`, label: "Bonus Drills" },
+              { value: `+${bonus}`, label: loopV2 ? "Bonus Charges" : "Bonus Drills" },
             ].map((s) => (
               <div key={s.label} style={{
                 flex: 1, textAlign: "center", padding: "12px 8px",

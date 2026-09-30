@@ -7137,6 +7137,7 @@ export default function OilPage() {
           seedCommitment={seedCommitment}
           anchorBlock={anchorBlock}
           anchorBlockHash={anchorBlockHash}
+          loopV2={loopV2}
         />
       </div>
     );
