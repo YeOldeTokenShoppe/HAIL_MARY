@@ -193,7 +193,7 @@ const ACTS = {
 const PHOTO_POSES = [["thumbsUp", "heartHands"], ["heartHands", "thumbsUp2"], ["thumbsUp2", "thumbsUp"]];   // [operator, the other]
 const PHOTO_FOCUS_DIST = 0.6;      // camera distance from the point between the two heads (tune; 1.0 was a wide rig shot — Michelle, 2026-09-30)
 const PHOTO_FOCUS_MIN_DIST = 0.3;
-const PHOTO_LEVEL_SPLIT = 1.0;     // rig-frame height that separates the walkway (≈0.24) from the service platform (≈1.73)
+const PHOTO_BLINK_S = 0.3;         // the crew are hidden this long while they cut to their marks
 const PHOTO_SETTLE_S = 1.8;        // camera flight + pose blend before the shutter
 const PHOTO_HOLD_S = 18;           // walk to the marks + pose; the page's safety shutter is 5 s after the crew are asked, so the mark walk should be short
 
@@ -750,6 +750,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
   const enterMode = (mode, now) => {
     const s = st.current; const old = s.mode; s.mode = mode; s.yawAim = null;
     if (old === "brief") setBubble(null);
+    if (old === "photo" && s.blinkUntil) { s.blinkUntil = 0; if (groupRef.current) groupRef.current.visible = true; }
     if (old === "cower" && mode !== "cower") { startAct("uncower", now); return; }   // stand back up first
     if (s.act === "doze" && mode !== "cower") { wakeUp(now, mode); return; }         // caught napping: scramble, then do the thing
     if (mode === "cower") { startAct("cower", now); s.actEnds = Infinity; }
@@ -762,21 +763,17 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
       if (s.celebrateTier === "strike" || s.act === "getUp" || s.act === "uncower") celebrateNext(now);   // a seep, or a worker who already scrambled up: no flinch
       else startAct("nervous", now, rand(0.6, 1.1));
     }
-    else if (mode === "photo") {                                            // the season photo: get to the mark, then hold the pose for the camera
+    else if (mode === "photo") {                                            // the season photo: cut to the mark, then hold the pose for the camera
       const mySpot = role.briefs ? "photo_a" : "photo_b";
       if (s.spot !== mySpot) {
-        // Not on the mark yet. Same level → walk straight there. Different level → the ladder is
-        // the only way between the walkway and the platform (2026-09-30: a worker walked through
-        // the air to a mark on the platform): walk to the ladder, climb or descend, and the mode
-        // re-enters at the top/bottom (wantMode still says photo) to finish the walk.
+        // A CUT, not a walk (Michelle, 2026-09-30): the crew have no pathing — a walk to the mark
+        // went through the rig mesh, and a mark on the other level meant the ladder, which the
+        // shutter did not wait for. So: blink out, appear on the mark, blink in (PHOTO_BLINK_S);
+        // the camera is flying round to the marks' front meanwhile, so it reads as a cut.
         const mark = resolveStation(rigScene, mySpot);
-        const levelOf = (y) => (y > PHOTO_LEVEL_SPLIT ? "platform" : "walkway");
-        const myLevel = levelOf(s.pos.y), markLevel = levelOf(mark.pos.y);
-        s.mode = null; s.photoMoving = true; setBubble(null);
-        if (myLevel === markLevel) slideTo(mySpot, SLIDE_S, "idle");
-        else if (markLevel === "platform") { if (s.spot === "ladder_base") beginClimb(now); else slideTo("ladder_base", SLIDE_S, "idle"); }
-        else { if (s.spot === "ladder_top") beginDescend(now); else slideTo("ladder_top", SLIDE_S, "idle"); }
-        return;
+        s.spot = mySpot; s.pos.copy(mark.pos); s.yaw = s.yawCur = mark.yaw; s.phase = "act"; s.topStay = 0; s.turn = null;
+        s.blinkUntil = performance.now() / 1000 + PHOTO_BLINK_S;
+        if (groupRef.current) groupRef.current.visible = false;
       }
       s.photoMoving = false;
       const pose = crew.photo?.poses?.[role.briefs ? "operator" : "other"] || "thumbsUp";
@@ -861,6 +858,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     } else if (mode === "photo") {
       const c = state.camera.position; faceWorld(c.x, c.y, c.z);          // both turn to the camera
       const ph = crew.photo; if (!ph) return;
+      if (s.blinkUntil && performance.now() / 1000 >= s.blinkUntil) { s.blinkUntil = 0; if (groupRef.current) groupRef.current.visible = true; }
       // photo timestamps are wall-clock seconds (startPhoto runs outside the frame loop);
       // `now` here is this worker's own uptime, so compare against the wall clock (2026-09-30 fix:
       // the ready event never fired and the pose never ended).
