@@ -217,7 +217,7 @@ Michelle saves the rig blend). Same frame convention; extras `hm_station`, `hm_c
 | `Crew_Rail_Doze3` | -0.131, -0.122, 0.236 | -90° | Bottom_Box | dozing (seat marker under the walking beam; 2026-09-11) |
 | `Crew_Chat_C` | -0.751, 1.799, 0.236 | -90° | Bottom_Box | second chat pair on the west walkway, facing each other (2026-09-11) |
 | `Crew_Photo_A` | (to author) | the way they face | — | **season-photo mark** for the operator (2026-09-30): the two stand side by side here for the polaroid; the camera flies round to the marks' FRONT (local +X), so pick a spot where nothing on the rig can stand between them and that side — the front walkway, or the platform rail. Until authored the page uses the PASS station. |
-| `Crew_Photo_B` | (to author) | same | — | the other worker's mark, a shoulder apart from A, same facing. Until authored: the EXTRACT station. |
+| `Crew_Photo_B` | (to author) | same | — | the other worker's mark, a shoulder apart from A, same facing. Until authored: the EXTRACT station. **Put both marks on the same level** (both on the walkway, or both on the platform): a worker on the other level takes the ladder to get there, which is slow and puts one of them on the rungs when the shutter would rather fire; a split pair also frames badly. |
 | `Crew_Chat_D` | -0.754, 1.299, 0.236 | 90° | Bottom_Box | " |
 | `Crew_Wellhead` | 0.556, -2.092, 0 | 180° | Bottom_Box | idle, tablet (east of the curb, on the ground) |
 | `Crew_Panel_Aside` | 0.655, -0.38, 0.245 | 174° | MachinePanel_Body | where the operator steps while the panel view is open |
