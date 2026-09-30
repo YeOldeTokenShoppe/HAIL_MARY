@@ -198,7 +198,11 @@ const PHOTO_CAM_TILT = -0.22;      // the framing direction's y: negative = the 
 const PHOTO_EXPRESSION = ["OpenSmile", 0.9];   // the SitePal face's cue while the shutter is open (3D scenes only)
 const PHOTO_SETTLE_S = 1.8;        // camera flight + pose blend before the shutter
 const PHOTO_FACE_WAIT_S = 3;       // after settling, wait up to this long more for the SitePal faces to fade in (the smile) before saying ready
-const PHOTO_HEAD_ABOVE = 0.45;     // where the heads sit in the square: this fraction of the way from the frame's centre to its top edge (0 = heads dead centre, which left the top half empty — Michelle, 2026-09-30)
+const PHOTO_HEADROOM = 0.35;       // air above the highest head, as a fraction of a worker's head height (the helmet + a little sky)
+const PHOTO_FIT_PAD = 1.15;        // the square is this much bigger than the crew's box (top head → lowest feet, and their sideways spread)
+// The camera fits the pair: with one mark on the platform and one on the deck the two span far
+// more height than a fixed close distance holds (2026-09-30: the top worker was cut off), so the
+// aim point is the middle of the crew's box and the distance is whatever fits it, PHOTO_FOCUS_DIST at least.
 const PHOTO_HOLD_S = 18;           // the pose outlives the shutter; the page ends it 1.5 s after the capture (photoStop), and its safety shutter fires 9 s after the crew are asked
 
 // crew_valve turns the rig's handwheel with the hands: three pulls of 35°, clockwise as the worker
@@ -902,17 +906,23 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
         if (!ph.faced && onMarks && wall >= ph.startedAt + PHOTO_BLINK_S + 0.1 && s.frames > 2 && headBone) {
           ph.faced = true; ph.framedAt = wall;
           const heads = all.map((w) => w.head).filter(Boolean);
-          const centre = heads.length ? heads.reduce((a, h) => a.add(h), new THREE.Vector3()).multiplyScalar(1 / heads.length) : s.head.clone();
-          // aim below the heads so the pair fill the square: the heads PHOTO_HEAD_ABOVE of the way
-          // up from the centre (the square crop is bounded by the canvas height → vertical fov)
-          const halfH = PHOTO_FOCUS_DIST * Math.tan(THREE.MathUtils.degToRad((state.camera.fov || 50) / 2));
-          centre.y -= PHOTO_HEAD_ABOVE * halfH;
+          const headH = Math.max(0.05, ...all.map((w) => w.head.y - (w.feetY ?? w.head.y)));     // a worker's head height (world)
+          const top = Math.max(...heads.map((h) => h.y)) + PHOTO_HEADROOM * headH;
+          const bottom = Math.min(...all.map((w) => w.feetY ?? w.head.y - headH));
+          const centre = heads.reduce((a, h) => a.add(h), new THREE.Vector3()).multiplyScalar(1 / heads.length);
+          centre.y = (top + bottom) / 2;                                                      // the middle of the crew's box, not of the heads
           const stn = resolveStation(rigScene, "photo_a");
           const f = new THREE.Vector3(Math.cos(stn.yaw), 0, -Math.sin(stn.yaw));           // the mark's facing, rig-local…
           const parent = groupRef.current?.parent; if (parent) f.applyQuaternion(parent.getWorldQuaternion(_q)); f.y = 0;   // …in world
-          if (f.lengthSq() < 1e-6) f.set(1, 0, 0); f.normalize(); f.y = PHOTO_CAM_TILT; f.normalize();   // a touch below the heads, looking up
-          console.info("[season-photo] crew: on their marks · framing at", centre.toArray().map((v) => +v.toFixed(2)), "from the marks' front, dist", PHOTO_FOCUS_DIST);
-          try { window.dispatchEvent(new CustomEvent("hm:crew-face", { detail: { center: centre.toArray(), front: f.toArray(), dist: PHOTO_FOCUS_DIST, minDist: PHOTO_FOCUS_MIN_DIST } })); } catch (e) {}
+          if (f.lengthSq() < 1e-6) f.set(1, 0, 0); f.normalize();
+          const right = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0)).normalize();
+          const halfW = Math.max(...heads.map((h) => Math.abs(_tmp.copy(h).sub(centre).dot(right)))) + 0.6 * headH;   // shoulders + a hand out
+          const halfH = (top - bottom) / 2;
+          const tanHalf = Math.tan(THREE.MathUtils.degToRad((state.camera.fov || 50) / 2));  // the square crop is bounded by the canvas height → vertical fov
+          const dist = Math.max(PHOTO_FOCUS_DIST, (Math.max(halfH, halfW) * PHOTO_FIT_PAD) / tanHalf);
+          f.y = PHOTO_CAM_TILT; f.normalize();                                                // a touch below the middle, looking up
+          console.info("[season-photo] crew: on their marks · framing at", centre.toArray().map((v) => +v.toFixed(2)), "from the marks' front, dist", +dist.toFixed(2), "· box h", +(top - bottom).toFixed(2), "w", +(2 * halfW).toFixed(2), "· head h", +headH.toFixed(2));
+          try { window.dispatchEvent(new CustomEvent("hm:crew-face", { detail: { center: centre.toArray(), front: f.toArray(), dist, minDist: PHOTO_FOCUS_MIN_DIST } })); } catch (e) {}
         }
         // ready once settled — and, for up to PHOTO_FACE_WAIT_S more, once both faces are up (the smile)
         const facesUp = all.every((w) => (w.projFade || 0) >= 0.9);
@@ -986,6 +996,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     if (s.blinkUntil && performance.now() / 1000 >= s.blinkUntil) { s.blinkUntil = 0; g.visible = true; }   // a photo cut's blink is over (wall clock)
     if (!g.visible && s.act && !s.blinkUntil) g.visible = true;   // first posed frame: only now let the worker be seen (not mid-blink — this line used to undo the blink on the very next frame)
     if (headBone) headBone.getWorldPosition(s.head);
+    s.feetY = g.getWorldPosition(_tmp).y;                        // the group stands at the feet (photo framing)
     // The season photo interrupts a scripted move: a worker up the ladder, or half way across the
     // deck, cuts to its mark now instead of after the climb (2026-09-30: the shutter did not wait
     // for the climb — mode changes are otherwise only taken up between moves).
