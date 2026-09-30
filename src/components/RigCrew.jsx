@@ -881,7 +881,10 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
         const onMarks = all.length > 0 && all.every((w) => (w.spot === "photo_a" || w.spot === "photo_b") && w.mode === "photo");
         // frame the pair once they stand together: the point between the two heads, seen from the
         // marks' FRONT (the way the photo stations face), so the rig never hides one of them
-        if (!ph.faced && onMarks && s.frames > 2 && headBone) {
+        // …but only after the blink: right after the cut a worker's `head` still holds last
+        // frame's (pre-cut) position, which pulled the centre toward the old spot and left the
+        // pair off-centre in the polaroid (Michelle, 2026-09-30)
+        if (!ph.faced && onMarks && wall >= ph.startedAt + PHOTO_BLINK_S + 0.1 && s.frames > 2 && headBone) {
           ph.faced = true; ph.framedAt = wall;
           const heads = all.map((w) => w.head).filter(Boolean);
           const centre = heads.length ? heads.reduce((a, h) => a.add(h), new THREE.Vector3()).multiplyScalar(1 / heads.length) : s.head.clone();
