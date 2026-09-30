@@ -4957,16 +4957,27 @@ export default function OilPage() {
   // share). No crew within 6 s → the shutter fires on the field as it is.
   const seasonPhotoRef = useRef({ timer: null, onReady: null, safety: null });
   const PHOTO_RELEASE_MS = 1500;   // after the shutter: the capture (html2canvas) needs the pose held a moment longer
+  // The polaroid's one line, in the crew's voice (Michelle, 2026-09-30: the data line read
+  // like a ledger; "people want a picture and a tagline"). One short sentence + the plot as
+  // the signature, so it fits the handwritten caption row (~40 characters).
   const seasonPhotoLabel = useCallback(() => {
-    const plot = userDrill?.col != null ? `plot (${userDrill.col + 1}, ${userDrill.row + 1})` : "the field";
+    const plot = userDrill?.col != null ? `Plot (${userDrill.col + 1}, ${userDrill.row + 1})` : "The field";
     if (reckoning && gameEnded) {
-      return reckoning.banked > 0
-        ? `Paid $${(reckoning.payoutUsd || 0).toFixed(2)} by a pumpjack.`
-        : `The crew of ${plot} wishes you were here.`;
+      const h = ownPlotV2?.hellLayers; const hellCount = !h ? 0 : Array.isArray(h) ? h.length : Object.keys(h).length;
+      const wentToHell = hellCount - (reckoning.casedHell || 0) > 0;
+      if (reckoning.banked > 0) {
+        return (reckoning.payoutUsd || 0) >= 0.01
+          ? `Paid $${reckoning.payoutUsd.toFixed(2)} by a pumpjack. ${plot}.`
+          : `That's a wrap on season one. ${plot}.`;
+      }
+      return wentToHell ? `Went to hell and back. ${plot}.` : `Struck out. Still smiling. ${plot}.`;
     }
-    const banked = Math.round(userDrill?.totalCollected || 0).toLocaleString();
-    return `Season one · ${plot} · ${banked} BTR banked`;
-  }, [userDrill?.col, userDrill?.row, userDrill?.totalCollected, reckoning, gameEnded]);
+    const layers = Number(userDrill?.drillDay) || 0;
+    const banked = Math.round(userDrill?.totalCollected || 0);
+    if (layers <= 0) return `Fresh rig, wish us luck. ${plot}.`;
+    if (banked > 0) return `${layers} layers down, ${banked.toLocaleString()} BTR up. ${plot}.`;
+    return `${layers} layers down. Still drilling. ${plot}.`;
+  }, [userDrill?.col, userDrill?.row, userDrill?.totalCollected, userDrill?.drillDay, ownPlotV2?.hellLayers, reckoning, gameEnded]);
   const takeSeasonPhoto = useCallback(() => {
     const log = (...a) => console.info("[season-photo]", ...a);
     log("takeSeasonPhoto called");
