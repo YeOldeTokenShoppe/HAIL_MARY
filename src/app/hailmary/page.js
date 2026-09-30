@@ -5497,8 +5497,8 @@ export default function OilPage() {
       <div style={styles.paramRow}>
         <span style={styles.paramLabel}>HELL POCKETS</span>
         <div style={styles.paramButtons}>
-          {/* AUTO = derive ~3% of grid (just 1 on a 6×6); pick a number to override. */}
-          {[{ label: "AUTO", val: null }, { label: "1", val: 1 }, { label: "2", val: 2 }, { label: "3", val: 3 }, { label: "4", val: 4 }, { label: "5", val: 5 }, { label: "8", val: 8 }].map(({ label, val }) => (
+          {/* AUTO = derive ~3% of grid (just 1 on a 6×6); pick a number to override. Season one: 6 (heat tuning, 2026-09-30). */}
+          {[{ label: "AUTO", val: null }, { label: "1", val: 1 }, { label: "2", val: 2 }, { label: "3", val: 3 }, { label: "4", val: 4 }, { label: "5", val: 5 }, { label: "6", val: 6 }, { label: "8", val: 8 }].map(({ label, val }) => (
             <button
               key={label}
               onClick={() => { setNumberOfHellPockets(val); handleReset(); saveGameSettings({ numberOfHellPockets: val }); }}

@@ -87,7 +87,7 @@ function CoreCylinder({ rack, pending, hud, width = 104, height = 236 }) {
       </g>
       {/* heat: the ground under the bore head glows — two bands for "elevated"
           (hot within reach, under you or next door), one hot band for "high" (the
-          next layer itself: hell or the motherlode) */}
+          next layer itself: hell or a gusher) */}
       {heat && reached > 0 && reached < n && (
         <g clipPath="url(#v3-clip)">
           <rect x={tubeX} y={headY} width={tubeW} height={bandH * (heat === "high" ? 1 : 2)} fill="url(#v3-heat)" opacity={heat === "high" ? 0.95 : 0.7}>
@@ -231,8 +231,8 @@ export default function OilCoreSampleV3({
     <div style={{ marginTop: "0.6rem", padding: "0.5rem 0.6rem", border: `1px solid ${casingArmed ? hud.warn : hud.goldFaint}`, background: casingArmed ? "rgba(232,122,43,0.08)" : "transparent" }}>
       <HudLine type="label" pad={PAD} label="CASING" text={casingArmed ? "ARMED — the next layer is drilled behind steel" : "the rig can seal the next layer"} />
       <HudLine type="note" text={casingArmed
-        ? "Whatever the next layer holds is sealed off: hell never breaches, a motherlode is never produced. No charge, no core on the table."
-        : heat === "high" ? "Case the next layer and lose whatever it is. Or ride it: the motherlode, or a breach."
+        ? "Whatever the next layer holds is sealed off: hell never breaches, a gusher is never produced. No charge, no core on the table."
+        : heat === "high" ? "Case the next layer and lose whatever it is. Or ride it: a gusher, or a breach."
         : "Casing seals the NEXT layer only. Arm it when the reading is HIGH — the hot cell is directly below then."} />
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: "0.35rem" }}>
         <button style={hudSmallBtn(casingArmed ? hud.red : hud.warn, busy, hud)} disabled={busy}
@@ -263,7 +263,7 @@ export default function OilCoreSampleV3({
       <HudLine type="warn" text={heatCopy.warn || (pending.hasInclusion ? "!! ANOMALOUS INCLUSION !!" : dry ? "!! DRY — NOTHING TO KEEP !!" : crewWould === "EXTRACT" ? "!! ABOVE YOUR LINE — CREW WOULD KEEP IT !!" : "!! BELOW YOUR LINE — CREW WOULD PASS !!")} />
       {heatCopy.warn && pending.hasInclusion && <HudLine type="warn" text="!! ANOMALOUS INCLUSION !!" />}
       <HudLine type="blank" />
-      {heat && <HudLine type="note" text={heat === "high" ? "The next layer is hot: a hell pocket or the motherlode." : "Something hot within two cells — under you or next door. Hell, or the big one."} />}
+      {heat && <HudLine type="note" text={heat === "high" ? "The next layer is hot: a hell pocket or a gusher." : "Something hot within two cells — under you or next door. Hell, or the big one."} />}
       {casingBlock}
       {(dry
         ? ["Passing is free. Extracting nothing wastes a charge.", "Do nothing: the crew passes."]
@@ -301,7 +301,7 @@ export default function OilCoreSampleV3({
       </div>
       <HudLine type="blank" />
       {(seasonOver ? ["!! SEASON CLOSED !!"] : clockOut ? ["!! SEASON CLOCK RUN OUT !!"] : columnDone ? ["!! COLUMN FULLY REVEALED !!"] : heatCopy.warn && !seasonOver ? [heatCopy.warn] : []).map((t) => <HudLine key={t} type="warn" text={t} />)}
-      {heat && !seasonOver && !clockOut && !columnDone && <HudLine type="note" text={heat === "high" ? "The next layer is hot: a hell pocket or the motherlode." : "Something hot within two cells — under you or next door. Hell, or the big one."} />}
+      {heat && !seasonOver && !clockOut && !columnDone && <HudLine type="note" text={heat === "high" ? "The next layer is hot: a hell pocket or a gusher." : "Something hot within two cells — under you or next door. Hell, or the big one."} />}
       {!clockOut && !columnDone && casingBlock}
       {(seasonOver ? ["The reckoning is below."]
         : clockOut ? ["The buzzer settles anything on the table."]
@@ -478,7 +478,7 @@ export default function OilCoreSampleV3({
             {onSetOrders && [
               ["salvage", "LATERAL EXTRACT", "take a neighbour's passed layer at or above your line, for 1 charge. Neighbours with the order take turns — longest wait goes first."],
               ["autopilot", "AUTO-PILOT", "once you can afford every layer left in your column, the crew keeps each wet one as it comes up, above your line or not. Dry layers still pass free. Off = ORDERS: the crew follows your line on every layer, and runs lateral extract if it's on. Nothing more."],
-              ["caseOnHeat", "CASE ON HEAT", "when a core reads HIGH (a hot cell directly below) the crew drills the next layer behind steel. Hell never breaches; a motherlode is cased off. Off = you arm the casing yourself."],
+              ["caseOnHeat", "CASE ON HEAT", "when a core reads HIGH (a hot cell directly below) the crew drills the next layer behind steel. Hell never breaches; a gusher is cased off. Off = you arm the casing yourself."],
             ].map(([key, name, desc]) => (
               <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "0.4rem 0", borderTop: `1px solid ${hud.goldFaint}`, marginTop: "0.4rem" }}>
                 <div style={{ minWidth: 0 }}>

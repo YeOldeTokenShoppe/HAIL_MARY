@@ -65,13 +65,13 @@ export function resolvePendingDecision({ pending, threshold = 0, chargesRemainin
 // Counterplay (step 2): casing through the next layer seals whatever it holds.
 export const HEAT_LOOKAHEAD = 2;         // layers below the bore head that read
 export const HEAT_NEIGHBOURS = "all8";   // "all8" | "ortho4" | "none" — tune with scripts/oil-heat-rate.mjs
-export const HEAT_LODE_FRACTION = 0.85;  // motherlode = this share of the field's richest cell (strike-tick tier)
+export const HEAT_LODE_FRACTION = 0.5;   // a "hot" deposit = this share of the field's richest cell: the GUSHER tier (0.85 = motherlode only until 2026-09-30 — too scarce; see the tuning readout in docs/oil-game.md)
 export const HEAT_COPY = {
   nominal:  { temp: "Ambient",  warn: null },
   elevated: { temp: "Elevated", warn: "!! HEAT RISING — SOMETHING HOT WITHIN REACH !!",
-              alert: "🌡 Heat rising in the core: a hell pocket or a motherlode within two cells — under you or next door." },
-  high:     { temp: "High",     warn: "!! HOT ZONE DIRECTLY BELOW — HELL OR THE MOTHERLODE !!",
-              alert: "🔥 Hot zone directly below the bit: the next layer is a hell pocket or a motherlode. Arm the casing to seal it — whatever it is — or ride it." },
+              alert: "🌡 Heat rising in the core: a hell pocket or a gusher within two cells — under you or next door." },
+  high:     { temp: "High",     warn: "!! HOT ZONE DIRECTLY BELOW — HELL OR A GUSHER !!",
+              alert: "🔥 Hot zone directly below the bit: the next layer is a hell pocket or a gusher. Arm the casing to seal it — whatever it is — or ride it." },
 };
 
 // ── Casing (step 2, Michelle 2026-09-29) ─────────────────────────────────────
@@ -80,7 +80,7 @@ export const HEAT_COPY = {
 // layer's forfeit is the whole price. Armed before the strike (`casingArmed`,
 // one-shot) — or the standing order CASE ON HEAT when the last core read HIGH —
 // makes the tick case the next layer: no core on the table, no charge, no
-// breach if it was hell, and no oil if it was the motherlode — cased off, never
+// breach if it was hell, and no oil if it was a gusher — cased off, never
 // produced. The forfeit is what makes the reading a decision.
 // (`supplies.casing` / casingCount were the 2026-09-29 supply model; dropped.)
 export function shouldCase({ armed = false, orders = null, lastHeat = null } = {}) {
