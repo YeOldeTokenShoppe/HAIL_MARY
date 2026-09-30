@@ -775,7 +775,6 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
         s.blinkUntil = performance.now() / 1000 + PHOTO_BLINK_S;
         if (groupRef.current) groupRef.current.visible = false;
       }
-      s.photoMoving = false;
       const pose = crew.photo?.poses?.[role.briefs ? "operator" : "other"] || "thumbsUp";
       startAct(pose, now, 999); s.actEnds = Infinity; s.nextGesture = Infinity; setBubble(null);
       console.info("[season-photo] crew:", role.id, "posing", pose, "→ clip", ACTS[s.act]?.clip, actionsRef.current[ACTS[s.act]?.clip] ? "(loaded)" : "(missing — fallback)");
