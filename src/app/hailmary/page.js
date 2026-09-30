@@ -5004,9 +5004,16 @@ export default function OilPage() {
       // the crew hold the pose through the capture, then go back to work
       setTimeout(() => { try { window.__hmCrew?.photoStop?.(); } catch (e) {} }, PHOTO_RELEASE_MS);
     };
-    log("start · plot", `(${userDrill.col + 1}, ${userDrill.row + 1})`, "· selecting the rig so the crew mount");
     setIntroComplete(true);
-    setSelectedX(userDrill.col); setSliceY(userDrill.row); setDrillDepth(0);
+    if (isMobile) {
+      // the phone's rig view (RigScene) is your rig with the crew already aboard; its camera
+      // takes the crew's framing itself (RigCamera ← hm:crew-face). Just make sure it is showing.
+      log("start · plot", `(${userDrill.col + 1}, ${userDrill.row + 1})`, "· phone: showing the rig view");
+      setMobileTab("3d");
+    } else {
+      log("start · plot", `(${userDrill.col + 1}, ${userDrill.row + 1})`, "· selecting the rig so the crew mount");
+      setSelectedX(userDrill.col); setSliceY(userDrill.row); setDrillDepth(0);
+    }
     let tries = 0;
     d.timer = setInterval(() => {
       const hook = window.__hmCrew;
@@ -5027,7 +5034,7 @@ export default function OilPage() {
         log("waiting for the crew… hook:", !!hook, "photo:", !!hook?.photo, "workers:", Object.keys(hook?.workers || {}));
       }
     }, 250);
-  }, [userDrill?.col, userDrill?.row, seasonPhotoLabel]);
+  }, [userDrill?.col, userDrill?.row, seasonPhotoLabel, isMobile]);
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.__hmSeasonPhoto = takeSeasonPhoto;   // dev: run it from the console
@@ -7696,7 +7703,7 @@ export default function OilPage() {
       >
         THE RECKONING
       </PanelTitle>
-      <OilReckoning chrome="section" theme={theme} reckoning={reckoning} col={userDrill.col} row={userDrill.row} onPhoto={!isMobile ? takeSeasonPhoto : null} />
+      <OilReckoning chrome="section" theme={theme} reckoning={reckoning} col={userDrill.col} row={userDrill.row} onPhoto={takeSeasonPhoto} />
     </PanelSection>
   );
 

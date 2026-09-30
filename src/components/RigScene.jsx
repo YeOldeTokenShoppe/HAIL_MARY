@@ -221,6 +221,7 @@ export function MesaTile({ cellSize, depthZ, envPreset, parabolum }) {
 // distMul/minDist ×1.48 with the 35° lens (same on-screen size as 1.7/0.11 at 50°).
 const PANEL_VIEW = { distMul: 2.5, minDist: 0.22, lift: -0.08, ease: 6, near: 0.02, azimuth: Infinity, polar: [Math.PI * 0.3, Math.PI * 0.64] }; // minDist ×1.4 for PUMPJACK_SCALE 0.14
 const RIG_ORBIT = { near: null, azimuth: Infinity, polar: [0.15, Math.PI * 0.55], minDist: 0.6, maxDist: 3.6 }; // ×1.4 for PUMPJACK_SCALE 0.14
+const CREW_FOCUS_LIFT = 0.15;   // the crew's framing (season photo): the camera a touch above the aim point, looking slightly down — the field's FOCUS_TILT
 function findMachinePanel(root) {
   let found = null;
   root.traverse((o) => { if (!found && typeof o.name === "string" && o.name.startsWith("MachinePanel")) found = o; });
@@ -238,6 +239,26 @@ function RigCamera({ view = "rig", controlsRef }) {
   // it every frame and ate every drag).
   const driving = useRef(true);
   const rigNear = useRef(null);   // the camera's authored near plane, restored on the way back
+  // The crew's framing request (RigCrew `hm:crew-face`: the season photo, an auto-briefing):
+  // glide to the point they name, seen from the front they name, and HOLD there — the orbit
+  // controls stay off so a swipe cannot move the shot. `hm:crew-photo-end` / `hm:brief-end`
+  // glide back to the rig view. Same lift as the field's focus flight (page.js FOCUS_TILT).
+  const focus = useRef(null);
+  useEffect(() => {
+    const onFace = (e) => {
+      const d = e.detail; if (!d?.center) return;
+      const f = new THREE.Vector3().fromArray(d.front || [1, 0, 0]); f.y = 0;
+      if (f.lengthSq() < 1e-6) f.set(1, 0, 0);
+      f.normalize(); f.y += CREW_FOCUS_LIFT; f.normalize();
+      focus.current = { center: new THREE.Vector3().fromArray(d.center), dir: f, dist: Number.isFinite(d.dist) ? d.dist : 0.5 };
+      driving.current = true;
+    };
+    const onRelease = () => { if (focus.current) { focus.current = null; driving.current = true; } };
+    window.addEventListener("hm:crew-face", onFace);
+    window.addEventListener("hm:crew-photo-end", onRelease);
+    window.addEventListener("hm:brief-end", onRelease);
+    return () => { window.removeEventListener("hm:crew-face", onFace); window.removeEventListener("hm:crew-photo-end", onRelease); window.removeEventListener("hm:brief-end", onRelease); };
+  }, []);
   useEffect(() => {
     camera.position.set(...RIG_CAMERA.position);
     camera.lookAt(...RIG_CAMERA.target);
@@ -250,7 +271,12 @@ function RigCamera({ view = "rig", controlsRef }) {
     const controls = controlsRef?.current;
     if (!driving.current) { if (controls && !controls.enabled) controls.enabled = true; return; }
     if (controls && controls.enabled) controls.enabled = false;   // no tug-of-war mid-glide
-    if (view === "panel") {
+    if (focus.current) {
+      const F = focus.current;
+      goalTgt.current.copy(F.center); goalPos.current.copy(F.center).addScaledVector(F.dir, F.dist);
+      if (rigNear.current == null) rigNear.current = camera.near;
+      if (camera.near !== PANEL_VIEW.near) { camera.near = PANEL_VIEW.near; camera.updateProjectionMatrix(); }
+    } else if (view === "panel") {
       // the pump mounts after the camera and the panel node is inside its clone — resolve lazily
       if (!panelRef.current || !panelRef.current.parent) panelRef.current = findMachinePanel(scene);
       const panel = panelRef.current;
@@ -288,8 +314,9 @@ function RigCamera({ view = "rig", controlsRef }) {
     curTgt.current.lerp(goalTgt.current, k);
     camera.lookAt(curTgt.current);
     // arrived: hand the camera (and its look-at) to the orbit controls, which
-    // then spin about whatever we glided to — the rig or the panel
-    if (camera.position.distanceTo(goalPos.current) < 0.004 && curTgt.current.distanceTo(goalTgt.current) < 0.004) {
+    // then spin about whatever we glided to — the rig or the panel (not the
+    // crew's shot: that holds until they release it)
+    if (!focus.current && camera.position.distanceTo(goalPos.current) < 0.004 && curTgt.current.distanceTo(goalTgt.current) < 0.004) {
       camera.position.copy(goalPos.current); curTgt.current.copy(goalTgt.current); camera.lookAt(curTgt.current);
       if (controls) { controls.target.copy(curTgt.current); controls.update?.(); controls.enabled = true; }
       driving.current = false;

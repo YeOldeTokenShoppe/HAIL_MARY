@@ -194,7 +194,6 @@ const PHOTO_POSES = [["thumbsUp", "heartHands"], ["heartHands", "thumbsUp2"], ["
 const PHOTO_FOCUS_DIST = 0.5;      // camera distance from the point between the two heads (1.0 wide → 0.6 → 0.5, Michelle 2026-09-30)
 const PHOTO_FOCUS_MIN_DIST = 0.3;
 const PHOTO_BLINK_S = 0.3;         // the crew are hidden this long while they cut to their marks
-const PHOTO_CAM_TILT = -0.22;      // the framing direction's y: negative = the camera sits a little below the heads, looking up (Michelle, 2026-09-30: "lower the camera a bit")
 const PHOTO_EXPRESSION = ["OpenSmile", 0.9];   // the SitePal face's cue while the shutter is open (3D scenes only)
 const PHOTO_SETTLE_S = 1.8;        // camera flight + pose blend before the shutter
 const PHOTO_FACE_WAIT_S = 3;       // after settling, wait up to this long more for the SitePal faces to fade in (the smile) before saying ready
@@ -920,7 +919,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
           const halfH = (top - bottom) / 2;
           const tanHalf = Math.tan(THREE.MathUtils.degToRad((state.camera.fov || 50) / 2));  // the square crop is bounded by the canvas height → vertical fov
           const dist = Math.max(PHOTO_FOCUS_DIST, (Math.max(halfH, halfW) * PHOTO_FIT_PAD) / tanHalf);
-          f.y = PHOTO_CAM_TILT; f.normalize();                                                // a touch below the middle, looking up
+          // (no tilt here: both cameras level the front and apply their own lift — page.js FOCUS_TILT on the field, RigScene CREW_FOCUS_LIFT on the phone)
           console.info("[season-photo] crew: on their marks · framing at", centre.toArray().map((v) => +v.toFixed(2)), "from the marks' front, dist", +dist.toFixed(2), "· box h", +(top - bottom).toFixed(2), "w", +(2 * halfW).toFixed(2), "· head h", +headH.toFixed(2));
           try { window.dispatchEvent(new CustomEvent("hm:crew-face", { detail: { center: centre.toArray(), front: f.toArray(), dist, minDist: PHOTO_FOCUS_MIN_DIST } })); } catch (e) {}
         }
