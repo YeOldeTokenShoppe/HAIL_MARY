@@ -191,7 +191,7 @@ const ACTS = {
 // pose; the camera flies to frame them (hm:crew-face at PHOTO_FOCUS_DIST, centred between the
 // two heads); after PHOTO_SETTLE_S the page hears hm:crew-photo-ready and fires the polaroid.
 const PHOTO_POSES = [["thumbsUp", "heartHands"], ["heartHands", "thumbsUp2"], ["thumbsUp2", "thumbsUp"]];   // [operator, the other]
-const PHOTO_FOCUS_DIST = 0.6;      // camera distance from the point between the two heads (tune; 1.0 was a wide rig shot — Michelle, 2026-09-30)
+const PHOTO_FOCUS_DIST = 0.5;      // camera distance from the point between the two heads (1.0 wide → 0.6 → 0.5, Michelle 2026-09-30)
 const PHOTO_FOCUS_MIN_DIST = 0.3;
 const PHOTO_BLINK_S = 0.3;         // the crew are hidden this long while they cut to their marks
 const PHOTO_CAM_TILT = -0.22;      // the framing direction's y: negative = the camera sits a little below the heads, looking up (Michelle, 2026-09-30: "lower the camera a bit")
@@ -481,7 +481,14 @@ function CrewInner({ sighting, forceScene, rigScene, scale, plotKey, plotId, env
     console.info("[season-photo] crew: photo mode set for", Object.keys(crew.workers), "poses", crew.photo.poses);
     return crew.photo.poses;
   }, [crew]);
-  const stopPhoto = useCallback(() => { crew.photo = null; }, [crew]);
+  // The page calls this just after the shutter (2026-09-30: the crew kept posing for the full
+  // hold); the frame loop also ends the photo on its own at `until`.
+  const stopPhoto = useCallback(() => {
+    if (!crew.photo) return;
+    crew.photo = null;
+    setVendorExpression("None"); deactivateVendorSitePal();
+    try { window.dispatchEvent(new CustomEvent("hm:crew-photo-end")); } catch (e) {}
+  }, [crew]);
   useEffect(() => { const hook = devHook(); if (hook) { hook.brief = toggleBrief; hook.briefing = () => !!crew.brief; hook.photo = startPhoto; hook.photoStop = stopPhoto; hook.posing = () => !!crew.photo; hook.plotId = plotId; } return () => { if (hook) { delete hook.brief; delete hook.briefing; delete hook.photo; delete hook.photoStop; delete hook.posing; delete hook.plotId; } }; }, [toggleBrief, startPhoto, stopPhoto, plotId, crew]);
   // SitePal's talk callbacks pace the briefing: a line's gesture and bubble go up when speech
   // starts, the next line follows when it ends. Without callbacks the BRIEF_LINE_S timer runs.

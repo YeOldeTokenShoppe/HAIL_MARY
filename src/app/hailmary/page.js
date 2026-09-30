@@ -4956,6 +4956,7 @@ export default function OilPage() {
   // and the referral link (PolaroidSnapshot does the frame, the caption, the
   // share). No crew within 6 s → the shutter fires on the field as it is.
   const seasonPhotoRef = useRef({ timer: null, onReady: null, safety: null });
+  const PHOTO_RELEASE_MS = 1500;   // after the shutter: the capture (html2canvas) needs the pose held a moment longer
   const seasonPhotoLabel = useCallback(() => {
     const plot = userDrill?.col != null ? `plot (${userDrill.col + 1}, ${userDrill.row + 1})` : "the field";
     if (reckoning && gameEnded) {
@@ -4989,6 +4990,8 @@ export default function OilPage() {
       // capture left it true
       setSnapshotTrigger(false);
       setTimeout(() => setSnapshotTrigger(true), 30);
+      // the crew hold the pose through the capture, then go back to work
+      setTimeout(() => { try { window.__hmCrew?.photoStop?.(); } catch (e) {} }, PHOTO_RELEASE_MS);
     };
     log("start · plot", `(${userDrill.col + 1}, ${userDrill.row + 1})`, "· selecting the rig so the crew mount");
     setIntroComplete(true);

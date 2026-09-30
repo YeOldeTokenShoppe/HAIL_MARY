@@ -820,14 +820,23 @@ export function primeVendorSitePal(vendorId) {
   if (!win || !config) return false;
   requestVendorSitePalEmbed("prime:" + vendorId);
   try {
-    state.pending = null;
     if (state.speakTimer) { clearTimeout(state.speakTimer); state.speakTimer = null; }
     state.activeVendorId = vendorId;
-    state.desiredVolume = 0; win.__vendorSitePalDesiredVolume = 0;   // nothing to hear
-    if (!vendorSitePalReady(config.sceneId) && win.__vendorSitePalSceneLoaded === true && typeof win.loadSceneByID === "function") {
+    // Same staging as a greeting, with NO text: speakPendingVendorLine then only
+    // brings the scene up — it asks the host for the swap once it has booted or
+    // finished whatever scene it is on (the lazy-embed case activate handles the
+    // same way), and clears the pending without speaking. The volume must be > 0
+    // for that path to run; nothing is said, so nothing is heard.
+    state.desiredVolume = 7; win.__vendorSitePalDesiredVolume = 7;
+    state.speakNotBefore = Date.now();
+    state.pending = { vendorId, sceneId: config.sceneId, text: null, gesture: null, voice: config.voice };
+    if (vendorSitePalReady(config.sceneId)) speakPendingVendorLine();
+    else if (win.__vendorSitePalSceneLoaded === true && typeof win.loadSceneByID === "function") {
       win.__vendorSitePalSceneLoaded = false;
       win.loadSceneByID(config.sceneId);
+      // vh_sceneLoaded → speakPendingVendorLine() → scene matches → pending cleared, no line
     }
+    // else: host still booting — vh_sceneLoaded picks the pending up and asks for the swap
   } catch (e) {}
   return true;
 }
