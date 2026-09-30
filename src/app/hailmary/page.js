@@ -4968,6 +4968,7 @@ export default function OilPage() {
   }, [userDrill?.col, userDrill?.row, userDrill?.totalCollected, reckoning, gameEnded]);
   const takeSeasonPhoto = useCallback(() => {
     const log = (...a) => console.info("[season-photo]", ...a);
+    log("takeSeasonPhoto called");
     if (typeof window === "undefined") return;
     if (userDrill?.col == null) { log("no rig on this account — nothing to photograph"); return; }
     const d = seasonPhotoRef.current;
@@ -5746,7 +5747,13 @@ export default function OilPage() {
             return `✓ TAKER BOT ${n} on (${selectedX + 1}, ${sliceY + 1}) — lateral extract ON, line 0, queue slot ${n}`;
           })}>CLAIM AS TAKER BOT {n}</button>
         ))}
-        <button disabled={userDrill?.col == null} style={styles.btn} title="the season polaroid: your crew pose on your rig, the camera frames them, the shutter fires with the season's line" onClick={takeSeasonPhoto}>CREW PHOTO</button>
+        <button style={styles.btn} title="the season polaroid: your crew pose on your rig, the camera frames them, the shutter fires with the season's line" onClick={() => {
+          // never a silently dead button: say why when it cannot shoot
+          console.info("[season-photo] CREW PHOTO clicked · rig:", userDrill?.col != null ? `(${userDrill.col + 1}, ${userDrill.row + 1})` : "none on this account", "· signed in:", !!user?.id);
+          if (userDrill?.col == null) { setToolStatus("✗ CREW PHOTO needs a rig on YOUR account — select a plot and CLAIM SELECTED first (the bots' rigs won't do)"); return; }
+          setToolStatus("📸 crew photo… watch the console for [season-photo] lines");
+          takeSeasonPhoto();
+        }}>CREW PHOTO</button>
         <button disabled={toolBusy || selectedX === null} style={styles.btn} onClick={() => runTool("Granting casing", async () => {
           // One casing string to the rig on the selected plot (the hot-zone test:
           // NEW TEST MAP → strike until Temp reads HIGH → arm the casing → strike).
