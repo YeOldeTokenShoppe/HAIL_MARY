@@ -811,6 +811,41 @@ export function activateVendorSitePal(vendorId) {
   } catch (e) {}
 }
 
+// Bring a vendor's scene up WITHOUT staging a line — the season photo wants the
+// crew's face on the workers, silent, with an expression (2026-09-30). Runs
+// inside the photo click, so the embed's gesture rules are satisfied.
+export function primeVendorSitePal(vendorId) {
+  const win = w();
+  const config = VENDOR_SITEPAL_CONFIG[vendorId];
+  if (!win || !config) return false;
+  requestVendorSitePalEmbed("prime:" + vendorId);
+  try {
+    state.pending = null;
+    if (state.speakTimer) { clearTimeout(state.speakTimer); state.speakTimer = null; }
+    state.activeVendorId = vendorId;
+    state.desiredVolume = 0; win.__vendorSitePalDesiredVolume = 0;   // nothing to hear
+    if (!vendorSitePalReady(config.sceneId) && win.__vendorSitePalSceneLoaded === true && typeof win.loadSceneByID === "function") {
+      win.__vendorSitePalSceneLoaded = false;
+      win.loadSceneByID(config.sceneId);
+    }
+  } catch (e) {}
+  return true;
+}
+
+// setFacialExpression("OpenSmile" | "ClosedSmile" | "Sad" | "Angry" | "Fear" |
+// "Disgust" | "Surprise" | "None", amplitude 0..1, duration s | -1) — 3D
+// characters only (docs/sitepal.md); a 2D scene ignores it. True when the
+// call was made.
+export function setVendorExpression(expression = "None", amplitude = 0.8, durationS = 5) {
+  const win = w();
+  if (!win || typeof win.setFacialExpression !== "function") return false;
+  try {
+    if (expression === "None") win.setFacialExpression("None");
+    else win.setFacialExpression(expression, amplitude, durationS);
+    return true;
+  } catch (e) { return false; }
+}
+
 // Speak one explicit line as `vendorId` (the crew's briefing, one line per
 // gesture) — same staging as a greeting, no delay, scene swapped if needed.
 // activateVendorSitePal(vendorId) should have run inside the tap that started

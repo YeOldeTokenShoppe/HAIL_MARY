@@ -50,7 +50,7 @@ import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { useGLTF, Html } from "@react-three/drei";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
-import { VENDOR_SITEPAL_CONFIG, activateVendorSitePal, deactivateVendorSitePal, speakVendorText, onVendorTalk, getVendorSitePalSource } from "@/lib/vendorSitePal";
+import { VENDOR_SITEPAL_CONFIG, activateVendorSitePal, deactivateVendorSitePal, primeVendorSitePal, setVendorExpression, speakVendorText, onVendorTalk, getVendorSitePalSource } from "@/lib/vendorSitePal";
 import { createProjectionState, disposeProjectionState, updateProjection } from "@/lib/sitepalFace";
 
 export const CREW_GLB = "/models/crew_goblin.glb?v=17";   // v17: crew_ThumbsUp / crew_ThumbsUp2 / crew_HeartHands (the season-photo poses)
@@ -194,6 +194,8 @@ const PHOTO_POSES = [["thumbsUp", "heartHands"], ["heartHands", "thumbsUp2"], ["
 const PHOTO_FOCUS_DIST = 0.6;      // camera distance from the point between the two heads (tune; 1.0 was a wide rig shot — Michelle, 2026-09-30)
 const PHOTO_FOCUS_MIN_DIST = 0.3;
 const PHOTO_BLINK_S = 0.3;         // the crew are hidden this long while they cut to their marks
+const PHOTO_CAM_TILT = -0.22;      // the framing direction's y: negative = the camera sits a little below the heads, looking up (Michelle, 2026-09-30: "lower the camera a bit")
+const PHOTO_EXPRESSION = ["OpenSmile", 0.9];   // the SitePal face's cue while the shutter is open (3D scenes only)
 const PHOTO_SETTLE_S = 1.8;        // camera flight + pose blend before the shutter
 const PHOTO_HOLD_S = 18;           // walk to the marks + pose; the page's safety shutter is 5 s after the crew are asked, so the mark walk should be short
 
@@ -472,7 +474,10 @@ function CrewInner({ sighting, forceScene, rigScene, scale, plotKey, plotId, env
     const pair = PHOTO_POSES[((Number(o.variant) || 0) % PHOTO_POSES.length + PHOTO_POSES.length) % PHOTO_POSES.length];
     const nowS = performance.now() / 1000;
     crew.brief = null; deactivateVendorSitePal();
-    crew.photo = { poses: { operator: pair[0], other: pair[1] }, startedAt: nowS, readyAt: nowS + PHOTO_SETTLE_S, until: nowS + (Number(o.hold) || PHOTO_HOLD_S), faced: false, announced: false };
+    crew.photo = { poses: { operator: pair[0], other: pair[1] }, startedAt: nowS, readyAt: nowS + PHOTO_SETTLE_S, until: nowS + (Number(o.hold) || PHOTO_HOLD_S), faced: false, announced: false, smiled: false, nextSmileTry: 0 };
+    // the SitePal face on both workers for the picture — silent, smiling (this runs inside the
+    // photo click, so the embed may boot / swap scenes now)
+    if (VENDOR_SITEPAL_CONFIG.crew) primeVendorSitePal("crew");
     console.info("[season-photo] crew: photo mode set for", Object.keys(crew.workers), "poses", crew.photo.poses);
     return crew.photo.poses;
   }, [crew]);
@@ -862,7 +867,14 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
       // `now` here is this worker's own uptime, so compare against the wall clock (2026-09-30 fix:
       // the ready event never fired and the pose never ended).
       const wall = performance.now() / 1000;
-      if (ph.until <= wall) { crew.photo = null; try { window.dispatchEvent(new CustomEvent("hm:crew-photo-end")); } catch (e) {} return; }
+      if (ph.until <= wall) { crew.photo = null; setVendorExpression("None"); deactivateVendorSitePal(); try { window.dispatchEvent(new CustomEvent("hm:crew-photo-end")); } catch (e) {} return; }
+      // the smile cue, once the crew scene is up (retry each second; a 2D scene ignores it)
+      if (role.briefs && !ph.smiled && wall >= ph.nextSmileTry) {
+        const cfg = VENDOR_SITEPAL_CONFIG.crew;
+        const onScene = window.__vendorSitePalSceneLoaded === true && window.__vendorSitePalCurrentSceneId === cfg?.sceneId;
+        if (onScene && setVendorExpression(PHOTO_EXPRESSION[0], PHOTO_EXPRESSION[1], Math.ceil(ph.until - wall))) { ph.smiled = true; console.info("[season-photo] crew: face cue", PHOTO_EXPRESSION[0]); }
+        else ph.nextSmileTry = wall + 1;
+      }
       if (role.briefs) {
         // both on their marks and posing? (a worker mid-climb or mid-walk joins when it can)
         const all = Object.values(crew.workers);
@@ -876,7 +888,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
           const stn = resolveStation(rigScene, "photo_a");
           const f = new THREE.Vector3(Math.cos(stn.yaw), 0, -Math.sin(stn.yaw));           // the mark's facing, rig-local…
           const parent = groupRef.current?.parent; if (parent) f.applyQuaternion(parent.getWorldQuaternion(_q)); f.y = 0;   // …in world
-          if (f.lengthSq() < 1e-6) f.set(1, 0, 0); f.normalize();
+          if (f.lengthSq() < 1e-6) f.set(1, 0, 0); f.normalize(); f.y = PHOTO_CAM_TILT; f.normalize();   // a touch below the heads, looking up
           console.info("[season-photo] crew: on their marks · framing at", centre.toArray().map((v) => +v.toFixed(2)), "from the marks' front, dist", PHOTO_FOCUS_DIST);
           try { window.dispatchEvent(new CustomEvent("hm:crew-face", { detail: { center: centre.toArray(), front: f.toArray(), dist: PHOTO_FOCUS_DIST, minDist: PHOTO_FOCUS_MIN_DIST } })); } catch (e) {}
         }
@@ -962,7 +974,8 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     if (projRef.current?.proj) {
       const cfg = VENDOR_SITEPAL_CONFIG.crew;
       const tuning = role.briefs && typeof window !== "undefined" && window.__vendorSitePalTuneId === "crew";   // ?tune=vendor, CREW tab
-      const briefing = tuning || (s.mode === "brief" && !!crew.brief && crew.brief.talker === role.id);
+      const posing = s.mode === "photo" && !!crew.photo;   // the season photo: the face on both workers (same source — they are the same goblin)
+      const briefing = tuning || posing || (s.mode === "brief" && !!crew.brief && crew.brief.talker === role.id);
       if (tuning) { const c = state.camera.position; faceWorld(c.x, c.y, c.z); s.tuneFacing = true; }   // hold the face toward the camera while it is being tuned
       else if (s.tuneFacing) { s.tuneFacing = false; s.yawAim = null; s.tuneFocused = false; s.tuneMoving = false; if (s.actEnds === Infinity && !ACTS[s.act]?.once && !ACTS[s.act]?.forever) s.actEnds = now + rand(2, 5); }   // tab left: let the schedule resume
       const source = briefing ? getVendorSitePalSource() : null;
