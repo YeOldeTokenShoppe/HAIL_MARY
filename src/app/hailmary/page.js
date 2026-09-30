@@ -5806,7 +5806,8 @@ export default function OilPage() {
           const v2Line = loopV2
             ? ` · crews: ${r.extracted || 0} extracted, ${r.passedOpen || 0} passed open, ${r.passedDry || 0} passed dry, ${r.salvagedByOrder || 0} lateral-extracted${r.cased ? `, ${r.cased} cased` : ""}`
             : "";
-          return `✓ struck ${r.struck}${scope} · skipped ${r.skipped}${reasons}${r.depleted ? ` · depleted ${r.depleted}` : ""}${r.demonsSummoned ? ` · demons ${r.demonsSummoned}` : ""}${v2Line}`;
+          const mapLine = typeof r.mapHellPockets === "number" ? ` · map: ${r.mapHellPockets} hell pocket${r.mapHellPockets === 1 ? "" : "s"}` : "";   // the server's map — the client survey can't see the live seed
+          return `✓ struck ${r.struck}${scope} · skipped ${r.skipped}${reasons}${r.depleted ? ` · depleted ${r.depleted}` : ""}${r.demonsSummoned ? ` · demons ${r.demonsSummoned}` : ""}${v2Line}${mapLine}`;
         })}>FORCE STRIKE</button>
         <button disabled={toolBusy || selectedX === null} style={styles.btn} onClick={() => runTool("Banking tank", async () => {
           // Bank the selected rig's un-banked tankOil into the community tank

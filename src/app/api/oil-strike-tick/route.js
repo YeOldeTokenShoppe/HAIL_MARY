@@ -281,7 +281,10 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
 
   const drillsSnap = await db.collection("oilDrills").get();
 
-  const summary = { struck: 0, skipped: 0, depleted: 0, errors: 0, demonsSummoned: 0, artifactsFound: 0, cursesTriggered: 0, skipReasons: {} };
+  const summary = { struck: 0, skipped: 0, depleted: 0, errors: 0, demonsSummoned: 0, artifactsFound: 0, cursesTriggered: 0, skipReasons: {},
+    // the live map's hell-pocket count — the only place an admin can read it while the seed is
+    // secret (the client survey computes over no seed and shows 0; 2026-09-30 tuning check)
+    mapHellPockets: hellSet.size };
   // Tally a skip with a human-readable reason so the admin FORCE STRIKE toast can
   // say *why* nothing struck (e.g. every rig lost its plot to a board reset).
   const skip = (reason) => { summary.skipped++; summary.skipReasons[reason] = (summary.skipReasons[reason] || 0) + 1; };
