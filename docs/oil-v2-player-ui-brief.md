@@ -53,7 +53,7 @@ misses one will show plain chrome there.
 | No charges left | `chargesRemaining == 0` | EXTRACT / TAKE / WILDCAT disabled, PASS live, CHARGES in red |
 | Column fully revealed | `remainingLayers == 0` | "nothing more comes up; the buzzer settles what's on the table"; charges still work next door |
 | Hot within reach (two down, or next door) | `pending.heat` / `plot.heat[layer]` = `elevated` | Temp elevated · "!! HEAT RISING — SOMETHING HOT WITHIN REACH !!" · glow under the bore head · note: hell or the big one, under you or next door |
-| Hot directly below | … = `high` | Temp high · "!! HOT ZONE DIRECTLY BELOW — HELL OR THE MOTHERLODE !!" · red tube outline · persists after the decision until the next strike · the CASING block: strings on the rig, CASE THE NEXT LAYER / DISARM, the forfeit spelled out |
+| Hot directly below | … = `high` | Temp high · "!! HOT ZONE DIRECTLY BELOW — HELL OR THE MOTHERLODE !!" · red tube outline · persists after the decision until the next strike · the CASING block (casing is free — no supply): CASE THE NEXT LAYER / DISARM, the forfeit spelled out |
 | Casing armed | `casingArmed` | orange CASING block: "ARMED — the next layer is drilled behind steel", disarm button; the crew line says so |
 | Cased layer | `plot.cased[layer]` | steel-blue band; ledger "cased through · a pay zone, cased off · N behind steel" / "hell, sealed"; reckoning Cased line + strip |
 | Season over | `gameEnded` (the flag, never the clock alone) | hand-off to the Reckoning |

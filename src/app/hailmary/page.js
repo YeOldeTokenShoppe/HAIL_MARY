@@ -5102,9 +5102,8 @@ export default function OilPage() {
       const heatNow = (userDrill?.pending?.heat && userDrill.pending.heat !== "nominal") ? userDrill.pending.heat
         : (userPlotState?.heat?.[(userPlotState?.drillDay || 0) - 1] || null);
       if (heatNow === "high") {
-        const strings = Number(userDrill?.supplies?.casing) || 0;
         say(`Hot zone right under the bit, boss. Hell, or the big one.`, "thoughtful");
-        say(userDrill?.casingArmed ? "Casing's armed. We drill through it sealed, whatever it is." : strings > 0 ? `${strings} casing string${strings === 1 ? "" : "s"} on the rig. Say the word and we seal it — or we ride it.` : "No casing on the rig. We ride it.", userDrill?.casingArmed ? "yes" : "thoughtful");
+        say(userDrill?.casingArmed ? "Casing's armed. We drill through it sealed, whatever it is." : "Say the word and we case it — lose the layer, whatever it is. Or we ride it.", userDrill?.casingArmed ? "yes" : "thoughtful");
       }
       else if (heatNow === "elevated") say("Something's hot down there, boss. Could be hell. Could be the big one. Could be next door.", "thoughtful");
       if (v) say(`${v.chargesRemaining} charge${v.chargesRemaining === 1 ? "" : "s"} left.`, v.chargesRemaining > 0 ? "yes" : "no");
@@ -5130,7 +5129,7 @@ export default function OilPage() {
     // RigCrew compares ownerPlot with the plot its rig stands on and brushes off everyone else.
     window.__hmBriefing = { lines, tones, signedIn: !!user?.id, ownerPlot: userDrill?.col != null ? `${userDrill.col}_${userDrill.row}` : null };
     return () => { delete window.__hmBriefing; };
-  }, [drillStatus, hellActive, awayRecap, tankFill, user?.id, userDrill?.col, userDrill?.row, loopV2, awayRecapV2, userDrill?.pending?.heat, userDrill?.supplies?.casing, userDrill?.casingArmed, userPlotState?.heat, userPlotState?.drillDay]);
+  }, [drillStatus, hellActive, awayRecap, tankFill, user?.id, userDrill?.col, userDrill?.row, loopV2, awayRecapV2, userDrill?.pending?.heat, userDrill?.casingArmed, userPlotState?.heat, userPlotState?.drillDay]);
 
   // ── The crew delivers the away recap (v2, desktop; Michelle 2026-09-28) ──────
   // On return with something to report, the page selects your rig so the crew
@@ -5768,15 +5767,6 @@ export default function OilPage() {
           setToolStatus("📸 crew photo… watch the console for [season-photo] lines");
           takeSeasonPhoto();
         }}>CREW PHOTO</button>
-        <button disabled={toolBusy || selectedX === null} style={styles.btn} onClick={() => runTool("Granting casing", async () => {
-          // One casing string to the rig on the selected plot (the hot-zone test:
-          // NEW TEST MAP → strike until Temp reads HIGH → arm the casing → strike).
-          const owner = allPlotsMap[`${selectedX}_${sliceY}`]?.currentOwnerId;
-          if (!owner) throw new Error("select a claimed plot first");
-          const r = await fetch(`/api/oil-strike-tick?password=${encodeURIComponent(adminPassword)}&supply=${encodeURIComponent(owner)}&item=casing&n=1`).then((x) => x.json());
-          if (!r?.ok) throw new Error(r?.error || "failed");
-          return `✓ casing ×${r.count} on the rig at (${selectedX + 1}, ${sliceY + 1})`;
-        })}>GRANT CASING</button>
         <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Forcing strike", async () => {
           let url = `/api/oil-strike-tick?password=${encodeURIComponent(adminPassword)}&force=1&deep=${toolDeep}`;
           let scope = " (all rigs)";
@@ -8697,7 +8687,6 @@ export default function OilPage() {
         ledger={rigLedger}
         ended={gameEnded}
         orders={{ autopilot: userDrill.autopilot === true, salvage: userDrill.orders?.salvage === true, caseOnHeat: userDrill.orders?.caseOnHeat === true }}
-        casing={Number(userDrill.supplies?.casing) || 0}
         casingArmed={userDrill.casingArmed === true}
         onSetOrders={handleSetOrders}
         onWalk={introComplete ? () => setWalkMode(true) : undefined}

@@ -147,7 +147,6 @@ export default function OilCoreSampleV3({
   onSetOrders = null, // async ({ salvage?, autopilot?, caseNext?, caseOnHeat? }) => void
   // CASING (2026-09-29): strings in supply and whether one is armed for the next
   // strike. Armed = the next layer is drilled behind steel, whatever it holds.
-  casing = 0,
   casingArmed = false,
   // "card" = standalone (meta row, corner brackets, shadow — the fixture);
   // "section" = inside a page section whose title row already says CORE SAMPLE ·
@@ -225,17 +224,18 @@ export default function OilCoreSampleV3({
     </div>
   );
   const noteLineEl = note && <HudLine type="data" text={note} />;
-  // CASING: the hot-zone decision. Shown whenever a string is armed or the
-  // reading is hot; the button arms/disarms the next strike.
+  // CASING: the hot-zone decision. Shown whenever casing is armed or the
+  // reading is hot; the button arms/disarms the next strike. Casing is free
+  // (Michelle, 2026-09-30): the forfeited layer is the whole price.
   const casingBlock = (heat || casingArmed) && onSetOrders && !seasonOver && (
     <div style={{ marginTop: "0.6rem", padding: "0.5rem 0.6rem", border: `1px solid ${casingArmed ? hud.warn : hud.goldFaint}`, background: casingArmed ? "rgba(232,122,43,0.08)" : "transparent" }}>
-      <HudLine type="label" pad={PAD} label="CASING" text={casingArmed ? "ARMED — the next layer is drilled behind steel" : casing > 0 ? `${casing} string${casing === 1 ? "" : "s"} on the rig` : "none on the rig"} />
+      <HudLine type="label" pad={PAD} label="CASING" text={casingArmed ? "ARMED — the next layer is drilled behind steel" : "the rig can seal the next layer"} />
       <HudLine type="note" text={casingArmed
         ? "Whatever the next layer holds is sealed off: hell never breaches, a motherlode is never produced. No charge, no core on the table."
         : heat === "high" ? "Case the next layer and lose whatever it is. Or ride it: the motherlode, or a breach."
         : "Casing seals the NEXT layer only. Arm it when the reading is HIGH — the hot cell is directly below then."} />
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: "0.35rem" }}>
-        <button style={hudSmallBtn(casingArmed ? hud.red : hud.warn, busy || (!casingArmed && casing <= 0), hud)} disabled={busy || (!casingArmed && casing <= 0)}
+        <button style={hudSmallBtn(casingArmed ? hud.red : hud.warn, busy, hud)} disabled={busy}
           onClick={() => run(() => onSetOrders({ caseNext: !casingArmed }), casingArmed ? "casing disarmed — the next layer comes to the table" : "✔ casing armed — the next layer is drilled behind steel")}>
           {casingArmed ? "Disarm casing" : "Case the next layer"}
         </button>
@@ -478,7 +478,7 @@ export default function OilCoreSampleV3({
             {onSetOrders && [
               ["salvage", "LATERAL EXTRACT", "take a neighbour's passed layer at or above your line, for 1 charge. Neighbours with the order take turns — longest wait goes first."],
               ["autopilot", "AUTO-PILOT", "once you can afford every layer left in your column, the crew keeps each wet one as it comes up, above your line or not. Dry layers still pass free. Off = ORDERS: the crew follows your line on every layer, and runs lateral extract if it's on. Nothing more."],
-              ["caseOnHeat", "CASE ON HEAT", "when a core reads HIGH (a hot cell directly below) and a casing string is on the rig, the crew drills the next layer behind steel. Hell never breaches; a motherlode is cased off. Off = you arm the casing yourself."],
+              ["caseOnHeat", "CASE ON HEAT", "when a core reads HIGH (a hot cell directly below) the crew drills the next layer behind steel. Hell never breaches; a motherlode is cased off. Off = you arm the casing yourself."],
             ].map(([key, name, desc]) => (
               <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "0.4rem 0", borderTop: `1px solid ${hud.goldFaint}`, marginTop: "0.4rem" }}>
                 <div style={{ minWidth: 0 }}>

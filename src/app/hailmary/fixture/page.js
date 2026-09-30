@@ -63,7 +63,7 @@ function mkWorld(o = {}) {
     threshold: o.threshold ?? 800, totalCollected: o.totalCollected ?? 0,
     layersExtracted: { ...(o.extracted || {}) }, layersPassed: { ...(o.layersPassed || o.passed || {}) },
     pending: o.pending ?? null, autopilot: false, lastStrikeAt: o.lastStrikeAt === undefined ? Date.now() - 2 * H : o.lastStrikeAt,
-    supplies: { tonic: o.tonic ?? 0, casing: o.casing ?? 0 }, casingArmed: !!o.casingArmed, orders: o.orders || { salvage: false, caseOnHeat: false },
+    supplies: { tonic: o.tonic ?? 0 }, casingArmed: !!o.casingArmed, orders: o.orders || { salvage: false, caseOnHeat: false },
   };
   const allPlots = { [`${col}_${row}`]: plot };
   for (const n of (o.neighbours || [])) allPlots[`${n.col}_${n.row}`] = n;
@@ -141,10 +141,10 @@ function simStrike(w) {
   if (z >= DEPTH_Z) return n;
   const lastHeat = w.drill.pending?.heat || p.heat?.[z - 1] || null;
   p.drillDay = z + 1; d.lastStrikeAt = Date.now();
-  const casing = (d.casingArmed || (d.orders?.caseOnHeat && lastHeat === "high")) && (d.supplies.casing || 0) > 0;
+  const casing = !!(d.casingArmed || (d.orders?.caseOnHeat && lastHeat === "high"));   // casing is free (2026-09-30)
   if (casing) {
     p.cased[z] = true; p.revealed[z] = COLUMN_HELL.has(z) ? 0 : COLUMN[z]; if (COLUMN_HELL.has(z)) p.hellLayers[z] = true;
-    d.supplies.casing -= 1; d.casingArmed = false; d.pending = null;
+    d.casingArmed = false; d.pending = null;
   } else if (COLUMN_HELL.has(z)) {
     p.hellLayers[z] = true; p.revealed[z] = 0;
     d.pending = null;
@@ -189,8 +189,8 @@ const CARD_SCENARIOS = [
   { key: "dry", name: "Pending · dry", trigger: "oil 0 — passing is free", world: () => mkWorld({ drillDay: 3, extracted: { 1: 400 }, layersPassed: { 0: 0 }, chargesSpent: 1, totalCollected: 400, pending: { layer: 2, oil: 0, hasInclusion: false, revealedAt: Date.now() - 60000 } }) },
   { key: "incl", name: "Pending · inclusion flagged", trigger: "below the line, anomalous inclusion", world: () => mkWorld({ drillDay: 7, extracted: { 1: 400, 3: 900 }, layersPassed: { 0: 0, 2: 0, 4: 0, 5: 1200 }, passed: { 5: 1200 }, chargesSpent: 2, totalCollected: 1300, pending: { layer: 6, oil: 300, hasInclusion: true, revealedAt: Date.now() - 25 * 60000 } }) },
   { key: "heat2", name: "Pending · heat rising", trigger: "something hot within reach — two down or next door; hell or the big one", world: () => mkWorld({ drillDay: 5, extracted: { 1: 400, 3: 900 }, layersPassed: { 0: 0, 2: 0 }, chargesSpent: 2, totalCollected: 1300, heat: { 4: "elevated" }, pending: { layer: 4, oil: 650, hasInclusion: false, heat: "elevated", revealedAt: Date.now() - 12 * 60000 } }) },
-  { key: "heat1", name: "Pending · hot zone below · casing on the rig", trigger: "HIGH — hell or the motherlode under the bit; one string in supply, the CASE decision", world: () => mkWorld({ drillDay: 6, extracted: { 1: 400, 3: 900, 4: 650 }, layersPassed: { 0: 0, 2: 0 }, chargesSpent: 3, totalCollected: 1950, casing: 1, heat: { 4: "elevated", 5: "high" }, pending: { layer: 5, oil: 0, hasInclusion: false, heat: "high", revealedAt: Date.now() - 3 * 60000 } }) },
-  { key: "armed", name: "Casing armed", trigger: "the next strike drills behind steel, whatever it holds", world: () => mkWorld({ drillDay: 6, extracted: { 1: 400, 3: 900, 4: 650 }, layersPassed: { 0: 0, 2: 0, 5: 0 }, chargesSpent: 3, totalCollected: 1950, casing: 1, casingArmed: true, heat: { 4: "elevated", 5: "high" } }) },
+  { key: "heat1", name: "Pending · hot zone below", trigger: "HIGH — hell or the motherlode under the bit; the CASE decision", world: () => mkWorld({ drillDay: 6, extracted: { 1: 400, 3: 900, 4: 650 }, layersPassed: { 0: 0, 2: 0 }, chargesSpent: 3, totalCollected: 1950, heat: { 4: "elevated", 5: "high" }, pending: { layer: 5, oil: 0, hasInclusion: false, heat: "high", revealedAt: Date.now() - 3 * 60000 } }) },
+  { key: "armed", name: "Casing armed", trigger: "the next strike drills behind steel, whatever it holds", world: () => mkWorld({ drillDay: 6, extracted: { 1: 400, 3: 900, 4: 650 }, layersPassed: { 0: 0, 2: 0, 5: 0 }, chargesSpent: 3, totalCollected: 1950, casingArmed: true, heat: { 4: "elevated", 5: "high" } }) },
   { key: "cased", name: "Cased through a pay zone", trigger: "L7 held 1,800 BTR — cased off, behind steel; the ledger says so", world: () => mkWorld({ drillDay: 8, extracted: { 1: 400, 3: 900, 4: 650 }, layersPassed: { 0: 0, 2: 0, 5: 0 }, chargesSpent: 3, totalCollected: 1950, heat: { 5: "high" }, cased: { 6: true }, pending: { layer: 7, oil: 120, hasInclusion: false, heat: "nominal", revealedAt: Date.now() - 60000 } }) },
   { key: "heat-idle", name: "Nothing on the table · hell below", trigger: "the warning persists after the decision, until the next strike", world: () => mkWorld({ drillDay: 6, extracted: { 1: 400, 3: 900, 4: 650 }, layersPassed: { 0: 0, 2: 0, 5: 0 }, chargesSpent: 3, totalCollected: 1950, heat: { 4: "elevated", 5: "high" } }) },
   { key: "nocharges", name: "No charges left", trigger: "8/8 spent, wet layer pending", world: () => mkWorld({ drillDay: 12, extracted: { 1: 400, 3: 900, 5: 1200, 6: 300, 8: 650 }, layersPassed: { 0: 0, 2: 0, 4: 0, 7: 0, 10: 0 }, chargesSpent: 8, totalCollected: 3450, pending: { layer: 11, oil: 1800, hasInclusion: false, revealedAt: Date.now() - 10 * 60000 }, neighbours: NEIGHBOURS_FULL }) },
@@ -241,7 +241,7 @@ export default function HailMaryV2FixturePage() {
     const b = deriveBoards(w);
     const props = { ...extra, theme, pending: w.drill.pending, chargesRemaining: b.chargesRemaining, chargesCap: b.cap, threshold: w.drill.threshold,
       salvage: b.salvage, frontier: b.frontier, cadence: b.cadence, rack: b.rack, ledger: b.ledger, ended: !!w.ended,
-      orders: { autopilot: !!w.drill.autopilot, salvage: !!w.drill.orders?.salvage, caseOnHeat: !!w.drill.orders?.caseOnHeat }, casing: w.drill.supplies?.casing || 0, casingArmed: !!w.drill.casingArmed, ...h };
+      orders: { autopilot: !!w.drill.autopilot, salvage: !!w.drill.orders?.salvage, caseOnHeat: !!w.drill.orders?.caseOnHeat }, casingArmed: !!w.drill.casingArmed, ...h };
     if (version === "both") return (<div key={key} style={{ display: "flex", gap: 12, flexWrap: "wrap" }}><div style={{ width, maxWidth: "100%" }}><OilCoreSampleV3 {...props} /></div><div style={{ width, maxWidth: "100%" }}><OilCoreSampleV2 {...props} /></div></div>);
     return version === "v2" ? <OilCoreSampleV2 key={key} {...props} /> : <OilCoreSampleV3 key={key} {...props} />;
   };

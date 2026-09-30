@@ -215,10 +215,10 @@ t("heatReading: distance not diagnosis — below = high, two down or next door =
 });
 
 t("casing: shouldCase, the rack, the ledger and the reckoning agree on a cased layer", () => {
-  assert.deepEqual(shouldCase({ armed: true, casing: 1 }), { case: true, via: "armed" });
-  assert.deepEqual(shouldCase({ armed: true, casing: 0 }), { case: false, via: null });
-  assert.deepEqual(shouldCase({ orders: { caseOnHeat: true }, lastHeat: "high", casing: 2 }), { case: true, via: "order" });
-  assert.deepEqual(shouldCase({ orders: { caseOnHeat: true }, lastHeat: "elevated", casing: 2 }), { case: false, via: null });
+  assert.deepEqual(shouldCase({ armed: true }), { case: true, via: "armed" });                                   // casing is free: no supply gate
+  assert.deepEqual(shouldCase({ orders: { caseOnHeat: true }, lastHeat: "high" }), { case: true, via: "order" });
+  assert.deepEqual(shouldCase({ orders: { caseOnHeat: true }, lastHeat: "elevated" }), { case: false, via: null });
+  assert.deepEqual(shouldCase({}), { case: false, via: null });
   assert.match(casedAlertBody({ col: 0, row: 0, layer: 6, oil: 0, hell: true }), /HELL POCKET.*Sealed/);
   assert.match(casedAlertBody({ col: 0, row: 0, layer: 6, oil: 1800, hell: false }), /1,800 BTR.*never produced/);
   const plot = { col: 0, row: 0, drillDay: 8, revealed: { 5: 0, 6: 1800, 7: 120 }, extracted: {}, passed: { 5: 0 }, cased: { 6: true }, hellLayers: {} };

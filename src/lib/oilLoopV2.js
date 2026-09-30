@@ -76,14 +76,14 @@ export const HEAT_COPY = {
 
 // ── Casing (step 2, Michelle 2026-09-29) ─────────────────────────────────────
 // The bore cannot skip a layer; it can drill THROUGH one with the hole sealed.
-// A casing string in supply (`supplies.casing`), armed before the strike
-// (`casingArmed`, one-shot) — or the standing order CASE ON HEAT when the last
-// core read HIGH — makes the tick case the next layer: no core on the table,
-// no charge, no breach if it was hell, and no oil if it was the motherlode —
-// cased off, never produced. The forfeit is what makes the reading a decision.
-export const casingCount = (drill) => Number(drill?.supplies?.casing) || 0;
-export function shouldCase({ armed = false, orders = null, lastHeat = null, casing = 0 } = {}) {
-  if (!(casing > 0)) return { case: false, via: null };
+// Casing is FREE (Michelle, 2026-09-30): no supply, no stall, no count — the
+// layer's forfeit is the whole price. Armed before the strike (`casingArmed`,
+// one-shot) — or the standing order CASE ON HEAT when the last core read HIGH —
+// makes the tick case the next layer: no core on the table, no charge, no
+// breach if it was hell, and no oil if it was the motherlode — cased off, never
+// produced. The forfeit is what makes the reading a decision.
+// (`supplies.casing` / casingCount were the 2026-09-29 supply model; dropped.)
+export function shouldCase({ armed = false, orders = null, lastHeat = null } = {}) {
   if (armed === true) return { case: true, via: "armed" };
   if (orders?.caseOnHeat === true && lastHeat === "high") return { case: true, via: "order" };
   return { case: false, via: null };
@@ -92,7 +92,7 @@ export function casedAlertBody({ col, row, layer, oil, hell }) {
   const plot = `Plot (${col + 1}, ${row + 1})`;
   if (hell) return `${plot} L${layer + 1}: the crew cased through a HELL POCKET. Sealed behind steel — no breach, no demon.`;
   if (oil > 0) return `${plot} L${layer + 1}: the crew cased through ${Math.round(oil).toLocaleString()} BTR. Cased off — behind steel, never produced.`;
-  return `${plot} L${layer + 1}: the crew cased through dry shale. The string was spent on nothing.`;
+  return `${plot} L${layer + 1}: the crew cased through dry shale. Nothing lost but the layer.`;
 }
 const NEIGHBOUR_SETS = {
   all8: [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]],

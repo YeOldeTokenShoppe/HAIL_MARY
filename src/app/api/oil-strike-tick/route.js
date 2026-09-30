@@ -8,7 +8,7 @@ import { sendPlayerAlert } from "@/lib/oilAlerts";
 import {
   PASSIVE_DRILLS, MAX_DEPTH, depthCapFor, seasonClock, strikeTargetMs,
 } from "@/lib/oilStrikeClock";
-import { chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, pickSalvageOrder, heatReading, shouldCase, casingCount, casedAlertBody } from "@/lib/oilLoopV2";
+import { chargesCapFor, chargesRemainingFor, resolvePendingDecision, assayAlertBody, pickSalvageOrder, heatReading, shouldCase, casedAlertBody } from "@/lib/oilLoopV2";
 import { applyV2Resolution, applyLateralTake } from "@/lib/oilLoopV2Server";
 
 export const runtime = "nodejs";
@@ -419,7 +419,7 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
             // layer behind steel. No core on the table, no charge; hell is sealed,
             // oil is cased off (the reveal still records what was there — the
             // verifier checks it, and the player learns what they gave up).
-            const casing = shouldCase({ armed: drillNow.casingArmed === true, orders: drillNow.orders, lastHeat: pending?.heat || null, casing: casingCount(drillNow) });
+            const casing = shouldCase({ armed: drillNow.casingArmed === true, orders: drillNow.orders, lastHeat: pending?.heat || null });   // casing is free (2026-09-30): no supply check
             let cased = false;
             if (casing.case) {
               cased = true;
@@ -431,7 +431,6 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
               drillUpdate.lastStrikeOil = 0;
               drillUpdate.lastStrikeHell = false;
               drillUpdate.casingArmed = false;
-              drillUpdate.supplies = { casing: FieldValue.increment(-1) };
               drillUpdate.casingsUsed = FieldValue.increment(1);
               drillUpdate.lastCasedAt = FieldValue.serverTimestamp();
             } else if (isHellL) {
@@ -890,7 +889,8 @@ async function scoutOil() {
 
 // Admin test helper: reset a single user's claim-jump counter (and re-arm the rig)
 // so a tester can keep relocating. Targeted by userId so it can't affect others.
-// Admin: hand a rig a consumable (TEST TOOLS → GRANT CASING). ?supply=<userId>&item=casing&n=1
+// Admin: hand a rig a consumable. ?supply=<userId>&item=<name>&n=1 (casing is free since 2026-09-30, so
+// nothing reads supplies.casing any more; kept as a generic grant for whatever consumable comes next)
 async function grantSupply(userId, item = "casing", n = 1) {
   const db = getAdminDb();
   const ref = db.collection("oilDrills").doc(userId);
