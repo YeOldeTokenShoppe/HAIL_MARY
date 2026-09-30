@@ -730,7 +730,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
   const wantMode = (now) => {
     const f = devHook()?.force || {};
     if (crew.cowerUntil > Date.now() || f.hell) return "cower";
-    if (crew.photo && now < crew.photo.until) return "photo";
+    if (crew.photo && performance.now() / 1000 < crew.photo.until) return "photo";   // wall clock: `now` is this worker's own uptime
     if (demonNear()) return "defend";
     if (gates.hell) return "alert";
     if (crew.gusher || f.celebrate) return "celebrate";
@@ -837,7 +837,11 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
     } else if (mode === "photo") {
       const c = state.camera.position; faceWorld(c.x, c.y, c.z);          // both turn to the camera
       const ph = crew.photo; if (!ph) return;
-      if (ph.until <= now) { crew.photo = null; try { window.dispatchEvent(new CustomEvent("hm:crew-photo-end")); } catch (e) {} return; }
+      // photo timestamps are wall-clock seconds (startPhoto runs outside the frame loop);
+      // `now` here is this worker's own uptime, so compare against the wall clock (2026-09-30 fix:
+      // the ready event never fired and the pose never ended).
+      const wall = performance.now() / 1000;
+      if (ph.until <= wall) { crew.photo = null; try { window.dispatchEvent(new CustomEvent("hm:crew-photo-end")); } catch (e) {} return; }
       if (role.briefs) {
         // frame the pair: the point between the two heads, seen from where the camera already is
         if (!ph.faced && s.frames > 2 && headBone) {
@@ -847,7 +851,7 @@ function Worker({ role, spot, scene, sceneObj, animations, rigScene, gates, pane
           const f = _tmp.copy(state.camera.position).sub(centre); f.y = 0; if (f.lengthSq() < 1e-6) f.set(1, 0, 0); f.normalize();
           try { window.dispatchEvent(new CustomEvent("hm:crew-face", { detail: { center: centre.toArray(), front: f.toArray(), dist: PHOTO_FOCUS_DIST, minDist: PHOTO_FOCUS_MIN_DIST } })); } catch (e) {}
         }
-        if (!ph.announced && now >= ph.readyAt) { ph.announced = true; try { window.dispatchEvent(new CustomEvent("hm:crew-photo-ready", { detail: { poses: ph.poses } })); } catch (e) {} }
+        if (!ph.announced && wall >= ph.readyAt) { ph.announced = true; try { window.dispatchEvent(new CustomEvent("hm:crew-photo-ready", { detail: { poses: ph.poses } })); } catch (e) {} }
       }
     } else if (mode === "brief") {
       const c = state.camera.position; faceWorld(c.x, c.y, c.z);          // turn to the player
