@@ -3,10 +3,10 @@
 // "profit-equivalents". Parameters make different Trader styles testable.
 
 export const PRESETS = {
-  banker:   { name: 'Banker',   keep: 0,  insurance: 0, aggression: 1.0, hedgeThreshold: 2.5 },
-  hodler:   { name: 'Hodler',   keep: 20, insurance: 1, aggression: 0.8, hedgeThreshold: 2.0 },
-  degen:    { name: 'Degen',    keep: 30, insurance: 0, aggression: 1.3, hedgeThreshold: 4.0 },
-  cautious: { name: 'Cautious', keep: 10, insurance: 2, aggression: 0.6, hedgeThreshold: 1.5 },
+  banker:   { name: 'Bank everything', keep: 0,  insurance: 0, aggression: 1.0, hedgeThreshold: 2.5 },
+  hodler:   { name: 'Keep 20 unbanked', keep: 20, insurance: 1, aggression: 0.8, hedgeThreshold: 2.0 },
+  degen:    { name: 'Keep 30, aggressive', keep: 30, insurance: 0, aggression: 1.3, hedgeThreshold: 4.0 },
+  cautious: { name: 'Keep 10, insured', keep: 10, insurance: 2, aggression: 0.6, hedgeThreshold: 1.5 },
 };
 
 const sum = (a) => a.reduce((x, y) => x + y, 0);
@@ -180,7 +180,6 @@ export class Policy {
       case 'ability': return this.estAbility(g, p, a.inst);
       case 'consult': { if (p.known.omen) return -1; const v = this.harmful(g, p, g.omen) ? 1.5 : 0.4; return v - a.cost * 0.6; }
       case 'invoke': { const pr = g.providence; if (pr.id === 'the_hail_mary') return p.portfolio >= 6 && g.isUnderdog(p) ? 2 : -1; if (pr.id === 'the_crash') return 1.2; if (pr.id === 'the_fed') return 0.3; return 0; }
-      case 'lockTrader': { const liq = g.liquidity(p); const enables = g.actions(p).some((x) => x.cost === liq + 1 && x.t !== 'reserve' && x.t !== 'lockTrader'); return enables && g.round <= 3 ? 0.4 : -1; }
       default: return 0;
     }
   }
