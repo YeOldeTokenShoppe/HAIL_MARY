@@ -349,7 +349,7 @@
         if (c.suit === 'coins') return c.reversed ? `Bank ${h} directly, ${cost}` : `+${r + g.modSum(me, 'coinsBonus')} Profit, ${cost}`;
         if (c.suit === 'candles') { const inst = ch.inst; const bonus = c.reversed ? h : r * g.modProduct(me, 'candlesMult'); return `Work ${inst.card.name} for +${g.yieldOf(me, inst, bonus + g.modSum(me, 'candlesBonus'))}${c.reversed ? ', shielded' : ''}, ${cost}`; }
         if (c.suit === 'cups') { const m = g.modProduct(me, 'cupsMult'); return c.reversed ? `Take ${h} from the bot, gain ${h}, ${cost}` : `Bot +${h * m}, you +${r * m + g.modSum(me, 'cupsBonus')} and draw, ${cost}`; }
-        const t = ch.target; const amt = r * g.modProduct(me, 'chainsMult'); if (t && t.card) { const kills = t.drawdown + amt >= t.card.res; return `Attack ${t.card.name}: ${amt} Drawdown${kills ? ', liquidates it' : ''}, ${cost}`; } return `Front-run ${t.name}: take up to ${amt}, ${cost}`; }
+        const t = ch.target; const amt = r * g.modProduct(me, 'chainsMult') + g.modSum(me, 'chainsBonus'); if (t && t.isPass) return `INTERCEPT the bot's pass: ${t.owner.inAir} in the air, you take up to ${amt}, ${cost}`; if (t && t.card) { const kills = t.drawdown + amt >= t.card.res; return `Attack ${t.card.name}: ${amt} Drawdown${kills ? ', liquidates it' : ''}, ${cost}`; } return `Front-run ${t.name}: take up to ${amt}, ${cost}`; }
       default: return a.t;
     }
   };
@@ -414,7 +414,7 @@
     else if (pr.kind === 'main') html = `<div class="prompt-h">YOUR MAIN PHASE &middot; Liquidity ${g.liquidity(me)}${me.reservedThisTurn ? '' : ' &middot; you may still Reserve one card'}</div><div style="display:flex;flex-wrap:wrap;gap:8px">
         ${acts.filter((a) => a.t === 'foretell' || a.t === 'invoke').map((a) => `<button class="act" data-act="${acts.indexOf(a)}">${esc(actLabel(a))}</button>`).join('')}
         <button class="act big" id="vsEnd">End turn</button></div><p class="note" style="margin:8px 0 0">Play cards from your hand below and put Personalities to Work from your Floor. Only Working Personalities can be attacked.</p>`;
-    else if (pr.kind === 'hedge') { const t = pr.threat; const tgt = t.target && t.target.card ? t.target.card.name : 'your Portfolio'; html = `<div class="prompt-h" style="color:var(--bad)">INCOMING &middot; ${esc(t.attacker ? t.attacker.name : 'The R-cana')} plays ${esc(t.card.name)} at ${esc(tgt)} for ${t.amount}</div><div style="display:flex;flex-wrap:wrap;gap:8px">
+    else if (pr.kind === 'hedge') { const t = pr.threat; const tgt = t.target && t.target.isPass ? `your Hail Mary Pass (${me.inAir} in the air)` : t.target && t.target.card ? t.target.card.name : 'your Portfolio'; html = `<div class="prompt-h" style="color:var(--bad)">INCOMING &middot; ${esc(t.attacker ? t.attacker.name : 'The R-cana')} plays ${esc(t.card.name)} at ${esc(tgt)} for ${t.amount}</div><div style="display:flex;flex-wrap:wrap;gap:8px">
         ${pr.opts.map((c, i) => `<button class="act" data-hedge="${i}">Hedge with ${esc(c.name)} (absorbs ${c.reversed ? c.rank + 2 : c.rank}${c.reversed ? ', free' : `, costs ${g.costOf(me, c)}`})</button>`).join('')}
         <button class="act big" id="vsNoHedge">Take it</button></div>`; }
     else if (pr.kind === 'foretell') html = `<div class="prompt-h">FORETELL &middot; the next Major is ${esc(pr.card.name)}</div><div class="note" style="margin-bottom:8px">${esc(pr.card.text)}</div><div style="display:flex;gap:8px"><button class="act big" id="vsBottom">Send it to the bottom</button><button class="act" id="vsKeep">Leave it</button></div>`;

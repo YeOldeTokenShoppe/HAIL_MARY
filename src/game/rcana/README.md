@@ -47,6 +47,11 @@ Numbers that matter live in two places: `WIN_BANK` in `engine.js`, and the card 
 Dividend and Interest are in `Game.set()`. The Reveal and Final Bell logic is in `Game.reveal()`.
 Add a card by adding an entry in `cards.js`; the deck builder and viewer pick it up automatically.
 
+## Rulebooks
+
+`RULES-v1.md` and `RULES-v2.md` are complete, standalone rulebooks for the two current games. `RULES.md` is the
+design history.
+
 ## Tarot configuration (80 cards)
 
 A second, simpler game sharing the same ideas: one shared deck of 22 Major R-cana and 56 Minors
@@ -90,8 +95,12 @@ node v2-sim.js --verbose --seed 3 --da cautious --db aggressive
 ```
 
 Deck presets: `upright`, `revChains`, `revChainsAll`, `revCoins`, `revCups`, `cautious`, `aggressive`, `random`.
-Duel defaults after tuning: the lead seat rotates each round, a game that reaches 80 plays out the round
-before the largest Bank wins, reversed Chains draw a card when used as a Hedge, upright Cups draw a card. Rule flags for experiments: `--firstHand N` (first player's opening-hand penalty), `--chainsDraw 1`
+Duel defaults after tuning: fixed seat order with the first Trader drawing eight, a game that reaches 80 plays
+out the round before the largest Bank wins, reversed Chains draw a card when used as a Hedge, upright Cups draw
+a card. The Hail Mary stake is its own zone: Chains may target it (interception), Events that take Profit knock
+it down, a pass still in the air at the end returns to the Portfolio undoubled. Experiment flags: `--rotate 1` (rotating lead; rejected because it gives one player consecutive turns at two
+players), `--seatHand 8,7,7`, `--revIntercept 1` (reversed Chains may intercept a pass), `--revealLast 1`,
+`--sharedSet 1` (everyone Sets at round start, before the reveal), `--finish 0`, `--first N`. Rule flags for experiments: `--firstHand N` (first player's opening-hand penalty), `--chainsDraw 1`
 (reversed Chains draw a card when used), `--chainsBonus N`, `--cupsCost N`, `--cupsPenalty N`, `--cupsDiv N`.
 
 ## How a game of version 2 plays, turn by turn

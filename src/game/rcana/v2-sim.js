@@ -15,12 +15,13 @@ class StrongV2 extends StrongPolicy {
     const h = Math.ceil(c.rank / 2);
     if (c.suit === 'coins') return h * 1.15; // banked, safe
     if (c.suit === 'candles') return h + g.modSum(p, 'candlesBonus') + g.yieldOf(p, a.choice.inst) + 0.5;
-    if (c.suit === 'cups') { const o = a.choice.opp; return Math.min(h, o.portfolio) * 1.2 + h + g.modSum(p, 'revCupsBonus') + (o.pass ? Math.max(0, o.portfolio - h) * 0.9 : 0); }
+    if (c.suit === 'cups') { const o = a.choice.opp; return Math.min(h, o.portfolio) * 1.2 + h + g.modSum(p, 'revCupsBonus'); }
     return -1;
   }
   wantHedge(g, p, opts, threat) {
     const t = threat.target; let harm;
-    if (t.card) { const kills = t.drawdown + threat.amount >= t.card.res; harm = kills ? 2 + g.yieldOf(p, t) * this.horizon(g) + (t.card.kw.exitScam || 0) : threat.amount * 0.4; }
+    if (t.isPass) harm = p.inAir * 1.2;
+    else if (t.card) { const kills = t.drawdown + threat.amount >= t.card.res; harm = kills ? 2 + g.yieldOf(p, t) * this.horizon(g) + (t.card.kw.exitScam || 0) : threat.amount * 0.4; }
     else harm = Math.min(threat.amount, p.portfolio);
     const rev = opts.filter((c) => c.reversed).sort((a, b) => a.rank - b.rank);
     const free = rev.find((c) => c.rank + 2 >= threat.amount) || rev[rev.length - 1];
@@ -61,7 +62,7 @@ export async function batch(opts, n) {
 }
 if (typeof process !== 'undefined' && process.argv && process.argv[1] && process.argv[1].endsWith('v2-sim.js')) {
   const optsA = {}, optsB = {};
-  const games = +(args.games || 500); const seed = +(args.seed || 1); const rules = {}; if (args.win) rules.winBank = +args.win; if (args.interest) rules.interestDiv = +args.interest; if (args.firstHand) rules.firstHandPenalty = +args.firstHand; if (args.chainsBonus) rules.revChainsBonus = +args.chainsBonus; if (args.chainsDraw) rules.revChainsDraw = true; if (args.cupsPenalty) rules.revCupsPenalty = +args.cupsPenalty; if (args.cupsCost) rules.revCupsCost = +args.cupsCost; if (args.cupsDiv) rules.revCupsTakeDiv = +args.cupsDiv; if (args.cupsDraw) rules.cupsDraw = true; if (args.rotate != null) rules.rotateLead = +args.rotate === 1; if (args.passMult) rules.passMult = +args.passMult; if (args.passMin) rules.passMin = +args.passMin; if (args.passUnderdog) rules.passUnderdogOnly = true; if (args.noPassA) optsA.usePass = false; if (args.noPassB) optsB.usePass = false; if (args.marginA) optsA.passMargin = +args.marginA; if (args.finish != null) rules.finishRound = +args.finish === 1; if (args.first != null) rules.firstTurnDraw = +args.first;
+  const games = +(args.games || 500); const seed = +(args.seed || 1); const rules = {}; if (args.win) rules.winBank = +args.win; if (args.interest) rules.interestDiv = +args.interest; if (args.firstHand) rules.firstHandPenalty = +args.firstHand; if (args.chainsBonus) rules.revChainsBonus = +args.chainsBonus; if (args.chainsDraw) rules.revChainsDraw = true; if (args.cupsPenalty) rules.revCupsPenalty = +args.cupsPenalty; if (args.cupsCost) rules.revCupsCost = +args.cupsCost; if (args.cupsDiv) rules.revCupsTakeDiv = +args.cupsDiv; if (args.cupsDraw) rules.cupsDraw = true; if (args.revIntercept) rules.revChainsIntercept = true; if (args.revealLast) rules.revealBeforeLast = true; if (args.sharedSet) rules.sharedSet = true; if (args.seatHand) rules.seatHand = String(args.seatHand).split(',').map(Number); if (args.rotate != null) rules.rotateLead = +args.rotate === 1; if (args.passMult) rules.passMult = +args.passMult; if (args.passMin) rules.passMin = +args.passMin; if (args.passUnderdog) rules.passUnderdogOnly = true; if (args.noPassA) optsA.usePass = false; if (args.noPassB) optsB.usePass = false; if (args.marginA) optsA.passMargin = +args.marginA; if (args.finish != null) rules.finishRound = +args.finish === 1; if (args.first != null) rules.firstTurnDraw = +args.first;
   const o = { a: args.a || 'strong', b: args.b || 'strong', da: args.da || 'upright', db: args.db || 'upright', seed, rules, optsA, optsB };
   if (args.verbose) { const g = playOne({ ...o, snapshots: true }); await g.run(); for (const s of g.snapshots) { console.log(`\n=== ${s.label} R${s.round} ${s.active || ''} | Market: ${s.market || '-'} | Providence: ${s.providence.join(', ') || '-'} ===`); s.events.forEach((e) => console.log('  ' + e)); s.players.forEach((p) => console.log(`  ${p.name}: Bank ${p.bank} Port ${p.portfolio} Liq ${p.reserve - p.locked}/${p.reserve} Hand ${p.hand.length} | ${p.floor.map((i) => `${i.name}${i.working ? '*' : ''}${i.drawdown ? `(${i.drawdown})` : ''}`).join(', ')}`)); } console.log(JSON.stringify(g.result(), null, 1)); }
   else {

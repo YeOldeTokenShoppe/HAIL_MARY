@@ -52,6 +52,9 @@ export const DECK_PRESETS = {
   revCups: { name: 'Cups reversed (take, not give)', rev: (s) => s.startsWith('cups_') && /_\d+$/.test(s) },
   cautious: { name: 'Cautious: Chains + Coins pips reversed', rev: (s) => (s.startsWith('chains_') || s.startsWith('coins_')) && /_\d+$/.test(s) },
   aggressive: { name: 'Aggressive: Cups + Candles pips reversed', rev: (s) => (s.startsWith('cups_') || s.startsWith('candles_')) && /_\d+$/.test(s) },
+  chainsLowRev: { name: 'Chains 1–5 reversed, 6–10 upright', rev: (s) => /^chains_[1-5]$/.test(s) },
+  chainsHighRev: { name: 'Chains 6–10 reversed, 1–5 upright', rev: (s) => /^chains_(6|7|8|9|10)$/.test(s) },
+  chainsEvenRev: { name: 'Even Chains reversed', rev: (s) => /^chains_(2|4|6|8|10)$/.test(s) },
   random: { name: 'Random reversals', rev: null },
 };
 export function buildDeck(preset, rng) {
