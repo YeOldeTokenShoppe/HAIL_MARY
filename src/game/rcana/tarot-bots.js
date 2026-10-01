@@ -8,12 +8,12 @@ export class RandomPolicy {
   bottomCard(g, p) { return this.rng() < 0.5; }
   hailMaryPass(g, p) { return this.rng() < 0.5; }
   reorder(g, p, cards) { return [...cards].sort(() => this.rng() - 0.5); }
-  takeTurn(g, p) {
+  async takeTurn(g, p) {
     let guard = 0;
     while (!g.over && guard++ < 30) {
       const acts = g.actions(p); if (!acts.length) break;
       const k = Math.floor(this.rng() * (acts.length + 1)); if (k === acts.length) break; // pass
-      g.act(p, acts[k]);
+      await g.act(p, acts[k]);
     }
   }
 }
@@ -90,14 +90,14 @@ export class StrongPolicy {
     const use = (c) => { let v = c.type === 'court' ? this.courtValue(g, p, c, h) : c.rank * (c.suit === 'chains' ? 0.7 : 1); if (c.cost > liq + 2) v *= 0.6; if (c.suit === 'candles' && !p.floor.length) v *= 0.5; return v / Math.max(1, Math.sqrt(c.cost)); };
     return [...p.hand].sort((a, b) => use(a) - use(b))[0];
   }
-  takeTurn(g, p) {
+  async takeTurn(g, p) {
     // Reserve first unless the hand is tiny and everything is playable
-    if (p.hand.length >= 3 || g.liquidity(p) < 2) { const c = this.reserveChoice(g, p); if (c) g.act(p, { t: 'reserve', card: c }); }
+    if (p.hand.length >= 3 || g.liquidity(p) < 2) { const c = this.reserveChoice(g, p); if (c) await g.act(p, { t: 'reserve', card: c }); }
     let guard = 0;
     while (!g.over && guard++ < 30) {
       const acts = g.actions(p).filter((a) => a.t !== 'reserve'); let best = null, bs = 0.25;
       for (const a of acts) { const s = this.score(g, p, a) + g.rng() * 1e-3; if (s > bs) { bs = s; best = a; } }
-      if (!best) break; g.act(p, best);
+      if (!best) break; await g.act(p, best);
     }
   }
 }
@@ -108,8 +108,23 @@ export class NaivePolicy extends RandomPolicy {
   bankAmount(g, p) { return p.portfolio; }
   hailMaryPass() { return true; }
   wantHedge(g, p, opts) { return opts.sort((a, b) => b.rank - a.rank)[0]; }
-  takeTurn(g, p) {
+  async takeTurn(g, p) {
     let guard = 0;
-    while (!g.over && guard++ < 30) { const acts = g.actions(p); if (!acts.length) break; g.act(p, acts[Math.floor(this.rng() * acts.length)]); }
+    while (!g.over && guard++ < 30) { const acts = g.actions(p); if (!acts.length) break; await g.act(p, acts[Math.floor(this.rng() * acts.length)]); }
   }
+}
+
+// A human at the table. The page supplies `ui`, an object of async prompts:
+//   ui.setPhase(g, p, { canPass })      → { pass: true } | { bank: n }
+//   ui.mainPhase(g, p)                  → resolves when the human ends their turn (the page calls g.act itself)
+//   ui.hedge(g, p, options, threat)     → a card or null
+//   ui.foretell(g, p, card)             → true to send it to the bottom
+export class HumanPolicy {
+  constructor(ui) { this.ui = ui; this.name = 'You'; this.human = true; this.pending = null; }
+  async hailMaryPass(g, p) { this.pending = await this.ui.setPhase(g, p, { canPass: true }); return !!this.pending.pass; }
+  async bankAmount(g, p) { if (!this.pending && p.portfolio === 0) return 0; const d = this.pending || (await this.ui.setPhase(g, p, { canPass: false })); this.pending = null; return d.bank ?? 0; }
+  async takeTurn(g, p) { await this.ui.mainPhase(g, p); }
+  async wantHedge(g, p, opts, threat) { return this.ui.hedge(g, p, opts, threat); }
+  async bottomCard(g, p, c) { return this.ui.foretell(g, p, c); }
+  reorder(g, p, cards) { return [...cards].sort((a, b) => (HARMFUL.has(a.name) ? 1 : 0) - (HARMFUL.has(b.name) ? 1 : 0)); }
 }

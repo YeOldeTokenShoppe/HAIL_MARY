@@ -22,10 +22,10 @@ export class DuelGame extends TarotGame {
   }
   bury(c) { const half = Math.floor(this.majors.length / 2); this.majors.splice(half + Math.floor(this.rng() * (this.majors.length - half + 1)), 0, c); this.log(`${c.name} is buried in the bottom half of the Majors`); c.buried = true; }
   oracle() { const top = this.majors.splice(0, 3); if (!top.length) return; const ud = this.players.filter((q) => this.isUnderdog(q))[0] || this.active || this.players[0]; this.log(`THE ORACLE shows ${top.map((c) => c.name).join(', ')}; ${ud.name} reorders`); this.majors.unshift(...ud.policy.reorder(this, ud, top)); }
-  foretell(p) { if (!this.omen || p.foretold) return; p.foretold = true; p.stats.foretells++; this.log(`${p.name} foretells the Omen: ${this.omen.name}`); if (p.policy.bottomCard(this, p, this.omen)) { this.majors.push(this.omen); this.omen = this.majors.shift(); this.log(`${p.name} sends it to the bottom`); } }
+  async foretell(p) { if (!this.omen || p.foretold) return; p.foretold = true; p.stats.foretells++; const show = !this.hiddenInfo || p.policy.human; this.log(`${p.name} foretells the Omen${show ? `: ${this.omen.name}` : ''}`); if (await p.policy.bottomCard(this, p, this.omen)) { this.majors.push(this.omen); this.omen = this.majors.shift(); this.log(`${p.name} sends it to the bottom`); } }
   costOf(p, c) { let base = super.costOf(p, c); if (c.reversed && c.suit === 'cups' && c.type === 'pip') base += (this.rules.revCupsCost || 0); if (c.suit === 'chains' && c.type === 'pip' && !c.reversed) for (const o of this.opps(p)) base += this.modSum(o, 'oppChainsCost'); return base; }
   // reversed pips
-  playPip(p, c, choice) {
+  async playPip(p, c, choice) {
     if (!c.reversed) return super.playPip(p, c, choice);
     const cost = this.costOf(p, c); if (!this.pay(p, cost)) return false;
     p.hand.splice(p.hand.indexOf(c), 1); this.count(c); p.stats.pips++; p.stats[c.suit + 'Rev'] = (p.stats[c.suit + 'Rev'] || 0) + 1;
@@ -33,14 +33,14 @@ export class DuelGame extends TarotGame {
     this.log(`${p.name} plays ${c.name} for ${cost}${choice && choice.opp ? ` → ${choice.opp.name}` : ''}`);
     if (c.suit === 'coins') this.bank(p, h, c.name);
     else if (c.suit === 'candles') { const inst = choice.inst; inst.shielded = true; this.work(p, inst, { bonus: h + this.modSum(p, 'candlesBonus') }); this.log(`${inst.card.name} cannot be targeted until ${p.name}'s next turn`); }
-    else if (c.suit === 'cups') { const o = choice.opp; this.current = { kind: 'chain', card: c, attacker: p, victim: o, reduce: 0, amount: h }; this.offerHedge(o, { card: c, attacker: p, target: o, amount: h }); this.frontrun(p, o, h); this.current = null; this.profit(p, Math.max(0, h - (this.rules.revCupsPenalty || 0)) + this.modSum(p, 'revCupsBonus'), c.name); for (const i of [...p.floor]) if (i.card.onRevCup && p.floor.includes(i)) i.card.onRevCup(this, p, i); }
+    else if (c.suit === 'cups') { const o = choice.opp; this.current = { kind: 'chain', card: c, attacker: p, victim: o, reduce: 0, amount: h }; await this.offerHedge(o, { card: c, attacker: p, target: o, amount: h }); this.frontrun(p, o, h); this.current = null; this.profit(p, Math.max(0, h - (this.rules.revCupsPenalty || 0)) + this.modSum(p, 'revCupsBonus'), c.name); for (const i of [...p.floor]) if (i.card.onRevCup && p.floor.includes(i)) i.card.onRevCup(this, p, i); }
     this.discard.push(c); return true;
   }
-  offerHedge(victim, threat) {
+  async offerHedge(victim, threat) {
     const upright = victim.hand.filter((c) => c.type === 'pip' && c.suit === 'chains' && !c.reversed && this.costOf(victim, c) <= this.liquidity(victim));
     const reversed = victim.hand.filter((c) => c.type === 'pip' && c.suit === 'chains' && c.reversed);
     const opts = [...reversed, ...upright]; if (!opts.length) return;
-    const ch = victim.policy.wantHedge(this, victim, opts, threat); if (!ch) return;
+    const ch = await victim.policy.wantHedge(this, victim, opts, threat); if (!ch) return;
     if (!ch.reversed) this.pay(victim, this.costOf(victim, ch));
     victim.hand.splice(victim.hand.indexOf(ch), 1); this.discard.push(ch); victim.stats.hedges++; this.count(ch);
     const absorb = ch.reversed ? ch.rank + 2 + (this.rules.revChainsBonus || 0) : ch.rank; this.current.reduce += absorb; this.log(`${victim.name} HEDGES with ${ch.name} (absorbs ${absorb}${ch.reversed ? ', free' : ''})`);
@@ -54,6 +54,6 @@ export class DuelGame extends TarotGame {
     return A.filter((a) => !(a.t === 'foretell' && !this.omen));
   }
   startOfRound() { if (this.round >= 1 && !this.over) this.revealOmen(); for (const q of this.players) for (const i of q.floor) if (i.owner === this.active) i.shielded = false; }
-  playTurn(idx, firstOfRound, lastOfRound) { const p = this.players[idx]; for (const i of p.floor) i.shielded = false; super.playTurn(idx, firstOfRound, lastOfRound); }
+  async playTurn(idx, firstOfRound, lastOfRound) { const p = this.players[idx]; for (const i of p.floor) i.shielded = false; await super.playTurn(idx, firstOfRound, lastOfRound); }
   result() { const r = super.result(); r.players.forEach((q, i) => { q.deckPreset = this.players[i].deckPreset; }); return r; }
 }

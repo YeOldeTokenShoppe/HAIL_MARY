@@ -45,10 +45,10 @@ export function playOne({ a = 'strong', b = 'strong', da = 'upright', db = 'upri
   if (swap) { const t = players[0]; players[0] = players[1]; players[1] = t; }
   return new DuelGame({ players, seed, snapshots, rules });
 }
-export function batch(opts, n) {
+export async function batch(opts, n) {
   const res = { games: n, wins: {}, firstWins: 0, bell: 0, rounds: [], banks: [], majors: 0, cardPlays: {}, stats: {}, archetypes: {}, reasons: {} };
   for (let i = 0; i < n; i++) {
-    const g = playOne({ ...opts, seed: opts.seed + i, swap: i % 2 === 1 }); const r = g.run();
+    const g = playOne({ ...opts, seed: opts.seed + i, swap: i % 2 === 1 }); const r = await g.run();
     const w = r.winner || 'draw'; res.wins[w] = (res.wins[w] || 0) + 1; if (r.winnerIdx === 0) res.firstWins++; if (r.finalBell) res.bell++;
     res.rounds.push(r.rounds); res.banks.push(...r.players.map((p) => p.bank)); res.majors += r.majorsSeen;
     const rk = /banked/.test(r.reason) ? 'banked target' : r.reason.split(':')[0]; res.reasons[rk] = (res.reasons[rk] || 0) + 1;
@@ -63,9 +63,9 @@ if (typeof process !== 'undefined' && process.argv && process.argv[1] && process
   const optsA = {}, optsB = {};
   const games = +(args.games || 500); const seed = +(args.seed || 1); const rules = {}; if (args.win) rules.winBank = +args.win; if (args.interest) rules.interestDiv = +args.interest; if (args.firstHand) rules.firstHandPenalty = +args.firstHand; if (args.chainsBonus) rules.revChainsBonus = +args.chainsBonus; if (args.chainsDraw) rules.revChainsDraw = true; if (args.cupsPenalty) rules.revCupsPenalty = +args.cupsPenalty; if (args.cupsCost) rules.revCupsCost = +args.cupsCost; if (args.cupsDiv) rules.revCupsTakeDiv = +args.cupsDiv; if (args.cupsDraw) rules.cupsDraw = true; if (args.rotate != null) rules.rotateLead = +args.rotate === 1; if (args.passMult) rules.passMult = +args.passMult; if (args.passMin) rules.passMin = +args.passMin; if (args.passUnderdog) rules.passUnderdogOnly = true; if (args.noPassA) optsA.usePass = false; if (args.noPassB) optsB.usePass = false; if (args.marginA) optsA.passMargin = +args.marginA; if (args.finish != null) rules.finishRound = +args.finish === 1; if (args.first != null) rules.firstTurnDraw = +args.first;
   const o = { a: args.a || 'strong', b: args.b || 'strong', da: args.da || 'upright', db: args.db || 'upright', seed, rules, optsA, optsB };
-  if (args.verbose) { const g = playOne({ ...o, snapshots: true }); g.run(); for (const s of g.snapshots) { console.log(`\n=== ${s.label} R${s.round} ${s.active || ''} | Market: ${s.market || '-'} | Providence: ${s.providence.join(', ') || '-'} ===`); s.events.forEach((e) => console.log('  ' + e)); s.players.forEach((p) => console.log(`  ${p.name}: Bank ${p.bank} Port ${p.portfolio} Liq ${p.reserve - p.locked}/${p.reserve} Hand ${p.hand.length} | ${p.floor.map((i) => `${i.name}${i.working ? '*' : ''}${i.drawdown ? `(${i.drawdown})` : ''}`).join(', ')}`)); } console.log(JSON.stringify(g.result(), null, 1)); }
+  if (args.verbose) { const g = playOne({ ...o, snapshots: true }); await g.run(); for (const s of g.snapshots) { console.log(`\n=== ${s.label} R${s.round} ${s.active || ''} | Market: ${s.market || '-'} | Providence: ${s.providence.join(', ') || '-'} ===`); s.events.forEach((e) => console.log('  ' + e)); s.players.forEach((p) => console.log(`  ${p.name}: Bank ${p.bank} Port ${p.portfolio} Liq ${p.reserve - p.locked}/${p.reserve} Hand ${p.hand.length} | ${p.floor.map((i) => `${i.name}${i.working ? '*' : ''}${i.drawdown ? `(${i.drawdown})` : ''}`).join(', ')}`)); } console.log(JSON.stringify(g.result(), null, 1)); }
   else {
-    const r = batch(o, games); const s = r.stats; const pg = (k) => ((s[k] || 0) / games).toFixed(2);
+    const r = await batch(o, games); const s = r.stats; const pg = (k) => ((s[k] || 0) / games).toFixed(2);
     console.log(`${games} games: ${o.da}(${o.a}) vs ${o.db}(${o.b}) | win ${rules.winBank || 80}`);
     console.log('wins', JSON.stringify(r.wins), '| first player', Math.round(r.firstWins / games * 100) + '%'); console.log('reasons', r.reasons);
     console.log(`rounds avg ${r.avgRounds} median ${r.medianRounds} p10 ${r.p10} p90 ${r.p90} | Final Bell ${r.bellRate} | avg end bank ${r.avgBank} | majors seen/game ${(r.majors / games).toFixed(1)}`);
