@@ -40,7 +40,7 @@ Courts are Personalities with a cost, Yield, Resilience, and one ability each. E
 
 ## Setup
 
-1. Each Trader shuffles their own deck. The first Trader draws eight; everyone else draws seven.
+1. Each Trader shuffles their own deck. The first Trader draws nine; the other draws eight.
 2. Shuffle the 22 Majors. Place the top one face-down in the Omen slot.
 3. Choose a first Trader. Turn order is fixed for the whole game, so each Trader's exposure window is the same: the opponent's turn plus one reveal.
 

@@ -255,7 +255,7 @@ Shuffled into the deck. When drawn, a Major does not go to your hand: it resolve
 
 ## Version 1: the shared reading (two players)
 
-Setup: each Trader draws seven Minors. The rest of the Minors and all 22 Majors are shuffled together. The first player skips the first draw.
+Setup: each Trader draws eight Minors. The rest of the Minors and all 22 Majors are shuffled together. The first player skips the first draw.
 
 Each turn: Refresh (Working Personalities stand up, Reserve unlocks). Set (Dividend 1; Interest 1 per full 5 in Portfolio; resolve or throw a Hail Mary Pass; bank any amount). Draw one Minor, resolving every Major drawn along the way. Main: Reserve one card as Liquidity, hire courts, play pips, Work idle Personalities, Foretell with Virgil, Invoke a Major in Providence. Only Working Personalities can be hit by Chains. Banked Profit is untouchable.
 

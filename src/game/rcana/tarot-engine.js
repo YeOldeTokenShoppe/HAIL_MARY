@@ -2,7 +2,7 @@
 import { MINORS, MAJORS, byId } from './tarot.js';
 import { makeRng } from './engine.js';
 
-export const DEFAULTS = { winBank: 80, openingHand: 7, minorsPerTurn: 1, firstTurnDraw: 0, interestDiv: 5, rotateLead: false, finishRound: false, passMult: 2, passMin: 10, passUnderdogOnly: false, maxRounds: 40 };
+export const DEFAULTS = { winBank: 80, openingHand: 8, minorsPerTurn: 1, firstTurnDraw: 0, interestDiv: 5, rotateLead: false, finishRound: false, passMult: 2, passMin: 10, passUnderdogOnly: false, maxRounds: 40 };
 let UID = 1;
 
 export class TarotGame {
