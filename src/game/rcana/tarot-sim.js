@@ -42,7 +42,7 @@ if (typeof process !== 'undefined' && process.argv && process.argv[1] && process
   } else {
     const r = batch({ a: args.a || 'strong', b: args.b || 'random', seed, rules, optsA, optsB }, games);
     console.log(`${games} games: ${args.a || 'strong'} vs ${args.b || 'random'} | win target ${rules.winBank || 80}`);
-    console.log('wins', r.wins, '| first player wins', Math.round(r.firstWins / games * 100) + '%'); console.log('reasons', r.reasons);
+    console.log('wins', JSON.stringify(r.wins), '| first player wins', Math.round(r.firstWins / games * 100) + '%'); console.log('reasons', r.reasons);
     console.log(`rounds avg ${r.avgRounds} median ${r.medianRounds} p10 ${r.p10} p90 ${r.p90} | Final Bell ${r.bellRate} | avg end bank ${r.avgBank} | majors seen/game ${(r.majors / games).toFixed(1)}`);
     const s = r.stats; const pg = (k) => (s[k] / games).toFixed(2);
     console.log(`per game: worked ${pg('worked')} pips ${pg('pips')} coins ${pg('coins')} candles ${pg('candles')} chains ${pg('chains')} cups ${pg('cups')} hedges ${pg('hedges')} hires ${pg('hires')} invokes ${pg('invokes')} liquidated ${pg('liquidated')} foretells ${pg('foretells')}`);

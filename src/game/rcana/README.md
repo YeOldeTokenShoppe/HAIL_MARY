@@ -62,3 +62,26 @@ node tarot-sim.js --games 1000 --a strong --b strong --win 60 --draw 2 --hand 5 
 
 Defaults after tuning: win at 80, opening hand 7, one Minor drawn per turn, the first player skips the
 first draw, Interest 1 per full 5 in Portfolio (`--interest 10` to compare). THE RECKONING revealed while more than half the deck remains is buried in the bottom half.
+
+## Version 2: duel with reversals
+
+Each Trader brings a private 56-card Minor deck: one card per slot (Ace–King of each suit), each chosen
+upright or reversed. The 22 Majors are a shared deck with a face-down Omen revealed at the start of every
+round. Supports two to four players.
+
+| File | What it is |
+|---|---|
+| `v2.js` | Reversed faces for all 56 Minors, deck presets, `buildDeck(preset, rng)`. |
+| `v2-engine.js` | `DuelGame`, a subclass of the tarot engine: private decks, Omen, reversed pips, free reversed-Chain hedges, shields. |
+| `v2-sim.js` | CLI and the `playOne` / `batch` exports the viewer's duel mode uses. |
+
+```bash
+node v2-sim.js --games 1000 --da revChains --db upright
+node v2-sim.js --games 1000 --da random --db random --a strong --b naive
+node v2-sim.js --verbose --seed 3 --da cautious --db aggressive
+```
+
+Deck presets: `upright`, `revChains`, `revChainsAll`, `revCoins`, `revCups`, `cautious`, `aggressive`, `random`.
+Duel defaults after tuning: the first player holds one fewer card, reversed Chains draw a card when used as a
+Hedge, upright Cups draw a card. Rule flags for experiments: `--firstHand N` (first player's opening-hand penalty), `--chainsDraw 1`
+(reversed Chains draw a card when used), `--chainsBonus N`, `--cupsCost N`, `--cupsPenalty N`, `--cupsDiv N`.

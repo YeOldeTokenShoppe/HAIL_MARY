@@ -78,7 +78,7 @@
 <div class="wrap">
   <header>
     <h1>R-CANA TAROT SIMULATOR</h1>
-    <span class="sub">The 80-card configuration: 22 Majors shuffled into one shared deck, four suits of fourteen. Bot versus bot.</span>
+    <span class="sub">Version 1 shares one 80-card deck. Version 2 gives each Trader a 56-card deck with reversals and shares the 22 Majors. Bot versus bot.</span>
     <nav role="tablist">
       <button role="tab" id="tab-play" aria-selected="true" data-tab="play">Play</button>
       <button role="tab" id="tab-batch" aria-selected="false" data-tab="batch">Batch</button>
@@ -87,8 +87,11 @@
   </header>
 
   <section class="panel controls" id="controls">
+    <label>Mode <select id="mode"><option value="reading">Version 1: shared reading</option><option value="duel">Version 2: duel with reversals</option></select></label>
     <label>Trader A <select id="polA"><option value="strong">Strong bot</option><option value="naive">Naive bot</option><option value="random">Random bot</option></select></label>
+    <label>Deck A (v2) <select id="deckA"></select></label>
     <label>Trader B <select id="polB"><option value="strong">Strong bot</option><option value="naive" selected>Naive bot</option><option value="random">Random bot</option></select></label>
+    <label>Deck B (v2) <select id="deckB"></select></label>
     <label>Win target <input type="number" id="win" value="80" min="20" max="200"></label>
     <label>Minors drawn per turn <input type="number" id="draw" value="1" min="1" max="4"></label>
     <label>Opening hand <input type="number" id="hand" value="7" min="3" max="10"></label>
@@ -135,15 +138,24 @@
 
 <script type="module">
   import { ALL, SUITS, SUIT_NAME } from './tarot.js';
-  import { playOne, batch } from './tarot-sim.js';
+  import { ALL_V2, DECK_PRESETS } from './v2.js';
+  import { playOne as playOne1, batch as batch1 } from './tarot-sim.js';
+  import { playOne as playOne2, batch as batch2 } from './v2-sim.js';
+  const isDuel = () => $('mode').value === 'duel';
+  const playOne = (o) => (isDuel() ? playOne2(o) : playOne1(o));
+  const batch = (o, n) => (isDuel() ? batch2(o, n) : batch1(o, n));
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   // ----- controls -----
-  try { const saved = JSON.parse(localStorage.getItem('rcana-tarot') || '{}'); for (const k of ['polA', 'polB', 'win', 'draw', 'hand', 'seed', 'games']) if (saved[k] != null) $(k).value = saved[k]; } catch (e) {}
-  const opts = () => ({ a: $('polA').value, b: $('polB').value, seed: +$('seed').value || 1, rules: { winBank: +$('win').value || 80, minorsPerTurn: +$('draw').value || 1, openingHand: +$('hand').value || 7 } });
-  const persist = () => { try { localStorage.setItem('rcana-tarot', JSON.stringify({ polA: $('polA').value, polB: $('polB').value, win: $('win').value, draw: $('draw').value, hand: $('hand').value, seed: $('seed').value, games: $('games').value })); } catch (e) {} };
+  for (const id of ['deckA', 'deckB']) $(id).innerHTML = Object.entries(DECK_PRESETS).map(([k, v]) => `<option value="${k}">${esc(v.name)}</option>`).join('');
+  $('deckB').value = 'random'; $('deckA').value = 'random';
+  try { const saved = JSON.parse(localStorage.getItem('rcana-tarot') || '{}'); for (const k of ['mode', 'polA', 'polB', 'deckA', 'deckB', 'win', 'draw', 'hand', 'seed', 'games']) if (saved[k] != null) $(k).value = saved[k]; } catch (e) {}
+  const opts = () => ({ a: $('polA').value, b: $('polB').value, da: $('deckA').value, db: $('deckB').value, seed: +$('seed').value || 1, rules: { winBank: +$('win').value || 80, minorsPerTurn: +$('draw').value || 1, openingHand: +$('hand').value || 7 } });
+  const persist = () => { try { localStorage.setItem('rcana-tarot', JSON.stringify({ mode: $('mode').value, polA: $('polA').value, polB: $('polB').value, deckA: $('deckA').value, deckB: $('deckB').value, win: $('win').value, draw: $('draw').value, hand: $('hand').value, seed: $('seed').value, games: $('games').value })); } catch (e) {} };
+  const syncMode = () => { const d = isDuel(); $('deckA').parentElement.hidden = !d; $('deckB').parentElement.hidden = !d; $('draw').parentElement.hidden = d; };
+  $('mode').addEventListener('change', () => { syncMode(); renderCards(); }); syncMode();
 
   // tabs
   document.querySelectorAll('nav [role=tab]').forEach((b) => b.addEventListener('click', () => {
@@ -167,7 +179,7 @@
       ['Round', s.round + (s.bell != null ? ` &middot; Final Bell R${s.bell}` : '')],
       ['Market', s.market || 'none'],
       ['Providence', s.providence.length ? s.providence.join(', ') : '&mdash;'],
-      ['R-cana left', s.deckLeft],
+      [isDuel() ? 'Majors left' : 'R-cana left', s.deckLeft],
       ['Result', s.winner ? `${s.winner} wins` : (s.over ? s.reason : 'in play')],
     ].map(([k, v]) => `<div class="cell"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
     $('boards').innerHTML = s.players.map((p) => `
@@ -233,7 +245,7 @@
         </div>
         <div class="zone-h" style="margin-top:12px">How the R-cana named each side</div>
         <div class="strip">${Object.entries(r.archetypes).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="cell"><div class="k">${esc(k)}</div><div class="v">${Math.round(v / n * 100)}%</div></div>`).join('')}</div>
-        <p class="note" style="margin:10px 0 0">${esc(o.a)} vs ${esc(o.b)}, sides alternate each game. Win target ${o.rules.winBank}, ${o.rules.minorsPerTurn} Minor${o.rules.minorsPerTurn > 1 ? 's' : ''} per turn, opening hand ${o.rules.openingHand}, first player skips the first draw. Seeds ${o.seed}&ndash;${o.seed + n - 1}.</p>`;
+        <p class="note" style="margin:10px 0 0">${esc(o.a)} vs ${esc(o.b)}, sides alternate each game. Win target ${o.rules.winBank}, ${o.rules.minorsPerTurn} Minor${o.rules.minorsPerTurn > 1 ? 's' : ''} per turn, opening hand ${o.rules.openingHand}, first player skips the first draw${isDuel() ? ' and holds one fewer card' : ''}. Seeds ${o.seed}&ndash;${o.seed + n - 1}.</p>`;
       // histogram
       const counts = {}; r.rounds.forEach((x) => { counts[x] = (counts[x] || 0) + 1; });
       const ks = Object.keys(counts).map(Number).sort((a, b) => a - b); const mx = Math.max(...Object.values(counts));
@@ -242,7 +254,7 @@
       ks.forEach((k, i) => { const h = (counts[k] / mx) * (H - padB - 14); svg += `<rect x="${padL + i * bw + 2}" y="${H - padB - h}" width="${bw - 4}" height="${h}" fill="var(--accent)" rx="2"/><text x="${padL + i * bw + bw / 2}" y="${H - 8}" font-size="10" text-anchor="middle" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${k}</text><text x="${padL + i * bw + bw / 2}" y="${H - padB - h - 3}" font-size="10" text-anchor="middle" fill="var(--fg)" font-family="IBM Plex Mono, monospace">${counts[k]}</text>`; });
       svg += '</svg>'; $('hist').innerHTML = svg;
       // card stats
-      const rows = ALL.map((c) => [c.name, r.cardPlays[c.name] || 0]).sort((a, b) => b[1] - a[1]);
+      const rows = Object.entries(r.cardPlays).sort((a, b) => b[1] - a[1]);
       $('cardStats').innerHTML = `<table><thead><tr><th>Card</th><th class="n">Played</th><th class="n">Per game</th></tr></thead><tbody>${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${v}</td><td class="n">${(v / n).toFixed(2)}</td></tr>`).join('')}</tbody></table>`;
     }, 20);
   });
@@ -252,7 +264,8 @@
   $('fType').innerHTML += ['pip', 'court', 'major'].map((t) => `<option value="${t}">${t}</option>`).join('');
   function renderCards() {
     const ft = $('fTemp').value, fy = $('fType').value, q = $('fText').value.toLowerCase();
-    const rows = ALL.filter((c) => (!ft || (ft === 'major' ? c.type === 'major' : c.suit === ft)) && (!fy || c.type === fy) && (!q || (c.name + ' ' + (c.title || '') + ' ' + (c.tarot || '') + ' ' + (c.text || '')).toLowerCase().includes(q)));
+    const pool = isDuel() ? [...ALL_V2, ...ALL.filter((c) => c.type === 'major')] : ALL;
+    const rows = pool.filter((c) => (!ft || (ft === 'major' ? c.type === 'major' : c.suit === ft)) && (!fy || c.type === fy) && (!q || (c.name + ' ' + (c.title || '') + ' ' + (c.tarot || '') + ' ' + (c.text || '')).toLowerCase().includes(q)));
     $('cardTable').innerHTML = `<table><thead><tr><th>Card</th><th>Type</th><th class="n">Cost</th><th class="n">Y / R</th><th>Text</th></tr></thead><tbody>${rows.map((c) => `<tr><td>${c.suit ? `<span class="temp ${c.suit}"></span>` : ''}<strong>${esc(c.name)}</strong>${c.villain ? ' <span class="pill" style="border-color:var(--villain);color:var(--villain)">Villain</span>' : ''}${c.title ? `<div class="note">${esc(c.title)}</div>` : ''}${c.tarot ? `<div class="note">${c.n}. ${esc(c.tarot)}</div>` : ''}</td><td>${c.type}${c.kind ? `<div class="note">${c.kind}</div>` : ''}</td><td class="n">${c.cost ?? '&mdash;'}</td><td class="n">${c.type === 'court' ? `${c.yield} / ${c.res}` : '&mdash;'}</td><td>${Object.keys(c.kw || {}).length ? `<em>${esc(Object.entries(c.kw).map(([k, v]) => (v === true ? k : `${k} ${v}`)).join(', '))}.</em> ` : ''}${esc(c.text || '')}</td></tr>`).join('')}</tbody></table><p class="note">${rows.length} cards, plus two Querents.</p>`;
   }
   ['fTemp', 'fType', 'fText'].forEach((id) => $(id).addEventListener('input', renderCards)); renderCards();
