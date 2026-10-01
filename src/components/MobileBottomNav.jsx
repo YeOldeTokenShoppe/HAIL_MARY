@@ -4,7 +4,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useWalletAuth } from './WalletAuthProvider';
 import { UnifiedAccountModal } from './UnifiedAccountModal';
 import { useLanguage } from './LanguageProvider';
-import useCyberConfirm from './useCyberConfirm';
 
 // Bottom mobile app-style navigation bar — drop-in replacement for NavControlsHome
 export default function MobileBottomNav({
@@ -113,11 +112,6 @@ export default function MobileBottomNav({
   const clerk = useClerk();
   const { t } = useLanguage();
 
-  // Cyberpunk confirm modal (shared with /main's portfolio buttons) — used
-  // by any extra slot that opts in via `slot.confirm`. Reuses CyberButton's
-  // glitch + sound-effect dialog instead of navigating on first tap.
-  const [confirmModal, cyberConfirm] = useCyberConfirm();
-
   useEffect(() => {
     setIsHydrated(true);
   }, []);
@@ -200,22 +194,12 @@ export default function MobileBottomNav({
 
   /* Renders a generic extra slot (placeholder / "coming soon" affordance).
      iconSrc renders as <img> (preserves color for multi-color SVGs like
-     /tcg.svg); icon is used as-is for inline JSX.
-
-     When a slot carries `confirm` ({ title, body, accent?, shadow?, ... }),
-     tapping it opens the shared cyberpunk confirm modal (glitch + sounds)
-     and `slot.onClick` becomes the modal's Proceed action — so the dock
-     keeps its app-style ergonomics but destination taps get the /main
-     ceremony. Slots without `confirm` fire onClick immediately as before. */
+     /tcg.svg); icon is used as-is for inline JSX. */
   const renderExtraSlot = (slot, idx) => (
     <button
       key={slot.key ?? `${slot.label}-${idx}`}
       className={`btm-nav-item ${slot.comingSoon ? 'btm-coming-soon' : ''}`}
-      onClick={
-        slot.confirm
-          ? () => cyberConfirm({ ...slot.confirm, onProceed: slot.onClick })
-          : slot.onClick
-      }
+      onClick={slot.onClick}
       title={slot.title ?? (slot.comingSoon ? `${slot.label} — coming soon` : slot.label)}
     >
       <div className="btm-nav-icon" style={{ position: 'relative' }}>
@@ -1157,9 +1141,6 @@ export default function MobileBottomNav({
         theme={accountModalTheme}
         unlockedItems={accountModalUnlockedItems}
       />
-
-      {/* Shared cyberpunk confirm modal for `confirm`-enabled extra slots. */}
-      {confirmModal}
     </>
   );
 }

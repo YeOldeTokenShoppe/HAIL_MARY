@@ -251,7 +251,7 @@ export default function OilCoreSampleV3({
         <CoreCylinder rack={rack} pending={pending} hud={hud} />
         <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
           <HudField voice="label" label="Sample" value={`L${pending.layer + 1} of ${n}`} />
-          <HudField voice="label" label="Class" value={dry ? "Dry shale" : pending.hasInclusion ? "Wet · anomalous" : "Wet core"} />
+          <HudField voice="label" label="Class" value={dry ? "Dry shale" : pending.hasInclusion ? "Liquid · anomalous" : "Liquid core"} />
           <HudField label="Assay" value={dry ? "dry" : `${fmtBtr(oil)} BTR`} color={dry ? hud.muted : undefined} />
           <HudField label="Temp" value={heatCopy.temp} color={heat === "high" ? hud.red : heat ? hud.warn : undefined} />
           <HudField label="Crew" value={`would ${crewWould.toLowerCase()}`} color={crewWould === "EXTRACT" ? hud.green : undefined} />
@@ -477,7 +477,7 @@ export default function OilCoreSampleV3({
             </div>
             {onSetOrders && [
               ["salvage", "LATERAL EXTRACT", "take a neighbour's passed layer at or above your line, for 1 charge. Neighbours with the order take turns — longest wait goes first."],
-              ["autopilot", "AUTO-PILOT", "once you can afford every layer left in your column, the crew keeps each wet one as it comes up, above your line or not. Dry layers still pass free. Off = ORDERS: the crew follows your line on every layer, and runs lateral extract if it's on. Nothing more."],
+              ["autopilot", "AUTO-PILOT", "once you can afford every layer left in your column, the crew keeps each liquid one as it comes up, above your line or not. Dry layers still pass free. Off = ORDERS: the crew follows your line on every layer, and runs lateral extract if it's on. Nothing more."],
               ["caseOnHeat", "CASE ON HEAT", "when a core reads HIGH (a hot cell directly below) the crew drills the next layer behind steel. Hell never breaches; a gusher is cased off. Off = you arm the casing yourself."],
             ].map(([key, name, desc]) => (
               <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "0.4rem 0", borderTop: `1px solid ${hud.goldFaint}`, marginTop: "0.4rem" }}>

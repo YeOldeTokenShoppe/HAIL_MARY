@@ -29,7 +29,6 @@ import {
   GAZE,
   COUNSEL_VOICES,
 } from "@/lib/counselSpeech";
-import useCyberConfirm from "@/components/useCyberConfirm";
 import { adviserMouth } from "@/lib/adviserMouth";
 
 // ── /main ── THE INNER STRUGGLE, staged as a triptych.
@@ -1771,10 +1770,8 @@ export default function MainPage() {
   const [glitchActive, setGlitchActive] = useState(false);
   const [glitchKey, setGlitchKey] = useState(0);
   const isTalking = activeAnim === "Talking";
-  // Bottom-dock MORE popover + shared cyberpunk confirm modal for its
-  // destinations (mirrors the root page's dock treatment).
+  // Bottom-dock MORE popover (mirrors the root page's dock treatment).
   const [showMoreMenu, setShowMoreMenu] = useState(false);
-  const [moreConfirmModal, moreConfirm] = useCyberConfirm();
 
   // The deliberation in flight: what each voice said, and who holds the floor.
   const [captions, setCaptions] = useState({}); // { JB|GR|OL: line }
@@ -3482,7 +3479,7 @@ export default function MainPage() {
         hideWallet
         isMobile
         accountOnLeft
-        /* Left slot — BUY RL80 → BuyModal (no confirm, matches root). */
+        /* Left slot — BUY RL80 → BuyModal (matches root). */
         onBookClick={() => setBuyModalOpen(true)}
         bookLabel="BUY RL80"
         bookIcon={
@@ -3521,12 +3518,6 @@ export default function MainPage() {
             label: "ex Machina",
             title: "ex Machina",
             onClick: () => { window.location.href = "/home"; },
-            confirm: {
-              title: "ex Machina",
-              body: "Return to home.",
-              accent: "hsl(189, 84%, 55%)",
-              shadow: "hsl(189, 70%, 38%)",
-            },
             // Same flame mark the other pages use for the candelarium slot.
             iconSrc: "/favicon.svg",
           },
@@ -3535,16 +3526,10 @@ export default function MainPage() {
           {
             key: "terminal",
             /* Label stays short — the dock's slot labels ellipsize past
-               ~88px. The full name lands in the confirm's title. */
+               ~88px. The full name lands in the tooltip title. */
             label: "Liminal Terminal",
             title: "The Liminal Terminal",
             onClick: () => { window.location.href = "/trade"; },
-            confirm: {
-              title: "The Liminal Terminal",
-              body: "Read the tape. Four consultants, one verdict — the market confesses to those who listen.",
-              accent: "hsl(189, 84%, 55%)",
-              shadow: "hsl(189, 70%, 38%)",
-            },
             icon: (
               <svg viewBox="0 0 24 24" fill="none" stroke="#39ff14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, display: "block", filter: "drop-shadow(0 0 4px rgba(57, 255, 20, 0.6))" }} aria-hidden="true">
                 <rect width="20" height="14" x="2" y="3" rx="2" />
@@ -3557,8 +3542,7 @@ export default function MainPage() {
       />
 
       {/* MORE popover — anchored above the far-right dock slot. Holds
-          secondary destinations (Hail Mary, Coin Fountain, Ex Libris),
-          confirm-gated. */}
+          secondary destinations (Hail Mary, Coin Fountain, Ex Libris). */}
       {showMoreMenu && (
         <>
           <div
@@ -3591,13 +3575,7 @@ export default function MainPage() {
                 label: "Hail Mary",
                 /* Amber/gold — matches the Hail Mary entry on the root dock. */
                 stroke: "#f4b53f",
-                onSelect: () => moreConfirm({
-                  title: "Hail Mary Prospecting Co",
-                  body: "Find your fortune in the digital frontier. Our Lady's prospectors never rest.",
-                  accent: "hsl(189, 84%, 55%)",
-                  shadow: "hsl(189, 70%, 38%)",
-                  onProceed: () => { window.location.href = "/hailmary?mode=test"; },
-                }),
+                onSelect: () => { window.location.href = "/hailmary?mode=test"; },
                 icon: (
                   <>
                     <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
@@ -3610,13 +3588,7 @@ export default function MainPage() {
               {
                 label: "Coin Fountain",
                 stroke: "#2ad6ee",
-                onSelect: () => moreConfirm({
-                  title: "Coin Fountain",
-                  body: "Toss a coin, whisper a wish. Our Lady keeps every offering the faithful let fall.",
-                  accent: "hsl(189, 84%, 55%)",
-                  shadow: "hsl(189, 70%, 38%)",
-                  onProceed: () => { window.location.href = "/fountain"; },
-                }),
+                onSelect: () => { window.location.href = "/fountain"; },
                 icon: (
                   <>
                     <path d="M12 10L12 2" />
@@ -3629,13 +3601,7 @@ export default function MainPage() {
               {
                 label: "Ex Libris",
                 stroke: "#ff44d4",
-                onSelect: () => moreConfirm({
-                  title: "Ex Libris",
-                  body: "The perpetual ledger. Every flame, every name, inscribed for those who came to pray.",
-                  accent: "hsl(189, 84%, 55%)",
-                  shadow: "hsl(189, 70%, 38%)",
-                  onProceed: () => { window.location.href = "/exlibris"; },
-                }),
+                onSelect: () => { window.location.href = "/exlibris"; },
                 icon: (
                   <>
                     <path d="M15 12h-5" />
@@ -3678,8 +3644,6 @@ export default function MainPage() {
         </>
       )}
 
-      {/* Cyberpunk confirm modal for the MORE-popover destinations. */}
-      {moreConfirmModal}
 
       {/* ── First-visit apparition triptych ── all of Our Lady's faces, side
           by side, before any one of them reads as the default. Held until the

@@ -31,6 +31,7 @@ import VendorSitePalHost from "@/components/VendorSitePalHost";
 import { setVendorGreetingContext } from "@/lib/vendorSitePal";
 import OilOverlayModal from "@/components/OilOverlayModal";
 import OilCoreSampleV3 from "@/components/OilCoreSampleV3";
+import OilSurveyPanel from "@/components/OilSurveyPanel";
 import OilReckoning from "@/components/OilReckoning";
 import PlayerWalker from "@/components/PlayerWalker";
 import { chargesCapFor, buildColumnRack, buildLedger, buildReckoning, resolvePendingDecision, fmtSpan } from "@/lib/oilLoopV2";
@@ -699,8 +700,6 @@ function TODSkyBodies({ todHour }) {
   );
 }
 
-const OilSurfaceMap = dynamic(() => import("@/components/OilSurfaceMap"), { ssr: false });
-const OilCrossSection = dynamic(() => import("@/components/OilCrossSection"), { ssr: false });
 const OilVerifyPanel = dynamic(() => import("@/components/OilVerifyPanel"), { ssr: false });
 const OilAdminGuide = dynamic(() => import("@/components/OilAdminGuide"), { ssr: false });
 const OilClaimCertificate = dynamic(() => import("@/components/OilClaimCertificate"), { ssr: false });
@@ -2444,6 +2443,11 @@ export default function OilPage() {
 
   // Claim jump state
   const [claimJumpMode, setClaimJumpMode] = useState(false);
+  const [surveyOpen, setSurveyOpen] = useState(false);
+  const [surveyView, setSurveyView] = useState("surface");
+  useEffect(() => {
+    if (claimJumpMode) { setSurveyView("surface"); setSurveyOpen(true); }
+  }, [claimJumpMode]);
   const [claimToast, setClaimToast] = useState(null);
   const claimToastTimer = useRef(null);
   const [chatModalPlotKey, setChatModalPlotKey] = useState(null);
@@ -2475,7 +2479,7 @@ export default function OilPage() {
   }, [isAdmin, adminAuthed, adminPassword]);
 
   // Mobile tab view
-  const [mobileTab, setMobileTab] = useState("3d"); // "3d" | "boardwalk" | "surface" | "xsec"
+  const [mobileTab, setMobileTab] = useState("3d"); // "3d" | "boardwalk"; surveys open in an overlay
   // The phone rig camera's view: the report's MACHINE PANEL chip toggles "panel"
   // (a head-on glide to the control box); leaving the RIG tab puts it back.
   const [rigView, setRigView] = useState("rig");
@@ -4529,17 +4533,12 @@ export default function OilPage() {
     handleFlyTo(x, y);
   }, [handleFlyTo, gridSize]);
 
-  // "Pick a plot" without a plot selected: take the player to the survey map.
-  // On the phone that is the SURFACE tab (the field lives there now); on
-  // desktop the map is already on screen, so just bring it into view.
+  // Plot picking uses the same expanded survey on desktop and phone.
   const goToSurveyMap = useCallback(() => {
-    if (isMobile) {
-      setMobileTab("surface");
-      document.getElementById("oil-scroll")?.scrollTo({ top: 0, behavior: "smooth" });
-    } else {
-      document.getElementById("survey-map")?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }, [isMobile]);
+    setPanelsCollapsed(false);
+    setSurveyView("surface");
+    setSurveyOpen(true);
+  }, []);
 
   // Phone: the 3D is your rig (RigScene), so the panels should be about your
   // plot from the first frame — select it once when the claim arrives. Once,
@@ -8318,7 +8317,6 @@ export default function OilPage() {
   //    coordinates, so there is no heading here. ──
   const rigDetails = !isAdmin && !isReport && activeUserDrill?.col != null && (
     <div>
-      {payoutHeadline}
       {user && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
           <input
@@ -8335,7 +8333,7 @@ export default function OilPage() {
               borderRadius: 2,
               color: theme.textStrong,
               fontFamily: "'Share Tech Mono', monospace",
-              fontSize: 11,
+              fontSize: 12,
               letterSpacing: "0.05em",
               outline: "none",
             }}
@@ -8351,8 +8349,8 @@ export default function OilPage() {
               borderRadius: 2,
               color: username.trim() ? theme.accent : theme.muted,
               fontFamily: "'Share Tech Mono', monospace",
-              fontSize: 10,
-              letterSpacing: "0.12em",
+              fontSize: 12,
+              letterSpacing: "0.02em",
               cursor: username.trim() ? "pointer" : "default",
               opacity: usernameSaving ? 0.5 : 1,
             }}
@@ -8362,31 +8360,31 @@ export default function OilPage() {
         </div>
       )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-        <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.green }}>
+        <span style={{ fontSize: 12, letterSpacing: "0.02em", color: theme.green }}>
           EXTRACTED: {playerExtracted.toLocaleString()} BTR
         </span>
         {/* The DEPTH dial carries this while the gauges are up */}
         {!showGauges && (
-          <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.accent }}>
+          <span style={{ fontSize: 12, letterSpacing: "0.02em", color: theme.accent }}>
             DEPTH {effectiveDrillDay}/{DEPTH_Z}
           </span>
         )}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-        <span style={{ fontSize: 10, letterSpacing: "0.1em", color: theme.muted }}>
+        <span style={{ fontSize: 12, letterSpacing: "0.02em", color: theme.muted }}>
           {passiveDepth} PASSIVE + {bonusDrills} BONUS
         </span>
-        <span style={{ fontSize: 10, letterSpacing: "0.1em", color: theme.muted }}>
+        <span style={{ fontSize: 12, letterSpacing: "0.02em", color: theme.muted }}>
           JUMPS {userDrill?.claimJumpsUsed ?? 0} ({Math.max(0, FREE_CLAIM_JUMPS + (userDrill?.bonusClaimJumps ?? 0) - (userDrill?.claimJumpsUsed ?? 0))} free)
         </span>
       </div>
       {/* Referral stats */}
       {userDrill?.referralCode && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-          <span style={{ fontSize: 10, letterSpacing: "0.1em", color: theme.gold }}>
+          <span style={{ fontSize: 12, letterSpacing: "0.02em", color: theme.gold }}>
             REFERRALS: {userDrill.confirmedReferrals || 0} confirmed
           </span>
-          <span style={{ fontSize: 10, letterSpacing: "0.1em", color: theme.gold }}>
+          <span style={{ fontSize: 12, letterSpacing: "0.02em", color: theme.gold }}>
             +{bonusDrills} bonus {loopV2 ? "charges" : "drills"}
           </span>
         </div>
@@ -8394,7 +8392,7 @@ export default function OilPage() {
       {/* Bonus-source breakdown. shares/holding are tracked precisely; the
           remainder (referrals + demon hunts) shares one counter, so it's lumped. */}
       {userDrill?.referralCode && bonusDrills > 0 && (
-        <div style={{ fontSize: 9, color: theme.muted, marginBottom: 6, letterSpacing: "0.05em" }}>
+        <div style={{ fontSize: 12, color: theme.muted, marginBottom: 6, letterSpacing: "0.05em" }}>
           {(() => {
             const shares = userDrill.bonusFromShares || 0;
             const holding = userDrill.bonusFromHolding || 0;
@@ -8412,7 +8410,7 @@ export default function OilPage() {
       {/* SUPPLIES — DAILY TICKET prizes that are held, not spent yet: tonics
           (the next strike drills two layers) and the stall coupon. */}
       {((userDrill?.supplies?.tonic ?? 0) > 0 || (userDrill?.supplies?.holyWater ?? 0) > 0 || couponValid(userDrill?.coupon)) && (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginBottom: 6, fontSize: 10, letterSpacing: "0.1em", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginBottom: 6, fontSize: 12, letterSpacing: "0.02em", flexWrap: "wrap" }}>
           <span style={{ color: theme.muted }}>SUPPLIES</span>
           <span style={{ color: theme.green, textAlign: "right" }}>
             {(userDrill?.supplies?.tonic ?? 0) > 0 && <span title="Your next strike drills two layers">🧪 TONIC ×{userDrill.supplies.tonic}</span>}
@@ -8429,7 +8427,7 @@ export default function OilPage() {
           display: "flex", alignItems: "center", gap: 6, marginBottom: 8,
           padding: "4px 8px", background: theme.inputBg, border: `1px solid ${theme.border}`, borderRadius: 2,
         }}>
-          <span style={{ fontSize: 10, color: theme.muted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 12, color: theme.muted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             rl80.com/hailmary?ref={userDrill.referralCode}
           </span>
           <button
@@ -8439,39 +8437,11 @@ export default function OilPage() {
             style={{
               padding: "2px 8px", border: `1px solid ${theme.border}`, borderRadius: 2,
               background: "transparent", color: theme.accent, fontFamily: "'Share Tech Mono', monospace",
-              fontSize: 9, letterSpacing: "0.1em", cursor: "pointer",
+              fontSize: 12, letterSpacing: "0.02em", cursor: "pointer",
             }}
           >
             COPY
           </button>
-        </div>
-      )}
-      {/* Claim Jump toggle */}
-      {gamePhase === "active" && !isTest && userDrill && (
-        <div style={{ marginBottom: 8 }}>
-          <button
-            onClick={() => setClaimJumpMode((m) => !m)}
-            style={{
-              width: "100%",
-              padding: "6px 12px",
-              border: `1px solid ${claimJumpMode ? theme.gold : theme.border}`,
-              borderRadius: 3,
-              fontFamily: "'Share Tech Mono', monospace",
-              fontSize: 10,
-              letterSpacing: "0.12em",
-              cursor: "pointer",
-              background: claimJumpMode ? `${theme.gold}22` : "transparent",
-              color: claimJumpMode ? theme.gold : theme.muted,
-            }}
-          >
-            {claimJumpMode ? "CANCEL CLAIM JUMP" : "CLAIM JUMP"}
-          </button>
-          {claimJumpMode && (
-            <div style={{ fontSize: 10, color: theme.gold, marginTop: 4, textAlign: "center" }}>
-              Click an open plot on the map to jump
-              {(userDrill?.claimJumpsUsed ?? 0) >= FREE_CLAIM_JUMPS + (userDrill?.bonusClaimJumps ?? 0) && ` (costs 1 bonus ${loopV2 ? "charge" : "drill"})`}
-            </div>
-          )}
         </div>
       )}
       {/* Time scrub slider (player review) */}
@@ -8479,7 +8449,7 @@ export default function OilPage() {
         <div style={{ marginBottom: 8, padding: "6px 0" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
             <span style={{
-              fontSize: 10, letterSpacing: "0.15em", fontFamily: "'Share Tech Mono', monospace",
+              fontSize: 12, letterSpacing: "0.02em", fontFamily: "'Share Tech Mono', monospace",
               color: reviewDay !== null ? theme.gold : theme.muted,
             }}>
               {reviewDay !== null ? `REVIEWING DAY ${reviewDay}` : "LIVE"}
@@ -8489,7 +8459,7 @@ export default function OilPage() {
                 onClick={() => setReviewDay(null)}
                 style={{
                   background: theme.accent, color: "#000", border: "none", borderRadius: 2,
-                  fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 8px",
+                  fontSize: 12, fontWeight: 700, letterSpacing: "0.02em", padding: "2px 8px",
                   cursor: "pointer", fontFamily: "'Share Tech Mono', monospace",
                 }}
               >
@@ -8517,10 +8487,10 @@ export default function OilPage() {
           at-a-glance version of the same data. */}
       <div
         onClick={() => setDepthProfileOpen((o) => !o)}
-        style={{ fontSize: 11, letterSpacing: "0.15em", color: theme.accent, marginBottom: 6, display: "flex", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
+        style={{ fontSize: 12, letterSpacing: "0.02em", color: theme.accent, marginBottom: 6, display: "flex", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
       >
         <span>DEPTH PROFILE</span>
-        <span style={{ fontSize: 10, color: theme.muted }}>{depthProfileOpen ? "\u25B4" : "\u25BE"}</span>
+        <span style={{ fontSize: 12, color: theme.muted }}>{depthProfileOpen ? "\u25B4" : "\u25BE"}</span>
       </div>
       {depthProfileOpen && (
       <div style={styles.depthChart}>
@@ -8795,8 +8765,63 @@ export default function OilPage() {
       </PanelTitle>
       {drillButton}
       {gaugesPanel}
-      {rigDetails}
     </PanelSection>
+  );
+
+  const rigAccountDetails = rigDetails && (
+    <PanelSection theme={theme} isMobile={isMobile}>
+      <details>
+        <summary style={{ cursor: "pointer", fontSize: 13, color: theme.textStrong, padding: "4px 0" }}>Rig details &amp; referrals</summary>
+        <div style={{ marginTop: 12 }}>{rigDetails}</div>
+      </details>
+    </PanelSection>
+  );
+  const playerPayout = showPayout && !isAdmin && !isReport && activeUserDrill?.col != null && (
+    <PanelSection theme={theme} isMobile={isMobile}>{payoutHeadline}</PanelSection>
+  );
+  const surveyPanel = (
+    <OilSurveyPanel
+      theme={theme}
+      open={surveyOpen}
+      view={surveyView}
+      onViewChange={setSurveyView}
+      onStartJump={gamePhase === "active" && !isTest && !isAdmin && !isReport && activeUserDrill?.col != null && userDrill ? () => { setClaimJumpMode(true); setSurveyView("surface"); setSurveyOpen(true); } : undefined}
+      onOpen={(view) => { setSurveyView(view); setSurveyOpen(true); }}
+      onClose={() => { setSurveyOpen(false); setClaimJumpMode(false); }}
+      onCancelJump={() => { setClaimJumpMode(false); setSurveyOpen(false); }}
+      onOwnPlot={() => {
+        const col = activeUserDrill?.col ?? userDrill?.col ?? myPlot?.col;
+        const row = activeUserDrill?.row ?? userDrill?.row ?? myPlot?.row;
+        if (col != null && row != null) handleSelectClaim({ x: col, y: row });
+      }}
+      onInspect={(claim) => {
+        handleSelectClaim(claim);
+        if (isMobile) setMobileTab("3d");
+        setTimeout(() => document.getElementById("your-rig")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+      }}
+      surfaceProps={{
+        blockade: hellActive && hellCol != null ? { col: hellCol, row: hellRow } : null,
+        claimTotals: fieldView.claimTotals, maxClaimTotal: fieldView.maxClaimTotal,
+        selectedClaimIndex, onSelectClaim: handleSelectClaim,
+        gridX: gridSize, gridY: gridSize, allPlotsMap: fieldView.allPlotsMap,
+        claimJumpMode, onClaimJump: handleClaimJump, currentUserId: user?.id,
+        claimJumpNote: (userDrill?.claimJumpsUsed ?? 0) >= FREE_CLAIM_JUMPS + (userDrill?.bonusClaimJumps ?? 0)
+          ? `Costs 1 bonus ${loopV2 ? "charge" : "drill"}`
+          : `${Math.max(0, FREE_CLAIM_JUMPS + (userDrill?.bonusClaimJumps ?? 0) - (userDrill?.claimJumpsUsed ?? 0))} free jumps remaining`,
+        hellMap: fieldView.hellMap, numberOfDeposits, numberOfHellPockets,
+        gusherEvents: fieldView.gusherEvents, plotsWithMessages: fieldView.plotsWithMessages,
+        verified: fieldVerified, revealAll: seedVisible || showOilData,
+      }}
+      undergroundProps={{
+        grid3D: fieldView.grid3D, maxCellValue: fieldView.maxOil,
+        sliceY, selectedX: xsecCol, drillDepth: showOilData ? drillDepth : effectiveDrillDay,
+        onSelectX: handleSelectX, onSelectRow: setSliceY,
+        gridX: gridSize, gridY: gridSize, allPlotsMap: fieldView.allPlotsMap,
+        hellMap: fieldView.hellMap, gusherEvents: fieldView.gusherEvents,
+        capDepth: PASSIVE_DRILLS, ownCapDepth: PASSIVE_DRILLS + (userDrill?.bonusDrills || 0),
+        currentUserId: user?.id, verified: fieldVerified, revealAll: seedVisible || showOilData,
+      }}
+    />
   );
 
   // ── Rig editor on the phone: opening it switches to the 3D tab, selects your
@@ -8927,12 +8952,11 @@ export default function OilPage() {
           {[
             { key: "3d", label: "RIG" },
             { key: "boardwalk", label: "MIDWAY" },
-            { key: "surface", label: "SURFACE" },
-            { key: "xsec", label: "X-SECTION" },
+            { key: "survey", label: "SURVEY" },
           ].map((tab) => (
             <button
               key={tab.key}
-              onClick={() => { if (tab.key === "boardwalk") warmBoardwalk("boardwalk-tab"); setMobileTab(tab.key); }}
+              onClick={() => { if (tab.key === "survey") { goToSurveyMap(); return; } if (tab.key === "boardwalk") warmBoardwalk("boardwalk-tab"); setMobileTab(tab.key); }}
               style={{
                 ...m.tab,
                 ...(mobileTab === tab.key ? m.tabActive : {}),
@@ -9223,62 +9247,7 @@ export default function OilPage() {
             </div>
           )}
 
-          {/* Surface Map */}
-          {mobileTab === "surface" && (
-            <div style={m.section}>
-              <OilSurfaceMap
-                blockade={hellActive && hellCol != null ? { col: hellCol, row: hellRow } : null}
-                claimTotals={fieldView.claimTotals}
-                maxClaimTotal={fieldView.maxClaimTotal}
-                selectedClaimIndex={selectedClaimIndex}
-                onSelectClaim={handleSelectClaim}
-                sliceY={sliceY}
-                theme={theme}
-                parabolum={parabolum}
-                gridX={gridSize}
-                gridY={gridSize}
-                allPlotsMap={fieldView.allPlotsMap}
-                claimJumpMode={claimJumpMode}
-                onClaimJump={handleClaimJump}
-                currentUserId={user?.id}
-                hellMap={fieldView.hellMap}
-                numberOfDeposits={numberOfDeposits}
-                numberOfHellPockets={numberOfHellPockets}
-                gusherEvents={fieldView.gusherEvents}
-                plotsWithMessages={fieldView.plotsWithMessages}
-                verified={fieldVerified}
-              />
-            </div>
-          )}
-
-          {/* Cross Section */}
-          {mobileTab === "xsec" && (
-            <div style={m.section}>
-              <OilCrossSection
-                grid3D={fieldView.grid3D}
-                maxCellValue={fieldView.maxOil}
-                sliceY={sliceY}
-                selectedX={xsecCol}
-                drillDepth={showOilData ? drillDepth : effectiveDrillDay}
-                onSelectX={handleSelectX}
-                onSelectRow={setSliceY}
-                theme={theme}
-                parabolum={parabolum}
-                gridX={gridSize}
-                gridY={gridSize}
-                allPlotsMap={fieldView.allPlotsMap}
-                hellMap={fieldView.hellMap}
-                gusherEvents={fieldView.gusherEvents}
-                capDepth={PASSIVE_DRILLS}
-                ownCapDepth={PASSIVE_DRILLS + (userDrill?.bonusDrills || 0)}
-                currentUserId={user?.id}
-                verified={fieldVerified}
-              />
-            </div>
-          )}
-
           {/* Panels below active view */}
-          {testStepper}
           {reckoningCard}
           {finalHaulCard}
           {/* Live first: the rig, its core, its finds, then the field. */}
@@ -9302,6 +9271,11 @@ export default function OilPage() {
             artifactMarks={revealedArtifactsByPlot[`${selectedX}_${sliceY}`] || []}
           />
           )}
+          {playerPayout}
+          {surveyPanel}
+          {rigAccountDetails}
+          {testStepper}
+
           <MuseumPanel
             theme={theme}
             inventory={userDrill?.artifacts || {}}
@@ -9559,7 +9533,7 @@ export default function OilPage() {
 
       <div style={{
         ...styles.dashboard,
-        gridTemplateColumns: panelsCollapsed ? "1fr" : `1fr ${Math.round(340 * uiScale)}px ${Math.round(280 * uiScale)}px`,
+        gridTemplateColumns: panelsCollapsed ? "1fr" : `minmax(0, 1fr) ${Math.round(360 * uiScale)}px`,
       }}>
         {/* 3D Voxel View */}
         <div id="oil-canvas" style={{
@@ -9823,8 +9797,9 @@ export default function OilPage() {
               parabolum={parabolum}
               setFireworksOn={setFireworksOn}
             />
+            <button type="button" onClick={goToSurveyMap} style={TOOLBAR_PILL}>FIELD SURVEY</button>
             <button
-              title={panelsCollapsed ? "Show the map and side panels" : "Hide the map and side panels"}
+              title={panelsCollapsed ? "Show the player panel" : "Hide the player panel"}
               onClick={() => setPanelsCollapsed((p) => !p)}
               style={TOOLBAR_PILL}
             >
@@ -9832,59 +9807,6 @@ export default function OilPage() {
             </button>
           </div>
         </div>
-
-        {/* Middle column */}
-        {!panelsCollapsed && (
-          <div style={{ ...styles.midColumn, zoom: uiScale }}>
-            <div id="survey-map" style={styles.midPanel}>
-              <OilSurfaceMap
-                blockade={hellActive && hellCol != null ? { col: hellCol, row: hellRow } : null}
-                claimTotals={fieldView.claimTotals}
-                maxClaimTotal={fieldView.maxClaimTotal}
-                selectedClaimIndex={selectedClaimIndex}
-                onSelectClaim={handleSelectClaim}
-                sliceY={sliceY}
-                theme={theme}
-                parabolum={parabolum}
-                gridX={gridSize}
-                gridY={gridSize}
-                allPlotsMap={fieldView.allPlotsMap}
-                claimJumpMode={claimJumpMode}
-                onClaimJump={handleClaimJump}
-                currentUserId={user?.id}
-                hellMap={fieldView.hellMap}
-                numberOfDeposits={numberOfDeposits}
-                numberOfHellPockets={numberOfHellPockets}
-                gusherEvents={fieldView.gusherEvents}
-                plotsWithMessages={fieldView.plotsWithMessages}
-                verified={fieldVerified}
-              />
-            </div>
-            <div style={{ ...styles.midPanel, flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-              <OilCrossSection
-                grid3D={fieldView.grid3D}
-                maxCellValue={fieldView.maxOil}
-                sliceY={sliceY}
-                selectedX={xsecCol}
-                drillDepth={showOilData ? drillDepth : effectiveDrillDay}
-                onSelectX={handleSelectX}
-                onSelectRow={setSliceY}
-                theme={theme}
-                parabolum={parabolum}
-                gridX={gridSize}
-                gridY={gridSize}
-                allPlotsMap={fieldView.allPlotsMap}
-                hellMap={fieldView.hellMap}
-                gusherEvents={fieldView.gusherEvents}
-                capDepth={PASSIVE_DRILLS}
-                ownCapDepth={PASSIVE_DRILLS + (userDrill?.bonusDrills || 0)}
-                currentUserId={user?.id}
-                verified={fieldVerified}
-                fillHeight
-              />
-            </div>
-          </div>
-        )}
 
         {/* Right side panel */}
         {!panelsCollapsed && (
@@ -9894,7 +9816,6 @@ export default function OilPage() {
             opacity: mounted ? 1 : 0,
             transform: mounted ? "translateX(0)" : "translateX(20px)",
           }}>
-            {testStepper}
             {reckoningCard}
             {finalHaulCard}
             {/* Live first: the rig, its core, its finds, then the field. */}
@@ -9917,6 +9838,11 @@ export default function OilPage() {
               artifactMarks={revealedArtifactsByPlot[`${selectedX}_${sliceY}`] || []}
             />
             )}
+            {playerPayout}
+            {surveyPanel}
+            {rigAccountDetails}
+            {testStepper}
+
             <MuseumPanel
               theme={theme}
               inventory={userDrill?.artifacts || {}}
@@ -10450,11 +10376,11 @@ function getStyles(t) { return {
     opacity: 0.8,
   },
 
-  // Dashboard: 3-column CSS grid
+  // Desktop: field plus one player panel
   dashboard: {
     flex: 1,
     display: "grid",
-    gridTemplateColumns: "1fr 340px 280px",
+    gridTemplateColumns: "minmax(0, 1fr) 360px",
     gap: 0,
     minHeight: 0,
     overflow: "hidden",
@@ -10512,22 +10438,6 @@ function getStyles(t) { return {
     textShadow: "0 1px 2px rgba(0,0,0,0.6)",
     zIndex: 6,
     pointerEvents: "none",
-  },
-
-  // Middle column
-  midColumn: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 0,
-    overflow: "hidden",
-    borderRight: `1px solid ${t.border}`,
-    background: t.panelWash || "transparent",
-  },
-
-  midPanel: {
-    padding: "10px 12px",
-    borderBottom: `1px solid ${t.border}`,
-    background: t.panelWash || "transparent",
   },
 
   // Right side panel

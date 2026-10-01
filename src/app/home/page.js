@@ -14,7 +14,6 @@ import ChartShrine, { TIMEFRAME_OPTIONS } from "@/components/ChartShrine";
 import ChartWidget from "@/components/ChartWidget";
 import RadialNavMenu from "@/components/RadialNavMenu";
 import MobileBottomNav from "@/components/MobileBottomNav";
-import useCyberConfirm from "@/components/useCyberConfirm";
 import ModernMusicPlayer from "@/components/ModernMusicPlayer";
 import BuyModal from "@/components/BuyModal";
 import { useBuyModal } from "@/lib/useBuyModal";
@@ -2279,10 +2278,6 @@ export default function HomePage() {
   }, [userId]);
   const router = useRouter();
   const [showBuyModal, setShowBuyModal] = useBuyModal();
-  // Shared cyberpunk confirm modal for the MORE-popover destinations
-  // (Coin Fountain, Ex Libris) — same glitch/sound dialog the dock's
-  // Hail Mary/Terminal slots use via MobileBottomNav's own confirm.
-  const [moreConfirmModal, moreConfirm] = useCyberConfirm();
   const [candleObjectHovered, setCandleObjectHovered] = useState(false);
   // "MORE" nav popover (far-right bottom-nav slot) — holds the secondary
   // destinations (Coin Fountain, Ex Libris) that don't each warrant a
@@ -3242,8 +3237,6 @@ export default function HomePage() {
 
       <BuyModal isOpen={showBuyModal} onClose={() => setShowBuyModal(false)} />
 
-      {/* Cyberpunk confirm modal for MORE-popover destinations. */}
-      {moreConfirmModal}
 
       <UnifiedAccountModal
         isOpen={showAccountModal}

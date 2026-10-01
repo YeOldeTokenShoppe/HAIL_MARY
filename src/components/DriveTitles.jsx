@@ -11,7 +11,7 @@ export default function DriveTitles({ moment }) {
       <div className={`opening-headline lettering ${plainBlack.className}`}>
         <span className="opening-first">Fortune</span>
         <span className="opening-second">favors</span>
-        <span className="opening-third"><span className="opening-the">the</span>{' '}<span className="opening-fun">fun</span></span>
+        <span className="opening-third"><span className="opening-the">the</span>{' '}<span className="opening-fun">focused</span></span>
       </div>
       <div className={`tagline opening-subheading ${interItalic.className}`}>Adventures in the attention economy.</div>
     </div>
@@ -69,12 +69,10 @@ export default function DriveTitles({ moment }) {
         .opening { left: 4%; top: 20%; width: 92%; }
         .opening .lettering, .finale .lettering { -webkit-text-stroke-width: 2.5px; text-shadow: 2px 3px 0 #171019; }
         .opening .lettering { font-size: clamp(48px, 18vw, 110px); }
-        .finale { top: auto; bottom: max(34%, 230px); right: 5%; width: 90%; max-width: none; }
+        .finale { top: auto; bottom: max(20%, 150px); right: 5%; width: 90%; max-width: none; }
         .finale .lettering { font-size: clamp(40px, 14vw, 84px); }
         .tagline { font-size: clamp(18px, 5vw, 26px); margin-top: 18px; }
         .opening .opening-subheading, .finale .finale-subheading { font-size: clamp(19px, 5.4vw, 26px); }
-        /* The finale tagline sits over the heart's bloom; a dark halo keeps it legible. */
-        .finale .finale-subheading { margin-top: 14px; text-shadow: 0 1px 2px #171019, 0 2px 6px rgba(23,16,25,.9), 0 0 16px rgba(23,16,25,.75); }
       }
       @media (prefers-reduced-motion: reduce) {
         .title { transition: none; }

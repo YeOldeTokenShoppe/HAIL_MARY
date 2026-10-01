@@ -5,8 +5,8 @@ import { createPortal } from "react-dom";
 import { playSfx, preloadSfx } from "../lib/uiSfx";
 import "./CyberButton.css";
 
-// ── Confirm-modal SFX levels ── These fire on EVERY dock destination and every
-// portfolio button, so they sit under the page's music rather than over it.
+// ── Confirm-modal SFX levels ── These sit under the page's music rather than
+// over it.
 //
 // PER-SOUND, because the assets carry different headroom and one shared knob
 // can't serve both. proceed/cancel are local files attenuated in the asset

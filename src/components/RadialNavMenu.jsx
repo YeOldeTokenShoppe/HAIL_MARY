@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import useCyberConfirm from "./useCyberConfirm";
 
 /**
  * RadialNavMenu — a button that blooms into a dark disk with four
@@ -16,7 +15,6 @@ import useCyberConfirm from "./useCyberConfirm";
  *    and nothing would ever close it);
  *  - Escape and a tap anywhere outside close it;
  *  - inline SVG icons instead of Font Awesome (not a dependency here);
- *  - destinations go through useCyberConfirm, like every other nav dock;
  *  - a telescope instead of a "+" ("+" reads as add/create, not navigate);
  *  - discoverability: the disk opens once on a first visit to show what
  *    the button does (remembered in localStorage).
@@ -31,7 +29,7 @@ import useCyberConfirm from "./useCyberConfirm";
  *    would otherwise become the containing block for its position:fixed.
  *
  * actions: extra non-navigation items ({ key, label, icon, onSelect }) that
- * join the ring after the destinations and run directly, no confirm —
+ * join the ring after the destinations —
  * /hailmary puts How to play + Account here once its header had no room.
  *
  * Controlled mode (`open` given, no trigger): another component owns
@@ -68,14 +66,11 @@ function writeFlag(key) {
   try { localStorage.setItem(key, "1"); } catch {}
 }
 
-const ACCENT = { accent: "hsl(189, 84%, 55%)", shadow: "hsl(189, 70%, 38%)" };
-
 const DESTINATIONS = [
   {
     key: "main",
     label: "Our Lady",
     href: "/main",
-    body: "Step before the mirror. Our Lady hears every question the faithful bring her.",
     icon: (
       <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
     ),
@@ -84,7 +79,6 @@ const DESTINATIONS = [
     key: "trade",
     label: "The Liminal Terminal",
     href: "/trade",
-    body: "Read the tape. Four consultants, one verdict — the market confesses to those who listen.",
     icon: (
       <>
         <polyline points="4 17 10 11 4 5" />
@@ -96,7 +90,6 @@ const DESTINATIONS = [
     key: "exlibris",
     label: "Ex Libris",
     href: "/exlibris",
-    body: "The perpetual ledger. Every flame, every name, inscribed for those who came to pray.",
     icon: (
       <>
         <path d="M15 12h-5" />
@@ -110,7 +103,6 @@ const DESTINATIONS = [
     key: "hailmary",
     label: "Hail Mary Prospecting Co",
     href: "/hailmary",
-    body: "Find your fortune in the digital frontier. Our Lady's prospectors never rest.",
     icon: (
       <>
         <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
@@ -124,7 +116,6 @@ const DESTINATIONS = [
     key: "fountain",
     label: "Coin Fountain",
     href: "/fountain",
-    body: "Toss a coin, whisper a wish. Our Lady keeps every offering the faithful let fall.",
     icon: (
       <>
         <path d="M12 10L12 2" />
@@ -162,7 +153,6 @@ const HOME = {
   key: "home",
   label: "ex Machina",
   href: "/home",
-  body: "Back to where it all begins. The candles are still burning.",
   icon: (
     <>
       <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
@@ -205,7 +195,6 @@ export default function RadialNavMenu({
   const layerRef = useRef(null);
   const leaveTimer = useRef(null);
   const lastPointer = useRef(null);
-  const [confirmModal, confirm] = useCyberConfirm();
 
   useEffect(() => setMounted(true), []);
 
@@ -335,12 +324,7 @@ export default function RadialNavMenu({
               onClick={() => {
                 close();
                 if (d.onSelect) { d.onSelect(); return; }
-                confirm({
-                  title: d.label,
-                  body: d.body,
-                  ...ACCENT,
-                  onProceed: () => { window.location.href = d.href; },
-                });
+                window.location.href = d.href;
               }}
             >
               <svg
@@ -435,8 +419,6 @@ export default function RadialNavMenu({
         </button>
       </div>
       )}
-
-      {confirmModal}
 
       <style jsx>{`
         /* The disk is built once (the disk const) and mounted in either wrapper,

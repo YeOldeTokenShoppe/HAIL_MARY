@@ -1,0 +1,111 @@
+.survey { color: var(--survey-text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.45; letter-spacing: normal; text-align: left; }
+.survey *, .overlay * { box-sizing: border-box; }
+.survey button, .overlay button { font: inherit; color: inherit; cursor: pointer; }
+.button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--survey-border); border-radius: 5px; background: var(--survey-wash); padding: 8px 12px; min-height: 38px; text-decoration: none; }
+.button:hover { border-color: var(--survey-accent); }
+.survey button:focus-visible, .overlay button:focus-visible, .survey summary:focus-visible { outline: 2px solid var(--survey-accent); outline-offset: 3px; }
+.heading { display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.heading h2, .heading h3 { text-align: left; font-family: 'Share Tech Mono', monospace; font-size: 15px; line-height: 1.4; font-weight: 600; margin: 0; color: var(--survey-accent); }
+.secondary { color: var(--survey-secondary); font-size: 12px; }
+.compact { border-bottom: 1px solid var(--survey-border); padding: 16px; }
+.previewRow { display: grid; grid-template-columns: minmax(100px,144px) minmax(0,1fr); gap: 16px; align-items: center; }
+.preview { border: 0; padding: 3px; background: transparent; width: 100%; border-radius: 3px; }
+.miniGrid { display: grid; gap: 2px; width: 100%; aspect-ratio: 1; }
+.miniCell { background: var(--survey-empty); position: relative; }
+.miniMine { outline: 2px solid var(--survey-text); outline-offset: 1px; z-index: 1; }
+.previewLabel { display: block; margin-top: 6px; color: var(--survey-secondary); font-size: 12px; text-align: left; }
+.compactReadout { min-width: 0; }
+.compactReadout strong { display: block; font-weight: 500; font-size: 15px; margin-bottom: 6px; }
+.compactReadout p { text-align: left; margin: 0 0 8px; }
+.compactReadout .button { font-size: 12px; padding: 6px 9px; }
+.footer { margin-top: 14px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 5px 12px; color: var(--survey-secondary); font-size: 12px; }
+.overlay { position: fixed; inset: 0; z-index: 10020; background: rgba(0,0,0,.72); backdrop-filter: blur(6px); display: grid; place-items: center; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.45; color: var(--survey-text); }
+.dialog { background: var(--survey-bg); border: 1px solid var(--survey-border); border-radius: 12px; width: min(820px,100%); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; box-shadow: 0 22px 80px #0007; }
+.dialogHead { padding: 18px 22px 12px; border-bottom: 1px solid var(--survey-border); }
+.dialogHead .heading { margin-bottom: 12px; }
+.dialogHead h2 { font-family: 'Orbitron', 'Share Tech Mono', monospace; font-size: 17px; }
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.tabs button[aria-pressed='true'] { border-color: var(--survey-accent); color: var(--survey-accent); background: color-mix(in srgb, var(--survey-accent) 12%, var(--survey-bg)); }
+.homeButton { margin-left: auto; }
+.dialogBody { padding: 20px 22px; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.dialogFoot { border-top: 1px solid var(--survey-border); padding: 12px 22px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.tallies { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-bottom: 14px; color: var(--survey-secondary); font-size: 12px; }
+.tallies b { font-weight: 500; color: var(--survey-text); }
+.mapLayout { display: grid; grid-template-columns: minmax(0,1fr) 190px; gap: 22px; align-items: start; }
+.surface { width: 100%; min-width: 0; }
+.xAxis { display: grid; gap: 3px; margin-left: 23px; margin-bottom: 5px; text-align: center; font-size: 12px; color: var(--survey-secondary); }
+.gridRow { display: grid; grid-template-columns: 20px minmax(0,1fr); gap: 3px; }
+.yAxis { display: grid; gap: 3px; font-size: 12px; text-align: center; color: var(--survey-secondary); }
+.yAxis span { display: flex; align-items: center; justify-content: center; }
+.grid { display: grid; gap: 3px; aspect-ratio: 1; }
+.cell { position: relative; min-width: 0; min-height: 0; padding: 0; border: 1px solid transparent; background: var(--survey-empty); color: var(--survey-text); border-radius: 2px; display: grid; place-items: center; touch-action: manipulation; }
+.cell:hover { box-shadow: inset 0 0 0 1px var(--survey-text); }
+.cell[aria-pressed='true'] { outline: 2px solid var(--survey-text); outline-offset: 1px; z-index: 1; }
+.cell:focus-visible { z-index: 2; }
+.ownerDot { width: 7px; height: 7px; border-radius: 50%; background: var(--survey-text); box-shadow: 0 0 0 2px var(--survey-bg); display: inline-block; }
+.claimedMark { width: 6px; height: 6px; background: var(--survey-text); box-shadow: 0 0 0 1px var(--survey-bg); }
+.dryMark { width: 9px; height: 2px; background: var(--survey-bg); }
+.dangerMark { position: absolute; top: 1px; right: 1px; width: 0; height: 0; border-top: 10px solid var(--survey-danger); border-left: 10px solid transparent; }
+.cappedMark { position: absolute; top: 2px; right: 2px; width: 6px; height: 2px; background: var(--survey-text); }
+.gusherMark { position: absolute; top: 0; left: 2px; color: var(--survey-text); text-shadow: 0 1px 2px var(--survey-bg); font-size: 12px; line-height: 1; }
+.messageMark { position: absolute; bottom: 1px; right: 2px; color: var(--survey-text); text-shadow: 0 1px 2px var(--survey-bg); font-size: 11px; line-height: 1; }
+.jumpTarget { border: 1px dashed var(--survey-accent); }
+.readout { border-left: 2px solid var(--survey-accent); padding-left: 14px; overflow-wrap: anywhere; }
+.readout h3 { color: var(--survey-text); text-align: left; font-family: 'Share Tech Mono', monospace; font-size: 16px; margin: 0 0 6px; font-weight: 500; }
+.readout p { text-align: left; margin: 0 0 12px; }
+.readout dl { margin: 14px 0 0; }
+.readout dt { color: var(--survey-secondary); font-size: 12px; }
+.readout dd { margin: 2px 0 12px; }
+.legend { display: flex; gap: 7px 16px; flex-wrap: wrap; color: var(--survey-secondary); font-size: 12px; margin-top: 16px; }
+.legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { display: inline-block; width: 12px; height: 12px; background: var(--survey-empty); flex-shrink: 0; }
+.oilSwatch { background: var(--survey-oil); }
+.drySwatch { background: var(--survey-dry); }
+.selectedSwatch { outline: 2px solid var(--survey-text); outline-offset: -2px; }
+.details { margin-top: 16px; border-top: 1px solid var(--survey-border); padding-top: 10px; color: var(--survey-secondary); font-size: 12px; }
+.details summary { cursor: pointer; color: var(--survey-text); padding: 4px 0; }
+.details p { margin: 10px 0 0; }
+.notice { margin-bottom: 14px; padding: 10px 12px; border-left: 3px solid var(--survey-accent); background: var(--survey-wash); }
+.dangerNotice { border-color: var(--survey-danger); }
+.rowPicker { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 16px; }
+.rowPicker > div { display: flex; gap: 10px; align-items: center; }
+.depthPlot { display: grid; grid-template-columns: 32px minmax(0,1fr); gap: 5px; min-width: 0; }
+.depthLabels { display: grid; grid-template-rows: repeat(20,1fr); padding-top: 25px; font-size: 12px; color: var(--survey-secondary); }
+.depthLabels span { display: flex; align-items: center; }
+.columns { display: grid; gap: 3px; min-width: 0; }
+.depthColumn { display: flex; flex-direction: column; padding: 0; border: 0; min-width: 0; background: transparent; }
+.columnLabel { display: flex; justify-content: center; align-items: center; gap: 4px; height: 25px; font-size: 12px; }
+.layers { display: grid; grid-template-rows: repeat(20,1fr); width: 100%; height: 340px; background: var(--survey-empty); }
+.layer { position: relative; display: block; min-height: 0; border-bottom: 1px solid color-mix(in srgb, var(--survey-bg) 25%, transparent); }
+.depthColumn[aria-pressed='true'] .layers { outline: 2px solid var(--survey-text); outline-offset: 1px; }
+.depthColumn:hover .layers { box-shadow: 0 0 0 1px var(--survey-secondary); }
+.cap { position: absolute; left: 0; right: 0; top: 0; border-top: 1px dashed var(--survey-accent); z-index: 1; }
+.bit { position: absolute; bottom: 0; left: 25%; right: 25%; height: 3px; background: var(--survey-text); box-shadow: 0 0 0 1px var(--survey-bg); }
+.layerList { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; padding-top: 12px; }
+.layerList span:nth-child(2n) { color: var(--survey-text); }
+@media (max-width:650px) {
+  .overlay { padding: 0; }
+  .dialog { height: 100dvh; max-height: 100dvh; width: 100%; border: 0; border-radius: 0; }
+  .dialogHead { padding: max(14px,env(safe-area-inset-top)) 14px 12px; }
+  .dialogBody { padding: 16px 14px; flex: 1; }
+  .dialogFoot { padding: 12px 14px max(12px,env(safe-area-inset-bottom)); }
+  .mapLayout { grid-template-columns: minmax(0,1fr); gap: 18px; }
+  .readout { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
+  .readout h3, .readout p { text-align: left; margin: 0; }
+  .readout dl { display: flex; gap: 8px 18px; flex-wrap: wrap; margin-top: 0; }
+  .readout dd { margin-bottom: 0; }
+  .homeButton { margin-left: 0; }
+  .button { min-height: 44px; }
+  .layers { height: 320px; }
+}
+@media (max-width:360px) {
+  .previewRow { grid-template-columns: 112px minmax(0,1fr); gap: 12px; }
+  .compact { padding: 12px; }
+}
+@media (prefers-reduced-motion:reduce) { .survey *, .overlay * { scroll-behavior: auto; } }
+
+.detailTable { width: 100%; border-collapse: collapse; margin-top: 10px; text-align: left; font-size: 12px; }
+.detailTable th, .detailTable td { padding: 5px 8px 5px 0; border-bottom: 1px solid var(--survey-border); font-weight: 400; }
+.detailTable td { color: var(--survey-text); }
+
+.miniDot { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: var(--survey-text); box-shadow: 0 0 0 1px var(--survey-bg); top: 50%; left: 50%; transform: translate(-50%,-50%); }
