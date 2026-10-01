@@ -66,7 +66,9 @@ whole table when drawn. Theme is general markets and money.
 | `tarot-bots.js` | Strong (heuristic), Naive (random actions, banks everything, always hedges) and Random (also passes at random) policies. |
 | `tarot-sim.js` | CLI and the `playOne` / `batch` exports the viewer uses. |
 | `tarot-viewer.html` | Browser UI: Watch (bot vs bot, turn by turn), Versus (you against a bot, with buttons and a coach), Batch, Cards. Covers both the shared reading and the duel. |
-| `table.html` | The card table: drag cards from your hand onto glowing zones, tap Personalities to Work them, play the bot. Same engine, no buttons for legality. |
+| `table.src.html` | Source of the card table: drag cards from your hand onto glowing zones, tap Personalities to Work them, play the bot with a coach. Same engine, no buttons for legality. Edit this file, not `table.html`. |
+| `build-table.js` | Bundles `table.src.html` and the engine modules into the single-file `table.html` (the claude.ai artifact viewer does not load separate script files). Run `node build-table.js` after editing the source or the engine. |
+| `table.html` | Built output of the above. Open it from any static server, or publish it as an artifact. When published with the `sample` capability, the "Ask the coach" box lets the player put free-form questions to Claude; the page sends the rules in brief, the visible table and the question, and streams the answer. Without that runtime the box stays hidden. |
 
 ```bash
 node tarot-sim.js --verbose --seed 5
