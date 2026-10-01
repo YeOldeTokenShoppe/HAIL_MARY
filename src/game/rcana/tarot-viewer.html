@@ -245,7 +245,7 @@
         </div>
         <div class="zone-h" style="margin-top:12px">How the R-cana named each side</div>
         <div class="strip">${Object.entries(r.archetypes).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="cell"><div class="k">${esc(k)}</div><div class="v">${Math.round(v / n * 100)}%</div></div>`).join('')}</div>
-        <p class="note" style="margin:10px 0 0">${esc(o.a)} vs ${esc(o.b)}, sides alternate each game. Win target ${o.rules.winBank}, ${o.rules.minorsPerTurn} Minor${o.rules.minorsPerTurn > 1 ? 's' : ''} per turn, opening hand ${o.rules.openingHand}, first player skips the first draw${isDuel() ? ' and holds one fewer card' : ''}. Seeds ${o.seed}&ndash;${o.seed + n - 1}.</p>`;
+        <p class="note" style="margin:10px 0 0">${esc(o.a)} vs ${esc(o.b)}, sides alternate each game. Win target ${o.rules.winBank}, ${o.rules.minorsPerTurn} Minor${o.rules.minorsPerTurn > 1 ? 's' : ''} per turn, opening hand ${o.rules.openingHand}, ${isDuel() ? 'lead seat rotates and the final round is played out' : 'first player skips the first draw'}. Seeds ${o.seed}&ndash;${o.seed + n - 1}.</p>`;
       // histogram
       const counts = {}; r.rounds.forEach((x) => { counts[x] = (counts[x] || 0) + 1; });
       const ks = Object.keys(counts).map(Number).sort((a, b) => a - b); const mx = Math.max(...Object.values(counts));

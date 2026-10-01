@@ -82,6 +82,45 @@ node v2-sim.js --verbose --seed 3 --da cautious --db aggressive
 ```
 
 Deck presets: `upright`, `revChains`, `revChainsAll`, `revCoins`, `revCups`, `cautious`, `aggressive`, `random`.
-Duel defaults after tuning: the first player holds one fewer card, reversed Chains draw a card when used as a
-Hedge, upright Cups draw a card. Rule flags for experiments: `--firstHand N` (first player's opening-hand penalty), `--chainsDraw 1`
+Duel defaults after tuning: the lead seat rotates each round, a game that reaches 80 plays out the round
+before the largest Bank wins, reversed Chains draw a card when used as a Hedge, upright Cups draw a card. Rule flags for experiments: `--firstHand N` (first player's opening-hand penalty), `--chainsDraw 1`
 (reversed Chains draw a card when used), `--chainsBonus N`, `--cupsCost N`, `--cupsPenalty N`, `--cupsDiv N`.
+
+## How a game of version 2 plays, turn by turn
+
+**Setup.** Each Trader shuffles their own 56-card deck and draws seven. The 22 Majors are shuffled into
+one shared pile; its top card is placed face-down in the Omen slot. Each Trader's Querent sits in front of
+them with an empty Bank. Portfolios start at zero.
+
+**A round** is one turn for every Trader. The seat that leads rotates each round, so nobody is always the
+first to act after a Major.
+
+**At the start of each round** the leading Trader turns the Omen face up. If it is a Market, it replaces the
+standing Market. If it is an Event, it resolves for everyone at once. If it is an Invoke, it goes to the
+Providence row where any Trader may later pay to use it. The next Major slides face-down into the Omen slot.
+
+**Each turn, in order:**
+
+1. **Refresh.** Your Working Personalities stand up. Your locked Reserve cards unlock. Shields expire.
+2. **Set.** Take your Dividend (1 Profit into your Portfolio, more under some Markets). Take Interest (1 Profit
+   for every full 5 already in your Portfolio). Then bank any amount you like from Portfolio to Bank.
+   Banked Profit can never be touched again.
+3. **Draw** one Minor from your deck.
+4. **Main phase**, any number of actions in any order:
+   - **Reserve** one card from hand face-down. It is now 1 Liquidity, locked when spent, back every Refresh.
+   - **Hire** a court by paying its cost. It cannot Work until your next turn unless it is Fast.
+   - **Play a pip** by paying its cost: Coins for Profit, Candles to put a Personality to Work with a bonus,
+     Cups to share Profit (and draw a card), Chains to attack a Working opposing Personality or Front-run a
+     Portfolio. Reversed pips do their reversed thing; reversed Chains cannot be played on your own turn.
+   - **Work** an idle Personality for its Yield. Working Personalities are the only ones Chains can hit.
+   - **Foretell**, if you have Virgil: look at the Omen and optionally send it to the bottom.
+   - **Invoke** a Major in Providence by paying its cost. It is spent afterwards.
+5. **End.** Play passes left.
+
+**When someone is attacked.** A Chain names its target. Before it lands, the defender may play a Chain from
+hand as a Hedge: an upright Chain costs its Liquidity and absorbs its rank; a reversed Chain is free, absorbs
+its rank plus two, and draws a card.
+
+**Winning.** When any Trader's Bank reaches 80 at a Set, the round is played out so everyone has had the
+same number of turns, and the largest Bank wins. If THE RECKONING is revealed in the second half of the Majors,
+or the Majors run out, the game ends after that round the same way.

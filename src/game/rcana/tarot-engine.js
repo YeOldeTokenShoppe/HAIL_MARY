@@ -2,7 +2,7 @@
 import { MINORS, MAJORS, byId } from './tarot.js';
 import { makeRng } from './engine.js';
 
-export const DEFAULTS = { winBank: 80, openingHand: 7, minorsPerTurn: 1, firstTurnDraw: 0, interestDiv: 5, maxRounds: 40 };
+export const DEFAULTS = { winBank: 80, openingHand: 7, minorsPerTurn: 1, firstTurnDraw: 0, interestDiv: 5, rotateLead: false, finishRound: false, maxRounds: 40 };
 let UID = 1;
 
 export class TarotGame {
@@ -12,7 +12,7 @@ export class TarotGame {
       hailMaryUsed: false, reservedThisTurn: 0, foretold: false, turnBonusLiquidity: 0,
       stats: { worked: 0, pips: 0, coins: 0, candles: 0, chains: 0, cups: 0, hedges: 0, hires: 0, invokes: 0, liquidated: 0, frontrun: 0, unbankedSum: 0, sets: 0, foretells: 0 } }));
     this.deck = []; this.discard = []; this.market = null; this.providence = []; this.events = []; this.snapshots = []; this.cardPlays = {};
-    this.round = 0; this.turnIdx = 0; this.turnCounter = 1; this.active = null; this.over = false; this.winner = null; this.reason = ''; this.bellRound = null; this.current = null; this.majorsSeen = 0;
+    this.round = 0; this.turnIdx = 0; this.turnCounter = 1; this.active = null; this.over = false; this.winner = null; this.reason = ''; this.bellRound = null; this.current = null; this.majorsSeen = 0; this.closing = false;
     this.setup();
   }
   shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(this.rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -61,7 +61,11 @@ export class TarotGame {
   profit(p, n, why) { if (n <= 0 || this.over) return 0; p.portfolio += n; this.log(`${p.name} +${n} Profit (${why}) → Portfolio ${p.portfolio}`); return n; }
   bank(p, n, why) { if (n <= 0 || this.over) return; p.bank += n; this.log(`${p.name} banks ${n} directly (${why}) → Bank ${p.bank}`); this.checkWin(p); }
   bankFromPortfolio(p, n, why) { n = Math.min(n, p.portfolio); if (n <= 0 || this.over) return; p.portfolio -= n; p.bank += n; this.log(`${p.name} banks ${n} (${why}) → Bank ${p.bank}, Portfolio ${p.portfolio}`); this.checkWin(p); }
-  checkWin(p) { if (!this.over && p.bank >= this.rules.winBank) { this.over = true; this.winner = p; this.reason = `${p.name} banked ${p.bank}`; this.log(`*** ${p.name} WINS with ${p.bank} banked ***`); } }
+  checkWin(p) {
+    if (this.over || p.bank < this.rules.winBank) return;
+    if (this.rules.finishRound) { if (!this.closing) { this.closing = true; this.log(`${p.name} reaches ${p.bank}: the round is played out, then the largest Bank wins`); } return; }
+    this.over = true; this.winner = p; this.reason = `${p.name} banked ${p.bank}`; this.log(`*** ${p.name} WINS with ${p.bank} banked ***`);
+  }
   loseProfit(p, n, why) {
     if (n <= 0 || this.over) return 0; const cur = this.current; const hostile = !cur || cur.attacker !== p;
     if (cur && cur.victim === p && cur.reduce) { const r = Math.min(n, cur.reduce); n -= r; cur.reduce -= r; if (r) this.log(`${p.name}'s Hedge absorbs ${r}`); }
@@ -172,35 +176,43 @@ export class TarotGame {
     }
   }
   // ── turn ──
-  playTurn() {
-    const p = this.players[this.turnIdx]; this.active = p;
-    if (this.turnIdx === 0) { this.round++; if (this.round > this.rules.maxRounds) { this.over = true; this.reason = 'round limit'; this.endByBell(); return; } }
-    this.log(`── Turn ${this.turnCounter}: ${p.name} ──`);
+  turnOrder() { const n = this.players.length; const lead = this.rules.rotateLead ? (this.round - 1) % n : 0; return Array.from({ length: n }, (_, k) => (lead + k) % n); }
+  playRound() {
+    this.round++;
+    if (this.round > this.rules.maxRounds) { this.over = true; this.reason = 'round limit'; this.endByBell(); return; }
+    const order = this.turnOrder();
+    for (let k = 0; k < order.length; k++) { if (this.over) break; this.turnIdx = order[k]; this.playTurn(order[k], k === 0, k === order.length - 1); }
+    if (!this.over && this.closing) { const s = [...this.players].sort((a, b) => b.bank - a.bank || b.portfolio - a.portfolio); this.over = true; this.winner = s[0]; this.reason = `${s[0].name} banked ${s[0].bank}`; this.log(`*** ${s[0].name} WINS with ${s[0].bank} banked (round played out) ***`); this.snapshot('end'); }
+  }
+  playTurn(idx, firstOfRound, lastOfRound) {
+    const p = this.players[idx]; this.active = p;
+    this.log(`── Turn ${this.turnCounter}: ${p.name}${firstOfRound ? ' (leads the round)' : ''} ──`);
+    if (firstOfRound) this.startOfRound(p);
     for (const i of p.floor) i.working = false; p.reserve.forEach((r) => { r.locked = false; }); p.reservedThisTurn = 0; p.foretold = false; p.turnBonusLiquidity = 0;
     // Set
-    const div = this.modFirst(p, 'dividend') ?? 1; this.profit(p, div, 'Dividend');
+    const div = (this.modFirst(p, 'dividend') ?? 1) + this.modSum(p, 'dividendDelta'); this.profit(p, div, 'Dividend');
     const idiv = this.modMin(p, 'interestDiv', this.rules.interestDiv); const im = this.modProduct(p, 'interestMult'); const interest = Math.floor(p.portfolio / idiv) * im; if (interest) this.profit(p, interest, 'Interest');
     p.stats.unbankedSum += p.portfolio; p.stats.sets++;
     let amt = Math.min(p.portfolio, Math.max(0, p.policy.bankAmount(this, p))); const cap = this.modFirst(p, 'bankCap'); if (cap != null) amt = Math.min(amt, cap);
     if (amt) this.bankFromPortfolio(p, amt, 'Set'); else if (p.portfolio) this.log(`${p.name} keeps ${p.portfolio} in Portfolio`);
     if (this.over) { this.snapshot('turn'); return; }
     // Draw
-    this.drawMinors(p, this.round === 1 && this.turnIdx === 0 ? Math.min(this.rules.firstTurnDraw, this.rules.minorsPerTurn) : this.rules.minorsPerTurn);
+    this.drawMinors(p, this.turnCounter === 1 ? Math.min(this.rules.firstTurnDraw, this.rules.minorsPerTurn) : this.rules.minorsPerTurn);
     if (this.over) { this.snapshot('turn'); return; }
     // Main
     p.policy.takeTurn(this, p);
-    const last = this.turnIdx === this.players.length - 1; this.turnCounter++;
+    this.turnCounter++;
     this.snapshot('turn');
-    if (!this.over && last && this.bellRound != null && this.round >= this.bellRound) this.endByBell();
-    this.turnIdx = (this.turnIdx + 1) % this.players.length;
+    if (!this.over && lastOfRound && this.bellRound != null && this.round >= this.bellRound) this.endByBell();
   }
+  startOfRound() {}
   endByBell() {
     if (this.winner) return; this.over = true;
     const s = [...this.players].sort((a, b) => b.bank - a.bank || b.portfolio - a.portfolio);
     if (s[0].bank === s[1].bank && s[0].portfolio === s[1].portfolio) { this.winner = null; this.reason = 'Final Bell: draw'; } else { this.winner = s[0]; this.reason = `Final Bell: ${s[0].name} leads ${s[0].bank} to ${s[1].bank}`; }
     this.log(`*** ${this.reason} ***`); this.snapshot('end');
   }
-  run() { let g = 0; while (!this.over && g++ < 300) this.playTurn(); if (!this.over) { this.over = true; this.reason = 'guard'; } return this.result(); }
+  run() { let g = 0; while (!this.over && g++ < 100) this.playRound(); if (!this.over) { this.over = true; this.reason = 'guard'; } return this.result(); }
   archetype(p) {
     const s = p.stats; const unbanked = s.unbankedSum / Math.max(1, s.sets);
     const sc = { HODLer: unbanked / 8, Contrarian: s.chains / 2.5, Samaritan: s.cups / 2, Analyst: s.foretells / 2 + s.invokes / 2, Opportunist: s.coins / 3, Degen: (p.floor.filter((i) => i.card.villain).length + s.frontrun / 4) * 0.8 + s.hedges * 0.2, Banker: unbanked < 3 ? 1.05 : 0.5 };

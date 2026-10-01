@@ -48,7 +48,7 @@ export class StrongPolicy {
     const c = a.card; const r = c.rank;
     if (c.suit === 'coins') return r + g.modSum(p, 'coinsBonus');
     if (c.suit === 'candles') return (r * g.modProduct(p, 'candlesMult') + g.modSum(p, 'candlesBonus')) + g.yieldOf(p, a.choice.inst) - 0; // includes the Work it triggers
-    if (c.suit === 'cups') { const m = g.modProduct(p, 'cupsMult'); return r * m + g.modSum(p, 'cupsBonus') - Math.ceil(r / 2) * m * 0.7; }
+    if (c.suit === 'cups') { const m = g.modProduct(p, 'cupsMult'); const o = a.choice.opp; const lead = o ? g.opps(p).reduce((mx, q) => Math.max(mx, q.bank), 0) - o.bank : 0; return r * m + g.modSum(p, 'cupsBonus') - Math.ceil(r / 2) * m * 0.7 + lead * 0.02; }
     const t = a.choice.target; const amt = r * g.modProduct(p, 'chainsMult');
     if (t.card) { const kills = t.drawdown + amt >= t.card.res; return kills ? 2 + g.yieldOf(t.owner, t) * this.horizon(g) * 0.8 + (t.card.kw.exitScam || 0) : amt * 0.35; }
     return Math.min(amt, t.portfolio) * 1.3;
@@ -75,7 +75,7 @@ export class StrongPolicy {
     let guard = 0;
     while (!g.over && guard++ < 30) {
       const acts = g.actions(p).filter((a) => a.t !== 'reserve'); let best = null, bs = 0.25;
-      for (const a of acts) { const s = this.score(g, p, a); if (s > bs) { bs = s; best = a; } }
+      for (const a of acts) { const s = this.score(g, p, a) + g.rng() * 1e-3; if (s > bs) { bs = s; best = a; } }
       if (!best) break; g.act(p, best);
     }
   }
