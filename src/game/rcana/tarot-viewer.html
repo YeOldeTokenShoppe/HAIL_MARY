@@ -71,6 +71,17 @@
   .temp { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
   .temp.coins { background: #d4af37; } .temp.candles { background: #e0642e; } .temp.chains { background: #5b6673; } .temp.cups { background: #2f7fd1; }
   .pill { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: 11px; border: 1px solid var(--line); color: var(--muted); }
+  .handcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+  .mini { border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--panel2); display: grid; gap: 6px; min-width: 0; }
+  .mini .t { font-weight: 600; font-size: 13px; display: flex; gap: 6px; align-items: center; }
+  .mini .x { font-size: 11px; color: var(--muted); line-height: 1.35; }
+  .mini .acts { display: flex; flex-wrap: wrap; gap: 4px; }
+  .act { font: inherit; font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--accent); background: transparent; color: var(--fg); cursor: pointer; }
+  .act:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+  .act.big { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; padding: 8px 14px; }
+  .act:disabled { opacity: .5; cursor: default; }
+  .prompt-h { font-family: var(--font-display); letter-spacing: .05em; font-size: 14px; margin-bottom: 8px; }
+  .chip.clickable { cursor: pointer; }
   .win-badge { background: var(--accent); color: var(--accent-ink); border-radius: 6px; padding: 8px 12px; font-weight: 600; }
   @media (prefers-reduced-motion: no-preference) { .chip { transition: background .15s; } }
 </style>
@@ -80,7 +91,8 @@
     <h1>R-CANA TAROT SIMULATOR</h1>
     <span class="sub">Version 1 shares one 80-card deck. Version 2 gives each Trader a 56-card deck with reversals and shares the 22 Majors. Bot versus bot.</span>
     <nav role="tablist">
-      <button role="tab" id="tab-play" aria-selected="true" data-tab="play">Play</button>
+      <button role="tab" id="tab-play" aria-selected="true" data-tab="play">Watch</button>
+      <button role="tab" id="tab-versus" aria-selected="false" data-tab="versus">Versus</button>
       <button role="tab" id="tab-batch" aria-selected="false" data-tab="batch">Batch</button>
       <button role="tab" id="tab-cards" aria-selected="false" data-tab="cards">Cards</button>
     </nav>
@@ -118,6 +130,18 @@
     </div>
   </section>
 
+  <section id="view-versus" class="wrap" hidden style="gap:16px">
+    <div class="panel" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+      <button class="primary" id="vsStart">Start a game against the bot</button>
+      <label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--fg)"><input type="checkbox" id="vsBotFirst"> bot goes first</label>
+      <span class="note">Uses the Mode, Deck A (yours), Deck B (bot's), Trader B (bot style), win target and seed above. The bot's hand and the Omen are hidden.</span>
+    </div>
+    <div class="panel strip" id="vsStrip"></div>
+    <div class="boards" id="vsBoards"></div>
+    <div class="panel" id="vsPrompt"><span class="note">No game yet.</span></div>
+    <div class="panel"><div class="zone-h">Log</div><div class="log" id="vsLog" style="max-height:260px"></div></div>
+  </section>
+
   <section id="view-batch" class="wrap" hidden style="gap:16px">
     <div class="panel" id="batchSummary"><span class="note">Run a batch to see win rates, game length, and which cards actually get played.</span></div>
     <div class="two">
@@ -140,7 +164,13 @@
   import { ALL, SUITS, SUIT_NAME } from './tarot.js';
   import { ALL_V2, DECK_PRESETS } from './v2.js';
   import { playOne as playOne1, batch as batch1 } from './tarot-sim.js';
-  import { playOne as playOne2, batch as batch2 } from './v2-sim.js';
+  import { playOne as playOne2, batch as batch2, policy as botPolicy2 } from './v2-sim.js';
+  import { policy as botPolicy1 } from './tarot-sim.js';
+  import { TarotGame } from './tarot-engine.js';
+  import { DuelGame } from './v2-engine.js';
+  import { HumanPolicy } from './tarot-bots.js';
+  import { buildDeck } from './v2.js';
+  import { makeRng } from './engine.js';
   const isDuel = () => $('mode').value === 'duel';
   const playOne = (o) => (isDuel() ? playOne2(o) : playOne1(o));
   const batch = (o, n) => (isDuel() ? batch2(o, n) : batch1(o, n));
@@ -160,14 +190,14 @@
   // tabs
   document.querySelectorAll('nav [role=tab]').forEach((b) => b.addEventListener('click', () => {
     document.querySelectorAll('nav [role=tab]').forEach((x) => x.setAttribute('aria-selected', x === b ? 'true' : 'false'));
-    for (const t of ['play', 'batch', 'cards']) $('view-' + t).hidden = t !== b.dataset.tab;
+    for (const t of ['play', 'versus', 'batch', 'cards']) $('view-' + t).hidden = t !== b.dataset.tab;
   }));
 
   // ----- single game -----
   let snaps = []; let cur = 0;
-  function runOne() {
+  async function runOne() {
     persist();
-    const g = playOne({ ...opts(), snapshots: true }); g.run();
+    const g = playOne({ ...opts(), snapshots: true }); await g.run();
     snaps = g.snapshots; cur = snaps.length - 1;
     $('scrub').max = String(snaps.length - 1); show(cur);
   }
@@ -227,9 +257,9 @@
     persist();
     document.querySelector('[data-tab=batch]').click();
     $('batchSummary').innerHTML = '<span class="note">Simulating&hellip;</span>';
-    setTimeout(() => {
+    setTimeout(async () => {
       const o = opts(); const n = Math.max(10, Math.min(5000, +$('games').value || 500));
-      const r = batch(o, n);
+      const r = await batch(o, n);
       const wins = Object.entries(r.wins).sort((a, b) => b[1] - a[1]); const st = r.stats; const pg = (k) => (st[k] / n).toFixed(2);
       $('batchSummary').innerHTML = `
         <div class="strip">
@@ -259,6 +289,108 @@
       $('cardStats').innerHTML = `<table><thead><tr><th>Card</th><th class="n">Played</th><th class="n">Per game</th></tr></thead><tbody>${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${v}</td><td class="n">${(v / n).toFixed(2)}</td></tr>`).join('')}</tbody></table>`;
     }, 20);
   });
+
+  // ----- versus: a human against a bot -----
+  let vs = null;
+  const vsUI = {
+    setPhase: (g, p, { canPass }) => new Promise((res) => { vs.resolve = res; vs.prompt = { kind: 'set', canPass }; renderVs(); }),
+    mainPhase: (g, p) => new Promise((res) => { vs.resolve = res; vs.prompt = { kind: 'main' }; renderVs(); }),
+    hedge: (g, p, opts, threat) => new Promise((res) => { vs.resolve = res; vs.prompt = { kind: 'hedge', opts, threat }; renderVs(); }),
+    foretell: (g, p, c) => new Promise((res) => { vs.resolve = res; vs.prompt = { kind: 'foretell', card: c }; renderVs(); }),
+  };
+  function resolveVs(v) { const r = vs.resolve; vs.resolve = null; vs.prompt = { kind: 'waiting' }; renderVs(); if (r) r(v); }
+  $('vsStart').addEventListener('click', async () => {
+    persist();
+    const o = opts(); const human = new HumanPolicy(vsUI); const botKind = $('polB').value;
+    const bot = isDuel() ? botPolicy2(botKind, o.seed + 1) : botPolicy1(botKind, o.seed + 1); bot.name = 'BOT';
+    const rng = makeRng(o.seed * 977 + 3);
+    let players = isDuel()
+      ? [{ name: 'YOU', policy: human, deckList: buildDeck($('deckA').value, rng), deckPreset: $('deckA').value }, { name: 'BOT', policy: bot, deckList: buildDeck($('deckB').value, rng), deckPreset: $('deckB').value }]
+      : [{ name: 'YOU', policy: human }, { name: 'BOT', policy: bot }];
+    if ($('vsBotFirst').checked) players = [players[1], players[0]];
+    const G = isDuel() ? DuelGame : TarotGame;
+    vs = { g: new G({ players, seed: o.seed, snapshots: true, rules: o.rules, hiddenInfo: true }), human, prompt: { kind: 'waiting' }, resolve: null, busy: false };
+    vs.me = vs.g.players.find((p) => p.policy === human); vs.bot = vs.g.players.find((p) => p.policy !== human);
+    renderVs();
+    const r = await vs.g.run();
+    vs.prompt = { kind: 'over', result: r }; renderVs();
+  });
+  async function doAct(a) { if (!vs || vs.busy || !a) return; vs.busy = true; try { await vs.g.act(vs.me, a); } finally { vs.busy = false; } renderVs(); }
+  const actLabel = (a) => {
+    switch (a.t) {
+      case 'reserve': return 'Reserve as Liquidity';
+      case 'hire': return `Hire for ${a.cost}`;
+      case 'work': return a.ability ? 'Work: ability' : `Work for ${vs.g.yieldOf(vs.me, a.inst)}`;
+      case 'foretell': return 'Foretell';
+      case 'invoke': return `Invoke ${a.major.name} (${a.cost})`;
+      case 'pip': { const c = a.card; const ch = a.choice || {}; const cost = a.cost ? ` for ${a.cost}` : ' free';
+        if (c.suit === 'coins') return `Play${cost}`;
+        if (c.suit === 'candles') return `Work ${ch.inst.card.name}${cost}`;
+        if (c.suit === 'cups') return `${c.reversed ? 'Take from' : 'Give to'} ${ch.opp.name}${cost}`;
+        const t = ch.target; return t && t.card ? `Attack ${t.card.name}${cost}` : `Front-run ${t.name}${cost}`; }
+      default: return a.t;
+    }
+  };
+  function renderVs() {
+    if (!vs) return; const g = vs.g; const me = vs.me; const bot = vs.bot; const s = g.makeSnapshot('live');
+    const sm = s.players.find((p) => p.name === me.name); const sb = s.players.find((p) => p.name === bot.name);
+    $('vsStrip').innerHTML = [
+      ['Round', s.round + (s.bell != null ? ` &middot; Final Bell R${s.bell}` : '')],
+      ['Market', s.market || 'none'],
+      ['Providence', s.providence.length ? s.providence.join(', ') : '&mdash;'],
+      [isDuel() ? 'Majors left' : 'R-cana left', s.deckLeft],
+      ['Turn', s.active || '&mdash;'],
+    ].map(([k, v]) => `<div class="cell"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+    const nums = (p) => `<div class="nums">
+          <div class="num bank"><div class="k">Bank</div><div class="v">${p.bank}</div></div>
+          <div class="num"><div class="k">Portfolio</div><div class="v">${p.portfolio}</div></div>
+          <div class="num"><div class="k">Liquidity</div><div class="v">${p.reserve - p.locked}<span style="font-size:12px;color:var(--muted)">/${p.reserve}</span></div></div>
+          <div class="num"><div class="k">Hand</div><div class="v">${p.hand.length}</div></div></div>`;
+    const acts = vs.prompt.kind === 'main' ? g.actions(me) : [];
+    const floorChips = (p, pl, clickable) => p.floor.map((i, k) => { const inst = pl.floor[k]; const mine = clickable ? acts.map((a, ix) => [a, ix]).filter(([a]) => a.t === 'work' && a.inst === inst) : [];
+      return `<span class="chip personality ${i.working ? 'working' : ''} ${i.villain ? 'villain' : ''} ${i.shielded ? 'shielded' : ''}" title="${esc(i.title)}"><span class="temp ${i.suit}"></span><span class="name">${esc(i.name)}</span><span class="stat">${i.yield}y/${i.res}r</span>${i.drawdown ? `<span class="dd">&minus;${i.drawdown}</span>` : ''}${mine.map(([a, ix]) => `<button class="act" data-act="${ix}">${a.ability ? 'ability' : 'Work'}</button>`).join('')}</span>`; }).join('') || '<span class="note">empty</span>';
+    const passBadge = (p) => (p.pass != null ? ` &middot; <span class="pill" style="border-color:var(--accent);color:var(--accent)">HAIL MARY PASS: ${p.pass} in the air</span>` : (p.passUsed ? ' &middot; pass thrown' : ''));
+    const handHtml = me.hand.map((c) => { const mine = acts.map((a, ix) => [a, ix]).filter(([a]) => a.card === c);
+      return `<div class="mini"><div class="t"><span class="temp ${c.suit}"></span>${esc(c.name)}${c.type === 'court' ? ` <span class="stat" style="font-family:var(--font-mono);color:var(--muted);font-weight:400">${c.yield}y/${c.res}r &middot; cost ${c.cost}</span>` : ` <span style="font-family:var(--font-mono);color:var(--muted);font-weight:400">cost ${g.costOf(me, c)}</span>`}</div><div class="x">${esc(c.text || c.title || '')}</div><div class="acts">${mine.length ? mine.map(([a, ix]) => `<button class="act" data-act="${ix}">${esc(actLabel(a))}</button>`).join('') : (vs.prompt.kind === 'main' ? '<span class="note">nothing playable now</span>' : '')}</div></div>`; }).join('');
+    $('vsBoards').innerHTML = `
+      <div class="panel board ${s.active === bot.name && !s.over ? 'active' : ''}">
+        <h2>${esc(bot.name)}</h2><div class="trader">${esc(bot.policy.name || 'bot')}${isDuel() ? ` &middot; deck: ${esc(bot.deckPreset)}` : ''}${passBadge(sb)}</div>${nums(sb)}
+        <div class="zone-h">Floor</div><div class="floor">${floorChips(sb, bot, false)}</div>
+        <div class="zone-h">Hand</div><div class="hand">${sb.hand.length} cards, face-down</div>
+      </div>
+      <div class="panel board ${s.active === me.name && !s.over ? 'active' : ''}">
+        <h2>${esc(me.name)}</h2><div class="trader">plays like a <strong>${esc(sm.archetype)}</strong>${isDuel() ? ` &middot; deck: ${esc(me.deckPreset)}` : ''}${passBadge(sm)}</div>${nums(sm)}
+        <div class="zone-h">Floor</div><div class="floor">${floorChips(sm, me, true)}</div>
+        <div class="zone-h">Hand</div><div class="handcards">${handHtml || '<span class="note">empty</span>'}</div>
+      </div>`;
+    // prompt
+    const pr = vs.prompt; let html = '';
+    if (pr.kind === 'waiting') html = `<span class="note">${s.over ? 'Game over.' : 'The bot is thinking&hellip;'}</span>`;
+    else if (pr.kind === 'set') html = `<div class="prompt-h">YOUR SET &middot; ${me.portfolio} in Portfolio</div><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="act big" id="vsBankAll">Bank all ${me.portfolio}</button>
+        <label style="display:flex;gap:6px;align-items:center;text-transform:none;letter-spacing:0;font-size:13px;color:var(--fg)">Bank <input type="number" id="vsBankN" min="0" max="${me.portfolio}" value="0" style="width:80px;font:inherit;color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px"> <button class="act" id="vsBankSome">and keep the rest exposed</button></label>
+        ${pr.canPass ? `<button class="act" id="vsPass" style="border-color:var(--bad);color:var(--bad)">Throw a HAIL MARY PASS with all ${me.portfolio}</button>` : ''}
+      </div><p class="note" style="margin:8px 0 0">Banked Profit can never be taken. Profit left in the Portfolio earns Interest but can be hit by Chains and Events.</p>`;
+    else if (pr.kind === 'main') html = `<div class="prompt-h">YOUR MAIN PHASE &middot; Liquidity ${g.liquidity(me)}${me.reservedThisTurn ? '' : ' &middot; you may still Reserve one card'}</div><div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${acts.filter((a) => a.t === 'foretell' || a.t === 'invoke').map((a) => `<button class="act" data-act="${acts.indexOf(a)}">${esc(actLabel(a))}</button>`).join('')}
+        <button class="act big" id="vsEnd">End turn</button></div><p class="note" style="margin:8px 0 0">Play cards from your hand below and put Personalities to Work from your Floor. Only Working Personalities can be attacked.</p>`;
+    else if (pr.kind === 'hedge') { const t = pr.threat; const tgt = t.target && t.target.card ? t.target.card.name : 'your Portfolio'; html = `<div class="prompt-h" style="color:var(--bad)">INCOMING &middot; ${esc(t.attacker ? t.attacker.name : 'The R-cana')} plays ${esc(t.card.name)} at ${esc(tgt)} for ${t.amount}</div><div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${pr.opts.map((c, i) => `<button class="act" data-hedge="${i}">Hedge with ${esc(c.name)} (absorbs ${c.reversed ? c.rank + 2 : c.rank}${c.reversed ? ', free' : `, costs ${g.costOf(me, c)}`})</button>`).join('')}
+        <button class="act big" id="vsNoHedge">Take it</button></div>`; }
+    else if (pr.kind === 'foretell') html = `<div class="prompt-h">FORETELL &middot; the next Major is ${esc(pr.card.name)}</div><div class="note" style="margin-bottom:8px">${esc(pr.card.text)}</div><div style="display:flex;gap:8px"><button class="act big" id="vsBottom">Send it to the bottom</button><button class="act" id="vsKeep">Leave it</button></div>`;
+    else if (pr.kind === 'over') { const r = pr.result; html = `<div class="win-badge" style="display:inline-block">${esc(r.winner === me.name ? 'You win.' : r.winner ? 'The bot wins.' : 'Draw.')} ${esc(r.reason)}</div><p class="note" style="margin:8px 0 0">The R-cana named you a <strong>${esc(sm.archetype)}</strong>. Start a new game above.</p>`; }
+    $('vsPrompt').innerHTML = html;
+    // wire
+    document.querySelectorAll('#view-versus [data-act]').forEach((b) => b.addEventListener('click', () => doAct(acts[+b.dataset.act])));
+    if (pr.kind === 'set') { $('vsBankAll').addEventListener('click', () => resolveVs({ bank: me.portfolio })); $('vsBankSome').addEventListener('click', () => resolveVs({ bank: +$('vsBankN').value || 0 })); if (pr.canPass) $('vsPass').addEventListener('click', () => resolveVs({ pass: true })); }
+    if (pr.kind === 'main') $('vsEnd').addEventListener('click', () => resolveVs());
+    if (pr.kind === 'hedge') { document.querySelectorAll('#view-versus [data-hedge]').forEach((b) => b.addEventListener('click', () => resolveVs(pr.opts[+b.dataset.hedge]))); $('vsNoHedge').addEventListener('click', () => resolveVs(null)); }
+    if (pr.kind === 'foretell') { $('vsBottom').addEventListener('click', () => resolveVs(true)); $('vsKeep').addEventListener('click', () => resolveVs(false)); }
+    // log
+    const lines = [...g.snapshots.flatMap((x) => x.events), ...g.events];
+    $('vsLog').innerHTML = lines.slice(-80).map((e) => { const t = esc(e.replace(/^\[[^\]]*\] /, '')); const cls = /WINS|FINAL BELL|Final Bell|reveals|HAIL MARY PASS|COMPLETE:/.test(e) ? 'win' : /LIQUIDATED|loses|Drawdown|Front-run|Exit Scam|INTERCEPTED|INCOMPLETE/.test(e) ? 'bad' : /banks/.test(e) ? 'good' : ''; return `<div class="${cls}">${t}</div>`; }).join('');
+    $('vsLog').scrollTop = $('vsLog').scrollHeight;
+  }
 
   // ----- cards tab -----
   $('fTemp').innerHTML += SUITS.map((t) => `<option value="${t}">${SUIT_NAME[t]}</option>`).join('') + '<option value="major">Major R-cana</option>';

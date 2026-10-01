@@ -33,6 +33,14 @@ The viewer needs to be served, not opened from disk, because it uses ES modules:
 cd src/game/rcana && python3 -m http.server 8765   # then open http://localhost:8765/viewer.html
 ```
 
+## Playing against the bot
+
+Open `tarot-viewer.html`, pick the Mode, your deck and the bot's deck (duel only), the bot style under
+Trader B, then use the Versus tab. The engine pauses for each of your decisions: bank or throw a Hail Mary
+Pass at your Set, every action in your main phase, hedging when the bot attacks you, and Foretell. The bot's
+hand and the Omen are hidden. Policies are `async`; a `HumanPolicy` in `tarot-bots.js` resolves each decision
+from the page.
+
 ## Changing the rules
 
 Numbers that matter live in two places: `WIN_BANK` in `engine.js`, and the card fields in `cards.js`.
@@ -52,7 +60,7 @@ whole table when drawn. Theme is general markets and money.
 | `tarot-engine.js` | Shared-deck rules: Set (Dividend, Interest, Bank), draw Minors resolving Majors on the way, Reserve, pips, courts, Chains as attack or Hedge, Invoke, Foretell, Final Bell. |
 | `tarot-bots.js` | Strong (heuristic), Naive (random actions, banks everything, always hedges) and Random (also passes at random) policies. |
 | `tarot-sim.js` | CLI and the `playOne` / `batch` exports the viewer uses. |
-| `tarot-viewer.html` | Browser UI, same layout as `viewer.html`. |
+| `tarot-viewer.html` | Browser UI: Watch (bot vs bot, turn by turn), Versus (you against a bot), Batch, Cards. Covers both the shared reading and the duel. |
 
 ```bash
 node tarot-sim.js --verbose --seed 5

@@ -16,10 +16,10 @@ export function playOne({ a = 'strong', b = 'random', seed = 1, swap = false, sn
   if (swap) players.reverse();
   return new TarotGame({ players, seed, snapshots, rules });
 }
-export function batch(opts, n) {
+export async function batch(opts, n) {
   const res = { games: n, wins: {}, firstWins: 0, bell: 0, rounds: [], banks: [], majors: 0, cardPlays: {}, stats: {}, archetypes: {}, reasons: {} };
   for (let i = 0; i < n; i++) {
-    const g = playOne({ ...opts, seed: opts.seed + i, swap: i % 2 === 1 }); const r = g.run();
+    const g = playOne({ ...opts, seed: opts.seed + i, swap: i % 2 === 1 }); const r = await g.run();
     const w = r.winner || 'draw'; res.wins[w] = (res.wins[w] || 0) + 1; if (r.winnerIdx === 0) res.firstWins++; if (r.finalBell) res.bell++;
     res.rounds.push(r.rounds); res.banks.push(...r.players.map((p) => p.bank)); res.majors += r.majorsSeen;
     const rk = /banked/.test(r.reason) ? 'banked target' : r.reason.split(':')[0]; res.reasons[rk] = (res.reasons[rk] || 0) + 1;
@@ -36,11 +36,11 @@ if (typeof process !== 'undefined' && process.argv && process.argv[1] && process
   const games = +(args.games || 500); const seed = +(args.seed || 1); const rules = {}; if (args.win) rules.winBank = +args.win; if (args.hand) rules.openingHand = +args.hand; if (args.draw) rules.minorsPerTurn = +args.draw; if (args.first != null) rules.firstTurnDraw = +args.first; if (args.interest) rules.interestDiv = +args.interest; if (args.passMult) rules.passMult = +args.passMult; if (args.passMin) rules.passMin = +args.passMin; if (args.passUnderdog) rules.passUnderdogOnly = true; if (args.noPassA) optsA.usePass = false; if (args.noPassB) optsB.usePass = false;
   const optsA = {}; if (args.keepA != null) optsA.keep = +args.keepA; const optsB = {}; if (args.keepB != null) optsB.keep = +args.keepB;
   if (args.verbose) {
-    const g = playOne({ a: args.a || 'strong', b: args.b || 'random', seed, snapshots: true, rules, optsA, optsB }); g.run();
+    const g = playOne({ a: args.a || 'strong', b: args.b || 'random', seed, snapshots: true, rules, optsA, optsB }); await g.run();
     for (const s of g.snapshots) { console.log(`\n=== ${s.label} R${s.round} ${s.active || ''} | Market: ${s.market || '-'} | Providence: ${s.providence.join(', ') || '-'} | deck ${s.deckLeft} ===`); s.events.forEach((e) => console.log('  ' + e)); s.players.forEach((p) => console.log(`  ${p.name}: Bank ${p.bank} Port ${p.portfolio} Liq ${p.reserve - p.locked}/${p.reserve} Hand ${p.hand.length} | ${p.floor.map((i) => `${i.name}${i.working ? '*' : ''}${i.drawdown ? `(${i.drawdown})` : ''}`).join(', ')}`)); }
     console.log(JSON.stringify(g.result(), null, 1));
   } else {
-    const r = batch({ a: args.a || 'strong', b: args.b || 'random', seed, rules, optsA, optsB }, games);
+    const r = await batch({ a: args.a || 'strong', b: args.b || 'random', seed, rules, optsA, optsB }, games);
     console.log(`${games} games: ${args.a || 'strong'} vs ${args.b || 'random'} | win target ${rules.winBank || 80}`);
     console.log('wins', JSON.stringify(r.wins), '| first player wins', Math.round(r.firstWins / games * 100) + '%'); console.log('reasons', r.reasons);
     console.log(`rounds avg ${r.avgRounds} median ${r.medianRounds} p10 ${r.p10} p90 ${r.p90} | Final Bell ${r.bellRate} | avg end bank ${r.avgBank} | majors seen/game ${(r.majors / games).toFixed(1)}`);
