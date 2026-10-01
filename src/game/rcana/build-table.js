@@ -23,7 +23,8 @@ function wrapModule(name) {
     if (/^export\s*\{/.test(line)) throw new Error(`unsupported export form in ${name}: ${line}`);
     return line;
   }).join('\n');
-  return `__m['./${name}'] = (() => {\n${body}\nreturn { ${exportsList.join(', ')} };\n})();\n`;
+  // async so the simulators' guarded top-level awaits stay legal; the page script awaits each module in order
+  return `__m['./${name}'] = await (async () => {\n${body}\nreturn { ${exportsList.join(', ')} };\n})();\n`;
 }
 const bundle = `const __m = {};\n` + ORDER.map(wrapModule).join('\n');
 let page = readFileSync(join(here, 'table.src.html'), 'utf8');
