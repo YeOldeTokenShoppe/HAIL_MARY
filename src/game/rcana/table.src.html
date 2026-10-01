@@ -265,7 +265,7 @@
     } else {
       const y = inst && owner ? S.g.yieldOf(owner, inst) : c.yield;
       el.innerHTML = `<div class="hd"><span>${esc(c.rank[0])}</span><span class="suit"></span><span class="cost ${cost > liq && !inst ? 'no' : ''}">${cost}</span></div><div class="mid"><div class="nm">${esc(c.name)}</div></div><div class="ft"><span>earns ${y}</span><span>resists ${c.res}</span></div>`;
-      if (inst) { const b = []; if (inst.drawdown) b.push(`<span class="bd dd">−${inst.drawdown}</span>`); if (inst.armor) b.push(`<span class="bd arm">+${inst.armor}🛡</span>`); if (inst.shielded) b.push(`<span class="bd sh">shield</span>`); if (c.villain) b.push(`<span class="bd vil">villain</span>`); if (b.length) el.insertAdjacentHTML('beforeend', `<div class="badges">${b.join('')}</div>`); if (inst.working) el.classList.add('working'); }
+      if (inst) { const b = []; if (inst.drawdown) b.push(`<span class="bd dd">−${inst.drawdown}</span>`); if (inst.armor) b.push(`<span class="bd arm">+${inst.armor}🛡</span>`); if (inst.shielded) b.push(`<span class="bd sh">shield</span>`); if (c.kw && c.kw.exitScam) b.push(`<span class="bd vil">exit scam ${c.kw.exitScam}</span>`); if (b.length) el.insertAdjacentHTML('beforeend', `<div class="badges">${b.join('')}</div>`); if (inst.working) el.classList.add('working'); }
     }
     return el;
   }
@@ -405,7 +405,7 @@
     const g = S.g; let s = c.name;
     if (c.type === 'major') return `${c.name} [${c.kind}${c.cost != null ? ' ' + c.cost : ''}]: ${c.text}`;
     if (c.type === 'pip') s += ` [${c.reversed ? 'reversed ' : ''}${c.suit} ${c.rank}, cost ${inst ? c.cost : g.costOf(S.me, c)}]: ${c.text}`;
-    else { s += ` [${c.title}${c.villain ? ', villain' : ''}, cost ${inst ? c.cost : g.costOf(S.me, c)}, Yield ${inst && owner ? g.yieldOf(owner, inst) : c.yield}, Resilience ${c.res}]: ${c.text}`; }
+    else { s += ` [${c.title}${c.kw && c.kw.exitScam ? ', Exit Scam ' + c.kw.exitScam : ''}, cost ${inst ? c.cost : g.costOf(S.me, c)}, Yield ${inst && owner ? g.yieldOf(owner, inst) : c.yield}, Resilience ${c.res}]: ${c.text}`; }
     if (inst) { const b = []; b.push(inst.working ? 'WORKING' : 'idle'); if (inst.drawdown) b.push(`${inst.drawdown} Drawdown`); if (inst.armor) b.push(`${inst.armor} armor`); if (inst.bonusYield) b.push(`+${inst.bonusYield} Collateral Yield`); if (inst.shielded) b.push('shielded'); if (!inst.working && !g.canWork(owner, inst)) b.push('cannot Work yet, arrived this turn'); s += ` (${b.join(', ')})`; }
     return s;
   }
