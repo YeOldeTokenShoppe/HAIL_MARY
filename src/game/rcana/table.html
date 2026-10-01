@@ -94,6 +94,14 @@
   .prompt .ph { font-family: var(--font-display); letter-spacing: .06em; font-size: 12px; color: var(--gold); width: 100%; }
   .prompt.danger { border-color: var(--bad); } .prompt.danger .ph { color: var(--bad); }
   .coach { font-size: 12px; color: var(--good); width: 100%; }
+  .ask { border: 1px solid var(--line); border-radius: 10px; background: var(--felt2); padding: 8px 10px; display: grid; gap: 6px; margin-top: 6px; }
+  .ask[hidden] { display: none; }
+  .ask-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .ask-row .who { font-family: var(--font-display); letter-spacing: .08em; font-size: 10px; color: var(--good); }
+  .ask-row input[type=text] { flex: 1 1 180px; min-width: 0; font: inherit; color: var(--ink); background: var(--felt); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; }
+  .ask-out { font-size: 12px; color: var(--ink); white-space: pre-wrap; line-height: 1.45; max-height: 180px; overflow: auto; }
+  .ask-out.thinking { color: var(--muted); font-style: italic; }
+  .ask-q { color: var(--muted); font-size: 11px; }
   .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 40; }
   .overlay .box { background: var(--felt2); border: 1px solid var(--gold); border-radius: 12px; padding: 16px; max-width: 560px; width: 100%; display: grid; gap: 10px; }
   .overlay .box .ph { font-family: var(--font-display); letter-spacing: .06em; color: var(--gold); }
@@ -131,7 +139,7 @@
       <li><strong>The Majors are fate.</strong> One is revealed each round for everyone. Markets stay, Events hit at once, Invokes sit in Providence; tap one to pay for it.</li>
       <li><strong>Hail Mary Pass:</strong> once per game, throw your whole Portfolio into the air instead of banking. If nothing touches it by your next Set, it banks doubled. If anything does, it's gone.</li>
     </ol>
-    <p class="note">The coach line under each decision says what the strong bot would do and why. Press "Do that" to follow it, or ignore it and see what happens.</p>
+    <p class="note">The coach line under each decision says what the strong bot would do and why. Press "Do that" to follow it, or ignore it and see what happens. In the Claude app you can also type a question into "Ask the coach" below your Reserve; it answers from the rules and the table in front of you.</p>
   </details>
 
   <section class="side opp">
@@ -154,6 +162,12 @@
       <div class="zone" id="meFloor"><span class="zl">Your floor · tap an idle Personality to Work it</span></div>
       <div class="zone" id="meReserveZone" style="min-height:40px"><span class="zl">Reserve · drop a card here to make it Liquidity</span></div>
       <div id="prompt"></div>
+      <div class="ask" id="ask" hidden>
+        <div class="ask-row"><span class="who">ASK THE COACH</span><input type="text" id="askQ" maxlength="400" placeholder="Why not attack? What does this Market do? Should I throw the pass?"><button class="primary" id="askGo">Ask</button><button id="askStop" hidden>Stop</button></div>
+        <div class="ask-q" id="askQShown" hidden></div>
+        <div class="ask-out" id="askOut" hidden></div>
+        <div class="note" id="askNote" hidden></div>
+      </div>
       <div class="zone" id="meHand" style="border-style:none;padding:0"><span class="zl">Your hand</span></div>
     </div>
   </section>
@@ -1936,6 +1950,7 @@ return { policy, playOne, batch };
     const g = new G({ players, seed, snapshots: true, rules: {}, hiddenInfo: true });
     S = { g, human, coach, prompt: { kind: 'wait' }, resolve: null, mainResolve: null, busy: false, seen: new Set() };
     S.me = g.players.find((p) => p.policy === human); S.bot = g.players.find((p) => p.policy !== human);
+    S.askTurns = []; if (askCtl) askCtl.abort(); ['askQShown', 'askOut', 'askNote'].forEach((id) => { $(id).hidden = true; $(id).textContent = ''; });
     // let the bot's plays show one at a time
     const origAct = g.act.bind(g); g.act = async (p, a) => { const r = await origAct(p, a); if (p === S.bot) { render(); await sleep(420); } return r; };
     render();
@@ -2008,6 +2023,7 @@ return { policy, playOne, batch };
     if (pr.kind === 'foretell') { $('bury').onclick = () => resolveP(true); $('leave').onclick = () => resolveP(false); }
     if (hint) { const d = $('coachDo'); if (d) d.onclick = () => hint.run(); const f = $('coachFinish'); if (f) f.onclick = coachFinish; const tz = hintTarget(hint.act); if (tz) tz.classList.add(tz.classList.contains('card') ? 'hint' : 'hint'); }
     $('status').textContent = g.over ? 'Game over.' : `Round ${g.round}${g.bellRound != null ? ' · Final Bell' : ''}`;
+    $('ask').hidden = !askFn;
   }
   $('endTurn').addEventListener('click', endTurn);
   $('coach').addEventListener('change', render);
@@ -2055,6 +2071,92 @@ return { policy, playOne, batch };
     if (a.t === 'pip') { if (ch.collateral) return document.querySelector(`#meFloor .card[data-uid="${ch.collateral.uid}"]`); if (ch.inst) return document.querySelector(`#meFloor .card[data-uid="${ch.inst.uid}"]`); if (ch.opp) return $('oppQ'); const t = ch.target; return t && t.isPass ? $('oppPassBadge') : t && t.card ? document.querySelector(`#oppFloor .card[data-uid="${t.uid}"]`) : $('oppQ'); }
     return null;
   }
+
+  // ───────── ask the coach (a question to Claude, through the artifact runtime) ─────────
+  let askFn = null, askCtl = null;
+  (async () => {
+    try { if (window.claude && typeof window.claude.use === 'function') askFn = await window.claude.use('sample'); } catch (e) { askFn = null; }
+    if (askFn && S) render();
+  })();
+  const RULES_BRIEF = [
+    'R-CANA RULES IN BRIEF (two players: YOU and the BOT).',
+    'Goal: be first to hold 80 Profit in your Bank. Banked Profit can never be taken. Profit you earn lands in your Portfolio, where it is exposed, until you bank it at your Set.',
+    'Your turn: 1 Refresh (Working Personalities go idle, locked Reserve cards unlock, shields expire). 2 Set: a pass in the air comes down; Dividend +1 Profit; Interest +1 per full 5 already in your Portfolio; then bank any amount from Portfolio to Bank, or throw a Hail Mary Pass. 3 Draw one Minor. 4 Main phase, any order: Reserve one card from hand (once per turn), hire courts, play pips, Work idle Personalities that were on your Floor at the start of your turn, Foretell (once, only with Virgil), Invoke a Major in Providence. 5 End.',
+    'Liquidity: each face-down card in your Reserve is 1 Liquidity per turn. Paying a cost locks that many Reserve cards until your next Refresh. Reserved cards are gone for good; early on, reserving every turn is usually right.',
+    'Personalities (courts: Page, Knight, Queen, King) have cost, Yield and Resilience. Hire one to your Floor; it cannot Work the turn it arrives unless it is Fast. Work it for its Yield into your Portfolio. Only a WORKING Personality can be attacked by Chains. Drawdown that reaches Resilience Liquidates it (discard, owner draws a Minor). Exit Scam courts cost their owner Profit when they leave.',
+    'Pips have rank R (Ace = 1 to 10); cost is half of R rounded up (upright Cups, reversed Candles and reversed Chains cost one less).',
+    'Coins: gain R Profit (reversed: bank half of R, rounded up, directly). Candles: an idle Personality Works now with +R Yield (reversed: +half of R and it cannot be targeted until your next turn). Cups: the opponent gains half of R, you gain R and draw a card (reversed: Front-run half of R from the opponent and gain the same). Chains: deal R Drawdown to a Working opposing Personality, or Front-run R from the opposing Portfolio, or intercept an opposing Hail Mary Pass; or keep it in hand as a Hedge that absorbs R when you are attacked (costs its Liquidity). Reversed Chains are Collateral: play on your own Personality for R armor against Chains and Events and +half of R Yield while it stays; or Hedge for free, absorb R+2 and draw a card.',
+    'Hedging: when a Chain or reversed Cup targets your Working Personality, your Portfolio or your pass, you may play a Chain from hand first; whatever is left of the hit gets through.',
+    'Hail Mary Pass: once per game, at your Set, instead of banking, throw your whole Portfolio (at least 10) into the air until your next Set. Profit earned meanwhile is separate. If nothing touches it, it banks doubled (Bag Holder cap applies). A Chain aimed at the pass that gets through intercepts: the interceptor takes that much, the rest is lost. Events that take Profit from Portfolios (THE REGULATOR, THE CRASH, THE AUDIT) knock it down: all lost. If the game ends with it in the air it returns undoubled.',
+    'Majors: one is revealed for both players at the start of each round. Markets stay until replaced. Events happen once. Invokes go to Providence, where either player may pay the cost on their turn to use it once. In the Duel, the next Major waits face down as the Omen; Foretell (Virgil) lets you look and bury it. THE RECKONING is buried if too many Majors remain.',
+    'Ending: when a Bank reaches 80 the round is played out so both players have equal turns (the "Final Bell"); then the larger Bank wins, ties to the larger Portfolio. The game also ends after the round THE RECKONING tolls, or when the last Major is revealed. (Shared reading, version 1: one shared 80-card deck with the Majors shuffled in, no reversed cards, Majors resolve when drawn, and 80 in the Bank wins at once.)',
+    'The 22 Majors: THE HAIL MARY (Invoke 3, Underdog only: throw a pass now even if used). THE FOUNDER (Invoke 2: draw two Minors). THE ORACLE (Event: reveal top three Majors, Underdog reorders). THE BOOM (Market: Candles give double). THE FED (Market: Interest doubled). THE REGULATOR (Event: every Portfolio loses 3, every Chains Personality takes 2 Drawdown). THE MERGER (Invoke 2: an idle Personality Works with +3). BULL RUN (Market: every Yield +1). CONVICTION (Market: Portfolios cannot be targeted by Chains). THE VAULT (Invoke 1: bank up to 5). VOLATILITY (Event: players swap Portfolios). THE AUDIT (Event: the player with the most Chains Personalities loses half their Portfolio). THE BAG HOLDER (Market: nobody banks more than 5 per turn). THE LIQUIDATION (Event: every Working Personality takes 3 Drawdown). DOLLAR-COST AVERAGE (Market: Dividend is 3, Yields above 3 become 3). LEVERAGE (Market: Yields doubled, Chains doubled). THE CRASH (Event: every Portfolio emptied). THE WINDFALL (Event: everyone draws two and gains 3). THE PANIC (Market: Chains cost 0). GOLDEN AGE (Market: Cups cost 0 and give double). THE RECKONING (Event: game ends after this round, or buried). OUR LADY OF PERPETUAL PROFIT (Event: whoever played the most upright Cups banks their whole Portfolio).',
+  ].join('\n');
+  function cardBrief(c, inst, owner) {
+    const g = S.g; let s = c.name;
+    if (c.type === 'major') return `${c.name} [${c.kind}${c.cost != null ? ' ' + c.cost : ''}]: ${c.text}`;
+    if (c.type === 'pip') s += ` [${c.reversed ? 'reversed ' : ''}${c.suit} ${c.rank}, cost ${inst ? c.cost : g.costOf(S.me, c)}]: ${c.text}`;
+    else { s += ` [${c.title}${c.villain ? ', villain' : ''}, cost ${inst ? c.cost : g.costOf(S.me, c)}, Yield ${inst && owner ? g.yieldOf(owner, inst) : c.yield}, Resilience ${c.res}]: ${c.text}`; }
+    if (inst) { const b = []; b.push(inst.working ? 'WORKING' : 'idle'); if (inst.drawdown) b.push(`${inst.drawdown} Drawdown`); if (inst.armor) b.push(`${inst.armor} armor`); if (inst.bonusYield) b.push(`+${inst.bonusYield} Collateral Yield`); if (inst.shielded) b.push('shielded'); if (!inst.working && !g.canWork(owner, inst)) b.push('cannot Work yet, arrived this turn'); s += ` (${b.join(', ')})`; }
+    return s;
+  }
+  function actBrief(a) {
+    const c = a.card, ch = a.choice || {};
+    switch (a.t) {
+      case 'work': return `Work ${a.inst.card.name}${a.ability ? ' for its ability' : ` for +${S.g.yieldOf(S.me, a.inst)}`}`;
+      case 'invoke': return `Invoke ${a.major.name} for ${a.cost}`;
+      case 'foretell': return 'Foretell the Omen';
+      case 'reserve': return `Reserve ${c.name} as Liquidity`;
+      case 'hire': return `Hire ${c.name} for ${a.cost}`;
+      case 'pip': { const cost = `for ${a.cost}`; if (ch.collateral) return `${c.name}: Collateral on ${ch.collateral.card.name} ${cost}`; if (c.suit === 'coins') return `Play ${c.name} ${cost}`; if (c.suit === 'candles') return `${c.name}: Work ${ch.inst.card.name} ${cost}`; if (c.suit === 'cups') return `${c.name}: ${c.reversed ? 'take from' : 'give to'} the bot ${cost}`; const t = ch.target; return `${c.name}: ${t && t.isPass ? 'intercept the pass' : t && t.card ? `attack ${t.card.name}` : 'Front-run the bot'} ${cost}`; }
+      default: return a.t;
+    }
+  }
+  function boardText() {
+    const g = S.g, me = S.me, bot = S.bot, pr = S.prompt; const L = [];
+    L.push(`Format: ${isDuel() ? 'Duel (version 2: private decks with reversed cards, shared Majors, Omen face down)' : 'Shared reading (version 1: one shared deck, no reversed cards)'}.`);
+    L.push(`Round ${g.round}${g.bellRound != null ? ' (FINAL BELL: the game ends after this round)' : ''}. ${isDuel() ? `${g.majors.length} Majors left in the deck.` : `${g.deck.length} cards left in the shared deck.`} ${g.active === me ? 'It is your turn.' : "It is the bot's turn."}`);
+    L.push(`YOU: Bank ${me.bank}, Portfolio ${me.portfolio}, Liquidity ${g.liquidity(me)} of ${me.reserve.length} Reserve, ${me.hand.length} cards in hand${me.reservedThisTurn ? ', already Reserved this turn' : ''}. ${me.pass ? `Your Hail Mary Pass is in the air with ${me.inAir}.` : me.hailMaryUsed ? 'Your Hail Mary Pass is used.' : 'Your Hail Mary Pass is still available.'}`);
+    L.push(me.floor.length ? 'Your Floor:\n' + me.floor.map((i) => '  - ' + cardBrief(i.card, i, me)).join('\n') : 'Your Floor: empty.');
+    L.push(`BOT: Bank ${bot.bank}, Portfolio ${bot.portfolio}, ${bot.reserve.length} Reserve (${bot.reserve.filter((r) => r.locked).length} locked), ${bot.hand.length} cards in hand (hidden). ${bot.pass ? `The bot's pass is in the air with ${bot.inAir}.` : bot.hailMaryUsed ? "The bot's pass is used." : "The bot's pass is still available."}`);
+    L.push(bot.floor.length ? "Bot's Floor:\n" + bot.floor.map((i) => '  - ' + cardBrief(i.card, i, bot)).join('\n') : "Bot's Floor: empty.");
+    L.push(g.market ? `Market in effect: ${cardBrief(g.market)}` : 'No Market in effect.');
+    L.push(g.providence.length ? 'Providence (Invokes waiting):\n' + g.providence.map((m) => '  - ' + cardBrief(m)).join('\n') : 'Providence: empty.');
+    L.push(me.hand.length ? 'Your hand:\n' + me.hand.map((c) => '  - ' + cardBrief(c)).join('\n') : 'Your hand: empty.');
+    if (pr.kind === 'main') L.push(acts.length ? 'Legal actions right now:\n' + acts.map((a) => '  - ' + actBrief(a)).join('\n') + '\n  - End turn' : 'Legal actions right now: only End turn.');
+    else if (pr.kind === 'set') L.push(`Decision now: your Set. You may bank any amount of your ${me.portfolio} Portfolio${pr.canPass ? ', or throw a Hail Mary Pass with all of it' : ''}.`);
+    else if (pr.kind === 'hedge') { const t = pr.threat; const tgt = t.target && t.target.isPass ? `your pass (${me.inAir} in the air)` : t.target && t.target.card ? t.target.card.name : 'your Portfolio'; L.push(`Decision now: the bot plays ${t.card.name} at ${tgt} for ${t.amount}. You may Hedge with: ${pr.opts.map((c) => c.name).join(', ') || 'nothing'}; or take it.`); }
+    else if (pr.kind === 'foretell') L.push(`Decision now: you Foretold the Omen. It is ${cardBrief(pr.card)}. Bury it or leave it.`);
+    else if (pr.kind === 'over') L.push(`The game is over: ${pr.result.winner === me.name ? 'you won' : pr.result.winner ? 'the bot won' : 'a draw'} (${pr.result.reason}).`);
+    else L.push('Decision now: none, the bot is playing.');
+    const h = $('coach').checked && ['set', 'main', 'hedge', 'foretell'].includes(pr.kind) ? advice() : null; if (h) L.push(`The strong bot's suggestion right now: ${h.text}`);
+    const recent = [...g.snapshots.flatMap((x) => x.events), ...g.events].slice(-12).map((e) => e.replace(/^\[[^\]]*\] /, '')); if (recent.length) L.push('Recent log:\n' + recent.map((e) => '  ' + e).join('\n'));
+    return L.join('\n');
+  }
+  const ASK_COPY = { rate_limited: 'The coach is busy. Try again in a moment.', prompt_too_large: 'Too much on the table to send. Ask a shorter question.', refused: 'The coach would rather not answer that one.', session_expired: 'Your Claude session expired. Reload the page.', sampling_disabled: 'Asking Claude is turned off for this page.', capability_disabled: 'Asking Claude is turned off for this page.' };
+  async function askCoach() {
+    const q = $('askQ').value.trim(); if (!askFn || !S || !q || askCtl) return;
+    const turns = S.askTurns.slice(-6).map((t) => ({ role: t.role, content: t.content }));
+    const prompt = `${RULES_BRIEF}\n\nCURRENT TABLE (what the human player can see)\n${boardText()}\n\nYou are the player's coach at this table. Answer their question in plain language, at most five short sentences, naming cards by name. Use only the rules and table above; the bot's hand and the face-down Omen are unknown to everyone. If they ask what to do, give one recommendation and the reason. If a card they mention is not on the table, say so.\n\nQUESTION: ${q}`;
+    turns.push({ role: 'user', content: prompt });
+    const out = $('askOut'), note = $('askNote'), shown = $('askQShown');
+    shown.hidden = false; shown.textContent = 'You asked: ' + q; out.hidden = false; out.classList.add('thinking'); out.textContent = 'Thinking…'; note.hidden = true; note.textContent = '';
+    $('askGo').disabled = true; $('askStop').hidden = false; askCtl = new AbortController();
+    try {
+      const r = await askFn(turns, { signal: askCtl.signal, cache: false, modelTier: 'default', onText: ({ text }) => { out.classList.remove('thinking'); out.textContent = text; } });
+      out.classList.remove('thinking'); out.textContent = r.text; S.askTurns.push({ role: 'user', content: 'QUESTION: ' + q }, { role: 'assistant', content: r.text }); $('askQ').value = '';
+      if (r.truncated) { note.hidden = false; note.textContent = 'The answer was cut short.'; }
+    } catch (e) {
+      out.classList.remove('thinking'); out.textContent = (e && e.text) || '';
+      const code = e && e.code;
+      if (code === 'not_granted' || code === 'not_declared' || code === 'capability_removed') { askFn = null; $('ask').hidden = true; }
+      else if (code === 'cancelled') { if (!out.textContent) out.hidden = true; }
+      else { note.hidden = false; note.textContent = ASK_COPY[code] || `The coach could not answer (${code || (e && e.message) || 'error'}).`; }
+    } finally { askCtl = null; $('askGo').disabled = false; $('askStop').hidden = true; }
+  }
+  $('askGo').addEventListener('click', askCoach);
+  $('askQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); askCoach(); } });
+  $('askStop').addEventListener('click', () => { if (askCtl) askCtl.abort(); });
 
   // ───────── drag and drop ─────────
   let dragging = null;
