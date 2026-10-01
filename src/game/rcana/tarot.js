@@ -48,7 +48,7 @@ export const COURTS = [
 // ── Majors: 22. kind = market (standing), event (instant), invoke (sits in Providence; one use). ──
 const M = (n, tarot, name, kind, text, o = {}) => ({ type: 'major', n, tarot, name, kind, text, id: 'major_' + n, ...o });
 export const MAJORS = [
-  M(0, 'The Fool', 'THE HAIL MARY', 'invoke', 'Invoke 3, Underdog only: flip a coin. Heads, double your Portfolio. Tails, empty it.', { cost: 3, can: (g, p) => g.isUnderdog(p) && p.portfolio >= 4, run: (g, p) => { if (g.coin()) g.profit(p, p.portfolio, 'HAIL MARY'); else g.loseProfit(p, p.portfolio, 'HAIL MARY'); } }),
+  M(0, 'The Fool', 'THE HAIL MARY', 'invoke', 'Invoke 3, Underdog only: throw a Hail Mary Pass now, even if you have already thrown one this game.', { cost: 3, can: (g, p) => g.isUnderdog(p) && !p.pass && p.portfolio >= g.rules.passMin, run: (g, p) => g.throwPass(p, { extra: true }) }),
   M(1, 'The Magician', 'THE FOUNDER', 'invoke', 'Invoke 2: draw two Minors.', { cost: 2, can: () => true, run: (g, p) => g.drawMinors(p, 2) }),
   M(2, 'The High Priestess', 'THE ORACLE', 'event', 'Reveal the top three cards. The Underdog puts them back in any order.', { resolve: (g) => g.oracle() }),
   M(3, 'The Empress', 'THE BOOM', 'market', 'Candles give double.', { mods: { candlesMult: () => 2 } }),

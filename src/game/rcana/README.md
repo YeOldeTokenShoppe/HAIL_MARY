@@ -121,6 +121,13 @@ Providence row where any Trader may later pay to use it. The next Major slides f
 hand as a Hedge: an upright Chain costs its Liquidity and absorbs its rank; a reversed Chain is free, absorbs
 its rank plus two, and draws a card.
 
+**The Hail Mary Pass.** Once per game, at your Set, instead of banking you may throw your whole Portfolio
+(at least 10) into the air. It stays in the air through your turn and every opponent's turn. If anything
+takes Profit from your Portfolio before your next Set, the pass is incomplete and you lose all of it; if the
+taker was an opponent's Chain, they intercepted it. If it comes down untouched, what you threw banks doubled.
+Profit you earn after the throw sits in the Portfolio as normal. THE HAIL MARY (The Fool) lets an Underdog
+throw a second one. Rule flags: `--passMult`, `--passMin`, `--passUnderdog`, `--noPassA`, `--noPassB`.
+
 **Winning.** When any Trader's Bank reaches 80 at a Set, the round is played out so everyone has had the
 same number of turns, and the largest Bank wins. If THE RECKONING is revealed in the second half of the Majors,
 or the Majors run out, the game ends after that round the same way.

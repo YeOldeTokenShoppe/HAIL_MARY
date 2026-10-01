@@ -185,7 +185,7 @@
     $('boards').innerHTML = s.players.map((p) => `
       <div class="panel board ${s.active === p.name && !s.over ? 'active' : ''}">
         <h2>${esc(p.name)}</h2>
-        <div class="trader">plays like a <strong>${esc(p.archetype)}</strong></div>
+        <div class="trader">plays like a <strong>${esc(p.archetype)}</strong>${p.pass != null ? ` &middot; <span class="pill" style="border-color:var(--accent);color:var(--accent)">HAIL MARY PASS: ${p.pass} in the air</span>` : (p.passUsed ? ' &middot; pass thrown' : '')}</div>
         <div class="nums">
           <div class="num bank"><div class="k">Bank</div><div class="v">${p.bank}</div></div>
           <div class="num"><div class="k">Portfolio</div><div class="v">${p.portfolio}</div></div>
@@ -197,7 +197,7 @@
         <div class="zone-h">Hand</div>
         <div class="hand">${p.hand.length ? p.hand.map(esc).join(' &middot; ') : '&mdash;'}</div>
       </div>`).join('');
-    $('log').innerHTML = s.events.map((e) => { const t = esc(e.replace(/^\[[^\]]*\] /, '')); const cls = /WINS|FINAL BELL|Final Bell|reveals/.test(e) ? 'win' : /LIQUIDATED|loses|Drawdown|Front-run|Exit Scam/.test(e) ? 'bad' : /banks/.test(e) ? 'good' : ''; return `<div class="${cls}">${t}</div>`; }).join('');
+    $('log').innerHTML = s.events.map((e) => { const t = esc(e.replace(/^\[[^\]]*\] /, '')); const cls = /WINS|FINAL BELL|Final Bell|reveals|HAIL MARY PASS|COMPLETE:/.test(e) ? 'win' : /LIQUIDATED|loses|Drawdown|Front-run|Exit Scam|INTERCEPTED|INCOMPLETE/.test(e) ? 'bad' : /banks/.test(e) ? 'good' : ''; return `<div class="${cls}">${t}</div>`; }).join('');
     drawChart();
   }
   function drawChart() {
@@ -241,6 +241,7 @@
           <div class="cell"><div class="k">Final Bell</div><div class="v">${r.bellRate}</div></div>
           <div class="cell"><div class="k">Avg end Bank</div><div class="v">${r.avgBank}</div></div>
           <div class="cell"><div class="k">Majors seen / game</div><div class="v">${(r.majors / n).toFixed(1)}</div></div>
+          <div class="cell"><div class="k">Hail Mary passes / game</div><div class="v">${pg('passes')} <span style="font-size:12px;color:var(--muted)">complete ${pg('completions')} &middot; intercepted ${pg('interceptions')}</span></div></div>
           <div class="cell"><div class="k">Per game</div><div class="v" style="font-size:12px">work ${pg('worked')} &middot; coins ${pg('coins')} &middot; candles ${pg('candles')} &middot; chains ${pg('chains')} &middot; cups ${pg('cups')} &middot; hedges ${pg('hedges')} &middot; invokes ${pg('invokes')} &middot; liquidated ${pg('liquidated')}</div></div>
         </div>
         <div class="zone-h" style="margin-top:12px">How the R-cana named each side</div>

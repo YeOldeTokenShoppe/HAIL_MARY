@@ -15,7 +15,7 @@ class StrongV2 extends StrongPolicy {
     const h = Math.ceil(c.rank / 2);
     if (c.suit === 'coins') return h * 1.15; // banked, safe
     if (c.suit === 'candles') return h + g.modSum(p, 'candlesBonus') + g.yieldOf(p, a.choice.inst) + 0.5;
-    if (c.suit === 'cups') { const o = a.choice.opp; return Math.min(h, o.portfolio) * 1.2 + h + g.modSum(p, 'revCupsBonus'); }
+    if (c.suit === 'cups') { const o = a.choice.opp; return Math.min(h, o.portfolio) * 1.2 + h + g.modSum(p, 'revCupsBonus') + (o.pass ? Math.max(0, o.portfolio - h) * 0.9 : 0); }
     return -1;
   }
   wantHedge(g, p, opts, threat) {
@@ -60,14 +60,15 @@ export function batch(opts, n) {
   return res;
 }
 if (typeof process !== 'undefined' && process.argv && process.argv[1] && process.argv[1].endsWith('v2-sim.js')) {
-  const games = +(args.games || 500); const seed = +(args.seed || 1); const rules = {}; if (args.win) rules.winBank = +args.win; if (args.interest) rules.interestDiv = +args.interest; if (args.firstHand) rules.firstHandPenalty = +args.firstHand; if (args.chainsBonus) rules.revChainsBonus = +args.chainsBonus; if (args.chainsDraw) rules.revChainsDraw = true; if (args.cupsPenalty) rules.revCupsPenalty = +args.cupsPenalty; if (args.cupsCost) rules.revCupsCost = +args.cupsCost; if (args.cupsDiv) rules.revCupsTakeDiv = +args.cupsDiv; if (args.cupsDraw) rules.cupsDraw = true; if (args.rotate != null) rules.rotateLead = +args.rotate === 1; if (args.finish != null) rules.finishRound = +args.finish === 1; if (args.first != null) rules.firstTurnDraw = +args.first;
-  const o = { a: args.a || 'strong', b: args.b || 'strong', da: args.da || 'upright', db: args.db || 'upright', seed, rules };
+  const optsA = {}, optsB = {};
+  const games = +(args.games || 500); const seed = +(args.seed || 1); const rules = {}; if (args.win) rules.winBank = +args.win; if (args.interest) rules.interestDiv = +args.interest; if (args.firstHand) rules.firstHandPenalty = +args.firstHand; if (args.chainsBonus) rules.revChainsBonus = +args.chainsBonus; if (args.chainsDraw) rules.revChainsDraw = true; if (args.cupsPenalty) rules.revCupsPenalty = +args.cupsPenalty; if (args.cupsCost) rules.revCupsCost = +args.cupsCost; if (args.cupsDiv) rules.revCupsTakeDiv = +args.cupsDiv; if (args.cupsDraw) rules.cupsDraw = true; if (args.rotate != null) rules.rotateLead = +args.rotate === 1; if (args.passMult) rules.passMult = +args.passMult; if (args.passMin) rules.passMin = +args.passMin; if (args.passUnderdog) rules.passUnderdogOnly = true; if (args.noPassA) optsA.usePass = false; if (args.noPassB) optsB.usePass = false; if (args.marginA) optsA.passMargin = +args.marginA; if (args.finish != null) rules.finishRound = +args.finish === 1; if (args.first != null) rules.firstTurnDraw = +args.first;
+  const o = { a: args.a || 'strong', b: args.b || 'strong', da: args.da || 'upright', db: args.db || 'upright', seed, rules, optsA, optsB };
   if (args.verbose) { const g = playOne({ ...o, snapshots: true }); g.run(); for (const s of g.snapshots) { console.log(`\n=== ${s.label} R${s.round} ${s.active || ''} | Market: ${s.market || '-'} | Providence: ${s.providence.join(', ') || '-'} ===`); s.events.forEach((e) => console.log('  ' + e)); s.players.forEach((p) => console.log(`  ${p.name}: Bank ${p.bank} Port ${p.portfolio} Liq ${p.reserve - p.locked}/${p.reserve} Hand ${p.hand.length} | ${p.floor.map((i) => `${i.name}${i.working ? '*' : ''}${i.drawdown ? `(${i.drawdown})` : ''}`).join(', ')}`)); } console.log(JSON.stringify(g.result(), null, 1)); }
   else {
     const r = batch(o, games); const s = r.stats; const pg = (k) => ((s[k] || 0) / games).toFixed(2);
     console.log(`${games} games: ${o.da}(${o.a}) vs ${o.db}(${o.b}) | win ${rules.winBank || 80}`);
     console.log('wins', JSON.stringify(r.wins), '| first player', Math.round(r.firstWins / games * 100) + '%'); console.log('reasons', r.reasons);
     console.log(`rounds avg ${r.avgRounds} median ${r.medianRounds} p10 ${r.p10} p90 ${r.p90} | Final Bell ${r.bellRate} | avg end bank ${r.avgBank} | majors seen/game ${(r.majors / games).toFixed(1)}`);
-    console.log(`per game: chains attacks ${pg('chains')} hedges ${pg('hedges')} coins ${pg('coins')} coinsRev ${pg('coinsRev')} candles ${pg('candles')} candlesRev ${pg('candlesRev')} cups ${pg('cups')} cupsRev ${pg('cupsRev')} liquidated ${pg('liquidated')} frontrun ${pg('frontrun')} foretells ${pg('foretells')} invokes ${pg('invokes')}`);
+    console.log(`per game: passes ${pg('passes')} complete ${pg('completions')} intercepted ${pg('interceptions')} passBanked ${pg('passBanked')} | chains attacks ${pg('chains')} hedges ${pg('hedges')} coins ${pg('coins')} coinsRev ${pg('coinsRev')} candles ${pg('candles')} candlesRev ${pg('candlesRev')} cups ${pg('cups')} cupsRev ${pg('cupsRev')} liquidated ${pg('liquidated')} frontrun ${pg('frontrun')} foretells ${pg('foretells')} invokes ${pg('invokes')}`);
   }
 }

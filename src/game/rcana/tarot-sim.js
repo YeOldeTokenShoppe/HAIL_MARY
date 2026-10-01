@@ -33,7 +33,7 @@ export function batch(opts, n) {
 const sum = (a) => a.reduce((x, y) => x + y, 0);
 
 if (typeof process !== 'undefined' && process.argv && process.argv[1] && process.argv[1].endsWith('tarot-sim.js')) {
-  const games = +(args.games || 500); const seed = +(args.seed || 1); const rules = {}; if (args.win) rules.winBank = +args.win; if (args.hand) rules.openingHand = +args.hand; if (args.draw) rules.minorsPerTurn = +args.draw; if (args.first != null) rules.firstTurnDraw = +args.first; if (args.interest) rules.interestDiv = +args.interest;
+  const games = +(args.games || 500); const seed = +(args.seed || 1); const rules = {}; if (args.win) rules.winBank = +args.win; if (args.hand) rules.openingHand = +args.hand; if (args.draw) rules.minorsPerTurn = +args.draw; if (args.first != null) rules.firstTurnDraw = +args.first; if (args.interest) rules.interestDiv = +args.interest; if (args.passMult) rules.passMult = +args.passMult; if (args.passMin) rules.passMin = +args.passMin; if (args.passUnderdog) rules.passUnderdogOnly = true; if (args.noPassA) optsA.usePass = false; if (args.noPassB) optsB.usePass = false;
   const optsA = {}; if (args.keepA != null) optsA.keep = +args.keepA; const optsB = {}; if (args.keepB != null) optsB.keep = +args.keepB;
   if (args.verbose) {
     const g = playOne({ a: args.a || 'strong', b: args.b || 'random', seed, snapshots: true, rules, optsA, optsB }); g.run();
@@ -45,7 +45,7 @@ if (typeof process !== 'undefined' && process.argv && process.argv[1] && process
     console.log('wins', JSON.stringify(r.wins), '| first player wins', Math.round(r.firstWins / games * 100) + '%'); console.log('reasons', r.reasons);
     console.log(`rounds avg ${r.avgRounds} median ${r.medianRounds} p10 ${r.p10} p90 ${r.p90} | Final Bell ${r.bellRate} | avg end bank ${r.avgBank} | majors seen/game ${(r.majors / games).toFixed(1)}`);
     const s = r.stats; const pg = (k) => (s[k] / games).toFixed(2);
-    console.log(`per game: worked ${pg('worked')} pips ${pg('pips')} coins ${pg('coins')} candles ${pg('candles')} chains ${pg('chains')} cups ${pg('cups')} hedges ${pg('hedges')} hires ${pg('hires')} invokes ${pg('invokes')} liquidated ${pg('liquidated')} foretells ${pg('foretells')}`);
+    console.log(`per game: passes ${pg('passes')} complete ${pg('completions')} intercepted ${pg('interceptions')} | worked ${pg('worked')} pips ${pg('pips')} coins ${pg('coins')} candles ${pg('candles')} chains ${pg('chains')} cups ${pg('cups')} hedges ${pg('hedges')} hires ${pg('hires')} invokes ${pg('invokes')} liquidated ${pg('liquidated')} foretells ${pg('foretells')}`);
     console.log('archetypes', r.archetypes);
     if (args.cards) { const e = Object.entries(r.cardPlays).sort((x, y) => y[1] - x[1]); console.log('most', e.slice(0, 10)); console.log('least', e.slice(-10)); }
   }
