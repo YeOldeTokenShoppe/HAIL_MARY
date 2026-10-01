@@ -61,4 +61,4 @@ node tarot-sim.js --games 1000 --a strong --b strong --win 60 --draw 2 --hand 5 
 ```
 
 Defaults after tuning: win at 80, opening hand 7, one Minor drawn per turn, the first player skips the
-first draw. THE RECKONING revealed while more than half the deck remains is buried in the bottom half.
+first draw, Interest 1 per full 5 in Portfolio (`--interest 10` to compare). THE RECKONING revealed while more than half the deck remains is buried in the bottom half.
