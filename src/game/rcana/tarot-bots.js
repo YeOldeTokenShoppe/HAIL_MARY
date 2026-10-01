@@ -6,6 +6,7 @@ export class RandomPolicy {
   bankAmount(g, p) { return Math.floor(this.rng() * (p.portfolio + 1)); }
   wantHedge(g, p, opts) { return this.rng() < 0.5 ? opts[Math.floor(this.rng() * opts.length)] : null; }
   bottomCard(g, p) { return this.rng() < 0.5; }
+  hailMaryPass(g, p) { return this.rng() < 0.5; }
   reorder(g, p, cards) { return [...cards].sort(() => this.rng() - 0.5); }
   takeTurn(g, p) {
     let guard = 0;
@@ -20,7 +21,27 @@ export class RandomPolicy {
 const HARMFUL = new Set(['THE REGULATOR', 'THE LIQUIDATION', 'THE CRASH', 'THE AUDIT', 'VOLATILITY']);
 
 export class StrongPolicy {
-  constructor(opts = {}) { this.name = 'Strong'; this.keep = 0; this.insurance = 1; Object.assign(this, opts); }
+  constructor(opts = {}) { this.name = 'Strong'; this.keep = 0; this.insurance = 1; this.usePass = true; this.passMargin = 0.15; Object.assign(this, opts); }
+  // Chance the pass survives one full round: no opponent Chain or reversed Cup, no harmful Event.
+  passSurvival(g, p) {
+    let q = 1;
+    for (const o of g.opps(p)) {
+      const deck = o.deck || g.deck || []; const unseen = deck.length + o.hand.length;
+      const threats = deck.filter((c) => c.type === 'pip' && ((c.suit === 'chains' && !c.reversed) || (c.suit === 'cups' && c.reversed))).length
+        + o.hand.filter((c) => c.type === 'pip' && ((c.suit === 'chains' && !c.reversed) || (c.suit === 'cups' && c.reversed))).length;
+      const frac = unseen ? threats / unseen : 0.25;
+      const pNoThreatInHand = Math.pow(1 - frac, o.hand.length + 1);
+      q *= g.modAny(p, 'portfolioSafe') ? 1 : pNoThreatInHand;
+    }
+    q *= 0.9; // Events: Regulator, Crash, Audit, Volatility
+    return q;
+  }
+  hailMaryPass(g, p) {
+    if (!this.usePass) return false;
+    const q = this.passSurvival(g, p); const m = g.rules.passMult;
+    const behind = g.isUnderdog(p) ? 0.1 : 0;
+    return q * m > 1 + this.passMargin - behind;
+  }
   horizon(g) { const left = g.bellRound != null ? g.bellRound - g.round + 1 : Math.max(1, Math.round(g.deck.length / (g.players.length * g.rules.minorsPerTurn * 1.3))); return Math.max(1, Math.min(4, left)); }
   bankAmount(g, p) {
     if ((g.bellRound != null && g.round >= g.bellRound) || p.bank + p.portfolio >= g.rules.winBank) return p.portfolio;
@@ -51,7 +72,7 @@ export class StrongPolicy {
     if (c.suit === 'cups') { const m = g.modProduct(p, 'cupsMult'); const o = a.choice.opp; const lead = o ? g.opps(p).reduce((mx, q) => Math.max(mx, q.bank), 0) - o.bank : 0; return r * m + g.modSum(p, 'cupsBonus') - Math.ceil(r / 2) * m * 0.7 + lead * 0.02; }
     const t = a.choice.target; const amt = r * g.modProduct(p, 'chainsMult');
     if (t.card) { const kills = t.drawdown + amt >= t.card.res; return kills ? 2 + g.yieldOf(t.owner, t) * this.horizon(g) * 0.8 + (t.card.kw.exitScam || 0) : amt * 0.35; }
-    return Math.min(amt, t.portfolio) * 1.3;
+    return Math.min(amt, t.portfolio) * 1.3 + (t.pass ? Math.max(0, t.portfolio - amt) * 0.9 : 0);
   }
   score(g, p, a) {
     const h = this.horizon(g);
@@ -85,6 +106,7 @@ export class StrongPolicy {
 export class NaivePolicy extends RandomPolicy {
   constructor(rng) { super(rng); this.name = 'Naive'; }
   bankAmount(g, p) { return p.portfolio; }
+  hailMaryPass() { return true; }
   wantHedge(g, p, opts) { return opts.sort((a, b) => b.rank - a.rank)[0]; }
   takeTurn(g, p) {
     let guard = 0;
