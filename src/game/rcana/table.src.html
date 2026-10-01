@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>R-cana Table</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
@@ -66,6 +67,16 @@
   .card[data-suit=coins] .pip { background: var(--coins); } .card[data-suit=candles] .pip { background: var(--candles); } .card[data-suit=chains] .pip { background: var(--chains); } .card[data-suit=cups] .pip { background: var(--cups); }
   .card .ft { font-size: 9px; color: var(--card-muted); display: flex; justify-content: space-between; font-family: var(--font-mono); }
   .card .nm { font-weight: 600; font-size: 10px; text-align: center; }
+  .card .verb { font-family: var(--font-display); font-size: 8.5px; letter-spacing: .04em; text-align: center; margin-top: 3px; color: var(--card-ink); line-height: 1.15; }
+  .card .mid .stack2 { display: grid; justify-items: center; gap: 1px; }
+  .num small { display: block; color: var(--muted); font-size: 9px; font-family: var(--font-body); letter-spacing: .02em; }
+  .hm { font-size: 11px; color: var(--muted); border: 1px dashed var(--line); border-radius: 6px; padding: 3px 6px; text-align: center; }
+  .hm.ready { border-style: solid; border-color: var(--gold); color: var(--gold); font-weight: 600; }
+  .phases { width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-family: var(--font-display); font-size: 10px; letter-spacing: .08em; color: var(--muted); }
+  .phases span { padding: 2px 6px; border-radius: 4px; }
+  .phases span.on { background: var(--gold); color: var(--gold-ink); }
+  .phases i { font-style: normal; opacity: .6; }
+  .phases .ptxt { font-family: var(--font-body); letter-spacing: 0; font-size: 11px; color: var(--ink); flex: 1 1 100%; padding: 0; }
   .card.rev { background: #e8dfd0; } .card.rev .hd::after { content: 'REV'; font-size: 8px; letter-spacing: .1em; color: var(--card-muted); }
   .card.major { background: #1b1a2a; color: #efe8ff; border-color: #4a4470; } .card.major .mid { font-size: 10px; } .card.major .nm { color: var(--gold); }
   .card.back { background: repeating-linear-gradient(45deg, #2b2440 0 6px, #241e36 6px 12px); border-color: #4a4470; display: flex; align-items: center; justify-content: center; }
@@ -132,18 +143,18 @@
   <details class="primer" id="primer" open>
     <summary>HOW TO PLAY IN SIX LINES</summary>
     <ol>
-      <li><strong>Goal:</strong> be the first to put 80 Profit in your <strong>Bank</strong>. Banked Profit can never be touched. Profit in your <strong>Portfolio</strong> is exposed until you bank it at the start of your turn.</li>
-      <li><strong>Liquidity pays for cards.</strong> Once a turn, drag a card you don't need onto your Reserve: it becomes a permanent Liquidity point that refreshes every turn. Early on, do this every turn.</li>
-      <li><strong>Personalities earn.</strong> Drag a court onto your Floor to hire it (it rests the turn it arrives), then tap it each turn to <strong>Work</strong> for its Yield. A Working Personality is the only thing the bot's Chains can hit.</li>
-      <li><strong>The Four C's:</strong> Coins give Profit now (drop on your Floor). Candles make a Personality Work for a bonus (drop on it). Cups give the bot a little and you more, and draw a card (drop on the bot). Chains attack a Working Personality, Front-run the bot's Portfolio, or intercept a pass (drop on the target); or stay in hand to Hedge when you're attacked. Reversed Chains are Collateral: drop on your own Personality for armor and extra Yield.</li>
-      <li><strong>The Majors are fate.</strong> One is revealed each round for everyone. Markets stay, Events hit at once, Invokes sit in Providence; tap one to pay for it.</li>
-      <li><strong>Hail Mary Pass:</strong> once per game, throw your whole Portfolio into the air instead of banking. If nothing touches it by your next Set, it banks doubled. If anything does, it's gone.</li>
+      <li><strong>Three numbers.</strong> <strong>Liquidity</strong> pays for cards. <strong>Portfolio</strong> is Profit you have earned but can still lose. <strong>Bank</strong> is Profit nobody can touch. First to 80 in the Bank wins.</li>
+      <li><strong>Your turn has three steps.</strong> SET: Profit arrives (Dividend, plus Interest on a big Portfolio), then you bank some or all of your Portfolio. DRAW one card. MAIN: play cards, then End turn.</li>
+      <li><strong>Getting Liquidity.</strong> Once a turn, drag a card you don't need onto Reserve. It's gone, but it pays 1 Liquidity every turn from now on. Spent Liquidity comes back next turn. Do this every turn early on.</li>
+      <li><strong>Personalities earn.</strong> Drag a face card onto your Floor to hire it (it rests the turn it arrives). Each turn after, tap it to <strong>Work</strong>: its earnings go to your Portfolio. A Working Personality is the only thing the bot's Chains can hit.</li>
+      <li><strong>The four suits, as printed on each card.</strong> Coins <strong>EARN</strong> Profit now. Candles <strong>BOOST</strong> one of your Personalities to Work for extra. Chains <strong>ATTACK</strong> a Working Personality or the bot's Portfolio, or stay in hand to <strong>HEDGE</strong> when you are attacked. Cups <strong>SHARE</strong>: the bot gets a little, you get more and draw a card.</li>
+      <li><strong>Fate and the Hail Mary.</strong> A Major card turns up for both players every round: Markets stay, Events hit at once, Invokes wait in Providence for whoever pays. Once per game, with 10 or more in your Portfolio, you may throw it all into the air at your SET instead of banking: untouched until your next SET, it banks doubled; touched, it is gone. The box under your numbers tells you when it's ready.</li>
     </ol>
     <p class="note">The coach line under each decision says what the strong bot would do and why. Press "Do that" to follow it, or ignore it and see what happens. In the Claude app you can also type a question into "Ask the coach" below your Reserve; it answers from the rules and the table in front of you.</p>
   </details>
 
   <section class="side opp">
-    <div class="querent" id="oppQ"><div class="who">BOT</div><div class="num"><span>Bank</span><b id="oppBank">0</b></div><div class="num port"><span>Portfolio</span><b id="oppPort">0</b></div><div id="oppPass"></div><div class="num"><span>Hand</span><b id="oppHand">0</b></div><div class="reserve" id="oppReserve"></div></div>
+    <div class="querent" id="oppQ"><div class="who">BOT</div><div class="num"><span>Bank<small>safe</small></span><b id="oppBank">0</b></div><div class="num port"><span>Portfolio<small>exposed</small></span><b id="oppPort">0</b></div><div id="oppPass"></div><div class="num"><span>Hand</span><b id="oppHand">0</b></div><div class="reserve" id="oppReserve"></div></div>
     <div class="zones">
       <div class="zone" id="oppFloor"><span class="zl">Bot's floor</span></div>
     </div>
@@ -157,10 +168,10 @@
   </section>
 
   <section class="side me">
-    <div class="querent" id="meQ"><div class="who">YOU</div><div class="num"><span>Bank</span><b id="meBank">0</b></div><div class="num port"><span>Portfolio</span><b id="mePort">0</b></div><div id="mePass"></div><div class="num"><span>Liquidity</span><b id="meLiq">0</b></div><div class="reserve" id="meReserve"></div><button id="endTurn" class="primary" disabled>End turn</button></div>
+    <div class="querent" id="meQ"><div class="who">YOU</div><div class="num"><span>Bank<small>safe for good</small></span><b id="meBank">0</b></div><div class="num port"><span>Portfolio<small>exposed until banked</small></span><b id="mePort">0</b></div><div class="num"><span>Liquidity<small>pays for cards</small></span><b id="meLiq">0</b></div><div id="mePass"></div><div class="reserve" id="meReserve"></div><button id="endTurn" class="primary" disabled>End turn</button></div>
     <div class="zones">
-      <div class="zone" id="meFloor"><span class="zl">Your floor · tap an idle Personality to Work it</span></div>
-      <div class="zone" id="meReserveZone" style="min-height:40px"><span class="zl">Reserve · drop a card here to make it Liquidity</span></div>
+      <div class="zone" id="meFloor"><span class="zl">Your floor · Personalities live here; tap an idle one to Work it for its earnings</span></div>
+      <div class="zone" id="meReserveZone" style="min-height:40px"><span class="zl">Reserve · drop one card a turn here: it is gone, but pays 1 Liquidity every turn</span></div>
       <div id="prompt"></div>
       <div class="ask" id="ask" hidden>
         <div class="ask-row"><span class="who">ASK THE COACH</span><input type="text" id="askQ" maxlength="400" placeholder="Why not attack? What does this Market do? Should I throw the pass?"><button class="primary" id="askGo">Ask</button><button id="askStop" hidden>Stop</button></div>
@@ -250,13 +261,25 @@
     const cost = S && S.me ? S.g.costOf(S.me, c) : c.cost; const liq = S && S.me ? S.g.liquidity(S.me) : 99;
     if (c.type === 'pip') {
       const pips = Array.from({ length: Math.min(c.rank, 10) }, () => '<span class="pip"></span>').join('');
-      el.innerHTML = `<div class="hd"><span>${c.rank === 1 ? 'A' : c.rank}</span><span class="suit"></span><span class="cost ${cost > liq && !inst ? 'no' : ''}">${cost}</span></div><div class="mid"><div class="pips">${pips}</div></div><div class="ft"><span>${esc(c.suit.toUpperCase())}</span><span>${c.reversed ? 'reversed' : ''}</span></div>`;
+      el.innerHTML = `<div class="hd"><span>${c.rank === 1 ? 'A' : c.rank}</span><span class="suit"></span><span class="cost ${cost > liq && !inst ? 'no' : ''}">${cost}</span></div><div class="mid"><div class="stack2"><div class="pips">${pips}</div><div class="verb">${esc(pipVerb(c))}</div></div></div><div class="ft"><span>${esc(c.suit.toUpperCase())}</span><span>${c.reversed ? 'reversed' : ''}</span></div>`;
     } else {
       const y = inst && owner ? S.g.yieldOf(owner, inst) : c.yield;
-      el.innerHTML = `<div class="hd"><span>${esc(c.rank[0])}</span><span class="suit"></span><span class="cost ${cost > liq && !inst ? 'no' : ''}">${cost}</span></div><div class="mid"><div class="nm">${esc(c.name)}</div></div><div class="ft"><span>${y}y</span><span>${esc(c.rank)}</span><span>${c.res}r</span></div>`;
+      el.innerHTML = `<div class="hd"><span>${esc(c.rank[0])}</span><span class="suit"></span><span class="cost ${cost > liq && !inst ? 'no' : ''}">${cost}</span></div><div class="mid"><div class="nm">${esc(c.name)}</div></div><div class="ft"><span>earns ${y}</span><span>resists ${c.res}</span></div>`;
       if (inst) { const b = []; if (inst.drawdown) b.push(`<span class="bd dd">−${inst.drawdown}</span>`); if (inst.armor) b.push(`<span class="bd arm">+${inst.armor}🛡</span>`); if (inst.shielded) b.push(`<span class="bd sh">shield</span>`); if (c.villain) b.push(`<span class="bd vil">villain</span>`); if (b.length) el.insertAdjacentHTML('beforeend', `<div class="badges">${b.join('')}</div>`); if (inst.working) el.classList.add('working'); }
     }
     return el;
+  }
+  function pipVerb(c) { // what the card does, in a verb, for the card face
+    const r = c.rank, h = Math.ceil(r / 2);
+    if (c.suit === 'coins') return c.reversed ? `BANK ${h}` : `EARN +${r}`;
+    if (c.suit === 'candles') return c.reversed ? `BOOST +${h} & shield` : `BOOST a worker +${r}`;
+    if (c.suit === 'chains') return c.reversed ? `COLLATERAL ${r} · free HEDGE` : `ATTACK ${r} · or HEDGE`;
+    return c.reversed ? `TAKE ${h} from the bot` : `SHARE: you +${r}, bot +${h}`;
+  }
+  function phaseStrip(kind) {
+    const steps = [['SET', 'Profit arrives (Dividend, plus Interest). Bank some or all of your Portfolio, or throw the Hail Mary.'], ['DRAW', 'One card.'], ['MAIN', 'Reserve one card for Liquidity, hire Personalities, Work them, play pips. Then End turn.'], ['BOT', 'The bot takes its turn. If it attacks you, you may Hedge with a Chain.']];
+    const cur = kind === 'set' ? 0 : kind === 'main' ? 2 : 3;
+    return `<div class="phases">${steps.map((st, i) => `<span class="${i === cur ? 'on' : ''}">${st[0]}</span>`).join('<i>›</i>')}<span class="ptxt">${esc(steps[cur][1])}</span></div>`;
   }
   function logHtml(lines) { return lines.slice(-60).map((e) => { const t = esc(e.replace(/^\[[^\]]*\] /, '')); const cls = /WINS|FINAL BELL|Final Bell|reveals|HAIL MARY PASS|COMPLETE:/.test(e) ? 'win' : /LIQUIDATED|loses|Drawdown|Front-run|Exit Scam|INTERCEPTED|INCOMPLETE/.test(e) ? 'bad' : /banks/.test(e) ? 'good' : ''; return `<div class="${cls}">${t}</div>`; }).join(''); }
 
@@ -270,7 +293,11 @@
     $('oppPass').innerHTML = bot.pass ? `<div class="pass-badge" id="oppPassBadge">PASS IN THE AIR: ${bot.inAir}</div>` : '';
     $('oppReserve').innerHTML = bot.reserve.map((r) => `<span class="chip ${r.locked ? 'locked' : ''}"></span>`).join('');
     $('meBank').textContent = me.bank; $('mePort').textContent = me.portfolio; $('meLiq').textContent = `${g.liquidity(me)}/${me.reserve.length}`;
-    $('mePass').innerHTML = me.pass ? `<div class="pass-badge">YOUR PASS: ${me.inAir} in the air</div>` : (me.hailMaryUsed ? '<div class="note" style="font-size:11px;color:var(--muted)">pass thrown</div>' : '');
+    $('mePass').innerHTML = me.pass ? `<div class="pass-badge">HAIL MARY IN THE AIR: ${me.inAir} · doubles at your next Set if untouched</div>`
+      : me.hailMaryUsed ? '<div class="hm">Hail Mary: used</div>'
+      : g.closing ? '<div class="hm">Hail Mary: too late, final round</div>'
+      : me.portfolio >= g.rules.passMin ? `<div class="hm ready">HAIL MARY READY at your next Set: throw ${me.portfolio} to double it</div>`
+      : `<div class="hm">Hail Mary: needs ${g.rules.passMin} in Portfolio, you have ${me.portfolio}</div>`;
     $('meReserve').innerHTML = me.reserve.map((r) => `<span class="chip ${r.locked ? 'locked' : ''}"></span>`).join('');
     document.querySelector('#oppQ .who').classList.toggle('active', g.active === bot && !g.over); document.querySelector('#meQ .who').classList.toggle('active', g.active === me && !g.over);
     $('endTurn').disabled = !main;
@@ -290,10 +317,10 @@
     const fa = acts.find((a) => a.t === 'foretell');
     const hintTxt = hint ? `<div class="coach-row"><span class="who">COACH</span><span class="txt">${esc(hint.text)}</span><button id="coachDo">Do that</button>${S.prompt.kind === 'main' ? '<button id="coachFinish">Let the coach finish my turn</button>' : ''}</div>` : '';
     // prompt panel
-    const pr = S.prompt; let html = '';
-    if (pr.kind === 'wait') html = `<div class="prompt"><div class="ph">${g.over ? 'GAME OVER' : 'THE BOT IS PLAYING'}</div></div>`;
-    else if (pr.kind === 'set') html = `<div class="prompt"><div class="ph">YOUR SET · ${me.portfolio} in your Portfolio</div><button class="primary" id="bankAll">Bank all ${me.portfolio}</button><label class="note" style="display:flex;gap:6px;align-items:center">Bank <input type="number" id="bankN" min="0" max="${me.portfolio}" value="0" style="width:70px"> <button id="bankSome">keep the rest exposed</button></label>${pr.canPass ? `<button class="danger" id="throwPass">Throw a HAIL MARY PASS with all ${me.portfolio}</button>` : ''}${hintTxt}</div>`;
-    else if (pr.kind === 'main') html = `<div class="prompt"><div class="ph">YOUR TURN · Liquidity ${g.liquidity(me)}${me.reservedThisTurn ? '' : ' · you may Reserve one card'}</div>${fa ? '<button id="foretell">Foretell the Omen</button>' : ''}<span class="note" style="color:var(--muted)">Drag a glowing card onto a glowing zone. Tap any card to read it.</span>${hintTxt}</div>`;
+    const pr = S.prompt; let html = ''; const strip = ['set', 'main', 'wait'].includes(pr.kind) && !g.over ? phaseStrip(pr.kind) : '';
+    if (pr.kind === 'wait') html = `<div class="prompt">${strip}<div class="ph">${g.over ? 'GAME OVER' : 'THE BOT IS PLAYING'}</div></div>`;
+    else if (pr.kind === 'set') html = `<div class="prompt">${strip}<div class="ph">YOUR SET · ${me.portfolio} in your Portfolio</div><button class="primary" id="bankAll">Bank all ${me.portfolio}</button><label class="note" style="display:flex;gap:6px;align-items:center">Bank <input type="number" id="bankN" min="0" max="${me.portfolio}" value="0" style="width:70px"> <button id="bankSome">keep the rest exposed</button></label>${pr.canPass ? `<button class="danger" id="throwPass">Throw a HAIL MARY PASS with all ${me.portfolio}</button>` : ''}${hintTxt}</div>`;
+    else if (pr.kind === 'main') html = `<div class="prompt">${strip}<div class="ph">YOUR MAIN PHASE · Liquidity ${g.liquidity(me)} to spend${me.reservedThisTurn ? '' : ' · you may still Reserve one card'}</div>${fa ? '<button id="foretell">Foretell the Omen</button>' : ''}<span class="note" style="color:var(--muted)">Drag a glowing card onto a glowing zone. Tap any card to read it.</span>${hintTxt}</div>`;
     else if (pr.kind === 'hedge') { const t = pr.threat; const tgt = t.target && t.target.isPass ? `your Hail Mary Pass (${me.inAir} in the air)` : t.target && t.target.card ? t.target.card.name : 'your Portfolio'; html = `<div class="prompt danger"><div class="ph">INCOMING · ${esc(t.attacker ? t.attacker.name : 'The R-cana')} plays ${esc(t.card.name)} at ${esc(tgt)} for ${t.amount}</div><span class="note">Tap a glowing Chain in your hand to Hedge, or</span><button id="takeIt" class="primary">Take it</button>${hintTxt}</div>`; }
     else if (pr.kind === 'foretell') html = `<div class="prompt"><div class="ph">THE OMEN IS ${esc(pr.card.name)}</div><span class="note">${esc(pr.card.text)}</span><button class="primary" id="bury">Bury it</button><button id="leave">Leave it</button>${hintTxt}</div>`;
     else if (pr.kind === 'over') { const r = pr.result; html = `<div class="prompt"><div class="ph">${r.winner === me.name ? 'YOU WIN' : r.winner ? 'THE BOT WINS' : 'DRAW'} · ${esc(r.reason)}</div><span class="note">The R-cana named you a ${esc(g.archetype(me))}. Press Deal for another.</span></div>`; }
