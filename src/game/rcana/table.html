@@ -110,7 +110,7 @@
     <label class="note">Seed <input type="number" id="seed" value="7" min="1" style="width:70px"></label>
     <button class="primary" id="start">Deal</button>
     <label class="note" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="coach"> coach glow</label>
-    <span class="note" id="status">Press Deal. Drag cards from your hand onto the table; tap a card to read it.</span>
+    <span class="note" id="status">Loading the engine&hellip;</span>
   </div>
 
   <section class="side opp">
@@ -141,6 +141,14 @@
 <div id="popHost"></div>
 <div class="toast" id="toast"></div>
 
+<script>
+  // Surface anything that goes wrong where the player can see it.
+  window.__rcanaReady = false;
+  const __status = (t, bad) => { const el = document.getElementById('status'); if (el) { el.textContent = t; el.style.color = bad ? '#e0574f' : ''; } };
+  window.addEventListener('error', (e) => __status('Page error: ' + (e.message || e.error || 'unknown') + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : ''), true));
+  window.addEventListener('unhandledrejection', (e) => __status('Error: ' + (e.reason && e.reason.message ? e.reason.message : e.reason), true));
+  setTimeout(() => { if (!window.__rcanaReady) __status('The game scripts did not load. Reload the page; if it persists, tell me what browser you are using.', true); }, 6000);
+</script>
 <script type="module">
   import { TarotGame } from './tarot-engine.js';
   import { DuelGame } from './v2-engine.js';
@@ -159,6 +167,7 @@
   const isDuel = () => $('mode').value === 'duel';
   const syncMode = () => { $('deckA').hidden = !isDuel(); $('deckB').hidden = !isDuel(); };
   $('mode').addEventListener('change', syncMode); syncMode();
+  window.__rcanaReady = true; $('status').textContent = 'Press Deal. Drag cards from your hand onto the table; tap a card to read it.'; $('status').style.color = '';
 
   // ───────── state ─────────
   let S = null; // { g, me, bot, human, coach, prompt, resolve, mainResolve, busy, seen }
@@ -175,6 +184,7 @@
   function endTurn() { const r = S.mainResolve; S.mainResolve = null; S.prompt = { kind: 'wait' }; render(); if (r) r(); }
 
   $('start').addEventListener('click', async () => {
+    try {
     const seed = +$('seed').value || 1; const human = new HumanPolicy(ui); const kind = $('bot').value;
     const bot = isDuel() ? botPolicy2(kind, seed + 1) : botPolicy1(kind, seed + 1); bot.name = 'BOT';
     const coach = isDuel() ? botPolicy2('strong', seed + 99) : botPolicy1('strong', seed + 99);
@@ -191,6 +201,7 @@
     render();
     try { const r = await g.run(); S.prompt = { kind: 'over', result: r }; } catch (e) { console.error(e); S.prompt = { kind: 'error', error: e }; }
     render();
+    } catch (e) { console.error(e); $('status').textContent = 'Deal failed: ' + (e && e.message ? e.message : e); $('status').style.color = '#e0574f'; }
   });
 
   // ───────── rendering ─────────
