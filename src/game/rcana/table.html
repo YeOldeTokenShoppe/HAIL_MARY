@@ -1,0 +1,333 @@
+<title>R-cana Table</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+  /* A card table: the bot across from you, the shared R-cana down the middle, your hand fanned at the bottom.
+     Single dark world on purpose: felt, ink, and gold. */
+  :root {
+    --felt: #12221c; --felt2: #0d1a15; --ink: #e9e4d6; --muted: #9aa89f; --line: #2a4036; --gold: #d4af37; --gold-ink: #1a1408;
+    --card: #f4efe3; --card-ink: #1d1a14; --card-muted: #6b665a; --coins: #c9962a; --candles: #d9622c; --chains: #5f6d78; --cups: #2f6fb3;
+    --good: #58c58f; --bad: #e0574f; --glow: 0 0 0 3px var(--gold), 0 0 18px rgba(212,175,55,.55);
+    --cw: 92px; --ch: 130px; color-scheme: dark;
+    --font-display: 'Cinzel', Georgia, serif; --font-body: 'IBM Plex Sans', system-ui, sans-serif; --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+  @media (max-width: 760px) { :root { --cw: 68px; --ch: 96px; } }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--felt); color: var(--ink); font-family: var(--font-body); font-size: 13px; padding-inline: 12px; padding-block: 8px; overflow-x: hidden; }
+  .table { max-width: 1180px; margin: 0 auto; display: grid; grid-template-rows: auto auto auto; gap: 10px; min-height: 100%; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  h1 { font-family: var(--font-display); font-size: 16px; letter-spacing: .08em; margin: 0; color: var(--gold); }
+  .bar .note { color: var(--muted); font-size: 12px; }
+  select, input[type=number] { font: inherit; color: var(--ink); background: var(--felt2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; }
+  button { font: inherit; cursor: pointer; border-radius: 6px; border: 1px solid var(--line); background: var(--felt2); color: var(--ink); padding: 6px 12px; }
+  button.primary { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); font-weight: 600; }
+  button.danger { border-color: var(--bad); color: var(--bad); }
+  button:disabled { opacity: .45; cursor: default; }
+  button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  .side { display: grid; grid-template-columns: 150px 1fr; gap: 10px; align-items: start; min-width: 0; }
+  @media (max-width: 760px) { .side { grid-template-columns: 1fr; } }
+  .querent { background: var(--felt2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 6px; }
+  .querent .who { font-family: var(--font-display); letter-spacing: .06em; font-size: 13px; }
+  .querent .who.active::after { content: ' ●'; color: var(--gold); }
+  .num { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 12px; }
+  .num b { color: var(--gold); font-size: 15px; }
+  .num.port b { color: var(--ink); }
+  .pass-badge { background: var(--gold); color: var(--gold-ink); border-radius: 6px; padding: 3px 6px; font-size: 11px; font-weight: 600; text-align: center; }
+  .zones { display: grid; gap: 8px; min-width: 0; }
+  .zone { min-height: calc(var(--ch) * .55); border: 1px dashed var(--line); border-radius: 10px; padding: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; position: relative; transition: background .15s, border-color .15s; min-width: 0; }
+  .zone .zl { position: absolute; top: -8px; left: 10px; background: var(--felt); color: var(--muted); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; padding: 0 4px; }
+  .zone.drop { border-color: var(--gold); background: rgba(212,175,55,.08); border-style: solid; }
+  .zone.drop-over { background: rgba(212,175,55,.18); }
+  .center { display: grid; grid-template-columns: auto auto 1fr auto; gap: 10px; align-items: start; background: var(--felt2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+  @media (max-width: 760px) { .center { grid-template-columns: 1fr 1fr; } .center .log { grid-column: 1 / -1; } }
+  .center .zl { font-size: 10px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 4px; }
+  .log { font-family: var(--font-mono); font-size: 11px; line-height: 1.45; max-height: calc(var(--ch) + 24px); overflow: auto; color: var(--muted); min-width: 0; }
+  .log .win { color: var(--gold); } .log .bad { color: var(--bad); } .log .good { color: var(--good); }
+
+  /* cards */
+  .card { width: var(--cw); height: var(--ch); border-radius: 8px; background: var(--card); color: var(--card-ink); border: 1px solid #c9c2b0; position: relative; display: grid; grid-template-rows: auto 1fr auto; padding: 5px 6px; font-size: 10px; line-height: 1.2; user-select: none; -webkit-user-select: none; touch-action: none; transition: transform .18s, box-shadow .18s, opacity .18s; box-shadow: 0 2px 6px rgba(0,0,0,.4); overflow: hidden; }
+  .card .hd { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-weight: 500; font-size: 11px; }
+  .card .suit { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+  .card[data-suit=coins] .suit { background: var(--coins); } .card[data-suit=candles] .suit { background: var(--candles); } .card[data-suit=chains] .suit { background: var(--chains); } .card[data-suit=cups] .suit { background: var(--cups); }
+  .card .cost { background: var(--card-ink); color: var(--card); border-radius: 10px; padding: 0 5px; font-size: 10px; }
+  .card .cost.no { background: var(--bad); }
+  .card .mid { display: flex; align-items: center; justify-content: center; text-align: center; font-family: var(--font-display); font-size: 11px; letter-spacing: .02em; padding: 2px; }
+  .card .pips { display: grid; grid-template-columns: repeat(2, 1fr); gap: 3px; }
+  .card .pip { width: 9px; height: 9px; border-radius: 50%; }
+  .card[data-suit=coins] .pip { background: var(--coins); } .card[data-suit=candles] .pip { background: var(--candles); } .card[data-suit=chains] .pip { background: var(--chains); } .card[data-suit=cups] .pip { background: var(--cups); }
+  .card .ft { font-size: 9px; color: var(--card-muted); display: flex; justify-content: space-between; font-family: var(--font-mono); }
+  .card .nm { font-weight: 600; font-size: 10px; text-align: center; }
+  .card.rev { background: #e8dfd0; } .card.rev .hd::after { content: 'REV'; font-size: 8px; letter-spacing: .1em; color: var(--card-muted); }
+  .card.major { background: #1b1a2a; color: #efe8ff; border-color: #4a4470; } .card.major .mid { font-size: 10px; } .card.major .nm { color: var(--gold); }
+  .card.back { background: repeating-linear-gradient(45deg, #2b2440 0 6px, #241e36 6px 12px); border-color: #4a4470; display: flex; align-items: center; justify-content: center; }
+  .card.back::after { content: 'R'; font-family: var(--font-display); font-size: 28px; color: var(--gold); opacity: .8; }
+  .card.playable { box-shadow: 0 0 0 2px var(--gold), 0 6px 14px rgba(0,0,0,.5); cursor: grab; }
+  .card.playable:hover { transform: translateY(-6px); }
+  .card.dim { opacity: .55; }
+  .card.hint { box-shadow: 0 0 0 3px var(--good), 0 0 16px rgba(88,197,143,.6); }
+  .card.working { transform: rotate(8deg); } .card.working.playable:hover { transform: rotate(8deg) translateY(-6px); }
+  .card.target { box-shadow: var(--glow); cursor: pointer; }
+  .card.target.over { transform: scale(1.06); }
+  .card.dealt { animation: deal .35s ease-out; }
+  @keyframes deal { from { transform: translateY(-40px) scale(.9); opacity: 0; } to { transform: none; opacity: 1; } }
+  .badges { position: absolute; top: 20px; right: 4px; display: grid; gap: 2px; justify-items: end; }
+  .bd { font-size: 9px; font-family: var(--font-mono); border-radius: 4px; padding: 1px 4px; background: rgba(0,0,0,.08); }
+  .bd.dd { background: var(--bad); color: #fff; } .bd.arm { background: var(--chains); color: #fff; } .bd.sh { background: var(--cups); color: #fff; } .bd.vil { background: #6b2fa3; color: #fff; }
+  .hand { display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-start; }
+  .stack { position: relative; width: var(--cw); height: var(--ch); }
+  .stack .card { position: absolute; left: 0; top: 0; }
+  .stack .count { position: absolute; right: -6px; bottom: -6px; background: var(--gold); color: var(--gold-ink); border-radius: 10px; padding: 1px 6px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; }
+  .reserve { display: flex; gap: 4px; flex-wrap: wrap; }
+  .reserve .chip { width: 22px; height: 30px; border-radius: 4px; background: #2b2440; border: 1px solid #4a4470; }
+  .reserve .chip.locked { transform: rotate(90deg); opacity: .5; }
+  .ghost { position: fixed; pointer-events: none; z-index: 50; transform: rotate(-3deg) scale(1.05); box-shadow: 0 12px 24px rgba(0,0,0,.6); }
+  .prompt { background: var(--felt2); border: 1px solid var(--gold); border-radius: 10px; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .prompt .ph { font-family: var(--font-display); letter-spacing: .06em; font-size: 12px; color: var(--gold); width: 100%; }
+  .prompt.danger { border-color: var(--bad); } .prompt.danger .ph { color: var(--bad); }
+  .coach { font-size: 12px; color: var(--good); width: 100%; }
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 40; }
+  .overlay .box { background: var(--felt2); border: 1px solid var(--gold); border-radius: 12px; padding: 16px; max-width: 560px; width: 100%; display: grid; gap: 10px; }
+  .overlay .box .ph { font-family: var(--font-display); letter-spacing: .06em; color: var(--gold); }
+  .pop { position: fixed; z-index: 45; background: var(--felt2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; max-width: 280px; display: grid; gap: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+  .pop .t { font-weight: 600; } .pop .x { color: var(--muted); font-size: 12px; }
+  .pop button { text-align: left; }
+  .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--gold); color: var(--gold-ink); padding: 8px 14px; border-radius: 8px; font-weight: 600; z-index: 60; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  .float { position: fixed; z-index: 55; font-family: var(--font-mono); font-weight: 600; color: var(--good); pointer-events: none; animation: rise .9s ease-out forwards; }
+  .float.bad { color: var(--bad); }
+  @keyframes rise { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-40px); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .card, .card.dealt, .float { animation: none; transition: none; } }
+</style>
+
+<div class="table">
+  <div class="bar">
+    <h1>R-CANA</h1>
+    <select id="mode"><option value="duel">Duel (version 2)</option><option value="reading">Shared reading (version 1)</option></select>
+    <select id="deckA"></select>
+    <select id="deckB"></select>
+    <select id="bot"><option value="strong">Strong bot</option><option value="naive">Naive bot</option><option value="random">Random bot</option></select>
+    <label class="note">Seed <input type="number" id="seed" value="7" min="1" style="width:70px"></label>
+    <button class="primary" id="start">Deal</button>
+    <label class="note" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="coach"> coach glow</label>
+    <span class="note" id="status">Press Deal. Drag cards from your hand onto the table; tap a card to read it.</span>
+  </div>
+
+  <section class="side opp">
+    <div class="querent" id="oppQ"><div class="who">BOT</div><div class="num"><span>Bank</span><b id="oppBank">0</b></div><div class="num port"><span>Portfolio</span><b id="oppPort">0</b></div><div id="oppPass"></div><div class="num"><span>Hand</span><b id="oppHand">0</b></div><div class="reserve" id="oppReserve"></div></div>
+    <div class="zones">
+      <div class="zone" id="oppFloor"><span class="zl">Bot's floor</span></div>
+    </div>
+  </section>
+
+  <section class="center">
+    <div><div class="zl" id="deckLabel">Majors</div><div class="stack" id="deckStack"></div></div>
+    <div><div class="zl">Market</div><div id="market"></div></div>
+    <div class="log" id="log"></div>
+    <div><div class="zl">Providence</div><div class="hand" id="providence"></div></div>
+  </section>
+
+  <section class="side me">
+    <div class="querent" id="meQ"><div class="who">YOU</div><div class="num"><span>Bank</span><b id="meBank">0</b></div><div class="num port"><span>Portfolio</span><b id="mePort">0</b></div><div id="mePass"></div><div class="num"><span>Liquidity</span><b id="meLiq">0</b></div><div class="reserve" id="meReserve"></div><button id="endTurn" class="primary" disabled>End turn</button></div>
+    <div class="zones">
+      <div class="zone" id="meFloor"><span class="zl">Your floor · tap an idle Personality to Work it</span></div>
+      <div class="zone" id="meReserveZone" style="min-height:40px"><span class="zl">Reserve · drop a card here to make it Liquidity</span></div>
+      <div id="prompt"></div>
+      <div class="zone" id="meHand" style="border-style:none;padding:0"><span class="zl">Your hand</span></div>
+    </div>
+  </section>
+</div>
+<div id="overlayHost"></div>
+<div id="popHost"></div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+  import { TarotGame } from './tarot-engine.js';
+  import { DuelGame } from './v2-engine.js';
+  import { HumanPolicy } from './tarot-bots.js';
+  import { buildDeck, DECK_PRESETS } from './v2.js';
+  import { makeRng } from './engine.js';
+  import { policy as botPolicy2 } from './v2-sim.js';
+  import { policy as botPolicy1 } from './tarot-sim.js';
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX', 'XXI'];
+  for (const id of ['deckA', 'deckB']) $(id).innerHTML = Object.entries(DECK_PRESETS).map(([k, v]) => `<option value="${k}">${id === 'deckA' ? 'You: ' : 'Bot: '}${esc(v.name)}</option>`).join('');
+  $('deckA').value = 'random'; $('deckB').value = 'random';
+  const isDuel = () => $('mode').value === 'duel';
+  const syncMode = () => { $('deckA').hidden = !isDuel(); $('deckB').hidden = !isDuel(); };
+  $('mode').addEventListener('change', syncMode); syncMode();
+
+  // ───────── state ─────────
+  let S = null; // { g, me, bot, human, coach, prompt, resolve, mainResolve, busy, seen }
+  const toast = (t) => { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 1400); };
+  const floatAt = (el, text, bad) => { if (!el) return; const r = el.getBoundingClientRect(); const f = document.createElement('div'); f.className = 'float' + (bad ? ' bad' : ''); f.textContent = text; f.style.left = (r.left + r.width / 2 - 10) + 'px'; f.style.top = (r.top + 10) + 'px'; document.body.appendChild(f); setTimeout(() => f.remove(), 900); };
+
+  const ui = {
+    setPhase: (g, p, { canPass }) => new Promise((res) => { S.resolve = res; S.prompt = { kind: 'set', canPass }; render(); }),
+    mainPhase: (g, p) => new Promise((res) => { S.mainResolve = res; S.prompt = { kind: 'main' }; render(); }),
+    hedge: (g, p, opts, threat) => new Promise((res) => { S.resolve = res; S.prompt = { kind: 'hedge', opts, threat }; render(); }),
+    foretell: (g, p, c) => new Promise((res) => { S.resolve = res; S.prompt = { kind: 'foretell', card: c }; render(); }),
+  };
+  function resolveP(v) { const r = S.resolve; S.resolve = null; S.prompt = S.mainResolve ? { kind: 'main' } : { kind: 'wait' }; render(); if (r) r(v); }
+  function endTurn() { const r = S.mainResolve; S.mainResolve = null; S.prompt = { kind: 'wait' }; render(); if (r) r(); }
+
+  $('start').addEventListener('click', async () => {
+    const seed = +$('seed').value || 1; const human = new HumanPolicy(ui); const kind = $('bot').value;
+    const bot = isDuel() ? botPolicy2(kind, seed + 1) : botPolicy1(kind, seed + 1); bot.name = 'BOT';
+    const coach = isDuel() ? botPolicy2('strong', seed + 99) : botPolicy1('strong', seed + 99);
+    const rng = makeRng(seed * 977 + 3);
+    const players = isDuel()
+      ? [{ name: 'YOU', policy: human, deckList: buildDeck($('deckA').value, rng), deckPreset: $('deckA').value }, { name: 'BOT', policy: bot, deckList: buildDeck($('deckB').value, rng), deckPreset: $('deckB').value }]
+      : [{ name: 'YOU', policy: human }, { name: 'BOT', policy: bot }];
+    const G = isDuel() ? DuelGame : TarotGame;
+    const g = new G({ players, seed, snapshots: true, rules: {}, hiddenInfo: true });
+    S = { g, human, coach, prompt: { kind: 'wait' }, resolve: null, mainResolve: null, busy: false, seen: new Set() };
+    S.me = g.players.find((p) => p.policy === human); S.bot = g.players.find((p) => p.policy !== human);
+    // let the bot's plays show one at a time
+    const origAct = g.act.bind(g); g.act = async (p, a) => { const r = await origAct(p, a); if (p === S.bot) { render(); await sleep(420); } return r; };
+    render();
+    try { const r = await g.run(); S.prompt = { kind: 'over', result: r }; } catch (e) { console.error(e); S.prompt = { kind: 'error', error: e }; }
+    render();
+  });
+
+  // ───────── rendering ─────────
+  function cardEl(c, { back = false, inst = null, owner = null } = {}) {
+    const el = document.createElement('div'); el.className = 'card';
+    if (back) { el.classList.add('back'); return el; }
+    el.dataset.id = c.id; if (c.suit) el.dataset.suit = c.suit; if (c.reversed) el.classList.add('rev');
+    if (c.type === 'major') { el.classList.add('major'); el.innerHTML = `<div class="hd"><span>${ROMAN[c.n]}</span><span style="font-size:9px;color:#b9b0d8">${esc(c.kind)}</span></div><div class="mid"><div><div class="nm">${esc(c.name)}</div><div style="font-size:9px;color:#b9b0d8;margin-top:2px">${esc(c.tarot)}</div></div></div><div class="ft" style="color:#b9b0d8;white-space:normal;font-family:var(--font-body)">${esc(c.text).slice(0, 70)}${c.text.length > 70 ? '…' : ''}</div>`; return el; }
+    const cost = S && S.me ? S.g.costOf(S.me, c) : c.cost; const liq = S && S.me ? S.g.liquidity(S.me) : 99;
+    if (c.type === 'pip') {
+      const pips = Array.from({ length: Math.min(c.rank, 10) }, () => '<span class="pip"></span>').join('');
+      el.innerHTML = `<div class="hd"><span>${c.rank === 1 ? 'A' : c.rank}</span><span class="suit"></span><span class="cost ${cost > liq && !inst ? 'no' : ''}">${cost}</span></div><div class="mid"><div class="pips">${pips}</div></div><div class="ft"><span>${esc(c.suit.toUpperCase())}</span><span>${c.reversed ? 'reversed' : ''}</span></div>`;
+    } else {
+      const y = inst && owner ? S.g.yieldOf(owner, inst) : c.yield;
+      el.innerHTML = `<div class="hd"><span>${esc(c.rank[0])}</span><span class="suit"></span><span class="cost ${cost > liq && !inst ? 'no' : ''}">${cost}</span></div><div class="mid"><div class="nm">${esc(c.name)}</div></div><div class="ft"><span>${y}y</span><span>${esc(c.rank)}</span><span>${c.res}r</span></div>`;
+      if (inst) { const b = []; if (inst.drawdown) b.push(`<span class="bd dd">−${inst.drawdown}</span>`); if (inst.armor) b.push(`<span class="bd arm">+${inst.armor}🛡</span>`); if (inst.shielded) b.push(`<span class="bd sh">shield</span>`); if (c.villain) b.push(`<span class="bd vil">villain</span>`); if (b.length) el.insertAdjacentHTML('beforeend', `<div class="badges">${b.join('')}</div>`); if (inst.working) el.classList.add('working'); }
+    }
+    return el;
+  }
+  function logHtml(lines) { return lines.slice(-60).map((e) => { const t = esc(e.replace(/^\[[^\]]*\] /, '')); const cls = /WINS|FINAL BELL|Final Bell|reveals|HAIL MARY PASS|COMPLETE:/.test(e) ? 'win' : /LIQUIDATED|loses|Drawdown|Front-run|Exit Scam|INTERCEPTED|INCOMPLETE/.test(e) ? 'bad' : /banks/.test(e) ? 'good' : ''; return `<div class="${cls}">${t}</div>`; }).join(''); }
+
+  let acts = []; // legal actions for the human in the current main phase
+  function render() {
+    if (!S) return; const g = S.g, me = S.me, bot = S.bot; const main = S.prompt.kind === 'main';
+    acts = main ? g.actions(me) : [];
+    const hint = $('coach').checked && ['set', 'main', 'hedge', 'foretell'].includes(S.prompt.kind) ? advice() : null;
+    // querents
+    $('oppBank').textContent = bot.bank; $('oppPort').textContent = bot.portfolio; $('oppHand').textContent = bot.hand.length;
+    $('oppPass').innerHTML = bot.pass ? `<div class="pass-badge" id="oppPassBadge">PASS IN THE AIR: ${bot.inAir}</div>` : '';
+    $('oppReserve').innerHTML = bot.reserve.map((r) => `<span class="chip ${r.locked ? 'locked' : ''}"></span>`).join('');
+    $('meBank').textContent = me.bank; $('mePort').textContent = me.portfolio; $('meLiq').textContent = `${g.liquidity(me)}/${me.reserve.length}`;
+    $('mePass').innerHTML = me.pass ? `<div class="pass-badge">YOUR PASS: ${me.inAir} in the air</div>` : (me.hailMaryUsed ? '<div class="note" style="font-size:11px;color:var(--muted)">pass thrown</div>' : '');
+    $('meReserve').innerHTML = me.reserve.map((r) => `<span class="chip ${r.locked ? 'locked' : ''}"></span>`).join('');
+    document.querySelector('#oppQ .who').classList.toggle('active', g.active === bot && !g.over); document.querySelector('#meQ .who').classList.toggle('active', g.active === me && !g.over);
+    $('endTurn').disabled = !main;
+    // center
+    $('deckLabel').textContent = isDuel() ? `Majors · ${g.majors.length} left` : `R-cana · ${g.deck.length} left`;
+    const ds = $('deckStack'); ds.innerHTML = ''; if ((isDuel() ? g.omen : g.deck.length)) { const b = cardEl(null, { back: true }); ds.appendChild(b); const n = document.createElement('span'); n.className = 'count'; n.textContent = isDuel() ? 'Omen' : g.deck.length; ds.appendChild(n); }
+    $('market').innerHTML = ''; if (g.market) $('market').appendChild(cardEl(g.market)); else $('market').innerHTML = '<div class="note" style="color:var(--muted);font-size:11px;width:var(--cw)">no Market in effect</div>';
+    const pv = $('providence'); pv.innerHTML = ''; for (const m of g.providence) { const el = cardEl(m); const a = acts.find((x) => x.t === 'invoke' && x.major === m); if (a) { el.classList.add('playable'); el.title = `Invoke for ${a.cost}`; el.addEventListener('click', () => doAct(a)); } pv.appendChild(el); }
+    $('log').innerHTML = logHtml([...g.snapshots.flatMap((x) => x.events), ...g.events]); $('log').scrollTop = $('log').scrollHeight;
+    // floors
+    const of = $('oppFloor'); of.querySelectorAll('.card').forEach((x) => x.remove()); for (const i of bot.floor) { const el = cardEl(i.card, { inst: i, owner: bot }); el.dataset.uid = i.uid; of.appendChild(el); }
+    const mf = $('meFloor'); mf.querySelectorAll('.card').forEach((x) => x.remove());
+    for (const i of me.floor) { const el = cardEl(i.card, { inst: i, owner: me }); el.dataset.uid = i.uid; const w = acts.filter((a) => a.t === 'work' && a.inst === i); if (w.length) { el.classList.add('playable'); el.addEventListener('click', (ev) => { if (dragging) return; if (w.length === 1) doAct(w[0]); else popMenu(ev, i.card, w.map((a) => [a.ability ? 'Work: ability' : `Work for ${g.yieldOf(me, i)}`, () => doAct(a)])); }); } if (hint && hint.act && hint.act.inst === i) el.classList.add('hint'); mf.appendChild(el); }
+    // hand
+    const hz = $('meHand'); hz.querySelectorAll('.card').forEach((x) => x.remove());
+    me.hand.forEach((c, ix) => { const el = cardEl(c); el.dataset.hix = ix; const mine = acts.filter((a) => a.card === c); if (main) el.classList.add(mine.length ? 'playable' : 'dim'); if (S.prompt.kind === 'hedge' && S.prompt.opts.includes(c)) { el.classList.add('target'); el.addEventListener('click', () => resolveP(c)); } if (hint && hint.act && hint.act.card === c) el.classList.add('hint'); if (!S.seen.has(c)) { el.classList.add('dealt'); S.seen.add(c); } attachDrag(el, c); hz.appendChild(el); });
+    const fa = acts.find((a) => a.t === 'foretell'); const hintTxt = hint ? `<div class="coach">Coach: ${esc(hint.text)}</div>` : '';
+    // prompt panel
+    const pr = S.prompt; let html = '';
+    if (pr.kind === 'wait') html = `<div class="prompt"><div class="ph">${g.over ? 'GAME OVER' : 'THE BOT IS PLAYING'}</div></div>`;
+    else if (pr.kind === 'set') html = `<div class="prompt"><div class="ph">YOUR SET · ${me.portfolio} in your Portfolio</div><button class="primary" id="bankAll">Bank all ${me.portfolio}</button><label class="note" style="display:flex;gap:6px;align-items:center">Bank <input type="number" id="bankN" min="0" max="${me.portfolio}" value="0" style="width:70px"> <button id="bankSome">keep the rest exposed</button></label>${pr.canPass ? `<button class="danger" id="throwPass">Throw a HAIL MARY PASS with all ${me.portfolio}</button>` : ''}${hintTxt}</div>`;
+    else if (pr.kind === 'main') html = `<div class="prompt"><div class="ph">YOUR TURN · Liquidity ${g.liquidity(me)}${me.reservedThisTurn ? '' : ' · you may Reserve one card'}</div>${fa ? '<button id="foretell">Foretell the Omen</button>' : ''}<span class="note" style="color:var(--muted)">Drag a glowing card onto a glowing zone. Tap any card to read it.</span>${hintTxt}</div>`;
+    else if (pr.kind === 'hedge') { const t = pr.threat; const tgt = t.target && t.target.isPass ? `your Hail Mary Pass (${me.inAir} in the air)` : t.target && t.target.card ? t.target.card.name : 'your Portfolio'; html = `<div class="prompt danger"><div class="ph">INCOMING · ${esc(t.attacker ? t.attacker.name : 'The R-cana')} plays ${esc(t.card.name)} at ${esc(tgt)} for ${t.amount}</div><span class="note">Tap a glowing Chain in your hand to Hedge, or</span><button id="takeIt" class="primary">Take it</button>${hintTxt}</div>`; }
+    else if (pr.kind === 'foretell') html = `<div class="prompt"><div class="ph">THE OMEN IS ${esc(pr.card.name)}</div><span class="note">${esc(pr.card.text)}</span><button class="primary" id="bury">Bury it</button><button id="leave">Leave it</button>${hintTxt}</div>`;
+    else if (pr.kind === 'over') { const r = pr.result; html = `<div class="prompt"><div class="ph">${r.winner === me.name ? 'YOU WIN' : r.winner ? 'THE BOT WINS' : 'DRAW'} · ${esc(r.reason)}</div><span class="note">The R-cana named you a ${esc(g.archetype(me))}. Press Deal for another.</span></div>`; }
+    else if (pr.kind === 'error') html = `<div class="prompt danger"><div class="ph">ENGINE ERROR</div><pre class="note">${esc(String(pr.error && pr.error.stack || pr.error))}</pre></div>`;
+    $('prompt').innerHTML = html;
+    if (pr.kind === 'set') { $('bankAll').onclick = () => resolveP({ bank: me.portfolio }); $('bankSome').onclick = () => resolveP({ bank: +$('bankN').value || 0 }); if (pr.canPass) $('throwPass').onclick = () => resolveP({ pass: true }); }
+    if (pr.kind === 'main' && fa) $('foretell').onclick = () => doAct(fa);
+    if (pr.kind === 'hedge') $('takeIt').onclick = () => resolveP(null);
+    if (pr.kind === 'foretell') { $('bury').onclick = () => resolveP(true); $('leave').onclick = () => resolveP(false); }
+    $('status').textContent = g.over ? 'Game over.' : `Round ${g.round}${g.bellRound != null ? ' · Final Bell' : ''}`;
+  }
+  $('endTurn').addEventListener('click', endTurn);
+  $('coach').addEventListener('change', render);
+
+  async function doAct(a) { if (!S || S.busy || !a) return; S.busy = true; const g = S.g; const before = { port: S.me.portfolio, bank: S.me.bank }; try { await g.act(S.me, a); } catch (e) { console.error(e); toast('That move failed: ' + e.message); } finally { S.busy = false; } if (S.mainResolve && S.prompt.kind === 'wait') S.prompt = { kind: 'main' }; render(); const d = S.me.portfolio - before.port; if (d > 0) floatAt($('mePort'), `+${d}`); if (d < 0) floatAt($('mePort'), `${d}`, true); const b = S.me.bank - before.bank; if (b > 0) floatAt($('meBank'), `+${b} banked`); }
+
+  // ───────── coach ─────────
+  function actText(a) {
+    const g = S.g, me = S.me; const c = a.card;
+    switch (a.t) {
+      case 'reserve': return `Reserve ${c.name}: it's your weakest card and Liquidity pays for everything else.`;
+      case 'hire': return `Hire ${c.name} for ${a.cost}: it earns ${c.yield} a turn once it Works.`;
+      case 'work': return `Work ${a.inst.card.name} for +${g.yieldOf(me, a.inst)}. Idle Personalities earn nothing.`;
+      case 'foretell': return 'Foretell: free information about the next Major.';
+      case 'invoke': return `Invoke ${a.major.name}: free value for whoever pays first.`;
+      case 'pip': { const ch = a.choice || {}; if (ch.collateral) return `Collateral ${c.name} on ${ch.collateral.card.name}: armor and permanent extra Yield.`; if (c.suit === 'coins') return `Play ${c.name}: Profit now beats cards in hand.`; if (c.suit === 'candles') return `Candle ${ch.inst.card.name}: a big Work this turn.`; if (c.suit === 'cups') return `${c.reversed ? 'Take with' : 'Give with'} ${c.name}: you come out ahead and draw.`; const t = ch.target; return t && t.isPass ? `INTERCEPT the pass with ${c.name}: ${t.owner.inAir} is in the air.` : t && t.card ? `Attack ${t.card.name} with ${c.name}: it is Working and exposed.` : `Front-run the bot with ${c.name}.`; }
+      default: return a.t;
+    }
+  }
+  function advice() {
+    const g = S.g, me = S.me, c = S.coach, pr = S.prompt;
+    if (pr.kind === 'set') { if (g.canPass(me) && c.hailMaryPass(g, me)) return { text: 'Throw the pass. The bot looks unlikely to have a Chain ready.' }; const n = Math.min(me.portfolio, Math.max(0, c.bankAmount(g, me))); return { text: n < me.portfolio ? `Bank ${n}, keep ${me.portfolio - n} for Interest.` : `Bank all ${me.portfolio}.` }; }
+    if (pr.kind === 'hedge') { const ch = c.wantHedge(g, me, pr.opts, pr.threat); return ch ? { text: `Hedge with ${ch.name}.`, act: { card: ch } } : { text: 'Take it; the hit is small.' }; }
+    if (pr.kind === 'foretell') return { text: c.bottomCard(g, me, pr.card) ? 'Bury it.' : 'Leave it.' };
+    if (me.reservedThisTurn < 1 && (me.hand.length >= 3 || g.liquidity(me) < 2)) { const rc = c.reserveChoice(g, me); if (rc) return { text: actText({ t: 'reserve', card: rc }), act: { card: rc } }; }
+    let best = null, bs = 0.25; for (const a of acts.filter((a) => a.t !== 'reserve')) { const sc = c.score(g, me, a); if (sc > bs) { bs = sc; best = a; } }
+    return best ? { text: actText(best), act: best } : { text: 'Nothing left worth doing. End your turn.' };
+  }
+
+  // ───────── drag and drop ─────────
+  let dragging = null;
+  function targetsFor(c) {
+    const g = S.g, me = S.me; const list = [];
+    for (const a of acts.filter((a) => a.card === c)) {
+      let el = null;
+      if (a.t === 'reserve') el = $('meReserveZone');
+      else if (a.t === 'hire') el = $('meFloor');
+      else if (a.t === 'pip') { const ch = a.choice || {};
+        if (ch.collateral) el = document.querySelector(`#meFloor .card[data-uid="${ch.collateral.uid}"]`);
+        else if (c.suit === 'coins') el = $('meFloor');
+        else if (c.suit === 'candles') el = document.querySelector(`#meFloor .card[data-uid="${ch.inst.uid}"]`);
+        else if (c.suit === 'cups') el = $('oppQ');
+        else { const t = ch.target; el = t && t.isPass ? $('oppPassBadge') : t && t.card ? document.querySelector(`#oppFloor .card[data-uid="${t.uid}"]`) : $('oppQ'); } }
+      if (el) list.push({ el, a });
+    }
+    return list;
+  }
+  function attachDrag(el, c) {
+    let start = null, ghost = null, targets = [];
+    el.addEventListener('pointerdown', (ev) => { if (ev.button !== 0) return; start = { x: ev.clientX, y: ev.clientY }; el.setPointerCapture(ev.pointerId); });
+    el.addEventListener('pointermove', (ev) => {
+      if (!start) return; const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
+      if (!dragging && Math.hypot(dx, dy) > 8) { if (S.prompt.kind !== 'main') { start = null; return; } targets = targetsFor(c); if (!targets.length) { start = null; toast('Nothing to do with that card right now'); return; } dragging = { c }; ghost = el.cloneNode(true); ghost.classList.add('ghost'); ghost.style.width = el.offsetWidth + 'px'; ghost.style.height = el.offsetHeight + 'px'; document.body.appendChild(ghost); el.style.opacity = '.35'; for (const t of targets) t.el.classList.add(t.el.classList.contains('card') ? 'target' : 'drop'); }
+      if (dragging) { ghost.style.left = (ev.clientX - el.offsetWidth / 2) + 'px'; ghost.style.top = (ev.clientY - el.offsetHeight / 2) + 'px'; const under = hitTarget(ev, targets); for (const t of targets) { t.el.classList.toggle('over', under === t); t.el.classList.toggle('drop-over', under === t); } }
+    });
+    const finish = async (ev) => {
+      if (!start) return; const wasDrag = !!dragging; start = null;
+      if (wasDrag) { const under = hitTarget(ev, targets); for (const t of targets) t.el.classList.remove('target', 'drop', 'over', 'drop-over'); ghost.remove(); ghost = null; el.style.opacity = ''; dragging = null; if (under) await doAct(under.a); else render(); }
+      else { popCard(ev, c); }
+    };
+    el.addEventListener('pointerup', finish); el.addEventListener('pointercancel', finish);
+  }
+  function hitTarget(ev, targets) { const els = document.elementsFromPoint(ev.clientX, ev.clientY); for (const e of els) { const t = targets.find((t) => t.el === e || t.el.contains(e)); if (t) return t; } return null; }
+  // tap: read the card, with its legal moves as a fallback to dragging
+  function popCard(ev, c) { const mine = acts.filter((a) => a.card === c); popMenu(ev, c, mine.map((a) => [actLabel(a), () => doAct(a)])); }
+  function actLabel(a) { const c = a.card; const ch = a.choice || {}; switch (a.t) { case 'reserve': return 'Reserve as Liquidity'; case 'hire': return `Hire for ${a.cost}`; case 'pip': if (ch.collateral) return `Collateral on ${ch.collateral.card.name}`; if (c.suit === 'coins') return `Play for ${a.cost}`; if (c.suit === 'candles') return `Work ${ch.inst.card.name}`; if (c.suit === 'cups') return `${c.reversed ? 'Take from' : 'Give to'} the bot`; { const t = ch.target; return t && t.isPass ? 'Intercept the pass' : t && t.card ? `Attack ${t.card.name}` : 'Front-run the bot'; } default: return a.t; } }
+  function popMenu(ev, c, items) {
+    const host = $('popHost'); host.innerHTML = ''; const p = document.createElement('div'); p.className = 'pop';
+    p.innerHTML = `<div class="t">${esc(c.name)}${c.title ? ` <span class="x">· ${esc(c.title)}</span>` : ''}${c.type === 'court' ? ` <span class="x">· ${c.yield}y / ${c.res}r · cost ${c.cost}</span>` : ''}</div><div class="x">${esc(c.text || '')}</div>`;
+    for (const [label, fn] of items) { const b = document.createElement('button'); b.textContent = label; b.addEventListener('click', () => { host.innerHTML = ''; fn(); }); p.appendChild(b); }
+    if (!items.length && S.prompt.kind === 'main') p.insertAdjacentHTML('beforeend', '<div class="x">Nothing to do with this card right now.</div>');
+    const x = Math.min(ev.clientX, window.innerWidth - 300), y = Math.min(ev.clientY, window.innerHeight - 220); p.style.left = Math.max(8, x) + 'px'; p.style.top = Math.max(8, y - 10) + 'px';
+    host.appendChild(p); setTimeout(() => document.addEventListener('pointerdown', (e) => { if (!p.contains(e.target)) host.innerHTML = ''; }, { once: true }), 0);
+  }
+  window.__rcanaTable = () => S;
+</script>

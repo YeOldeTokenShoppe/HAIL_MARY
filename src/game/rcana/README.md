@@ -65,7 +65,8 @@ whole table when drawn. Theme is general markets and money.
 | `tarot-engine.js` | Shared-deck rules: Set (Dividend, Interest, Bank), draw Minors resolving Majors on the way, Reserve, pips, courts, Chains as attack or Hedge, Invoke, Foretell, Final Bell. |
 | `tarot-bots.js` | Strong (heuristic), Naive (random actions, banks everything, always hedges) and Random (also passes at random) policies. |
 | `tarot-sim.js` | CLI and the `playOne` / `batch` exports the viewer uses. |
-| `tarot-viewer.html` | Browser UI: Watch (bot vs bot, turn by turn), Versus (you against a bot), Batch, Cards. Covers both the shared reading and the duel. |
+| `tarot-viewer.html` | Browser UI: Watch (bot vs bot, turn by turn), Versus (you against a bot, with buttons and a coach), Batch, Cards. Covers both the shared reading and the duel. |
+| `table.html` | The card table: drag cards from your hand onto glowing zones, tap Personalities to Work them, play the bot. Same engine, no buttons for legality. |
 
 ```bash
 node tarot-sim.js --verbose --seed 5
