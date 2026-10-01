@@ -33,7 +33,7 @@ export class TarotGame {
     return { label, round: this.round, active: this.active ? this.active.name : null, bell: this.bellRound, market: this.market ? this.market.name : null,
       providence: this.providence.map((m) => m.name), deckLeft: this.deck.length, over: this.over, winner: this.winner ? this.winner.name : null, reason: this.reason, events: this.events,
       players: this.players.map((p) => ({ name: p.name, bank: p.bank, portfolio: p.portfolio, pass: p.pass ? p.inAir : null, passUsed: p.hailMaryUsed, hand: p.hand.map((c) => c.name), reserve: p.reserve.length, locked: p.reserve.filter((r) => r.locked).length, archetype: this.archetype(p),
-        floor: p.floor.map((i) => ({ name: i.card.name, title: i.card.title, suit: i.card.suit, working: i.working, drawdown: i.drawdown, res: i.card.res, yield: this.yieldOf(p, i), villain: i.card.villain, shielded: !!i.shielded, canWork: this.canWork(p, i) })) })) };
+        floor: p.floor.map((i) => ({ name: i.card.name, title: i.card.title, suit: i.card.suit, working: i.working, drawdown: i.drawdown, res: i.card.res, yield: this.yieldOf(p, i), villain: i.card.villain, shielded: !!i.shielded, armor: i.armor || 0, canWork: this.canWork(p, i) })) })) };
   }
   // ── queries ──
   opps(p) { return this.players.filter((q) => q !== p); }
@@ -56,7 +56,7 @@ export class TarotGame {
   modChain(p, k, init, ...a) { let v = init; for (const s of this.modSources(p)) if (s.mods && s.mods[k]) v = s.mods[k](this, p, ...a, v); return v; }
   yieldOf(p, inst, bonus = 0) {
     let b = inst.card.yield; if (inst.card.yieldFn) b = inst.card.yieldFn(this, p, inst, b);
-    let y = b + bonus + this.modSum(p, 'yield', inst); y = this.modChain(p, 'yieldFinal', y, inst); return Math.max(0, y);
+    let y = b + bonus + (inst.bonusYield || 0) + this.modSum(p, 'yield', inst); y = this.modChain(p, 'yieldFinal', y, inst); return Math.max(0, y);
   }
   costOf(p, c) { const ov = this.modFirst(p, 'costOverride', c); if (ov != null) return ov; return Math.max(0, c.cost + this.modSum(p, 'cost', c)); }
   isHedged(p, inst) { return !!inst.card.kw.hedged; }
@@ -91,7 +91,7 @@ export class TarotGame {
   drawdown(inst, n, why) {
     const o = inst.owner; if (!o.floor.includes(inst) || this.over) return; const cur = this.current;
     if (cur && cur.victim === o && cur.reduce) { const r = Math.min(n, cur.reduce); n -= r; cur.reduce -= r; if (r) this.log(`${o.name}'s Hedge absorbs ${r}`); }
-    n += this.modSum(o, 'incomingDd', inst); if (this.isHedged(o, inst)) n -= 1; n = Math.max(0, n); if (!n) return;
+    n += this.modSum(o, 'incomingDd', inst); if (this.isHedged(o, inst)) n -= 1; if (inst.armor) { const a = Math.min(n, inst.armor); n -= a; if (a) this.log(`${inst.card.name}'s Collateral absorbs ${a}`); } n = Math.max(0, n); if (!n) return;
     inst.drawdown += n; this.log(`${inst.card.name} (${o.name}) takes ${n} Drawdown (${why}) → ${inst.drawdown}/${inst.card.res}`);
     if (inst.drawdown >= inst.card.res) this.liquidate(inst, why);
   }
