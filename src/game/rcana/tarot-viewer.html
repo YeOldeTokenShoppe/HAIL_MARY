@@ -108,7 +108,7 @@
     <label>Deck B (v2) <select id="deckB"></select></label>
     <label>Win target <input type="number" id="win" value="80" min="20" max="200"></label>
     <label>Minors drawn per turn <input type="number" id="draw" value="1" min="1" max="4"></label>
-    <label>Opening hand <input type="number" id="hand" value="7" min="3" max="10"></label>
+    <label>Opening hand <input type="number" id="hand" value="8" min="3" max="12"></label>
     <label>Seed <input type="number" id="seed" value="7" min="1"></label>
     <label>Games (batch) <input type="number" id="games" value="500" min="10" max="5000"></label>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="primary" id="run">Run one game</button><button class="ghost" id="runBatch">Run batch</button></div>
@@ -196,7 +196,7 @@
   for (const id of ['deckA', 'deckB']) $(id).innerHTML = Object.entries(DECK_PRESETS).map(([k, v]) => `<option value="${k}">${esc(v.name)}</option>`).join('');
   $('deckB').value = 'random'; $('deckA').value = 'random';
   try { const saved = JSON.parse(localStorage.getItem('rcana-tarot') || '{}'); for (const k of ['mode', 'polA', 'polB', 'deckA', 'deckB', 'win', 'draw', 'hand', 'seed', 'games']) if (saved[k] != null) $(k).value = saved[k]; } catch (e) {}
-  const opts = () => ({ a: $('polA').value, b: $('polB').value, da: $('deckA').value, db: $('deckB').value, seed: +$('seed').value || 1, rules: { winBank: +$('win').value || 80, minorsPerTurn: +$('draw').value || 1, openingHand: +$('hand').value || 7 } });
+  const opts = () => ({ a: $('polA').value, b: $('polB').value, da: $('deckA').value, db: $('deckB').value, seed: +$('seed').value || 1, rules: { winBank: +$('win').value || 80, minorsPerTurn: +$('draw').value || 1, openingHand: +$('hand').value || 8 } });
   const persist = () => { try { localStorage.setItem('rcana-tarot', JSON.stringify({ mode: $('mode').value, polA: $('polA').value, polB: $('polB').value, deckA: $('deckA').value, deckB: $('deckB').value, win: $('win').value, draw: $('draw').value, hand: $('hand').value, seed: $('seed').value, games: $('games').value })); } catch (e) {} };
   const syncMode = () => { const d = isDuel(); $('deckA').parentElement.hidden = !d; $('deckB').parentElement.hidden = !d; $('draw').parentElement.hidden = d; };
   $('mode').addEventListener('change', () => { syncMode(); renderCards(); }); syncMode();
@@ -290,7 +290,7 @@
         </div>
         <div class="zone-h" style="margin-top:12px">How the R-cana named each side</div>
         <div class="strip">${Object.entries(r.archetypes).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="cell"><div class="k">${esc(k)}</div><div class="v">${Math.round(v / n * 100)}%</div></div>`).join('')}</div>
-        <p class="note" style="margin:10px 0 0">${esc(o.a)} vs ${esc(o.b)}, sides alternate each game. Win target ${o.rules.winBank}, ${o.rules.minorsPerTurn} Minor${o.rules.minorsPerTurn > 1 ? 's' : ''} per turn, opening hand ${o.rules.openingHand}, ${isDuel() ? 'lead seat rotates and the final round is played out' : 'first player skips the first draw'}. Seeds ${o.seed}&ndash;${o.seed + n - 1}.</p>`;
+        <p class="note" style="margin:10px 0 0">${esc(o.a)} vs ${esc(o.b)}, sides alternate each game. Win target ${o.rules.winBank}, ${o.rules.minorsPerTurn} Minor${o.rules.minorsPerTurn > 1 ? 's' : ''} per turn, opening hand ${o.rules.openingHand}, ${isDuel() ? 'the first player draws one extra card and the final round is played out' : 'first player skips the first draw'}. Seeds ${o.seed}&ndash;${o.seed + n - 1}.</p>`;
       // histogram
       const counts = {}; r.rounds.forEach((x) => { counts[x] = (counts[x] || 0) + 1; });
       const ks = Object.keys(counts).map(Number).sort((a, b) => a - b); const mx = Math.max(...Object.values(counts));

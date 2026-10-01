@@ -36,7 +36,7 @@ Courts are Personalities. Each has a cost, a Yield, a Resilience, and one abilit
 
 ## Setup
 
-1. Separate the Majors. Shuffle the Minors and deal seven to each Trader.
+1. Separate the Majors. Shuffle the Minors and deal eight to each Trader.
 2. Shuffle the Majors into the remaining Minors. This is the R-cana deck.
 3. Choose a first Trader. The first Trader skips the Draw step on the first turn only.
 
