@@ -18,13 +18,13 @@ Be the first Trader to hold 80 Profit in your **Bank**. Banked Profit can never 
 
 ## The suits
 
-Every pip has a rank R from 1 (Ace) to 10. Its cost is half its rank, rounded up; upright Cups and reversed Candles cost one less.
+Every pip has a rank R from 1 (Ace) to 10. Its cost is half its rank, rounded up; upright Cups, reversed Candles and reversed Chains cost one less.
 
 | Suit | Upright | Reversed |
 |---|---|---|
 | Coins | Gain R Profit into your Portfolio. | Bank half of R (rounded up) directly. |
 | Candles | Put an idle Personality to Work. It yields +R this turn. | Put an idle Personality to Work. It yields +half of R and cannot be targeted until your next turn. |
-| Chains | Deal R Drawdown to a Working opposing Personality, Front-run R from an opposing Portfolio, or intercept an opposing Hail Mary Pass. Or hold it as a Hedge that absorbs R. | Hedge only. When a Chain targets you, play it for free: it absorbs R+2 and you draw a card. It cannot be played on your own turn. |
+| Chains | Deal R Drawdown to a Working opposing Personality, Front-run R from an opposing Portfolio, or intercept an opposing Hail Mary Pass. Or hold it as a Hedge that absorbs R. | Collateral: play on one of your own Personalities that has none. It takes R less Drawdown from every Chain and Event, and yields +half of R (rounded up) for as long as it stays on your Floor. Or Hedge: when a Chain targets you, play it for free to absorb R+2 and draw a card. |
 | Cups | Another Trader gains half of R. You gain R and draw a card. | Front-run half of R from another Trader. You gain the same. |
 
 Courts are Personalities with a cost, Yield, Resilience, and one ability each. Each court has a reversed version with a different ability; both are listed in the card file.

@@ -5,10 +5,10 @@ import { MINORS, COURTS, SUITS, SUIT_NAME, pipCost } from './tarot.js';
 export const REV_PIP_TEXT = {
   coins: 'Bank half of R (rounded up) directly.',
   candles: 'Put an idle Personality to Work. It yields +half of R and cannot be targeted until your next turn.',
-  chains: 'Hedge only. When a Chain targets you, play this for free: it absorbs R+2.',
+  chains: 'Collateral: play on one of your Personalities. It takes R less Drawdown from every Chain and Event and yields +half of R. Or Hedge: when a Chain targets you, play this for free to absorb R+2 and draw a card.',
   cups: 'Front-run half of R (rounded up) from another Trader. Gain the same.',
 };
-export function revCost(suit, r) { const c = Math.ceil(r / 2); return suit === 'candles' ? Math.max(0, c - 1) : c; }
+export function revCost(suit, r) { const c = Math.ceil(r / 2); return suit === 'candles' || suit === 'chains' ? Math.max(0, c - 1) : c; }
 
 const revPips = [];
 for (const suit of SUITS) for (let r = 1; r <= 10; r++) {

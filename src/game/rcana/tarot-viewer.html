@@ -144,7 +144,7 @@
         <li><strong>Goal:</strong> be the first to put 80 Profit in your <strong>Bank</strong>. Banked Profit can never be touched. Profit in your <strong>Portfolio</strong> is exposed until you bank it at the start of your turn.</li>
         <li><strong>Liquidity pays for cards.</strong> Once a turn, Reserve a card you don't need: it becomes a permanent Liquidity point that refreshes every turn. Early on, reserve every turn.</li>
         <li><strong>Personalities earn.</strong> Hire one (it rests the turn it arrives), then put it to <strong>Work</strong> each turn for its Yield. A Working Personality is the only thing the bot's Chains can hit.</li>
-        <li><strong>The Four C's:</strong> Coins give Profit now. Candles make a Personality Work for a bonus. Cups give the bot a little and you more, and draw a card. Chains attack a Working Personality or Front-run the bot's Portfolio, or stay in hand to Hedge when you're attacked.</li>
+        <li><strong>The Four C's:</strong> Coins give Profit now. Candles make a Personality Work for a bonus. Cups give the bot a little and you more, and draw a card. Chains attack a Working Personality, Front-run the bot's Portfolio, or intercept a pass; or stay in hand to Hedge when you're attacked. Reversed Chains are Collateral: armor and extra Yield for one of your own Personalities.</li>
         <li><strong>The Majors are fate.</strong> One is revealed each round for everyone. Markets stay, Events hit at once, Invokes sit in Providence for whoever pays.</li>
         <li><strong>Hail Mary Pass:</strong> once per game, throw your whole Portfolio into the air instead of banking. If nothing touches it by your next Set, it banks doubled. If anything does, it's gone.</li>
       </ol>
@@ -346,6 +346,7 @@
       case 'foretell': return 'Foretell: peek at the next Major';
       case 'invoke': return `Invoke ${a.major.name} for ${a.cost}`;
       case 'pip': { const c = a.card; const ch = a.choice || {}; const r = c.rank; const h = Math.ceil(r / 2); const cost = a.cost ? `for ${a.cost}` : 'free';
+        if (ch.collateral) return `Collateral on ${ch.collateral.card.name}: takes ${r} less Drawdown, yields +${h} from now on, ${cost}`;
         if (c.suit === 'coins') return c.reversed ? `Bank ${h} directly, ${cost}` : `+${r + g.modSum(me, 'coinsBonus')} Profit, ${cost}`;
         if (c.suit === 'candles') { const inst = ch.inst; const bonus = c.reversed ? h : r * g.modProduct(me, 'candlesMult'); return `Work ${inst.card.name} for +${g.yieldOf(me, inst, bonus + g.modSum(me, 'candlesBonus'))}${c.reversed ? ', shielded' : ''}, ${cost}`; }
         if (c.suit === 'cups') { const m = g.modProduct(me, 'cupsMult'); return c.reversed ? `Take ${h} from the bot, gain ${h}, ${cost}` : `Bot +${h * m}, you +${r * m + g.modSum(me, 'cupsBonus')} and draw, ${cost}`; }

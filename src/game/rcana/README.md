@@ -96,11 +96,12 @@ node v2-sim.js --verbose --seed 3 --da cautious --db aggressive
 
 Deck presets: `upright`, `revChains`, `revChainsAll`, `revCoins`, `revCups`, `cautious`, `aggressive`, `random`.
 Duel defaults after tuning: fixed seat order with the first Trader drawing eight, a game that reaches 80 plays
-out the round before the largest Bank wins, reversed Chains draw a card when used as a Hedge, upright Cups draw
-a card. The Hail Mary stake is its own zone: Chains may target it (interception), Events that take Profit knock
+out the round before the largest Bank wins, reversed Chains are Collateral (armor plus half-rank Yield on one of your Personalities) and still Hedge for free
+with a card draw, upright Cups draw a card. The Hail Mary stake is its own zone: Chains may target it (interception), Events that take Profit knock
 it down, a pass still in the air at the end returns to the Portfolio undoubled. Experiment flags: `--rotate 1` (rotating lead; rejected because it gives one player consecutive turns at two
 players), `--seatHand 8,7,7`, `--revIntercept 1` (reversed Chains may intercept a pass), `--revealLast 1`,
-`--sharedSet 1` (everyone Sets at round start, before the reveal), `--finish 0`, `--first N`. Rule flags for experiments: `--firstHand N` (first player's opening-hand penalty), `--chainsDraw 1`
+`--sharedSet 1` (everyone Sets at round start, before the reveal), `--finish 0`, `--first N`, `--chainsMode hedge|collateral|both|bothDraw`,
+`--cy one|third|half` (Collateral yield), `--collCost N`. Rule flags for experiments: `--firstHand N` (first player's opening-hand penalty), `--chainsDraw 1`
 (reversed Chains draw a card when used), `--chainsBonus N`, `--cupsCost N`, `--cupsPenalty N`, `--cupsDiv N`.
 
 ## How a game of version 2 plays, turn by turn
