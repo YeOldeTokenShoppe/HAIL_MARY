@@ -2,7 +2,7 @@
 import { MINORS, MAJORS, byId } from './tarot.js';
 import { makeRng } from './engine.js';
 
-export const DEFAULTS = { winBank: 80, openingHand: 7, minorsPerTurn: 1, firstTurnDraw: 0, maxRounds: 40 };
+export const DEFAULTS = { winBank: 80, openingHand: 7, minorsPerTurn: 1, firstTurnDraw: 0, interestDiv: 5, maxRounds: 40 };
 let UID = 1;
 
 export class TarotGame {
@@ -178,7 +178,7 @@ export class TarotGame {
     for (const i of p.floor) i.working = false; p.reserve.forEach((r) => { r.locked = false; }); p.reservedThisTurn = 0; p.foretold = false; p.turnBonusLiquidity = 0;
     // Set
     const div = this.modFirst(p, 'dividend') ?? 1; this.profit(p, div, 'Dividend');
-    const idiv = this.modMin(p, 'interestDiv', 10); const im = this.modProduct(p, 'interestMult'); const interest = Math.floor(p.portfolio / idiv) * im; if (interest) this.profit(p, interest, 'Interest');
+    const idiv = this.modMin(p, 'interestDiv', this.rules.interestDiv); const im = this.modProduct(p, 'interestMult'); const interest = Math.floor(p.portfolio / idiv) * im; if (interest) this.profit(p, interest, 'Interest');
     p.stats.unbankedSum += p.portfolio; p.stats.sets++;
     let amt = Math.min(p.portfolio, Math.max(0, p.policy.bankAmount(this, p))); const cap = this.modFirst(p, 'bankCap'); if (cap != null) amt = Math.min(amt, cap);
     if (amt) this.bankFromPortfolio(p, amt, 'Set'); else if (p.portfolio) this.log(`${p.name} keeps ${p.portfolio} in Portfolio`);
