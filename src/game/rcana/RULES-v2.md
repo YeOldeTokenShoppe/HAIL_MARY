@@ -1,10 +1,10 @@
 # RL80 R-cana — Version 2: The Duel
 
-Complete rules for two to four players. This document stands on its own; it does not depend on Version 1.
+Complete rules for two players. This document stands on its own; it does not depend on Version 1.
 
 ## What you need
 
-- For each Trader: a 56-card Minor deck of their own, and a Querent card.
+- For each of the two Traders: a 56-card Minor deck of their own, and a Querent card.
 - One shared set of the 22 Major R-cana.
 - Profit counters, Drawdown counters.
 
@@ -42,7 +42,7 @@ Courts are Personalities with a cost, Yield, Resilience, and one ability each. E
 
 1. Each Trader shuffles their own deck. The first Trader draws eight; everyone else draws seven.
 2. Shuffle the 22 Majors. Place the top one face-down in the Omen slot.
-3. Choose a first Trader. Turn order is fixed for the whole game, so every Trader's exposure window is the same: all opponents' turns plus one reveal.
+3. Choose a first Trader. Turn order is fixed for the whole game, so each Trader's exposure window is the same: the opponent's turn plus one reveal.
 
 ## The round
 
@@ -80,10 +80,6 @@ THE HAIL MARY (The Fool) lets an Underdog throw a second pass.
 ## Ending the game
 
 When any Trader's Bank reaches 80, at any point, the current round is played out so that every Trader has had the same number of turns. Then the largest Bank wins; ties go to the larger Portfolio. The same happens at the end of the round in which THE RECKONING tolls (unless it is buried: if more than ten Majors remain, it goes into the bottom half of the Major deck instead), or when the last Major has been revealed.
-
-## Three and four players
-
-Seat order is fixed. Turns pass to the left. Simulation with the supplied bots shows three seats within a few points of even, and a last-seat edge of roughly seven points at four; that is an open balance item, not a rule. Cups and Chains name their target Trader. Underdog means your Bank is smaller than at least one opponent's. VOLATILITY passes each Portfolio one seat to the left.
 
 ## The Majors
 

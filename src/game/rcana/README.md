@@ -80,7 +80,7 @@ first draw, Interest 1 per full 5 in Portfolio (`--interest 10` to compare). THE
 
 Each Trader brings a private 56-card Minor deck: one card per slot (Ace–King of each suit), each chosen
 upright or reversed. The 22 Majors are a shared deck with a face-down Omen revealed at the start of every
-round. Supports two to four players.
+round. The game is for two players; the engine runs more seats for experiments only.
 
 | File | What it is |
 |---|---|
