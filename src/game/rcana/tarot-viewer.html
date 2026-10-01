@@ -80,6 +80,8 @@
   .act:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
   .act.big { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; padding: 8px 14px; }
   .act:disabled { opacity: .5; cursor: default; }
+  .coach { border-left: 3px solid var(--accent); padding: 8px 12px; background: color-mix(in srgb, var(--accent) 10%, var(--panel2)); border-radius: 0 6px 6px 0; margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 13px; }
+  .coach .who { font-family: var(--font-display); letter-spacing: .06em; font-size: 11px; color: var(--accent); }
   .prompt-h { font-family: var(--font-display); letter-spacing: .05em; font-size: 14px; margin-bottom: 8px; }
   .chip.clickable { cursor: pointer; }
   .win-badge { background: var(--accent); color: var(--accent-ink); border-radius: 6px; padding: 8px 12px; font-weight: 600; }
@@ -136,6 +138,18 @@
       <label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--fg)"><input type="checkbox" id="vsBotFirst"> bot goes first</label>
       <span class="note">Uses the Mode, Deck A (yours), Deck B (bot's), Trader B (bot style), win target and seed above. The bot's hand and the Omen are hidden.</span>
     </div>
+    <details class="panel" id="vsPrimer" open>
+      <summary style="cursor:pointer;font-family:var(--font-display);letter-spacing:.05em;font-size:14px">HOW TO PLAY IN SIX LINES</summary>
+      <ol style="margin:10px 0 0;padding-left:20px;display:grid;gap:6px;max-width:70ch">
+        <li><strong>Goal:</strong> be the first to put 80 Profit in your <strong>Bank</strong>. Banked Profit can never be touched. Profit in your <strong>Portfolio</strong> is exposed until you bank it at the start of your turn.</li>
+        <li><strong>Liquidity pays for cards.</strong> Once a turn, Reserve a card you don't need: it becomes a permanent Liquidity point that refreshes every turn. Early on, reserve every turn.</li>
+        <li><strong>Personalities earn.</strong> Hire one (it rests the turn it arrives), then put it to <strong>Work</strong> each turn for its Yield. A Working Personality is the only thing the bot's Chains can hit.</li>
+        <li><strong>The Four C's:</strong> Coins give Profit now. Candles make a Personality Work for a bonus. Cups give the bot a little and you more, and draw a card. Chains attack a Working Personality or Front-run the bot's Portfolio, or stay in hand to Hedge when you're attacked.</li>
+        <li><strong>The Majors are fate.</strong> One is revealed each round for everyone. Markets stay, Events hit at once, Invokes sit in Providence for whoever pays.</li>
+        <li><strong>Hail Mary Pass:</strong> once per game, throw your whole Portfolio into the air instead of banking. If nothing touches it by your next Set, it banks doubled. If anything does, it's gone.</li>
+      </ol>
+      <p class="note" style="margin:10px 0 0">The coach below shows what the strong bot would do at each decision. Take its advice, or ignore it and see what happens.</p>
+    </details>
     <div class="panel strip" id="vsStrip"></div>
     <div class="boards" id="vsBoards"></div>
     <div class="panel" id="vsPrompt"><span class="note">No game yet.</span></div>
@@ -299,8 +313,9 @@
     foretell: (g, p, c) => new Promise((res) => { vs.resolve = res; vs.prompt = { kind: 'foretell', card: c }; renderVs(); }),
   };
   function resolveVs(v) { const r = vs.resolve; vs.resolve = null; vs.prompt = { kind: 'waiting' }; renderVs(); if (r) r(v); }
+  try { if (localStorage.getItem('rcana-played')) $('vsPrimer').open = false; } catch (e) {}
   $('vsStart').addEventListener('click', async () => {
-    persist();
+    persist(); try { localStorage.setItem('rcana-played', '1'); } catch (e) {}
     const o = opts(); const human = new HumanPolicy(vsUI); const botKind = $('polB').value;
     const bot = isDuel() ? botPolicy2(botKind, o.seed + 1) : botPolicy1(botKind, o.seed + 1); bot.name = 'BOT';
     const rng = makeRng(o.seed * 977 + 3);
@@ -309,7 +324,8 @@
       : [{ name: 'YOU', policy: human }, { name: 'BOT', policy: bot }];
     if ($('vsBotFirst').checked) players = [players[1], players[0]];
     const G = isDuel() ? DuelGame : TarotGame;
-    vs = { g: new G({ players, seed: o.seed, snapshots: true, rules: o.rules, hiddenInfo: true }), human, prompt: { kind: 'waiting' }, resolve: null, busy: false };
+    const coach = isDuel() ? botPolicy2('strong', o.seed + 99) : botPolicy1('strong', o.seed + 99);
+    vs = { g: new G({ players, seed: o.seed, snapshots: true, rules: o.rules, hiddenInfo: true }), human, coach, prompt: { kind: 'waiting' }, resolve: null, busy: false };
     vs.me = vs.g.players.find((p) => p.policy === human); vs.bot = vs.g.players.find((p) => p.policy !== human);
     renderVs();
     const r = await vs.g.run();
@@ -317,20 +333,39 @@
   });
   async function doAct(a) { if (!vs || vs.busy || !a) return; vs.busy = true; try { await vs.g.act(vs.me, a); } finally { vs.busy = false; } renderVs(); }
   const actLabel = (a) => {
+    const g = vs.g, me = vs.me;
     switch (a.t) {
-      case 'reserve': return 'Reserve as Liquidity';
-      case 'hire': return `Hire for ${a.cost}`;
-      case 'work': return a.ability ? 'Work: ability' : `Work for ${vs.g.yieldOf(vs.me, a.inst)}`;
-      case 'foretell': return 'Foretell';
-      case 'invoke': return `Invoke ${a.major.name} (${a.cost})`;
-      case 'pip': { const c = a.card; const ch = a.choice || {}; const cost = a.cost ? ` for ${a.cost}` : ' free';
-        if (c.suit === 'coins') return `Play${cost}`;
-        if (c.suit === 'candles') return `Work ${ch.inst.card.name}${cost}`;
-        if (c.suit === 'cups') return `${c.reversed ? 'Take from' : 'Give to'} ${ch.opp.name}${cost}`;
-        const t = ch.target; return t && t.card ? `Attack ${t.card.name}${cost}` : `Front-run ${t.name}${cost}`; }
+      case 'reserve': return 'Reserve: +1 Liquidity every turn';
+      case 'hire': return `Hire for ${a.cost}: earns ${a.card.yield} a turn once it Works`;
+      case 'work': return a.ability ? `Work: ${a.inst.card.text.replace(/^.*Work: /, '')}` : `Work: +${g.yieldOf(me, a.inst)} Profit`;
+      case 'foretell': return 'Foretell: peek at the next Major';
+      case 'invoke': return `Invoke ${a.major.name} for ${a.cost}`;
+      case 'pip': { const c = a.card; const ch = a.choice || {}; const r = c.rank; const h = Math.ceil(r / 2); const cost = a.cost ? `for ${a.cost}` : 'free';
+        if (c.suit === 'coins') return c.reversed ? `Bank ${h} directly, ${cost}` : `+${r + g.modSum(me, 'coinsBonus')} Profit, ${cost}`;
+        if (c.suit === 'candles') { const inst = ch.inst; const bonus = c.reversed ? h : r * g.modProduct(me, 'candlesMult'); return `Work ${inst.card.name} for +${g.yieldOf(me, inst, bonus + g.modSum(me, 'candlesBonus'))}${c.reversed ? ', shielded' : ''}, ${cost}`; }
+        if (c.suit === 'cups') { const m = g.modProduct(me, 'cupsMult'); return c.reversed ? `Take ${h} from the bot, gain ${h}, ${cost}` : `Bot +${h * m}, you +${r * m + g.modSum(me, 'cupsBonus')} and draw, ${cost}`; }
+        const t = ch.target; const amt = r * g.modProduct(me, 'chainsMult'); if (t && t.card) { const kills = t.drawdown + amt >= t.card.res; return `Attack ${t.card.name}: ${amt} Drawdown${kills ? ', liquidates it' : ''}, ${cost}`; } return `Front-run ${t.name}: take up to ${amt}, ${cost}`; }
       default: return a.t;
     }
   };
+  // What the strong bot would do here, in words.
+  function coachAdvice(acts) {
+    const g = vs.g, me = vs.me, c = vs.coach; const pr = vs.prompt;
+    if (pr.kind === 'set') {
+      const pass = g.canPass(me) && c.hailMaryPass(g, me); if (pass) return { text: `Throw the Hail Mary Pass. The bot looks unlikely to have a Chain ready, and ${me.portfolio} doubled is worth the risk.`, act: () => resolveVs({ pass: true }) };
+      const n = Math.min(me.portfolio, Math.max(0, c.bankAmount(g, me))); const keep = me.portfolio - n;
+      return { text: keep > 0 ? `Bank ${n} and keep ${keep} exposed for Interest; the Market is safe right now.` : `Bank all ${me.portfolio}. Nothing exposed means nothing to lose on the bot's turn.`, act: () => resolveVs({ bank: n }) };
+    }
+    if (pr.kind === 'hedge') { const ch = c.wantHedge(g, me, pr.opts, pr.threat); return ch ? { text: `Hedge with ${ch.name}. What you'd lose is worth more than the card.`, act: () => resolveVs(ch) } : { text: 'Take it. The hit is small and the Chain in your hand is worth more later.', act: () => resolveVs(null) }; }
+    if (pr.kind === 'foretell') { const b = c.bottomCard(g, me, pr.card); return { text: b ? `Bury it. ${pr.card.name} would hurt you.` : `Leave it. ${pr.card.name} is fine for you or hurts the bot more.`, act: () => resolveVs(b) }; }
+    if (pr.kind !== 'main') return null;
+    if (me.reservedThisTurn < 1 && (me.hand.length >= 3 || g.liquidity(me) < 2)) { const rc = c.reserveChoice(g, me); if (rc) return { text: `Reserve ${rc.name} first. It's your least useful card and Liquidity is what lets you play everything else.`, act: () => doAct({ t: 'reserve', card: rc }) }; }
+    let best = null, bs = 0.25; for (const a of acts.filter((a) => a.t !== 'reserve')) { const sc = c.score(g, me, a); if (sc > bs) { bs = sc; best = a; } }
+    if (!best) return { text: 'Nothing left worth doing. End your turn.', act: () => resolveVs() };
+    const why = { hire: 'Personalities are your engine: they earn every turn from now on.', work: 'Idle Personalities earn nothing. Work them.', pip: best.card && best.card.suit === 'chains' ? 'The bot has something exposed. Hit it while it is Working.' : 'Profit now beats cards in hand.', foretell: 'Free information about the next Major.', invoke: 'A Major in Providence is free value for whoever pays first.' }[best.t] || '';
+    return { text: `${actLabel(best)}${best.card ? ` with ${best.card.name}` : ''}. ${why}`, act: () => doAct(best) };
+  }
+  async function coachFinish() { if (!vs || vs.prompt.kind !== 'main') return; for (let k = 0; k < 20 && vs.prompt.kind === 'main'; k++) { const adv = coachAdvice(vs.g.actions(vs.me)); if (!adv) break; const before = vs.prompt.kind; await adv.act(); if (before !== 'main') break; if (!vs.resolve) break; } }
   function renderVs() {
     if (!vs) return; const g = vs.g; const me = vs.me; const bot = vs.bot; const s = g.makeSnapshot('live');
     const sm = s.players.find((p) => p.name === me.name); const sb = s.players.find((p) => p.name === bot.name);
@@ -379,7 +414,10 @@
         <button class="act big" id="vsNoHedge">Take it</button></div>`; }
     else if (pr.kind === 'foretell') html = `<div class="prompt-h">FORETELL &middot; the next Major is ${esc(pr.card.name)}</div><div class="note" style="margin-bottom:8px">${esc(pr.card.text)}</div><div style="display:flex;gap:8px"><button class="act big" id="vsBottom">Send it to the bottom</button><button class="act" id="vsKeep">Leave it</button></div>`;
     else if (pr.kind === 'over') { const r = pr.result; html = `<div class="win-badge" style="display:inline-block">${esc(r.winner === me.name ? 'You win.' : r.winner ? 'The bot wins.' : 'Draw.')} ${esc(r.reason)}</div><p class="note" style="margin:8px 0 0">The R-cana named you a <strong>${esc(sm.archetype)}</strong>. Start a new game above.</p>`; }
+    const adv = ['set', 'main', 'hedge', 'foretell'].includes(pr.kind) ? coachAdvice(acts) : null;
+    if (adv) html += `<div class="coach"><span class="who">COACH</span><span>${esc(adv.text)}</span><button class="act" id="vsCoachDo">Do that</button>${pr.kind === 'main' ? '<button class="act" id="vsCoachFinish">Let the coach finish my turn</button>' : ''}</div>`;
     $('vsPrompt').innerHTML = html;
+    if (adv) { $('vsCoachDo').addEventListener('click', () => adv.act()); const f = $('vsCoachFinish'); if (f) f.addEventListener('click', coachFinish); }
     // wire
     document.querySelectorAll('#view-versus [data-act]').forEach((b) => b.addEventListener('click', () => doAct(acts[+b.dataset.act])));
     if (pr.kind === 'set') { $('vsBankAll').addEventListener('click', () => resolveVs({ bank: me.portfolio })); $('vsBankSome').addEventListener('click', () => resolveVs({ bank: +$('vsBankN').value || 0 })); if (pr.canPass) $('vsPass').addEventListener('click', () => resolveVs({ pass: true })); }
