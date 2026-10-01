@@ -2,7 +2,7 @@
 import { TarotGame } from './tarot-engine.js';
 import { MAJORS, byId } from './tarot.js';
 
-export const DUEL_DEFAULTS = { firstHandPenalty: 1, revChainsDraw: true, cupsDraw: true };
+export const DUEL_DEFAULTS = { firstHandPenalty: 0, firstTurnDraw: 1, revChainsDraw: true, cupsDraw: true, rotateLead: true, finishRound: true };
 export class DuelGame extends TarotGame {
   constructor(opts) { super({ ...opts, rules: { ...DUEL_DEFAULTS, ...(opts.rules || {}) } }); }
   setup() {
@@ -53,11 +53,7 @@ export class DuelGame extends TarotGame {
     if (!p.foretold && p.floor.some((i) => i.card.foretell) && this.omen) { if (!A.some((a) => a.t === 'foretell')) A.push({ t: 'foretell', cost: 0 }); }
     return A.filter((a) => !(a.t === 'foretell' && !this.omen));
   }
-  playTurn() {
-    const p = this.players[this.turnIdx];
-    if (this.turnIdx === 0 && this.round >= 1 && !this.over) { this.active = p; this.revealOmen(); }
-    for (const i of p.floor) i.shielded = false;
-    super.playTurn();
-  }
+  startOfRound() { if (this.round >= 1 && !this.over) this.revealOmen(); for (const q of this.players) for (const i of q.floor) if (i.owner === this.active) i.shielded = false; }
+  playTurn(idx, firstOfRound, lastOfRound) { const p = this.players[idx]; for (const i of p.floor) i.shielded = false; super.playTurn(idx, firstOfRound, lastOfRound); }
   result() { const r = super.result(); r.players.forEach((q, i) => { q.deckPreset = this.players[i].deckPreset; }); return r; }
 }
