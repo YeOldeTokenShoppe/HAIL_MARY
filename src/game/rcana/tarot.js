@@ -68,7 +68,7 @@ export const MAJORS = [
   M(17, 'The Star', 'THE WINDFALL', 'event', 'Every Trader draws two Minors and gains 3 Profit into their Portfolio.', { resolve: (g) => g.players.forEach((q) => { g.drawMinors(q, 2); g.profit(q, 3, 'THE WINDFALL'); }) }),
   M(18, 'The Moon', 'THE PANIC', 'market', 'Chains cost 0.', { mods: { costOverride: (g, p, c) => (c.suit === 'chains' && c.type === 'pip' ? 0 : null) } }),
   M(19, 'The Sun', 'GOLDEN AGE', 'market', 'Cups cost 0 and give double.', { mods: { costOverride: (g, p, c) => (c.suit === 'cups' && c.type === 'pip' ? 0 : null), cupsMult: () => 2 } }),
-  M(20, 'Judgement', 'THE RECKONING', 'event', 'The Final Bell: the game ends at the end of this round. If more than half the R-cana remains, it is instead buried in the bottom half of the deck.', { resolve: (g) => { if (g.deck.length > 34) g.bury(g.byId('major_20')); else g.callBell('THE RECKONING'); } }),
+  M(20, 'Judgement', 'THE RECKONING', 'event', 'The Final Bell: the game ends at the end of this round. If more than half the R-cana remains, it is instead buried in the bottom half of the deck.', { resolve: (g) => { if (g.deck.length > g.buryThreshold()) g.bury(g.byId('major_20')); else g.callBell('THE RECKONING'); } }),
   M(21, 'The World', 'OUR LADY OF PERPETUAL PROFIT', 'event', 'The Trader who has played the most Cups banks their entire Portfolio.', { resolve: (g) => { const mx = Math.max(...g.players.map((q) => q.stats.cups)); g.players.filter((q) => q.stats.cups === mx).forEach((q) => g.bankFromPortfolio(q, q.portfolio, 'OUR LADY')); } }),
 ];
 
