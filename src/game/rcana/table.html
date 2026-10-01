@@ -25,6 +25,14 @@
   button:disabled { opacity: .45; cursor: default; }
   button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
+  .primer { background: var(--felt2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+  .primer summary { cursor: pointer; font-family: var(--font-display); letter-spacing: .06em; font-size: 12px; color: var(--gold); }
+  .primer ol { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 5px; max-width: 80ch; font-size: 12px; line-height: 1.4; }
+  .primer .note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+  .zone.hint { border-color: var(--good); border-style: solid; background: rgba(88,197,143,.08); }
+  .coach-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; width: 100%; border-top: 1px solid var(--line); padding-top: 8px; margin-top: 2px; }
+  .coach-row .who { font-family: var(--font-display); letter-spacing: .08em; font-size: 10px; color: var(--good); }
+  .coach-row .txt { color: var(--ink); font-size: 12px; flex: 1 1 200px; }
   .side { display: grid; grid-template-columns: 150px 1fr; gap: 10px; align-items: start; min-width: 0; }
   @media (max-width: 760px) { .side { grid-template-columns: 1fr; } }
   .querent { background: var(--felt2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 6px; }
@@ -109,9 +117,22 @@
     <select id="bot"><option value="strong">Strong bot</option><option value="naive">Naive bot</option><option value="random">Random bot</option></select>
     <label class="note">Seed <input type="number" id="seed" value="7" min="1" style="width:70px"></label>
     <button class="primary" id="start">Deal</button>
-    <label class="note" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="coach"> coach glow</label>
+    <label class="note" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="coach" checked> coach</label>
     <span class="note" id="status">Loading the engine&hellip;</span>
   </div>
+
+  <details class="primer" id="primer" open>
+    <summary>HOW TO PLAY IN SIX LINES</summary>
+    <ol>
+      <li><strong>Goal:</strong> be the first to put 80 Profit in your <strong>Bank</strong>. Banked Profit can never be touched. Profit in your <strong>Portfolio</strong> is exposed until you bank it at the start of your turn.</li>
+      <li><strong>Liquidity pays for cards.</strong> Once a turn, drag a card you don't need onto your Reserve: it becomes a permanent Liquidity point that refreshes every turn. Early on, do this every turn.</li>
+      <li><strong>Personalities earn.</strong> Drag a court onto your Floor to hire it (it rests the turn it arrives), then tap it each turn to <strong>Work</strong> for its Yield. A Working Personality is the only thing the bot's Chains can hit.</li>
+      <li><strong>The Four C's:</strong> Coins give Profit now (drop on your Floor). Candles make a Personality Work for a bonus (drop on it). Cups give the bot a little and you more, and draw a card (drop on the bot). Chains attack a Working Personality, Front-run the bot's Portfolio, or intercept a pass (drop on the target); or stay in hand to Hedge when you're attacked. Reversed Chains are Collateral: drop on your own Personality for armor and extra Yield.</li>
+      <li><strong>The Majors are fate.</strong> One is revealed each round for everyone. Markets stay, Events hit at once, Invokes sit in Providence; tap one to pay for it.</li>
+      <li><strong>Hail Mary Pass:</strong> once per game, throw your whole Portfolio into the air instead of banking. If nothing touches it by your next Set, it banks doubled. If anything does, it's gone.</li>
+    </ol>
+    <p class="note">The coach line under each decision says what the strong bot would do and why. Press "Do that" to follow it, or ignore it and see what happens.</p>
+  </details>
 
   <section class="side opp">
     <div class="querent" id="oppQ"><div class="who">BOT</div><div class="num"><span>Bank</span><b id="oppBank">0</b></div><div class="num port"><span>Portfolio</span><b id="oppPort">0</b></div><div id="oppPass"></div><div class="num"><span>Hand</span><b id="oppHand">0</b></div><div class="reserve" id="oppReserve"></div></div>
@@ -1902,6 +1923,7 @@ return { policy, playOne, batch };
   function endTurn() { const r = S.mainResolve; S.mainResolve = null; S.prompt = { kind: 'wait' }; render(); if (r) r(); }
 
   $('start').addEventListener('click', async () => {
+    try { localStorage.setItem('rcana-table-played', '1'); } catch (e) {}
     try {
     const seed = +$('seed').value || 1; const human = new HumanPolicy(ui); const kind = $('bot').value;
     const bot = isDuel() ? botPolicy2(kind, seed + 1) : botPolicy1(kind, seed + 1); bot.name = 'BOT';
@@ -1968,7 +1990,8 @@ return { policy, playOne, batch };
     // hand
     const hz = $('meHand'); hz.querySelectorAll('.card').forEach((x) => x.remove());
     me.hand.forEach((c, ix) => { const el = cardEl(c); el.dataset.hix = ix; const mine = acts.filter((a) => a.card === c); if (main) el.classList.add(mine.length ? 'playable' : 'dim'); if (S.prompt.kind === 'hedge' && S.prompt.opts.includes(c)) { el.classList.add('target'); el.addEventListener('click', () => resolveP(c)); } if (hint && hint.act && hint.act.card === c) el.classList.add('hint'); if (!S.seen.has(c)) { el.classList.add('dealt'); S.seen.add(c); } attachDrag(el, c); hz.appendChild(el); });
-    const fa = acts.find((a) => a.t === 'foretell'); const hintTxt = hint ? `<div class="coach">Coach: ${esc(hint.text)}</div>` : '';
+    const fa = acts.find((a) => a.t === 'foretell');
+    const hintTxt = hint ? `<div class="coach-row"><span class="who">COACH</span><span class="txt">${esc(hint.text)}</span><button id="coachDo">Do that</button>${S.prompt.kind === 'main' ? '<button id="coachFinish">Let the coach finish my turn</button>' : ''}</div>` : '';
     // prompt panel
     const pr = S.prompt; let html = '';
     if (pr.kind === 'wait') html = `<div class="prompt"><div class="ph">${g.over ? 'GAME OVER' : 'THE BOT IS PLAYING'}</div></div>`;
@@ -1983,34 +2006,54 @@ return { policy, playOne, batch };
     if (pr.kind === 'main' && fa) $('foretell').onclick = () => doAct(fa);
     if (pr.kind === 'hedge') $('takeIt').onclick = () => resolveP(null);
     if (pr.kind === 'foretell') { $('bury').onclick = () => resolveP(true); $('leave').onclick = () => resolveP(false); }
+    if (hint) { const d = $('coachDo'); if (d) d.onclick = () => hint.run(); const f = $('coachFinish'); if (f) f.onclick = coachFinish; const tz = hintTarget(hint.act); if (tz) tz.classList.add(tz.classList.contains('card') ? 'hint' : 'hint'); }
     $('status').textContent = g.over ? 'Game over.' : `Round ${g.round}${g.bellRound != null ? ' · Final Bell' : ''}`;
   }
   $('endTurn').addEventListener('click', endTurn);
   $('coach').addEventListener('change', render);
+  try { if (localStorage.getItem('rcana-table-played')) $('primer').open = false; } catch (e) {}
 
   async function doAct(a) { if (!S || S.busy || !a) return; S.busy = true; const g = S.g; const before = { port: S.me.portfolio, bank: S.me.bank }; try { await g.act(S.me, a); } catch (e) { console.error(e); toast('That move failed: ' + e.message); } finally { S.busy = false; } if (S.mainResolve && S.prompt.kind === 'wait') S.prompt = { kind: 'main' }; render(); const d = S.me.portfolio - before.port; if (d > 0) floatAt($('mePort'), `+${d}`); if (d < 0) floatAt($('mePort'), `${d}`, true); const b = S.me.bank - before.bank; if (b > 0) floatAt($('meBank'), `+${b} banked`); }
 
   // ───────── coach ─────────
+  const WHY = { hire: 'Personalities are your engine: they earn every turn from now on.', work: 'Idle Personalities earn nothing. Work them.', foretell: 'Free information about the next Major.', invoke: 'A Major in Providence is free value for whoever pays first.' };
   function actText(a) {
     const g = S.g, me = S.me; const c = a.card;
     switch (a.t) {
-      case 'reserve': return `Reserve ${c.name}: it's your weakest card and Liquidity pays for everything else.`;
-      case 'hire': return `Hire ${c.name} for ${a.cost}: it earns ${c.yield} a turn once it Works.`;
-      case 'work': return `Work ${a.inst.card.name} for +${g.yieldOf(me, a.inst)}. Idle Personalities earn nothing.`;
-      case 'foretell': return 'Foretell: free information about the next Major.';
-      case 'invoke': return `Invoke ${a.major.name}: free value for whoever pays first.`;
-      case 'pip': { const ch = a.choice || {}; if (ch.collateral) return `Collateral ${c.name} on ${ch.collateral.card.name}: armor and permanent extra Yield.`; if (c.suit === 'coins') return `Play ${c.name}: Profit now beats cards in hand.`; if (c.suit === 'candles') return `Candle ${ch.inst.card.name}: a big Work this turn.`; if (c.suit === 'cups') return `${c.reversed ? 'Take with' : 'Give with'} ${c.name}: you come out ahead and draw.`; const t = ch.target; return t && t.isPass ? `INTERCEPT the pass with ${c.name}: ${t.owner.inAir} is in the air.` : t && t.card ? `Attack ${t.card.name} with ${c.name}: it is Working and exposed.` : `Front-run the bot with ${c.name}.`; }
+      case 'reserve': return `Reserve ${c.name}. It's your least useful card, and Liquidity is what lets you play everything else.`;
+      case 'hire': return `Hire ${c.name} for ${a.cost}. ${WHY.hire}`;
+      case 'work': return a.ability ? `Put ${a.inst.card.name} to Work for its ability.` : `Work ${a.inst.card.name} for +${g.yieldOf(me, a.inst)}. ${WHY.work}`;
+      case 'foretell': return `Foretell. ${WHY.foretell}`;
+      case 'invoke': return `Invoke ${a.major.name} for ${a.cost}. ${WHY.invoke}`;
+      case 'pip': { const ch = a.choice || {}; const cost = a.cost ? `for ${a.cost}` : 'for free';
+        if (ch.collateral) return `Put ${c.name} on ${ch.collateral.card.name} as Collateral ${cost}: armor now and +${Math.ceil(c.rank / 2)} Yield every turn.`;
+        if (c.suit === 'coins') return c.reversed ? `Play ${c.name} ${cost}: banks ${Math.ceil(c.rank / 2)} where nothing can touch it.` : `Play ${c.name} ${cost}: +${c.rank + g.modSum(me, 'coinsBonus')} Profit now beats a card in hand.`;
+        if (c.suit === 'candles') return `Candle ${ch.inst.card.name} with ${c.name} ${cost}: a big Work this turn${c.reversed ? ' and it cannot be targeted' : ''}.`;
+        if (c.suit === 'cups') return c.reversed ? `Take from the bot with ${c.name} ${cost}: the swing is worth it.` : `Give with ${c.name} ${cost}: the bot gets a little, you get more and draw a card.`;
+        const t = ch.target; return t && t.isPass ? `INTERCEPT the bot's pass with ${c.name} ${cost}: ${t.owner.inAir} is in the air.` : t && t.card ? `Attack ${t.card.name} with ${c.name} ${cost}: it is Working, so it is exposed${t.drawdown + c.rank >= t.card.res ? ', and this liquidates it' : ''}.` : `Front-run the bot with ${c.name} ${cost}: take from its exposed Portfolio.`; }
       default: return a.t;
     }
   }
   function advice() {
     const g = S.g, me = S.me, c = S.coach, pr = S.prompt;
-    if (pr.kind === 'set') { if (g.canPass(me) && c.hailMaryPass(g, me)) return { text: 'Throw the pass. The bot looks unlikely to have a Chain ready.' }; const n = Math.min(me.portfolio, Math.max(0, c.bankAmount(g, me))); return { text: n < me.portfolio ? `Bank ${n}, keep ${me.portfolio - n} for Interest.` : `Bank all ${me.portfolio}.` }; }
-    if (pr.kind === 'hedge') { const ch = c.wantHedge(g, me, pr.opts, pr.threat); return ch ? { text: `Hedge with ${ch.name}.`, act: { card: ch } } : { text: 'Take it; the hit is small.' }; }
-    if (pr.kind === 'foretell') return { text: c.bottomCard(g, me, pr.card) ? 'Bury it.' : 'Leave it.' };
-    if (me.reservedThisTurn < 1 && (me.hand.length >= 3 || g.liquidity(me) < 2)) { const rc = c.reserveChoice(g, me); if (rc) return { text: actText({ t: 'reserve', card: rc }), act: { card: rc } }; }
+    if (pr.kind === 'set') {
+      if (g.canPass(me) && c.hailMaryPass(g, me)) return { text: `Throw the Hail Mary Pass. The bot looks unlikely to have a Chain ready, and ${me.portfolio} doubled is worth the risk.`, run: () => resolveP({ pass: true }) };
+      const n = Math.min(me.portfolio, Math.max(0, c.bankAmount(g, me)));
+      return { text: n < me.portfolio ? `Bank ${n} and keep ${me.portfolio - n} exposed for Interest; the Market is safe right now.` : `Bank all ${me.portfolio}. Nothing exposed means nothing to lose on the bot's turn.`, run: () => resolveP({ bank: n }) };
+    }
+    if (pr.kind === 'hedge') { const ch = c.wantHedge(g, me, pr.opts, pr.threat); return ch ? { text: `Hedge with ${ch.name}. What you'd lose is worth more than the card.`, act: { card: ch }, run: () => resolveP(ch) } : { text: 'Take it. The hit is small and the Chain in your hand is worth more later.', run: () => resolveP(null) }; }
+    if (pr.kind === 'foretell') { const b = c.bottomCard(g, me, pr.card); return { text: b ? `Bury it. ${pr.card.name} would hurt you.` : `Leave it. ${pr.card.name} is fine for you, or hurts the bot more.`, run: () => resolveP(b) }; }
+    if (pr.kind !== 'main') return null;
+    if (me.reservedThisTurn < 1 && (me.hand.length >= 3 || g.liquidity(me) < 2)) { const rc = c.reserveChoice(g, me); if (rc) { const a = { t: 'reserve', card: rc }; return { text: actText(a), act: a, run: () => doAct(a) }; } }
     let best = null, bs = 0.25; for (const a of acts.filter((a) => a.t !== 'reserve')) { const sc = c.score(g, me, a); if (sc > bs) { bs = sc; best = a; } }
-    return best ? { text: actText(best), act: best } : { text: 'Nothing left worth doing. End your turn.' };
+    return best ? { text: actText(best), act: best, run: () => doAct(best) } : { text: 'Nothing left worth doing. End your turn.', run: () => endTurn() };
+  }
+  async function coachFinish() { if (!S || S.prompt.kind !== 'main') return; for (let k = 0; k < 20 && S.mainResolve; k++) { if (S.prompt.kind !== 'main') break; const adv = advice(); if (!adv) break; await adv.run(); } }
+  function hintTarget(a) { // the zone or card the coach's move would land on
+    if (!a) return null; const ch = a.choice || {};
+    if (a.t === 'reserve') return $('meReserveZone'); if (a.t === 'hire' || (a.t === 'pip' && a.card.suit === 'coins')) return $('meFloor');
+    if (a.t === 'pip') { if (ch.collateral) return document.querySelector(`#meFloor .card[data-uid="${ch.collateral.uid}"]`); if (ch.inst) return document.querySelector(`#meFloor .card[data-uid="${ch.inst.uid}"]`); if (ch.opp) return $('oppQ'); const t = ch.target; return t && t.isPass ? $('oppPassBadge') : t && t.card ? document.querySelector(`#oppFloor .card[data-uid="${t.uid}"]`) : $('oppQ'); }
+    return null;
   }
 
   // ───────── drag and drop ─────────
