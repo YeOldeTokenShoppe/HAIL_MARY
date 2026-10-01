@@ -50,9 +50,10 @@ export class StrongPolicy {
   }
   wantHedge(g, p, opts, threat) {
     const t = threat.target; let harm;
-    if (t.card) { const kills = t.drawdown + threat.amount >= t.card.res; harm = kills ? 2 + g.yieldOf(p, t) * this.horizon(g) + (t.card.kw.exitScam || 0) : threat.amount * 0.4; }
+    if (t.isPass) harm = p.inAir * 1.2;
+    else if (t.card) { const kills = t.drawdown + threat.amount >= t.card.res; harm = kills ? 2 + g.yieldOf(p, t) * this.horizon(g) + (t.card.kw.exitScam || 0) : threat.amount * 0.4; }
     else harm = Math.min(threat.amount, p.portfolio);
-    const best = opts.filter((c) => c.rank <= threat.amount + 1).sort((a, b) => a.rank - b.rank).find((c) => c.rank >= Math.min(threat.amount, t.card ? threat.amount - (t.card.res - t.drawdown - 1) : threat.amount)) || opts.sort((a, b) => b.rank - a.rank)[0];
+    const best = opts.filter((c) => c.rank <= threat.amount + 1).sort((a, b) => a.rank - b.rank).find((c) => c.rank >= Math.min(threat.amount, t.card ? threat.amount - (t.card.res - t.drawdown - 1) : threat.amount)) || [...opts].sort((a, b) => b.rank - a.rank)[0];
     if (!best) return null;
     const value = harm - g.costOf(p, best) * 0.5 - best.rank * 0.3;
     return value >= 1.5 ? best : null;
@@ -70,9 +71,10 @@ export class StrongPolicy {
     if (c.suit === 'coins') return r + g.modSum(p, 'coinsBonus');
     if (c.suit === 'candles') return (r * g.modProduct(p, 'candlesMult') + g.modSum(p, 'candlesBonus')) + g.yieldOf(p, a.choice.inst) - 0; // includes the Work it triggers
     if (c.suit === 'cups') { const m = g.modProduct(p, 'cupsMult'); const o = a.choice.opp; const lead = o ? g.opps(p).reduce((mx, q) => Math.max(mx, q.bank), 0) - o.bank : 0; return r * m + g.modSum(p, 'cupsBonus') - Math.ceil(r / 2) * m * 0.7 + lead * 0.02; }
-    const t = a.choice.target; const amt = r * g.modProduct(p, 'chainsMult');
+    const t = a.choice.target; const amt = r * g.modProduct(p, 'chainsMult') + g.modSum(p, 'chainsBonus');
+    if (t.isPass) return t.owner.inAir * 0.9 + Math.min(amt, t.owner.inAir);
     if (t.card) { const kills = t.drawdown + amt >= t.card.res; return kills ? 2 + g.yieldOf(t.owner, t) * this.horizon(g) * 0.8 + (t.card.kw.exitScam || 0) : amt * 0.35; }
-    return Math.min(amt, t.portfolio) * 1.3 + (t.pass ? Math.max(0, t.portfolio - amt) * 0.9 : 0);
+    return Math.min(amt, t.portfolio) * 1.3;
   }
   score(g, p, a) {
     const h = this.horizon(g);

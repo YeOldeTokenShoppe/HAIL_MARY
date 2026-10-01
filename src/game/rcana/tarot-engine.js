@@ -10,7 +10,7 @@ export class TarotGame {
     this.hiddenInfo = hiddenInfo;
     this.rules = { ...DEFAULTS, ...rules }; this.rng = makeRng(seed); this.seed = seed; this.snapshotsOn = snapshots;
     this.players = players.map((cfg, idx) => ({ idx, name: cfg.name, policy: cfg.policy, deckList: cfg.deckList || null, deckPreset: cfg.deckPreset || null, hand: [], reserve: [], floor: [], portfolio: 0, bank: 0,
-      hailMaryUsed: false, pass: null, reservedThisTurn: 0, foretold: false, turnBonusLiquidity: 0,
+      hailMaryUsed: false, pass: null, inAir: 0, bankedThisTurn: 0, reservedThisTurn: 0, foretold: false, turnBonusLiquidity: 0,
       stats: { worked: 0, pips: 0, coins: 0, candles: 0, chains: 0, cups: 0, hedges: 0, hires: 0, invokes: 0, liquidated: 0, frontrun: 0, unbankedSum: 0, sets: 0, foretells: 0, passes: 0, completions: 0, interceptions: 0, passBanked: 0 } }));
     this.deck = []; this.discard = []; this.market = null; this.providence = []; this.events = []; this.snapshots = []; this.cardPlays = {};
     this.round = 0; this.turnIdx = 0; this.turnCounter = 1; this.active = null; this.over = false; this.winner = null; this.reason = ''; this.bellRound = null; this.current = null; this.majorsSeen = 0; this.closing = false;
@@ -32,7 +32,7 @@ export class TarotGame {
   makeSnapshot(label) {
     return { label, round: this.round, active: this.active ? this.active.name : null, bell: this.bellRound, market: this.market ? this.market.name : null,
       providence: this.providence.map((m) => m.name), deckLeft: this.deck.length, over: this.over, winner: this.winner ? this.winner.name : null, reason: this.reason, events: this.events,
-      players: this.players.map((p) => ({ name: p.name, bank: p.bank, portfolio: p.portfolio, pass: p.pass ? p.pass.thrown : null, passUsed: p.hailMaryUsed, hand: p.hand.map((c) => c.name), reserve: p.reserve.length, locked: p.reserve.filter((r) => r.locked).length, archetype: this.archetype(p),
+      players: this.players.map((p) => ({ name: p.name, bank: p.bank, portfolio: p.portfolio, pass: p.pass ? p.inAir : null, passUsed: p.hailMaryUsed, hand: p.hand.map((c) => c.name), reserve: p.reserve.length, locked: p.reserve.filter((r) => r.locked).length, archetype: this.archetype(p),
         floor: p.floor.map((i) => ({ name: i.card.name, title: i.card.title, suit: i.card.suit, working: i.working, drawdown: i.drawdown, res: i.card.res, yield: this.yieldOf(p, i), villain: i.card.villain, shielded: !!i.shielded, canWork: this.canWork(p, i) })) })) };
   }
   // ── queries ──
@@ -62,8 +62,17 @@ export class TarotGame {
   isHedged(p, inst) { return !!inst.card.kw.hedged; }
   // ── economy ──
   profit(p, n, why) { if (n <= 0 || this.over) return 0; p.portfolio += n; this.log(`${p.name} +${n} Profit (${why}) → Portfolio ${p.portfolio}`); return n; }
-  bank(p, n, why) { if (n <= 0 || this.over) return; p.bank += n; this.log(`${p.name} banks ${n} directly (${why}) → Bank ${p.bank}`); this.checkWin(p); }
-  bankFromPortfolio(p, n, why) { n = Math.min(n, p.portfolio); if (n <= 0 || this.over) return; p.portfolio -= n; p.bank += n; this.log(`${p.name} banks ${n} (${why}) → Bank ${p.bank}, Portfolio ${p.portfolio}`); this.checkWin(p); }
+  bankRoom(p) { const cap = this.modFirst(p, 'bankCap'); return cap == null ? Infinity : Math.max(0, cap - p.bankedThisTurn); }
+  bank(p, n, why) {
+    if (n <= 0 || this.over) return; const room = this.bankRoom(p); const b = Math.min(n, room); const rest = n - b;
+    if (b > 0) { p.bank += b; p.bankedThisTurn += b; this.log(`${p.name} banks ${b} directly (${why}) → Bank ${p.bank}`); }
+    if (rest > 0) { p.portfolio += rest; this.log(`THE BAG HOLDER: ${rest} of it lands in ${p.name}'s Portfolio instead`); }
+    if (b > 0) this.checkWin(p);
+  }
+  bankFromPortfolio(p, n, why) {
+    n = Math.min(n, p.portfolio, this.bankRoom(p)); if (n <= 0 || this.over) return;
+    p.portfolio -= n; p.bank += n; p.bankedThisTurn += n; this.log(`${p.name} banks ${n} (${why}) → Bank ${p.bank}, Portfolio ${p.portfolio}`); this.checkWin(p);
+  }
   checkWin(p) {
     if (this.over || p.bank < this.rules.winBank) return;
     if (this.rules.finishRound) { if (!this.closing) { this.closing = true; this.log(`${p.name} reaches ${p.bank}: the round is played out, then the largest Bank wins`); } return; }
@@ -74,7 +83,7 @@ export class TarotGame {
     if (cur && cur.victim === p && cur.reduce) { const r = Math.min(n, cur.reduce); n -= r; cur.reduce -= r; if (r) this.log(`${p.name}'s Hedge absorbs ${r}`); }
     if (hostile && this.modAny(p, 'portfolioSafe') && cur && cur.kind === 'chain') { this.log(`${p.name}'s Portfolio is protected by CONVICTION`); return 0; }
     const a = Math.min(n, p.portfolio); if (a <= 0) return 0; p.portfolio -= a; this.log(`${p.name} loses ${a} Profit (${why}) → Portfolio ${p.portfolio}`);
-    if (p.pass) { const rest = p.portfolio; p.pass = null; const by = cur && cur.attacker ? cur.attacker : null; if (by) { by.stats.interceptions++; this.log(`✝ INTERCEPTED by ${by.name}: ${p.name}'s Hail Mary Pass falls. The remaining ${rest} is lost.`); } else this.log(`✝ INCOMPLETE: ${p.name}'s Hail Mary Pass falls (${why}). The remaining ${rest} is lost.`); p.portfolio = 0; }
+    if (p.pass && cur && cur.kind === 'major') this.knockDown(p, why, null);
     return a;
   }
   frontrun(att, victim, n) { const got = this.loseProfit(victim, n, `Front-run by ${att.name}`); if (got) { att.portfolio += got; att.stats.frontrun += got; this.log(`${att.name} front-runs ${got} → Portfolio ${att.portfolio}`); } return got; }
@@ -138,10 +147,10 @@ export class TarotGame {
     else if (c.suit === 'candles') { const inst = choice.inst; this.work(p, inst, { bonus: r * this.modProduct(p, 'candlesMult') + this.modSum(p, 'candlesBonus') }); }
     else if (c.suit === 'cups') { const o = choice.opp; const give = Math.ceil(r / 2); const mult = this.modProduct(p, 'cupsMult'); this.profit(o, give * mult, `${c.name} from ${p.name}`); this.profit(p, r * mult + this.modSum(p, 'cupsBonus'), c.name); if (this.rules.cupsDraw) this.drawMinors(p, 1); for (const i of [...p.floor]) if (i.card.onCup && p.floor.includes(i)) i.card.onCup(this, p, i); }
     else if (c.suit === 'chains') {
-      const amount = r * this.modProduct(p, 'chainsMult'); const t = choice.target; const victim = t.card ? t.owner : t;
+      const amount = r * this.modProduct(p, 'chainsMult') + this.modSum(p, 'chainsBonus'); const t = choice.target; const victim = t.card || t.isPass ? t.owner : t;
       this.current = { kind: 'chain', card: c, attacker: p, victim, reduce: 0, amount };
       await this.offerHedge(victim, { card: c, attacker: p, target: t, amount });
-      if (t.card) { if (victim.floor.includes(t)) this.drawdown(t, amount, c.name); } else this.frontrun(p, victim, amount);
+      if (t.isPass) this.intercept(p, victim, amount); else if (t.card) { if (victim.floor.includes(t)) this.drawdown(t, amount, c.name); } else this.frontrun(p, victim, amount);
       this.current = null;
     }
     this.discard.push(c); return true;
@@ -152,7 +161,7 @@ export class TarotGame {
     this.pay(victim, this.costOf(victim, ch)); victim.hand.splice(victim.hand.indexOf(ch), 1); this.discard.push(ch); victim.stats.hedges++; this.count(ch);
     this.current.reduce += ch.rank; this.log(`${victim.name} HEDGES with ${ch.name} (reduces by ${ch.rank})`);
   }
-  invoke(p, m) { if (!this.pay(p, m.cost)) return; p.stats.invokes++; this.log(`${p.name} INVOKES ${m.name} (locks ${m.cost})`); if (m.id === 'major_0') p.hailMaryUsed = true; m.run(this, p); this.providence.splice(this.providence.indexOf(m), 1); this.discard.push(m); }
+  invoke(p, m) { if (!this.pay(p, m.cost)) return; p.stats.invokes++; this.log(`${p.name} INVOKES ${m.name} (locks ${m.cost})`); m.run(this, p); this.providence.splice(this.providence.indexOf(m), 1); this.discard.push(m); }
   // ── legal actions ──
   actions(p) {
     const A = []; const liq = this.liquidity(p);
@@ -163,11 +172,11 @@ export class TarotGame {
       if (c.suit === 'coins') A.push({ t: 'pip', card: c, cost, choice: {} });
       else if (c.suit === 'candles') for (const i of this.idleEligible(p)) A.push({ t: 'pip', card: c, cost, choice: { inst: i } });
       else if (c.suit === 'cups') for (const o of this.opps(p)) A.push({ t: 'pip', card: c, cost, choice: { opp: o } });
-      else { for (const o of this.opps(p)) { for (const i of this.working(o)) A.push({ t: 'pip', card: c, cost, choice: { target: i } }); if (o.portfolio > 0 && !this.modAny(o, 'portfolioSafe')) A.push({ t: 'pip', card: c, cost, choice: { target: o } }); } }
+      else { for (const o of this.opps(p)) { for (const i of this.working(o)) A.push({ t: 'pip', card: c, cost, choice: { target: i } }); if (o.portfolio > 0 && !this.modAny(o, 'portfolioSafe')) A.push({ t: 'pip', card: c, cost, choice: { target: o } }); if (o.pass && o.inAir > 0) A.push({ t: 'pip', card: c, cost, choice: { target: this.passTarget(o) } }); } }
     }
     for (const i of this.idleEligible(p)) { A.push({ t: 'work', inst: i, cost: 0 }); if (i.card.work) A.push({ t: 'work', inst: i, ability: true, cost: 0 }); }
     if (!p.foretold && p.floor.some((i) => i.card.foretell) && this.deck.length) A.push({ t: 'foretell', cost: 0 });
-    for (const m of this.providence) if (m.cost <= liq && m.can(this, p) && !(m.id === 'major_0' && p.hailMaryUsed)) A.push({ t: 'invoke', major: m, cost: m.cost });
+    for (const m of this.providence) if (m.cost <= liq && m.can(this, p)) A.push({ t: 'invoke', major: m, cost: m.cost });
     return A;
   }
   async act(p, a) {
@@ -187,24 +196,14 @@ export class TarotGame {
     if (this.round > this.rules.maxRounds) { this.over = true; this.reason = 'round limit'; this.endByBell(); return; }
     const order = this.turnOrder();
     for (let k = 0; k < order.length; k++) { if (this.over) break; this.turnIdx = order[k]; await this.playTurn(order[k], k === 0, k === order.length - 1); }
-    if (!this.over && this.closing) { const s = [...this.players].sort((a, b) => b.bank - a.bank || b.portfolio - a.portfolio); this.over = true; this.winner = s[0]; this.reason = `${s[0].name} banked ${s[0].bank}`; this.log(`*** ${s[0].name} WINS with ${s[0].bank} banked (round played out) ***`); this.snapshot('end'); }
+    if (!this.over && this.closing) { this.landPasses(); const s = [...this.players].sort((a, b) => b.bank - a.bank || b.portfolio - a.portfolio); this.over = true; this.winner = s[0]; this.reason = `${s[0].name} banked ${s[0].bank}`; this.log(`*** ${s[0].name} WINS with ${s[0].bank} banked (round played out) ***`); this.snapshot('end'); }
   }
   async playTurn(idx, firstOfRound, lastOfRound) {
     const p = this.players[idx]; this.active = p;
     this.log(`── Turn ${this.turnCounter}: ${p.name}${firstOfRound ? ' (leads the round)' : ''} ──`);
     if (firstOfRound) await this.startOfRound(p);
     this.phase = 'set';
-    for (const i of p.floor) i.working = false; p.reserve.forEach((r) => { r.locked = false; }); p.reservedThisTurn = 0; p.foretold = false; p.turnBonusLiquidity = 0;
-    // Set
-    if (p.pass) { const thrown = Math.min(p.pass.thrown, p.portfolio); const n = Math.floor(thrown * this.rules.passMult); p.pass = null; p.stats.completions++; p.stats.passBanked += n; this.log(`✝ COMPLETE: ${p.name}'s Hail Mary Pass comes down. ${thrown} in the air banks as ${n}.`); p.portfolio -= thrown; this.bank(p, n, 'Hail Mary Pass'); }
-    const div = (this.modFirst(p, 'dividend') ?? 1) + this.modSum(p, 'dividendDelta'); this.profit(p, div, 'Dividend');
-    const idiv = this.modMin(p, 'interestDiv', this.rules.interestDiv); const im = this.modProduct(p, 'interestMult'); const interest = Math.floor(p.portfolio / idiv) * im; if (interest) this.profit(p, interest, 'Interest');
-    p.stats.unbankedSum += p.portfolio; p.stats.sets++;
-    if (this.canPass(p) && await p.policy.hailMaryPass(this, p)) { this.throwPass(p); }
-    else {
-      let amt = Math.min(p.portfolio, Math.max(0, await p.policy.bankAmount(this, p))); const cap = this.modFirst(p, 'bankCap'); if (cap != null) amt = Math.min(amt, cap);
-      if (amt) this.bankFromPortfolio(p, amt, 'Set'); else if (p.portfolio) this.log(`${p.name} keeps ${p.portfolio} in Portfolio`);
-    }
+    if (!this.rules.sharedSet) await this.doSet(p);
     if (this.over) { this.snapshot('turn'); return; }
     // Draw
     this.drawMinors(p, this.turnCounter === 1 ? Math.min(this.rules.firstTurnDraw, this.rules.minorsPerTurn) : this.rules.minorsPerTurn);
@@ -218,10 +217,38 @@ export class TarotGame {
     if (!this.over && lastOfRound && this.bellRound != null && this.round >= this.bellRound) this.endByBell();
   }
   canPass(p) { return !p.hailMaryUsed && !p.pass && p.portfolio >= this.rules.passMin && (!this.rules.passUnderdogOnly || this.isUnderdog(p)) && !this.closing; }
-  throwPass(p, { extra = false } = {}) { if (!extra) p.hailMaryUsed = true; p.pass = { thrown: p.portfolio, round: this.round }; p.stats.passes++; this.log(`✝ ${p.name} throws a HAIL MARY PASS: ${p.portfolio} in the air until their next Set. Intercept it, or watch it double.`); }
+  throwPass(p, { extra = false } = {}) {
+    if (!extra) p.hailMaryUsed = true; p.inAir = p.portfolio; p.portfolio = 0; p.pass = { round: this.round }; p.stats.passes++;
+    this.log(`✝ ${p.name} throws a HAIL MARY PASS: ${p.inAir} in the air until their next Set. Intercept it, or watch it double.`);
+  }
+  passTarget(o) { return { isPass: true, owner: o, name: `${o.name}'s Hail Mary Pass` }; }
+  // An opponent's Chain aimed at the pass itself. Hedges reduce it; whatever gets through brings the pass down.
+  intercept(att, victim, amount) {
+    const cur = this.current; let n = amount;
+    if (cur && cur.victim === victim && cur.reduce) { const r = Math.min(n, cur.reduce); n -= r; cur.reduce -= r; if (r) this.log(`${victim.name}'s Hedge absorbs ${r}`); }
+    if (n <= 0 || !victim.pass) { this.log(`${att.name}'s interception is turned away`); return 0; }
+    const stake = victim.inAir; const take = Math.min(n, stake); victim.inAir = 0; victim.pass = null; att.portfolio += take; att.stats.interceptions++; att.stats.frontrun += take;
+    this.log(`✝ INTERCEPTED by ${att.name}: ${victim.name}'s Hail Mary Pass falls. ${att.name} takes ${take}; the rest of the ${stake} is lost.`);
+    return take;
+  }
+  knockDown(p, why, by) { if (!p.pass) return; const stake = p.inAir; p.inAir = 0; p.pass = null; this.log(`✝ INCOMPLETE: ${p.name}'s Hail Mary Pass falls (${why}). The ${stake} in the air is lost.`); }
+  landPasses() { for (const q of this.players) if (q.pass) { this.log(`✝ The Final Bell catches ${q.name}'s Hail Mary Pass in the air: ${q.inAir} returns to their Portfolio, undoubled.`); q.portfolio += q.inAir; q.inAir = 0; q.pass = null; } }
+  async doSet(p) {
+    for (const i of p.floor) i.working = false; p.reserve.forEach((r) => { r.locked = false; }); p.reservedThisTurn = 0; p.foretold = false; p.turnBonusLiquidity = 0; p.bankedThisTurn = 0;
+    // Set
+    if (p.pass) { const stake = p.inAir; const n = Math.floor(stake * this.rules.passMult); p.inAir = 0; p.pass = null; p.stats.completions++; p.stats.passBanked += n; this.log(`✝ COMPLETE: ${p.name}'s Hail Mary Pass comes down. ${stake} in the air banks as ${n}.`); this.bank(p, n, 'Hail Mary Pass'); }
+    const div = (this.modFirst(p, 'dividend') ?? 1) + this.modSum(p, 'dividendDelta'); this.profit(p, div, 'Dividend');
+    const idiv = this.modMin(p, 'interestDiv', this.rules.interestDiv); const im = this.modProduct(p, 'interestMult'); const interest = Math.floor(p.portfolio / idiv) * im; if (interest) this.profit(p, interest, 'Interest');
+    p.stats.unbankedSum += p.portfolio; p.stats.sets++;
+    if (this.canPass(p) && await p.policy.hailMaryPass(this, p)) { this.throwPass(p); }
+    else {
+      let amt = Math.min(p.portfolio, Math.max(0, await p.policy.bankAmount(this, p)));
+      if (amt) this.bankFromPortfolio(p, amt, 'Set'); else if (p.portfolio) this.log(`${p.name} keeps ${p.portfolio} in Portfolio`);
+    }
+  }
   startOfRound() {}
   endByBell() {
-    if (this.winner) return; this.over = true;
+    if (this.winner) return; this.landPasses(); this.over = true;
     const s = [...this.players].sort((a, b) => b.bank - a.bank || b.portfolio - a.portfolio);
     if (s[0].bank === s[1].bank && s[0].portfolio === s[1].portfolio) { this.winner = null; this.reason = 'Final Bell: draw'; } else { this.winner = s[0]; this.reason = `Final Bell: ${s[0].name} leads ${s[0].bank} to ${s[1].bank}`; }
     this.log(`*** ${this.reason} ***`); this.snapshot('end');

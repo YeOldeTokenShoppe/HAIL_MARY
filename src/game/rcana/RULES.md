@@ -1,8 +1,8 @@
 # RL80 R-cana — Rules Drafts
 
 The design went through several drafts in conversation before the simulator existed. They are kept here
-in order so the reasoning behind the current rules is not lost. The current game is the **tarot
-configuration** at the end of this document; everything before it is history.
+in order so the reasoning behind the current rules is not lost. The complete, standalone rulebooks for the current games are `RULES-v1.md` (the shared reading) and
+`RULES-v2.md` (the duel). This document is the design history; where it disagrees with those two, they win.
 
 | Draft | What it was | Status |
 |---|---|---|

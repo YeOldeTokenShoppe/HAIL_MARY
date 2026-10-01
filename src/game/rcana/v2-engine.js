@@ -2,11 +2,11 @@
 import { TarotGame } from './tarot-engine.js';
 import { MAJORS, byId } from './tarot.js';
 
-export const DUEL_DEFAULTS = { firstHandPenalty: 0, firstTurnDraw: 1, revChainsDraw: true, cupsDraw: true, rotateLead: true, finishRound: true };
+export const DUEL_DEFAULTS = { firstHandPenalty: -1, firstTurnDraw: 1, revChainsDraw: true, cupsDraw: true, rotateLead: false, finishRound: true, revealBeforeLast: false, sharedSet: false };
 export class DuelGame extends TarotGame {
   constructor(opts) { super({ ...opts, rules: { ...DUEL_DEFAULTS, ...(opts.rules || {}) } }); }
   setup() {
-    for (const p of this.players) { p.deck = this.shuffle([...p.deckList]); const n = this.rules.openingHand - (p.idx === 0 ? (this.rules.firstHandPenalty || 0) : 0); for (let i = 0; i < n; i++) if (p.deck.length) p.hand.push(p.deck.shift()); }
+    for (const p of this.players) { p.deck = this.shuffle([...p.deckList]); const sh = this.rules.seatHand; const n = sh && sh[p.idx] != null ? sh[p.idx] : this.rules.openingHand - (p.idx === 0 ? (this.rules.firstHandPenalty || 0) : 0); for (let i = 0; i < n; i++) if (p.deck.length) p.hand.push(p.deck.shift()); }
     this.majors = this.shuffle([...MAJORS]); this.deck = this.majors; // Final Bell when the Majors run out
     this.omen = this.majors.shift();
     this.log(`Each Trader shuffles their own 56. The 22 Majors are shuffled; the first lies face-down as the Omen.`);
@@ -26,7 +26,7 @@ export class DuelGame extends TarotGame {
   costOf(p, c) { let base = super.costOf(p, c); if (c.reversed && c.suit === 'cups' && c.type === 'pip') base += (this.rules.revCupsCost || 0); if (c.suit === 'chains' && c.type === 'pip' && !c.reversed) for (const o of this.opps(p)) base += this.modSum(o, 'oppChainsCost'); return base; }
   // reversed pips
   async playPip(p, c, choice) {
-    if (!c.reversed) return super.playPip(p, c, choice);
+    if (!c.reversed || (c.suit === 'chains' && choice && choice.target && choice.target.isPass)) return super.playPip(p, c, choice);
     const cost = this.costOf(p, c); if (!this.pay(p, cost)) return false;
     p.hand.splice(p.hand.indexOf(c), 1); this.count(c); p.stats.pips++; p.stats[c.suit + 'Rev'] = (p.stats[c.suit + 'Rev'] || 0) + 1;
     const h = c.suit === 'cups' ? Math.ceil(c.rank / (this.rules.revCupsTakeDiv || 2)) : Math.ceil(c.rank / 2);
@@ -48,12 +48,20 @@ export class DuelGame extends TarotGame {
   }
   drawdown(inst, n, why) { if (inst.shielded && this.current && this.current.attacker && this.current.attacker !== inst.owner) { this.log(`${inst.card.name} is shielded`); return; } super.drawdown(inst, n, why); }
   actions(p) {
-    const A = super.actions(p).filter((a) => !(a.t === 'pip' && a.card.suit === 'chains' && a.card.reversed) && !(a.t === 'pip' && a.card.suit === 'chains' && a.choice.target && a.choice.target.shielded));
+    const A = super.actions(p).filter((a) => !(a.t === 'pip' && a.card.suit === 'chains' && a.card.reversed && !(this.rules.revChainsIntercept && a.choice.target && a.choice.target.isPass)) && !(a.t === 'pip' && a.card.suit === 'chains' && a.choice.target && a.choice.target.card && a.choice.target.shielded));
     // reversed Cups target an opponent (take); super enumerated them as 'opp' choices already via suit 'cups'
     if (!p.foretold && p.floor.some((i) => i.card.foretell) && this.omen) { if (!A.some((a) => a.t === 'foretell')) A.push({ t: 'foretell', cost: 0 }); }
     return A.filter((a) => !(a.t === 'foretell' && !this.omen));
   }
-  startOfRound() { if (this.round >= 1 && !this.over) this.revealOmen(); for (const q of this.players) for (const i of q.floor) if (i.owner === this.active) i.shielded = false; }
-  async playTurn(idx, firstOfRound, lastOfRound) { const p = this.players[idx]; for (const i of p.floor) i.shielded = false; await super.playTurn(idx, firstOfRound, lastOfRound); }
+  startOfRound() {
+    if (this.rules.sharedSet && this.round >= 1 && !this.over) { for (const q of this.turnOrder().map((i) => this.players[i])) { if (this.over) break; this.active = q; this.sharedSetFor(q); } this.active = this.players[this.turnOrder()[0]]; }
+    if (!this.rules.revealBeforeLast && this.round >= 1 && !this.over) this.revealOmen();
+  }
+  sharedSetFor(p) { this.log(`${p.name} sets (shared Set)`); return this.doSet(p); }
+  async playTurn(idx, firstOfRound, lastOfRound) {
+    const p = this.players[idx]; for (const i of p.floor) i.shielded = false;
+    if (this.rules.revealBeforeLast && lastOfRound && this.round >= 1 && !this.over) { this.active = p; this.revealOmen(); }
+    await super.playTurn(idx, firstOfRound, lastOfRound);
+  }
   result() { const r = super.result(); r.players.forEach((q, i) => { q.deckPreset = this.players[i].deckPreset; }); return r; }
 }
