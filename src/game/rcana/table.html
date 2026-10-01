@@ -151,7 +151,7 @@
 </script>
 <script type="module">
 const __m = {};
-__m['./cards.js'] = (() => {
+__m['./cards.js'] = await (async () => {
 // RL80 R-cana — the 160-card base set, executable.
 // Rules draft v4 + Villains. Every card is data plus small effect functions that
 // call the engine's helpers (see engine.js). Keep card text and code in sync.
@@ -511,7 +511,7 @@ function card(nameOrId) {
 return { TEMPERAMENTS, RARITY, PAIRS, pairById, MARKETS, EXTERNALITIES, MAJORS, DECK_CARDS, ALL_CARDS, byId, byName, card };
 })();
 
-__m['./engine.js'] = (() => {
+__m['./engine.js'] = await (async () => {
 // RL80 R-cana rules engine (draft v4 + Villains). Deterministic given a seed.
 // Works in Node and the browser. Policies (bots) live in bots.js and drive the
 // main phase through game.actions(p) / game.act(p, action).
@@ -1091,7 +1091,7 @@ class Game {
 return { WIN_BANK, MAX_ROUNDS, makeRng, Game };
 })();
 
-__m['./tarot.js'] = (() => {
+__m['./tarot.js'] = await (async () => {
 // RL80 R-cana, tarot configuration: 80 cards.
 //   22 Major R-cana, shuffled into the deck, resolve for the table when drawn.
 //   56 Minor R-cana: four suits (Coins, Candles, Chains, Cups) × (Ace–10 pips + Page, Knight, Queen, King).
@@ -1173,7 +1173,7 @@ const byId = Object.fromEntries(ALL.map((c) => [c.id, c]));
 return { SUITS, SUIT_NAME, RANKS, PIP_TEXT, pipCost, COURTS, MAJORS, MINORS, ALL, byId };
 })();
 
-__m['./tarot-engine.js'] = (() => {
+__m['./tarot-engine.js'] = await (async () => {
 // Shared-deck engine for the tarot configuration of R-cana.
 const { MINORS, MAJORS, byId } = __m['./tarot.js'];
 const { makeRng } = __m['./engine.js'];
@@ -1442,7 +1442,7 @@ class TarotGame {
 return { DEFAULTS, TarotGame };
 })();
 
-__m['./tarot-bots.js'] = (() => {
+__m['./tarot-bots.js'] = await (async () => {
 // Policies for the tarot configuration: a heuristic "strong" player and a uniformly random one.
 const sum = (a) => a.reduce((x, y) => x + y, 0);
 
@@ -1579,7 +1579,7 @@ class HumanPolicy {
 return { RandomPolicy, StrongPolicy, NaivePolicy, HumanPolicy };
 })();
 
-__m['./tarot-sim.js'] = (() => {
+__m['./tarot-sim.js'] = await (async () => {
 
 // Tarot-configuration batch simulator.
 //   node tarot-sim.js --games 2000 --a strong --b random
@@ -1636,7 +1636,7 @@ if (typeof process !== 'undefined' && process.argv && process.argv[1] && process
 return { policy, playOne, batch };
 })();
 
-__m['./v2.js'] = (() => {
+__m['./v2.js'] = await (async () => {
 // R-cana version 2: reversals. Every Minor has an upright and a reversed face.
 // A deck is one card per slot (56), each chosen upright or reversed. Majors are shared.
 const { MINORS, COURTS, SUITS, SUIT_NAME, pipCost } = __m['./tarot.js'];
@@ -1705,7 +1705,7 @@ const ALL_V2 = [...UPRIGHT, ...REVERSED];
 return { REV_PIP_TEXT, revCost, REV_COURTS, UPRIGHT, REVERSED, SLOTS, DECK_PRESETS, buildDeck, ALL_V2 };
 })();
 
-__m['./v2-engine.js'] = (() => {
+__m['./v2-engine.js'] = await (async () => {
 // Version 2 engine: private Minor decks with reversals, shared Major deck with an Omen slot.
 const { TarotGame } = __m['./tarot-engine.js'];
 const { MAJORS, byId } = __m['./tarot.js'];
@@ -1787,7 +1787,7 @@ class DuelGame extends TarotGame {
 return { DUEL_DEFAULTS, DuelGame };
 })();
 
-__m['./v2-sim.js'] = (() => {
+__m['./v2-sim.js'] = await (async () => {
 
 // Version 2 (duel) simulator.
 //   node v2-sim.js --games 1000 --a strong --b strong --da revChains --db upright
