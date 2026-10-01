@@ -1162,7 +1162,7 @@ for (const suit of SUITS) for (let r = 1; r <= 10; r++) {
 }
 
 // ── Courts: 16 Personalities. cost / yield / res, one ability each. ──
-const C = (suit, rank, o) => ({ type: 'court', suit, rank, villain: false, kw: {}, ...o, id: `${suit}_${rank.toLowerCase()}`, title: `${rank} of ${SUIT_NAME[suit]}` });
+const C = (suit, rank, o) => ({ type: 'court', suit, rank, kw: {}, ...o, id: `${suit}_${rank.toLowerCase()}`, title: `${rank} of ${SUIT_NAME[suit]}` });
 const COURTS = [
   C('coins', 'Page', { name: 'Ethan, Junior Analyst', cost: 2, yield: 2, res: 3, text: 'Bank 20: Yield 3.', yieldFn: (g, p, i, b) => (p.bank >= 20 ? 3 : b) }),
   C('coins', 'Knight', { name: 'The Day Trader', cost: 3, yield: 3, res: 2, kw: { fast: true }, text: 'Fast.' }),
@@ -1175,9 +1175,9 @@ const COURTS = [
   C('candles', 'King', { name: 'The Promoter', cost: 5, yield: 3, res: 3, text: 'Your Coins and Candles give +1.', mods: { coinsBonus: () => 1, candlesBonus: () => 1 } }),
 
   C('chains', 'Page', { name: 'The Short Seller', cost: 2, yield: 1, res: 3, text: 'During THE PANIC or LEVERAGE, Yield 4.', yieldFn: (g, p, i, b) => (g.marketIs('THE PANIC') || g.marketIs('LEVERAGE') ? 4 : b) }),
-  C('chains', 'Knight', { name: 'The Raider', cost: 4, yield: 1, res: 2, villain: true, kw: { fast: true, exitScam: 3 }, text: 'Fast. Exit Scam 3. Work: Front-run 3.', work: (g, p, inst) => { const t = g.richestOpp(p); if (t) g.frontrun(p, t, 3); } }),
+  C('chains', 'Knight', { name: 'The Raider', cost: 4, yield: 1, res: 2, kw: { fast: true, exitScam: 3 }, text: 'Fast. Exit Scam 3. Work: Front-run 3.', work: (g, p, inst) => { const t = g.richestOpp(p); if (t) g.frontrun(p, t, 3); } }),
   C('chains', 'Queen', { name: 'Cassandra', cost: 4, yield: 2, res: 3, text: 'Chains and Events deal 1 less Drawdown to your cards.', mods: { incomingDd: () => -1 } }),
-  C('chains', 'King', { name: 'Connor, Demon', cost: 6, yield: 4, res: 3, villain: true, kw: { exitScam: 4 }, text: 'Exit Scam 4. Whenever an Event resolves, gain 3 Profit into your Portfolio.', onEvent: (g, p) => g.profit(p, 3, 'Connor') }),
+  C('chains', 'King', { name: 'Connor, Demon', cost: 6, yield: 4, res: 3, kw: { exitScam: 4 }, text: 'Exit Scam 4. Whenever an Event resolves, gain 3 Profit into your Portfolio.', onEvent: (g, p) => g.profit(p, 3, 'Connor') }),
 
   C('cups', 'Page', { name: 'Sister Ledger', cost: 2, yield: 1, res: 3, text: 'When hired: bank 2 directly.', onHired: (g, p) => g.bank(p, 2, 'Sister Ledger') }),
   C('cups', 'Knight', { name: 'The Almoner', cost: 3, yield: 2, res: 3, kw: { fast: true }, text: 'Fast. Your Cups give +1 to you.', mods: { cupsBonus: () => 1 } }),
@@ -1255,7 +1255,7 @@ class TarotGame {
     return { label, round: this.round, active: this.active ? this.active.name : null, bell: this.bellRound, market: this.market ? this.market.name : null,
       providence: this.providence.map((m) => m.name), deckLeft: this.deck.length, over: this.over, winner: this.winner ? this.winner.name : null, reason: this.reason, events: this.events,
       players: this.players.map((p) => ({ name: p.name, bank: p.bank, portfolio: p.portfolio, pass: p.pass ? p.inAir : null, passUsed: p.hailMaryUsed, hand: p.hand.map((c) => c.name), reserve: p.reserve.length, locked: p.reserve.filter((r) => r.locked).length, archetype: this.archetype(p),
-        floor: p.floor.map((i) => ({ name: i.card.name, title: i.card.title, suit: i.card.suit, working: i.working, drawdown: i.drawdown, res: i.card.res, yield: this.yieldOf(p, i), villain: i.card.villain, shielded: !!i.shielded, armor: i.armor || 0, canWork: this.canWork(p, i) })) })) };
+        floor: p.floor.map((i) => ({ name: i.card.name, title: i.card.title, suit: i.card.suit, working: i.working, drawdown: i.drawdown, res: i.card.res, yield: this.yieldOf(p, i), shielded: !!i.shielded, armor: i.armor || 0, canWork: this.canWork(p, i) })) })) };
   }
   // ── queries ──
   opps(p) { return this.players.filter((q) => q !== p); }
@@ -1478,7 +1478,7 @@ class TarotGame {
   async run() { let g = 0; while (!this.over && g++ < 100) await this.playRound(); if (!this.over) { this.over = true; this.reason = 'guard'; } return this.result(); }
   archetype(p) {
     const s = p.stats; const unbanked = s.unbankedSum / Math.max(1, s.sets);
-    const sc = { HODLer: unbanked / 8, Contrarian: s.chains / 2.5, Samaritan: s.cups / 2, Analyst: s.foretells / 2 + s.invokes / 2, Opportunist: s.coins / 3, Degen: (p.floor.filter((i) => i.card.villain).length + s.frontrun / 4) * 0.8 + s.hedges * 0.2, Banker: unbanked < 3 ? 1.05 : 0.5 };
+    const sc = { HODLer: unbanked / 8, Contrarian: s.chains / 2.5, Samaritan: s.cups / 2, Analyst: s.foretells / 2 + s.invokes / 2, Opportunist: s.coins / 3, Degen: (p.floor.filter((i) => i.card.kw.exitScam).length + s.frontrun / 4) * 0.8 + s.hedges * 0.2, Banker: unbanked < 3 ? 1.05 : 0.5 };
     return Object.entries(sc).sort((a, b) => b[1] - a[1])[0][0];
   }
   result() { return { winner: this.winner ? this.winner.name : null, winnerIdx: this.winner ? this.winner.idx : -1, reason: this.reason, rounds: this.round, finalBell: this.reason.startsWith('Final Bell'), majorsSeen: this.majorsSeen,
@@ -1702,7 +1702,7 @@ for (const suit of SUITS) for (let r = 1; r <= 10; r++) {
 }
 
 // Reversed courts: the same sixteen characters on a bad day (or a better one).
-const RC = (slot, o) => { const base = COURTS.find((c) => c.id === slot); return { type: 'court', suit: base.suit, rank: base.rank, title: base.title + ' (reversed)', villain: false, kw: {}, reversed: true, slot, id: slot + '_rev', ...o }; };
+const RC = (slot, o) => { const base = COURTS.find((c) => c.id === slot); return { type: 'court', suit: base.suit, rank: base.rank, title: base.title + ' (reversed)', kw: {}, reversed: true, slot, id: slot + '_rev', ...o }; };
 const REV_COURTS = [
   RC('coins_page', { name: 'Ethan, Burned Out', cost: 2, yield: 2, res: 3, text: 'Underdog: Yield 3.', yieldFn: (g, p, i, b) => (g.isUnderdog(p) ? 3 : b) }),
   RC('coins_knight', { name: 'The Day Trader, Humbled', cost: 3, yield: 3, res: 2, kw: { hedged: true }, text: 'Hedged.' }),
@@ -1983,7 +1983,7 @@ return { policy, playOne, batch };
     } else {
       const y = inst && owner ? S.g.yieldOf(owner, inst) : c.yield;
       el.innerHTML = `<div class="hd"><span>${esc(c.rank[0])}</span><span class="suit"></span><span class="cost ${cost > liq && !inst ? 'no' : ''}">${cost}</span></div><div class="mid"><div class="nm">${esc(c.name)}</div></div><div class="ft"><span>earns ${y}</span><span>resists ${c.res}</span></div>`;
-      if (inst) { const b = []; if (inst.drawdown) b.push(`<span class="bd dd">−${inst.drawdown}</span>`); if (inst.armor) b.push(`<span class="bd arm">+${inst.armor}🛡</span>`); if (inst.shielded) b.push(`<span class="bd sh">shield</span>`); if (c.villain) b.push(`<span class="bd vil">villain</span>`); if (b.length) el.insertAdjacentHTML('beforeend', `<div class="badges">${b.join('')}</div>`); if (inst.working) el.classList.add('working'); }
+      if (inst) { const b = []; if (inst.drawdown) b.push(`<span class="bd dd">−${inst.drawdown}</span>`); if (inst.armor) b.push(`<span class="bd arm">+${inst.armor}🛡</span>`); if (inst.shielded) b.push(`<span class="bd sh">shield</span>`); if (c.kw && c.kw.exitScam) b.push(`<span class="bd vil">exit scam ${c.kw.exitScam}</span>`); if (b.length) el.insertAdjacentHTML('beforeend', `<div class="badges">${b.join('')}</div>`); if (inst.working) el.classList.add('working'); }
     }
     return el;
   }
@@ -2123,7 +2123,7 @@ return { policy, playOne, batch };
     const g = S.g; let s = c.name;
     if (c.type === 'major') return `${c.name} [${c.kind}${c.cost != null ? ' ' + c.cost : ''}]: ${c.text}`;
     if (c.type === 'pip') s += ` [${c.reversed ? 'reversed ' : ''}${c.suit} ${c.rank}, cost ${inst ? c.cost : g.costOf(S.me, c)}]: ${c.text}`;
-    else { s += ` [${c.title}${c.villain ? ', villain' : ''}, cost ${inst ? c.cost : g.costOf(S.me, c)}, Yield ${inst && owner ? g.yieldOf(owner, inst) : c.yield}, Resilience ${c.res}]: ${c.text}`; }
+    else { s += ` [${c.title}${c.kw && c.kw.exitScam ? ', Exit Scam ' + c.kw.exitScam : ''}, cost ${inst ? c.cost : g.costOf(S.me, c)}, Yield ${inst && owner ? g.yieldOf(owner, inst) : c.yield}, Resilience ${c.res}]: ${c.text}`; }
     if (inst) { const b = []; b.push(inst.working ? 'WORKING' : 'idle'); if (inst.drawdown) b.push(`${inst.drawdown} Drawdown`); if (inst.armor) b.push(`${inst.armor} armor`); if (inst.bonusYield) b.push(`+${inst.bonusYield} Collateral Yield`); if (inst.shielded) b.push('shielded'); if (!inst.working && !g.canWork(owner, inst)) b.push('cannot Work yet, arrived this turn'); s += ` (${b.join(', ')})`; }
     return s;
   }

@@ -17,7 +17,7 @@ for (const suit of SUITS) for (let r = 1; r <= 10; r++) {
 }
 
 // Reversed courts: the same sixteen characters on a bad day (or a better one).
-const RC = (slot, o) => { const base = COURTS.find((c) => c.id === slot); return { type: 'court', suit: base.suit, rank: base.rank, title: base.title + ' (reversed)', villain: false, kw: {}, reversed: true, slot, id: slot + '_rev', ...o }; };
+const RC = (slot, o) => { const base = COURTS.find((c) => c.id === slot); return { type: 'court', suit: base.suit, rank: base.rank, title: base.title + ' (reversed)', kw: {}, reversed: true, slot, id: slot + '_rev', ...o }; };
 export const REV_COURTS = [
   RC('coins_page', { name: 'Ethan, Burned Out', cost: 2, yield: 2, res: 3, text: 'Underdog: Yield 3.', yieldFn: (g, p, i, b) => (g.isUnderdog(p) ? 3 : b) }),
   RC('coins_knight', { name: 'The Day Trader, Humbled', cost: 3, yield: 3, res: 2, kw: { hedged: true }, text: 'Hedged.' }),

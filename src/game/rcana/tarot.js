@@ -22,7 +22,7 @@ for (const suit of SUITS) for (let r = 1; r <= 10; r++) {
 }
 
 // ── Courts: 16 Personalities. cost / yield / res, one ability each. ──
-const C = (suit, rank, o) => ({ type: 'court', suit, rank, villain: false, kw: {}, ...o, id: `${suit}_${rank.toLowerCase()}`, title: `${rank} of ${SUIT_NAME[suit]}` });
+const C = (suit, rank, o) => ({ type: 'court', suit, rank, kw: {}, ...o, id: `${suit}_${rank.toLowerCase()}`, title: `${rank} of ${SUIT_NAME[suit]}` });
 export const COURTS = [
   C('coins', 'Page', { name: 'Ethan, Junior Analyst', cost: 2, yield: 2, res: 3, text: 'Bank 20: Yield 3.', yieldFn: (g, p, i, b) => (p.bank >= 20 ? 3 : b) }),
   C('coins', 'Knight', { name: 'The Day Trader', cost: 3, yield: 3, res: 2, kw: { fast: true }, text: 'Fast.' }),
@@ -35,9 +35,9 @@ export const COURTS = [
   C('candles', 'King', { name: 'The Promoter', cost: 5, yield: 3, res: 3, text: 'Your Coins and Candles give +1.', mods: { coinsBonus: () => 1, candlesBonus: () => 1 } }),
 
   C('chains', 'Page', { name: 'The Short Seller', cost: 2, yield: 1, res: 3, text: 'During THE PANIC or LEVERAGE, Yield 4.', yieldFn: (g, p, i, b) => (g.marketIs('THE PANIC') || g.marketIs('LEVERAGE') ? 4 : b) }),
-  C('chains', 'Knight', { name: 'The Raider', cost: 4, yield: 1, res: 2, villain: true, kw: { fast: true, exitScam: 3 }, text: 'Fast. Exit Scam 3. Work: Front-run 3.', work: (g, p, inst) => { const t = g.richestOpp(p); if (t) g.frontrun(p, t, 3); } }),
+  C('chains', 'Knight', { name: 'The Raider', cost: 4, yield: 1, res: 2, kw: { fast: true, exitScam: 3 }, text: 'Fast. Exit Scam 3. Work: Front-run 3.', work: (g, p, inst) => { const t = g.richestOpp(p); if (t) g.frontrun(p, t, 3); } }),
   C('chains', 'Queen', { name: 'Cassandra', cost: 4, yield: 2, res: 3, text: 'Chains and Events deal 1 less Drawdown to your cards.', mods: { incomingDd: () => -1 } }),
-  C('chains', 'King', { name: 'Connor, Demon', cost: 6, yield: 4, res: 3, villain: true, kw: { exitScam: 4 }, text: 'Exit Scam 4. Whenever an Event resolves, gain 3 Profit into your Portfolio.', onEvent: (g, p) => g.profit(p, 3, 'Connor') }),
+  C('chains', 'King', { name: 'Connor, Demon', cost: 6, yield: 4, res: 3, kw: { exitScam: 4 }, text: 'Exit Scam 4. Whenever an Event resolves, gain 3 Profit into your Portfolio.', onEvent: (g, p) => g.profit(p, 3, 'Connor') }),
 
   C('cups', 'Page', { name: 'Sister Ledger', cost: 2, yield: 1, res: 3, text: 'When hired: bank 2 directly.', onHired: (g, p) => g.bank(p, 2, 'Sister Ledger') }),
   C('cups', 'Knight', { name: 'The Almoner', cost: 3, yield: 2, res: 3, kw: { fast: true }, text: 'Fast. Your Cups give +1 to you.', mods: { cupsBonus: () => 1 } }),

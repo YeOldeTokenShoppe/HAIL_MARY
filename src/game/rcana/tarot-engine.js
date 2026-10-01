@@ -33,7 +33,7 @@ export class TarotGame {
     return { label, round: this.round, active: this.active ? this.active.name : null, bell: this.bellRound, market: this.market ? this.market.name : null,
       providence: this.providence.map((m) => m.name), deckLeft: this.deck.length, over: this.over, winner: this.winner ? this.winner.name : null, reason: this.reason, events: this.events,
       players: this.players.map((p) => ({ name: p.name, bank: p.bank, portfolio: p.portfolio, pass: p.pass ? p.inAir : null, passUsed: p.hailMaryUsed, hand: p.hand.map((c) => c.name), reserve: p.reserve.length, locked: p.reserve.filter((r) => r.locked).length, archetype: this.archetype(p),
-        floor: p.floor.map((i) => ({ name: i.card.name, title: i.card.title, suit: i.card.suit, working: i.working, drawdown: i.drawdown, res: i.card.res, yield: this.yieldOf(p, i), villain: i.card.villain, shielded: !!i.shielded, armor: i.armor || 0, canWork: this.canWork(p, i) })) })) };
+        floor: p.floor.map((i) => ({ name: i.card.name, title: i.card.title, suit: i.card.suit, working: i.working, drawdown: i.drawdown, res: i.card.res, yield: this.yieldOf(p, i), shielded: !!i.shielded, armor: i.armor || 0, canWork: this.canWork(p, i) })) })) };
   }
   // ── queries ──
   opps(p) { return this.players.filter((q) => q !== p); }
@@ -256,7 +256,7 @@ export class TarotGame {
   async run() { let g = 0; while (!this.over && g++ < 100) await this.playRound(); if (!this.over) { this.over = true; this.reason = 'guard'; } return this.result(); }
   archetype(p) {
     const s = p.stats; const unbanked = s.unbankedSum / Math.max(1, s.sets);
-    const sc = { HODLer: unbanked / 8, Contrarian: s.chains / 2.5, Samaritan: s.cups / 2, Analyst: s.foretells / 2 + s.invokes / 2, Opportunist: s.coins / 3, Degen: (p.floor.filter((i) => i.card.villain).length + s.frontrun / 4) * 0.8 + s.hedges * 0.2, Banker: unbanked < 3 ? 1.05 : 0.5 };
+    const sc = { HODLer: unbanked / 8, Contrarian: s.chains / 2.5, Samaritan: s.cups / 2, Analyst: s.foretells / 2 + s.invokes / 2, Opportunist: s.coins / 3, Degen: (p.floor.filter((i) => i.card.kw.exitScam).length + s.frontrun / 4) * 0.8 + s.hedges * 0.2, Banker: unbanked < 3 ? 1.05 : 0.5 };
     return Object.entries(sc).sort((a, b) => b[1] - a[1])[0][0];
   }
   result() { return { winner: this.winner ? this.winner.name : null, winnerIdx: this.winner ? this.winner.idx : -1, reason: this.reason, rounds: this.round, finalBell: this.reason.startsWith('Final Bell'), majorsSeen: this.majorsSeen,
