@@ -107,8 +107,8 @@ OPP(T.GREED, { name: 'Early Entry', cost: 3, rarity: 'C', kw: { seize: 'Founder'
   profitFn: (g, p) => (g.bankAtLeast(p, 20) ? 8 : 5) });
 OPP(T.GREED, { name: 'Degen Play', cost: 1, rarity: 'C', text: 'Flip a coin. Heads: gain 6 Profit into your Portfolio. Tails: one of your Working Personalities takes 2 Drawdown.',
   play: (g, p) => { if (g.coin()) g.oppProfit(p, 6, 'Degen Play'); else { const t = g.pick(p, g.working(p), 'selfHarm'); if (t) g.drawdown(t, 2, 'Degen Play'); } } });
-OPP(T.GREED, { name: 'Pump', cost: 4, rarity: 'U', kw: { seize: 'Whale' }, text: 'Seize Whale. Gain 8 Profit into your Portfolio. Your Working Personalities stay Working through your next Refresh.',
-  profit: 8, after: (g, p) => g.setTemp(p, 'stayWorking', true) });
+CAL(T.GREED, { name: 'Insider Dump', cost: 2, rarity: 'U', target: 'oppPortfolio', harm: { loss: 2 }, text: 'Front-run 2. If the target has more banked Profit than you, Front-run 3 instead.',
+  play: (g, p, t) => g.frontrun(p, t, t.bank > p.bank ? 3 : 2) });
 OPP(T.GREED, { name: 'Take the Bag', cost: 5, rarity: 'R', text: 'Bank 5 Profit directly.', play: (g, p) => g.bank(p, 5, 'Take the Bag') });
 CAL(T.GREED, { name: 'Sandwich Attack', cost: 3, rarity: 'C', target: 'oppPortfolio', harm: { loss: 4 }, text: 'Front-run 4.', play: (g, p, t) => g.frontrun(p, t, 4) });
 CAL(T.GREED, { name: 'Skim', cost: 2, rarity: 'C', target: 'oppPortfolio', harm: { loss: 2 }, text: 'Front-run 2. Draw a card.', play: (g, p, t) => { g.frontrun(p, t, 2); g.draw(p, 1); } });
@@ -185,8 +185,8 @@ OPP(T.HYPE, { name: 'Viral Moment', cost: 4, rarity: 'C', kw: { seize: 'Influenc
 OPP(T.HYPE, { name: 'Airdrop', cost: 2, rarity: 'C', text: 'Gain 2 Attention. Draw a card.', play: (g, p) => { g.token(p, 'attention', 2); g.draw(p, 1); } });
 OPP(T.HYPE, { name: 'Trending', cost: 3, rarity: 'C', text: 'Spend 2 Attention: gain 5 Profit into your Portfolio.',
   can: (g, p) => g.has(p, 'attention', 2), play: (g, p) => { g.spend(p, 'attention', 2); g.oppProfit(p, 5, 'Trending'); } });
-OPP(T.HYPE, { name: 'Launch Day', cost: 5, rarity: 'U', kw: { seize: 'Founder' }, text: 'Seize Founder. Gain 7 Profit into your Portfolio. Each opponent gains 2 Attention.',
-  profit: 7, after: (g, p) => g.opps(p).forEach((o) => g.token(o, 'attention', 2)) });
+CAL(T.HYPE, { name: "Ratio'd", cost: 1, rarity: 'U', target: 'oppWorking', harm: { dd: 1 }, text: 'A Working Personality takes 1 Drawdown, or 2 if its controller has more Attention than you.',
+  play: (g, p, t) => g.drawdown(t, t.owner.tokens.attention > p.tokens.attention ? 2 : 1, "Ratio'd") });
 OPP(T.HYPE, { name: 'Main Character Moment', cost: 4, rarity: 'R', kw: { seize: 'Influencer' }, text: 'Seize Influencer. Gain Profit into your Portfolio equal to twice your Attention, max 10.',
   profitFn: (g, p) => Math.min(10, 2 * p.tokens.attention) });
 CAL(T.HYPE, { name: 'Cancelled', cost: 3, rarity: 'C', target: 'oppWorking', harm: { dd: 2 }, text: 'A Working Personality takes 2 Drawdown. Its controller loses all Attention.',
@@ -229,8 +229,8 @@ OPP(T.REASON, { name: 'Undervalued Asset', cost: 3, rarity: 'C', kw: { seize: 'A
 OPP(T.REASON, { name: 'Forecast', cost: 1, rarity: 'C', text: 'Consult for free. Draw a card.', play: (g, p) => { g.consult(p, { free: true }); g.draw(p, 1); } });
 OPP(T.REASON, { name: 'Due Diligence', cost: 2, rarity: 'U', text: "Spend 2 Credibility: look at an opponent's hand and discard a Villain from it.",
   can: (g, p) => g.has(p, 'credibility', 2), play: (g, p) => { g.spend(p, 'credibility', 2); g.discardVillainFromHand(g.opp(p)); } });
-OPP(T.REASON, { name: 'Perfect Information', cost: 4, rarity: 'U', kw: { seize: 'Oracle' }, text: 'Seize Oracle. Reveal the Omen to all. Gain 6 Profit into your Portfolio if it is a Market, 4 otherwise.',
-  play: (g, p) => { g.revealOmen(); g.oppProfit(p, g.omen && g.omen.type === 'market' ? 6 : 4, 'Perfect Information'); } });
+CAL(T.REASON, { name: 'Short Report', cost: 2, rarity: 'U', target: 'oppPlayer', harm: { loss: 2 }, text: 'Target Trader loses 2 Profit from their Portfolio. Spend 1 Data: 4 instead.',
+  play: (g, p, t) => { const big = g.has(p, 'data', 1) && t.portfolio >= 3; if (big) g.spend(p, 'data', 1); g.loseProfit(t, big ? 4 : 2, 'Short Report'); } });
 CAL(T.REASON, { name: 'Exposé', cost: 3, rarity: 'C', target: 'oppWorking', harm: { dd: 2 }, text: 'Deal 2 Drawdown to a Working Personality, or 4 if it is a Villain.',
   play: (g, p, t) => g.drawdown(t, t.card.villain ? 4 : 2, 'Exposé') });
 GRA(T.REASON, { name: 'Shared Research', cost: 2, rarity: 'C', text: 'Another Trader gains 1 Data. Gain 2 Data and 2 Profit into your Portfolio.',
@@ -262,8 +262,8 @@ OPP(T.PATIENCE, { name: 'Dollar-Cost Average', cost: 2, rarity: 'C', text: 'Gain
 OPP(T.PATIENCE, { name: 'Long-Term Hold', cost: 3, rarity: 'C', kw: { hedge: true }, text: "Hedge. Your Portfolio can't be targeted until your next turn. Gain 2 Profit into your Portfolio.",
   play: (g, p) => { g.setTemp(p, 'portfolioProtected', true); g.profit(p, 2, 'Long-Term Hold'); },
   hedgeEffect: (g, p) => { g.prevent('loss'); g.setTemp(p, 'portfolioProtected', true); g.profit(p, 2, 'Long-Term Hold'); } });
-OPP(T.PATIENCE, { name: 'Compounding', cost: 4, rarity: 'U', kw: { seize: 'Value Investor' }, text: 'Seize Value Investor. Gain Profit into your Portfolio equal to the Profit already there, max 8.',
-  profitFn: (g, p) => Math.min(8, p.portfolio) });
+CAL(T.PATIENCE, { name: 'Margin Call', cost: 2, rarity: 'U', target: 'oppPlayer', harm: { loss: 2, lock: 2 }, text: 'Target Trader locks two Reserve cards. If they have 10 or more Profit in their Portfolio, they also lose 2.',
+  play: (g, p, t) => { g.forceLock(t, 2); if (t.portfolio >= 10) g.loseProfit(t, 2, 'Margin Call'); } });
 CAL(T.PATIENCE, { name: 'Vesting Cliff', cost: 3, rarity: 'U', target: 'oppWorking', harm: { dd: 0, stall: true }, text: "A Working Personality stays Working through its controller's next Refresh.",
   play: (g, p, t) => { t.stayWorking = true; } });
 GRA(T.PATIENCE, { name: 'Mentorship', cost: 2, rarity: 'C', target: 'oppPersonalityHurt', text: "Remove 2 Drawdown from another Trader's Personality. Draw two cards.",
@@ -272,23 +272,14 @@ COM(T.PATIENCE, { name: 'Diamond Hands', cost: 2, rarity: 'C', text: "Each Trade
 COM(T.PATIENCE, { name: 'Slow and Steady', cost: 3, rarity: 'U', text: 'Each Trader gains 2 Profit into their Portfolio. Gain 1 Credibility. Bank 20: also bank 2 directly.',
   play: (g, p) => { g.players.forEach((q) => g.profit(q, 2, 'Slow and Steady')); g.token(p, 'credibility', 1); if (g.bankAtLeast(p, 20)) g.bank(p, 2, 'Slow and Steady'); } });
 
-// ───────────────────────────── TRADERS ─────────────────────────────
-export const TRADERS = [
-  { id: 'analyst', name: 'THE ANALYST', temps: [T.REASON, T.PATIENCE], text: 'Once per turn, Consult for free.', mods: { consultFreeOnce: () => true } },
-  { id: 'degen', name: 'THE DEGEN', temps: [T.HYPE, T.GREED], text: 'Once per turn, a Personality you hire has Fast. Calamities deal 1 extra Drawdown to your Working Personalities.',
-    onHire: (g, p, inst) => { if (!p.turnTemp.degenFast) { p.turnTemp.degenFast = true; inst.fast = true; } },
-    mods: { incomingDd: (g, p, inst, src) => (src && src.type === 'calamity' && inst.working && inst.card.type === 'personality' ? 1 : 0) } },
-  { id: 'hodler', name: 'THE HODLER', temps: [T.HOPE, T.PATIENCE], text: 'Interest counts every full 5 in your Portfolio.', mods: { interestDiv: () => 5 } },
-  { id: 'contrarian', name: 'THE CONTRARIAN', temps: [T.FEAR, T.REASON], text: 'While the Market is Bear Market, or no Market is in effect, your Yields are +1.',
-    mods: { yield: (g) => (!g.market || g.market.name === 'Bear Market' ? 1 : 0) } },
-  { id: 'gambler', name: 'THE GAMBLER', temps: [T.GREED, T.FEAR], text: 'Once per turn when a Personality Works, you may flip a coin. Heads: it yields +3. Tails: it takes 1 Drawdown.',
-    onAnyWork: (g, p, inst) => { if (p.turnTemp.gambled) return; if (!p.policy.gamble(g, p, inst)) return; p.turnTemp.gambled = true; if (g.coin()) g.profit(p, 3, 'Gambler heads'); else g.drawdown(inst, 1, 'Gambler tails'); } },
-  { id: 'value', name: 'THE VALUE INVESTOR', temps: [T.PATIENCE, T.GREED], text: 'Bank 20: your Opportunities produce +1 Profit. Bank 40: +2 instead.',
-    mods: { opportunityProfit: (g, p) => (g.bankAtLeast(p, 40) ? 2 : g.bankAtLeast(p, 20) ? 1 : 0) } },
-  { id: 'quant', name: 'THE QUANT', temps: [T.REASON, T.HYPE], text: 'You may spend Data as Attention and Attention as Data.', mods: { tokensInterchangeable: () => true } },
-  { id: 'evangelist', name: 'THE EVANGELIST', temps: [T.HOPE, T.HYPE], text: 'Whenever you play a Grace, gain 2 Attention. Whenever an opponent plays a Grace, gain 1 Credibility.',
-    onGrace: (g, p) => g.token(p, 'attention', 2), onOppGrace: (g, p) => g.token(p, 'credibility', 1) },
-].map((t) => ({ type: 'trader', rarity: 'R', kw: {}, cls: [], ...t }));
+// ───────────────────────────── TEMPERAMENT PAIRS ─────────────────────────────
+// There are no Trader cards. A deck chooses two Temperaments; the player is the Trader.
+export const PAIRS = [];
+for (let i = 0; i < TEMPERAMENTS.length; i++) for (let j = i + 1; j < TEMPERAMENTS.length; j++) {
+  const temps = [TEMPERAMENTS[i], TEMPERAMENTS[j]];
+  PAIRS.push({ id: temps.join('+'), name: temps.map((t) => t[0].toUpperCase() + t.slice(1)).join(' + '), temps });
+}
+export const pairById = Object.fromEntries(PAIRS.map((p) => [p.id, p]));
 
 // ───────────────────────────── MARKETS ─────────────────────────────
 const M = (o) => ({ type: 'market', kw: {}, cls: [], ...o, id: o.name.toLowerCase().replace(/[^a-z0-9]+/g, '_') });
@@ -354,7 +345,7 @@ export const MAJORS = [
 ];
 
 export const DECK_CARDS = cards;
-export const ALL_CARDS = [...cards, ...TRADERS, ...MARKETS, ...EXTERNALITIES, ...MAJORS];
+export const ALL_CARDS = [...cards, ...MARKETS, ...EXTERNALITIES, ...MAJORS];
 export const byId = Object.fromEntries(ALL_CARDS.map((c) => [c.id, c]));
 export const byName = Object.fromEntries(ALL_CARDS.map((c) => [c.name, c]));
 export function card(nameOrId) {

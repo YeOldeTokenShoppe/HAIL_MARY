@@ -25,11 +25,12 @@ export class Game {
     this.seed = seed;
     this.snapshotsOn = snapshots;
     this.players = players.map((cfg, idx) => ({
-      idx, name: cfg.name || cfg.trader.name, trader: cfg.trader, policy: cfg.policy,
+      idx, name: cfg.name || cfg.temps.join('+'), temps: cfg.temps, policy: cfg.policy,
       deck: [...cfg.deck], hand: [], discard: [], reserve: [], floor: [],
       portfolio: 0, bank: 0, tokens: { attention: 0, data: 0, credibility: 0 },
-      traderLocked: false, hailMaryUsed: false, reservedThisTurn: 0,
-      turnTemp: this.freshTurnTemp(), temp: {}, known: {}, stats: { worked: 0, played: 0, hedged: 0, liquidated: 0, frontrun: 0 },
+      hailMaryUsed: false, reservedThisTurn: 0,
+      turnTemp: this.freshTurnTemp(), temp: {}, known: {},
+      stats: { worked: 0, played: 0, hedged: 0, liquidated: 0, frontrun: 0, consults: 0, calamities: 0, graces: 0, opportunities: 0, communities: 0, villains: 0, positions: 0, hires: 0, flips: 0, unbankedSum: 0, sets: 0, seizes: 0 },
     }));
     this.rcanaDeck = [...rcana];
     this.rcanaDiscard = [];
@@ -80,8 +81,8 @@ export class Game {
       market: this.market ? this.market.name : null, omen: this.omen ? this.omen.name : null, providence: this.providence ? this.providence.name : null,
       rcanaLeft: this.rcanaDeck.length, over: this.over, winner: this.winner ? this.winner.name : null, reason: this.reason,
       players: this.players.map((p) => ({
-        name: p.name, trader: p.trader.name, bank: p.bank, portfolio: p.portfolio, tokens: { ...p.tokens },
-        hand: p.hand.map((c) => c.name), deck: p.deck.length, discard: p.discard.length, traderLocked: p.traderLocked,
+        name: p.name, temps: p.temps.join(' + '), archetype: this.archetype(p), bank: p.bank, portfolio: p.portfolio, tokens: { ...p.tokens },
+        hand: p.hand.map((c) => c.name), deck: p.deck.length, discard: p.discard.length,
         reserve: p.reserve.length, locked: p.reserve.filter((r) => r.locked).length, knowsOmen: !!p.known.omen,
         floor: p.floor.map((i) => ({ name: i.card.name, type: i.card.type, working: i.working, drawdown: i.drawdown, res: i.card.res,
           yield: i.card.type === 'personality' ? this.yieldOf(p, i) : null, locked: i.locked, villain: i.card.villain, stack: i.stack.length })),
@@ -109,12 +110,11 @@ export class Game {
   bankAtLeast(p, n) { return p.bank >= n; }
   isUnderdog(p) { return this.opps(p).some((o) => o.bank > p.bank) && !this.opps(p).some((o) => o.bank < p.bank) || (this.opps(p).length === 1 && this.opps(p)[0].bank > p.bank); }
   marketIs(name) { return !!this.market && this.market.name === name; }
-  coin() { const h = this.rng() < 0.5; this.log(`Coin: ${h ? 'heads' : 'tails'}`); return h; }
+  coin() { const h = this.rng() < 0.5; if (this.active) this.active.stats.flips++; this.log(`Coin: ${h ? 'heads' : 'tails'}`); return h; }
 
   // ─────────── modifiers ───────────
   modSources(p) {
     const s = [];
-    if (!p.traderLocked) s.push(p.trader);
     p.floor.forEach((i) => s.push(i.card));
     if (this.market) s.push(this.market);
     if (this.providence) s.push(this.providence);
@@ -282,6 +282,7 @@ export class Game {
     const cost = free ? 0 : this.consultCost(p);
     if (!free && cost === 0 && !this.modAny(p, 'consultFree')) p.turnTemp.freeConsultUsed = true;
     if (!this.pay(p, cost)) return;
+    p.stats.consults++;
     this.log(`${p.name} consults the R-cana${cost ? ` (locks ${cost})` : ''}`);
     this.peekOmen(p);
     if (this.modAny(p, 'consultSeesTop')) this.peekDeck(p, 1);
@@ -372,7 +373,8 @@ export class Game {
       inst = this.newInst(p, card); p.floor.push(inst);
       this.log(`${p.name} hires ${card.name}${free ? ' for free' : ` for ${cost}`}`);
       if (card.villain && p.tokens.credibility) { this.log(`${p.name} loses all Credibility for hiring a Villain`); p.tokens.credibility = 0; }
-      if (p.trader.onHire && !p.traderLocked) p.trader.onHire(this, p, inst);
+      if (card.villain) p.stats.villains++;
+      p.stats.hires++;
       if (card.onHired) card.onHired(this, p, inst);
     }
     return inst;
@@ -380,7 +382,7 @@ export class Game {
   open(p, card) {
     const cost = this.costOf(p, card); if (!this.pay(p, cost)) return null;
     p.hand.splice(p.hand.indexOf(card), 1); this.count(card);
-    const inst = this.newInst(p, card); p.floor.push(inst);
+    const inst = this.newInst(p, card); p.floor.push(inst); p.stats.positions++;
     this.log(`${p.name} opens ${card.name} for ${cost}`);
     if (card.onHired) card.onHired(this, p, inst);
     return inst;
@@ -391,6 +393,7 @@ export class Game {
     if (!this.pay(p, cost)) return false;
     const hi = p.hand.indexOf(card); if (hi >= 0) p.hand.splice(hi, 1);
     this.count(card); p.stats.played++;
+    if (card.type === 'calamity') p.stats.calamities++; else if (card.type === 'grace') p.stats.graces++; else if (card.type === 'opportunity') p.stats.opportunities++; else p.stats.communities++;
     this.log(`${p.name} plays ${card.name}${free ? ' (free)' : ` for ${cost}`}${target ? ` → ${target.card ? target.card.name : target.name}` : ''}`);
     if (card.type === 'calamity') {
       const victim = target ? (target.card ? target.owner : target) : null;
@@ -408,21 +411,17 @@ export class Game {
       if (card.play) card.play(this, p, target);
       if (card.after) card.after(this, p);
       this.current = null;
-      if (card.type === 'grace') {
-        for (const s of this.modSources(p)) if (s.onGrace) s.onGrace(this, p, p.floor.find((i) => i.card === s));
-        for (const o of this.opps(p)) if (o.trader.onOppGrace && !o.traderLocked) o.trader.onOppGrace(this, o);
-      }
+      if (card.type === 'grace') for (const s of this.modSources(p)) if (s.onGrace) s.onGrace(this, p, p.floor.find((i) => i.card === s));
     }
     p.discard.push(card);
     return true;
   }
   work(p, inst, { ability = false, target = null, seizeCard = null } = {}) {
     inst.working = true; p.stats.worked++;
-    if (seizeCard) { this.log(`${p.name} puts ${inst.card.name} to Work to SEIZE ${seizeCard.name}`); this.resolveAction(p, seizeCard, null, { free: true }); }
+    if (seizeCard) { p.stats.seizes++; this.log(`${p.name} puts ${inst.card.name} to Work to SEIZE ${seizeCard.name}`); this.resolveAction(p, seizeCard, null, { free: true }); }
     else if (ability) { this.log(`${p.name} puts ${inst.card.name} to Work: ability${target ? ` → ${target.card ? target.card.name : target.name}` : ''}`); inst.card.work(this, p, inst, target); }
     else { const y = this.yieldOf(p, inst); this.log(`${p.name} puts ${inst.card.name} to Work`); this.profit(p, y, `${inst.card.name} Yield`); }
     if (inst.card.onWorking && p.floor.includes(inst)) inst.card.onWorking(this, p, inst);
-    if (p.trader.onAnyWork && !p.traderLocked && p.floor.includes(inst)) p.trader.onAnyWork(this, p, inst);
   }
   takeover(p, inst) {
     const from = inst.owner; this.log(`${p.name} takes over ${inst.card.name} from ${from.name}`);
@@ -476,7 +475,6 @@ export class Game {
     if (this.providence && this.providence.invoke && !p.turnTemp.invoked) {
       const iv = this.providence.invoke; if (iv.cost <= liq && iv.can(this, p)) A.push({ t: 'invoke', cost: iv.cost });
     }
-    if (!p.traderLocked) A.push({ t: 'lockTrader', cost: 0 });
     return A;
   }
   act(p, a) {
@@ -493,7 +491,6 @@ export class Game {
       case 'ability': this.log(`${p.name} uses ${a.inst.card.name}`); a.inst.card.ability.run(this, p, a.inst); break;
       case 'consult': this.consult(p); break;
       case 'invoke': { const iv = this.providence.invoke; this.pay(p, iv.cost); p.turnTemp.invoked = true; this.log(`${p.name} INVOKES ${this.providence.name} (locks ${iv.cost})`); iv.run(this, p); break; }
-      case 'lockTrader': p.traderLocked = true; p.turnTemp.liquidity += 1; this.log(`${p.name} locks their Trader for 1 Liquidity`); break;
       default: throw new Error('unknown action ' + a.t);
     }
   }
@@ -504,7 +501,7 @@ export class Game {
       if (i.working) { if (i.stayWorking || p.temp.stayWorking) { i.stayWorking = false; } else i.working = false; }
       i.locked = false;
     }
-    p.reserve.forEach((r) => { r.locked = false; }); p.traderLocked = false; p.temp = {}; p.reservedThisTurn = 0;
+    p.reserve.forEach((r) => { r.locked = false; }); p.temp = {}; p.reservedThisTurn = 0;
     if (this.noCalamityUntil === p) this.noCalamityUntil = null;
   }
   set(p) {
@@ -516,13 +513,14 @@ export class Game {
       const times = this.modMax(p, 'interestTimes', 1); const mult = this.modProduct(p, 'interestMult');
       for (let k = 0; k < times; k++) { const n = Math.floor(p.portfolio / div) * mult; if (n) this.profit(p, n, 'Interest'); }
     }
+    p.stats.unbankedSum += p.portfolio; p.stats.sets++;
     const amt = Math.min(p.portfolio, Math.max(0, p.policy.bankAmount(this, p)));
     if (amt) this.bankFromPortfolio(p, amt, 'Set'); else if (p.portfolio) this.log(`${p.name} keeps ${p.portfolio} in Portfolio`);
   }
   playTurn() {
     const p = this.players[this.turnIdx]; this.active = p;
     if (this.turnIdx === 0) { this.round++; if (this.round > MAX_ROUNDS) { this.over = true; this.reason = 'round limit'; this.endByBell(); return; } }
-    this.log(`── Turn ${this.turnCounter}: ${p.name} (${p.trader.name}) ──`);
+    this.log(`── Turn ${this.turnCounter}: ${p.name} (${p.temps.join(' + ')}) ──`);
     if (this.turnIdx === 0 && this.round > 1 && !this.over) this.reveal();
     if (this.over) { this.snapshot('turn'); return; }
     this.refresh(p);
@@ -557,6 +555,21 @@ export class Game {
   result() {
     return { winner: this.winner ? this.winner.name : null, winnerIdx: this.winner ? this.winner.idx : -1, reason: this.reason, rounds: this.round, turns: this.turnCounter - 1,
       finalBell: this.finalBellRound != null && this.reason.startsWith('Final Bell'),
-      players: this.players.map((p) => ({ name: p.name, trader: p.trader.name, bank: p.bank, portfolio: p.portfolio, stats: { ...p.stats } })), cardPlays: this.cardPlays };
+      players: this.players.map((p) => ({ name: p.name, temps: p.temps, archetype: this.archetype(p), bank: p.bank, portfolio: p.portfolio, stats: { ...p.stats } })), cardPlays: this.cardPlays };
+  }
+  // The R-cana names you: an archetype read from how you actually played.
+  archetype(p) {
+    const s = p.stats; const sets = Math.max(1, s.sets); const unbanked = s.unbankedSum / sets;
+    const scores = {
+      'HODLer': unbanked / 8,
+      'Degen': s.villains * 0.8 + s.flips * 0.6 + (unbanked >= 15 ? 0.5 : 0),
+      'Analyst': s.consults / 2.5,
+      'Contrarian': s.calamities / 2.5,
+      'Samaritan': s.graces / 1.5,
+      'Value Investor': s.positions / 2.5,
+      'Opportunist': (s.opportunities + s.seizes) / 4,
+      'Banker': unbanked < 3 && s.calamities < 2 ? 1.05 : 0.6,
+    };
+    return Object.entries(scores).sort((a, b) => b[1] - a[1])[0][0];
   }
 }

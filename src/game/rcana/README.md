@@ -1,6 +1,6 @@
 # RL80 R-cana — rules engine and simulator
 
-Executable version of the R-cana rules draft v4 (with Villains) and the 160-card base set.
+Executable version of the R-cana rules draft v5: Villains, no Trader cards, 17 Opportunities and 17 Calamities. 152 cards.
 Plain JavaScript modules, no dependencies. Runs in Node 18+ and in the browser.
 
 ## Files
@@ -23,7 +23,8 @@ node sim.js --games 500 --a degen --b analyst --pa banker --pb hodler --cards
 node sim.js --matrix --games 50                     # all 8 Traders vs each other, auto decks
 ```
 
-Deck ids: `degen`, `analyst` (hand-built starters) or any Trader id (`hodler`, `contrarian`, `gambler`, `value`, `quant`, `evangelist`, plus `degen`/`analyst` as auto decks via `--a` when the starter is not wanted).
+Deck ids: `degen`, `analyst` (hand-built starters) or any Temperament pair such as `reason+patience`, `greed+fear`, `hope+hype` (auto-built).
+There are no Trader cards: the archetype is a label the engine awards after the game from how each side played.
 Policies: `banker` (banks everything), `hodler` (keeps 20 in Portfolio for Interest), `degen` (keeps 30, aggressive), `cautious` (holds Liquidity for Hedges).
 
 The viewer needs to be served, not opened from disk, because it uses ES modules:

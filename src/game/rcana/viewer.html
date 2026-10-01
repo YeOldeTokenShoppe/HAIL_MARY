@@ -78,7 +78,7 @@
 <div class="wrap">
   <header>
     <h1>R-CANA SIMULATOR</h1>
-    <span class="sub">Rules draft v4 with Villains. 160-card base set. Bot versus bot.</span>
+    <span class="sub">Rules draft v5: no Trader cards, 17 Opportunities and 17 Calamities. Bot versus bot.</span>
     <nav role="tablist">
       <button role="tab" id="tab-play" aria-selected="true" data-tab="play">Play</button>
       <button role="tab" id="tab-batch" aria-selected="false" data-tab="batch">Batch</button>
@@ -87,10 +87,10 @@
   </header>
 
   <section class="panel controls" id="controls">
-    <label>Trader A <select id="deckA"></select></label>
-    <label>Style A <select id="polA"></select></label>
-    <label>Trader B <select id="deckB"></select></label>
-    <label>Style B <select id="polB"></select></label>
+    <label>Deck A <select id="deckA"></select></label>
+    <label>Bot style A <select id="polA"></select></label>
+    <label>Deck B <select id="deckB"></select></label>
+    <label>Bot style B <select id="polB"></select></label>
     <label>R-cana deck <select id="rcana"><option value="first">First-game set (13 fixed)</option><option value="random">Random 8 / 3 / 2</option></select></label>
     <label>Seed <input type="number" id="seed" value="7" min="1"></label>
     <label>Games (batch) <input type="number" id="games" value="400" min="10" max="5000"></label>
@@ -134,19 +134,18 @@
 </div>
 
 <script type="module">
-  import { ALL_CARDS, TRADERS, TEMPERAMENTS } from './cards.js';
+  import { ALL_CARDS, TEMPERAMENTS } from './cards.js';
   import { PRESETS } from './bots.js';
-  import { STARTER_DECKS, listDeck, deckFor } from './decks.js';
+  import { DECK_OPTIONS, deckFor } from './decks.js';
   import { playOne, batch } from './sim.js';
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   // ----- controls -----
-  const deckOptions = [...Object.entries(STARTER_DECKS).map(([k, v]) => [k, v.name]), ...TRADERS.map((t) => [t.id, `${t.name} (auto deck)`])];
-  for (const id of ['deckA', 'deckB']) $(id).innerHTML = deckOptions.map(([k, n]) => `<option value="${k}">${esc(n)}</option>`).join('');
+  for (const id of ['deckA', 'deckB']) $(id).innerHTML = DECK_OPTIONS.map((d) => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
   $('deckB').value = 'analyst';
-  for (const id of ['polA', 'polB']) $(id).innerHTML = Object.entries(PRESETS).map(([k, v]) => `<option value="${k}">${v.name} (keep ${v.keep}, insure ${v.insurance})</option>`).join('');
+  for (const id of ['polA', 'polB']) $(id).innerHTML = Object.entries(PRESETS).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('');
   $('polB').value = 'hodler';
   try { const saved = JSON.parse(localStorage.getItem('rcana-sim') || '{}'); for (const k of ['deckA', 'polA', 'deckB', 'polB', 'rcana', 'seed', 'games']) if (saved[k] != null) $(k).value = saved[k]; } catch (e) {}
   const opts = () => ({ a: $('deckA').value, b: $('deckB').value, pa: $('polA').value, pb: $('polB').value, rcana: $('rcana').value, seed: +$('seed').value || 1 });
@@ -182,7 +181,7 @@
     $('boards').innerHTML = s.players.map((p) => `
       <div class="panel board ${s.active === p.name && !s.over ? 'active' : ''}">
         <h2>${esc(p.name)}</h2>
-        <div class="trader">${esc(p.trader)}${p.traderLocked ? ' &middot; locked' : ''} &middot; deck ${p.deck} &middot; discard ${p.discard}${p.knowsOmen ? ' &middot; knows the Omen' : ''}</div>
+        <div class="trader">${esc(p.temps)} &middot; plays like a <strong>${esc(p.archetype)}</strong> &middot; deck ${p.deck} &middot; discard ${p.discard}${p.knowsOmen ? ' &middot; knows the Omen' : ''}</div>
         <div class="nums">
           <div class="num bank"><div class="k">Bank</div><div class="v">${p.bank}</div></div>
           <div class="num"><div class="k">Portfolio</div><div class="v">${p.portfolio}</div></div>
@@ -257,14 +256,14 @@
   });
 
   // ----- cards tab -----
-  $('fTemp').innerHTML += TEMPERAMENTS.map((t) => `<option value="${t}">${t}</option>`).join('') + '<option value="shared">shared (Markets, Externalities, Majors, Traders)</option>';
+  $('fTemp').innerHTML += TEMPERAMENTS.map((t) => `<option value="${t}">${t}</option>`).join('') + '<option value="shared">shared (Markets, Externalities, Majors)</option>';
   const types = [...new Set(ALL_CARDS.map((c) => c.type))]; $('fType').innerHTML += types.map((t) => `<option value="${t}">${t}</option>`).join('');
   const rarityName = { C: 'Common', U: 'Uncommon', R: 'Rare', UR: 'Ultra Rare' };
   function renderCards() {
     const ft = $('fTemp').value, fy = $('fType').value, q = $('fText').value.toLowerCase();
     const rows = ALL_CARDS.filter((c) => (!ft || (ft === 'shared' ? !c.temp : c.temp === ft)) && (!fy || c.type === fy) && (!q || (c.name + ' ' + (c.text || '') + ' ' + (c.cls || []).join(' ')).toLowerCase().includes(q)));
     const kw = (c) => Object.entries(c.kw || {}).map(([k, v]) => (v === true ? k : `${k} ${v}`)).join(', ');
-    $('cardTable').innerHTML = `<table><thead><tr><th>Card</th><th>Type</th><th class="n">Cost</th><th class="n">Y / R</th><th>Text</th><th>Rarity</th></tr></thead><tbody>${rows.map((c) => `<tr><td>${c.temp ? `<span class="temp ${c.temp}"></span>` : ''}<strong>${esc(c.name)}</strong>${c.villain ? ' <span class="pill" style="border-color:var(--villain);color:var(--villain)">Villain</span>' : ''}${c.temps ? `<div class="note">${c.temps.join(' + ')}</div>` : ''}</td><td>${c.type}${c.cls && c.cls.length ? `<div class="note">${esc(c.cls.join(', '))}</div>` : ''}</td><td class="n">${c.cost ?? '&mdash;'}</td><td class="n">${c.type === 'personality' ? `${c.yield} / ${c.res}` : c.type === 'position' ? `&mdash; / ${c.res}` : '&mdash;'}</td><td>${kw(c) ? `<em>${esc(kw(c))}.</em> ` : ''}${esc(c.text || '')}</td><td>${rarityName[c.rarity] || c.rarity}</td></tr>`).join('')}</tbody></table><p class="note">${rows.length} cards</p>`;
+    $('cardTable').innerHTML = `<table><thead><tr><th>Card</th><th>Type</th><th class="n">Cost</th><th class="n">Y / R</th><th>Text</th><th>Rarity</th></tr></thead><tbody>${rows.map((c) => `<tr><td>${c.temp ? `<span class="temp ${c.temp}"></span>` : ''}<strong>${esc(c.name)}</strong>${c.villain ? ' <span class="pill" style="border-color:var(--villain);color:var(--villain)">Villain</span>' : ''}</td><td>${c.type}${c.cls && c.cls.length ? `<div class="note">${esc(c.cls.join(', '))}</div>` : ''}</td><td class="n">${c.cost ?? '&mdash;'}</td><td class="n">${c.type === 'personality' ? `${c.yield} / ${c.res}` : c.type === 'position' ? `&mdash; / ${c.res}` : '&mdash;'}</td><td>${kw(c) ? `<em>${esc(kw(c))}.</em> ` : ''}${esc(c.text || '')}</td><td>${rarityName[c.rarity] || c.rarity}</td></tr>`).join('')}</tbody></table><p class="note">${rows.length} cards</p>`;
   }
   ['fTemp', 'fType', 'fText'].forEach((id) => $(id).addEventListener('input', renderCards)); renderCards();
 
