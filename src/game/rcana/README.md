@@ -38,3 +38,27 @@ cd src/game/rcana && python3 -m http.server 8765   # then open http://localhost:
 Numbers that matter live in two places: `WIN_BANK` in `engine.js`, and the card fields in `cards.js`.
 Dividend and Interest are in `Game.set()`. The Reveal and Final Bell logic is in `Game.reveal()`.
 Add a card by adding an entry in `cards.js`; the deck builder and viewer pick it up automatically.
+
+## Tarot configuration (80 cards)
+
+A second, simpler game sharing the same ideas: one shared deck of 22 Major R-cana and 56 Minors
+(Coins, Candles, Chains, Cups: Ace–10 pips plus Page, Knight, Queen, King), and two Querents.
+Pips are four templates scaled by rank; courts are sixteen named Personalities; Majors resolve for the
+whole table when drawn. Theme is general markets and money.
+
+| File | What it is |
+|---|---|
+| `tarot.js` | The 80 cards. |
+| `tarot-engine.js` | Shared-deck rules: Set (Dividend, Interest, Bank), draw Minors resolving Majors on the way, Reserve, pips, courts, Chains as attack or Hedge, Invoke, Foretell, Final Bell. |
+| `tarot-bots.js` | Strong (heuristic), Naive (random actions, banks everything, always hedges) and Random (also passes at random) policies. |
+| `tarot-sim.js` | CLI and the `playOne` / `batch` exports the viewer uses. |
+| `tarot-viewer.html` | Browser UI, same layout as `viewer.html`. |
+
+```bash
+node tarot-sim.js --verbose --seed 5
+node tarot-sim.js --games 2000 --a strong --b naive
+node tarot-sim.js --games 1000 --a strong --b strong --win 60 --draw 2 --hand 5 --first 1 --keepA 10
+```
+
+Defaults after tuning: win at 80, opening hand 7, one Minor drawn per turn, the first player skips the
+first draw. THE RECKONING revealed while more than half the deck remains is buried in the bottom half.
