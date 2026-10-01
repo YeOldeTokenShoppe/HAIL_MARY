@@ -305,14 +305,18 @@
   });
 
   // ----- versus: a human against a bot -----
-  let vs = null;
+  let vs = null; window.__rcana = () => vs; // for tests and debugging
+  // Prompts that can nest inside the main phase (Foretell, a hedge) keep their own resolver;
+  // the main phase keeps its resolver in vs.mainResolve so answering a nested prompt never ends the turn.
+  const safeRender = () => { try { renderVs(); } catch (e) { console.error(e); $('vsPrompt').innerHTML = `<div class="prompt-h" style="color:var(--bad)">PAGE ERROR</div><pre class="note">${esc(String(e && e.stack || e))}</pre>`; } };
   const vsUI = {
-    setPhase: (g, p, { canPass }) => new Promise((res) => { vs.resolve = res; vs.prompt = { kind: 'set', canPass }; renderVs(); }),
-    mainPhase: (g, p) => new Promise((res) => { vs.resolve = res; vs.prompt = { kind: 'main' }; renderVs(); }),
-    hedge: (g, p, opts, threat) => new Promise((res) => { vs.resolve = res; vs.prompt = { kind: 'hedge', opts, threat }; renderVs(); }),
-    foretell: (g, p, c) => new Promise((res) => { vs.resolve = res; vs.prompt = { kind: 'foretell', card: c }; renderVs(); }),
+    setPhase: (g, p, { canPass }) => new Promise((res) => { vs.resolve = res; vs.prompt = { kind: 'set', canPass }; safeRender(); }),
+    mainPhase: (g, p) => new Promise((res) => { vs.mainResolve = res; vs.prompt = { kind: 'main' }; safeRender(); }),
+    hedge: (g, p, opts, threat) => new Promise((res) => { vs.resolve = res; vs.prompt = { kind: 'hedge', opts, threat }; safeRender(); }),
+    foretell: (g, p, c) => new Promise((res) => { vs.resolve = res; vs.prompt = { kind: 'foretell', card: c }; safeRender(); }),
   };
-  function resolveVs(v) { const r = vs.resolve; vs.resolve = null; vs.prompt = { kind: 'waiting' }; renderVs(); if (r) r(v); }
+  function resolveVs(v) { const r = vs.resolve; vs.resolve = null; vs.prompt = vs.mainResolve ? { kind: 'main' } : { kind: 'waiting' }; safeRender(); if (r) r(v); }
+  function endTurn() { const r = vs.mainResolve; vs.mainResolve = null; vs.prompt = { kind: 'waiting' }; safeRender(); if (r) r(); }
   try { if (localStorage.getItem('rcana-played')) $('vsPrimer').open = false; } catch (e) {}
   $('vsStart').addEventListener('click', async () => {
     persist(); try { localStorage.setItem('rcana-played', '1'); } catch (e) {}
@@ -327,11 +331,12 @@
     const coach = isDuel() ? botPolicy2('strong', o.seed + 99) : botPolicy1('strong', o.seed + 99);
     vs = { g: new G({ players, seed: o.seed, snapshots: true, rules: o.rules, hiddenInfo: true }), human, coach, prompt: { kind: 'waiting' }, resolve: null, busy: false };
     vs.me = vs.g.players.find((p) => p.policy === human); vs.bot = vs.g.players.find((p) => p.policy !== human);
-    renderVs();
-    const r = await vs.g.run();
-    vs.prompt = { kind: 'over', result: r }; renderVs();
+    safeRender();
+    try { const r = await vs.g.run(); vs.prompt = { kind: 'over', result: r }; }
+    catch (e) { console.error(e); vs.prompt = { kind: 'waiting' }; $('vsPrompt').innerHTML = `<div class="prompt-h" style="color:var(--bad)">ENGINE ERROR</div><pre class="note">${esc(String(e && e.stack || e))}</pre>`; return; }
+    safeRender();
   });
-  async function doAct(a) { if (!vs || vs.busy || !a) return; vs.busy = true; try { await vs.g.act(vs.me, a); } finally { vs.busy = false; } renderVs(); }
+  async function doAct(a) { if (!vs || vs.busy || !a) return; vs.busy = true; try { await vs.g.act(vs.me, a); } catch (e) { console.error(e); } finally { vs.busy = false; } if (vs.mainResolve && vs.prompt.kind === 'waiting') vs.prompt = { kind: 'main' }; safeRender(); }
   const actLabel = (a) => {
     const g = vs.g, me = vs.me;
     switch (a.t) {
@@ -361,11 +366,11 @@
     if (pr.kind !== 'main') return null;
     if (me.reservedThisTurn < 1 && (me.hand.length >= 3 || g.liquidity(me) < 2)) { const rc = c.reserveChoice(g, me); if (rc) return { text: `Reserve ${rc.name} first. It's your least useful card and Liquidity is what lets you play everything else.`, act: () => doAct({ t: 'reserve', card: rc }) }; }
     let best = null, bs = 0.25; for (const a of acts.filter((a) => a.t !== 'reserve')) { const sc = c.score(g, me, a); if (sc > bs) { bs = sc; best = a; } }
-    if (!best) return { text: 'Nothing left worth doing. End your turn.', act: () => resolveVs() };
+    if (!best) return { text: 'Nothing left worth doing. End your turn.', act: () => endTurn() };
     const why = { hire: 'Personalities are your engine: they earn every turn from now on.', work: 'Idle Personalities earn nothing. Work them.', pip: best.card && best.card.suit === 'chains' ? 'The bot has something exposed. Hit it while it is Working.' : 'Profit now beats cards in hand.', foretell: 'Free information about the next Major.', invoke: 'A Major in Providence is free value for whoever pays first.' }[best.t] || '';
     return { text: `${actLabel(best)}${best.card ? ` with ${best.card.name}` : ''}. ${why}`, act: () => doAct(best) };
   }
-  async function coachFinish() { if (!vs || vs.prompt.kind !== 'main') return; for (let k = 0; k < 20 && vs.prompt.kind === 'main'; k++) { const adv = coachAdvice(vs.g.actions(vs.me)); if (!adv) break; const before = vs.prompt.kind; await adv.act(); if (before !== 'main') break; if (!vs.resolve) break; } }
+  async function coachFinish() { if (!vs || vs.prompt.kind !== 'main') return; for (let k = 0; k < 20 && vs.mainResolve; k++) { if (vs.prompt.kind !== 'main') break; const adv = coachAdvice(vs.g.actions(vs.me)); if (!adv) break; await adv.act(); } }
   function renderVs() {
     if (!vs) return; const g = vs.g; const me = vs.me; const bot = vs.bot; const s = g.makeSnapshot('live');
     const sm = s.players.find((p) => p.name === me.name); const sb = s.players.find((p) => p.name === bot.name);
@@ -421,7 +426,7 @@
     // wire
     document.querySelectorAll('#view-versus [data-act]').forEach((b) => b.addEventListener('click', () => doAct(acts[+b.dataset.act])));
     if (pr.kind === 'set') { $('vsBankAll').addEventListener('click', () => resolveVs({ bank: me.portfolio })); $('vsBankSome').addEventListener('click', () => resolveVs({ bank: +$('vsBankN').value || 0 })); if (pr.canPass) $('vsPass').addEventListener('click', () => resolveVs({ pass: true })); }
-    if (pr.kind === 'main') $('vsEnd').addEventListener('click', () => resolveVs());
+    if (pr.kind === 'main') $('vsEnd').addEventListener('click', () => endTurn());
     if (pr.kind === 'hedge') { document.querySelectorAll('#view-versus [data-hedge]').forEach((b) => b.addEventListener('click', () => resolveVs(pr.opts[+b.dataset.hedge]))); $('vsNoHedge').addEventListener('click', () => resolveVs(null)); }
     if (pr.kind === 'foretell') { $('vsBottom').addEventListener('click', () => resolveVs(true)); $('vsKeep').addEventListener('click', () => resolveVs(false)); }
     // log
