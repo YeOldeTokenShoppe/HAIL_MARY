@@ -227,16 +227,17 @@ export class TarotGame {
     const cur = this.current; let n = amount;
     if (cur && cur.victim === victim && cur.reduce) { const r = Math.min(n, cur.reduce); n -= r; cur.reduce -= r; if (r) this.log(`${victim.name}'s Hedge absorbs ${r}`); }
     if (n <= 0 || !victim.pass) { this.log(`${att.name}'s interception is turned away`); return 0; }
-    const stake = victim.inAir; const take = Math.min(n, stake); victim.inAir = 0; victim.pass = null; att.portfolio += take; att.stats.interceptions++; att.stats.frontrun += take;
+    const stake = victim.inAir; const take = Math.min(n, stake); victim.inAir = 0; victim.pass = null; att.portfolio += take; att.stats.interceptions++; att.stats.frontrun += take; this.passNews(victim, { result: 'intercepted', stake, amount: take, by: att.name });
     this.log(`✝ INTERCEPTED by ${att.name}: ${victim.name}'s Hail Mary Pass falls. ${att.name} takes ${take}; the rest of the ${stake} is lost.`);
     return take;
   }
-  knockDown(p, why, by) { if (!p.pass) return; const stake = p.inAir; p.inAir = 0; p.pass = null; this.log(`✝ INCOMPLETE: ${p.name}'s Hail Mary Pass falls (${why}). The ${stake} in the air is lost.`); }
-  landPasses() { for (const q of this.players) if (q.pass) { this.log(`✝ The Final Bell catches ${q.name}'s Hail Mary Pass in the air: ${q.inAir} returns to their Portfolio, undoubled.`); q.portfolio += q.inAir; q.inAir = 0; q.pass = null; } }
+  knockDown(p, why, by) { if (!p.pass) return; const stake = p.inAir; p.inAir = 0; p.pass = null; this.passNews(p, { result: 'knocked', stake, amount: 0, by: why }); this.log(`✝ INCOMPLETE: ${p.name}'s Hail Mary Pass falls (${why}). The ${stake} in the air is lost.`); }
+  passNews(p, news) { p.lastPass = { ...news, seq: (this.passSeq = (this.passSeq || 0) + 1), round: this.round }; }
+  landPasses() { for (const q of this.players) if (q.pass) { this.log(`✝ The Final Bell catches ${q.name}'s Hail Mary Pass in the air: ${q.inAir} returns to their Portfolio, undoubled.`); this.passNews(q, { result: 'returned', stake: q.inAir, amount: q.inAir, by: 'the Final Bell' }); q.portfolio += q.inAir; q.inAir = 0; q.pass = null; } }
   async doSet(p) {
     for (const i of p.floor) i.working = false; p.reserve.forEach((r) => { r.locked = false; }); p.reservedThisTurn = 0; p.foretold = false; p.turnBonusLiquidity = 0; p.bankedThisTurn = 0;
     // Set
-    if (p.pass) { const stake = p.inAir; const n = Math.floor(stake * this.rules.passMult); p.inAir = 0; p.pass = null; p.stats.completions++; p.stats.passBanked += n; this.log(`✝ COMPLETE: ${p.name}'s Hail Mary Pass comes down. ${stake} in the air banks as ${n}.`); this.bank(p, n, 'Hail Mary Pass'); }
+    if (p.pass) { const stake = p.inAir; const n = Math.floor(stake * this.rules.passMult); p.inAir = 0; p.pass = null; p.stats.completions++; p.stats.passBanked += n; this.passNews(p, { result: 'complete', stake, amount: n, by: null }); this.log(`✝ COMPLETE: ${p.name}'s Hail Mary Pass comes down. ${stake} in the air banks as ${n}.`); this.bank(p, n, 'Hail Mary Pass'); }
     const div = (this.modFirst(p, 'dividend') ?? 1) + this.modSum(p, 'dividendDelta'); this.profit(p, div, 'Dividend');
     const idiv = this.modMin(p, 'interestDiv', this.rules.interestDiv); const im = this.modProduct(p, 'interestMult'); const interest = Math.floor(p.portfolio / idiv) * im; if (interest) this.profit(p, interest, 'Interest');
     p.stats.unbankedSum += p.portfolio; p.stats.sets++;

@@ -70,6 +70,10 @@
   .card .verb { font-family: var(--font-display); font-size: 8.5px; letter-spacing: .04em; text-align: center; margin-top: 3px; color: var(--card-ink); line-height: 1.15; }
   .card .mid .stack2 { display: grid; justify-items: center; gap: 1px; }
   .num small { display: block; color: var(--muted); font-size: 9px; font-family: var(--font-body); letter-spacing: .02em; }
+  .ghost .tag { position: absolute; left: 50%; bottom: -22px; transform: translateX(-50%); white-space: nowrap; background: var(--gold); color: var(--gold-ink); font: 600 11px var(--font-body); padding: 2px 8px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.5); }
+  .ghost .tag:empty { display: none; }
+  .passnews { width: 100%; border-radius: 8px; padding: 8px 10px; font-weight: 600; font-size: 13px; }
+  .passnews.good { background: var(--good); color: #06281a; } .passnews.bad { background: var(--bad); color: #fff; } .passnews.flat { background: var(--felt); color: var(--ink); border: 1px solid var(--line); }
   .hm { font-size: 11px; color: var(--muted); border: 1px dashed var(--line); border-radius: 6px; padding: 3px 6px; text-align: center; }
   .hm.ready { border-style: solid; border-color: var(--gold); color: var(--gold); font-weight: 600; }
   .phases { width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-family: var(--font-display); font-size: 10px; letter-spacing: .08em; color: var(--muted); }
@@ -171,7 +175,7 @@
     <div class="querent" id="meQ"><div class="who">YOU</div><div class="num"><span>Bank<small>safe for good</small></span><b id="meBank">0</b></div><div class="num port"><span>Portfolio<small>exposed until banked</small></span><b id="mePort">0</b></div><div class="num"><span>Liquidity<small>pays for cards</small></span><b id="meLiq">0</b></div><div id="mePass"></div><div class="reserve" id="meReserve"></div><button id="endTurn" class="primary" disabled>End turn</button></div>
     <div class="zones">
       <div class="zone" id="meFloor"><span class="zl">Your floor · Personalities live here; tap an idle one to Work it for its earnings</span></div>
-      <div class="zone" id="meReserveZone" style="min-height:40px"><span class="zl">Reserve · drop one card a turn here: it is gone, but pays 1 Liquidity every turn</span></div>
+      <div class="zone" id="meReserveZone" style="min-height:calc(var(--ch) * .7)"><span class="zl">Reserve · drop one card a turn here: it is gone, but pays 1 Liquidity every turn</span></div>
       <div id="prompt"></div>
       <div class="ask" id="ask" hidden>
         <div class="ask-row"><span class="who">ASK THE COACH</span><input type="text" id="askQ" maxlength="400" placeholder="Why not attack? What does this Market do? Should I throw the pass?"><button class="primary" id="askGo">Ask</button><button id="askStop" hidden>Stop</button></div>
@@ -227,7 +231,7 @@
     foretell: (g, p, c) => new Promise((res) => { S.resolve = res; S.prompt = { kind: 'foretell', card: c }; render(); }),
   };
   function resolveP(v) { const r = S.resolve; S.resolve = null; S.prompt = S.mainResolve ? { kind: 'main' } : { kind: 'wait' }; render(); if (r) r(v); }
-  function endTurn() { const r = S.mainResolve; S.mainResolve = null; S.prompt = { kind: 'wait' }; render(); if (r) r(); }
+  function endTurn() { const r = S.mainResolve; S.mainResolve = null; S.passNews = null; S.prompt = { kind: 'wait' }; render(); if (r) r(); }
 
   $('start').addEventListener('click', async () => {
     try { localStorage.setItem('rcana-table-played', '1'); } catch (e) {}
@@ -276,6 +280,13 @@
     if (c.suit === 'chains') return c.reversed ? `COLLATERAL ${r} · free HEDGE` : `ATTACK ${r} · or HEDGE`;
     return c.reversed ? `TAKE ${h} from the bot` : `SHARE: you +${r}, bot +${h}`;
   }
+  function passNewsText(q) {
+    const n = q.lastPass, who = q === S.me ? 'YOUR' : "THE BOT'S", bot = q === S.me ? 'the bot' : 'you';
+    if (n.result === 'complete') return { cls: 'good', text: `✝ ${who} HAIL MARY CAME DOWN UNTOUCHED: ${n.stake} in the air banked as ${n.amount}.` };
+    if (n.result === 'intercepted') return { cls: 'bad', text: `✝ ${who} HAIL MARY WAS INTERCEPTED by ${n.by === S.me.name ? 'you' : n.by === S.bot.name ? 'the bot' : n.by}: ${n.amount} of the ${n.stake} went to the interceptor, the rest is lost.` };
+    if (n.result === 'knocked') return { cls: 'bad', text: `✝ ${who} HAIL MARY WAS KNOCKED DOWN by ${n.by}: all ${n.stake} in the air is lost.` };
+    return { cls: 'flat', text: `✝ ${who} HAIL MARY was still in the air at the end: ${n.stake} returns to the Portfolio, undoubled.` };
+  }
   function phaseStrip(kind) {
     const steps = [['SET', 'Profit arrives (Dividend, plus Interest). Bank some or all of your Portfolio, or throw the Hail Mary.'], ['DRAW', 'One card.'], ['MAIN', 'Reserve one card for Liquidity, hire Personalities, Work them, play pips. Then End turn.'], ['BOT', 'The bot takes its turn. If it attacks you, you may Hedge with a Chain.']];
     const cur = kind === 'set' ? 0 : kind === 'main' ? 2 : 3;
@@ -288,6 +299,7 @@
     if (!S) return; const g = S.g, me = S.me, bot = S.bot; const main = S.prompt.kind === 'main';
     acts = main ? g.actions(me) : [];
     const hint = $('coach').checked && ['set', 'main', 'hedge', 'foretell'].includes(S.prompt.kind) ? advice() : null;
+    for (const q of [me, bot]) if (q.lastPass && q.lastPass.seq > (S.seenPass || 0)) { S.seenPass = q.lastPass.seq; const n = passNewsText(q); toast(n.text); if (q === me) S.passNews = n; }
     // querents
     $('oppBank').textContent = bot.bank; $('oppPort').textContent = bot.portfolio; $('oppHand').textContent = bot.hand.length;
     $('oppPass').innerHTML = bot.pass ? `<div class="pass-badge" id="oppPassBadge">PASS IN THE AIR: ${bot.inAir}</div>` : '';
@@ -317,7 +329,7 @@
     const fa = acts.find((a) => a.t === 'foretell');
     const hintTxt = hint ? `<div class="coach-row"><span class="who">COACH</span><span class="txt">${esc(hint.text)}</span><button id="coachDo">Do that</button>${S.prompt.kind === 'main' ? '<button id="coachFinish">Let the coach finish my turn</button>' : ''}</div>` : '';
     // prompt panel
-    const pr = S.prompt; let html = ''; const strip = ['set', 'main', 'wait'].includes(pr.kind) && !g.over ? phaseStrip(pr.kind) : '';
+    const pr = S.prompt; let html = ''; const strip = (['set', 'main', 'wait'].includes(pr.kind) && !g.over ? phaseStrip(pr.kind) : '') + (S.passNews && ['set', 'main'].includes(pr.kind) ? `<div class="passnews ${S.passNews.cls}">${esc(S.passNews.text)}</div>` : '');
     if (pr.kind === 'wait') html = `<div class="prompt">${strip}<div class="ph">${g.over ? 'GAME OVER' : 'THE BOT IS PLAYING'}</div></div>`;
     else if (pr.kind === 'set') html = `<div class="prompt">${strip}<div class="ph">YOUR SET · ${me.portfolio} in your Portfolio</div><button class="primary" id="bankAll">Bank all ${me.portfolio}</button><label class="note" style="display:flex;gap:6px;align-items:center">Bank <input type="number" id="bankN" min="0" max="${me.portfolio}" value="0" style="width:70px"> <button id="bankSome">keep the rest exposed</button></label>${pr.canPass ? `<button class="danger" id="throwPass">Throw a HAIL MARY PASS with all ${me.portfolio}</button>` : ''}${hintTxt}</div>`;
     else if (pr.kind === 'main') html = `<div class="prompt">${strip}<div class="ph">YOUR MAIN PHASE · Liquidity ${g.liquidity(me)} to spend${me.reservedThisTurn ? '' : ' · you may still Reserve one card'}</div>${fa ? '<button id="foretell">Foretell the Omen</button>' : ''}<span class="note" style="color:var(--muted)">Drag a glowing card onto a glowing zone. Tap any card to read it.</span>${hintTxt}</div>`;
@@ -338,7 +350,7 @@
   $('coach').addEventListener('change', render);
   try { if (localStorage.getItem('rcana-table-played')) $('primer').open = false; } catch (e) {}
 
-  async function doAct(a) { if (!S || S.busy || !a) return; S.busy = true; const g = S.g; const before = { port: S.me.portfolio, bank: S.me.bank }; try { await g.act(S.me, a); } catch (e) { console.error(e); toast('That move failed: ' + e.message); } finally { S.busy = false; } if (S.mainResolve && S.prompt.kind === 'wait') S.prompt = { kind: 'main' }; render(); const d = S.me.portfolio - before.port; if (d > 0) floatAt($('mePort'), `+${d}`); if (d < 0) floatAt($('mePort'), `${d}`, true); const b = S.me.bank - before.bank; if (b > 0) floatAt($('meBank'), `+${b} banked`); }
+  async function doAct(a) { if (!S || S.busy || !a) return; S.busy = true; const g = S.g; const before = { port: S.me.portfolio, bank: S.me.bank }; try { await g.act(S.me, a); toast(actLabel(a) + (a.card ? ': ' + a.card.name : a.inst ? ': ' + a.inst.card.name : '')); } catch (e) { console.error(e); toast('That move failed: ' + e.message); } finally { S.busy = false; } if (S.mainResolve && S.prompt.kind === 'wait') S.prompt = { kind: 'main' }; render(); const d = S.me.portfolio - before.port; if (d > 0) floatAt($('mePort'), `+${d}`); if (d < 0) floatAt($('mePort'), `${d}`, true); const b = S.me.bank - before.bank; if (b > 0) floatAt($('meBank'), `+${b} banked`); }
 
   // ───────── coach ─────────
   const WHY = { hire: 'Personalities are your engine: they earn every turn from now on.', work: 'Idle Personalities earn nothing. Work them.', foretell: 'Free information about the next Major.', invoke: 'A Major in Providence is free value for whoever pays first.' };
@@ -490,15 +502,15 @@
     el.addEventListener('pointerdown', (ev) => { if (ev.button !== 0) return; start = { x: ev.clientX, y: ev.clientY }; el.setPointerCapture(ev.pointerId); });
     el.addEventListener('pointermove', (ev) => {
       if (!start) return; const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
-      if (!dragging && Math.hypot(dx, dy) > 8) { if (S.prompt.kind !== 'main') { start = null; return; } targets = targetsFor(c); if (!targets.length) { start = null; toast('Nothing to do with that card right now'); return; } dragging = { c }; ghost = el.cloneNode(true); ghost.classList.add('ghost'); ghost.style.width = el.offsetWidth + 'px'; ghost.style.height = el.offsetHeight + 'px'; document.body.appendChild(ghost); el.style.opacity = '.35'; for (const t of targets) t.el.classList.add(t.el.classList.contains('card') ? 'target' : 'drop'); }
-      if (dragging) { ghost.style.left = (ev.clientX - el.offsetWidth / 2) + 'px'; ghost.style.top = (ev.clientY - el.offsetHeight / 2) + 'px'; const under = hitTarget(ev, targets); for (const t of targets) { t.el.classList.toggle('over', under === t); t.el.classList.toggle('drop-over', under === t); } }
+      if (!dragging && Math.hypot(dx, dy) > 8) { if (S.prompt.kind !== 'main') { start = null; return; } targets = targetsFor(c); if (!targets.length) { start = null; toast('Nothing to do with that card right now'); return; } dragging = { c }; ghost = el.cloneNode(true); ghost.classList.add('ghost'); ghost.insertAdjacentHTML('beforeend', '<span class="tag"></span>'); ghost.style.width = el.offsetWidth + 'px'; ghost.style.height = el.offsetHeight + 'px'; document.body.appendChild(ghost); el.style.opacity = '.35'; for (const t of targets) t.el.classList.add(t.el.classList.contains('card') ? 'target' : 'drop'); }
+      if (dragging) { ghost.style.left = (ev.clientX - el.offsetWidth / 2) + 'px'; ghost.style.top = (ev.clientY - el.offsetHeight / 2) + 'px'; const under = hitTarget(ev, targets); for (const t of targets) { t.el.classList.toggle('over', under === t); t.el.classList.toggle('drop-over', under === t); } const tag = ghost.querySelector('.tag'); if (tag) tag.textContent = under ? '→ ' + actLabel(under.a) : ''; }
     });
     const finish = async (ev) => {
       if (!start) return; const wasDrag = !!dragging; start = null;
       if (wasDrag) { const under = hitTarget(ev, targets); for (const t of targets) t.el.classList.remove('target', 'drop', 'over', 'drop-over'); ghost.remove(); ghost = null; el.style.opacity = ''; dragging = null; if (under) await doAct(under.a); else render(); }
       else { popCard(ev, c); }
     };
-    el.addEventListener('pointerup', finish); el.addEventListener('pointercancel', finish);
+    el.addEventListener('pointerup', finish); el.addEventListener('pointercancel', finish); el.addEventListener('lostpointercapture', (ev) => { if (start) finish(ev); });
   }
   function hitTarget(ev, targets) { const els = document.elementsFromPoint(ev.clientX, ev.clientY); for (const e of els) { const t = targets.find((t) => t.el === e || t.el.contains(e)); if (t) return t; } return null; }
   // tap: read the card, with its legal moves as a fallback to dragging
