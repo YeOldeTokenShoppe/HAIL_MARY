@@ -37,7 +37,7 @@ cd src/game/rcana && python3 -m http.server 8765   # then open http://localhost:
 
 Open `tarot-viewer.html`, pick the Mode, your deck and the bot's deck (duel only), the bot style under
 Trader B, then use the Versus tab. The engine pauses for each of your decisions: bank or throw a Hail Mary
-Pass at your Set, every action in your main phase, hedging when the bot attacks you, and Foretell. The bot's
+Pass at the start of your turn, every action in your main phase, hedging when the bot attacks you, and Foretell. The bot's
 hand and the Omen are hidden. Policies are `async`; a `HumanPolicy` in `tarot-bots.js` resolves each decision
 from the page.
 
@@ -62,7 +62,7 @@ whole table when drawn. Theme is general markets and money.
 | File | What it is |
 |---|---|
 | `tarot.js` | The 80 cards. |
-| `tarot-engine.js` | Shared-deck rules: Set (Dividend, Interest, Bank), draw Minors resolving Majors on the way, Reserve, pips, courts, Chains as attack or Hedge, Invoke, Foretell, Final Bell. |
+| `tarot-engine.js` | Shared-deck rules: start of turn (Dividend, Interest, Bank), draw Minors resolving Majors on the way, Reserve, pips, courts, Chains as attack or Hedge, Invoke, Foretell, Final Bell. |
 | `tarot-bots.js` | Strong (heuristic), Naive (random actions, banks everything, always hedges) and Random (also passes at random) policies. |
 | `tarot-sim.js` | CLI and the `playOne` / `batch` exports the viewer uses. |
 | `tarot-viewer.html` | Browser UI: Watch (bot vs bot, turn by turn), Versus (you against a bot, with buttons and a coach), Batch, Cards. Covers both the shared reading and the duel. |
@@ -131,7 +131,7 @@ Providence row where any Trader may later pay to use it. The next Major slides f
 **Each turn, in order:**
 
 1. **Refresh.** Your Working Personalities stand up. Your locked Reserve cards unlock. Shields expire.
-2. **Set.** Take your Dividend (1 Profit into your Portfolio, more under some Markets). Take Interest (1 Profit
+2. **Start of turn.** Take your Dividend (1 Profit into your Portfolio, more under some Markets). Take Interest (1 Profit
    for every full 5 already in your Portfolio). Then bank any amount you like from Portfolio to Bank.
    Banked Profit can never be touched again.
 3. **Draw** one Minor from your deck.
@@ -150,13 +150,13 @@ Providence row where any Trader may later pay to use it. The next Major slides f
 hand as a Hedge: an upright Chain costs its Liquidity and absorbs its rank; a reversed Chain is free, absorbs
 its rank plus two, and draws a card.
 
-**The Hail Mary Pass.** Once per game, at your Set, instead of banking you may throw your whole Portfolio
+**The Hail Mary Pass.** Once per game, at the start of your turn, instead of banking you may throw your whole Portfolio
 (at least 10) into the air. It stays in the air through your turn and every opponent's turn. If anything
-takes Profit from your Portfolio before your next Set, the pass is incomplete and you lose all of it; if the
+takes Profit from your Portfolio before the start of your next turn, the pass is incomplete and you lose all of it; if the
 taker was an opponent's Chain, they intercepted it. If it comes down untouched, what you threw banks doubled.
 Profit you earn after the throw sits in the Portfolio as normal. THE HAIL MARY (The Fool) lets an Underdog
 throw a second one. Rule flags: `--passMult`, `--passMin`, `--passUnderdog`, `--noPassA`, `--noPassB`.
 
-**Winning.** When any Trader's Bank reaches 80 at a Set, the round is played out so everyone has had the
+**Winning.** When any Trader's Bank reaches 80 at the start of a turn, the round is played out so everyone has had the
 same number of turns, and the largest Bank wins. If THE RECKONING is revealed in the second half of the Majors,
 or the Majors run out, the game ends after that round the same way.

@@ -144,7 +144,7 @@
         <li><strong>Personalities earn.</strong> Hire one (it rests the turn it arrives), then put it to <strong>Work</strong> each turn for its Yield. A Working Personality is the only thing the bot's Chains can hit.</li>
         <li><strong>The Four C's:</strong> Coins give Profit now. Candles make a Personality Work for a bonus. Cups give the bot a little and you more, and draw a card. Chains attack a Working Personality, Front-run the bot's Portfolio, or intercept a pass; or stay in hand to Hedge when you're attacked. Reversed Chains are Collateral: armor and extra Yield for one of your own Personalities.</li>
         <li><strong>The Majors are fate.</strong> One is revealed each round for everyone. Markets stay, Events hit at once, Invokes sit in Providence for whoever pays.</li>
-        <li><strong>Hail Mary Pass:</strong> once per game, throw your whole Portfolio into the air instead of banking. If nothing touches it by your next Set, it banks doubled. If anything does, it's gone.</li>
+        <li><strong>Hail Mary Pass:</strong> once per game, throw your whole Portfolio into the air instead of banking. If nothing touches it by the start of your next turn, it banks doubled. If anything does, it's gone.</li>
       </ol>
       <p class="note" style="margin:10px 0 0">The coach below shows what the strong bot would do at each decision. Take its advice, or ignore it and see what happens.</p>
     </details>
@@ -406,7 +406,7 @@
     // prompt
     const pr = vs.prompt; let html = '';
     if (pr.kind === 'waiting') html = `<span class="note">${s.over ? 'Game over.' : 'The bot is thinking&hellip;'}</span>`;
-    else if (pr.kind === 'set') html = `<div class="prompt-h">YOUR SET &middot; ${me.portfolio} in Portfolio</div><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+    else if (pr.kind === 'set') html = `<div class="prompt-h">START OF YOUR TURN &middot; ${me.portfolio} in Portfolio</div><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
         <button class="act big" id="vsBankAll">Bank all ${me.portfolio}</button>
         <label style="display:flex;gap:6px;align-items:center;text-transform:none;letter-spacing:0;font-size:13px;color:var(--fg)">Bank <input type="number" id="vsBankN" min="0" max="${me.portfolio}" value="0" style="width:80px;font:inherit;color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px"> <button class="act" id="vsBankSome">and keep the rest exposed</button></label>
         ${pr.canPass ? `<button class="act" id="vsPass" style="border-color:var(--bad);color:var(--bad)">Throw a HAIL MARY PASS with all ${me.portfolio}</button>` : ''}

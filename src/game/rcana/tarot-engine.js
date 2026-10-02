@@ -233,7 +233,7 @@ export class TarotGame {
   canPass(p) { return !p.hailMaryUsed && !p.pass && p.portfolio >= this.rules.passMin && (!this.rules.passUnderdogOnly || this.isUnderdog(p)) && !this.closing; }
   throwPass(p, { extra = false } = {}) {
     if (!extra) p.hailMaryUsed = true; p.inAir = p.portfolio; p.portfolio = 0; p.pass = { round: this.round }; p.stats.passes++;
-    this.log(`✝ ${p.name} throws a HAIL MARY PASS: ${p.inAir} in the air until their next Set. Intercept it, or watch it double.`);
+    this.log(`✝ ${p.name} throws a HAIL MARY PASS: ${p.inAir} in the air until the start of their next turn. Intercept it, or watch it double.`);
   }
   passTarget(o) { return { isPass: true, owner: o, name: `${o.name}'s Hail Mary Pass` }; }
   // An opponent's Chain aimed at the pass itself. Hedges reduce it; whatever gets through brings the pass down.
@@ -250,7 +250,7 @@ export class TarotGame {
   landPasses() { for (const q of this.players) if (q.pass) { this.log(`✝ The Final Bell catches ${q.name}'s Hail Mary Pass in the air: ${q.inAir} returns to their Portfolio, undoubled.`); this.passNews(q, { result: 'returned', stake: q.inAir, amount: q.inAir, by: 'the Final Bell' }); q.portfolio += q.inAir; q.inAir = 0; q.pass = null; } }
   async doSet(p) {
     for (const i of p.floor) i.working = false; p.reserve.forEach((r) => { r.locked = false; }); p.reservedThisTurn = 0; p.copiedThisTurn = false; p.foretold = false; p.turnBonusLiquidity = 0; p.bankedThisTurn = 0;
-    // Set
+    // Start of turn: pass lands, Dividend, bonus, bank or throw
     if (p.pass) { const stake = p.inAir; const n = Math.floor(stake * this.rules.passMult); p.inAir = 0; p.pass = null; p.stats.completions++; p.stats.passBanked += n; this.passNews(p, { result: 'complete', stake, amount: n, by: null }); this.log(`✝ COMPLETE: ${p.name}'s Hail Mary Pass comes down. ${stake} in the air banks as ${n}.`); this.bank(p, n, 'Hail Mary Pass'); }
     const div = (this.modFirst(p, 'dividend') ?? 1) + this.modSum(p, 'dividendDelta'); this.profit(p, div, 'Dividend');
     const idiv = this.modMin(p, 'interestDiv', this.rules.interestDiv); const im = this.modProduct(p, 'interestMult'); const interest = Math.floor(p.portfolio / idiv) * im; if (interest) this.profit(p, interest, this.rules.v1b ? `Dividend bonus: ${p.portfolio} exposed` : 'Interest');
@@ -258,7 +258,7 @@ export class TarotGame {
     if (this.canPass(p) && await p.policy.hailMaryPass(this, p)) { this.throwPass(p); }
     else {
       let amt = Math.min(p.portfolio, Math.max(0, await p.policy.bankAmount(this, p)));
-      if (amt) this.bankFromPortfolio(p, amt, 'Set'); else if (p.portfolio) this.log(`${p.name} keeps ${p.portfolio} in Portfolio`);
+      if (amt) this.bankFromPortfolio(p, amt, 'start of turn'); else if (p.portfolio) this.log(`${p.name} keeps ${p.portfolio} in Portfolio`);
     }
   }
   startOfRound() {}

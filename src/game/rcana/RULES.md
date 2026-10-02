@@ -258,7 +258,7 @@ Shuffled into the deck. When drawn, a Major does not go to your hand: it resolve
 
 Setup: each Trader draws eight Minors. The rest of the Minors and all 22 Majors are shuffled together. The first player skips the first draw.
 
-Each turn: Refresh (Working Personalities stand up, Reserve unlocks). Set (Dividend 1; Interest 1 per full 5 in Portfolio; resolve or throw a Hail Mary Pass; bank any amount). Draw one Minor, resolving every Major drawn along the way. Main: Reserve one card as Liquidity, hire courts, play pips, Work idle Personalities, Foretell with Virgil, Invoke a Major in Providence. Only Working Personalities can be hit by Chains. Banked Profit is untouchable.
+Each turn: Refresh (Working Personalities stand up, Reserve unlocks). Start of turn (Dividend 1; Interest 1 per full 5 in Portfolio; resolve or throw a Hail Mary Pass; bank any amount). Draw one Minor, resolving every Major drawn along the way. Main: Reserve one card as Liquidity, hire courts, play pips, Work idle Personalities, Foretell with Virgil, Invoke a Major in Providence. Only Working Personalities can be hit by Chains. Banked Profit is untouchable.
 
 The game ends at 80 banked, at THE RECKONING, or when the deck runs out (Final Bell: largest Bank wins).
 
@@ -279,13 +279,13 @@ Each Trader brings a private 56-card deck: one card per slot, each chosen uprigh
 
 Courts have reversed versions too (the same character on a different day). Every deck has the same skeleton, so balance is structural; there are 2^56 possible decks. Reversed courts and pips are in `v2.js`.
 
-When any Bank reaches 80 at a Set, the round is played out so everyone has had the same number of turns, then the largest Bank wins.
+When any Bank reaches 80 at the start of a turn, the round is played out so everyone has had the same number of turns, then the largest Bank wins.
 
 Tuned by simulation: reversed Chains lifted hedging from near zero to a third of a game and need the card draw to be an even trade; a deck that never gives (reversed Cups) had a structural edge until upright Cups drew a card; seat order is fair at two, three and four players with the rotating lead and the played-out final round.
 
 ## The Hail Mary Pass
 
-Once per game, at your Set, instead of banking you may throw your whole Portfolio (at least 10) into the air. It stays in the air through your turn and every opponent's turn. If anything takes Profit from your Portfolio before your next Set, the pass is incomplete and you lose all of it; if the taker was an opponent, they intercepted it. If it comes down untouched, what you threw banks doubled. Profit earned after the throw sits in the Portfolio as normal. THE HAIL MARY (The Fool) lets an Underdog throw a second one.
+Once per game, at the start of your turn, instead of banking you may throw your whole Portfolio (at least 10) into the air. It stays in the air through your turn and every opponent's turn. If anything takes Profit from your Portfolio before the start of your next turn, the pass is incomplete and you lose all of it; if the taker was an opponent, they intercepted it. If it comes down untouched, what you threw banks doubled. Profit earned after the throw sits in the Portfolio as normal. THE HAIL MARY (The Fool) lets an Underdog throw a second one.
 
 Tuned by simulation: at double, a thrower has a 52–54% edge over a non-thrower; at 1.5 times nobody throws. About 70% of passes complete, 5% are intercepted, the rest fall to Events.
 
