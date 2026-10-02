@@ -99,7 +99,7 @@
   </header>
 
   <section class="panel controls" id="controls">
-    <label>Mode <select id="mode"><option value="reading">Version 1: shared reading</option><option value="reading1b">Version 1b: Favor &amp; Network</option><option value="duel">Version 2: duel with reversals</option></select></label>
+    <label>Mode <select id="mode"><option value="reading">Version 1: shared reading</option><option value="reading1b">Version 1b: Favor &amp; Network</option><option value="reading1c">Version 1c: Omen, free Hedges, capped pass</option><option value="duel">Version 2: duel with reversals</option></select></label>
     <label>Trader A <select id="polA"><option value="strong">Strong bot</option><option value="naive">Naive bot</option><option value="random">Random bot</option></select></label>
     <label>Deck A (v2) <select id="deckA"></select></label>
     <label>Trader B <select id="polB"><option value="strong">Strong bot</option><option value="naive" selected>Naive bot</option><option value="random">Random bot</option></select></label>
@@ -184,7 +184,8 @@
   import { buildDeck } from './v2.js';
   import { makeRng } from './engine.js';
   const isDuel = () => $('mode').value === 'duel';
-  const isV1b = () => $('mode').value === 'reading1b';
+  const isV1b = () => $('mode').value === 'reading1b' || $('mode').value === 'reading1c';
+  const isV1c = () => $('mode').value === 'reading1c';
   const playOne = (o) => (isDuel() ? playOne2(o) : playOne1(o));
   const batch = (o, n) => (isDuel() ? batch2(o, n) : batch1(o, n));
 
@@ -195,7 +196,7 @@
   for (const id of ['deckA', 'deckB']) $(id).innerHTML = Object.entries(DECK_PRESETS).map(([k, v]) => `<option value="${k}">${esc(v.name)}</option>`).join('');
   $('deckB').value = 'random'; $('deckA').value = 'random';
   try { const saved = JSON.parse(localStorage.getItem('rcana-tarot') || '{}'); for (const k of ['mode', 'polA', 'polB', 'deckA', 'deckB', 'win', 'draw', 'hand', 'seed', 'games']) if (saved[k] != null) $(k).value = saved[k]; } catch (e) {}
-  const opts = () => ({ a: $('polA').value, b: $('polB').value, da: $('deckA').value, db: $('deckB').value, seed: +$('seed').value || 1, rules: { v1b: isV1b(), winBank: +$('win').value || 80, minorsPerTurn: +$('draw').value || 1, openingHand: +$('hand').value || 8 } });
+  const opts = () => ({ a: $('polA').value, b: $('polB').value, da: $('deckA').value, db: $('deckB').value, seed: +$('seed').value || 1, rules: { v1b: isV1b(), v1c: isV1c(), winBank: +$('win').value || 80, minorsPerTurn: +$('draw').value || 1, openingHand: +$('hand').value || 8 } });
   const persist = () => { try { localStorage.setItem('rcana-tarot', JSON.stringify({ mode: $('mode').value, polA: $('polA').value, polB: $('polB').value, deckA: $('deckA').value, deckB: $('deckB').value, win: $('win').value, draw: $('draw').value, hand: $('hand').value, seed: $('seed').value, games: $('games').value })); } catch (e) {} };
   const syncMode = () => { const d = isDuel(); $('deckA').parentElement.hidden = !d; $('deckB').parentElement.hidden = !d; $('draw').parentElement.hidden = d; };
   $('mode').addEventListener('change', () => { syncMode(); renderCards(); }); syncMode();

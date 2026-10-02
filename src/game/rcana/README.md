@@ -9,14 +9,15 @@ Three rule sets share one engine:
 | Version | What it is | Rulebook | Status |
 |---|---|---|---|
 | 1, the shared reading | One shared deck with the Majors shuffled in; a Major resolves for both players when drawn. | `RULES-v1.md` | Complete |
-| 1b, Favor and Network | Version 1 with a two-partner Network, Copy trades, and Favor earned by generosity. | `RULES-v1b.md` | Current playtest build; the table opens on it |
-| 2, the duel | Private decks with reversed faces, a shared Major deck with a face-down Omen. | `RULES-v2.md` | Complete, parked while 1b is tested |
+| 1b, Favor and Network | Version 1 with a two-partner Network, Copy trades, and Favor earned by generosity. | `RULES-v1b.md` | Complete; superseded by 1c |
+| 1c, the Omen | 1b with the Majors as their own deck turned over at the start of each round, free Hedges, a Hail Mary capped at 20, partner replacement, Favor from Cups only. | `RULES-v1c.md` | Current playtest build; the table opens on it |
+| 2, the duel | Private decks with reversed faces, a shared Major deck with a face-down Omen. | `RULES-v2.md` | Complete, parked while 1c is tested |
 
 `RULES.md` is the design history. The earlier 152-card deck-building draft is kept in a drawer at the end of this file.
 
 ## Play it
 
-**The card table** (`table.html`) is the way to play. Press Deal, drag cards from your hand onto glowing zones,
+**The card table** (`table.html`) is the way to play. Press Deal, tap the deck to draw, drag cards from your hand onto glowing zones,
 tap a Personality to Trade (or Work) with it, tap one of the bot's to Copy trade it. Every pip says what it does on its
 face. The coach line under each decision says what the strong bot would do and why; press "Do that" to follow it.
 Every Major that turns up stops the table with a pop-up saying who drew it and what it did; a Hail Mary's fate is
@@ -76,6 +77,14 @@ by Sharing and copying, spent on Foretells (`--foretellFavor`) or taken by Our L
 (`--spare`). Defaults: cap 2, full-earnings copies, copies earn Favor, Foretell 1, spare 2. Chosen after testing cap 3
 and half-earnings copies, which were also balanced; see the tuning notes in `RULES-v1b.md`.
 
+### Version 1c defaults and flags
+
+`--v1c` turns on 1c, which is 1b plus: the Majors as a separate deck with an Omen revealed at round start (`--majors 0|1`),
+free Hedges (`--hedgeFree 0|1`), a pass cap (`--passMax N`, 0 for none), partner replacement at capacity (`--replace 0|1`),
+Favor from Cups only (`--copyFavor 0`), protection only against losses of 3 or more (`--spareMin N`), and the first Trader
+drawing one card fewer (`--firstHand 1`). The game is won at once at 80; `--finish 1 --firstHand -1 --first 1` is the
+balanced played-out-round alternative.
+
 ### Version 2 defaults and flags
 
 Deck presets: `upright`, `revChains`, `revChainsAll`, `revCoins`, `revCups`, `cautious`, `aggressive`, `chainsLowRev`,
@@ -95,6 +104,8 @@ change a card there and every page and bot picks it up. After any change to the 
 `node build-table.js`.
 
 ## How a game of version 1b plays, turn by turn
+
+(Version 1c differs as `RULES-v1c.md` describes: the Omen turns over at the start of each round instead of Majors being drawn, Hedges are free, the pass is capped at 20, a partner can be replaced, Favor comes from Cups only, and the first Trader starts on seven cards.)
 
 **Setup.** Shuffle the 22 Majors into the 56 Minors. Each Trader draws eight. The first Trader skips their first draw.
 Querents start with an empty Bank and no Favor.
