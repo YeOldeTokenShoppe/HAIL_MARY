@@ -32,6 +32,28 @@ With two Personalities already in your Network, you may still partner with a new
 
 Favor comes from **Sharing only**: each upright Cups you play earns 1 Favor. Copy trades no longer earn Favor. Our Lady's protection (2 Favor, automatic) applies only when an Event would take **3 or more** Profit from your Portfolio, or would bring down your pass; smaller losses are simply taken.
 
+## The last-play Hail Mary (prototype, on by default at the table)
+
+A Hail Mary Pass may only be thrown when the opponent **could win by banking at their next turn**: their Bank plus their Portfolio, with the Dividend they are about to receive, reaches 80. You still need at least 10 exposed. The whole Portfolio goes up; there is no cap.
+
+**The clock stops.** While a pass is in the air nobody can win. The opponent banks on their turn as usual and may aim Chains at the pass. At the start of the thrower's next turn the pass lands: untouched, it banks doubled. Only then does the game check for 80, and the **larger Bank wins**, ties to the larger Portfolio. If the pass is intercepted or an Event brings it down, the clock restarts at once and the opponent wins.
+
+THE HAIL MARY (The Fool) becomes the one way to throw early: "Invoke 3: throw a Hail Mary Pass now, whatever the score."
+
+Simulator flags: `--passLast 1`, `--passMult`, `--passNoHedge 1`. The table has a "last-play Hail Mary" box in 1c mode.
+
+### Numbers, strong against strong over 2,000 games
+
+| | 1c, pass any time (cap 20) | Last play, doubles | Last play, 1.5x |
+|---|---|---|---|
+| Games with a throw | 75% | 46% | 27% |
+| Throws that land | 60% | 78% | 78% |
+| Games won by the landing pass | 0% | 23% | 9% |
+| First seat wins | 50% | 53% | 52% |
+| Rounds per game | 7.2 | 7.5 | 7.5 |
+
+Under the last-play rule the condition arises in almost every game, so the climax is reliable. Interceptions stay rare (one throw in fourteen) because the bots seldom hold a Chain at the end; making a pass un-Hedgeable changed nothing. The multiplier is the lever: at 2x a quarter of all games are decided by the throw, at 1.5x one in eleven. The leader's real defence is on their own turn before the throw: Front-run the trailing player's exposed Profit below 10, or bank earlier so the condition never arises with a loaded opponent.
+
 ## Setup and seat balance
 
 Shuffle the Minors and the Majors separately. Each Trader draws **eight** Minors, and both draw on their first turn. The second Trader opens with **8 Profit** in their Portfolio: going second means meeting every Omen a turn later, and eight is the number of this world. Turn the first Major face down as the Omen. The first Omen turns over at the start of round one, before the first Trader's turn.
