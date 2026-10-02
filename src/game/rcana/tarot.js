@@ -23,11 +23,13 @@ for (const suit of SUITS) for (let r = 1; r <= 10; r++) {
 
 // ── Courts: 16 Personalities. cost / yield / res, one ability each. ──
 const C = (suit, rank, o) => ({ type: 'court', suit, rank, kw: {}, ...o, id: `${suit}_${rank.toLowerCase()}`, title: `${rank} of ${SUIT_NAME[suit]}` });
+// text1b: the wording under version 1b (Favor and Network), where it differs.
+export const cardText = (c, g) => (g && g.rules && g.rules.v1b && c.text1b) || c.text;
 export const COURTS = [
   C('coins', 'Page', { name: 'Ethan, Junior Analyst', cost: 2, yield: 2, res: 3, text: 'Bank 20: Yield 3.', yieldFn: (g, p, i, b) => (p.bank >= 20 ? 3 : b) }),
   C('coins', 'Knight', { name: 'The Day Trader', cost: 3, yield: 3, res: 2, kw: { fast: true }, text: 'Fast.' }),
   C('coins', 'Queen', { name: 'Marisol, Investigator', cost: 4, yield: 2, res: 4, text: 'When hired: draw a Minor. Your Coins give +1 Profit.', onHired: (g, p) => g.drawMinors(p, 1), mods: { coinsBonus: () => 1 } }),
-  C('coins', 'King', { name: 'Old Money', cost: 6, yield: 3, res: 6, text: 'Your Interest is doubled.', mods: { interestMult: () => 2 } }),
+  C('coins', 'King', { name: 'Old Money', cost: 6, yield: 3, res: 6, text: 'Your Interest is doubled.', text1b: 'Your Dividend bonus for exposed Profit is doubled.', mods: { interestMult: () => 2 } }),
 
   C('candles', 'Page', { name: 'The Apprentice', cost: 2, yield: 1, res: 2, text: 'Your Candles cost 1 less.', mods: { cost: (g, p, c) => (c.suit === 'candles' ? -1 : 0) } }),
   C('candles', 'Knight', { name: 'Unihood, Meme Prophet', cost: 3, yield: 2, res: 3, kw: { fast: true }, text: 'Fast. During THE BOOM, Yield 5.', yieldFn: (g, p, i, b) => (g.marketIs('THE BOOM') ? 5 : b) }),
@@ -41,18 +43,18 @@ export const COURTS = [
 
   C('cups', 'Page', { name: 'Sister Ledger', cost: 2, yield: 1, res: 3, text: 'When hired: bank 2 directly.', onHired: (g, p) => g.bank(p, 2, 'Sister Ledger') }),
   C('cups', 'Knight', { name: 'The Almoner', cost: 3, yield: 2, res: 3, kw: { fast: true }, text: 'Fast. Your Cups give +1 to you.', mods: { cupsBonus: () => 1 } }),
-  C('cups', 'Queen', { name: 'Virgil, Oracle', cost: 4, yield: 2, res: 3, text: 'Foretell: once per turn, look at the top card of the R-cana. You may put it on the bottom.', foretell: true }),
+  C('cups', 'Queen', { name: 'Virgil, Oracle', cost: 4, yield: 2, res: 3, text: 'Foretell: once per turn, look at the top card of the R-cana. You may put it on the bottom.', text1b: 'Your Foretells cost no Favor.', foretell: true }),
   C('cups', 'King', { name: 'GR80, Monk', cost: 5, yield: 1, res: 6, kw: { hedged: true }, text: 'Hedged. Whenever you play a Cup, GR80 yields without Working.', onCup: (g, p, inst) => g.profit(p, g.yieldOf(p, inst), 'GR80') }),
 ];
 
 // ── Majors: 22. kind = market (standing), event (instant), invoke (sits in Providence; one use). ──
 const M = (n, tarot, name, kind, text, o = {}) => ({ type: 'major', n, tarot, name, kind, text, id: 'major_' + n, ...o });
 export const MAJORS = [
-  M(0, 'The Fool', 'THE HAIL MARY', 'invoke', 'Invoke 3, Underdog only: throw a Hail Mary Pass now, even if you have already thrown one this game.', { cost: 3, can: (g, p) => g.isUnderdog(p) && !p.pass && p.portfolio >= g.rules.passMin, run: (g, p) => g.throwPass(p, { extra: true }) }),
+  M(0, 'The Fool', 'THE HAIL MARY', 'invoke', 'Invoke 3, Underdog only: throw a Hail Mary Pass now, even if you have already thrown one this game.', { text1b: 'Invoke 3: throw a Hail Mary Pass now, even if you have already thrown one this game.', cost: 3, can: (g, p) => (g.rules.v1b || g.isUnderdog(p)) && !p.pass && p.portfolio >= g.rules.passMin, run: (g, p) => g.throwPass(p, { extra: true }) }),
   M(1, 'The Magician', 'THE FOUNDER', 'invoke', 'Invoke 2: draw two Minors.', { cost: 2, can: () => true, run: (g, p) => g.drawMinors(p, 2) }),
-  M(2, 'The High Priestess', 'THE ORACLE', 'event', 'Reveal the top three cards. The Underdog puts them back in any order.', { resolve: (g) => g.oracle() }),
+  M(2, 'The High Priestess', 'THE ORACLE', 'event', 'Reveal the top three cards. The Underdog puts them back in any order.', { text1b: 'Reveal the top three cards. The Trader with the most Favor puts them back in any order.', resolve: (g) => g.oracle() }),
   M(3, 'The Empress', 'THE BOOM', 'market', 'Candles give double.', { mods: { candlesMult: () => 2 } }),
-  M(4, 'The Emperor', 'THE FED', 'market', 'Interest is doubled.', { mods: { interestMult: () => 2 } }),
+  M(4, 'The Emperor', 'THE FED', 'market', 'Interest is doubled.', { text1b: 'The Dividend bonus for exposed Profit is doubled.', mods: { interestMult: () => 2 } }),
   M(5, 'The Hierophant', 'THE REGULATOR', 'event', 'Every Portfolio loses 3. Every Chains Personality takes 2 Drawdown.', { resolve: (g) => g.players.forEach((q) => { g.loseProfit(q, 3, 'THE REGULATOR'); g.floor(q).filter((i) => i.card.suit === 'chains').forEach((i) => g.drawdown(i, 2, 'THE REGULATOR')); }) }),
   M(6, 'The Lovers', 'THE MERGER', 'invoke', 'Invoke 2: an idle Personality Works with +3 Yield.', { cost: 2, can: (g, p) => g.idleEligible(p).length > 0, run: (g, p) => { const i = g.bestIdle(p); if (i) g.work(p, i, { bonus: 3 }); } }),
   M(7, 'The Chariot', 'BULL RUN', 'market', 'Every Yield is +1.', { mods: { yield: () => 1 } }),
@@ -60,7 +62,7 @@ export const MAJORS = [
   M(9, 'The Hermit', 'THE VAULT', 'invoke', 'Invoke 1: bank up to 5 Profit from your Portfolio.', { cost: 1, can: (g, p) => p.portfolio >= 3, run: (g, p) => g.bankFromPortfolio(p, Math.min(5, p.portfolio), 'THE VAULT') }),
   M(10, 'Wheel of Fortune', 'VOLATILITY', 'event', 'Every Trader passes their Portfolio to the Trader on their left.', { resolve: (g) => g.rotatePortfolios() }),
   M(11, 'Justice', 'THE AUDIT', 'event', 'Each Trader with the most Chains Personalities loses half their Portfolio.', { resolve: (g) => { const n = (q) => g.floor(q).filter((i) => i.card.suit === 'chains').length; const mx = Math.max(...g.players.map(n)); if (mx > 0) g.players.filter((q) => n(q) === mx).forEach((q) => g.loseProfit(q, Math.floor(q.portfolio / 2), 'THE AUDIT')); } }),
-  M(12, 'The Hanged Man', 'THE BAG HOLDER', 'market', 'No Trader may bank more than 5 per turn.', { mods: { bankCap: () => 5 } }),
+  M(12, 'The Hanged Man', 'THE BAG HOLDER', 'market', 'No Trader may bank more than 5 per turn.', { text1b: 'No Dividend.', mods: { bankCap: (g) => (g.rules.v1b ? null : 5), dividend: (g) => (g.rules.v1b ? 0 : null) } }),
   M(13, 'Death', 'THE LIQUIDATION', 'event', 'Every Working Personality takes 3 Drawdown.', { resolve: (g) => g.players.forEach((q) => g.working(q).forEach((i) => g.drawdown(i, 3, 'THE LIQUIDATION'))) }),
   M(14, 'Temperance', 'DOLLAR-COST AVERAGE', 'market', 'Dividend is 3. Yields above 3 become 3.', { mods: { dividend: () => 3, yieldFinal: (g, p, i, y) => Math.min(3, y) } }),
   M(15, 'The Devil', 'LEVERAGE', 'market', 'Every Yield is doubled. Every Chain is doubled.', { mods: { yieldFinal: (g, p, i, y) => y * 2, chainsMult: () => 2 } }),
@@ -69,7 +71,7 @@ export const MAJORS = [
   M(18, 'The Moon', 'THE PANIC', 'market', 'Chains cost 0.', { mods: { costOverride: (g, p, c) => (c.suit === 'chains' && c.type === 'pip' ? 0 : null) } }),
   M(19, 'The Sun', 'GOLDEN AGE', 'market', 'Cups cost 0 and give double.', { mods: { costOverride: (g, p, c) => (c.suit === 'cups' && c.type === 'pip' ? 0 : null), cupsMult: () => 2 } }),
   M(20, 'Judgement', 'THE RECKONING', 'event', 'The Final Bell: the game ends at the end of this round. If more than half the R-cana remains, it is instead buried in the bottom half of the deck.', { resolve: (g) => { if (g.deck.length > g.buryThreshold()) g.bury(g.byId('major_20')); else g.callBell('THE RECKONING'); } }),
-  M(21, 'The World', 'OUR LADY OF PERPETUAL PROFIT', 'event', 'The Trader who has played the most Cups banks their entire Portfolio.', { resolve: (g) => { const mx = Math.max(...g.players.map((q) => q.stats.cups)); g.players.filter((q) => q.stats.cups === mx).forEach((q) => g.bankFromPortfolio(q, q.portfolio, 'OUR LADY')); } }),
+  M(21, 'The World', 'OUR LADY OF PERPETUAL PROFIT', 'event', 'The Trader who has played the most Cups banks their entire Portfolio.', { text1b: 'The Trader with the most Favor banks their entire Portfolio.', resolve: (g) => { const key = (q) => (g.rules.v1b ? q.favor : q.stats.cups); const mx = Math.max(...g.players.map(key)); g.players.filter((q) => key(q) === mx).forEach((q) => g.bankFromPortfolio(q, q.portfolio, 'OUR LADY')); } }),
 ];
 
 export const MINORS = [...pips, ...COURTS];

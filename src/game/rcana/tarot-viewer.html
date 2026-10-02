@@ -99,7 +99,7 @@
   </header>
 
   <section class="panel controls" id="controls">
-    <label>Mode <select id="mode"><option value="reading">Version 1: shared reading</option><option value="duel">Version 2: duel with reversals</option></select></label>
+    <label>Mode <select id="mode"><option value="reading">Version 1: shared reading</option><option value="reading1b">Version 1b: Favor &amp; Network</option><option value="duel">Version 2: duel with reversals</option></select></label>
     <label>Trader A <select id="polA"><option value="strong">Strong bot</option><option value="naive">Naive bot</option><option value="random">Random bot</option></select></label>
     <label>Deck A (v2) <select id="deckA"></select></label>
     <label>Trader B <select id="polB"><option value="strong">Strong bot</option><option value="naive" selected>Naive bot</option><option value="random">Random bot</option></select></label>
@@ -184,6 +184,7 @@
   import { buildDeck } from './v2.js';
   import { makeRng } from './engine.js';
   const isDuel = () => $('mode').value === 'duel';
+  const isV1b = () => $('mode').value === 'reading1b';
   const playOne = (o) => (isDuel() ? playOne2(o) : playOne1(o));
   const batch = (o, n) => (isDuel() ? batch2(o, n) : batch1(o, n));
 
@@ -194,7 +195,7 @@
   for (const id of ['deckA', 'deckB']) $(id).innerHTML = Object.entries(DECK_PRESETS).map(([k, v]) => `<option value="${k}">${esc(v.name)}</option>`).join('');
   $('deckB').value = 'random'; $('deckA').value = 'random';
   try { const saved = JSON.parse(localStorage.getItem('rcana-tarot') || '{}'); for (const k of ['mode', 'polA', 'polB', 'deckA', 'deckB', 'win', 'draw', 'hand', 'seed', 'games']) if (saved[k] != null) $(k).value = saved[k]; } catch (e) {}
-  const opts = () => ({ a: $('polA').value, b: $('polB').value, da: $('deckA').value, db: $('deckB').value, seed: +$('seed').value || 1, rules: { winBank: +$('win').value || 80, minorsPerTurn: +$('draw').value || 1, openingHand: +$('hand').value || 8 } });
+  const opts = () => ({ a: $('polA').value, b: $('polB').value, da: $('deckA').value, db: $('deckB').value, seed: +$('seed').value || 1, rules: { v1b: isV1b(), winBank: +$('win').value || 80, minorsPerTurn: +$('draw').value || 1, openingHand: +$('hand').value || 8 } });
   const persist = () => { try { localStorage.setItem('rcana-tarot', JSON.stringify({ mode: $('mode').value, polA: $('polA').value, polB: $('polB').value, deckA: $('deckA').value, deckB: $('deckB').value, win: $('win').value, draw: $('draw').value, hand: $('hand').value, seed: $('seed').value, games: $('games').value })); } catch (e) {} };
   const syncMode = () => { const d = isDuel(); $('deckA').parentElement.hidden = !d; $('deckB').parentElement.hidden = !d; $('draw').parentElement.hidden = d; };
   $('mode').addEventListener('change', () => { syncMode(); renderCards(); }); syncMode();
@@ -230,7 +231,7 @@
         <div class="trader">plays like a <strong>${esc(p.archetype)}</strong>${p.pass != null ? ` &middot; <span class="pill" style="border-color:var(--accent);color:var(--accent)">HAIL MARY PASS: ${p.pass} in the air</span>` : (p.passUsed ? ' &middot; pass thrown' : '')}</div>
         <div class="nums">
           <div class="num bank"><div class="k">Bank</div><div class="v">${p.bank}</div></div>
-          <div class="num"><div class="k">Portfolio</div><div class="v">${p.portfolio}</div></div>
+          <div class="num"><div class="k">Portfolio</div><div class="v">${p.portfolio}</div></div>${p.favor != null && isV1b() ? `<div class="num"><div class="k">Favor</div><div class="v">${p.favor}</div></div>` : ''}
           <div class="num"><div class="k">Liquidity</div><div class="v">${p.reserve - p.locked}<span style="font-size:12px;color:var(--muted)">/${p.reserve}</span></div></div>
           <div class="num"><div class="k">Hand</div><div class="v">${p.hand.length}</div></div>
         </div>
@@ -382,7 +383,7 @@
     ].map(([k, v]) => `<div class="cell"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
     const nums = (p) => `<div class="nums">
           <div class="num bank"><div class="k">Bank</div><div class="v">${p.bank}</div></div>
-          <div class="num"><div class="k">Portfolio</div><div class="v">${p.portfolio}</div></div>
+          <div class="num"><div class="k">Portfolio</div><div class="v">${p.portfolio}</div></div>${p.favor != null && isV1b() ? `<div class="num"><div class="k">Favor</div><div class="v">${p.favor}</div></div>` : ''}
           <div class="num"><div class="k">Liquidity</div><div class="v">${p.reserve - p.locked}<span style="font-size:12px;color:var(--muted)">/${p.reserve}</span></div></div>
           <div class="num"><div class="k">Hand</div><div class="v">${p.hand.length}</div></div></div>`;
     const acts = vs.prompt.kind === 'main' ? g.actions(me) : [];
@@ -390,7 +391,7 @@
       return `<span class="chip personality ${i.working ? 'working' : ''} ${i.shielded ? 'shielded' : ''}" title="${esc(i.title)}"><span class="temp ${i.suit}"></span><span class="name">${esc(i.name)}</span><span class="stat">${i.yield}y/${i.res}r</span>${i.drawdown ? `<span class="dd">&minus;${i.drawdown}</span>` : ''}${mine.map(([a, ix]) => `<button class="act" data-act="${ix}">${a.ability ? 'ability' : 'Work'}</button>`).join('')}</span>`; }).join('') || '<span class="note">empty</span>';
     const passBadge = (p) => (p.pass != null ? ` &middot; <span class="pill" style="border-color:var(--accent);color:var(--accent)">HAIL MARY PASS: ${p.pass} in the air</span>` : (p.passUsed ? ' &middot; pass thrown' : ''));
     const handHtml = me.hand.map((c) => { const mine = acts.map((a, ix) => [a, ix]).filter(([a]) => a.card === c);
-      return `<div class="mini"><div class="t"><span class="temp ${c.suit}"></span>${esc(c.name)}${c.type === 'court' ? ` <span class="stat" style="font-family:var(--font-mono);color:var(--muted);font-weight:400">${c.yield}y/${c.res}r &middot; cost ${c.cost}</span>` : ` <span style="font-family:var(--font-mono);color:var(--muted);font-weight:400">cost ${g.costOf(me, c)}</span>`}</div><div class="x">${esc(c.text || c.title || '')}</div><div class="acts">${mine.length ? mine.map(([a, ix]) => `<button class="act" data-act="${ix}">${esc(actLabel(a))}</button>`).join('') : (vs.prompt.kind === 'main' ? '<span class="note">nothing playable now</span>' : '')}</div></div>`; }).join('');
+      return `<div class="mini"><div class="t"><span class="temp ${c.suit}"></span>${esc(c.name)}${c.type === 'court' ? ` <span class="stat" style="font-family:var(--font-mono);color:var(--muted);font-weight:400">${c.yield}y/${c.res}r &middot; cost ${c.cost}</span>` : ` <span style="font-family:var(--font-mono);color:var(--muted);font-weight:400">cost ${g.costOf(me, c)}</span>`}</div><div class="x">${esc((isV1b() && c.text1b) || c.text || c.title || '')}</div><div class="acts">${mine.length ? mine.map(([a, ix]) => `<button class="act" data-act="${ix}">${esc(actLabel(a))}</button>`).join('') : (vs.prompt.kind === 'main' ? '<span class="note">nothing playable now</span>' : '')}</div></div>`; }).join('');
     $('vsBoards').innerHTML = `
       <div class="panel board ${s.active === bot.name && !s.over ? 'active' : ''}">
         <h2>${esc(bot.name)}</h2><div class="trader">${esc(bot.policy.name || 'bot')}${isDuel() ? ` &middot; deck: ${esc(bot.deckPreset)}` : ''}${passBadge(sb)}</div>${nums(sb)}
@@ -441,7 +442,7 @@
     const ft = $('fTemp').value, fy = $('fType').value, q = $('fText').value.toLowerCase();
     const pool = isDuel() ? [...ALL_V2, ...ALL.filter((c) => c.type === 'major')] : ALL;
     const rows = pool.filter((c) => (!ft || (ft === 'major' ? c.type === 'major' : c.suit === ft)) && (!fy || c.type === fy) && (!q || (c.name + ' ' + (c.title || '') + ' ' + (c.tarot || '') + ' ' + (c.text || '')).toLowerCase().includes(q)));
-    $('cardTable').innerHTML = `<table><thead><tr><th>Card</th><th>Type</th><th class="n">Cost</th><th class="n">Y / R</th><th>Text</th></tr></thead><tbody>${rows.map((c) => `<tr><td>${c.suit ? `<span class="temp ${c.suit}"></span>` : ''}<strong>${esc(c.name)}</strong>${c.title ? `<div class="note">${esc(c.title)}</div>` : ''}${c.tarot ? `<div class="note">${c.n}. ${esc(c.tarot)}</div>` : ''}</td><td>${c.type}${c.kind ? `<div class="note">${c.kind}</div>` : ''}</td><td class="n">${c.cost ?? '&mdash;'}</td><td class="n">${c.type === 'court' ? `${c.yield} / ${c.res}` : '&mdash;'}</td><td>${Object.keys(c.kw || {}).length ? `<em>${esc(Object.entries(c.kw).map(([k, v]) => (v === true ? k : `${k} ${v}`)).join(', '))}.</em> ` : ''}${esc(c.text || '')}</td></tr>`).join('')}</tbody></table><p class="note">${rows.length} cards, plus two Querents.</p>`;
+    $('cardTable').innerHTML = `<table><thead><tr><th>Card</th><th>Type</th><th class="n">Cost</th><th class="n">Y / R</th><th>Text</th></tr></thead><tbody>${rows.map((c) => `<tr><td>${c.suit ? `<span class="temp ${c.suit}"></span>` : ''}<strong>${esc(c.name)}</strong>${c.title ? `<div class="note">${esc(c.title)}</div>` : ''}${c.tarot ? `<div class="note">${c.n}. ${esc(c.tarot)}</div>` : ''}</td><td>${c.type}${c.kind ? `<div class="note">${c.kind}</div>` : ''}</td><td class="n">${c.cost ?? '&mdash;'}</td><td class="n">${c.type === 'court' ? `${c.yield} / ${c.res}` : '&mdash;'}</td><td>${Object.keys(c.kw || {}).length ? `<em>${esc(Object.entries(c.kw).map(([k, v]) => (v === true ? k : `${k} ${v}`)).join(', '))}.</em> ` : ''}${esc((isV1b() && c.text1b) || c.text || '')}</td></tr>`).join('')}</tbody></table><p class="note">${rows.length} cards, plus two Querents.</p>`;
   }
   ['fTemp', 'fType', 'fText'].forEach((id) => $(id).addEventListener('input', renderCards)); renderCards();
 
