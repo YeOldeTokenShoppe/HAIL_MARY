@@ -56,7 +56,7 @@ export class StrongPolicy {
     else harm = Math.min(threat.amount, p.portfolio);
     const best = opts.filter((c) => c.rank <= threat.amount + 1).sort((a, b) => a.rank - b.rank).find((c) => c.rank >= Math.min(threat.amount, t.card ? threat.amount - (t.card.res - t.drawdown - 1) : threat.amount)) || [...opts].sort((a, b) => b.rank - a.rank)[0];
     if (!best) return null;
-    const value = harm - g.costOf(p, best) * 0.5 - best.rank * 0.3;
+    const value = harm - (g.rules.hedgeFree ? 0 : g.costOf(p, best) * 0.5) - best.rank * 0.3;
     return value >= 1.5 ? best : null;
   }
   bottomCard(g, p, c) { if (c.type !== 'major') return false; if (HARMFUL.has(c.name)) return !(c.name === 'VOLATILITY' && g.richestOpp(p) && g.richestOpp(p).portfolio > p.portfolio); if (c.name === 'THE RECKONING') return g.isUnderdog(p); return false; }
@@ -80,7 +80,7 @@ export class StrongPolicy {
   score(g, p, a) {
     const h = this.horizon(g);
     switch (a.t) {
-      case 'hire': return this.courtValue(g, p, a.card, h) - a.cost * 0.2;
+      case 'hire': { const v = this.courtValue(g, p, a.card, h) - a.cost * 0.2; return a.replace ? v - this.courtValue(g, p, a.replace.card, h) - (a.replace.card.kw.exitScam || 0) * 0.6 - 0.4 : v; }
       case 'pip': { let v = this.pipValue(g, p, a) - a.cost * 0.2; if (a.card.suit === 'chains' && this.insurance && p.hand.filter((c) => c.suit === 'chains').length <= 1 && v < 4) v -= 1.5; return v; }
       case 'work': return a.ability ? (a.inst.card.id === 'chains_knight' && g.richestOpp(p) ? Math.min(3, g.richestOpp(p).portfolio) * 1.3 : 0.5) : g.yieldOf(p, a.inst);
       case 'foretell': return a.favor ? (p.favor >= 3 ? 0.6 : -1) : 0.6;
@@ -130,5 +130,6 @@ export class HumanPolicy {
   async takeTurn(g, p) { await this.ui.mainPhase(g, p); }
   async wantHedge(g, p, opts, threat) { return this.ui.hedge(g, p, opts, threat); }
   async bottomCard(g, p, c) { return this.ui.foretell(g, p, c); }
+  async beforeDraw(g, p) { if (this.ui.draw) await this.ui.draw(g, p); }
   reorder(g, p, cards) { return [...cards].sort((a, b) => (HARMFUL.has(a.name) ? 1 : 0) - (HARMFUL.has(b.name) ? 1 : 0)); }
 }
