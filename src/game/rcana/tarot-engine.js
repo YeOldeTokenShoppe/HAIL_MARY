@@ -41,7 +41,7 @@ export class TarotGame {
   }
   makeSnapshot(label) {
     return { label, round: this.round, active: this.active ? this.active.name : null, bell: this.bellRound, market: this.market ? this.market.name : null,
-      providence: this.providence.map((m) => m.name), deckLeft: this.deck.length, majorsLeft: this.majors ? this.majors.length : null, omen: !!this.omen, over: this.over, winner: this.winner ? this.winner.name : null, reason: this.reason, events: this.events,
+      providence: this.providence.map((m) => m.name), deckLeft: this.deck.length, majorsLeft: this.majors ? this.majors.length : null, omen: !!this.omen, projected: this.players.map((q) => this.projectedBank(q)), over: this.over, winner: this.winner ? this.winner.name : null, reason: this.reason, events: this.events,
       players: this.players.map((p) => ({ name: p.name, bank: p.bank, portfolio: p.portfolio, favor: p.favor, pass: p.pass ? p.inAir : null, passUsed: p.hailMaryUsed, hand: p.hand.map((c) => c.name), reserve: p.reserve.length, locked: p.reserve.filter((r) => r.locked).length, archetype: this.archetype(p),
         floor: p.floor.map((i) => ({ name: i.card.name, title: i.card.title, suit: i.card.suit, working: i.working, drawdown: i.drawdown, res: i.card.res, yield: this.yieldOf(p, i), shielded: !!i.shielded, armor: i.armor || 0, canWork: this.canWork(p, i) })) })) };
   }
@@ -83,10 +83,13 @@ export class TarotGame {
     n = Math.min(n, p.portfolio, this.bankRoom(p)); if (n <= 0 || this.over) return;
     p.portfolio -= n; p.bank += n; p.bankedThisTurn += n; this.log(`${p.name} banks ${n} (${why}) → Bank ${p.bank}, Portfolio ${p.portfolio}`); this.checkWin(p);
   }
-  wouldWinNext(o) { // the opponent reaches the target by banking at their next start of turn (Dividend and bonus included)
+  projectedBank(o) { // what the opponent can have banked by the end of their next turn, by every visible route: the Portfolio with its Dividend and bonus, a pass landing doubled, THE VAULT from Providence
     const div = (this.modFirst(o, 'dividend') ?? 1) + this.modSum(o, 'dividendDelta'); const after = o.portfolio + div; const idiv = this.modMin(o, 'interestDiv', this.rules.interestDiv); const bonus = Math.floor(after / idiv) * this.modProduct(o, 'interestMult');
-    return o.bank + after + bonus >= this.rules.winBank;
+    const landing = o.pass ? Math.floor(o.inAir * this.rules.passMult) : 0; const vault = this.providence.some((m) => m.id === 'major_9') && o.reserve.length >= 1 ? 5 : 0;
+    const cap = this.modFirst(o, 'bankCap'); const banked = cap == null ? after + bonus + vault : Math.min(after + bonus + vault, cap);
+    return o.bank + landing + banked;
   }
+  wouldWinNext(o) { return this.projectedBank(o) >= this.rules.winBank; }
   clockStopped(p) { return this.rules.passLast && this.players.some((q) => q !== p && q.pass); }
   resumeClock() { // a pass has landed or fallen: whoever is over the line now wins, the larger Bank first
     if (this.over || !this.rules.passLast) return; const s = [...this.players].filter((q) => q.bank >= this.rules.winBank).sort((a, b) => b.bank - a.bank || b.portfolio - a.portfolio);
