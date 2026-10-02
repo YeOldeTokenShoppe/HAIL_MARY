@@ -81,8 +81,8 @@ and half-earnings copies, which were also balanced; see the tuning notes in `RUL
 
 `--v1c` turns on 1c, which is 1b plus: the Majors as a separate deck with an Omen revealed at round start (`--majors 0|1`),
 free Hedges (`--hedgeFree 0|1`), a pass cap (`--passMax N`, 0 for none), partner replacement at capacity (`--replace 0|1`),
-Favor from Cups only (`--copyFavor 0`), protection only against losses of 3 or more (`--spareMin N`), and the first Trader
-drawing one card fewer (`--firstHand 1`). The game is won at once at 80; `--finish 1 --firstHand -1 --first 1` is the
+Favor from Cups only (`--copyFavor 0`), protection only against losses of 3 or more (`--spareMin N`), and the second
+Trader opening with 8 Profit (`--seatProfit N`; also `--seatLiq N`, `--seatFavor N`). Both draw on their first turn. The game is won at once at 80; `--finish 1 --firstHand -1 --first 1` is the
 balanced played-out-round alternative.
 
 ### Version 2 defaults and flags
@@ -105,7 +105,7 @@ change a card there and every page and bot picks it up. After any change to the 
 
 ## How a game of version 1b plays, turn by turn
 
-(Version 1c differs as `RULES-v1c.md` describes: the Omen turns over at the start of each round instead of Majors being drawn, Hedges are free, the pass is capped at 20, a partner can be replaced, Favor comes from Cups only, and the first Trader starts on seven cards.)
+(Version 1c differs as `RULES-v1c.md` describes: the Omen turns over at the start of each round instead of Majors being drawn, Hedges are free, the pass is capped at 20, a partner can be replaced, Favor comes from Cups only, and the second Trader opens with 8 Profit.)
 
 **Setup.** Shuffle the 22 Majors into the 56 Minors. Each Trader draws eight. The first Trader skips their first draw.
 Querents start with an empty Bank and no Favor.

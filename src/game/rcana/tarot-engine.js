@@ -6,8 +6,10 @@ export const DEFAULTS = { winBank: 80, openingHand: 8, minorsPerTurn: 1, firstTu
   // version 1b: Favor and Network. Share (upright Cups) earns Favor; Favor buys Foretells and Our Lady's protection from Events; at most networkCap Personalities; Copy trade an opponent's Working Personality once a turn.
   v1b: false, networkCap: 2, copyCost: 1, copyYield: 'full', copyFavor: true, favorPerShare: 1, foretellFavor: 1, spareFavor: 2,
   // version 1c: the Majors are their own deck revealed at the start of each round (Omen), partners can be replaced at capacity, Hedges are free, Favor comes from Cups only, Our Lady spares only real losses, the Hail Mary stake is capped.
-  v1c: false, majorsSeparate: false, replacePartner: false, hedgeFree: false, spareMin: 0, passMax: 0 };
-export const V1C_PRESET = { v1b: true, majorsSeparate: true, replacePartner: true, hedgeFree: true, copyFavor: false, spareMin: 3, passMax: 20, firstHandPenalty: 1 };
+  v1c: false, majorsSeparate: false, replacePartner: false, hedgeFree: false, spareMin: 0, passMax: 0,
+  // compensation for the second seat (applied to player index 1 at setup): Reserve chips, Profit in the Portfolio, Favor
+  seatLiq: 0, seatProfit: 0, seatFavor: 0 };
+export const V1C_PRESET = { v1b: true, majorsSeparate: true, replacePartner: true, hedgeFree: true, copyFavor: false, spareMin: 3, passMax: 20, firstHandPenalty: 0, firstTurnDraw: 1, seatProfit: 8 };
 let UID = 1;
 
 export class TarotGame {
@@ -25,6 +27,7 @@ export class TarotGame {
   setup() {
     const minors = this.shuffle([...MINORS]);
     for (const p of this.players) { const n = this.rules.openingHand - (p.idx === 0 ? (this.rules.firstHandPenalty || 0) : 0); for (let i = 0; i < n; i++) p.hand.push(minors.shift()); }
+    const second = this.players[1]; if (second) { for (let i = 0; i < (this.rules.seatLiq || 0); i++) second.reserve.push({ card: null, locked: false }); second.portfolio += this.rules.seatProfit || 0; second.favor += this.rules.v1b ? (this.rules.seatFavor || 0) : 0; if (this.rules.seatLiq || this.rules.seatProfit || this.rules.seatFavor) this.log(`${second.name} goes second and opens with${this.rules.seatLiq ? ` ${this.rules.seatLiq} Liquidity` : ''}${this.rules.seatProfit ? ` ${this.rules.seatProfit} Profit` : ''}${this.rules.seatFavor && this.rules.v1b ? ` ${this.rules.seatFavor} Favor` : ''}`); }
     if (this.rules.majorsSeparate) { this.deck = this.shuffle([...minors]); this.majors = this.shuffle([...MAJORS]); this.omen = this.majors.shift(); this.log(`The Minors are shuffled: ${this.deck.length} cards; each Trader holds ${this.rules.openingHand}. The 22 Majors are shuffled; the first lies face-down as the Omen.`); }
     else { this.deck = this.shuffle([...minors, ...MAJORS]); this.log(`The R-cana is shuffled: ${this.deck.length} cards. Each Trader holds ${this.rules.openingHand}.`); }
     this.snapshot('setup');
