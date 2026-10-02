@@ -266,7 +266,7 @@
     // let the bot's plays show one at a time
     const origAct = g.act.bind(g); g.act = async (p, a) => { const r = await origAct(p, a); if (p === S.bot) { render(); await sleep(420); while (S.overlayDone) await S.overlayDone; } return r; };
     // every Major gets a moment on screen: record the reveal and what it did, show it at the next render
-    const origReveal = g.revealMajor.bind(g); g.revealMajor = (c) => { const b = g.events.length; origReveal(c); S.reveals.push({ card: c, lines: g.events.slice(b) }); };
+    const origReveal = g.revealMajor.bind(g); g.revealMajor = (c) => { const b = g.events.length; origReveal(c); S.reveals.push({ card: c, lines: g.events.slice(b), who: g.active }); };
     render();
     try { const r = await g.run(); S.prompt = { kind: 'over', result: r }; } catch (e) { console.error(e); S.prompt = { kind: 'error', error: e }; }
     render();
@@ -299,11 +299,13 @@
   }
   function showReveal() {
     if (S.overlayDone || !S.reveals.length) return;
-    const { card: c, lines } = S.reveals.shift(); const host = $('overlayHost');
+    const { card: c, lines, who } = S.reveals.shift(); const host = $('overlayHost');
+    const head = isDuel() ? 'THE OMEN TURNS OVER' : who === S.me ? 'YOU DREW A MAJOR' : 'THE BOT DREW A MAJOR';
+    const why = isDuel() ? 'The face-down Omen is turned up at the start of every round. It resolves for both players at once, and the next Major takes its place face down.' : `The 22 Majors are shuffled into the deck. ${who === S.me ? 'Your' : "The bot's"} draw turned this one up, so it resolves for both players right now, and ${who === S.me ? 'you draw' : 'the bot draws'} again to replace it.`;
     const kindText = c.kind === 'event' ? 'EVENT · happens now' : c.kind === 'market' ? 'MARKET · stays in effect until the next Market' : `INVOKE ${c.cost} · waits in Providence for whoever pays`;
     const did = lines.slice(1).map((e) => { const s = e.replace(/^\[[^\]]*\] /, ''); const cls = /INCOMPLETE|loses|LIQUIDATED|emptied|Drawdown/.test(s) ? 'bad' : /banks|gains|\+\d/.test(s) ? 'good' : ''; return `<div class="${cls}">${esc(s)}</div>`; }).join('');
     let done; S.overlayDone = new Promise((r) => { done = r; });
-    host.innerHTML = `<div class="overlay"><div class="box"><div class="ph">THE R-CANA REVEALS</div><div class="reveal"><div></div><div><div class="kind ${c.kind}">${kindText}</div><div class="nm" style="font-family:var(--font-display);font-size:18px;color:var(--gold)">${esc(c.name)}</div><div class="note">${esc(c.tarot)}</div><div class="txt">${esc(ctext(c))}</div>${did ? `<div class="did">${did}</div>` : ''}</div></div><div><button class="primary" id="revealOk">Continue</button></div></div></div>`;
+    host.innerHTML = `<div class="overlay"><div class="box"><div class="ph">${head}</div><div class="note" style="margin-top:-4px">${esc(why)}</div><div class="reveal"><div></div><div><div class="kind ${c.kind}">${kindText}</div><div class="nm" style="font-family:var(--font-display);font-size:18px;color:var(--gold)">${esc(c.name)}</div><div class="note">${esc(c.tarot)}</div><div class="txt">${esc(ctext(c))}</div>${did ? `<div class="did">${did}</div>` : ''}</div></div><div><button class="primary" id="revealOk">Continue</button></div></div></div>`;
     host.querySelector('.reveal > div').appendChild(cardEl(c));
     const close = () => { host.innerHTML = ''; const r = S.overlayDone; S.overlayDone = null; done(); if (S.reveals.length) render(); };
     host.querySelector('#revealOk').addEventListener('click', close); host.querySelector('.overlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) close(); });
