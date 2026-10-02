@@ -120,6 +120,15 @@
   .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 40; }
   .overlay .box { background: var(--felt2); border: 1px solid var(--gold); border-radius: 12px; padding: 16px; max-width: 560px; width: 100%; display: grid; gap: 10px; }
   .overlay .box .ph { font-family: var(--font-display); letter-spacing: .06em; color: var(--gold); }
+  .reveal { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: start; }
+  .reveal .card { transform: scale(1.35); transform-origin: top left; margin-right: calc(var(--cw) * .35); margin-bottom: calc(var(--ch) * .35); animation: flip .45s ease-out; }
+  @keyframes flip { from { transform: scale(1.35) rotateY(90deg); } to { transform: scale(1.35) rotateY(0); } }
+  .reveal .kind { font-family: var(--font-display); letter-spacing: .1em; font-size: 11px; color: var(--muted); }
+  .reveal .kind.event { color: var(--bad); } .reveal .kind.market { color: var(--gold); } .reveal .kind.invoke { color: var(--good); }
+  .reveal .txt { font-size: 13px; line-height: 1.4; }
+  .reveal .did { font-family: var(--font-mono); font-size: 11px; color: var(--ink); line-height: 1.5; border-top: 1px solid var(--line); padding-top: 6px; }
+  .reveal .did .bad { color: var(--bad); } .reveal .did .good { color: var(--good); }
+  @media (max-width: 760px) { .reveal { grid-template-columns: 1fr; } }
   .pop { position: fixed; z-index: 45; background: var(--felt2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; max-width: 280px; display: grid; gap: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
   .pop .t { font-weight: 600; } .pop .x { color: var(--muted); font-size: 12px; }
   .pop button { text-align: left; }
@@ -1964,11 +1973,13 @@ return { policy, playOne, batch };
       : [{ name: 'YOU', policy: human }, { name: 'BOT', policy: bot }];
     const G = isDuel() ? DuelGame : TarotGame;
     const g = new G({ players, seed, snapshots: true, rules: {}, hiddenInfo: true });
-    S = { g, human, coach, prompt: { kind: 'wait' }, resolve: null, mainResolve: null, busy: false, seen: new Set() };
+    S = { g, human, coach, prompt: { kind: 'wait' }, resolve: null, mainResolve: null, busy: false, seen: new Set(), reveals: [], overlayDone: null };
     S.me = g.players.find((p) => p.policy === human); S.bot = g.players.find((p) => p.policy !== human);
     S.askTurns = []; if (askCtl) askCtl.abort(); ['askQShown', 'askOut', 'askNote'].forEach((id) => { $(id).hidden = true; $(id).textContent = ''; });
     // let the bot's plays show one at a time
-    const origAct = g.act.bind(g); g.act = async (p, a) => { const r = await origAct(p, a); if (p === S.bot) { render(); await sleep(420); } return r; };
+    const origAct = g.act.bind(g); g.act = async (p, a) => { const r = await origAct(p, a); if (p === S.bot) { render(); await sleep(420); while (S.overlayDone) await S.overlayDone; } return r; };
+    // every Major gets a moment on screen: record the reveal and what it did, show it at the next render
+    const origReveal = g.revealMajor.bind(g); g.revealMajor = (c) => { const b = g.events.length; origReveal(c); S.reveals.push({ card: c, lines: g.events.slice(b) }); };
     render();
     try { const r = await g.run(); S.prompt = { kind: 'over', result: r }; } catch (e) { console.error(e); S.prompt = { kind: 'error', error: e }; }
     render();
@@ -1999,6 +2010,17 @@ return { policy, playOne, batch };
     if (c.suit === 'chains') return c.reversed ? `COLLATERAL ${r} · free HEDGE` : `ATTACK ${r} · or HEDGE`;
     return c.reversed ? `TAKE ${h} from the bot` : `SHARE: you +${r}, bot +${h}`;
   }
+  function showReveal() {
+    if (S.overlayDone || !S.reveals.length) return;
+    const { card: c, lines } = S.reveals.shift(); const host = $('overlayHost');
+    const kindText = c.kind === 'event' ? 'EVENT · happens now' : c.kind === 'market' ? 'MARKET · stays in effect until the next Market' : `INVOKE ${c.cost} · waits in Providence for whoever pays`;
+    const did = lines.slice(1).map((e) => { const s = e.replace(/^\[[^\]]*\] /, ''); const cls = /INCOMPLETE|loses|LIQUIDATED|emptied|Drawdown/.test(s) ? 'bad' : /banks|gains|\+\d/.test(s) ? 'good' : ''; return `<div class="${cls}">${esc(s)}</div>`; }).join('');
+    let done; S.overlayDone = new Promise((r) => { done = r; });
+    host.innerHTML = `<div class="overlay"><div class="box"><div class="ph">THE R-CANA REVEALS</div><div class="reveal"><div></div><div><div class="kind ${c.kind}">${kindText}</div><div class="nm" style="font-family:var(--font-display);font-size:18px;color:var(--gold)">${esc(c.name)}</div><div class="note">${esc(c.tarot)}</div><div class="txt">${esc(c.text)}</div>${did ? `<div class="did">${did}</div>` : ''}</div></div><div><button class="primary" id="revealOk">Continue</button></div></div></div>`;
+    host.querySelector('.reveal > div').appendChild(cardEl(c));
+    const close = () => { host.innerHTML = ''; const r = S.overlayDone; S.overlayDone = null; done(); if (S.reveals.length) render(); };
+    host.querySelector('#revealOk').addEventListener('click', close); host.querySelector('.overlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) close(); });
+  }
   function passNewsText(q) {
     const n = q.lastPass, who = q === S.me ? 'YOUR' : "THE BOT'S", bot = q === S.me ? 'the bot' : 'you';
     if (n.result === 'complete') return { cls: 'good', text: `✝ ${who} HAIL MARY CAME DOWN UNTOUCHED: ${n.stake} in the air banked as ${n.amount}.` };
@@ -2016,6 +2038,7 @@ return { policy, playOne, batch };
   let acts = []; // legal actions for the human in the current main phase
   function render() {
     if (!S) return; const g = S.g, me = S.me, bot = S.bot; const main = S.prompt.kind === 'main';
+    showReveal();
     acts = main ? g.actions(me) : [];
     const hint = $('coach').checked && ['set', 'main', 'hedge', 'foretell'].includes(S.prompt.kind) ? advice() : null;
     for (const q of [me, bot]) if (q.lastPass && q.lastPass.seq > (S.seenPass || 0)) { S.seenPass = q.lastPass.seq; const n = passNewsText(q); toast(n.text); if (q === me) S.passNews = n; }
@@ -2024,7 +2047,7 @@ return { policy, playOne, batch };
     $('oppPass').innerHTML = bot.pass ? `<div class="pass-badge" id="oppPassBadge">PASS IN THE AIR: ${bot.inAir}</div>` : '';
     $('oppReserve').innerHTML = bot.reserve.map((r) => `<span class="chip ${r.locked ? 'locked' : ''}"></span>`).join('');
     $('meBank').textContent = me.bank; $('mePort').textContent = me.portfolio; $('meLiq').textContent = `${g.liquidity(me)}/${me.reserve.length}`;
-    $('mePass').innerHTML = me.pass ? `<div class="pass-badge">HAIL MARY IN THE AIR: ${me.inAir} · doubles at your next Set if untouched</div>`
+    $('mePass').innerHTML = me.pass ? `<div class="pass-badge">HAIL MARY IN THE AIR: ${me.inAir} · doubles at your next Set if untouched</div><div class="hm">At risk from the bot's Chains, and from THE REGULATOR, THE CRASH or THE AUDIT turning up</div>`
       : me.hailMaryUsed ? '<div class="hm">Hail Mary: used</div>'
       : g.closing ? '<div class="hm">Hail Mary: too late, final round</div>'
       : me.portfolio >= g.rules.passMin ? `<div class="hm ready">HAIL MARY READY at your next Set: throw ${me.portfolio} to double it</div>`
@@ -2050,7 +2073,7 @@ return { policy, playOne, batch };
     // prompt panel
     const pr = S.prompt; let html = ''; const strip = (['set', 'main', 'wait'].includes(pr.kind) && !g.over ? phaseStrip(pr.kind) : '') + (S.passNews && ['set', 'main'].includes(pr.kind) ? `<div class="passnews ${S.passNews.cls}">${esc(S.passNews.text)}</div>` : '');
     if (pr.kind === 'wait') html = `<div class="prompt">${strip}<div class="ph">${g.over ? 'GAME OVER' : 'THE BOT IS PLAYING'}</div></div>`;
-    else if (pr.kind === 'set') html = `<div class="prompt">${strip}<div class="ph">YOUR SET · ${me.portfolio} in your Portfolio</div><button class="primary" id="bankAll">Bank all ${me.portfolio}</button><label class="note" style="display:flex;gap:6px;align-items:center">Bank <input type="number" id="bankN" min="0" max="${me.portfolio}" value="0" style="width:70px"> <button id="bankSome">keep the rest exposed</button></label>${pr.canPass ? `<button class="danger" id="throwPass">Throw a HAIL MARY PASS with all ${me.portfolio}</button>` : ''}${hintTxt}</div>`;
+    else if (pr.kind === 'set') html = `<div class="prompt">${strip}<div class="ph">YOUR SET · ${me.portfolio} in your Portfolio</div><button class="primary" id="bankAll">Bank all ${me.portfolio}</button><label class="note" style="display:flex;gap:6px;align-items:center">Bank <input type="number" id="bankN" min="0" max="${me.portfolio}" value="0" style="width:70px"> <button id="bankSome">keep the rest exposed</button></label>${pr.canPass ? `<button class="danger" id="throwPass" title="Lost to any Chain aimed at it that you cannot Hedge, or to THE REGULATOR, THE CRASH or THE AUDIT">Throw a HAIL MARY PASS with all ${me.portfolio}</button>` : ''}${hintTxt}</div>`;
     else if (pr.kind === 'main') html = `<div class="prompt">${strip}<div class="ph">YOUR MAIN PHASE · Liquidity ${g.liquidity(me)} to spend${me.reservedThisTurn ? '' : ' · you may still Reserve one card'}</div>${fa ? '<button id="foretell">Foretell the Omen</button>' : ''}<span class="note" style="color:var(--muted)">Drag a glowing card onto a glowing zone. Tap any card to read it.</span>${hintTxt}</div>`;
     else if (pr.kind === 'hedge') { const t = pr.threat; const tgt = t.target && t.target.isPass ? `your Hail Mary Pass (${me.inAir} in the air)` : t.target && t.target.card ? t.target.card.name : 'your Portfolio'; html = `<div class="prompt danger"><div class="ph">INCOMING · ${esc(t.attacker ? t.attacker.name : 'The R-cana')} plays ${esc(t.card.name)} at ${esc(tgt)} for ${t.amount}</div><span class="note">Tap a glowing Chain in your hand to Hedge, or</span><button id="takeIt" class="primary">Take it</button>${hintTxt}</div>`; }
     else if (pr.kind === 'foretell') html = `<div class="prompt"><div class="ph">THE OMEN IS ${esc(pr.card.name)}</div><span class="note">${esc(pr.card.text)}</span><button class="primary" id="bury">Bury it</button><button id="leave">Leave it</button>${hintTxt}</div>`;
