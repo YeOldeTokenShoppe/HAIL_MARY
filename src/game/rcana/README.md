@@ -1,162 +1,173 @@
-# RL80 R-cana — rules engine and simulator
+# RL80 R-cana — rules engine, simulator and card table
 
-Executable version of the R-cana rules draft v5: Villains, no Trader cards, 17 Opportunities and 17 Calamities. 152 cards.
-Plain JavaScript modules, no dependencies. Runs in Node 18+ and in the browser.
+The R-cana is an 80-card game in a tarot configuration: 22 Major R-cana, 56 Minors in four suits (Coins, Candles,
+Chains, Cups: Ace–10 pips plus Page, Knight, Queen, King), and two Querents. Theme is general markets and money.
+Plain JavaScript modules, no dependencies, Node 18+ and the browser.
+
+Three rule sets share one engine:
+
+| Version | What it is | Rulebook | Status |
+|---|---|---|---|
+| 1, the shared reading | One shared deck with the Majors shuffled in; a Major resolves for both players when drawn. | `RULES-v1.md` | Complete |
+| 1b, Favor and Network | Version 1 with a two-partner Network, Copy trades, and Favor earned by generosity. | `RULES-v1b.md` | Current playtest build; the table opens on it |
+| 2, the duel | Private decks with reversed faces, a shared Major deck with a face-down Omen. | `RULES-v2.md` | Complete, parked while 1b is tested |
+
+`RULES.md` is the design history. The earlier 152-card deck-building draft is kept in a drawer at the end of this file.
+
+## Play it
+
+**The card table** (`table.html`) is the way to play. Press Deal, drag cards from your hand onto glowing zones,
+tap a Personality to Trade (or Work) with it, tap one of the bot's to Copy trade it. Every pip says what it does on its
+face. The coach line under each decision says what the strong bot would do and why; press "Do that" to follow it.
+Every Major that turns up stops the table with a pop-up saying who drew it and what it did; a Hail Mary's fate is
+announced the moment it lands. Published as a claude.ai artifact with the `sample` capability, the "Ask the coach" box
+lets the player put free-form questions to Claude from the rules and the table in front of them.
+
+**The viewer** (`tarot-viewer.html`) is the lab: Watch (bot vs bot, turn by turn), Versus (play with buttons and a
+coach), Batch (hundreds of games with win rates and pacing), Cards (the whole set with a filter). Both pages must be
+served, not opened from disk, because they use ES modules:
+
+```bash
+cd src/game/rcana && python3 -m http.server 8765
+# http://localhost:8765/table.html   http://localhost:8765/tarot-viewer.html
+```
 
 ## Files
 
 | File | What it is |
 |---|---|
-| `cards.js` | All 160 cards as data plus effect functions. The single source of truth for the set. |
-| `engine.js` | The rules: turn structure, Reserve/Lock, Work, Seize, Ascend, Hedge reactions, Calamity targeting, Drawdown, Exit Scam, Front-run, Dividend, Interest, Reveal/Omen, Majors, Final Bell. |
-| `bots.js` | Bot policies (Banker, Hodler, Degen, Cautious). Greedy action scoring in profit-equivalents. |
-| `decks.js` | Starter decks, auto deck builder per Trader, R-cana deck builder. |
-| `sim.js` | CLI batch simulator. Also exports `playOne` and `batch` for the viewer. |
-| `viewer.html` | Browser UI: run a game and step through it turn by turn, run batches, browse the cards. |
-
-## Run
-
-```bash
-cd src/game/rcana
-node sim.js --verbose --seed 7                      # one game, printed turn by turn
-node sim.js --games 500 --a degen --b analyst --pa banker --pb hodler --cards
-node sim.js --matrix --games 50                     # all 8 Traders vs each other, auto decks
-```
-
-Deck ids: `degen`, `analyst` (hand-built starters) or any Temperament pair such as `reason+patience`, `greed+fear`, `hope+hype` (auto-built).
-There are no Trader cards: the archetype is a label the engine awards after the game from how each side played.
-Policies: `banker` (banks everything), `hodler` (keeps 20 in Portfolio for Interest), `degen` (keeps 30, aggressive), `cautious` (holds Liquidity for Hedges).
-
-The viewer needs to be served, not opened from disk, because it uses ES modules:
-
-```bash
-cd src/game/rcana && python3 -m http.server 8765   # then open http://localhost:8765/viewer.html
-```
-
-## Playing against the bot
-
-Open `tarot-viewer.html`, pick the Mode, your deck and the bot's deck (duel only), the bot style under
-Trader B, then use the Versus tab. The engine pauses for each of your decisions: bank or throw a Hail Mary
-Pass at the start of your turn, every action in your main phase, hedging when the bot attacks you, and Foretell. The bot's
-hand and the Omen are hidden. Policies are `async`; a `HumanPolicy` in `tarot-bots.js` resolves each decision
-from the page.
-
-## Changing the rules
-
-Numbers that matter live in two places: `WIN_BANK` in `engine.js`, and the card fields in `cards.js`.
-Dividend and Interest are in `Game.set()`. The Reveal and Final Bell logic is in `Game.reveal()`.
-Add a card by adding an entry in `cards.js`; the deck builder and viewer pick it up automatically.
-
-## Rulebooks
-
-`RULES-v1.md` and `RULES-v2.md` are complete, standalone rulebooks for the two current games. `RULES.md` is the
-design history.
-
-## Tarot configuration (80 cards)
-
-A second, simpler game sharing the same ideas: one shared deck of 22 Major R-cana and 56 Minors
-(Coins, Candles, Chains, Cups: Ace–10 pips plus Page, Knight, Queen, King), and two Querents.
-Pips are four templates scaled by rank; courts are sixteen named Personalities; Majors resolve for the
-whole table when drawn. Theme is general markets and money.
-
-| File | What it is |
-|---|---|
-| `tarot.js` | The 80 cards. |
-| `tarot-engine.js` | Shared-deck rules: start of turn (Dividend, Interest, Bank), draw Minors resolving Majors on the way, Reserve, pips, courts, Chains as attack or Hedge, Invoke, Foretell, Final Bell. |
-| `tarot-bots.js` | Strong (heuristic), Naive (random actions, banks everything, always hedges) and Random (also passes at random) policies. |
+| `tarot.js` | The 80 cards. `text1b` on a card is its wording under version 1b; `cardText(c, g)` picks the right one. |
+| `tarot-engine.js` | `TarotGame`: start of turn (Dividend, Interest or Dividend bonus, bank or throw), draw Minors resolving Majors on the way, Reserve, pips, courts, Chains as attack or Hedge, Invoke, Foretell, the Hail Mary Pass, Final Bell. `DEFAULTS` holds every tunable, including the 1b rules behind `v1b`. |
+| `tarot-bots.js` | Strong (heuristic), Naive (random actions, banks everything, always hedges), Random, and `HumanPolicy`, which resolves each decision from a page. |
 | `tarot-sim.js` | CLI and the `playOne` / `batch` exports the viewer uses. |
-| `tarot-viewer.html` | Browser UI: Watch (bot vs bot, turn by turn), Versus (you against a bot, with buttons and a coach), Batch, Cards. Covers both the shared reading and the duel. |
-| `table.src.html` | Source of the card table: drag cards from your hand onto glowing zones, tap Personalities to Work them, play the bot with a coach. Same engine, no buttons for legality. Edit this file, not `table.html`. |
-| `build-table.js` | Bundles `table.src.html` and the engine modules into the single-file `table.html` (the claude.ai artifact viewer does not load separate script files). Run `node build-table.js` after editing the source or the engine. |
-| `table.html` | Built output of the above. Open it from any static server, or publish it as an artifact. When published with the `sample` capability, the "Ask the coach" box lets the player put free-form questions to Claude; the page sends the rules in brief, the visible table and the question, and streams the answer. Without that runtime the box stays hidden. |
-
-```bash
-node tarot-sim.js --verbose --seed 5
-node tarot-sim.js --games 2000 --a strong --b naive
-node tarot-sim.js --games 1000 --a strong --b strong --win 60 --draw 2 --hand 5 --first 1 --keepA 10
-```
-
-Defaults after tuning: win at 80, opening hand 8, one Minor drawn per turn, the first player skips the
-first draw, Interest 1 per full 5 in Portfolio (`--interest 10` to compare). THE RECKONING revealed while more than half the deck remains is buried in the bottom half.
-
-## Version 1b: Favor and Network
-
-`node tarot-sim.js --v1b` plays the shared reading with the 1b rules (`RULES-v1b.md`): at most two Personalities
-in your Network (`--cap`), a once-a-turn Copy trade of an opponent's Trading Personality for 1 Liquidity
-(`--copyCost`, `--copyYield half|full`, `--copyFavor 0|1`), and Favor earned by Sharing and copying, spent on
-Foretells (`--foretellFavor`) or taken by Our Lady in place of an Event's losses (`--spare`). The table and the
-viewer offer it as "Shared reading 1b". Defaults: cap 2, full-earnings copies, copies earn Favor, Foretell 1, spare 2.
-
-## Version 2: duel with reversals
-
-Each Trader brings a private 56-card Minor deck: one card per slot (Ace–King of each suit), each chosen
-upright or reversed. The 22 Majors are a shared deck with a face-down Omen revealed at the start of every
-round. The game is for two players; the engine runs more seats for experiments only.
-
-| File | What it is |
-|---|---|
 | `v2.js` | Reversed faces for all 56 Minors, deck presets, `buildDeck(preset, rng)`. |
-| `v2-engine.js` | `DuelGame`, a subclass of the tarot engine: private decks, Omen, reversed pips, free reversed-Chain hedges, shields. |
-| `v2-sim.js` | CLI and the `playOne` / `batch` exports the viewer's duel mode uses. |
+| `v2-engine.js` | `DuelGame`, a subclass of the tarot engine: private decks, Omen, reversed pips, Collateral, free reversed-Chain hedges, shields. `DUEL_DEFAULTS`. |
+| `v2-sim.js` | CLI and exports for the duel. |
+| `tarot-viewer.html` | The viewer. Loads the modules directly. |
+| `table.src.html` | Source of the card table. Edit this file, not `table.html`. |
+| `build-table.js` | Bundles `table.src.html` and the engine modules into the single-file `table.html` (the claude.ai artifact viewer does not load separate script files). Run `node build-table.js` after editing the source or the engine. |
+| `table.html` | Built output of the above. |
+
+## Run the simulator
 
 ```bash
-node v2-sim.js --games 1000 --da revChains --db upright
-node v2-sim.js --games 1000 --da random --db random --a strong --b naive
+node tarot-sim.js --verbose --seed 5                       # one shared reading, printed turn by turn
+node tarot-sim.js --games 2000 --a strong --b naive          # version 1 batch
+node tarot-sim.js --games 2000 --a strong --b strong --v1b   # version 1b batch
+node v2-sim.js --games 1000 --da revChains --db upright      # duel batch
 node v2-sim.js --verbose --seed 3 --da cautious --db aggressive
 ```
 
-Deck presets: `upright`, `revChains`, `revChainsAll`, `revCoins`, `revCups`, `cautious`, `aggressive`, `random`.
-Duel defaults after tuning: opening hand 8, fixed seat order with the first Trader drawing one extra card (nine), a game that reaches 80 plays
-out the round before the largest Bank wins, reversed Chains are Collateral (armor plus half-rank Yield on one of your Personalities) and still Hedge for free
-with a card draw, upright Cups draw a card. The Hail Mary stake is its own zone: Chains may target it (interception), Events that take Profit knock
-it down, a pass still in the air at the end returns to the Portfolio undoubled. Experiment flags: `--rotate 1` (rotating lead; rejected because it gives one player consecutive turns at two
-players), `--seatHand 8,7,7`, `--revIntercept 1` (reversed Chains may intercept a pass), `--revealLast 1`,
-`--sharedSet 1` (everyone Sets at round start, before the reveal), `--finish 0`, `--first N`, `--chainsMode hedge|collateral|both|bothDraw`,
-`--cy one|third|half` (Collateral yield), `--collCost N`. Rule flags for experiments: `--firstHand N` (first player's opening-hand penalty), `--chainsDraw 1`
-(reversed Chains draw a card when used), `--chainsBonus N`, `--cupsCost N`, `--cupsPenalty N`, `--cupsDiv N`.
+Sides alternate each game; the batch reports wins by policy, first-seat win rate, how games ended, rounds, and per-game
+counts of everything that happened.
 
-## How a game of version 2 plays, turn by turn
+### Version 1 defaults and flags
 
-**Setup.** Each Trader shuffles their own 56-card deck and draws eight; the first Trader draws nine. The 22 Majors are shuffled into
-one shared pile; its top card is placed face-down in the Omen slot. Each Trader's Querent sits in front of
-them with an empty Bank. Portfolios start at zero.
+Win at 80 (`--win`), opening hand 8 (`--hand`), one Minor drawn per turn (`--draw`), the first player skips the first
+draw (`--first 1` to let them draw), Interest 1 per full 5 in Portfolio (`--interest 10` to compare), the Hail Mary
+doubles (`--passMult`) and needs 10 in Portfolio (`--passMin`); `--passUnderdog`, `--noPassA`, `--noPassB`, `--keepA N`
+(bot A keeps N exposed). THE RECKONING revealed while more than half the deck remains is buried in the bottom half.
 
-**A round** is one turn for every Trader. The seat that leads rotates each round, so nobody is always the
-first to act after a Major.
+### Version 1b defaults and flags
 
-**At the start of each round** the leading Trader turns the Omen face up. If it is a Market, it replaces the
-standing Market. If it is an Event, it resolves for everyone at once. If it is an Invoke, it goes to the
-Providence row where any Trader may later pay to use it. The next Major slides face-down into the Omen slot.
+`--v1b` turns on the 1b rules: at most two Personalities in your Network (`--cap`), a once-a-turn Copy trade of an
+opponent's Trading Personality for 1 Liquidity (`--copyCost`, `--copyYield half|full`, `--copyFavor 0|1`), and Favor earned
+by Sharing and copying, spent on Foretells (`--foretellFavor`) or taken by Our Lady in place of an Event's losses
+(`--spare`). Defaults: cap 2, full-earnings copies, copies earn Favor, Foretell 1, spare 2. Chosen after testing cap 3
+and half-earnings copies, which were also balanced; see the tuning notes in `RULES-v1b.md`.
+
+### Version 2 defaults and flags
+
+Deck presets: `upright`, `revChains`, `revChainsAll`, `revCoins`, `revCups`, `cautious`, `aggressive`, `chainsLowRev`,
+`chainsHighRev`, `chainsEvenRev`, `random`. Opening hand 8 with the first Trader drawing one extra (`--firstHand`,
+`--seatHand 9,8`), fixed seat order, a game that reaches 80 plays out the round before the largest Bank wins
+(`--finish 0` to win at once), reversed Chains are Collateral and still Hedge for free with a card draw
+(`--chainsMode hedge|collateral|both|bothDraw`, `--cy one|third|half`, `--collCost N`), upright Cups draw a card.
+Experiment flags: `--rotate 1` (rotating lead; rejected because it gives one player consecutive turns at two players),
+`--revIntercept 1`, `--revealLast 1`, `--sharedSet 1`, `--chainsDraw 1`, `--chainsBonus N`, `--cupsCost N`,
+`--cupsPenalty N`, `--cupsDiv N`.
+
+### Changing the rules
+
+Every number lives in `DEFAULTS` in `tarot-engine.js` or `DUEL_DEFAULTS` in `v2-engine.js`; pass overrides as `rules`
+when constructing a game, or through the CLI flags above. Card text and effects live in `tarot.js` and `v2.js`; add or
+change a card there and every page and bot picks it up. After any change to the engine or the table source, run
+`node build-table.js`.
+
+## How a game of version 1b plays, turn by turn
+
+**Setup.** Shuffle the 22 Majors into the 56 Minors. Each Trader draws eight. The first Trader skips their first draw.
+Querents start with an empty Bank and no Favor.
 
 **Each turn, in order:**
 
-1. **Refresh.** Your Working Personalities stand up. Your locked Reserve cards unlock. Shields expire.
-2. **Start of turn.** Take your Dividend (1 Profit into your Portfolio, more under some Markets). Take Interest (1 Profit
-   for every full 5 already in your Portfolio). Then bank any amount you like from Portfolio to Bank.
-   Banked Profit can never be touched again.
+1. **Start of your turn.** If you threw a Hail Mary Pass last turn and nothing touched it, it lands now and banks
+   doubled. Then your Profit arrives: the Dividend of 1, plus the Dividend bonus of 1 for every full 5 already in your
+   Portfolio. Then bank any amount from Portfolio to Bank, or, once per game with at least 10 exposed, throw it all into
+   the air as a Hail Mary Pass instead.
+2. **Draw** one card. If it is a Major it resolves for both players at once (a Market replaces the standing Market, an
+   Event happens, an Invoke waits in Providence) and you draw again.
+3. **Main phase**, any order:
+   - **Reserve** one card from hand, once per turn. It is gone, but it is 1 Liquidity every turn from now on.
+   - **Partner** with a Personality by paying its cost, up to two in your Network. It rests the turn it arrives.
+   - **Trade** with an idle Personality for its earnings. A Trading Personality is the only thing Chains can hit.
+   - **Copy trade**, once per turn: pay 1 Liquidity to take the full earnings of one of the opponent's Trading
+     Personalities. They gain 1. You gain 1 Favor.
+   - **Play a pip**: Coins earn, Candles boost a Personality, Chains attack a Trading Personality or Front-run a
+     Portfolio or intercept a pass, Cups share (the opponent gains half, you gain the rank, draw a card, and gain 1 Favor).
+   - **Foretell** for 1 Favor (free with Virgil): look at the top card and optionally put it on the bottom.
+   - **Invoke** a Major in Providence by paying its cost.
+4. **End.** The opponent's turn. If they aim a Chain at you, you may Hedge with a Chain from your hand first.
+
+**Favor.** Hold 2 or more when an Event would take your Profit or bring down your pass, and Our Lady spares you, taking
+2 Favor instead. When OUR LADY OF PERPETUAL PROFIT turns up, the Trader with the most Favor banks everything.
+
+**Winning.** The first Bank to reach 80 wins at once. If THE RECKONING is drawn in the second half of the deck, the game
+ends after that round and the largest Bank wins.
+
+## How a game of version 2 plays, turn by turn
+
+**Setup.** Each Trader shuffles their own 56-card deck and draws eight; the first Trader draws nine. The 22 Majors are
+shuffled into one shared pile; its top card is placed face-down in the Omen slot. Seat order is fixed for the game.
+
+**At the start of each round** the Omen is turned face up. A Market replaces the standing Market, an Event resolves for
+everyone at once, an Invoke goes to Providence. The next Major slides face-down into the Omen slot.
+
+**Each turn, in order:**
+
+1. **Refresh.** Working Personalities stand up, locked Reserve cards unlock, shields expire.
+2. **Start of turn.** A pass in the air lands. Take your Dividend and Interest. Bank any amount, or throw a Hail Mary.
 3. **Draw** one Minor from your deck.
-4. **Main phase**, any number of actions in any order:
-   - **Reserve** one card from hand face-down. It is now 1 Liquidity, locked when spent, back every Refresh.
-   - **Hire** a court by paying its cost. It cannot Work until your next turn unless it is Fast.
-   - **Play a pip** by paying its cost: Coins for Profit, Candles to put a Personality to Work with a bonus,
-     Cups to share Profit (and draw a card), Chains to attack a Working opposing Personality or Front-run a
-     Portfolio. Reversed pips do their reversed thing; reversed Chains cannot be played on your own turn.
-   - **Work** an idle Personality for its Yield. Working Personalities are the only ones Chains can hit.
-   - **Foretell**, if you have Virgil: look at the Omen and optionally send it to the bottom.
-   - **Invoke** a Major in Providence by paying its cost. It is spent afterwards.
-5. **End.** Play passes left.
+4. **Main phase**, any order: Reserve one card; hire a court (it cannot Work until your next turn unless Fast); play a
+   pip (reversed pips do their reversed thing; reversed Chains are Collateral on your own Personality, or a free Hedge
+   that draws a card); Work an idle Personality; Foretell with Virgil (look at the Omen, optionally bury it); Invoke.
+5. **End.**
 
-**When someone is attacked.** A Chain names its target. Before it lands, the defender may play a Chain from
-hand as a Hedge: an upright Chain costs its Liquidity and absorbs its rank; a reversed Chain is free, absorbs
-its rank plus two, and draws a card.
+**Hedging.** Before a Chain lands, the defender may play a Chain from hand: an upright Chain costs its Liquidity and
+absorbs its rank; a reversed Chain is free, absorbs its rank plus two, and draws a card.
 
-**The Hail Mary Pass.** Once per game, at the start of your turn, instead of banking you may throw your whole Portfolio
-(at least 10) into the air. It stays in the air through your turn and every opponent's turn. If anything
-takes Profit from your Portfolio before the start of your next turn, the pass is incomplete and you lose all of it; if the
-taker was an opponent's Chain, they intercepted it. If it comes down untouched, what you threw banks doubled.
-Profit you earn after the throw sits in the Portfolio as normal. THE HAIL MARY (The Fool) lets an Underdog
-throw a second one. Rule flags: `--passMult`, `--passMin`, `--passUnderdog`, `--noPassA`, `--noPassB`.
+**The Hail Mary Pass** works as in version 1. THE HAIL MARY (The Fool) lets an Underdog throw a second one.
 
-**Winning.** When any Trader's Bank reaches 80 at the start of a turn, the round is played out so everyone has had the
-same number of turns, and the largest Bank wins. If THE RECKONING is revealed in the second half of the Majors,
-or the Majors run out, the game ends after that round the same way.
+**Winning.** When a Bank reaches 80, the round is played out so both players have had the same number of turns, then
+the largest Bank wins, ties to the larger Portfolio. THE RECKONING in the second half of the Majors, or the last Major
+revealed, ends the game after that round the same way.
+
+## In a drawer: the 152-card deck-builder (rules draft v5)
+
+The earlier game: eight card types across six Temperaments, Villains with Credibility rules, Opportunities and
+Calamities, Trader archetypes awarded after the game. Kept runnable; not the current direction.
+
+| File | What it is |
+|---|---|
+| `cards.js` | All 152 cards as data plus effect functions. |
+| `engine.js` | The rules: Reserve/Lock, Work, Seize, Ascend, Hedge reactions, Calamity targeting, Drawdown, Exit Scam, Front-run, Dividend, Interest, Reveal, Final Bell. Also exports `makeRng`, which every engine uses. |
+| `bots.js` | Bot policies (Banker, Hodler, Degen, Cautious). |
+| `decks.js` | Starter decks and the auto deck builder by Temperament pair. |
+| `sim.js` | CLI: `--verbose`, `--games`, `--matrix`, `--cards`. |
+| `viewer.html` | Its browser UI. |
+
+```bash
+node sim.js --verbose --seed 7
+node sim.js --games 500 --a degen --b analyst --pa banker --pb hodler --cards
+node sim.js --matrix --games 50
+```
