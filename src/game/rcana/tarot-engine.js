@@ -2,7 +2,7 @@
 import { MINORS, MAJORS, byId } from './tarot.js';
 import { makeRng } from './engine.js';
 
-export const DEFAULTS = { winBank: 80, openingHand: 8, minorsPerTurn: 1, firstTurnDraw: 0, interestDiv: 5, rotateLead: false, finishRound: false, passMult: 2, passMin: 10, passUnderdogOnly: false, maxRounds: 40,
+export const DEFAULTS = { winBank: 80, openingHand: 8, minorsPerTurn: 1, firstTurnDraw: 0, interestDiv: 5, rotateLead: false, finishRound: false, passMult: 2, passMin: 10, passUnderdogOnly: false, maxRounds: 40, cupsDraw: true,
   // version 1b: Favor and Network. Share (upright Cups) earns Favor; Favor buys Foretells and Our Lady's protection from Events; at most networkCap Personalities; Copy trade an opponent's Working Personality once a turn.
   v1b: false, networkCap: 2, copyCost: 1, copyYield: 'full', copyFavor: true, favorPerShare: 1, foretellFavor: 1, spareFavor: 2 };
 let UID = 1;
@@ -81,7 +81,8 @@ export class TarotGame {
     this.over = true; this.winner = p; this.reason = `${p.name} banked ${p.bank}`; this.log(`*** ${p.name} WINS with ${p.bank} banked ***`);
   }
   loseProfit(p, n, why) {
-    if (n <= 0 || this.over) return 0; const cur = this.current; const hostile = !cur || cur.attacker !== p;
+    if (this.over) return 0; const cur = this.current; const hostile = !cur || cur.attacker !== p;
+    if (n <= 0) { if (cur && cur.kind === 'major' && p.pass) { if (this.rules.v1b && p.favor >= this.rules.spareFavor) { p.favor -= this.rules.spareFavor; p.stats.favorSpent += this.rules.spareFavor; p.stats.spared++; this.log(`✧ OUR LADY SPARES ${p.name}'s pass from ${why} (${this.rules.spareFavor} Favor given) → Favor ${p.favor}`); } else this.knockDown(p, why, null); } return 0; }
     if (cur && cur.victim === p && cur.reduce) { const r = Math.min(n, cur.reduce); n -= r; cur.reduce -= r; if (r) this.log(`${p.name}'s Hedge absorbs ${r}`); }
     if (hostile && this.modAny(p, 'portfolioSafe') && cur && cur.kind === 'chain') { this.log(`${p.name}'s Portfolio is protected by CONVICTION`); return 0; }
     const fromEvent = cur && cur.kind === 'major';
