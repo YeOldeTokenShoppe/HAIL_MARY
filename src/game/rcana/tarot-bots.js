@@ -70,7 +70,7 @@ export class StrongPolicy {
     const c = a.card; const r = c.rank;
     if (c.suit === 'coins') return r + g.modSum(p, 'coinsBonus');
     if (c.suit === 'candles') return (r * g.modProduct(p, 'candlesMult') + g.modSum(p, 'candlesBonus')) + g.yieldOf(p, a.choice.inst) - 0; // includes the Work it triggers
-    if (c.suit === 'cups') { const m = g.modProduct(p, 'cupsMult'); const o = a.choice.opp; const lead = o ? g.opps(p).reduce((mx, q) => Math.max(mx, q.bank), 0) - o.bank : 0; return r * m + g.modSum(p, 'cupsBonus') - Math.ceil(r / 2) * m * 0.7 + lead * 0.02; }
+    if (c.suit === 'cups') { const m = g.modProduct(p, 'cupsMult'); const o = a.choice.opp; const favorV = g.rules.v1b && !c.reversed ? 0.6 : 0; const lead = o ? g.opps(p).reduce((mx, q) => Math.max(mx, q.bank), 0) - o.bank : 0; return favorV + r * m + g.modSum(p, 'cupsBonus') - Math.ceil(r / 2) * m * 0.7 + lead * 0.02; }
     const t = a.choice.target; const amt = r * g.modProduct(p, 'chainsMult') + g.modSum(p, 'chainsBonus');
     if (t.isPass) return t.owner.inAir * 0.9 + Math.min(amt, t.owner.inAir);
     if (t.card) { const kills = t.drawdown + amt >= t.card.res; return kills ? 2 + g.yieldOf(t.owner, t) * this.horizon(g) * 0.8 + (t.card.kw.exitScam || 0) : amt * 0.35; }
@@ -82,8 +82,9 @@ export class StrongPolicy {
       case 'hire': return this.courtValue(g, p, a.card, h) - a.cost * 0.2;
       case 'pip': { let v = this.pipValue(g, p, a) - a.cost * 0.2; if (a.card.suit === 'chains' && this.insurance && p.hand.filter((c) => c.suit === 'chains').length <= 1 && v < 4) v -= 1.5; return v; }
       case 'work': return a.ability ? (a.inst.card.id === 'chains_knight' && g.richestOpp(p) ? Math.min(3, g.richestOpp(p).portfolio) * 1.3 : 0.5) : g.yieldOf(p, a.inst);
-      case 'foretell': return 0.6;
-      case 'invoke': { const m = a.major; if (m.id === 'major_0') return p.portfolio >= 8 && g.isUnderdog(p) ? 2.5 : -1; if (m.id === 'major_1') return 2.2; if (m.id === 'major_6') return g.bestIdle(p) ? 3 + g.yieldOf(p, g.bestIdle(p)) : -1; if (m.id === 'major_9') return p.portfolio >= 5 ? 2 : 0.5; return 0; }
+      case 'foretell': return a.favor ? (p.favor >= 3 ? 0.6 : -1) : 0.6;
+      case 'copy': { const y = g.yieldOf(a.inst.owner, a.inst); return (g.rules.copyYield === 'full' ? y : Math.ceil(y / 2)) + (g.rules.copyFavor ? 0.4 : 0) - 0.3; }
+      case 'invoke': { const m = a.major; if (m.id === 'major_0') return p.portfolio >= 8 && (g.rules.v1b || g.isUnderdog(p)) ? 2.5 : -1; if (m.id === 'major_1') return 2.2; if (m.id === 'major_6') return g.bestIdle(p) ? 3 + g.yieldOf(p, g.bestIdle(p)) : -1; if (m.id === 'major_9') return p.portfolio >= 5 ? 2 : 0.5; return 0; }
       default: return -1;
     }
   }

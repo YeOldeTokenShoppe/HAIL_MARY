@@ -11,6 +11,7 @@ in order so the reasoning behind the current rules is not lost. The complete, st
 | v3 | v2 with Faith removed. Hope replaces the Faith Temperament. | Superseded |
 | v4 | After reading Cyberpunk TCG: Final Bell clock, Bank thresholds, Hedge, Front-run, Dividend, formal triggers, 40–50 card decks. Vocabulary: hire, Work, Lock, Refresh. | Superseded, reproduced in full below |
 | v5 | Villains, 17 Opportunities / 17 Calamities, Trader cards removed. 152 cards. Built in `cards.js` / `engine.js`. | Implemented, kept as the deck-building game in a drawer |
+| tarot 1b | The shared reading with Favor (charity steers fate) and a two-partner Network with Copy trades instead of a hiring spree. `RULES-v1b.md`. | Current playtest build |
 | Tarot | 80 cards: 22 Majors, 56 Minors in four suits, 2 Querents. One shared deck. Built in `tarot.js` / `tarot-engine.js`. | **Current, version 1** |
 | Tarot v2 | Private 56-card decks with reversals, shared Majors. Built in `v2.js` / `v2-engine.js`. | **Current, version 2** |
 

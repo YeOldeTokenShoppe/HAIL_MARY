@@ -79,6 +79,14 @@ node tarot-sim.js --games 1000 --a strong --b strong --win 60 --draw 2 --hand 5 
 Defaults after tuning: win at 80, opening hand 8, one Minor drawn per turn, the first player skips the
 first draw, Interest 1 per full 5 in Portfolio (`--interest 10` to compare). THE RECKONING revealed while more than half the deck remains is buried in the bottom half.
 
+## Version 1b: Favor and Network
+
+`node tarot-sim.js --v1b` plays the shared reading with the 1b rules (`RULES-v1b.md`): at most two Personalities
+in your Network (`--cap`), a once-a-turn Copy trade of an opponent's Trading Personality for 1 Liquidity
+(`--copyCost`, `--copyYield half|full`, `--copyFavor 0|1`), and Favor earned by Sharing and copying, spent on
+Foretells (`--foretellFavor`) or taken by Our Lady in place of an Event's losses (`--spare`). The table and the
+viewer offer it as "Shared reading 1b". Defaults: cap 2, full-earnings copies, copies earn Favor, Foretell 1, spare 2.
+
 ## Version 2: duel with reversals
 
 Each Trader brings a private 56-card Minor deck: one card per slot (Ace–King of each suit), each chosen
