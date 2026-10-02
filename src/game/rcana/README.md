@@ -82,7 +82,9 @@ and half-earnings copies, which were also balanced; see the tuning notes in `RUL
 `--v1c` turns on 1c, which is 1b plus: the Majors as a separate deck with an Omen revealed at round start (`--majors 0|1`),
 free Hedges (`--hedgeFree 0|1`), a pass cap (`--passMax N`, 0 for none), partner replacement at capacity (`--replace 0|1`),
 Favor from Cups only (`--copyFavor 0`), protection only against losses of 3 or more (`--spareMin N`), and the second
-Trader opening with 8 Profit (`--seatProfit N`; also `--seatLiq N`, `--seatFavor N`). Both draw on their first turn. The game is won at once at 80; `--finish 1 --firstHand -1 --first 1` is the
+Trader opening with 8 Profit (`--seatProfit N`; also `--seatLiq N`, `--seatFavor N`). Both draw on their first turn.
+The last-play Hail Mary (`--passLast 1`: a pass only when the opponent could win next turn, no cap, the clock stops while it
+is in the air; `--passNoHedge 1` to make it un-Hedgeable) is a prototype described in `RULES-v1c.md`; the table turns it on by default. The game is won at once at 80; `--finish 1 --firstHand -1 --first 1` is the
 balanced played-out-round alternative.
 
 ### Version 2 defaults and flags

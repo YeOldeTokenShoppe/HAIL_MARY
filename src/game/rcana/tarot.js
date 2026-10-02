@@ -24,7 +24,7 @@ for (const suit of SUITS) for (let r = 1; r <= 10; r++) {
 // ── Courts: 16 Personalities. cost / yield / res, one ability each. ──
 const C = (suit, rank, o) => ({ type: 'court', suit, rank, kw: {}, ...o, id: `${suit}_${rank.toLowerCase()}`, title: `${rank} of ${SUIT_NAME[suit]}` });
 // text1b: the wording under version 1b (Favor and Network), where it differs.
-export const cardText = (c, g) => (g && g.rules && g.rules.v1b && c.text1b) || c.text;
+export const cardText = (c, g) => (g && g.rules && g.rules.passLast && c.textLast) || (g && g.rules && g.rules.v1b && c.text1b) || c.text;
 export const COURTS = [
   C('coins', 'Page', { name: 'Ethan, Junior Analyst', cost: 2, yield: 2, res: 3, text: 'Bank 20: Yield 3.', yieldFn: (g, p, i, b) => (p.bank >= 20 ? 3 : b) }),
   C('coins', 'Knight', { name: 'The Day Trader', cost: 3, yield: 3, res: 2, kw: { fast: true }, text: 'Fast.' }),
@@ -50,7 +50,7 @@ export const COURTS = [
 // ── Majors: 22. kind = market (standing), event (instant), invoke (sits in Providence; one use). ──
 const M = (n, tarot, name, kind, text, o = {}) => ({ type: 'major', n, tarot, name, kind, text, id: 'major_' + n, ...o });
 export const MAJORS = [
-  M(0, 'The Fool', 'THE HAIL MARY', 'invoke', 'Invoke 3, Underdog only: throw a Hail Mary Pass now, even if you have already thrown one this game.', { text1b: 'Invoke 3: throw a Hail Mary Pass now, even if you have already thrown one this game.', cost: 3, can: (g, p) => (g.rules.v1b || g.isUnderdog(p)) && !p.pass && p.portfolio >= g.rules.passMin, run: (g, p) => g.throwPass(p, { extra: true }) }),
+  M(0, 'The Fool', 'THE HAIL MARY', 'invoke', 'Invoke 3, Underdog only: throw a Hail Mary Pass now, even if you have already thrown one this game.', { text1b: 'Invoke 3: throw a Hail Mary Pass now, even if you have already thrown one this game.', textLast: 'Invoke 3: throw a Hail Mary Pass now, whatever the score.', cost: 3, can: (g, p) => (g.rules.v1b || g.isUnderdog(p)) && !p.pass && p.portfolio >= g.rules.passMin, run: (g, p) => g.throwPass(p, { extra: true }) }),
   M(1, 'The Magician', 'THE FOUNDER', 'invoke', 'Invoke 2: draw two Minors.', { cost: 2, can: () => true, run: (g, p) => g.drawMinors(p, 2) }),
   M(2, 'The High Priestess', 'THE ORACLE', 'event', 'Reveal the top three cards. The Underdog puts them back in any order.', { text1b: 'Reveal the top three cards. The Trader with the most Favor puts them back in any order.', resolve: (g) => g.oracle() }),
   M(3, 'The Empress', 'THE BOOM', 'market', 'Candles give double.', { mods: { candlesMult: () => 2 } }),
