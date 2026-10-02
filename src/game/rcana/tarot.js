@@ -12,7 +12,7 @@ export const PIP_TEXT = {
   coins: 'Gain R Profit into your Portfolio.',
   candles: 'Put an idle Personality to Work. It yields +R this turn.',
   chains: 'Deal R Drawdown to a Working opposing Personality, or Front-run R from an opposing Portfolio. Hedge: when a Chain targets you, play this to reduce it by R.',
-  cups: 'Another Trader gains half of R (rounded up) Profit. You gain R Profit.',
+  cups: 'Another Trader gains half of R (rounded up) Profit. You gain R Profit and draw a Minor.',
 };
 export function pipCost(suit, r) { const c = Math.ceil(r / 2); return suit === 'cups' ? Math.max(0, c - 1) : c; }
 

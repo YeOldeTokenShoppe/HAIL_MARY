@@ -21,7 +21,7 @@ Every pip has a rank R from 1 (Ace) to 10. Its cost is half its rank, rounded up
 | Coins | Gain R Profit into your Portfolio. |
 | Candles | Put an idle Personality to Work. It yields +R this turn. |
 | Chains | Choose one: deal R Drawdown to a Working opposing Personality; Front-run R from an opposing Portfolio; or intercept an opposing Hail Mary Pass. Or hold it: when a Chain targets you, play it as a Hedge to absorb R. |
-| Cups | Another Trader gains half of R (rounded up). You gain R. |
+| Cups | Another Trader gains half of R (rounded up). You gain R and draw a Minor. |
 
 Courts are Personalities. Each has a cost, a Yield, a Resilience, and one ability printed on the card. The sixteen courts are listed in the card file.
 

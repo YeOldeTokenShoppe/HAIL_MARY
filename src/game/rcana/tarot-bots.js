@@ -38,6 +38,7 @@ export class StrongPolicy {
   }
   hailMaryPass(g, p) {
     if (!this.usePass) return false;
+    if (p.bank + p.portfolio >= g.rules.winBank) return false; // bank and win instead
     const q = this.passSurvival(g, p); const m = g.rules.passMult;
     const behind = g.isUnderdog(p) ? 0.1 : 0;
     return q * m > 1 + this.passMargin - behind;
