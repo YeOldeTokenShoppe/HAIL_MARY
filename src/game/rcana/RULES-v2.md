@@ -51,7 +51,7 @@ A round is one turn for each Trader, in seat order. At the start of each round, 
 ## The turn
 
 1. **Refresh.** Your Working Personalities go idle. Your locked Reserve cards unlock. Your shields expire.
-2. **Set.** In order: if you have a Hail Mary Pass in the air, it comes down. Take your Dividend (1 Profit into your Portfolio, or as the Market says). Take Interest (1 Profit for every full 5 already in your Portfolio). Then either bank any amount from Portfolio to Bank, or throw a Hail Mary Pass.
+2. **Start of turn.** In order: if you have a Hail Mary Pass in the air, it comes down. Take your Dividend (1 Profit into your Portfolio, or as the Market says). Take Interest (1 Profit for every full 5 already in your Portfolio). Then either bank any amount from Portfolio to Bank, or throw a Hail Mary Pass.
 3. **Draw** one Minor from your own deck.
 4. **Main phase**, any number of actions, any order: Reserve one card from hand, once per turn. Hire a court. Play a pip. Work an idle Personality that has been on your Floor since the start of your turn. Foretell, once per turn, if you have Virgil: look at the Omen and optionally put it on the bottom of the Major deck. Invoke a Major in Providence.
 5. **End.** The next Trader's turn begins.
@@ -66,13 +66,13 @@ When an opponent's Chain or reversed Cup targets one of your Working Personaliti
 
 ## The Hail Mary Pass
 
-Once per game, at your Set, instead of banking you may throw your whole Portfolio (at least 10) into the air. The stake leaves your Portfolio and sits in the air until your next Set.
+Once per game, at the start of your turn, instead of banking you may throw your whole Portfolio (at least 10) into the air. The stake leaves your Portfolio and sits in the air until the start of your next turn.
 
 - Profit you earn after the throw goes into your Portfolio as normal. It is not part of the stake.
 - An opponent may aim a Chain at the pass. You may Hedge it. Whatever gets through intercepts the pass: the interceptor takes that much of the stake into their Portfolio and the rest is lost.
 - An Event that takes Profit from Portfolios (THE REGULATOR, THE CRASH, THE AUDIT) also knocks the pass down: the stake is lost.
 - Chains and reversed Cups aimed at your Portfolio do not touch the stake. VOLATILITY swaps Portfolios, not stakes. Banking by any effect does not touch the stake.
-- If the pass is still in the air at your next Set, the stake banks doubled, subject to THE BAG HOLDER's cap.
+- If the pass is still in the air at the start of your next turn, the stake banks doubled, subject to THE BAG HOLDER's cap.
 - If the game ends while a pass is in the air, the stake returns to the Portfolio undoubled.
 
 THE HAIL MARY (The Fool) lets an Underdog throw a second pass.
