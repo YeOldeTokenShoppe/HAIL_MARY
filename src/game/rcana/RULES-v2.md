@@ -70,7 +70,7 @@ Once per game, at the start of your turn, instead of banking you may throw your 
 
 - Profit you earn after the throw goes into your Portfolio as normal. It is not part of the stake.
 - An opponent may aim a Chain at the pass. You may Hedge it. Whatever gets through intercepts the pass: the interceptor takes that much of the stake into their Portfolio and the rest is lost.
-- An Event that takes Profit from Portfolios (THE REGULATOR, THE CRASH, THE AUDIT) also knocks the pass down: the stake is lost.
+- An Event that takes Profit from Portfolios (THE REGULATOR, THE CRASH, THE AUDIT) also knocks the pass down: the stake is lost. This happens whether or not you had any Profit exposed at the time.
 - Chains and reversed Cups aimed at your Portfolio do not touch the stake. VOLATILITY swaps Portfolios, not stakes. Banking by any effect does not touch the stake.
 - If the pass is still in the air at the start of your next turn, the stake banks doubled, subject to THE BAG HOLDER's cap.
 - If the game ends while a pass is in the air, the stake returns to the Portfolio undoubled.
