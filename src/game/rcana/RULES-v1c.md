@@ -34,7 +34,7 @@ Favor comes from **Sharing only**: each upright Cups you play earns 1 Favor. Cop
 
 ## Setup and seat balance
 
-Shuffle the Minors and the Majors separately. The first Trader draws **seven** Minors and the second draws eight; the first Trader also skips the Draw step on their first turn. Turn the first Major face down as the Omen. The first Omen turns over at the start of round one, before the first Trader's turn.
+Shuffle the Minors and the Majors separately. Each Trader draws **eight** Minors, and both draw on their first turn. The second Trader opens with **8 Profit** in their Portfolio: going second means meeting every Omen a turn later, and eight is the number of this world. Turn the first Major face down as the Omen. The first Omen turns over at the start of round one, before the first Trader's turn.
 
 ## Ending
 
@@ -42,6 +42,6 @@ The first Bank to reach 80 wins at once. The game also ends after the round in w
 
 ## Tuning notes
 
-Strong bot against strong bot over 2,000 games: first seat wins 50%, games last about 7.5 rounds, and THE RECKONING almost never ends a game (the Majors are revealed one per round, so about eight are seen). A Hedge is played in roughly one game in three, up from one in twenty under Version 1. Each player partners with about 2.6 Personalities a game (replacements included), copy trades 1.5 times and earns about 2.2 Favor. The strong bot beats the naive bot 62% of the time.
+Strong bot against strong bot over 2,000 games: first seat wins 50%, games last about 7 rounds, and THE RECKONING never ended a game (the Majors are revealed one per round, so about seven are seen). A Hedge is played about once every two games, up from once in twenty under Version 1. Each player partners with about 2.5 Personalities a game (replacements included), copy trades 1.3 times and earns about 2.2 Favor. The strong bot beats the naive bot 59% of the time.
 
-Seat balance was the delicate part. Revealing the Omen at round start with an immediate win at 80 gave the first seat 58%; playing out the round instead gave the second seat 64%. The first Trader drawing seven cards (and skipping the first draw, as in Version 1) brought it to 50% under immediate win, which is also the simpler rule to explain. Playing out the round with the first Trader on nine cards also balanced (48%) and is kept as an option (`--finish 1 --firstHand -1 --first 1`).
+Seat balance was the delicate part. Revealing the Omen at round start with an immediate win at 80 gave the first seat 58% with eight cards each; playing out the round instead gave the second seat 64%. A Reserve chip for the second seat overshot (40% for the first seat), two Favor did too little (56%), seven cards for the first Trader balanced but broke the rule of eights. The second Trader opening with 8 Profit, both drawing on their first turn, balanced at 50% and keeps every number an eight: eight cards, 8 Profit, 80 to win. Playing out the round with the first Trader on nine cards also balanced (48%) and is kept as an option (`--finish 1 --firstHand -1 --first 1`).
