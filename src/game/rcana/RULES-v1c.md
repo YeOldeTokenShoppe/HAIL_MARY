@@ -34,7 +34,7 @@ Favor comes from **Sharing only**: each upright Cups you play earns 1 Favor. Cop
 
 ## The last-play Hail Mary (prototype, on by default at the table)
 
-A Hail Mary Pass may only be thrown when the opponent **could win by banking at their next turn**: their Bank plus their Portfolio, with the Dividend they are about to receive, reaches 80. You still need at least 10 exposed. The whole Portfolio goes up; there is no cap.
+A Hail Mary Pass may only be thrown when the opponent **could win at their next turn** by any visible route: their Bank, plus their Portfolio with the Dividend and bonus they are about to receive, plus a pass of theirs landing doubled, plus THE VAULT if it waits in Providence and they can pay for it, reaches 80. The table shows this projection on each querent as "Next turn banks to", and flags CAN WIN AT ITS NEXT TURN. You still need at least 10 exposed. The whole Portfolio goes up; there is no cap.
 
 **The clock stops.** While a pass is in the air nobody can win. The opponent banks on their turn as usual and may aim Chains at the pass. At the start of the thrower's next turn the pass lands: untouched, it banks doubled. Only then does the game check for 80, and the **larger Bank wins**, ties to the larger Portfolio. If the pass is intercepted or an Event brings it down, the clock restarts at once and the opponent wins.
 
