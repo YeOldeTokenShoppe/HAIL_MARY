@@ -193,7 +193,7 @@ export class TarotGame {
     this.current = { kind: 'major', card: c, attacker: null, victim: null };
     if (c.kind === 'market') { if (this.market) this.discard.push(this.market); this.market = c; }
     else if (c.kind === 'event' && this.rules.traders && !this.rules.majorsSeparate && this.players.some((q) => this.eventHurts(c, q) && this.reaction(q, 'breaker', c.name))) { this.log(`${c.name} does not resolve`); this.bury(c); }
-    else if (c.kind === 'event') { c.buried = false; c.resolve(this); if (!c.buried) this.discard.push(c); for (const q of this.players) for (const i of [...q.floor]) if (i.card.onEvent && q.floor.includes(i)) i.card.onEvent(this, q, i); }
+    else if (c.kind === 'event') { c.buried = false; this.lastEvent = { card: c, round: this.round }; c.resolve(this); if (!c.buried) this.discard.push(c); for (const q of this.players) for (const i of [...q.floor]) if (i.card.onEvent && q.floor.includes(i)) i.card.onEvent(this, q, i); }
     else this.providence.push(c);
     this.current = null;
     for (const q of this.players) for (const i of [...q.floor]) if (i.card.onMajor && q.floor.includes(i)) i.card.onMajor(this, q, i);
