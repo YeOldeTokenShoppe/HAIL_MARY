@@ -130,6 +130,14 @@
   .reveal .txt { font-size: 13px; line-height: 1.4; }
   .reveal .did { font-family: var(--font-mono); font-size: 11px; color: var(--ink); line-height: 1.5; border-top: 1px solid var(--line); padding-top: 6px; }
   .reveal .did .bad { color: var(--bad); } .reveal .did .good { color: var(--good); }
+  .review { display: grid; gap: 10px; max-height: 80vh; overflow: auto; }
+  .review .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .review .col { background: var(--felt); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; }
+  .review .col .who { font-family: var(--font-display); letter-spacing: .06em; font-size: 12px; margin-bottom: 4px; }
+  .review .chip { display: inline-block; border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; margin: 2px 2px 0 0; font-size: 11px; } .review .chip.working { border-color: var(--gold); color: var(--gold); }
+  .review .lines { font-family: var(--font-mono); font-size: 11px; line-height: 1.5; max-height: 220px; overflow: auto; } .review .lines .bad { color: var(--bad); } .review .lines .good { color: var(--good); } .review .lines .win { color: var(--gold); }
+  .review .nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  @media (max-width: 760px) { .review .cols { grid-template-columns: 1fr; } }
   @media (max-width: 760px) { .reveal { grid-template-columns: 1fr; } }
   .pop { position: fixed; z-index: 45; background: var(--felt2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; max-width: 280px; display: grid; gap: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
   .pop .t { font-weight: 600; } .pop .x { color: var(--muted); font-size: 12px; }
@@ -152,6 +160,7 @@
     <label class="note">Seed <input type="number" id="seed" value="7" min="1" style="width:70px"></label>
     <button class="primary" id="start">Deal</button>
     <label class="note" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="coach" checked> coach</label>
+    <button id="review" disabled title="Step back through every turn of this game">Review</button>
     <label class="note" data-v1c="only" style="display:flex;gap:6px;align-items:center" title="A Hail Mary may only be thrown when the bot could win by banking at its next turn; no cap; nobody wins while it is in the air"><input type="checkbox" id="passLast" checked> last-play Hail Mary</label>
     <span class="note" id="status">Loading the engine&hellip;</span>
   </div>
@@ -205,6 +214,7 @@
   </section>
 </div>
 <div id="overlayHost"></div>
+<div id="reviewHost"></div>
 <div id="popHost"></div>
 <div class="toast" id="toast"></div>
 
@@ -319,6 +329,19 @@
     const close = () => { host.innerHTML = ''; const r = S.overlayDone; S.overlayDone = null; done(); if (S.reveals.length) render(); };
     host.querySelector('#revealOk').addEventListener('click', close); host.querySelector('.overlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) close(); });
   }
+  // ───────── review: step back through the turns ─────────
+  function openReview(idx) {
+    if (!S) return; const g = S.g, snaps = g.snapshots; if (!snaps.length) return; idx = Math.max(0, Math.min(snaps.length - 1, idx)); const sn = snaps[idx];
+    const title = sn.label === 'setup' ? 'SETUP' : sn.label === 'end' ? 'THE END' : `TURN ${idx} · ${sn.active === S.me.name ? 'YOU' : 'THE BOT'} · round ${sn.round}`;
+    const col = (p) => { const mine = p.name === S.me.name; return `<div class="col"><div class="who">${mine ? 'YOU' : 'BOT'}</div>Bank <b>${p.bank}</b> · Portfolio <b>${p.portfolio}</b>${p.favor != null && V() ? ` · Favor <b>${p.favor}</b>` : ''} · Liquidity ${p.reserve - p.locked}/${p.reserve}${p.pass != null ? ` · <b>pass in the air: ${p.pass}</b>` : ''}<br>${mine ? `Hand: ${p.hand.map(esc).join(', ') || 'empty'}` : `Hand: ${p.hand.length} cards`}<div>${p.floor.length ? p.floor.map((i) => `<span class="chip ${i.working ? 'working' : ''}">${esc(i.name)} · ${i.working ? 'Trading' : 'idle'} · earns ${i.yield}${i.drawdown ? ` · ${i.drawdown}/${i.res} dd` : ''}</span>`).join('') : '<span class="note">no Personalities</span>'}</div></div>`; };
+    const lines = (sn.events || []).map((e) => { const t = esc(e.replace(/^\[[^\]]*\] /, '')); const cls = /WINS|COMPLETE:|reveals|HAIL MARY PASS/.test(e) ? 'win' : /loses|LIQUIDATED|INTERCEPTED|INCOMPLETE|Drawdown|Front-run/.test(e) ? 'bad' : /banks|\+\d/.test(e) ? 'good' : ''; return `<div class="${cls}">${t}</div>`; }).join('');
+    const host = $('reviewHost');
+    host.innerHTML = `<div class="overlay"><div class="box review"><div class="ph">REVIEW · ${title}</div><div class="note">The table as it stood at the end of this turn${sn.market ? ` · Market: ${esc(sn.market)}` : ''}${sn.providence && sn.providence.length ? ` · Providence: ${sn.providence.map(esc).join(', ')}` : ''}${sn.projected ? ` · next turn banks to ${sn.projected.map((n, i) => `${g.players[i].name === S.me.name ? 'you' : 'bot'} ${n}`).join(', ')}` : ''}</div><div class="cols">${g.players.map((q, i) => col(sn.players[i])).join('')}</div><div class="zl">What happened this turn</div><div class="lines">${lines || '<span class="note">nothing logged</span>'}</div><div class="nav"><button id="rvPrev" ${idx === 0 ? 'disabled' : ''}>‹ Earlier</button><span class="note">${idx + 1} of ${snaps.length}</span><button id="rvNext" ${idx === snaps.length - 1 ? 'disabled' : ''}>Later ›</button><button class="primary" id="rvClose" style="margin-left:auto">Back to the table</button></div></div></div>`;
+    host.querySelector('#rvPrev').onclick = () => openReview(idx - 1); host.querySelector('#rvNext').onclick = () => openReview(idx + 1); host.querySelector('#rvClose').onclick = () => { host.innerHTML = ''; };
+    host.querySelector('.overlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) host.innerHTML = ''; });
+  }
+  $('review').addEventListener('click', () => openReview(S ? S.g.snapshots.length - 1 : 0));
+  document.addEventListener('keydown', (e) => { const h = $('reviewHost'); if (!h.firstChild) return; if (e.key === 'ArrowLeft') { const b = h.querySelector('#rvPrev'); if (b && !b.disabled) b.click(); } if (e.key === 'ArrowRight') { const b = h.querySelector('#rvNext'); if (b && !b.disabled) b.click(); } if (e.key === 'Escape') h.innerHTML = ''; });
   function passNewsText(q) {
     const n = q.lastPass, who = q === S.me ? 'YOUR' : "THE BOT'S", bot = q === S.me ? 'the bot' : 'you';
     if (n.result === 'complete') return { cls: 'good', text: `✝ ${who} HAIL MARY CAME DOWN UNTOUCHED: ${n.stake} in the air banked as ${n.amount}.${S.g.rules.passLast && S.g.over ? ' The clock restarts: the larger Bank wins.' : ''}` };
@@ -348,13 +371,13 @@
     $('mePass').innerHTML = me.pass ? `<div class="pass-badge">HAIL MARY IN THE AIR: ${me.inAir} · doubles at the start of your next turn if untouched${g.rules.passLast ? ' · the clock is stopped: nobody wins until it lands' : ''}</div><div class="hm">At risk from the bot's Chains, and from THE REGULATOR, THE CRASH or THE AUDIT turning up</div>`
       : me.hailMaryUsed ? '<div class="hm">Hail Mary: used</div>'
       : g.closing ? '<div class="hm">Hail Mary: too late, final round</div>'
-      : g.rules.passLast && !g.opps(me).some((o) => g.wouldWinNext(o)) ? `<div class="hm">Hail Mary: the last play. Available only when the bot could win by banking at its next turn${me.portfolio < g.rules.passMin ? `, and needs ${g.rules.passMin} exposed` : ''}</div>`
-      : me.portfolio >= g.rules.passMin ? `<div class="hm ready">HAIL MARY READY at the start of your next turn: ${g.rules.passLast ? `the bot can win next turn. Throw all ${me.portfolio}; nobody wins while it is in the air` : `throw ${g.rules.passMax ? Math.min(me.portfolio, g.rules.passMax) : me.portfolio} to double it`}</div>`
-      : `<div class="hm">Hail Mary: needs ${g.rules.passMin} in Portfolio, you have ${me.portfolio}${g.rules.passLast ? ' (the bot could win next turn)' : ''}</div>`;
+      : g.rules.passLast && !g.opps(me).some((o) => g.wouldWinNext(o)) ? `<div class="hm">Hail Mary: the last play. Available when the bot could win at its next turn and you have Profit exposed</div>`
+      : me.portfolio >= (g.rules.passLast ? 1 : g.rules.passMin) ? `<div class="hm ready">HAIL MARY READY at the start of your next turn: ${g.rules.passLast ? `the bot can win next turn. Throw all ${me.portfolio}; nobody wins while it is in the air` : `throw ${g.rules.passMax ? Math.min(me.portfolio, g.rules.passMax) : me.portfolio} to double it`}</div>`
+      : `<div class="hm">Hail Mary: ${g.rules.passLast ? 'the bot could win next turn, but you have nothing exposed to throw' : `needs ${g.rules.passMin} in Portfolio, you have ${me.portfolio}`}</div>`;
     $('meReserve').innerHTML = me.reserve.map((r) => `<span class="chip ${r.locked ? 'locked' : ''}"></span>`).join('');
     $('meFavorRow').hidden = $('oppFavorRow').hidden = !V(); $('meFavor').textContent = me.favor; $('oppFavor').textContent = bot.favor;
     const pb = g.projectedBank(bot), pm = g.projectedBank(me); $('oppNext').textContent = pb; $('meNext').textContent = pm; const danger = !g.over && pb >= g.rules.winBank;
-    $('oppDanger').innerHTML = danger ? `<div class="pass-badge" style="background:var(--bad);color:#fff">CAN WIN AT ITS NEXT TURN${g.rules.passLast ? (g.canPass(me) ? ' · your last play' : me.hailMaryUsed || me.pass ? '' : ` · a Hail Mary needs ${g.rules.passMin} exposed`) : ''}</div>` : '';
+    $('oppDanger').innerHTML = danger ? `<div class="pass-badge" style="background:var(--bad);color:#fff">CAN WIN AT ITS NEXT TURN${g.rules.passLast ? (g.canPass(me) ? ' · your last play' : me.hailMaryUsed || me.pass ? '' : ' · nothing exposed to throw') : ''}</div>` : '';
     if (danger && S.dangerShown !== g.turnCounter) { S.dangerShown = g.turnCounter; if (g.active === me) toast('THE BOT CAN WIN AT ITS NEXT TURN'); }
     $('meFloorLabel').textContent = V() ? `Your network · ${me.floor.length}/${g.rules.networkCap} partners; tap an idle one to Trade for its earnings` : 'Your floor · Personalities live here; tap an idle one to Work it for its earnings'; $('oppFloorLabel').textContent = V() ? "Bot's network · tap a Trading Personality to Copy trade it for 1 Liquidity" : "Bot's floor";
     document.querySelector('#oppQ .who').classList.toggle('active', g.active === bot && !g.over); document.querySelector('#meQ .who').classList.toggle('active', g.active === me && !g.over);
@@ -386,16 +409,18 @@
     else if (pr.kind === 'main') html = `<div class="prompt">${strip}<div class="ph">YOUR MAIN PHASE · Liquidity ${g.liquidity(me)} to spend${me.reservedThisTurn ? '' : ' · you may still Reserve one card'}</div>${fa ? `<button id="foretell">${isDuel() ? 'Foretell the Omen' : 'Foretell the next card'}${fa.favor ? ` (${fa.favor} Favor)` : V() ? ' (free: Virgil)' : ''}</button>` : ''}<span class="note" style="color:var(--muted)">Drag a glowing card onto a glowing zone. Tap any card to read it.</span>${hintTxt}</div>`;
     else if (pr.kind === 'hedge') { const t = pr.threat; const tgt = t.target && t.target.isPass ? `your Hail Mary Pass (${me.inAir} in the air)` : t.target && t.target.card ? t.target.card.name : 'your Portfolio'; html = `<div class="prompt danger"><div class="ph">INCOMING · ${esc(t.attacker ? t.attacker.name : 'The R-cana')} plays ${esc(t.card.name)} at ${esc(tgt)} for ${t.amount}</div><span class="note">Tap a glowing Chain in your hand to Hedge${g.rules.hedgeFree ? ' (free: the card is spent, no Liquidity)' : ''}, or</span><button id="takeIt" class="primary">Take it</button>${hintTxt}</div>`; }
     else if (pr.kind === 'foretell') html = `<div class="prompt"><div class="ph">THE OMEN IS ${esc(pr.card.name)}</div><span class="note">${esc(pr.card.text)}</span><button class="primary" id="bury">Bury it</button><button id="leave">Leave it</button>${hintTxt}</div>`;
-    else if (pr.kind === 'over') { const r = pr.result; html = `<div class="prompt"><div class="ph">${r.winner === me.name ? 'YOU WIN' : r.winner ? 'THE BOT WINS' : 'DRAW'} · ${esc(r.reason)}</div><span class="note">The R-cana named you a ${esc(g.archetype(me))}. Press Deal for another.</span><div class="did" style="width:100%;font-family:var(--font-mono);font-size:11px;line-height:1.5;border-top:1px solid var(--line);padding-top:6px">${[...g.snapshots.flatMap((x) => x.events), ...g.events].slice(-6).map((e) => esc(e.replace(/^\[[^\]]*\] /, ''))).join('<br>')}</div></div>`; }
+    else if (pr.kind === 'over') { const r = pr.result; html = `<div class="prompt"><div class="ph">${r.winner === me.name ? 'YOU WIN' : r.winner ? 'THE BOT WINS' : 'DRAW'} · ${esc(r.reason)}</div><span class="note">The R-cana named you a ${esc(g.archetype(me))}. Press Deal for another.</span><button id="reviewEnd">Review the last turns</button><div class="did" style="width:100%;font-family:var(--font-mono);font-size:11px;line-height:1.5;border-top:1px solid var(--line);padding-top:6px">${[...g.snapshots.flatMap((x) => x.events), ...g.events].slice(-6).map((e) => esc(e.replace(/^\[[^\]]*\] /, ''))).join('<br>')}</div></div>`; }
     else if (pr.kind === 'error') html = `<div class="prompt danger"><div class="ph">ENGINE ERROR</div><pre class="note">${esc(String(pr.error && pr.error.stack || pr.error))}</pre></div>`;
     $('prompt').innerHTML = html;
     if (pr.kind === 'set') { $('bankAll').onclick = () => resolveP({ bank: me.portfolio }); $('bankSome').onclick = () => resolveP({ bank: +$('bankN').value || 0 }); if (pr.canPass) $('throwPass').onclick = () => resolveP({ pass: true }); }
     if (pr.kind === 'main' && fa) $('foretell').onclick = () => doAct(fa);
     if (pr.kind === 'draw') $('drawBtn').onclick = () => resolveP(true);
+    if (pr.kind === 'over') $('reviewEnd').onclick = () => openReview(Math.max(0, g.snapshots.length - 2));
     if (pr.kind === 'hedge') $('takeIt').onclick = () => resolveP(null);
     if (pr.kind === 'foretell') { $('bury').onclick = () => resolveP(true); $('leave').onclick = () => resolveP(false); }
     if (hint) { const d = $('coachDo'); if (d) d.onclick = () => hint.run(); const f = $('coachFinish'); if (f) f.onclick = coachFinish; const tz = hintTarget(hint.act); if (tz) tz.classList.add(tz.classList.contains('card') ? 'hint' : 'hint'); }
     $('status').textContent = g.over ? 'Game over.' : `Round ${g.round}${g.bellRound != null ? ' · Final Bell' : ''}`;
+    $('review').disabled = g.snapshots.length < 2;
     $('ask').hidden = !askFn;
   }
   $('endTurn').addEventListener('click', endTurn);
@@ -471,7 +496,7 @@
   ].join('\n');
   const RULES_1B = 'VERSION 1b (Favor and Network) changes the shared reading as follows. Hire is called Partner and Work is called Trade; a Trader may have at most two Personalities in their Network. Copy trade: once per turn, pay 1 Liquidity to copy one of the opponent\'s Trading (Working) Personalities: you gain its full earnings, the opponent gains 1. Favor: each upright Cups you play (Share) and each Copy trade gives you 1 Favor. Spend 1 Favor to Foretell (look at the top card of the deck and optionally put it on the bottom; free if you have Virgil). If an Event would take Profit from your Portfolio or bring down your pass while you hold 2 or more Favor, Our Lady spares you and takes 2 Favor instead. The Underdog clause is gone: THE HAIL MARY can be invoked by anyone with 10 in Portfolio; THE ORACLE lets the Trader with the most Favor reorder; OUR LADY OF PERPETUAL PROFIT banks the Portfolio of the Trader with the most Favor; THE BAG HOLDER is a Market with no Dividend; Interest is called the Dividend bonus (same amount: 1 per full 5 exposed).';
   const RULES_1C = 'VERSION 1c builds on 1b with these changes. The 22 Majors are a separate deck: the top one lies face down as the Omen and is turned over at the start of every round, before either player banks; the Minor deck holds only Minors, so draws never reveal Majors. Foretell (1 Favor, free with Virgil) looks at the Omen and may bury it. Hedging is free: the Chain is spent, no Liquidity, one Chain per attack. A Hail Mary stake is capped at 20 (the rest stays in the Portfolio). With two partners you may still partner with a new Personality by releasing one (its Exit Scam applies). Favor comes from Sharing (Cups) only, not from Copy trades. Our Lady spares only a loss of 3 or more, or a pass. The game ends when a Bank reaches 80, after the round THE RECKONING tolls, or when the last Major is revealed.';
-  const RULES_LAST = 'THE LAST-PLAY HAIL MARY (in force at this table): a Hail Mary Pass may only be thrown when the opponent could win by banking at their next turn (their Bank plus Portfolio, with the coming Dividend, reaches 80) and you hold at least 10 exposed. The whole Portfolio goes up, no cap. While a pass is in the air nobody can win: the opponent still banks on their turn but the game is not decided until the pass lands at the start of the thrower\'s next turn; then it banks doubled if untouched, and the larger Bank wins. THE HAIL MARY (The Fool) is the only way to throw early.';
+  const RULES_LAST = 'THE LAST-PLAY HAIL MARY (in force at this table): a Hail Mary Pass may only be thrown when the opponent could win at their next turn by any visible route (their Bank plus Portfolio with the coming Dividend and bonus, a landing pass, THE VAULT in Providence reaches 80) and you have any Profit exposed. The whole Portfolio goes up, no cap. While a pass is in the air nobody can win: the opponent still banks on their turn but the game is not decided until the pass lands at the start of the thrower\'s next turn; then it banks doubled if untouched, and the larger Bank wins. THE HAIL MARY (The Fool) is the only way to throw early.';
   function cardBrief(c, inst, owner) {
     const g = S.g; let s = c.name;
     if (c.type === 'major') return `${c.name} [${c.kind}${c.cost != null ? ' ' + c.cost : ''}]: ${ctext(c)}`;
