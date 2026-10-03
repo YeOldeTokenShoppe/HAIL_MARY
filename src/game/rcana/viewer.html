@@ -1,0 +1,271 @@
+<title>R-cana Simulator</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: a control bar, a shared "table strip", then two Trader boards side by side; log and chart beneath. */
+  :root {
+    --bg: #eef1f4; --fg: #141a22; --muted: #5b6673; --panel: #ffffff; --panel2: #f6f8fa; --line: #cfd6de;
+    --accent: #8a6d1f; --accent-ink: #ffffff; --good: #1f7a4d; --bad: #b23a3a; --warn: #a86f0b; --villain: #6b2fa3;
+    --font-display: 'Cinzel', Georgia, serif; --font-body: 'IBM Plex Sans', system-ui, sans-serif; --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0f1419; --fg: #e6e9ee; --muted: #8b96a3; --panel: #171d25; --panel2: #1e2631; --line: #2a333e; --accent: #d4af37; --accent-ink: #141a22; --good: #4cc38a; --bad: #e5484d; --warn: #e3a93c; --villain: #b48ee0; color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg: #0f1419; --fg: #e6e9ee; --muted: #8b96a3; --panel: #171d25; --panel2: #1e2631; --line: #2a333e; --accent: #d4af37; --accent-ink: #141a22; --good: #4cc38a; --bad: #e5484d; --warn: #e3a93c; --villain: #b48ee0; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.45; margin: 0; padding-block: 16px 40px; padding-inline: 16px; }
+  .wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 16px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 20px; }
+  h1 { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: .04em; margin: 0; }
+  header .sub { color: var(--muted); }
+  nav { display: flex; gap: 4px; margin-left: auto; }
+  nav button { background: transparent; border: 1px solid var(--line); color: var(--fg); padding: 6px 12px; border-radius: 6px; cursor: pointer; font: inherit; }
+  nav button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; min-width: 0; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 12px; align-items: end; }
+  label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  select, input[type="number"] { font: inherit; font-family: var(--font-body); color: var(--fg); background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; width: 100%; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 6px; padding: 9px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.ghost { background: var(--panel2); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; font: inherit; cursor: pointer; }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+  .strip .cell { background: var(--panel2); border-radius: 6px; padding: 8px 10px; }
+  .cell .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .cell .v { font-family: var(--font-mono); font-size: 14px; font-weight: 500; }
+  .boards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .boards { grid-template-columns: 1fr; } }
+  .board h2 { font-family: var(--font-display); font-size: 15px; letter-spacing: .05em; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+  .board.active h2::after { content: 'ON THE CLOCK'; font-family: var(--font-body); font-size: 10px; letter-spacing: .08em; background: var(--accent); color: var(--accent-ink); padding: 2px 6px; border-radius: 4px; }
+  .board .trader { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+  .nums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+  .num { background: var(--panel2); border-radius: 6px; padding: 6px 8px; }
+  .num .k { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .num .v { font-family: var(--font-mono); font-size: 18px; font-variant-numeric: tabular-nums; }
+  .num.bank .v { color: var(--accent); }
+  .zone-h { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 8px 0 4px; }
+  .floor { display: flex; flex-wrap: wrap; gap: 6px; min-height: 28px; }
+  .chip { border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font-size: 12px; background: var(--panel2); display: inline-flex; gap: 6px; align-items: center; }
+  .chip.working { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel2)); }
+  .chip.working::before { content: '\27F3'; color: var(--accent); }
+  .chip.position { border-style: dashed; }
+  .chip .stat { font-family: var(--font-mono); color: var(--muted); }
+  .chip .dd { color: var(--bad); font-family: var(--font-mono); }
+  .chip.villain { border-color: var(--villain); }
+  .chip.villain .name::after { content: ' \2726'; color: var(--villain); }
+  .hand { color: var(--muted); font-size: 12px; }
+  .tokens { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+  .turnbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .turnbar input[type="range"] { flex: 1 1 200px; min-width: 120px; accent-color: var(--accent); }
+  .turnbar .pos { font-family: var(--font-mono); min-width: 110px; }
+  .log { font-family: var(--font-mono); font-size: 12px; white-space: pre-wrap; max-height: 320px; overflow: auto; background: var(--panel2); border-radius: 6px; padding: 10px; line-height: 1.5; }
+  .log .win { color: var(--accent); font-weight: 600; }
+  .log .bad { color: var(--bad); }
+  .log .good { color: var(--good); }
+  .chart svg { width: 100%; height: auto; display: block; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  td.n, th.n { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .tablewrap { overflow-x: auto; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+  .note { color: var(--muted); font-size: 12px; }
+  .temp { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .temp.hope { background: #d4af37; } .temp.greed { background: #2e9e5b; } .temp.fear { background: #7a7f8a; } .temp.hype { background: #e04e9a; } .temp.reason { background: #2f7fd1; } .temp.patience { background: #8a5a2b; }
+  .pill { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: 11px; border: 1px solid var(--line); color: var(--muted); }
+  .win-badge { background: var(--accent); color: var(--accent-ink); border-radius: 6px; padding: 8px 12px; font-weight: 600; }
+  @media (prefers-reduced-motion: no-preference) { .chip { transition: background .15s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>R-CANA SIMULATOR</h1>
+    <span class="sub">Rules draft v5: no Trader cards, 17 Opportunities and 17 Calamities. Bot versus bot.</span>
+    <nav role="tablist">
+      <button role="tab" id="tab-play" aria-selected="true" data-tab="play">Play</button>
+      <button role="tab" id="tab-batch" aria-selected="false" data-tab="batch">Batch</button>
+      <button role="tab" id="tab-cards" aria-selected="false" data-tab="cards">Cards</button>
+    </nav>
+  </header>
+
+  <section class="panel controls" id="controls">
+    <label>Deck A <select id="deckA"></select></label>
+    <label>Bot style A <select id="polA"></select></label>
+    <label>Deck B <select id="deckB"></select></label>
+    <label>Bot style B <select id="polB"></select></label>
+    <label>R-cana deck <select id="rcana"><option value="first">First-game set (13 fixed)</option><option value="random">Random 8 / 3 / 2</option></select></label>
+    <label>Seed <input type="number" id="seed" value="7" min="1"></label>
+    <label>Games (batch) <input type="number" id="games" value="400" min="10" max="5000"></label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="primary" id="run">Run one game</button><button class="ghost" id="runBatch">Run batch</button></div>
+  </section>
+
+  <section id="view-play" class="wrap" style="gap:16px">
+    <div class="panel strip" id="strip"></div>
+    <div class="boards" id="boards"></div>
+    <div class="panel">
+      <div class="turnbar">
+        <button class="ghost" id="first">&#9198;</button><button class="ghost" id="prev">&#9664; Prev</button>
+        <input type="range" id="scrub" min="0" max="0" value="0">
+        <button class="ghost" id="next">Next &#9654;</button><button class="ghost" id="last">&#9197;</button>
+        <span class="pos" id="pos"></span>
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0"><input type="checkbox" id="showOmen"> reveal Omen</label>
+      </div>
+    </div>
+    <div class="two">
+      <div class="panel"><div class="zone-h">This turn</div><div class="log" id="log"></div></div>
+      <div class="panel chart"><div class="zone-h">Bank (solid) and Portfolio (dashed) by turn</div><div id="chart"></div></div>
+    </div>
+  </section>
+
+  <section id="view-batch" class="wrap" hidden style="gap:16px">
+    <div class="panel" id="batchSummary"><span class="note">Run a batch to see win rates, game length, and which cards actually get played.</span></div>
+    <div class="two">
+      <div class="panel chart"><div class="zone-h">Game length (rounds)</div><div id="hist"></div></div>
+      <div class="panel"><div class="zone-h">Card play counts</div><div class="tablewrap" id="cardStats"></div></div>
+    </div>
+  </section>
+
+  <section id="view-cards" class="wrap" hidden style="gap:16px">
+    <div class="panel controls">
+      <label>Temperament <select id="fTemp"><option value="">All</option></select></label>
+      <label>Type <select id="fType"><option value="">All</option></select></label>
+      <label>Search <input type="text" id="fText" placeholder="name or text" style="font:inherit;color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:7px 8px;width:100%"></label>
+    </div>
+    <div class="panel tablewrap" id="cardTable"></div>
+  </section>
+</div>
+
+<script type="module">
+  import { ALL_CARDS, TEMPERAMENTS } from './cards.js';
+  import { PRESETS } from './bots.js';
+  import { DECK_OPTIONS, deckFor } from './decks.js';
+  import { playOne, batch } from './sim.js';
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // ----- controls -----
+  for (const id of ['deckA', 'deckB']) $(id).innerHTML = DECK_OPTIONS.map((d) => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
+  $('deckB').value = 'analyst';
+  for (const id of ['polA', 'polB']) $(id).innerHTML = Object.entries(PRESETS).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('');
+  $('polB').value = 'hodler';
+  try { const saved = JSON.parse(localStorage.getItem('rcana-sim') || '{}'); for (const k of ['deckA', 'polA', 'deckB', 'polB', 'rcana', 'seed', 'games']) if (saved[k] != null) $(k).value = saved[k]; } catch (e) {}
+  const opts = () => ({ a: $('deckA').value, b: $('deckB').value, pa: $('polA').value, pb: $('polB').value, rcana: $('rcana').value, seed: +$('seed').value || 1 });
+  const persist = () => { try { localStorage.setItem('rcana-sim', JSON.stringify({ ...opts(), games: $('games').value })); } catch (e) {} };
+
+  // tabs
+  document.querySelectorAll('nav [role=tab]').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('nav [role=tab]').forEach((x) => x.setAttribute('aria-selected', x === b ? 'true' : 'false'));
+    for (const t of ['play', 'batch', 'cards']) $('view-' + t).hidden = t !== b.dataset.tab;
+  }));
+
+  // ----- single game -----
+  let snaps = []; let cur = 0;
+  function runOne() {
+    persist();
+    const g = playOne({ ...opts(), snapshots: true }); g.run();
+    snaps = g.snapshots; cur = snaps.length - 1;
+    $('scrub').max = String(snaps.length - 1); show(cur);
+  }
+  function show(i) {
+    cur = Math.max(0, Math.min(snaps.length - 1, i)); const s = snaps[cur]; if (!s) return;
+    $('scrub').value = String(cur);
+    $('pos').textContent = `${cur} / ${snaps.length - 1} \u00b7 round ${s.round}`;
+    const showOmen = $('showOmen').checked;
+    $('strip').innerHTML = [
+      ['Round', s.round + (s.finalBell != null ? ` &middot; Final Bell R${s.finalBell}` : '')],
+      ['Market', s.market || 'none'],
+      ['Omen', showOmen ? (s.omen || 'empty') : (s.omen ? 'face-down' : 'empty')],
+      ['Providence', s.providence || '&mdash;'],
+      ['R-cana left', s.rcanaLeft],
+      ['Result', s.winner ? `${s.winner} wins` : (s.over ? s.reason : 'in play')],
+    ].map(([k, v]) => `<div class="cell"><div class="k">${k}</div><div class="v">${esc(v)}</div></div>`).join('');
+    $('boards').innerHTML = s.players.map((p) => `
+      <div class="panel board ${s.active === p.name && !s.over ? 'active' : ''}">
+        <h2>${esc(p.name)}</h2>
+        <div class="trader">${esc(p.temps)} &middot; plays like a <strong>${esc(p.archetype)}</strong> &middot; deck ${p.deck} &middot; discard ${p.discard}${p.knowsOmen ? ' &middot; knows the Omen' : ''}</div>
+        <div class="nums">
+          <div class="num bank"><div class="k">Bank</div><div class="v">${p.bank}</div></div>
+          <div class="num"><div class="k">Portfolio</div><div class="v">${p.portfolio}</div></div>
+          <div class="num"><div class="k">Liquidity</div><div class="v">${p.reserve - p.locked}<span style="font-size:12px;color:var(--muted)">/${p.reserve}</span></div></div>
+          <div class="num"><div class="k">Hand</div><div class="v">${p.hand.length}</div></div>
+        </div>
+        <div class="tokens">Attention ${p.tokens.attention} &middot; Data ${p.tokens.data} &middot; Credibility ${p.tokens.credibility}</div>
+        <div class="zone-h">Floor</div>
+        <div class="floor">${p.floor.length ? p.floor.map((i) => `<span class="chip ${i.type} ${i.working ? 'working' : ''} ${i.villain ? 'villain' : ''}" title="${i.type}${i.stack ? ', ascended' : ''}"><span class="name">${esc(i.name)}</span>${i.type === 'personality' ? `<span class="stat">${i.yield}y/${i.res}r</span>` : `<span class="stat">${i.res}r${i.locked ? ' locked' : ''}</span>`}${i.drawdown ? `<span class="dd">&minus;${i.drawdown}</span>` : ''}</span>`).join('') : '<span class="note">empty</span>'}</div>
+        <div class="zone-h">Hand</div>
+        <div class="hand">${p.hand.length ? p.hand.map(esc).join(' &middot; ') : '&mdash;'}</div>
+      </div>`).join('');
+    $('log').innerHTML = s.events.map((e) => { const t = esc(e.replace(/^\[[^\]]*\] /, '')); const cls = /WINS|FINAL BELL|Final Bell/.test(e) ? 'win' : /LIQUIDATED|loses|Drawdown|Front-run|INSOLVENT|Exit Scam/.test(e) ? 'bad' : /banks/.test(e) ? 'good' : ''; return `<div class="${cls}">${t}</div>`; }).join('');
+    drawChart();
+  }
+  function drawChart() {
+    const W = 560, H = 220, padL = 34, padB = 22, padT = 10, padR = 10; const n = snaps.length; if (n < 2) { $('chart').innerHTML = ''; return; }
+    const maxY = Math.max(80, ...snaps.flatMap((s) => s.players.map((p) => Math.max(p.bank, p.portfolio))));
+    const x = (i) => padL + (i / (n - 1)) * (W - padL - padR); const y = (v) => padT + (1 - v / maxY) * (H - padT - padB);
+    const colors = ['var(--accent)', 'var(--good)'];
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Bank and Portfolio by turn">`;
+    for (const v of [0, 20, 40, 60, 80]) svg += `<line x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${padL - 6}" y="${y(v) + 4}" font-size="10" text-anchor="end" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${v}</text>`;
+    svg += `<line x1="${padL}" x2="${W - padR}" y1="${y(80)}" y2="${y(80)}" stroke="var(--accent)" stroke-dasharray="2 3"/>`;
+    snaps[0].players.forEach((_, pi) => {
+      const bank = snaps.map((s, i) => `${x(i)},${y(s.players[pi].bank)}`).join(' '); const port = snaps.map((s, i) => `${x(i)},${y(s.players[pi].portfolio)}`).join(' ');
+      svg += `<polyline points="${bank}" fill="none" stroke="${colors[pi]}" stroke-width="2"/><polyline points="${port}" fill="none" stroke="${colors[pi]}" stroke-width="1.5" stroke-dasharray="4 3" opacity=".8"/>`;
+      svg += `<text x="${padL + 4 + pi * 150}" y="${H - 6}" font-size="11" fill="${colors[pi]}" font-family="IBM Plex Sans, sans-serif">${esc(snaps[0].players[pi].name)}</text>`;
+    });
+    svg += `<line x1="${x(cur)}" x2="${x(cur)}" y1="${padT}" y2="${H - padB}" stroke="var(--fg)" stroke-width="1" opacity=".5"/>`;
+    svg += '</svg>'; $('chart').innerHTML = svg;
+  }
+  $('run').addEventListener('click', runOne);
+  $('scrub').addEventListener('input', (e) => show(+e.target.value));
+  $('prev').addEventListener('click', () => show(cur - 1)); $('next').addEventListener('click', () => show(cur + 1));
+  $('first').addEventListener('click', () => show(0)); $('last').addEventListener('click', () => show(snaps.length - 1));
+  $('showOmen').addEventListener('change', () => show(cur));
+  document.addEventListener('keydown', (e) => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return; if (e.key === 'ArrowLeft') show(cur - 1); if (e.key === 'ArrowRight') show(cur + 1); });
+
+  // ----- batch -----
+  $('runBatch').addEventListener('click', () => {
+    persist();
+    document.querySelector('[data-tab=batch]').click();
+    $('batchSummary').innerHTML = '<span class="note">Simulating&hellip;</span>';
+    setTimeout(() => {
+      const o = opts(); const n = Math.max(10, Math.min(5000, +$('games').value || 400));
+      const r = batch(o, n);
+      const A = deckFor(o.a, 1), B = deckFor(o.b, 2);
+      const wins = Object.entries(r.wins).sort((a, b) => b[1] - a[1]);
+      $('batchSummary').innerHTML = `
+        <div class="strip">
+          ${wins.map(([k, v]) => `<div class="cell"><div class="k">${esc(k)}</div><div class="v">${Math.round(v / n * 100)}% <span style="color:var(--muted);font-size:12px">(${v})</span></div></div>`).join('')}
+          <div class="cell"><div class="k">Games</div><div class="v">${n}</div></div>
+          <div class="cell"><div class="k">Rounds avg / median</div><div class="v">${r.avgRounds} / ${r.medianRounds}</div></div>
+          <div class="cell"><div class="k">p10 &ndash; p90 rounds</div><div class="v">${r.p10} &ndash; ${r.p90}</div></div>
+          <div class="cell"><div class="k">Final Bell</div><div class="v">${r.bellRate}</div></div>
+          <div class="cell"><div class="k">Avg end Bank</div><div class="v">${r.avgBank}</div></div>
+          <div class="cell"><div class="k">Per game</div><div class="v" style="font-size:12px">work ${(r.worked / n).toFixed(1)} &middot; liq ${(r.liquidated / n).toFixed(2)} &middot; hedge ${(r.hedged / n).toFixed(2)} &middot; front-run ${(r.frontrun / n).toFixed(1)}</div></div>
+        </div>
+        <p class="note" style="margin:10px 0 0">${esc(A.label)} as ${esc(PRESETS[o.pa].name)} vs ${esc(B.label)} as ${esc(PRESETS[o.pb].name)}. Sides alternate each game. R-cana: ${o.rcana === 'first' ? 'first-game set' : 'random'}. Seeds ${o.seed}&ndash;${o.seed + n - 1}.</p>`;
+      // histogram
+      const counts = {}; r.rounds.forEach((x) => { counts[x] = (counts[x] || 0) + 1; });
+      const ks = Object.keys(counts).map(Number).sort((a, b) => a - b); const mx = Math.max(...Object.values(counts));
+      const W = 560, H = 200, padL = 30, padB = 24; const bw = (W - padL - 10) / Math.max(1, ks.length);
+      let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Game length histogram">`;
+      ks.forEach((k, i) => { const h = (counts[k] / mx) * (H - padB - 14); svg += `<rect x="${padL + i * bw + 2}" y="${H - padB - h}" width="${bw - 4}" height="${h}" fill="var(--accent)" rx="2"/><text x="${padL + i * bw + bw / 2}" y="${H - 8}" font-size="10" text-anchor="middle" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${k}</text><text x="${padL + i * bw + bw / 2}" y="${H - padB - h - 3}" font-size="10" text-anchor="middle" fill="var(--fg)" font-family="IBM Plex Mono, monospace">${counts[k]}</text>`; });
+      svg += '</svg>'; $('hist').innerHTML = svg;
+      // card stats
+      const inDecks = new Set([...A.deck, ...B.deck].map((c) => c.name));
+      const rows = [...inDecks].map((name) => [name, r.cardPlays[name] || 0]).sort((a, b) => b[1] - a[1]);
+      $('cardStats').innerHTML = `<table><thead><tr><th>Card</th><th class="n">Played</th><th class="n">Per game</th></tr></thead><tbody>${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${v}</td><td class="n">${(v / n).toFixed(2)}</td></tr>`).join('')}</tbody></table>`;
+    }, 20);
+  });
+
+  // ----- cards tab -----
+  $('fTemp').innerHTML += TEMPERAMENTS.map((t) => `<option value="${t}">${t}</option>`).join('') + '<option value="shared">shared (Markets, Externalities, Majors)</option>';
+  const types = [...new Set(ALL_CARDS.map((c) => c.type))]; $('fType').innerHTML += types.map((t) => `<option value="${t}">${t}</option>`).join('');
+  const rarityName = { C: 'Common', U: 'Uncommon', R: 'Rare', UR: 'Ultra Rare' };
+  function renderCards() {
+    const ft = $('fTemp').value, fy = $('fType').value, q = $('fText').value.toLowerCase();
+    const rows = ALL_CARDS.filter((c) => (!ft || (ft === 'shared' ? !c.temp : c.temp === ft)) && (!fy || c.type === fy) && (!q || (c.name + ' ' + (c.text || '') + ' ' + (c.cls || []).join(' ')).toLowerCase().includes(q)));
+    const kw = (c) => Object.entries(c.kw || {}).map(([k, v]) => (v === true ? k : `${k} ${v}`)).join(', ');
+    $('cardTable').innerHTML = `<table><thead><tr><th>Card</th><th>Type</th><th class="n">Cost</th><th class="n">Y / R</th><th>Text</th><th>Rarity</th></tr></thead><tbody>${rows.map((c) => `<tr><td>${c.temp ? `<span class="temp ${c.temp}"></span>` : ''}<strong>${esc(c.name)}</strong>${c.villain ? ' <span class="pill" style="border-color:var(--villain);color:var(--villain)">Villain</span>' : ''}</td><td>${c.type}${c.cls && c.cls.length ? `<div class="note">${esc(c.cls.join(', '))}</div>` : ''}</td><td class="n">${c.cost ?? '&mdash;'}</td><td class="n">${c.type === 'personality' ? `${c.yield} / ${c.res}` : c.type === 'position' ? `&mdash; / ${c.res}` : '&mdash;'}</td><td>${kw(c) ? `<em>${esc(kw(c))}.</em> ` : ''}${esc(c.text || '')}</td><td>${rarityName[c.rarity] || c.rarity}</td></tr>`).join('')}</tbody></table><p class="note">${rows.length} cards</p>`;
+  }
+  ['fTemp', 'fType', 'fText'].forEach((id) => $(id).addEventListener('input', renderCards)); renderCards();
+
+  runOne();
+</script>

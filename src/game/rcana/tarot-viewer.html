@@ -1,0 +1,451 @@
+<title>R-cana Tarot Simulator</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: a control bar, a shared "table strip", then two Trader boards side by side; log and chart beneath. */
+  :root {
+    --bg: #eef1f4; --fg: #141a22; --muted: #5b6673; --panel: #ffffff; --panel2: #f6f8fa; --line: #cfd6de;
+    --accent: #8a6d1f; --accent-ink: #ffffff; --good: #1f7a4d; --bad: #b23a3a; --warn: #a86f0b;
+    --font-display: 'Cinzel', Georgia, serif; --font-body: 'IBM Plex Sans', system-ui, sans-serif; --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0f1419; --fg: #e6e9ee; --muted: #8b96a3; --panel: #171d25; --panel2: #1e2631; --line: #2a333e; --accent: #d4af37; --accent-ink: #141a22; --good: #4cc38a; --bad: #e5484d; --warn: #e3a93c; color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg: #0f1419; --fg: #e6e9ee; --muted: #8b96a3; --panel: #171d25; --panel2: #1e2631; --line: #2a333e; --accent: #d4af37; --accent-ink: #141a22; --good: #4cc38a; --bad: #e5484d; --warn: #e3a93c; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.45; margin: 0; padding-block: 16px 40px; padding-inline: 16px; }
+  .wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 16px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 20px; }
+  h1 { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: .04em; margin: 0; }
+  header .sub { color: var(--muted); }
+  nav { display: flex; gap: 4px; margin-left: auto; }
+  nav button { background: transparent; border: 1px solid var(--line); color: var(--fg); padding: 6px 12px; border-radius: 6px; cursor: pointer; font: inherit; }
+  nav button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; min-width: 0; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 12px; align-items: end; }
+  label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  select, input[type="number"] { font: inherit; font-family: var(--font-body); color: var(--fg); background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; width: 100%; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 6px; padding: 9px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.ghost { background: var(--panel2); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; font: inherit; cursor: pointer; }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+  .strip .cell { background: var(--panel2); border-radius: 6px; padding: 8px 10px; }
+  .cell .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .cell .v { font-family: var(--font-mono); font-size: 14px; font-weight: 500; }
+  .boards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .boards { grid-template-columns: 1fr; } }
+  .board h2 { font-family: var(--font-display); font-size: 15px; letter-spacing: .05em; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+  .board.active h2::after { content: 'ON THE CLOCK'; font-family: var(--font-body); font-size: 10px; letter-spacing: .08em; background: var(--accent); color: var(--accent-ink); padding: 2px 6px; border-radius: 4px; }
+  .board .trader { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+  .nums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+  .num { background: var(--panel2); border-radius: 6px; padding: 6px 8px; }
+  .num .k { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .num .v { font-family: var(--font-mono); font-size: 18px; font-variant-numeric: tabular-nums; }
+  .num.bank .v { color: var(--accent); }
+  .zone-h { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 8px 0 4px; }
+  .floor { display: flex; flex-wrap: wrap; gap: 6px; min-height: 28px; }
+  .chip { border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font-size: 12px; background: var(--panel2); display: inline-flex; gap: 6px; align-items: center; }
+  .chip.working { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel2)); }
+  .chip.working::before { content: '\27F3'; color: var(--accent); }
+  .chip.position { border-style: dashed; }
+  .chip .stat { font-family: var(--font-mono); color: var(--muted); }
+  .chip .dd { color: var(--bad); font-family: var(--font-mono); }
+  .hand { color: var(--muted); font-size: 12px; }
+  .tokens { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+  .turnbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .turnbar input[type="range"] { flex: 1 1 200px; min-width: 120px; accent-color: var(--accent); }
+  .turnbar .pos { font-family: var(--font-mono); min-width: 110px; }
+  .log { font-family: var(--font-mono); font-size: 12px; white-space: pre-wrap; max-height: 320px; overflow: auto; background: var(--panel2); border-radius: 6px; padding: 10px; line-height: 1.5; }
+  .log .win { color: var(--accent); font-weight: 600; }
+  .log .bad { color: var(--bad); }
+  .log .good { color: var(--good); }
+  .chart svg { width: 100%; height: auto; display: block; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  td.n, th.n { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .tablewrap { overflow-x: auto; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+  .note { color: var(--muted); font-size: 12px; }
+  .temp { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .temp.coins { background: #d4af37; } .temp.candles { background: #e0642e; } .temp.chains { background: #5b6673; } .temp.cups { background: #2f7fd1; }
+  .pill { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: 11px; border: 1px solid var(--line); color: var(--muted); }
+  .handcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+  .mini { border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--panel2); display: grid; gap: 6px; min-width: 0; }
+  .mini .t { font-weight: 600; font-size: 13px; display: flex; gap: 6px; align-items: center; }
+  .mini .x { font-size: 11px; color: var(--muted); line-height: 1.35; }
+  .mini .acts { display: flex; flex-wrap: wrap; gap: 4px; }
+  .act { font: inherit; font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--accent); background: transparent; color: var(--fg); cursor: pointer; }
+  .act:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+  .act.big { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; padding: 8px 14px; }
+  .act:disabled { opacity: .5; cursor: default; }
+  .coach { border-left: 3px solid var(--accent); padding: 8px 12px; background: color-mix(in srgb, var(--accent) 10%, var(--panel2)); border-radius: 0 6px 6px 0; margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 13px; }
+  .coach .who { font-family: var(--font-display); letter-spacing: .06em; font-size: 11px; color: var(--accent); }
+  .prompt-h { font-family: var(--font-display); letter-spacing: .05em; font-size: 14px; margin-bottom: 8px; }
+  .chip.clickable { cursor: pointer; }
+  .win-badge { background: var(--accent); color: var(--accent-ink); border-radius: 6px; padding: 8px 12px; font-weight: 600; }
+  @media (prefers-reduced-motion: no-preference) { .chip { transition: background .15s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>R-CANA TAROT SIMULATOR</h1>
+    <span class="sub">Version 1 shares one 80-card deck. Version 2 gives each Trader a 56-card deck with reversals and shares the 22 Majors. Bot versus bot.</span>
+    <nav role="tablist">
+      <button role="tab" id="tab-play" aria-selected="true" data-tab="play">Watch</button>
+      <button role="tab" id="tab-versus" aria-selected="false" data-tab="versus">Versus</button>
+      <button role="tab" id="tab-batch" aria-selected="false" data-tab="batch">Batch</button>
+      <button role="tab" id="tab-cards" aria-selected="false" data-tab="cards">Cards</button>
+    </nav>
+  </header>
+
+  <section class="panel controls" id="controls">
+    <label>Mode <select id="mode"><option value="reading">Version 1: shared reading</option><option value="reading1b">Version 1b: Favor &amp; Network</option><option value="reading1c">Version 1c: Omen, free Hedges, capped pass</option><option value="duel">Version 2: duel with reversals</option></select></label>
+    <label>Trader A <select id="polA"><option value="strong">Strong bot</option><option value="naive">Naive bot</option><option value="random">Random bot</option></select></label>
+    <label>Deck A (v2) <select id="deckA"></select></label>
+    <label>Trader B <select id="polB"><option value="strong">Strong bot</option><option value="naive" selected>Naive bot</option><option value="random">Random bot</option></select></label>
+    <label>Deck B (v2) <select id="deckB"></select></label>
+    <label>Win target <input type="number" id="win" value="80" min="20" max="200"></label>
+    <label>Minors drawn per turn <input type="number" id="draw" value="1" min="1" max="4"></label>
+    <label>Opening hand <input type="number" id="hand" value="8" min="3" max="12"></label>
+    <label>Seed <input type="number" id="seed" value="7" min="1"></label>
+    <label>Games (batch) <input type="number" id="games" value="500" min="10" max="5000"></label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="primary" id="run">Run one game</button><button class="ghost" id="runBatch">Run batch</button></div>
+  </section>
+
+  <section id="view-play" class="wrap" style="gap:16px">
+    <div class="panel strip" id="strip"></div>
+    <div class="boards" id="boards"></div>
+    <div class="panel">
+      <div class="turnbar">
+        <button class="ghost" id="first">&#9198;</button><button class="ghost" id="prev">&#9664; Prev</button>
+        <input type="range" id="scrub" min="0" max="0" value="0">
+        <button class="ghost" id="next">Next &#9654;</button><button class="ghost" id="last">&#9197;</button>
+        <span class="pos" id="pos"></span>
+        
+      </div>
+    </div>
+    <div class="two">
+      <div class="panel"><div class="zone-h">This turn</div><div class="log" id="log"></div></div>
+      <div class="panel chart"><div class="zone-h">Bank (solid) and Portfolio (dashed) by turn</div><div id="chart"></div></div>
+    </div>
+  </section>
+
+  <section id="view-versus" class="wrap" hidden style="gap:16px">
+    <div class="panel" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+      <button class="primary" id="vsStart">Start a game against the bot</button>
+      <label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--fg)"><input type="checkbox" id="vsBotFirst"> bot goes first</label>
+      <span class="note">Uses the Mode, Deck A (yours), Deck B (bot's), Trader B (bot style), win target and seed above. The bot's hand and the Omen are hidden.</span>
+    </div>
+    <details class="panel" id="vsPrimer" open>
+      <summary style="cursor:pointer;font-family:var(--font-display);letter-spacing:.05em;font-size:14px">HOW TO PLAY IN SIX LINES</summary>
+      <ol style="margin:10px 0 0;padding-left:20px;display:grid;gap:6px;max-width:70ch">
+        <li><strong>Goal:</strong> be the first to put 80 Profit in your <strong>Bank</strong>. Banked Profit can never be touched. Profit in your <strong>Portfolio</strong> is exposed until you bank it at the start of your turn.</li>
+        <li><strong>Liquidity pays for cards.</strong> Once a turn, Reserve a card you don't need: it becomes a permanent Liquidity point that refreshes every turn. Early on, reserve every turn.</li>
+        <li><strong>Personalities earn.</strong> Hire one (it rests the turn it arrives), then put it to <strong>Work</strong> each turn for its Yield. A Working Personality is the only thing the bot's Chains can hit.</li>
+        <li><strong>The Four C's:</strong> Coins give Profit now. Candles make a Personality Work for a bonus. Cups give the bot a little and you more, and draw a card. Chains attack a Working Personality, Front-run the bot's Portfolio, or intercept a pass; or stay in hand to Hedge when you're attacked. Reversed Chains are Collateral: armor and extra Yield for one of your own Personalities.</li>
+        <li><strong>The Majors are fate.</strong> One is revealed each round for everyone. Markets stay, Events hit at once, Invokes sit in Providence for whoever pays.</li>
+        <li><strong>Hail Mary Pass:</strong> once per game, throw your whole Portfolio into the air instead of banking. If nothing touches it by the start of your next turn, it banks doubled. If anything does, it's gone.</li>
+      </ol>
+      <p class="note" style="margin:10px 0 0">The coach below shows what the strong bot would do at each decision. Take its advice, or ignore it and see what happens.</p>
+    </details>
+    <div class="panel strip" id="vsStrip"></div>
+    <div class="boards" id="vsBoards"></div>
+    <div class="panel" id="vsPrompt"><span class="note">No game yet.</span></div>
+    <div class="panel"><div class="zone-h">Log</div><div class="log" id="vsLog" style="max-height:260px"></div></div>
+  </section>
+
+  <section id="view-batch" class="wrap" hidden style="gap:16px">
+    <div class="panel" id="batchSummary"><span class="note">Run a batch to see win rates, game length, and which cards actually get played.</span></div>
+    <div class="two">
+      <div class="panel chart"><div class="zone-h">Game length (rounds)</div><div id="hist"></div></div>
+      <div class="panel"><div class="zone-h">Card play counts</div><div class="tablewrap" id="cardStats"></div></div>
+    </div>
+  </section>
+
+  <section id="view-cards" class="wrap" hidden style="gap:16px">
+    <div class="panel controls">
+      <label>Suit <select id="fTemp"><option value="">All</option></select></label>
+      <label>Type <select id="fType"><option value="">All</option></select></label>
+      <label>Search <input type="text" id="fText" placeholder="name or text" style="font:inherit;color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:7px 8px;width:100%"></label>
+    </div>
+    <div class="panel tablewrap" id="cardTable"></div>
+  </section>
+</div>
+
+<script type="module">
+  import { ALL, TRADERS, SUITS, SUIT_NAME } from './tarot.js';
+  import { ALL_V2, DECK_PRESETS } from './v2.js';
+  import { playOne as playOne1, batch as batch1 } from './tarot-sim.js';
+  import { playOne as playOne2, batch as batch2, policy as botPolicy2 } from './v2-sim.js';
+  import { policy as botPolicy1 } from './tarot-sim.js';
+  import { TarotGame } from './tarot-engine.js';
+  import { DuelGame } from './v2-engine.js';
+  import { HumanPolicy } from './tarot-bots.js';
+  import { buildDeck } from './v2.js';
+  import { makeRng } from './engine.js';
+  const isDuel = () => $('mode').value === 'duel';
+  const isV1b = () => $('mode').value === 'reading1b' || $('mode').value === 'reading1c';
+  const isV1c = () => $('mode').value === 'reading1c';
+  const playOne = (o) => (isDuel() ? playOne2(o) : playOne1(o));
+  const batch = (o, n) => (isDuel() ? batch2(o, n) : batch1(o, n));
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // ----- controls -----
+  for (const id of ['deckA', 'deckB']) $(id).innerHTML = Object.entries(DECK_PRESETS).map(([k, v]) => `<option value="${k}">${esc(v.name)}</option>`).join('');
+  $('deckB').value = 'random'; $('deckA').value = 'random';
+  try { const saved = JSON.parse(localStorage.getItem('rcana-tarot') || '{}'); for (const k of ['mode', 'polA', 'polB', 'deckA', 'deckB', 'win', 'draw', 'hand', 'seed', 'games']) if (saved[k] != null) $(k).value = saved[k]; } catch (e) {}
+  const opts = () => ({ a: $('polA').value, b: $('polB').value, da: $('deckA').value, db: $('deckB').value, seed: +$('seed').value || 1, rules: { v1b: isV1b(), v1c: isV1c(), winBank: +$('win').value || 80, minorsPerTurn: +$('draw').value || 1, openingHand: +$('hand').value || 8 } });
+  const persist = () => { try { localStorage.setItem('rcana-tarot', JSON.stringify({ mode: $('mode').value, polA: $('polA').value, polB: $('polB').value, deckA: $('deckA').value, deckB: $('deckB').value, win: $('win').value, draw: $('draw').value, hand: $('hand').value, seed: $('seed').value, games: $('games').value })); } catch (e) {} };
+  const syncMode = () => { const d = isDuel(); $('deckA').parentElement.hidden = !d; $('deckB').parentElement.hidden = !d; $('draw').parentElement.hidden = d; };
+  $('mode').addEventListener('change', () => { syncMode(); renderCards(); }); syncMode();
+
+  // tabs
+  document.querySelectorAll('nav [role=tab]').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('nav [role=tab]').forEach((x) => x.setAttribute('aria-selected', x === b ? 'true' : 'false'));
+    for (const t of ['play', 'versus', 'batch', 'cards']) $('view-' + t).hidden = t !== b.dataset.tab;
+  }));
+
+  // ----- single game -----
+  let snaps = []; let cur = 0;
+  async function runOne() {
+    persist();
+    const g = playOne({ ...opts(), snapshots: true }); await g.run();
+    snaps = g.snapshots; cur = snaps.length - 1;
+    $('scrub').max = String(snaps.length - 1); show(cur);
+  }
+  function show(i) {
+    cur = Math.max(0, Math.min(snaps.length - 1, i)); const s = snaps[cur]; if (!s) return;
+    $('scrub').value = String(cur);
+    $('pos').textContent = `${cur} / ${snaps.length - 1} \u00b7 round ${s.round}`;
+        $('strip').innerHTML = [
+      ['Round', s.round + (s.bell != null ? ` &middot; Final Bell R${s.bell}` : '')],
+      ['Market', s.market || 'none'],
+      ['Providence', s.providence.length ? s.providence.join(', ') : '&mdash;'],
+      [isDuel() ? 'Majors left' : 'R-cana left', s.deckLeft],
+      ['Result', s.winner ? `${s.winner} wins` : (s.over ? s.reason : 'in play')],
+    ].map(([k, v]) => `<div class="cell"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+    $('boards').innerHTML = s.players.map((p) => `
+      <div class="panel board ${s.active === p.name && !s.over ? 'active' : ''}">
+        <h2>${esc(p.name)}</h2>
+        <div class="trader">plays like a <strong>${esc(p.archetype)}</strong>${p.pass != null ? ` &middot; <span class="pill" style="border-color:var(--accent);color:var(--accent)">HAIL MARY PASS: ${p.pass} in the air</span>` : (p.passUsed ? ' &middot; pass thrown' : '')}</div>
+        <div class="nums">
+          <div class="num bank"><div class="k">Bank</div><div class="v">${p.bank}</div></div>
+          <div class="num"><div class="k">Portfolio</div><div class="v">${p.portfolio}</div></div>${p.favor != null && isV1b() ? `<div class="num"><div class="k">Favor</div><div class="v">${p.favor}</div></div>` : ''}
+          <div class="num"><div class="k">Liquidity</div><div class="v">${p.reserve - p.locked}<span style="font-size:12px;color:var(--muted)">/${p.reserve}</span></div></div>
+          <div class="num"><div class="k">Hand</div><div class="v">${p.hand.length}</div></div>
+        </div>
+        <div class="zone-h">Floor</div>
+        <div class="floor">${p.floor.length ? p.floor.map((i) => `<span class="chip personality ${i.working ? 'working' : ''}" title="${esc(i.title)}"><span class="temp ${i.suit}"></span><span class="name">${esc(i.name)}</span><span class="stat">${i.yield}y/${i.res}r</span>${i.drawdown ? `<span class="dd">&minus;${i.drawdown}</span>` : ''}</span>`).join('') : '<span class="note">empty</span>'}</div>
+        <div class="zone-h">Hand</div>
+        <div class="hand">${p.hand.length ? p.hand.map(esc).join(' &middot; ') : '&mdash;'}</div>
+      </div>`).join('');
+    $('log').innerHTML = s.events.map((e) => { const t = esc(e.replace(/^\[[^\]]*\] /, '')); const cls = /WINS|FINAL BELL|Final Bell|reveals|HAIL MARY PASS|COMPLETE:/.test(e) ? 'win' : /LIQUIDATED|loses|Drawdown|Front-run|Exit Scam|INTERCEPTED|INCOMPLETE/.test(e) ? 'bad' : /banks/.test(e) ? 'good' : ''; return `<div class="${cls}">${t}</div>`; }).join('');
+    drawChart();
+  }
+  function drawChart() {
+    const W = 560, H = 220, padL = 34, padB = 22, padT = 10, padR = 10; const n = snaps.length; if (n < 2) { $('chart').innerHTML = ''; return; }
+    const maxY = Math.max(80, ...snaps.flatMap((s) => s.players.map((p) => Math.max(p.bank, p.portfolio))));
+    const x = (i) => padL + (i / (n - 1)) * (W - padL - padR); const y = (v) => padT + (1 - v / maxY) * (H - padT - padB);
+    const colors = ['var(--accent)', 'var(--good)'];
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Bank and Portfolio by turn">`;
+    for (const v of [0, 20, 40, 60, 80]) svg += `<line x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${padL - 6}" y="${y(v) + 4}" font-size="10" text-anchor="end" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${v}</text>`;
+    svg += `<line x1="${padL}" x2="${W - padR}" y1="${y(80)}" y2="${y(80)}" stroke="var(--accent)" stroke-dasharray="2 3"/>`;
+    snaps[0].players.forEach((_, pi) => {
+      const bank = snaps.map((s, i) => `${x(i)},${y(s.players[pi].bank)}`).join(' '); const port = snaps.map((s, i) => `${x(i)},${y(s.players[pi].portfolio)}`).join(' ');
+      svg += `<polyline points="${bank}" fill="none" stroke="${colors[pi]}" stroke-width="2"/><polyline points="${port}" fill="none" stroke="${colors[pi]}" stroke-width="1.5" stroke-dasharray="4 3" opacity=".8"/>`;
+      svg += `<text x="${padL + 4 + pi * 150}" y="${H - 6}" font-size="11" fill="${colors[pi]}" font-family="IBM Plex Sans, sans-serif">${esc(snaps[0].players[pi].name)}</text>`;
+    });
+    svg += `<line x1="${x(cur)}" x2="${x(cur)}" y1="${padT}" y2="${H - padB}" stroke="var(--fg)" stroke-width="1" opacity=".5"/>`;
+    svg += '</svg>'; $('chart').innerHTML = svg;
+  }
+  $('run').addEventListener('click', runOne);
+  $('scrub').addEventListener('input', (e) => show(+e.target.value));
+  $('prev').addEventListener('click', () => show(cur - 1)); $('next').addEventListener('click', () => show(cur + 1));
+  $('first').addEventListener('click', () => show(0)); $('last').addEventListener('click', () => show(snaps.length - 1));
+  document.addEventListener('keydown', (e) => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return; if (e.key === 'ArrowLeft') show(cur - 1); if (e.key === 'ArrowRight') show(cur + 1); });
+
+  // ----- batch -----
+  $('runBatch').addEventListener('click', () => {
+    persist();
+    document.querySelector('[data-tab=batch]').click();
+    $('batchSummary').innerHTML = '<span class="note">Simulating&hellip;</span>';
+    setTimeout(async () => {
+      const o = opts(); const n = Math.max(10, Math.min(5000, +$('games').value || 500));
+      const r = await batch(o, n);
+      const wins = Object.entries(r.wins).sort((a, b) => b[1] - a[1]); const st = r.stats; const pg = (k) => (st[k] / n).toFixed(2);
+      $('batchSummary').innerHTML = `
+        <div class="strip">
+          ${wins.map(([k, v]) => `<div class="cell"><div class="k">${esc(k)}</div><div class="v">${Math.round(v / n * 100)}% <span style="color:var(--muted);font-size:12px">(${v})</span></div></div>`).join('')}
+          <div class="cell"><div class="k">First player wins</div><div class="v">${Math.round(r.firstWins / n * 100)}%</div></div>
+          <div class="cell"><div class="k">Games</div><div class="v">${n}</div></div>
+          <div class="cell"><div class="k">Rounds avg / median</div><div class="v">${r.avgRounds} / ${r.medianRounds}</div></div>
+          <div class="cell"><div class="k">p10 &ndash; p90 rounds</div><div class="v">${r.p10} &ndash; ${r.p90}</div></div>
+          <div class="cell"><div class="k">Final Bell</div><div class="v">${r.bellRate}</div></div>
+          <div class="cell"><div class="k">Avg end Bank</div><div class="v">${r.avgBank}</div></div>
+          <div class="cell"><div class="k">Majors seen / game</div><div class="v">${(r.majors / n).toFixed(1)}</div></div>
+          <div class="cell"><div class="k">Hail Mary passes / game</div><div class="v">${pg('passes')} <span style="font-size:12px;color:var(--muted)">complete ${pg('completions')} &middot; intercepted ${pg('interceptions')}</span></div></div>
+          <div class="cell"><div class="k">Per game</div><div class="v" style="font-size:12px">work ${pg('worked')} &middot; coins ${pg('coins')} &middot; candles ${pg('candles')} &middot; chains ${pg('chains')} &middot; cups ${pg('cups')} &middot; hedges ${pg('hedges')} &middot; invokes ${pg('invokes')} &middot; liquidated ${pg('liquidated')}</div></div>
+        </div>
+        <div class="zone-h" style="margin-top:12px">How the R-cana named each side</div>
+        <div class="strip">${Object.entries(r.archetypes).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="cell"><div class="k">${esc(k)}</div><div class="v">${Math.round(v / n * 100)}%</div></div>`).join('')}</div>
+        <p class="note" style="margin:10px 0 0">${esc(o.a)} vs ${esc(o.b)}, sides alternate each game. Win target ${o.rules.winBank}, ${o.rules.minorsPerTurn} Minor${o.rules.minorsPerTurn > 1 ? 's' : ''} per turn, opening hand ${o.rules.openingHand}, ${isDuel() ? 'the first player draws one extra card and the final round is played out' : 'first player skips the first draw'}. Seeds ${o.seed}&ndash;${o.seed + n - 1}.</p>`;
+      // histogram
+      const counts = {}; r.rounds.forEach((x) => { counts[x] = (counts[x] || 0) + 1; });
+      const ks = Object.keys(counts).map(Number).sort((a, b) => a - b); const mx = Math.max(...Object.values(counts));
+      const W = 560, H = 200, padL = 30, padB = 24; const bw = (W - padL - 10) / Math.max(1, ks.length);
+      let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Game length histogram">`;
+      ks.forEach((k, i) => { const h = (counts[k] / mx) * (H - padB - 14); svg += `<rect x="${padL + i * bw + 2}" y="${H - padB - h}" width="${bw - 4}" height="${h}" fill="var(--accent)" rx="2"/><text x="${padL + i * bw + bw / 2}" y="${H - 8}" font-size="10" text-anchor="middle" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${k}</text><text x="${padL + i * bw + bw / 2}" y="${H - padB - h - 3}" font-size="10" text-anchor="middle" fill="var(--fg)" font-family="IBM Plex Mono, monospace">${counts[k]}</text>`; });
+      svg += '</svg>'; $('hist').innerHTML = svg;
+      // card stats
+      const rows = Object.entries(r.cardPlays).sort((a, b) => b[1] - a[1]);
+      $('cardStats').innerHTML = `<table><thead><tr><th>Card</th><th class="n">Played</th><th class="n">Per game</th></tr></thead><tbody>${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${v}</td><td class="n">${(v / n).toFixed(2)}</td></tr>`).join('')}</tbody></table>`;
+    }, 20);
+  });
+
+  // ----- versus: a human against a bot -----
+  let vs = null; window.__rcana = () => vs; // for tests and debugging
+  // Prompts that can nest inside the main phase (Foretell, a hedge) keep their own resolver;
+  // the main phase keeps its resolver in vs.mainResolve so answering a nested prompt never ends the turn.
+  const safeRender = () => { try { renderVs(); } catch (e) { console.error(e); $('vsPrompt').innerHTML = `<div class="prompt-h" style="color:var(--bad)">PAGE ERROR</div><pre class="note">${esc(String(e && e.stack || e))}</pre>`; } };
+  const vsUI = {
+    setPhase: (g, p, { canPass }) => new Promise((res) => { vs.resolve = res; vs.prompt = { kind: 'set', canPass }; safeRender(); }),
+    mainPhase: (g, p) => new Promise((res) => { vs.mainResolve = res; vs.prompt = { kind: 'main' }; safeRender(); }),
+    hedge: (g, p, opts, threat) => new Promise((res) => { vs.resolve = res; vs.prompt = { kind: 'hedge', opts, threat }; safeRender(); }),
+    foretell: (g, p, c) => new Promise((res) => { vs.resolve = res; vs.prompt = { kind: 'foretell', card: c }; safeRender(); }),
+  };
+  function resolveVs(v) { const r = vs.resolve; vs.resolve = null; vs.prompt = vs.mainResolve ? { kind: 'main' } : { kind: 'waiting' }; safeRender(); if (r) r(v); }
+  function endTurn() { const r = vs.mainResolve; vs.mainResolve = null; vs.prompt = { kind: 'waiting' }; safeRender(); if (r) r(); }
+  try { if (localStorage.getItem('rcana-played')) $('vsPrimer').open = false; } catch (e) {}
+  $('vsStart').addEventListener('click', async () => {
+    persist(); try { localStorage.setItem('rcana-played', '1'); } catch (e) {}
+    const o = opts(); const human = new HumanPolicy(vsUI); const botKind = $('polB').value;
+    const bot = isDuel() ? botPolicy2(botKind, o.seed + 1) : botPolicy1(botKind, o.seed + 1); bot.name = 'BOT';
+    const rng = makeRng(o.seed * 977 + 3);
+    let players = isDuel()
+      ? [{ name: 'YOU', policy: human, deckList: buildDeck($('deckA').value, rng), deckPreset: $('deckA').value }, { name: 'BOT', policy: bot, deckList: buildDeck($('deckB').value, rng), deckPreset: $('deckB').value }]
+      : [{ name: 'YOU', policy: human }, { name: 'BOT', policy: bot }];
+    if ($('vsBotFirst').checked) players = [players[1], players[0]];
+    const G = isDuel() ? DuelGame : TarotGame;
+    const coach = isDuel() ? botPolicy2('strong', o.seed + 99) : botPolicy1('strong', o.seed + 99);
+    vs = { g: new G({ players, seed: o.seed, snapshots: true, rules: o.rules, hiddenInfo: true }), human, coach, prompt: { kind: 'waiting' }, resolve: null, busy: false };
+    vs.me = vs.g.players.find((p) => p.policy === human); vs.bot = vs.g.players.find((p) => p.policy !== human);
+    safeRender();
+    try { const r = await vs.g.run(); vs.prompt = { kind: 'over', result: r }; }
+    catch (e) { console.error(e); vs.prompt = { kind: 'waiting' }; $('vsPrompt').innerHTML = `<div class="prompt-h" style="color:var(--bad)">ENGINE ERROR</div><pre class="note">${esc(String(e && e.stack || e))}</pre>`; return; }
+    safeRender();
+  });
+  async function doAct(a) { if (!vs || vs.busy || !a) return; vs.busy = true; try { await vs.g.act(vs.me, a); } catch (e) { console.error(e); } finally { vs.busy = false; } if (vs.mainResolve && vs.prompt.kind === 'waiting') vs.prompt = { kind: 'main' }; safeRender(); }
+  const actLabel = (a) => {
+    const g = vs.g, me = vs.me;
+    switch (a.t) {
+      case 'reserve': return 'Reserve: +1 Liquidity every turn';
+      case 'hire': return `Hire for ${a.cost}: earns ${a.card.yield} a turn once it Works`;
+      case 'work': return a.ability ? `Work: ${a.inst.card.text.replace(/^.*Work: /, '')}` : `Work: +${g.yieldOf(me, a.inst)} Profit`;
+      case 'foretell': return 'Foretell: peek at the next Major';
+      case 'invoke': return `Invoke ${a.major.name} for ${a.cost}`;
+      case 'pip': { const c = a.card; const ch = a.choice || {}; const r = c.rank; const h = Math.ceil(r / 2); const cost = a.cost ? `for ${a.cost}` : 'free';
+        if (ch.collateral) return `Collateral on ${ch.collateral.card.name}: takes ${r} less Drawdown, yields +${h} from now on, ${cost}`;
+        if (c.suit === 'coins') return c.reversed ? `Bank ${h} directly, ${cost}` : `+${r + g.modSum(me, 'coinsBonus')} Profit, ${cost}`;
+        if (c.suit === 'candles') { const inst = ch.inst; const bonus = c.reversed ? h : r * g.modProduct(me, 'candlesMult'); return `Work ${inst.card.name} for +${g.yieldOf(me, inst, bonus + g.modSum(me, 'candlesBonus'))}${c.reversed ? ', shielded' : ''}, ${cost}`; }
+        if (c.suit === 'cups') { const m = g.modProduct(me, 'cupsMult'); return c.reversed ? `Take ${h} from the bot, gain ${h}, ${cost}` : `Bot +${h * m}, you +${r * m + g.modSum(me, 'cupsBonus')} and draw, ${cost}`; }
+        const t = ch.target; const amt = r * g.modProduct(me, 'chainsMult') + g.modSum(me, 'chainsBonus'); if (t && t.isPass) return `INTERCEPT the bot's pass: ${t.owner.inAir} in the air, you take up to ${amt}, ${cost}`; if (t && t.card) { const kills = t.drawdown + amt >= t.card.res; return `Attack ${t.card.name}: ${amt} Drawdown${kills ? ', liquidates it' : ''}, ${cost}`; } return `Front-run ${t.name}: take up to ${amt}, ${cost}`; }
+      default: return a.t;
+    }
+  };
+  // What the strong bot would do here, in words.
+  function coachAdvice(acts) {
+    const g = vs.g, me = vs.me, c = vs.coach; const pr = vs.prompt;
+    if (pr.kind === 'set') {
+      const pass = g.canPass(me) && c.hailMaryPass(g, me); if (pass) return { text: `Throw the Hail Mary Pass. The bot looks unlikely to have a Chain ready, and ${me.portfolio} doubled is worth the risk.`, act: () => resolveVs({ pass: true }) };
+      const n = Math.min(me.portfolio, Math.max(0, c.bankAmount(g, me))); const keep = me.portfolio - n;
+      return { text: keep > 0 ? `Bank ${n} and keep ${keep} exposed for Interest; the Market is safe right now.` : `Bank all ${me.portfolio}. Nothing exposed means nothing to lose on the bot's turn.`, act: () => resolveVs({ bank: n }) };
+    }
+    if (pr.kind === 'hedge') { const ch = c.wantHedge(g, me, pr.opts, pr.threat); return ch ? { text: `Hedge with ${ch.name}. What you'd lose is worth more than the card.`, act: () => resolveVs(ch) } : { text: 'Take it. The hit is small and the Chain in your hand is worth more later.', act: () => resolveVs(null) }; }
+    if (pr.kind === 'foretell') { const b = c.bottomCard(g, me, pr.card); return { text: b ? `Bury it. ${pr.card.name} would hurt you.` : `Leave it. ${pr.card.name} is fine for you or hurts the bot more.`, act: () => resolveVs(b) }; }
+    if (pr.kind !== 'main') return null;
+    if (me.reservedThisTurn < 1 && (me.hand.length >= 3 || g.liquidity(me) < 2)) { const rc = c.reserveChoice(g, me); if (rc) return { text: `Reserve ${rc.name} first. It's your least useful card and Liquidity is what lets you play everything else.`, act: () => doAct({ t: 'reserve', card: rc }) }; }
+    let best = null, bs = 0.25; for (const a of acts.filter((a) => a.t !== 'reserve')) { const sc = c.score(g, me, a); if (sc > bs) { bs = sc; best = a; } }
+    if (!best) return { text: 'Nothing left worth doing. End your turn.', act: () => endTurn() };
+    const why = { hire: 'Personalities are your engine: they earn every turn from now on.', work: 'Idle Personalities earn nothing. Work them.', pip: best.card && best.card.suit === 'chains' ? 'The bot has something exposed. Hit it while it is Working.' : 'Profit now beats cards in hand.', foretell: 'Free information about the next Major.', invoke: 'A Major in Providence is free value for whoever pays first.' }[best.t] || '';
+    return { text: `${actLabel(best)}${best.card ? ` with ${best.card.name}` : ''}. ${why}`, act: () => doAct(best) };
+  }
+  async function coachFinish() { if (!vs || vs.prompt.kind !== 'main') return; for (let k = 0; k < 20 && vs.mainResolve; k++) { if (vs.prompt.kind !== 'main') break; const adv = coachAdvice(vs.g.actions(vs.me)); if (!adv) break; await adv.act(); } }
+  function renderVs() {
+    if (!vs) return; const g = vs.g; const me = vs.me; const bot = vs.bot; const s = g.makeSnapshot('live');
+    const sm = s.players.find((p) => p.name === me.name); const sb = s.players.find((p) => p.name === bot.name);
+    $('vsStrip').innerHTML = [
+      ['Round', s.round + (s.bell != null ? ` &middot; Final Bell R${s.bell}` : '')],
+      ['Market', s.market || 'none'],
+      ['Providence', s.providence.length ? s.providence.join(', ') : '&mdash;'],
+      [isDuel() ? 'Majors left' : 'R-cana left', s.deckLeft],
+      ['Turn', s.active || '&mdash;'],
+    ].map(([k, v]) => `<div class="cell"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+    const nums = (p) => `<div class="nums">
+          <div class="num bank"><div class="k">Bank</div><div class="v">${p.bank}</div></div>
+          <div class="num"><div class="k">Portfolio</div><div class="v">${p.portfolio}</div></div>${p.favor != null && isV1b() ? `<div class="num"><div class="k">Favor</div><div class="v">${p.favor}</div></div>` : ''}
+          <div class="num"><div class="k">Liquidity</div><div class="v">${p.reserve - p.locked}<span style="font-size:12px;color:var(--muted)">/${p.reserve}</span></div></div>
+          <div class="num"><div class="k">Hand</div><div class="v">${p.hand.length}</div></div></div>`;
+    const acts = vs.prompt.kind === 'main' ? g.actions(me) : [];
+    const floorChips = (p, pl, clickable) => p.floor.map((i, k) => { const inst = pl.floor[k]; const mine = clickable ? acts.map((a, ix) => [a, ix]).filter(([a]) => a.t === 'work' && a.inst === inst) : [];
+      return `<span class="chip personality ${i.working ? 'working' : ''} ${i.shielded ? 'shielded' : ''}" title="${esc(i.title)}"><span class="temp ${i.suit}"></span><span class="name">${esc(i.name)}</span><span class="stat">${i.yield}y/${i.res}r</span>${i.drawdown ? `<span class="dd">&minus;${i.drawdown}</span>` : ''}${mine.map(([a, ix]) => `<button class="act" data-act="${ix}">${a.ability ? 'ability' : 'Work'}</button>`).join('')}</span>`; }).join('') || '<span class="note">empty</span>';
+    const passBadge = (p) => (p.pass != null ? ` &middot; <span class="pill" style="border-color:var(--accent);color:var(--accent)">HAIL MARY PASS: ${p.pass} in the air</span>` : (p.passUsed ? ' &middot; pass thrown' : ''));
+    const handHtml = me.hand.map((c) => { const mine = acts.map((a, ix) => [a, ix]).filter(([a]) => a.card === c);
+      return `<div class="mini"><div class="t"><span class="temp ${c.suit}"></span>${esc(c.name)}${c.type === 'court' ? ` <span class="stat" style="font-family:var(--font-mono);color:var(--muted);font-weight:400">${c.yield}y/${c.res}r &middot; cost ${c.cost}</span>` : ` <span style="font-family:var(--font-mono);color:var(--muted);font-weight:400">cost ${g.costOf(me, c)}</span>`}</div><div class="x">${esc((isV1b() && c.text1b) || c.text || c.title || '')}</div><div class="acts">${mine.length ? mine.map(([a, ix]) => `<button class="act" data-act="${ix}">${esc(actLabel(a))}</button>`).join('') : (vs.prompt.kind === 'main' ? '<span class="note">nothing playable now</span>' : '')}</div></div>`; }).join('');
+    $('vsBoards').innerHTML = `
+      <div class="panel board ${s.active === bot.name && !s.over ? 'active' : ''}">
+        <h2>${esc(bot.name)}</h2><div class="trader">${esc(bot.policy.name || 'bot')}${isDuel() ? ` &middot; deck: ${esc(bot.deckPreset)}` : ''}${passBadge(sb)}</div>${nums(sb)}
+        <div class="zone-h">Floor</div><div class="floor">${floorChips(sb, bot, false)}</div>
+        <div class="zone-h">Hand</div><div class="hand">${sb.hand.length} cards, face-down</div>
+      </div>
+      <div class="panel board ${s.active === me.name && !s.over ? 'active' : ''}">
+        <h2>${esc(me.name)}</h2><div class="trader">plays like a <strong>${esc(sm.archetype)}</strong>${isDuel() ? ` &middot; deck: ${esc(me.deckPreset)}` : ''}${passBadge(sm)}</div>${nums(sm)}
+        <div class="zone-h">Floor</div><div class="floor">${floorChips(sm, me, true)}</div>
+        <div class="zone-h">Hand</div><div class="handcards">${handHtml || '<span class="note">empty</span>'}</div>
+      </div>`;
+    // prompt
+    const pr = vs.prompt; let html = '';
+    if (pr.kind === 'waiting') html = `<span class="note">${s.over ? 'Game over.' : 'The bot is thinking&hellip;'}</span>`;
+    else if (pr.kind === 'set') html = `<div class="prompt-h">START OF YOUR TURN &middot; ${me.portfolio} in Portfolio</div><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="act big" id="vsBankAll">Bank all ${me.portfolio}</button>
+        <label style="display:flex;gap:6px;align-items:center;text-transform:none;letter-spacing:0;font-size:13px;color:var(--fg)">Bank <input type="number" id="vsBankN" min="0" max="${me.portfolio}" value="0" style="width:80px;font:inherit;color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px"> <button class="act" id="vsBankSome">and keep the rest exposed</button></label>
+        ${pr.canPass ? `<button class="act" id="vsPass" style="border-color:var(--bad);color:var(--bad)">Throw a HAIL MARY PASS with all ${me.portfolio}</button>` : ''}
+      </div><p class="note" style="margin:8px 0 0">Banked Profit can never be taken. Profit left in the Portfolio earns Interest but can be hit by Chains and Events.</p>`;
+    else if (pr.kind === 'main') html = `<div class="prompt-h">YOUR MAIN PHASE &middot; Liquidity ${g.liquidity(me)}${me.reservedThisTurn ? '' : ' &middot; you may still Reserve one card'}</div><div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${acts.filter((a) => a.t === 'foretell' || a.t === 'invoke').map((a) => `<button class="act" data-act="${acts.indexOf(a)}">${esc(actLabel(a))}</button>`).join('')}
+        <button class="act big" id="vsEnd">End turn</button></div><p class="note" style="margin:8px 0 0">Play cards from your hand below and put Personalities to Work from your Floor. Only Working Personalities can be attacked.</p>`;
+    else if (pr.kind === 'hedge') { const t = pr.threat; const tgt = t.target && t.target.isPass ? `your Hail Mary Pass (${me.inAir} in the air)` : t.target && t.target.card ? t.target.card.name : 'your Portfolio'; html = `<div class="prompt-h" style="color:var(--bad)">INCOMING &middot; ${esc(t.attacker ? t.attacker.name : 'The R-cana')} plays ${esc(t.card.name)} at ${esc(tgt)} for ${t.amount}</div><div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${pr.opts.map((c, i) => `<button class="act" data-hedge="${i}">Hedge with ${esc(c.name)} (absorbs ${c.reversed ? c.rank + 2 : c.rank}${c.reversed ? ', free' : `, costs ${g.costOf(me, c)}`})</button>`).join('')}
+        <button class="act big" id="vsNoHedge">Take it</button></div>`; }
+    else if (pr.kind === 'foretell') html = `<div class="prompt-h">FORETELL &middot; the next Major is ${esc(pr.card.name)}</div><div class="note" style="margin-bottom:8px">${esc(pr.card.text)}</div><div style="display:flex;gap:8px"><button class="act big" id="vsBottom">Send it to the bottom</button><button class="act" id="vsKeep">Leave it</button></div>`;
+    else if (pr.kind === 'over') { const r = pr.result; html = `<div class="win-badge" style="display:inline-block">${esc(r.winner === me.name ? 'You win.' : r.winner ? 'The bot wins.' : 'Draw.')} ${esc(r.reason)}</div><p class="note" style="margin:8px 0 0">The R-cana named you a <strong>${esc(sm.archetype)}</strong>. Start a new game above.</p>`; }
+    const adv = ['set', 'main', 'hedge', 'foretell'].includes(pr.kind) ? coachAdvice(acts) : null;
+    if (adv) html += `<div class="coach"><span class="who">COACH</span><span>${esc(adv.text)}</span><button class="act" id="vsCoachDo">Do that</button>${pr.kind === 'main' ? '<button class="act" id="vsCoachFinish">Let the coach finish my turn</button>' : ''}</div>`;
+    $('vsPrompt').innerHTML = html;
+    if (adv) { $('vsCoachDo').addEventListener('click', () => adv.act()); const f = $('vsCoachFinish'); if (f) f.addEventListener('click', coachFinish); }
+    // wire
+    document.querySelectorAll('#view-versus [data-act]').forEach((b) => b.addEventListener('click', () => doAct(acts[+b.dataset.act])));
+    if (pr.kind === 'set') { $('vsBankAll').addEventListener('click', () => resolveVs({ bank: me.portfolio })); $('vsBankSome').addEventListener('click', () => resolveVs({ bank: +$('vsBankN').value || 0 })); if (pr.canPass) $('vsPass').addEventListener('click', () => resolveVs({ pass: true })); }
+    if (pr.kind === 'main') $('vsEnd').addEventListener('click', () => endTurn());
+    if (pr.kind === 'hedge') { document.querySelectorAll('#view-versus [data-hedge]').forEach((b) => b.addEventListener('click', () => resolveVs(pr.opts[+b.dataset.hedge]))); $('vsNoHedge').addEventListener('click', () => resolveVs(null)); }
+    if (pr.kind === 'foretell') { $('vsBottom').addEventListener('click', () => resolveVs(true)); $('vsKeep').addEventListener('click', () => resolveVs(false)); }
+    // log
+    const lines = [...g.snapshots.flatMap((x) => x.events), ...g.events];
+    $('vsLog').innerHTML = lines.slice(-80).map((e) => { const t = esc(e.replace(/^\[[^\]]*\] /, '')); const cls = /WINS|FINAL BELL|Final Bell|reveals|HAIL MARY PASS|COMPLETE:/.test(e) ? 'win' : /LIQUIDATED|loses|Drawdown|Front-run|Exit Scam|INTERCEPTED|INCOMPLETE/.test(e) ? 'bad' : /banks/.test(e) ? 'good' : ''; return `<div class="${cls}">${t}</div>`; }).join('');
+    $('vsLog').scrollTop = $('vsLog').scrollHeight;
+  }
+
+  // ----- cards tab -----
+  $('fTemp').innerHTML += SUITS.map((t) => `<option value="${t}">${SUIT_NAME[t]}</option>`).join('') + '<option value="major">Major R-cana</option><option value="trader">Trader cards</option>';
+  $('fType').innerHTML += ['pip', 'court', 'major', 'trader'].map((t) => `<option value="${t}">${t}</option>`).join('');
+  function renderCards() {
+    const ft = $('fTemp').value, fy = $('fType').value, q = $('fText').value.toLowerCase();
+    const pool = isDuel() ? [...ALL_V2, ...ALL.filter((c) => c.type === 'major')] : [...ALL, ...TRADERS];
+    const rows = pool.filter((c) => (!ft || (ft === 'major' ? c.type === 'major' : ft === 'trader' ? c.type === 'trader' : c.suit === ft)) && (!fy || c.type === fy) && (!q || (c.name + ' ' + (c.title || '') + ' ' + (c.tarot || '') + ' ' + (c.text || '')).toLowerCase().includes(q)));
+    $('cardTable').innerHTML = `<table><thead><tr><th>Card</th><th>Type</th><th class="n">Cost</th><th class="n">Y / R</th><th>Text</th></tr></thead><tbody>${rows.map((c) => `<tr><td>${c.suit ? `<span class="temp ${c.suit}"></span>` : ''}<strong>${esc(c.name)}</strong>${c.title ? `<div class="note">${esc(c.title)}</div>` : ''}${c.tarot ? `<div class="note">${c.n}. ${esc(c.tarot)}</div>` : ''}${c.type === 'trader' ? `<div class="note">Trader · ${c.kind === 'turn' ? 'move' : 'reaction'}</div>` : ''}</td><td>${c.type}${c.kind ? `<div class="note">${c.kind}</div>` : ''}</td><td class="n">${c.cost ?? '&mdash;'}</td><td class="n">${c.type === 'court' ? `${c.yield} / ${c.res}` : '&mdash;'}</td><td>${Object.keys(c.kw || {}).length ? `<em>${esc(Object.entries(c.kw).map(([k, v]) => (v === true ? k : `${k} ${v}`)).join(', '))}.</em> ` : ''}${esc((isV1b() && c.text1b) || c.text || '')}</td></tr>`).join('')}</tbody></table><p class="note">${rows.length} cards, plus two Querents.</p>`;
+  }
+  ['fTemp', 'fType', 'fText'].forEach((id) => $(id).addEventListener('input', renderCards)); renderCards();
+
+  runOne();
+</script>
