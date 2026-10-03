@@ -338,7 +338,7 @@ class WireTunnel extends THREE.LineSegments {
   // canopy: keep only the part of the tunnel that arches over the road.
   // canopyFloor is the cut height, -1 (bottom) .. 1 (top), measured along the
   // camera's screen-up at each ring; 0 keeps the half above the horizon.
-  constructor({ canopy = true, canopyFloor = -0.05 } = {}) {
+  constructor({ canopy = true, canopyFloor = -0.75 } = {}) {
     const basePoints = [
       { x: 6.097824119373165, y: 2.962665382204997, z: 1.7433171949691226 },
       { x: 2.498887329278077, y: 1.876906878980996, z: -6.263607800877008 },
