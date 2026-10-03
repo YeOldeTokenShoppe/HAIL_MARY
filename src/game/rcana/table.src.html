@@ -183,8 +183,14 @@
     if (c.suit === 'chains') return c.reversed ? `COLLATERAL ${r} · free HEDGE` : `ATTACK ${r} · or HEDGE`;
     return c.reversed ? `TAKE ${h} from the bot` : `SHARE: you +${r}, bot +${h}`;
   }
+  function flyCard(from, to) { // a face-down card slides from one zone to another, cosmetic only
+    if (!from || !to) return; const a = from.getBoundingClientRect(), b = to.getBoundingClientRect(); const el = cardEl(null, { back: true }); el.classList.add('fly'); el.style.left = a.left + 'px'; el.style.top = a.top + 'px'; document.body.appendChild(el);
+    requestAnimationFrame(() => { el.style.transform = `translate(${b.left + 12 - a.left}px, ${b.top + 8 - a.top}px) scale(.9)`; el.style.opacity = '0.2'; }); setTimeout(() => el.remove(), 480);
+  }
   function showReveal() {
     if (S.overlayDone || !S.reveals.length) return;
+    const flipping = hasMajors() && $('majorStack').querySelector('.card');
+    if (flipping && !S.flipDone) { let done; S.overlayDone = new Promise((r) => { done = r; }); flipping.classList.add('flip'); setTimeout(() => { S.overlayDone = null; S.flipDone = true; done(); showReveal(); S.flipDone = false; }, 520); return; }
     const { card: c, lines, who } = S.reveals.shift(); const host = $('overlayHost');
     const head = hasMajors() ? 'THE OMEN TURNS OVER' : who === S.me ? 'YOU DREW A MAJOR' : 'THE BOT DREW A MAJOR';
     const why = hasMajors() ? 'The face-down Omen is turned up at the start of every round. It resolves for both players at once, and the next Major takes its place face down.' : `The 22 Majors are shuffled into the deck. ${who === S.me ? 'Your' : "The bot's"} draw turned this one up, so it resolves for both players right now, and ${who === S.me ? 'you draw' : 'the bot draws'} again to replace it.`;
@@ -252,10 +258,10 @@
     $('endTurn').disabled = !main;
     // center
     $('majorBox').hidden = !hasMajors();
-    if (hasMajors()) { $('majorLabel').textContent = `Majors · ${g.majors.length} left · the Omen turns at the start of each round`; const ms = $('majorStack'); ms.innerHTML = ''; if (g.omen) { ms.appendChild(cardEl(null, { back: true })); const n = document.createElement('span'); n.className = 'count'; n.textContent = 'Omen'; ms.appendChild(n); } }
+    if (hasMajors()) { $('majorLabel').textContent = `MAJOR DECK · ${g.majors.length} left · nobody draws from it: the Omen on top turns itself over at the start of each round`; const ms = $('majorStack'); ms.innerHTML = ''; if (g.omen) { ms.appendChild(cardEl(null, { back: true })); const n = document.createElement('span'); n.className = 'count'; n.textContent = 'Omen'; ms.appendChild(n); } }
     const drawPile = isDuel() ? me.deck : g.deck; const drawing = S.prompt.kind === 'draw';
-    $('deckLabel').textContent = drawing ? 'TAP THE DECK TO DRAW' : isDuel() ? `Your deck · ${drawPile.length} left` : hasMajors() ? `Minors · ${drawPile.length} left` : `R-cana · ${drawPile.length} left (Majors shuffled in)`;
-    const ds = $('deckStack'); ds.innerHTML = ''; ds.classList.toggle('drawable', drawing); ds.onclick = drawing ? () => resolveP(true) : null;
+    $('deckLabel').textContent = drawing ? 'TAP THE DECK TO DRAW' : isDuel() ? `YOUR DECK · ${drawPile.length} left` : hasMajors() ? `MINOR DECK · ${drawPile.length} left · you and the bot draw from here (${g.discard.filter((c) => c.type !== 'major').length} discarded)` : `R-CANA · ${drawPile.length} left (Majors shuffled in)`;
+    const ds = $('deckStack'); ds.innerHTML = ''; ds.classList.toggle('drawable', drawing); ds.onclick = drawing ? () => { flyCard($('deckStack'), $('meHand')); resolveP(true); } : null;
     if (drawPile.length) { ds.appendChild(cardEl(null, { back: true })); const n = document.createElement('span'); n.className = 'count'; n.textContent = drawPile.length; ds.appendChild(n); }
     $('lastEvent').innerHTML = ''; if (g.lastEvent) { const el = cardEl(g.lastEvent.card); el.classList.add('dim'); el.title = `${g.lastEvent.card.name} resolved in round ${g.lastEvent.round}; Events happen once and are discarded`; $('lastEvent').appendChild(el); $('lastEventLabel').textContent = `Last Event · round ${g.lastEvent.round} · already happened`; } else { $('lastEvent').innerHTML = '<div class="note" style="color:var(--muted);font-size:11px;width:var(--cw)">none yet</div>'; $('lastEventLabel').textContent = 'Last Event · already happened'; }
     $('market').innerHTML = ''; if (g.market) $('market').appendChild(cardEl(g.market)); else $('market').innerHTML = '<div class="note" style="color:var(--muted);font-size:11px;width:var(--cw)">no Market in effect</div>';
@@ -285,7 +291,7 @@
     $('prompt').innerHTML = html;
     if (pr.kind === 'set') { $('bankAll').onclick = () => resolveP({ bank: me.portfolio }); $('bankSome').onclick = () => resolveP({ bank: +$('bankN').value || 0 }); if (pr.canPass) $('throwPass').onclick = () => resolveP({ pass: true }); }
     if (pr.kind === 'main' && fa) $('foretell').onclick = () => doAct(fa);
-    if (pr.kind === 'draw') $('drawBtn').onclick = () => resolveP(true);
+    if (pr.kind === 'draw') $('drawBtn').onclick = () => { flyCard($('deckStack'), $('meHand')); resolveP(true); };
     if (pr.kind === 'react') { $('reactPlay').onclick = () => resolveP(true); $('reactKeep').onclick = () => resolveP(false); }
     if (pr.kind === 'choose') { const box = $('chooseBox'); for (const c of pr.cards) { const el = cardEl(c); el.classList.toggle('target', pr.picked.has(c)); el.addEventListener('click', () => { if (pr.picked.has(c)) pr.picked.delete(c); else pr.picked.add(c); el.classList.toggle('target', pr.picked.has(c)); }); box.appendChild(el); } $('chooseOk').onclick = () => resolveP([...pr.picked]); }
     if (pr.kind === 'over') $('reviewEnd').onclick = () => openReview(Math.max(0, g.snapshots.length - 2));

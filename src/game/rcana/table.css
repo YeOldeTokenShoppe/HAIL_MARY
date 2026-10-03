@@ -463,3 +463,9 @@ h1 { margin: 0 8px 0 0; color: var(--gold); font: 700 23px/1.2 var(--font-displa
   .settings-menu { position: fixed; top: 64px; left: 12px; right: 12px; min-width: 0; max-height: calc(100dvh - 88px); overflow: auto; }
   .primer-copy { position: fixed; top: 100px; left: 12px; right: 12px; width: auto; max-height: calc(100dvh - 124px); }
 }
+
+/* ── motion: the Omen flipping off the Major deck, a card flying from the Minor deck to your hand ── */
+.stack .card.flip { animation: omenflip .5s ease-in forwards; transform-origin: center; }
+@keyframes omenflip { 0% { transform: rotateY(0) translateY(0); } 60% { transform: rotateY(90deg) translateY(-10px); } 100% { transform: rotateY(90deg) translateY(-20px); opacity: 0; } }
+.card.fly { position: fixed; z-index: 70; pointer-events: none; transition: transform .45s cubic-bezier(.2,.7,.2,1), opacity .45s; }
+@media (prefers-reduced-motion: reduce) { .stack .card.flip, .card.fly { animation: none; transition: none; } }
