@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Bundles the engine modules into table.html so the page has no files to fetch.
 // Each module becomes a scoped function registered in a tiny module table.
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -34,4 +34,9 @@ page = page.replace('<link rel="stylesheet" href="table.css">', '<style>\n' + re
 page = page.replace(/^\s*import\s*\{[^}]*\}\s*from\s*['"][^'"]+['"];?$/gm, (l) => '  ' + importToConst(l.trim()));
 page = page.replace('<script type="module">\n', '<script type="module">\n' + bundle + '\n');
 writeFileSync(join(here, 'table.html'), page);
+// a second copy, as a complete HTML document, for the app's /rcana route (served from public/)
+const headEnd = page.indexOf('</style>') + '</style>'.length;
+const doc = '<!doctype html>\n<html lang="en">\n<head>\n<meta name="viewport" content="width=device-width, initial-scale=1">\n' + page.slice(0, headEnd) + '\n</head>\n<body>\n' + page.slice(headEnd) + '\n</body>\n</html>\n';
+const pub = join(here, '..', '..', '..', 'public', 'rcana'); mkdirSync(pub, { recursive: true }); writeFileSync(join(pub, 'table.html'), doc);
+console.log('public/rcana/table.html written');
 console.log(`table.html written: ${(page.length / 1024).toFixed(0)} KB, modules: ${ORDER.join(', ')}`);
