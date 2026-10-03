@@ -88,7 +88,7 @@ Favor from Cups only (`--copyFavor 0`), protection only against losses of 3 or m
 Trader opening with 8 Profit (`--seatProfit N`; also `--seatLiq N`, `--seatFavor N`). Both draw on their first turn.
 The last-play Hail Mary (`--passLast 1`: a pass only when the opponent could win next turn, no cap, the clock stops while it
 is in the air; `--passNoHedge 1` to make it un-Hedgeable) is a prototype described in `RULES-v1c.md`; the table turns it on by default.
-Three actions per main phase (`--actions 3`, Reserve free) is a third option, on at the table by default.
+Three actions per main phase (`--actions 3`; Reserve and Foretell free) is a third option, on at the table by default.
 Trader cards (`--traders 1`: eight one-shot moves and reactions shuffled into the Minor deck, an 88-card R-cana) are a second
 prototype described there; the table turns them on by default too. The game is won at once at 80; `--finish 1 --firstHand -1 --first 1` is the
 balanced played-out-round alternative.
