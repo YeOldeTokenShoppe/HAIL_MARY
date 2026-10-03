@@ -10,7 +10,7 @@ Three rule sets share one engine:
 |---|---|---|---|
 | 1, the shared reading | One shared deck with the Majors shuffled in; a Major resolves for both players when drawn. | `RULES-v1.md` | Complete |
 | 1b, Favor and Network | Version 1 with a two-partner Network, Copy trades, and Favor earned by generosity. | `RULES-v1b.md` | Complete; superseded by 1c |
-| 1c, the Omen | 1b with the Majors as their own deck turned over at the start of each round, free Hedges, partner replacement, Favor from Cups only, the last-play Hail Mary and eight Trader cards (an 88-card deck). | `RULES-v1c.md` | Current playtest build; the table opens on it |
+| 1c, the Omen | 1b with the Majors as their own deck turned over at the start of each round, free Hedges, partner replacement, Favor from Cups only, the last-play Hail Mary and eight Trader cards (an 88-card deck). | `RULES-v1c.md` (complete, standalone) | Current playtest build; the table opens on it |
 | 2, the duel | Private decks with reversed faces, a shared Major deck with a face-down Omen. | `RULES-v2.md` | Complete, parked while 1c is tested |
 
 `RULES.md` is the design history. The earlier 152-card deck-building draft is kept in a drawer at the end of this file.

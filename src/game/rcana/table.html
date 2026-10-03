@@ -168,6 +168,7 @@
     <button id="review" disabled title="Step back through every turn of this game">Review</button>
     <label class="note" data-v1c="only" style="display:flex;gap:6px;align-items:center" title="A Hail Mary may only be thrown when the bot could win by banking at its next turn; no cap; nobody wins while it is in the air"><input type="checkbox" id="passLast" checked> last-play Hail Mary</label>
     <label class="note" data-v1c="only" style="display:flex;gap:6px;align-items:center" title="Eight one-shot Trader cards shuffled into the deck: an 88-card R-cana"><input type="checkbox" id="traders" checked> Trader cards (88)</label>
+    <label class="note" data-v1c="only" style="display:flex;gap:6px;align-items:center">pass <select id="passMult"><option value="2">doubles</option><option value="1.5">×1.5</option></select></label>
     <span class="note" id="status">Loading the engine&hellip;</span>
   </div>
 
@@ -182,7 +183,7 @@
       <li><strong>The four suits, as printed on each card.</strong> Coins <strong>EARN</strong> Profit now. Candles <strong>BOOST</strong> one of your Personalities for extra earnings. Chains <strong>ATTACK</strong> a Personality that is earning, or the bot's Portfolio, or stay in hand to <strong>HEDGE</strong> when you are attacked. Cups <strong>SHARE</strong>: the bot gets a little, you get more and draw a card.</li>
       <li data-v1b="only"><strong>Favor.</strong> Every time you Share (a Cups card)<span data-v1c="not"> or Copy trade</span>, Our Lady of Perpetual Profit notices: +1 Favor. Spend 1 Favor to <strong>Foretell</strong>: look at the next card of the deck and bury it if you don't like it. Hold 2 Favor and Our Lady <strong>spares</strong> you from the next Event that would take your Profit or your pass, taking the Favor instead. When THE WORLD turns up, the most favored Trader banks everything.</li>
       <li data-v1c="only"><strong>The last play</strong> (the "last-play Hail Mary" box, on by default). You may only throw a Hail Mary when the bot could win by banking at its next turn. Everything exposed goes up, no cap. Nobody wins while it is in the air: the bot banks on its turn and hunts the pass with Chains; at the start of your next turn the pass lands, doubles if untouched, and the larger Bank wins. THE HAIL MARY (The Fool) is the only way to throw early.</li>
-      <li data-v1c="only"><strong>Trader cards</strong> (the "Trader cards" box, on by default: an 88-card deck). Eight one-shot moves of your own are shuffled in with the Minors. A <strong>MOVE</strong> is played from your hand like a pip, for its cost. A <strong>REACTION</strong> is free and fires by itself the first time its moment comes: Stop-Loss caps a big loss at 2, Bailout saves a Personality from Liquidation, Short Squeeze turns a Front-run back on the bot, Circuit Breaker buries an Event that would hurt you. Tap a reaction card to hold it back for a better moment. The bot cannot see what you hold.</li>
+      <li data-v1c="only"><strong>Trader cards</strong> (the "Trader cards" box, on by default: an 88-card deck). Eight one-shot moves of your own are shuffled in with the Minors. A <strong>MOVE</strong> is played from your hand like a pip, for its cost. A <strong>REACTION</strong> is free and fires by itself the first time its moment comes: Stop-Loss caps a big loss at 2, Bailout saves a Personality from Liquidation, Short Squeeze turns a Front-run back on the bot, Circuit Breaker asks you, when a harmful Event turns over, whether to bury it. Tap a reaction card to hold it back for a better moment. The bot cannot see what you hold.</li>
       <li data-v1c="only"><strong>Version 1c.</strong> The Majors are their own deck: the face-down <strong>Omen</strong> turns over at the start of every round, before anyone banks, so an Event hits both players in the same spot. Foretell looks at the Omen. <strong>Hedging is free</strong>: the Chain is spent, no Liquidity. A Hail Mary stake is capped at 20; the rest stays exposed. At two partners you may drag a new face card onto one of them to replace it (its Exit Scam applies). Favor comes from Sharing only.</li>
       <li><strong>Fate and the Hail Mary.</strong> A Major card turns up for both players every round: Markets stay, Events hit at once, Invokes wait in Providence for whoever pays. Once per game you may throw your Portfolio into the air at the start of your turn instead of banking: untouched until the start of your next turn, it banks doubled; touched, it is gone. The box under your numbers tells you when it's allowed and when it's ready.</li>
     </ol>
@@ -1248,7 +1249,7 @@ const MAJORS = [
   M(17, 'The Star', 'THE WINDFALL', 'event', 'Every Trader draws two Minors and gains 3 Profit into their Portfolio.', { resolve: (g) => g.players.forEach((q) => { g.drawMinors(q, 2); g.profit(q, 3, 'THE WINDFALL'); }) }),
   M(18, 'The Moon', 'THE PANIC', 'market', 'Chains cost 0.', { mods: { costOverride: (g, p, c) => (c.suit === 'chains' && c.type === 'pip' ? 0 : null) } }),
   M(19, 'The Sun', 'GOLDEN AGE', 'market', 'Cups cost 0 and give double.', { mods: { costOverride: (g, p, c) => (c.suit === 'cups' && c.type === 'pip' ? 0 : null), cupsMult: () => 2 } }),
-  M(20, 'Judgement', 'THE RECKONING', 'event', 'The Final Bell: the game ends at the end of this round. If more than half the R-cana remains, it is instead buried in the bottom half of the deck.', { resolve: (g) => { if (g.deck.length > g.buryThreshold()) g.bury(g.byId('major_20')); else g.callBell('THE RECKONING'); } }),
+  M(20, 'Judgement', 'THE RECKONING', 'event', 'The Final Bell: the game ends at the end of this round. If more than half the R-cana remains, it is instead buried in the bottom half of the deck.', { resolve: (g) => { if (g.majorsLeft() > g.buryThreshold()) g.bury(g.byId('major_20')); else g.callBell('THE RECKONING'); } }),
   M(21, 'The World', 'OUR LADY OF PERPETUAL PROFIT', 'event', 'The Trader who has played the most Cups banks their entire Portfolio.', { text1b: 'The Trader with the most Favor banks their entire Portfolio.', resolve: (g) => { const key = (q) => (g.rules.v1b ? q.favor : q.stats.cups); const mx = Math.max(...g.players.map(key)); g.players.filter((q) => key(q) === mx).forEach((q) => g.bankFromPortfolio(q, q.portfolio, 'OUR LADY')); } }),
 ];
 
@@ -1363,14 +1364,15 @@ class TarotGame {
   }
   projectedBank(o) { // what the opponent can have banked by the end of their next turn, by every visible route: the Portfolio with its Dividend and bonus, a pass landing doubled, THE VAULT from Providence
     const div = (this.modFirst(o, 'dividend') ?? 1) + this.modSum(o, 'dividendDelta'); const after = o.portfolio + div; const idiv = this.modMin(o, 'interestDiv', this.rules.interestDiv); const bonus = Math.floor(after / idiv) * this.modProduct(o, 'interestMult');
-    const landing = o.pass ? Math.floor(o.inAir * this.rules.passMult) : 0; const vault = this.providence.some((m) => m.id === 'major_9') && o.reserve.length >= 1 ? 5 : 0;
-    const cap = this.modFirst(o, 'bankCap'); const banked = cap == null ? after + bonus + vault : Math.min(after + bonus + vault, cap);
+    const landing = o.pass ? Math.floor(o.inAir * this.rules.passMult) : 0; // THE VAULT banks from the Portfolio and cannot exceed what banking at the start of the turn already reaches
+    const cap = this.modFirst(o, 'bankCap'); const banked = cap == null ? after + bonus : Math.min(after + bonus, cap);
     return o.bank + landing + banked;
   }
   wouldWinNext(o) { return this.projectedBank(o) >= this.rules.winBank; }
-  clockStopped(p) { return this.rules.passLast && this.players.some((q) => q !== p && q.pass); }
+  clockStopped(p) { return this.rules.passLast && this.players.some((q) => q.pass); }
+  majorsLeft() { return this.rules.majorsSeparate ? this.majors.length : this.deck.length; }
   resumeClock() { // a pass has landed or fallen: whoever is over the line now wins, the larger Bank first
-    if (this.over || !this.rules.passLast) return; const s = [...this.players].filter((q) => q.bank >= this.rules.winBank).sort((a, b) => b.bank - a.bank || b.portfolio - a.portfolio);
+    if (this.over || !this.rules.passLast || this.players.some((q) => q.pass)) return; const s = [...this.players].filter((q) => q.bank >= this.rules.winBank).sort((a, b) => b.bank - a.bank || b.portfolio - a.portfolio);
     if (!s.length) return; if (this.rules.finishRound) { this.checkWin(s[0]); return; }
     const w = s[0]; this.over = true; this.winner = w; this.reason = `${w.name} banked ${w.bank}`; if (w.justLanded) w.stats.passWins++; this.log(`*** ${w.name} WINS with ${w.bank} banked${s.length > 1 ? ` (over ${s[1].name}'s ${s[1].bank})` : ''} ***`);
   }
@@ -1379,7 +1381,7 @@ class TarotGame {
     if (this.rules.passLast && p.justLanded) return; // the landing resolves through resumeClock, larger Bank first
     if (this.clockStopped(p)) { this.log(`${p.name} has ${p.bank} banked, but a Hail Mary is in the air: the clock is stopped until it lands`); return; }
     if (this.rules.finishRound) { if (!this.closing) { this.closing = true; this.log(`${p.name} reaches ${p.bank}: the round is played out, then the largest Bank wins`); } return; }
-    this.over = true; this.winner = p; this.reason = `${p.name} banked ${p.bank}`; this.log(`*** ${p.name} WINS with ${p.bank} banked ***`);
+    this.over = true; this.winner = p; this.reason = `${p.name} banked ${p.bank}`; if (p.justLanded) p.stats.passWins++; this.log(`*** ${p.name} WINS with ${p.bank} banked ***`);
   }
   loseProfit(p, n, why) {
     if (this.over) return 0; const cur = this.current; const hostile = !cur || cur.attacker !== p;
@@ -1465,7 +1467,7 @@ class TarotGame {
     this.majorsSeen++; this.log(`✦ The R-cana reveals ${c.name} (${c.tarot})`);
     this.current = { kind: 'major', card: c, attacker: null, victim: null };
     if (c.kind === 'market') { if (this.market) this.discard.push(this.market); this.market = c; }
-    else if (c.kind === 'event' && this.rules.traders && this.players.some((q) => this.eventHurts(c, q) && this.reaction(q, 'breaker', c.name))) { this.log(`${c.name} does not resolve`); this.bury(c); }
+    else if (c.kind === 'event' && this.rules.traders && !this.rules.majorsSeparate && this.players.some((q) => this.eventHurts(c, q) && this.reaction(q, 'breaker', c.name))) { this.log(`${c.name} does not resolve`); this.bury(c); }
     else if (c.kind === 'event') { c.buried = false; c.resolve(this); if (!c.buried) this.discard.push(c); for (const q of this.players) for (const i of [...q.floor]) if (i.card.onEvent && q.floor.includes(i)) i.card.onEvent(this, q, i); }
     else this.providence.push(c);
     this.current = null;
@@ -1528,6 +1530,7 @@ class TarotGame {
     for (const c of p.hand) {
       const cost = this.costOf(p, c); if (cost > liq) continue;
       if (c.type === 'court') { if (!this.rules.v1b || p.floor.length < this.rules.networkCap) A.push({ t: 'hire', card: c, cost }); else if (this.rules.replacePartner) for (const i of p.floor) A.push({ t: 'hire', card: c, cost, replace: i }); continue; }
+      if (c.type !== 'pip') continue;
       if (c.suit === 'coins') A.push({ t: 'pip', card: c, cost, choice: {} });
       else if (c.suit === 'candles') for (const i of this.idleEligible(p)) A.push({ t: 'pip', card: c, cost, choice: { inst: i } });
       else if (c.suit === 'cups') for (const o of this.opps(p)) A.push({ t: 'pip', card: c, cost, choice: { opp: o } });
@@ -1620,7 +1623,16 @@ class TarotGame {
       if (amt) this.bankFromPortfolio(p, amt, 'start of turn'); else if (p.portfolio) this.log(`${p.name} keeps ${p.portfolio} in Portfolio`);
     }
   }
-  startOfRound() { if (this.rules.majorsSeparate && this.round >= 1 && !this.over) this.revealOmen(); }
+  async startOfRound() {
+    if (!this.rules.majorsSeparate || this.round < 1 || this.over) return;
+    const c = this.omen;
+    if (c && c.kind === 'event' && this.rules.traders) for (const i of this.turnOrder()) { const q = this.players[i]; if (!this.eventHurts(c, q) || !this.traderInHand(q, 'breaker')) continue;
+      this.log(`✦ The Omen turns over: ${c.name}. ${q.name} holds a Circuit Breaker.`);
+      const yes = q.policy.useReaction ? await q.policy.useReaction(this, q, this.traderInHand(q, 'breaker'), c) : true;
+      if (yes) { this.omen = null; this.majorsSeen++; this.reaction(q, 'breaker', c.name); this.log(`${c.name} does not resolve`); this.bury(c); this.omen = this.majors.shift() || null; if (!this.omen && this.bellRound == null) this.callBell('the last Major has been revealed'); return; }
+      this.log(`${q.name} keeps the Circuit Breaker`); }
+    this.revealOmen();
+  }
   revealOmen() {
     if (!this.omen) { this.callBell('the Majors are spent'); return; }
     const c = this.omen; this.omen = null; this.revealMajor(c);
@@ -1655,6 +1667,7 @@ class RandomPolicy {
   wantHedge(g, p, opts) { return this.rng() < 0.5 ? opts[Math.floor(this.rng() * opts.length)] : null; }
   bottomCard(g, p) { return this.rng() < 0.5; }
   bottomMinors(g, p, cards) { return cards.filter(() => this.rng() < 0.5); }
+  useReaction(g, p) { return this.rng() < 0.5; }
   hailMaryPass(g, p) { return this.rng() < 0.5; }
   reorder(g, p, cards) { return [...cards].sort(() => this.rng() - 0.5); }
   async takeTurn(g, p) {
@@ -1711,6 +1724,15 @@ class StrongPolicy {
   }
   bottomCard(g, p, c) { if (c.type !== 'major') return false; if (HARMFUL.has(c.name)) return !(c.name === 'VOLATILITY' && g.richestOpp(p) && g.richestOpp(p).portfolio > p.portfolio); if (c.name === 'THE RECKONING') return g.isUnderdog(p); return false; }
   reorder(g, p, cards) { return [...cards].sort((a, b) => (this.bottomCard(g, p, a) ? 1 : 0) - (this.bottomCard(g, p, b) ? 1 : 0)); }
+  eventHarm(g, q, ev) { // rough cost of an Event to q, in Profit
+    const o = g.opps(q)[0]; switch (ev.name) {
+      case 'THE CRASH': return q.portfolio + (q.pass ? q.inAir * 2 : 0);
+      case 'THE REGULATOR': return Math.min(3, q.portfolio) + (q.pass ? q.inAir * 2 : 0) + q.floor.filter((i) => i.card.suit === 'chains').length;
+      case 'THE AUDIT': return g.eventHurts(ev, q) ? Math.floor(q.portfolio / 2) + (q.pass ? q.inAir * 2 : 0) : 0;
+      case 'THE LIQUIDATION': return q.floor.filter((i) => i.working && i.drawdown + 3 >= i.card.res).reduce((s, i) => s + 2 + g.yieldOf(q, i) * 2, 0) + q.floor.filter((i) => i.working).length;
+      case 'VOLATILITY': return o ? Math.max(0, q.portfolio - o.portfolio) : 0;
+      default: return 0; } }
+  useReaction(g, p, card, ev) { if (card.key !== 'breaker') return true; const o = g.opps(p)[0]; return this.eventHarm(g, p, ev) >= Math.max(2, o ? this.eventHarm(g, o, ev) : 0); }
   bottomMinors(g, p, cards) { return cards.filter((c) => (c.type === 'major' && this.bottomCard(g, p, c)) || (c.type === 'pip' && c.rank <= 3) || (c.type === 'court' && c.cost >= 5 && p.floor.length >= 1)); }
   courtValue(g, p, c, h) {
     const fake = { card: c, owner: p, working: false, drawdown: 0, hiredTurn: 0 }; const y = g.yieldOf(p, fake);
@@ -1748,7 +1770,7 @@ class StrongPolicy {
   }
   reserveChoice(g, p) {
     if (!p.hand.length) return null; const liq = g.liquidity(p) + 1; const h = this.horizon(g);
-    const use = (c) => { if (c.type === 'trader') return c.kind === 'reaction' ? 4.5 : 3.5; let v = c.type === 'court' ? this.courtValue(g, p, c, h) : c.rank * (c.suit === 'chains' ? 0.7 : 1); if (c.cost > liq + 2) v *= 0.6; if (c.suit === 'candles' && !p.floor.length) v *= 0.5; return v / Math.max(1, Math.sqrt(c.cost)); };
+    const use = (c) => { if (c.type === 'trader') return c.kind === 'reaction' ? 7 : 6; let v = c.type === 'court' ? this.courtValue(g, p, c, h) : c.rank * (c.suit === 'chains' ? 0.7 : 1); if (c.cost > liq + 2) v *= 0.6; if (c.suit === 'candles' && !p.floor.length) v *= 0.5; return v / Math.max(1, Math.sqrt(c.cost)); };
     return [...p.hand].sort((a, b) => use(a) - use(b))[0];
   }
   async takeTurn(g, p) {
@@ -1787,6 +1809,7 @@ class HumanPolicy {
   async takeTurn(g, p) { await this.ui.mainPhase(g, p); }
   async wantHedge(g, p, opts, threat) { return this.ui.hedge(g, p, opts, threat); }
   async bottomCard(g, p, c) { return this.ui.foretell(g, p, c); }
+  async useReaction(g, p, card, ev) { return this.ui.react ? this.ui.react(g, p, card, ev) : true; }
   async bottomMinors(g, p, cards) { return this.ui.chooseCards ? this.ui.chooseCards(g, p, { title: 'INSIDER TIP · the top three Minors. Tap the ones to send to the bottom', cards }) : []; }
   async beforeDraw(g, p) { if (this.ui.draw) await this.ui.draw(g, p); }
   reorder(g, p, cards) { return [...cards].sort((a, b) => (HARMFUL.has(a.name) ? 1 : 0) - (HARMFUL.has(b.name) ? 1 : 0)); }
@@ -2120,6 +2143,7 @@ return { policy, playOne, batch };
     hedge: (g, p, opts, threat) => new Promise((res) => { S.resolve = res; S.prompt = { kind: 'hedge', opts, threat }; render(); }),
     foretell: (g, p, c) => new Promise((res) => { S.resolve = res; S.prompt = { kind: 'foretell', card: c }; render(); }),
     draw: (g, p) => new Promise((res) => { S.resolve = res; S.prompt = { kind: 'draw' }; render(); }),
+    react: (g, p, card, ev) => new Promise((res) => { S.resolve = res; S.prompt = { kind: 'react', card, ev }; render(); }),
     chooseCards: (g, p, { title, cards }) => new Promise((res) => { S.resolve = res; S.prompt = { kind: 'choose', title, cards, picked: new Set() }; render(); }),
   };
   function resolveP(v) { const r = S.resolve; S.resolve = null; S.prompt = S.mainResolve ? { kind: 'main' } : { kind: 'wait' }; render(); if (r) r(v); }
@@ -2136,7 +2160,7 @@ return { policy, playOne, batch };
       ? [{ name: 'YOU', policy: human, deckList: buildDeck($('deckA').value, rng), deckPreset: $('deckA').value }, { name: 'BOT', policy: bot, deckList: buildDeck($('deckB').value, rng), deckPreset: $('deckB').value }]
       : [{ name: 'YOU', policy: human }, { name: 'BOT', policy: bot }];
     const G = isDuel() ? DuelGame : TarotGame;
-    const g = new G({ players, seed, snapshots: true, rules: isV1c() ? { v1c: true, passLast: $('passLast').checked, traders: $('traders').checked } : isV1b() ? { v1b: true } : {}, hiddenInfo: true });
+    const g = new G({ players, seed, snapshots: true, rules: isV1c() ? { v1c: true, passLast: $('passLast').checked, traders: $('traders').checked, passMult: +$('passMult').value } : isV1b() ? { v1b: true } : {}, hiddenInfo: true });
     S = { g, human, coach, prompt: { kind: 'wait' }, resolve: null, mainResolve: null, busy: false, seen: new Set(), reveals: [], overlayDone: null };
     S.me = g.players.find((p) => p.policy === human); S.bot = g.players.find((p) => p.policy !== human);
     S.askTurns = []; if (askCtl) askCtl.abort(); ['askQShown', 'askOut', 'askNote'].forEach((id) => { $(id).hidden = true; $(id).textContent = ''; });
@@ -2220,7 +2244,7 @@ return { policy, playOne, batch };
     if (!S) return; const g = S.g, me = S.me, bot = S.bot; const main = S.prompt.kind === 'main';
     showReveal();
     acts = main ? g.actions(me) : [];
-    const hint = $('coach').checked && ['set', 'draw', 'main', 'hedge', 'foretell'].includes(S.prompt.kind) ? advice() : null;
+    const hint = $('coach').checked && ['set', 'draw', 'main', 'hedge', 'foretell', 'react'].includes(S.prompt.kind) ? advice() : null;
     for (const q of [me, bot]) if (q.lastTrader && q.lastTrader.seq > (S.seenTrader || 0)) { S.seenTrader = q.lastTrader.seq; toast(`▲ ${q === me ? 'YOU PLAY' : 'THE BOT PLAYS'} ${q.lastTrader.name.toUpperCase()}${q.lastTrader.why ? ': ' + q.lastTrader.why : ''}`); }
     for (const q of [me, bot]) if (q.lastPass && q.lastPass.seq > (S.seenPass || 0)) { S.seenPass = q.lastPass.seq; const n = passNewsText(q); toast(n.text); if (q === me) S.passNews = n; }
     // querents
@@ -2269,6 +2293,7 @@ return { policy, playOne, batch };
     else if (pr.kind === 'main') html = `<div class="prompt">${strip}<div class="ph">YOUR MAIN PHASE · Liquidity ${g.liquidity(me)} to spend${me.reservedThisTurn ? '' : ' · you may still Reserve one card'}</div>${fa ? `<button id="foretell">${isDuel() ? 'Foretell the Omen' : 'Foretell the next card'}${fa.favor ? ` (${fa.favor} Favor)` : V() ? ' (free: Virgil)' : ''}</button>` : ''}<span class="note" style="color:var(--muted)">Drag a glowing card onto a glowing zone. Tap any card to read it.</span>${hintTxt}</div>`;
     else if (pr.kind === 'hedge') { const t = pr.threat; const tgt = t.target && t.target.isPass ? `your Hail Mary Pass (${me.inAir} in the air)` : t.target && t.target.card ? t.target.card.name : 'your Portfolio'; html = `<div class="prompt danger"><div class="ph">INCOMING · ${esc(t.attacker ? t.attacker.name : 'The R-cana')} plays ${esc(t.card.name)} at ${esc(tgt)} for ${t.amount}</div><span class="note">Tap a glowing Chain in your hand to Hedge${g.rules.hedgeFree ? ' (free: the card is spent, no Liquidity)' : ''}, or</span><button id="takeIt" class="primary">Take it</button>${hintTxt}</div>`; }
     else if (pr.kind === 'foretell') html = `<div class="prompt"><div class="ph">THE OMEN IS ${esc(pr.card.name)}</div><span class="note">${esc(pr.card.text)}</span><button class="primary" id="bury">Bury it</button><button id="leave">Leave it</button>${hintTxt}</div>`;
+    else if (pr.kind === 'react') html = `<div class="prompt danger"><div class="ph">THE OMEN TURNS OVER: ${esc(pr.ev.name)} · you hold ${esc(pr.card.name)}</div><span class="note">${esc(ctext(pr.ev))} Play the Circuit Breaker to bury it unresolved (it spares the bot too), or keep it for a worse one.</span><button class="primary" id="reactPlay">Play ${esc(pr.card.name)}</button><button id="reactKeep">Keep it</button>${hintTxt}</div>`;
     else if (pr.kind === 'choose') html = `<div class="prompt"><div class="ph">${esc(pr.title)}</div><div class="choose" id="chooseBox"></div><button class="primary" id="chooseOk">Done</button><span class="note">Tapped cards go to the bottom; the rest stay on top in order.</span></div>`;
     else if (pr.kind === 'over') { const r = pr.result; html = `<div class="prompt"><div class="ph">${r.winner === me.name ? 'YOU WIN' : r.winner ? 'THE BOT WINS' : 'DRAW'} · ${esc(r.reason)}</div><span class="note">The R-cana named you a ${esc(g.archetype(me))}. Press Deal for another.</span><button id="reviewEnd">Review the last turns</button><div class="did" style="width:100%;font-family:var(--font-mono);font-size:11px;line-height:1.5;border-top:1px solid var(--line);padding-top:6px">${[...g.snapshots.flatMap((x) => x.events), ...g.events].slice(-6).map((e) => esc(e.replace(/^\[[^\]]*\] /, ''))).join('<br>')}</div></div>`; }
     else if (pr.kind === 'error') html = `<div class="prompt danger"><div class="ph">ENGINE ERROR</div><pre class="note">${esc(String(pr.error && pr.error.stack || pr.error))}</pre></div>`;
@@ -2276,6 +2301,7 @@ return { policy, playOne, batch };
     if (pr.kind === 'set') { $('bankAll').onclick = () => resolveP({ bank: me.portfolio }); $('bankSome').onclick = () => resolveP({ bank: +$('bankN').value || 0 }); if (pr.canPass) $('throwPass').onclick = () => resolveP({ pass: true }); }
     if (pr.kind === 'main' && fa) $('foretell').onclick = () => doAct(fa);
     if (pr.kind === 'draw') $('drawBtn').onclick = () => resolveP(true);
+    if (pr.kind === 'react') { $('reactPlay').onclick = () => resolveP(true); $('reactKeep').onclick = () => resolveP(false); }
     if (pr.kind === 'choose') { const box = $('chooseBox'); for (const c of pr.cards) { const el = cardEl(c); el.classList.toggle('target', pr.picked.has(c)); el.addEventListener('click', () => { if (pr.picked.has(c)) pr.picked.delete(c); else pr.picked.add(c); el.classList.toggle('target', pr.picked.has(c)); }); box.appendChild(el); } $('chooseOk').onclick = () => resolveP([...pr.picked]); }
     if (pr.kind === 'over') $('reviewEnd').onclick = () => openReview(Math.max(0, g.snapshots.length - 2));
     if (pr.kind === 'hedge') $('takeIt').onclick = () => resolveP(null);
@@ -2321,6 +2347,7 @@ return { policy, playOne, batch };
       return { text: n < me.portfolio ? `Bank ${n} and keep ${me.portfolio - n} exposed for the Dividend bonus; the Market is safe right now.` : `Bank all ${me.portfolio}. Nothing exposed means nothing to lose on the bot's turn.`, run: () => resolveP({ bank: n }) };
     }
     if (pr.kind === 'draw') return { text: 'Draw your card.', run: () => resolveP(true) };
+    if (pr.kind === 'react') { const yes = c.useReaction(g, me, pr.card, pr.ev); return { text: yes ? `Play it: ${pr.ev.name} costs you about ${c.eventHarm(g, me, pr.ev)} and the bot about ${c.eventHarm(g, S.bot, pr.ev)}.` : `Keep it: ${pr.ev.name} hurts the bot (about ${c.eventHarm(g, S.bot, pr.ev)}) more than you (about ${c.eventHarm(g, me, pr.ev)}).`, run: () => resolveP(yes) }; }
     if (pr.kind === 'hedge') { const ch = c.wantHedge(g, me, pr.opts, pr.threat); return ch ? { text: `Hedge with ${ch.name}. What you'd lose is worth more than the card.`, act: { card: ch }, run: () => resolveP(ch) } : { text: 'Take it. The hit is small and the Chain in your hand is worth more later.', run: () => resolveP(null) }; }
     if (pr.kind === 'foretell') { const b = c.bottomCard(g, me, pr.card); return { text: b ? `Bury it. ${pr.card.name} would hurt you.` : `Leave it. ${pr.card.name} is fine for you, or hurts the bot more.`, run: () => resolveP(b) }; }
     if (pr.kind !== 'main') return null;
@@ -2402,6 +2429,7 @@ return { policy, playOne, batch };
     else if (pr.kind === 'hedge') { const t = pr.threat; const tgt = t.target && t.target.isPass ? `your pass (${me.inAir} in the air)` : t.target && t.target.card ? t.target.card.name : 'your Portfolio'; L.push(`Decision now: the bot plays ${t.card.name} at ${tgt} for ${t.amount}. You may Hedge with: ${pr.opts.map((c) => c.name).join(', ') || 'nothing'}; or take it.`); }
     else if (pr.kind === 'foretell') L.push(`Decision now: you Foretold the Omen. It is ${cardBrief(pr.card)}. Bury it or leave it.`);
     else if (pr.kind === 'draw') L.push('Decision now: none, you are about to draw your card for the turn.');
+    else if (pr.kind === 'react') L.push(`Decision now: the Omen turned over as ${pr.ev.name} (${ctext(pr.ev)}) and you hold ${pr.card.name}. Play it to bury the Event unresolved for both players, or keep it.`);
     else if (pr.kind === 'over') L.push(`The game is over: ${pr.result.winner === me.name ? 'you won' : pr.result.winner ? 'the bot won' : 'a draw'} (${pr.result.reason}).`);
     else L.push('Decision now: none, the bot is playing.');
     const h = $('coach').checked && ['set', 'main', 'hedge', 'foretell'].includes(pr.kind) ? advice() : null; if (h) L.push(`The strong bot's suggestion right now: ${h.text}`);
