@@ -17,7 +17,11 @@ import { createCandyEmeraldPaint } from '@/lib/palmTreeDrivePaint.mjs'
 // rider is parked this far down so its tires touch the road.
 const ROAD_DROP = 0.2
 // The camera covers this fraction of the curve per second (FlyThrough).
-const CURVE_SPEED = 0.025
+// 0.025 was the original ship pace; the car drives it at about two thirds.
+const CURVE_SPEED = 0.017
+// Scales the control points' height so the climbs and drops are gentler
+// for the car (1 is the original tunnel).
+const VERTICAL_SCALE = 0.75
 // Length of the low rider in world units; the road is about 0.48 wide.
 const CAR_LENGTH = 0.42
 
@@ -361,7 +365,10 @@ class WireTunnel extends THREE.LineSegments {
       { x: -6.004952702196002, y: 0.16039311931742395, z: -3.59371911696846 }
     ]
 
-    const curve = new THREE.CatmullRomCurve3(basePoints, true, 'catmullrom', 0.7)
+    const curve = new THREE.CatmullRomCurve3(
+      basePoints.map(p => new THREE.Vector3(p.x, p.y * VERTICAL_SCALE, p.z)),
+      true, 'catmullrom', 0.7
+    )
     const tubularSegments = 130
     const radialSegments = 7
     const tube = new THREE.TubeGeometry(curve, tubularSegments, 0.2, radialSegments, true)
@@ -583,6 +590,7 @@ class FlyThrough {
     this.curve = curve
     this.vehicle = vehicle
     this.la = new THREE.Vector3()
+    this.tangent = new THREE.Vector3()
     this.laVehicle = new THREE.Vector3()
   }
 
@@ -590,14 +598,17 @@ class FlyThrough {
     const move = t * CURVE_SPEED
     const cameraA = move % 1
     const lookAtA = (move + 0.025) % 1
-    const lookAtVehicle = (move + 0.05) % 1
 
     this.curve.getPointAt(cameraA, this.camera.position)
     this.curve.getPointAt(lookAtA, this.la)
     this.camera.lookAt(this.la)
     
+    // The vehicle sits at the camera's look-at point and faces along the
+    // road under it (the curve tangent there), rather than cutting across
+    // bends toward a point further ahead.
     this.vehicle.position.copy(this.la)
-    this.curve.getPointAt(lookAtVehicle, this.laVehicle)
+    this.curve.getTangentAt(lookAtA, this.tangent)
+    this.laVehicle.copy(this.la).add(this.tangent)
     this.vehicle.lookAt(this.laVehicle)
   }
 }
@@ -777,12 +788,14 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
     // Only the vehicle is lit (the wire, points and gallery are unlit), so
     // these are tuned for the low rider under the tunnel's dim exposure: a
     // key from above-right, violet road glow from below, and a soft fill.
-    const light = new THREE.DirectionalLight(0xffffff, Math.PI * 2)
+    // Kept modest: the full-frame bloom flares the car's white passengers
+    // as soon as they go past white.
+    const light = new THREE.DirectionalLight(0xffffff, Math.PI * 1.1)
     light.position.setScalar(1)
     scene.add(
       light,
-      new THREE.HemisphereLight(0xffffff, 0x4411ff, Math.PI * 0.8),
-      new THREE.AmbientLight(0xffffff, Math.PI * 0.25)
+      new THREE.HemisphereLight(0xffffff, 0x4411ff, Math.PI * 0.35),
+      new THREE.AmbientLight(0xffffff, Math.PI * 0.2)
     )
     
     const wireTunnel = new WireTunnel({ canopy })
