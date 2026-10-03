@@ -26,6 +26,8 @@ win; the Review button steps back through every turn of the game. Trader cards, 
 up in the draw. Published as a claude.ai artifact with the `sample` capability, the "Ask the coach" box
 lets the player put free-form questions to Claude from the rules and the table in front of them.
 
+**In the app** the table lives at `/rcana` (`src/app/rcana/page.js` frames `public/rcana/table.html`). `npm run rcana:build` rebuilds both `table.html` here and the copy under `public/` after any change to the source, the stylesheet or the engine.
+
 **The viewer** (`tarot-viewer.html`) is the lab: Watch (bot vs bot, turn by turn), Versus (play with buttons and a
 coach), Batch (hundreds of games with win rates and pacing), Cards (the whole set with a filter). Both pages must be
 served, not opened from disk, because they use ES modules:
