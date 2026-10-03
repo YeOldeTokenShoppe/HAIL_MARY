@@ -100,7 +100,7 @@ export class StrongPolicy {
   }
   reserveChoice(g, p) {
     if (!p.hand.length) return null; const liq = g.liquidity(p) + 1; const h = this.horizon(g);
-    const use = (c) => { let v = c.type === 'court' ? this.courtValue(g, p, c, h) : c.rank * (c.suit === 'chains' ? 0.7 : 1); if (c.cost > liq + 2) v *= 0.6; if (c.suit === 'candles' && !p.floor.length) v *= 0.5; return v / Math.max(1, Math.sqrt(c.cost)); };
+    const use = (c) => { if (c.type === 'trader') return c.kind === 'reaction' ? 4.5 : 3.5; let v = c.type === 'court' ? this.courtValue(g, p, c, h) : c.rank * (c.suit === 'chains' ? 0.7 : 1); if (c.cost > liq + 2) v *= 0.6; if (c.suit === 'candles' && !p.floor.length) v *= 0.5; return v / Math.max(1, Math.sqrt(c.cost)); };
     return [...p.hand].sort((a, b) => use(a) - use(b))[0];
   }
   async takeTurn(g, p) {
