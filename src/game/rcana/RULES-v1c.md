@@ -1,6 +1,6 @@
 # RL80 R-cana — Version 1c: The Omen
 
-Version 1b (Favor and Network) with the Majors taken out of the draw pile, free Hedges, a capped Hail Mary and partner replacement. This document lists only what differs from `RULES-v1b.md`; everything else is unchanged from 1b and, before it, `RULES-v1.md`.
+Version 1b (Favor and Network) with the Majors taken out of the draw pile, free Hedges, partner replacement, the last-play Hail Mary and eight Trader cards. The table runs all of it by default; the last play and the Trader cards can be switched off there and are flagged as prototypes below. This document lists only what differs from `RULES-v1b.md`; everything else is unchanged from 1b and, before it, `RULES-v1.md`.
 
 ## Why
 
@@ -20,9 +20,9 @@ THE ORACLE reveals the top three Majors. THE RECKONING is buried in the bottom h
 
 When a Chain targets your Trading Personality, your Portfolio or your pass, you may play one Chain from your hand as a Hedge. It costs no Liquidity. The card is spent and you do not draw a replacement. It absorbs its rank; whatever is left gets through.
 
-## The Hail Mary stake is capped
+## The Hail Mary
 
-A Hail Mary Pass throws at most **20** into the air. Any Profit beyond that stays in your Portfolio, exposed as usual. You still need at least 10 in your Portfolio to throw, and throwing still replaces banking that turn.
+With the last-play rule (below, the default) a pass is thrown only when the opponent could win at their next turn, with no cap and no minimum. Without it, the 1b pass applies with one change: the stake is capped at **20**, and any Profit beyond that stays exposed. In every version, a Hail Mary is never offered when banking would already win: bank and win.
 
 ## Replacing a partner
 
@@ -44,7 +44,7 @@ Simulator flags: `--passLast 1`, `--passMult`, `--passNoHedge 1`. The table has 
 
 ### Numbers, strong against strong over 2,000 games
 
-| | 1c, pass any time (cap 20) | Last play, doubles | Last play, 1.5x |
+| | Pass any time (cap 20) | Last play, doubles | Last play, 1.5x |
 |---|---|---|---|
 | Games with a throw | 75% | 46% | 27% |
 | Throws that land | 60% | 78% | 78% |

@@ -95,7 +95,7 @@ When a Major is revealed, it resolves for the whole table. A **Market** replaces
 
 ## The Hail Mary Pass
 
-Once per game, at the start of your turn, instead of banking you may throw your whole Portfolio (at least 10) into the air. The stake leaves your Portfolio and sits in the air until the start of your next turn.
+Once per game, at the start of your turn, instead of banking you may throw your whole Portfolio (at least 10) into the air. If banking would already bring your Bank to 80, there is no pass to throw: bank and win. The stake leaves your Portfolio and sits in the air until the start of your next turn.
 
 - Profit you earn after the throw goes into your Portfolio as normal. It is not part of the stake.
 - An opponent may aim a Chain at the pass. You may Hedge it. Whatever gets through intercepts the pass: the interceptor takes that much of the stake (up to the stake) into their Portfolio and the rest is lost.

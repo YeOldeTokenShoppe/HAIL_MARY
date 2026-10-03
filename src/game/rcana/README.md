@@ -10,7 +10,7 @@ Three rule sets share one engine:
 |---|---|---|---|
 | 1, the shared reading | One shared deck with the Majors shuffled in; a Major resolves for both players when drawn. | `RULES-v1.md` | Complete |
 | 1b, Favor and Network | Version 1 with a two-partner Network, Copy trades, and Favor earned by generosity. | `RULES-v1b.md` | Complete; superseded by 1c |
-| 1c, the Omen | 1b with the Majors as their own deck turned over at the start of each round, free Hedges, a Hail Mary capped at 20, partner replacement, Favor from Cups only. | `RULES-v1c.md` | Current playtest build; the table opens on it |
+| 1c, the Omen | 1b with the Majors as their own deck turned over at the start of each round, free Hedges, partner replacement, Favor from Cups only, the last-play Hail Mary and eight Trader cards (an 88-card deck). | `RULES-v1c.md` | Current playtest build; the table opens on it |
 | 2, the duel | Private decks with reversed faces, a shared Major deck with a face-down Omen. | `RULES-v2.md` | Complete, parked while 1c is tested |
 
 `RULES.md` is the design history. The earlier 152-card deck-building draft is kept in a drawer at the end of this file.
@@ -21,7 +21,9 @@ Three rule sets share one engine:
 tap a Personality to Trade (or Work) with it, tap one of the bot's to Copy trade it. Every pip says what it does on its
 face. The coach line under each decision says what the strong bot would do and why; press "Do that" to follow it.
 Every Major that turns up stops the table with a pop-up saying who drew it and what it did; a Hail Mary's fate is
-announced the moment it lands. Published as a claude.ai artifact with the `sample` capability, the "Ask the coach" box
+announced the moment it lands. Each querent shows what its owner banks to next turn, with a red warning when the bot could
+win; the Review button steps back through every turn of the game. Trader cards, eight one-shot moves and reactions, come
+up in the draw. Published as a claude.ai artifact with the `sample` capability, the "Ask the coach" box
 lets the player put free-form questions to Claude from the rules and the table in front of them.
 
 **The viewer** (`tarot-viewer.html`) is the lab: Watch (bot vs bot, turn by turn), Versus (play with buttons and a
@@ -109,7 +111,7 @@ change a card there and every page and bot picks it up. After any change to the 
 
 ## How a game of version 1b plays, turn by turn
 
-(Version 1c differs as `RULES-v1c.md` describes: the Omen turns over at the start of each round instead of Majors being drawn, Hedges are free, the pass is capped at 20, a partner can be replaced, Favor comes from Cups only, and the second Trader opens with 8 Profit.)
+(Version 1c differs as `RULES-v1c.md` describes: the Omen turns over at the start of each round instead of Majors being drawn, Hedges are free, a Hail Mary is the last play when the bot could win next turn, Trader cards come up in the draw, a partner can be replaced, Favor comes from Cups only, and the second Trader opens with 8 Profit.)
 
 **Setup.** Shuffle the 22 Majors into the 56 Minors. Each Trader draws eight. The first Trader skips their first draw.
 Querents start with an empty Bank and no Favor.
