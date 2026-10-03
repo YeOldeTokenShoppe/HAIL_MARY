@@ -310,7 +310,8 @@ export class TarotGame {
     this.snapshot('turn');
     if (!this.over && lastOfRound && this.bellRound != null && this.round >= this.bellRound) this.endByBell();
   }
-  canPass(p) { return !p.hailMaryUsed && !p.pass && p.portfolio >= (this.rules.passLast ? 1 : this.rules.passMin) && (!this.rules.passUnderdogOnly || this.isUnderdog(p)) && !this.closing && (!this.rules.passLast || this.opps(p).some((o) => this.wouldWinNext(o))); }
+  canPass(p) { return !p.hailMaryUsed && !p.pass && p.bank + p.portfolio < this.rules.winBank && // banking wins outright: no throw offered
+    p.portfolio >= (this.rules.passLast ? 1 : this.rules.passMin) && (!this.rules.passUnderdogOnly || this.isUnderdog(p)) && !this.closing && (!this.rules.passLast || this.opps(p).some((o) => this.wouldWinNext(o))); }
   throwPass(p, { extra = false } = {}) {
     if (!extra) p.hailMaryUsed = true; const stake = this.rules.passMax && !this.rules.passLast ? Math.min(p.portfolio, this.rules.passMax) : p.portfolio; p.inAir = stake; p.portfolio -= stake; p.pass = { round: this.round }; p.stats.passes++;
     this.log(`✝ ${p.name} throws a HAIL MARY PASS: ${p.inAir} in the air until the start of their next turn${p.portfolio ? ` (${p.portfolio} stays in the Portfolio)` : ''}. Intercept it, or watch it double.`);
