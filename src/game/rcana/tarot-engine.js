@@ -12,7 +12,9 @@ export const DEFAULTS = { winBank: 80, openingHand: 8, minorsPerTurn: 1, firstTu
   // the last-play pass: a Hail Mary may only be thrown when the opponent could win by banking at their next turn; no cap; while it is in the air nobody wins (the clock stops), and the game resolves when it lands
   passLast: false, passNoHedge: false,
   // Trader cards: the eight one-shot moves shuffled into the Minor deck (88 cards)
-  traders: false };
+  traders: false,
+  // actions per main phase (0 = unlimited). Reserving one card is free; everything else counts.
+  actionsPerTurn: 0 };
 export const V1C_PRESET = { v1b: true, majorsSeparate: true, replacePartner: true, hedgeFree: true, copyFavor: false, spareMin: 3, passMax: 20, firstHandPenalty: 0, firstTurnDraw: 1, seatProfit: 8 };
 let UID = 1;
 
@@ -21,7 +23,7 @@ export class TarotGame {
     this.hiddenInfo = hiddenInfo;
     this.rules = { ...DEFAULTS, ...rules }; if (this.rules.v1c) this.rules = { ...this.rules, ...V1C_PRESET, ...rules, v1c: true }; this.rng = makeRng(seed); this.seed = seed; this.snapshotsOn = snapshots;
     this.players = players.map((cfg, idx) => ({ idx, name: cfg.name, policy: cfg.policy, deckList: cfg.deckList || null, deckPreset: cfg.deckPreset || null, hand: [], reserve: [], floor: [], portfolio: 0, bank: 0,
-      hailMaryUsed: false, pass: null, inAir: 0, bankedThisTurn: 0, reservedThisTurn: 0, foretold: false, turnBonusLiquidity: 0, favor: 0, copiedThisTurn: false, traderHold: {},
+      hailMaryUsed: false, pass: null, inAir: 0, bankedThisTurn: 0, reservedThisTurn: 0, foretold: false, turnBonusLiquidity: 0, favor: 0, copiedThisTurn: false, traderHold: {}, actionsThisTurn: 0,
       stats: { worked: 0, pips: 0, coins: 0, candles: 0, chains: 0, cups: 0, hedges: 0, hires: 0, invokes: 0, liquidated: 0, frontrun: 0, unbankedSum: 0, sets: 0, foretells: 0, passes: 0, completions: 0, interceptions: 0, passBanked: 0, passWins: 0, passOffers: 0, traderPlays: 0, copies: 0, favorGained: 0, favorSpent: 0, spared: 0 } }));
     this.deck = []; this.discard = []; this.market = null; this.providence = []; this.events = []; this.snapshots = []; this.cardPlays = {};
     this.round = 0; this.turnIdx = 0; this.turnCounter = 1; this.active = null; this.over = false; this.winner = null; this.reason = ''; this.bellRound = null; this.current = null; this.majorsSeen = 0; this.closing = false;
@@ -247,9 +249,11 @@ export class TarotGame {
   }
   invoke(p, m) { if (!this.pay(p, m.cost)) return; p.stats.invokes++; this.log(`${p.name} INVOKES ${m.name} (locks ${m.cost})`); m.run(this, p); this.providence.splice(this.providence.indexOf(m), 1); this.discard.push(m); }
   // ── legal actions ──
+  actionsLeft(p) { return this.rules.actionsPerTurn ? Math.max(0, this.rules.actionsPerTurn - p.actionsThisTurn) : Infinity; }
   actions(p) {
     const A = []; const liq = this.liquidity(p);
     if (p.reservedThisTurn < 1) for (const c of p.hand) A.push({ t: 'reserve', card: c, cost: 0 });
+    if (this.actionsLeft(p) <= 0) return A; // out of actions: only the free Reserve remains
     for (const c of p.hand) {
       const cost = this.costOf(p, c); if (cost > liq) continue;
       if (c.type === 'court') { if (!this.rules.v1b || p.floor.length < this.rules.networkCap) A.push({ t: 'hire', card: c, cost }); else if (this.rules.replacePartner) for (const i of p.floor) A.push({ t: 'hire', card: c, cost, replace: i }); continue; }
@@ -272,6 +276,7 @@ export class TarotGame {
     return A;
   }
   async act(p, a) {
+    if (a.t !== 'reserve' && this.rules.actionsPerTurn) { if (this.actionsLeft(p) <= 0) return; p.actionsThisTurn++; }
     switch (a.t) {
       case 'reserve': p.hand.splice(p.hand.indexOf(a.card), 1); p.reserve.push({ card: a.card, locked: false }); p.reservedThisTurn++; this.log(`${p.name} reserves ${a.card.name} (Liquidity ${this.liquidity(p)})`); break;
       case 'hire': if (a.replace) { if (this.liquidity(p) < a.cost) break; this.release(a.replace); } this.hire(p, a.card); break;
@@ -333,7 +338,7 @@ export class TarotGame {
   passNews(p, news) { p.lastPass = { ...news, seq: (this.passSeq = (this.passSeq || 0) + 1), round: this.round }; }
   landPasses() { for (const q of this.players) if (q.pass) { this.log(`✝ The Final Bell catches ${q.name}'s Hail Mary Pass in the air: ${q.inAir} returns to their Portfolio, undoubled.`); this.passNews(q, { result: 'returned', stake: q.inAir, amount: q.inAir, by: 'the Final Bell' }); q.portfolio += q.inAir; q.inAir = 0; q.pass = null; } }
   async doSet(p) {
-    for (const i of p.floor) i.working = false; p.reserve.forEach((r) => { r.locked = false; }); p.reservedThisTurn = 0; p.copiedThisTurn = false; p.foretold = false; p.turnBonusLiquidity = 0; p.bankedThisTurn = 0;
+    for (const i of p.floor) i.working = false; p.reserve.forEach((r) => { r.locked = false; }); p.reservedThisTurn = 0; p.copiedThisTurn = false; p.actionsThisTurn = 0; p.foretold = false; p.turnBonusLiquidity = 0; p.bankedThisTurn = 0;
     // Start of turn: pass lands, Dividend, bonus, bank or throw
     if (p.pass) { const stake = p.inAir; const n = Math.floor(stake * this.rules.passMult); p.inAir = 0; p.pass = null; p.stats.completions++; p.stats.passBanked += n; this.passNews(p, { result: 'complete', stake, amount: n, by: null }); this.log(`✝ COMPLETE: ${p.name}'s Hail Mary Pass comes down. ${stake} in the air banks as ${n}.`); p.justLanded = true; this.bank(p, n, 'Hail Mary Pass'); this.resumeClock(); p.justLanded = false; if (this.over) return; }
     const div = (this.modFirst(p, 'dividend') ?? 1) + this.modSum(p, 'dividendDelta'); this.profit(p, div, 'Dividend');
