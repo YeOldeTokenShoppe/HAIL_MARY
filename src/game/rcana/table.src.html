@@ -187,10 +187,18 @@
     if (!from || !to) return; const a = from.getBoundingClientRect(), b = to.getBoundingClientRect(); const el = cardEl(null, { back: true }); el.classList.add('fly'); el.style.left = a.left + 'px'; el.style.top = a.top + 'px'; document.body.appendChild(el);
     requestAnimationFrame(() => { el.style.transform = `translate(${b.left + 12 - a.left}px, ${b.top + 8 - a.top}px) scale(.9)`; el.style.opacity = '0.2'; }); setTimeout(() => el.remove(), 480);
   }
+  function flyReveal(card, from) { // a face-down card flies from its deck to centre stage, grows, and turns over to show its face
+    const a = from ? from.getBoundingClientRect() : { left: window.innerWidth / 2, top: 40, width: 0, height: 0 }; const el = cardEl(null, { back: true }); el.classList.add('fly', 'flyreveal'); el.style.left = a.left + 'px'; el.style.top = a.top + 'px'; document.body.appendChild(el);
+    const w = el.offsetWidth, h = el.offsetHeight; const cx = window.innerWidth / 2 - w / 2, cy = window.innerHeight / 2 - h / 2; const travel = `translate(${cx - a.left}px, ${cy - a.top}px) scale(1.7)`;
+    requestAnimationFrame(() => { el.style.transform = travel + ' rotateY(90deg)'; });
+    setTimeout(() => { const face = cardEl(card); el.className = face.className + ' fly flyreveal'; el.innerHTML = face.innerHTML; el.style.transition = 'none'; el.style.transform = travel + ' rotateY(-90deg)'; requestAnimationFrame(() => { el.style.transition = ''; el.style.transform = travel + ' rotateY(0)'; }); }, 560);
+    setTimeout(() => el.remove(), 1150); return 1100;
+  }
   function showReveal() {
     if (S.overlayDone || !S.reveals.length) return;
-    const flipping = hasMajors() && $('majorStack').querySelector('.card');
-    if (flipping && !S.flipDone) { let done; S.overlayDone = new Promise((r) => { done = r; }); flipping.classList.add('flip'); setTimeout(() => { S.overlayDone = null; S.flipDone = true; done(); showReveal(); S.flipDone = false; }, 520); return; }
+    if (!S.flipDone) { // the card travels from its deck to the middle of the table and turns over, then the pop-up opens
+      const from = hasMajors() ? $('majorStack') : $('deckStack'); const next = S.reveals[0].card; let done; S.overlayDone = new Promise((r) => { done = r; });
+      const ms = flyReveal(next, from); setTimeout(() => { S.overlayDone = null; S.flipDone = true; done(); showReveal(); S.flipDone = false; }, ms); return; }
     const { card: c, lines, who } = S.reveals.shift(); const host = $('overlayHost');
     const head = hasMajors() ? 'THE OMEN TURNS OVER' : who === S.me ? 'YOU DREW A MAJOR' : 'THE BOT DREW A MAJOR';
     const why = hasMajors() ? 'The face-down Omen is turned up at the start of every round. It resolves for both players at once, and the next Major takes its place face down.' : `The 22 Majors are shuffled into the deck. ${who === S.me ? 'Your' : "The bot's"} draw turned this one up, so it resolves for both players right now, and ${who === S.me ? 'you draw' : 'the bot draws'} again to replace it.`;
