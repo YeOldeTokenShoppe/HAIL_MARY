@@ -8,6 +8,18 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
+import { createLowRider, LOW_RIDER_MODEL_URL } from '@/lib/palmTreeDriveCar.mjs'
+import { createCandyEmeraldPaint } from '@/lib/palmTreeDrivePaint.mjs'
+
+// How far below the camera path the road surface sits (world units). The low
+// rider is parked this far down so its tires touch the road.
+const ROAD_DROP = 0.2
+// The camera covers this fraction of the curve per second (FlyThrough).
+const CURVE_SPEED = 0.025
+// Length of the low rider in world units; the road is about 0.48 wide.
+const CAR_LENGTH = 0.42
 
 // Custom scanline shader
 const ScanlineShader = {
@@ -460,7 +472,7 @@ class SynthwaveRoad extends THREE.Mesh {
   constructor(curve, {
     segments = 600,
     halfWidth = 0.24,   // world units; maps to 7.5 road units (the landing road's black edge)
-    drop = 0.2,         // how far below the curve (camera/ship) the surface sits
+    drop = ROAD_DROP,   // how far below the curve (camera/ship) the surface sits
     acrossScale = 7.5 / 0.24,
     alongScale = 8      // road units per world unit along the curve (sets grid pace)
   } = {}) {
@@ -564,31 +576,105 @@ class SynthwaveRoad extends THREE.Mesh {
 }
 
 class FlyThrough {
-  constructor(camera, curve, ship) {
+  // vehicle: an Object3D kept just ahead of the camera on the curve, facing
+  // along it (its +Z points forward, the Object3D.lookAt convention).
+  constructor(camera, curve, vehicle) {
     this.camera = camera
     this.curve = curve
-    this.ship = ship
+    this.vehicle = vehicle
     this.la = new THREE.Vector3()
-    this.laShip = new THREE.Vector3()
+    this.laVehicle = new THREE.Vector3()
   }
 
   update(t) {
-    const move = t * 0.025
+    const move = t * CURVE_SPEED
     const cameraA = move % 1
     const lookAtA = (move + 0.025) % 1
-    const lookAtShip = (move + 0.05) % 1
+    const lookAtVehicle = (move + 0.05) % 1
 
     this.curve.getPointAt(cameraA, this.camera.position)
     this.curve.getPointAt(lookAtA, this.la)
     this.camera.lookAt(this.la)
     
-    this.ship.position.copy(this.la)
-    this.curve.getPointAt(lookAtShip, this.laShip)
-    this.ship.lookAt(this.laShip)
+    this.vehicle.position.copy(this.la)
+    this.curve.getPointAt(lookAtVehicle, this.laVehicle)
+    this.vehicle.lookAt(this.laVehicle)
   }
 }
 
-export default function OldsCoolTunnel({ isFullscreen = false, road = true, canopy = true }) {
+// Load the landing page's low rider and park it on the vehicle rig with its
+// tires on the road, scaled from the landing scene down to the tunnel.
+// Resolves to the lowRider handle (for per-frame updates and disposal).
+function loadLowRider({ rig, renderer, cameraSpeed, onError }) {
+  const dracoLoader = new DRACOLoader()
+  dracoLoader.setDecoderPath('/draco/')
+  dracoLoader.setWorkerLimit(1)
+  const loader = new GLTFLoader()
+  loader.setDRACOLoader(dracoLoader)
+
+  let cancelled = false
+  let lowRider = null
+  let paint = null
+
+  loader.load(LOW_RIDER_MODEL_URL, (gltf) => {
+    if (cancelled) return
+    // createLowRider scales the car by 2.7 and faces it down -Z; measure first
+    // so the wheel roll rate can be given in the car's own units.
+    const native = new THREE.Box3().setFromObject(gltf.scene).getSize(new THREE.Vector3())
+    const fitScale = CAR_LENGTH / (native.z * 2.7)
+    lowRider = createLowRider(gltf, { roadSpeed: cameraSpeed / fitScale })
+    const carScene = lowRider.car
+    carScene.updateMatrixWorld(true)
+
+    // createLowRider parks the car in the landing page's lane; centre it on
+    // the rig instead (its tires are already grounded at y = 0).
+    const centre = new THREE.Box3().setFromObject(carScene).getCenter(new THREE.Vector3())
+    carScene.position.x -= centre.x
+    carScene.position.z -= centre.z
+
+    paint = createCandyEmeraldPaint(renderer)
+    carScene.traverse((child) => {
+      if (!child.isMesh) return
+      paint.apply(child)
+      // The car never leaves the camera's view distance; constant fog would
+      // only dim it, and a tiny skinned passenger must not be culled mid-sway.
+      child.frustumCulled = false
+      const materials = Array.isArray(child.material) ? child.material : [child.material]
+      for (const material of materials) {
+        if (!material) continue
+        material.fog = false
+        // The tunnel blooms the whole frame, so the export's emissive
+        // passengers and trim flare out; keep only the lights at full glow.
+        if (material.emissive && !/^(headlights|taillights)/i.test(child.name)) {
+          material.emissiveIntensity = Math.min(material.emissiveIntensity, 0.35)
+        }
+      }
+    })
+
+    const fit = new THREE.Group()
+    fit.name = 'LowRiderFit'
+    fit.scale.setScalar(fitScale)
+    fit.position.y = -ROAD_DROP
+    fit.rotation.y = Math.PI // the car's front (-Z) faces the rig's forward (+Z)
+    fit.add(carScene)
+    rig.add(fit)
+  }, undefined, (error) => {
+    if (cancelled) return
+    console.warn('Low rider could not load; keeping the ship.', error)
+    onError?.()
+  })
+
+  return {
+    update(dt) { lowRider?.update(dt) },
+    dispose() {
+      cancelled = true
+      lowRider?.dispose()
+      dracoLoader.dispose()
+    }
+  }
+}
+
+export default function OldsCoolTunnel({ isFullscreen = false, road = true, canopy = true, car = true }) {
   const { t } = useLanguage()
   const mountRef = useRef(null)
   const sceneRef = useRef(null)
@@ -688,9 +774,16 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
 
     // Removed "Old's cool" text - no longer needed
 
-    const light = new THREE.DirectionalLight(0xffffff, Math.PI)
+    // Only the vehicle is lit (the wire, points and gallery are unlit), so
+    // these are tuned for the low rider under the tunnel's dim exposure: a
+    // key from above-right, violet road glow from below, and a soft fill.
+    const light = new THREE.DirectionalLight(0xffffff, Math.PI * 2)
     light.position.setScalar(1)
-    scene.add(light, new THREE.AmbientLight(0xffffff, Math.PI * 0.25))
+    scene.add(
+      light,
+      new THREE.HemisphereLight(0xffffff, 0x4411ff, Math.PI * 0.8),
+      new THREE.AmbientLight(0xffffff, Math.PI * 0.25)
+    )
     
     const wireTunnel = new WireTunnel({ canopy })
     scene.add(wireTunnel)
@@ -703,7 +796,19 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
     
     // Removed position arrow - no longer needed
     
-    const flyThrough = new FlyThrough(camera, wireTunnel.curve, wireTunnel.ship)
+    // The vehicle rig rides the curve ahead of the camera. It carries the
+    // low rider when it loads, otherwise the original wireframe ship.
+    const vehicle = new THREE.Group()
+    vehicle.name = 'TunnelVehicle'
+    scene.add(vehicle)
+    const showShip = () => { vehicle.add(wireTunnel.ship); wireTunnel.ship.visible = true }
+    wireTunnel.ship.visible = false
+    const lowRiderLoad = car
+      ? loadLowRider({ rig: vehicle, renderer, cameraSpeed: CURVE_SPEED * wireTunnel.curve.getLength(), onError: showShip })
+      : null
+    if (!car) showShip()
+
+    const flyThrough = new FlyThrough(camera, wireTunnel.curve, vehicle)
 
     let t = 0
     let isPausedLocal = false
@@ -725,6 +830,7 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
         if (!isPausedLocal) {
           t += dt
           flyThrough.update(t)
+          lowRiderLoad?.update(dt)
         }
         
         gallery.update(t)
@@ -905,6 +1011,8 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
       if (frameIdRef.current) {
         cancelAnimationFrame(frameIdRef.current)
       }
+
+      lowRiderLoad?.dispose()
       
       // Dispose of gallery resources
       if (gallery && gallery.dispose) {
@@ -942,7 +1050,7 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
         }
       }
     }
-  }, [isFullscreen, road, canopy])
+  }, [isFullscreen, road, canopy, car])
 
   // Apply translations to focused image data when index changes
   useEffect(() => {
