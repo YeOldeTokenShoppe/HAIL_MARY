@@ -98,6 +98,12 @@ Once per game, at the start of your turn, instead of banking you may throw your 
 
 *The table lets you switch the last play off; the pass may then be thrown at any start of turn with at least 10 in your Portfolio, with the stake capped at 20. The table also lets you set the pass to ×1.5 instead of doubling.*
 
+## Three actions (prototype option, on by default at the table)
+
+In your main phase you take **up to three actions**, in any order: partner, Trade, Copy trade, play a pip, play a Trader move, Foretell, Invoke. **Reserving one card is free** and does not count. The table shows how many actions remain; the "3 actions" box switches the limit off.
+
+Simulator flag: `--actions N` (0 for unlimited). Strong against strong over 2,000 games the limit changes little on the surface (8.1 rounds against 7.9, seat balance 49%), because the strong bot rarely wanted more than three paid actions; what it changes is who wins between unequal players: the strong bot's edge over the naive bot rises from 72% to 77%, since choosing which three now matters. Foretells fall by two thirds under the limit, which suggests Foretell may deserve to be free.
+
 ## Ending the game
 
 The first Bank to reach 80 wins at once, subject to the stopped clock above. The game also ends after the round in which THE RECKONING tolls (it is buried instead if more than ten Majors remain), or when the last Major has been revealed; then the larger Bank wins, ties to the larger Portfolio.
