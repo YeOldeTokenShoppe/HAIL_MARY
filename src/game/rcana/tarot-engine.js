@@ -253,7 +253,7 @@ export class TarotGame {
   actions(p) {
     const A = []; const liq = this.liquidity(p);
     if (p.reservedThisTurn < 1) for (const c of p.hand) A.push({ t: 'reserve', card: c, cost: 0 });
-    if (this.actionsLeft(p) <= 0) return A; // out of actions: only the free Reserve remains
+    const spent = this.actionsLeft(p) <= 0; // out of actions: only the free Reserve and Foretell remain
     for (const c of p.hand) {
       const cost = this.costOf(p, c); if (cost > liq) continue;
       if (c.type === 'court') { if (!this.rules.v1b || p.floor.length < this.rules.networkCap) A.push({ t: 'hire', card: c, cost }); else if (this.rules.replacePartner) for (const i of p.floor) A.push({ t: 'hire', card: c, cost, replace: i }); continue; }
@@ -271,12 +271,13 @@ export class TarotGame {
       else if (c.key === 'insider') { if (this.deck.length || this.omen) A.push({ t: 'trader', card: c, cost, choice: {} }); } }
     const virgil = p.floor.some((i) => i.card.foretell);
     if (!p.foretold && (this.rules.majorsSeparate ? !!this.omen : this.deck.length) && (virgil || this.hasFavor(p, this.rules.foretellFavor))) A.push({ t: 'foretell', cost: 0, favor: virgil ? 0 : this.rules.foretellFavor });
+    if (spent) return A.filter((a) => a.t === 'reserve' || a.t === 'foretell');
     if (this.rules.v1b && !p.copiedThisTurn && liq >= this.rules.copyCost) for (const o of this.opps(p)) for (const i of this.working(o)) A.push({ t: 'copy', inst: i, cost: this.rules.copyCost });
     for (const m of this.providence) if (m.cost <= liq && m.can(this, p)) A.push({ t: 'invoke', major: m, cost: m.cost });
     return A;
   }
   async act(p, a) {
-    if (a.t !== 'reserve' && this.rules.actionsPerTurn) { if (this.actionsLeft(p) <= 0) return; p.actionsThisTurn++; }
+    if (a.t !== 'reserve' && a.t !== 'foretell' && this.rules.actionsPerTurn) { if (this.actionsLeft(p) <= 0) return; p.actionsThisTurn++; } // Reserve and Foretell are free of the count
     switch (a.t) {
       case 'reserve': p.hand.splice(p.hand.indexOf(a.card), 1); p.reserve.push({ card: a.card, locked: false }); p.reservedThisTurn++; this.log(`${p.name} reserves ${a.card.name} (Liquidity ${this.liquidity(p)})`); break;
       case 'hire': if (a.replace) { if (this.liquidity(p) < a.cost) break; this.release(a.replace); } this.hire(p, a.card); break;

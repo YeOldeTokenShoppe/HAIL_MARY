@@ -100,9 +100,9 @@ Once per game, at the start of your turn, instead of banking you may throw your 
 
 ## Three actions (prototype option, on by default at the table)
 
-In your main phase you take **up to three actions**, in any order: partner, Trade, Copy trade, play a pip, play a Trader move, Foretell, Invoke. **Reserving one card is free** and does not count. The table shows how many actions remain; the "3 actions" box switches the limit off.
+In your main phase you take **up to three actions**, in any order: partner, Trade, Copy trade, play a pip, play a Trader move, Invoke. **Reserving one card and Foretelling are free** and do not count. The table shows how many actions remain; the "3 actions" box switches the limit off.
 
-Simulator flag: `--actions N` (0 for unlimited). Strong against strong over 2,000 games the limit changes little on the surface (8.1 rounds against 7.9, seat balance 49%), because the strong bot rarely wanted more than three paid actions; what it changes is who wins between unequal players: the strong bot's edge over the naive bot rises from 72% to 77%, since choosing which three now matters. Foretells fall by two thirds under the limit, which suggests Foretell may deserve to be free.
+Simulator flag: `--actions N` (0 for unlimited). Strong against strong over 2,000 games the limit changes little on the surface (8.1 rounds against 7.9, seat balance 49%), because the strong bot rarely wanted more than three paid actions; what it changes is who wins between unequal players: the strong bot's edge over the naive bot rises from 72% to 77%, since choosing which three now matters. With Foretell counted as an action, Foretells fell by two thirds; it is now free of the count and Foretells return to their usual rate (about two a game), with the seat balance at 50% and the strong bot beating the naive bot 75% of the time.
 
 ## Ending the game
 
