@@ -54,6 +54,27 @@ Simulator flags: `--passLast 1`, `--passMult`, `--passNoHedge 1`. The table has 
 
 Under the last-play rule the condition arises in almost every game, so the climax is reliable. Interceptions stay rare (one throw in fourteen) because the bots seldom hold a Chain at the end; making a pass un-Hedgeable changed nothing. The multiplier is the lever: at 2x a quarter of all games are decided by the throw, at 1.5x one in eleven. The leader's real defence is on their own turn before the throw: Front-run the trailing player's exposed Profit below 10, or bank earlier so the condition never arises with a loaded opponent.
 
+## Trader cards (prototype, on by default at the table)
+
+Eight one-shot moves of your own, shuffled into the Minor deck: the R-cana becomes 88 cards. They come up in the draw like any Minor, can be Reserved as Liquidity like any card, and are played from the hand. The opponent cannot see what you hold.
+
+A **move** is played in your main phase for its Liquidity cost. A **reaction** costs nothing and fires by itself from your hand the first time its moment comes; you may hold a reaction back to save it for a better moment.
+
+| Card | Kind | Cost | Effect |
+|---|---|---|---|
+| Stop-Loss | reaction | 0 | The next time a Chain or an Event would take 3 or more Profit from you, lose 2 instead. |
+| Bailout | reaction | 0 | The next time one of your Personalities would be Liquidated, it stays, with its Drawdown cleared. |
+| Short Squeeze | reaction | 0 | The next time the opponent Front-runs you for 2 or more, they lose that much from their own Portfolio instead. |
+| Circuit Breaker | reaction | 0 | The next Event that would cost you Profit, your pass or a Personality is buried instead of resolving. |
+| Margin Call | move | 2 | A Trading opposing Personality takes 3 Drawdown. It cannot be Hedged. |
+| Insider Tip | move | 1 | Look at the Omen and the top three Minors. Put any of them on the bottom. |
+| Rebalance | move | 1 | Bank up to 5 Profit from your Portfolio right now. |
+| Pump | move | 1 | One of your Trading Personalities Trades again this turn. |
+
+Why drawn rather than drafted: both players would pick from an identical set anyway, so a draft adds a decision before a new player knows the game. Drawn, a Trader card is a small event in the hand. A secret two-card draft remains a variant worth trying later ("choose your moves"); a snake draft with the second seat picking first could then replace the 8 Profit as the seat balance.
+
+Simulator flag: `--traders 1`. Strong against strong over 2,000 games: first seat 53% (unchanged), games 7.9 rounds (up from 7.5), about one Trader card played per player per game. The strong bot's edge over the naive bot widens to 83%, because the naive bot neither aims its moves nor benefits from its reactions well; a sign the cards reward attention.
+
 ## Setup and seat balance
 
 Shuffle the Minors and the Majors separately. Each Trader draws **eight** Minors, and both draw on their first turn. The second Trader opens with **8 Profit** in their Portfolio: going second means meeting every Omen a turn later, and eight is the number of this world. Turn the first Major face down as the Omen. The first Omen turns over at the start of round one, before the first Trader's turn.

@@ -37,7 +37,7 @@ cd src/game/rcana && python3 -m http.server 8765
 
 | File | What it is |
 |---|---|
-| `tarot.js` | The 80 cards. `text1b` on a card is its wording under version 1b; `cardText(c, g)` picks the right one. |
+| `tarot.js` | The 80 cards plus the eight Trader cards (`TRADERS`, `ALL_88`). `text1b` on a card is its wording under version 1b; `cardText(c, g)` picks the right one. |
 | `tarot-engine.js` | `TarotGame`: start of turn (Dividend, Interest or Dividend bonus, bank or throw), draw Minors resolving Majors on the way, Reserve, pips, courts, Chains as attack or Hedge, Invoke, Foretell, the Hail Mary Pass, Final Bell. `DEFAULTS` holds every tunable, including the 1b rules behind `v1b`. |
 | `tarot-bots.js` | Strong (heuristic), Naive (random actions, banks everything, always hedges), Random, and `HumanPolicy`, which resolves each decision from a page. |
 | `tarot-sim.js` | CLI and the `playOne` / `batch` exports the viewer uses. |
@@ -84,7 +84,9 @@ free Hedges (`--hedgeFree 0|1`), a pass cap (`--passMax N`, 0 for none), partner
 Favor from Cups only (`--copyFavor 0`), protection only against losses of 3 or more (`--spareMin N`), and the second
 Trader opening with 8 Profit (`--seatProfit N`; also `--seatLiq N`, `--seatFavor N`). Both draw on their first turn.
 The last-play Hail Mary (`--passLast 1`: a pass only when the opponent could win next turn, no cap, the clock stops while it
-is in the air; `--passNoHedge 1` to make it un-Hedgeable) is a prototype described in `RULES-v1c.md`; the table turns it on by default. The game is won at once at 80; `--finish 1 --firstHand -1 --first 1` is the
+is in the air; `--passNoHedge 1` to make it un-Hedgeable) is a prototype described in `RULES-v1c.md`; the table turns it on by default.
+Trader cards (`--traders 1`: eight one-shot moves and reactions shuffled into the Minor deck, an 88-card R-cana) are a second
+prototype described there; the table turns them on by default too. The game is won at once at 80; `--finish 1 --firstHand -1 --first 1` is the
 balanced played-out-round alternative.
 
 ### Version 2 defaults and flags

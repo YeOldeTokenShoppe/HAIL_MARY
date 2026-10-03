@@ -75,5 +75,19 @@ export const MAJORS = [
 ];
 
 export const MINORS = [...pips, ...COURTS];
+// ── Trader cards: the player's own moves. Eight of them, shuffled into the Minor deck when the rules allow (an 88-card R-cana).
+// kind 'turn': an action in your main phase. kind 'reaction': fires by itself from your hand the first time its moment comes, unless you hold it back.
+const T = (id, name, kind, cost, text, o = {}) => ({ type: 'trader', id: 'trader_' + id, key: id, name, kind, cost, text, ...o });
+export const TRADERS = [
+  T('stoploss', 'Stop-Loss', 'reaction', 0, 'The next time a Chain or an Event would take 3 or more Profit from you, lose 2 instead.'),
+  T('bailout', 'Bailout', 'reaction', 0, 'The next time one of your Personalities would be Liquidated, it stays, with its Drawdown cleared.'),
+  T('squeeze', 'Short Squeeze', 'reaction', 0, 'The next time the opponent Front-runs you for 2 or more, they lose that much from their own Portfolio instead.'),
+  T('breaker', 'Circuit Breaker', 'reaction', 0, 'The next Event that would cost you Profit, your pass or a Personality is buried instead of resolving.'),
+  T('margincall', 'Margin Call', 'turn', 2, 'A Trading opposing Personality takes 3 Drawdown. It cannot be Hedged.'),
+  T('insider', 'Insider Tip', 'turn', 1, 'Look at the Omen and the top three Minors. Put any of them on the bottom.'),
+  T('rebalance', 'Rebalance', 'turn', 1, 'Bank up to 5 Profit from your Portfolio right now.'),
+  T('pump', 'Pump', 'turn', 1, 'One of your Trading Personalities Trades again this turn.'),
+];
 export const ALL = [...MINORS, ...MAJORS];
+export const ALL_88 = [...MINORS, ...TRADERS, ...MAJORS];
 export const byId = Object.fromEntries(ALL.map((c) => [c.id, c]));
