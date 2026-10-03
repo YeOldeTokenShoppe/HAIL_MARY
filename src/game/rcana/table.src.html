@@ -10,19 +10,22 @@
     <select id="deckA"></select>
     <select id="deckB"></select>
     <select id="bot"><option value="strong">Strong bot</option><option value="naive">Naive bot</option><option value="random">Random bot</option></select>
-    <label class="note">Seed <input type="number" id="seed" value="7" min="1" style="width:70px"></label>
     <button class="primary" id="start">Deal</button>
     <label class="note" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="coach" checked> coach</label>
     <button id="review" disabled title="Step back through every turn of this game">Review</button>
-    <label class="note" data-v1c="only" style="display:flex;gap:6px;align-items:center" title="A Hail Mary may only be thrown when the bot could win by banking at its next turn; no cap; nobody wins while it is in the air"><input type="checkbox" id="passLast" checked> last-play Hail Mary</label>
-    <label class="note" data-v1c="only" style="display:flex;gap:6px;align-items:center" title="Eight one-shot Trader cards shuffled into the deck: an 88-card R-cana"><input type="checkbox" id="traders" checked> Trader cards (88)</label>
-    <label class="note" data-v1c="only" style="display:flex;gap:6px;align-items:center" title="Up to three actions in your main phase; Reserving one card is free"><input type="checkbox" id="actions3" checked> 3 actions</label>
-    <label class="note" data-v1c="only" style="display:flex;gap:6px;align-items:center">pass <select id="passMult"><option value="2">doubles</option><option value="1.5">×1.5</option></select></label>
+    <details class="settings" id="tableSettings"><summary>Table settings</summary><div class="settings-menu">
+      <label class="note">Seed <input type="number" id="seed" value="7" min="1" style="width:70px"></label>
+      <label class="note" data-v1c="only" style="display:flex;gap:6px;align-items:center" title="A Hail Mary may only be thrown when the bot could win by banking at its next turn; no cap; nobody wins while it is in the air"><input type="checkbox" id="passLast" checked> last-play Hail Mary</label>
+      <label class="note" data-v1c="only" style="display:flex;gap:6px;align-items:center" title="Eight one-shot Trader cards shuffled into the deck: an 88-card R-cana"><input type="checkbox" id="traders" checked> Trader cards (88)</label>
+      <label class="note" data-v1c="only" style="display:flex;gap:6px;align-items:center" title="Up to three actions in your main phase; Reserving one card is free"><input type="checkbox" id="actions3" checked> 3 actions</label>
+      <label class="note" data-v1c="only" style="display:flex;gap:6px;align-items:center">pass <select id="passMult"><option value="2">doubles</option><option value="1.5">×1.5</option></select></label>
+    </div></details>
     <span class="note" id="status">Loading the engine&hellip;</span>
   </div>
 
-  <details class="primer" id="primer" open>
-    <summary>HOW TO PLAY IN SIX LINES</summary>
+  <details class="primer" id="primer">
+    <summary>How to play</summary>
+    <div class="primer-copy">
     <ol>
       <li><strong>Three numbers.</strong> <strong>Liquidity</strong> pays for cards. <strong>Portfolio</strong> is Profit you have earned but can still lose. <strong>Bank</strong> is Profit nobody can touch. First to 80 in the Bank wins.</li>
       <li><strong>Your turn has three steps.</strong> START: Profit arrives (Dividend, plus a bonus for a big Portfolio), then you bank some or all of your Portfolio. DRAW one card. MAIN: play cards, then End turn.</li>
@@ -38,6 +41,7 @@
       <li><strong>Fate and the Hail Mary.</strong> A Major card turns up for both players every round: Markets stay, Events hit at once, Invokes wait in Providence for whoever pays. Once per game you may throw your Portfolio into the air at the start of your turn instead of banking: untouched until the start of your next turn, it banks doubled; touched, it is gone. The box under your numbers tells you when it's allowed and when it's ready.</li>
     </ol>
     <p class="note">The coach line under each decision says what the strong bot would do and why. Press "Do that" to follow it, or ignore it and see what happens. In the Claude app you can also type a question into "Ask the coach" below your Reserve; it answers from the rules and the table in front of you.</p>
+    </div>
   </details>
 
   <section class="side opp">
@@ -128,6 +132,7 @@
   function endTurn() { const r = S.mainResolve; S.mainResolve = null; S.passNews = null; S.prompt = { kind: 'wait' }; render(); if (r) r(); }
 
   $('start').addEventListener('click', async () => {
+    $('primer').open = false; $('tableSettings').open = false;
     try { localStorage.setItem('rcana-table-played', '1'); } catch (e) {}
     try {
     const seed = +$('seed').value || 1; const human = new HumanPolicy(ui); const kind = $('bot').value;
@@ -230,10 +235,10 @@
     $('oppPass').innerHTML = bot.pass ? `<div class="pass-badge" id="oppPassBadge">PASS IN THE AIR: ${bot.inAir}</div>` : '';
     $('oppReserve').innerHTML = bot.reserve.map((r) => `<span class="chip ${r.locked ? 'locked' : ''}"></span>`).join('');
     $('meBank').textContent = me.bank; $('mePort').textContent = me.portfolio; $('meLiq').textContent = `${g.liquidity(me)}/${me.reserve.length}`;
-    $('mePass').innerHTML = me.pass ? `<div class="pass-badge">HAIL MARY IN THE AIR: ${me.inAir} · doubles at the start of your next turn if untouched${g.rules.passLast ? ' · the clock is stopped: nobody wins until it lands' : ''}</div><div class="hm">At risk from the bot's Chains, and from THE REGULATOR, THE CRASH or THE AUDIT turning up</div>`
+    $('mePass').innerHTML = me.pass ? `<div class="pass-badge">HAIL MARY: ${me.inAir} · doubles if untouched</div><div class="hm">Lands next turn${g.rules.passLast ? ' · nobody wins until it lands' : ''}. Chains, the Regulator, the Crash or the Audit can stop it.</div>`
       : me.hailMaryUsed ? '<div class="hm">Hail Mary: used</div>'
       : g.closing ? '<div class="hm">Hail Mary: too late, final round</div>'
-      : g.rules.passLast && !g.opps(me).some((o) => g.wouldWinNext(o)) ? `<div class="hm">Hail Mary: the last play. Available when the bot could win at its next turn and you have Profit exposed</div>`
+      : g.rules.passLast && !g.opps(me).some((o) => g.wouldWinNext(o)) ? `<div class="hm">Hail Mary: available when the bot can win next turn</div>`
       : me.portfolio >= (g.rules.passLast ? 1 : g.rules.passMin) ? `<div class="hm ready">HAIL MARY READY at the start of your next turn: ${g.rules.passLast ? `the bot can win next turn. Throw all ${me.portfolio}; nobody wins while it is in the air` : `throw ${g.rules.passMax ? Math.min(me.portfolio, g.rules.passMax) : me.portfolio} to double it`}</div>`
       : `<div class="hm">Hail Mary: ${g.rules.passLast ? 'the bot could win next turn, but you have nothing exposed to throw' : `needs ${g.rules.passMin} in Portfolio, you have ${me.portfolio}`}</div>`;
     $('meReserve').innerHTML = me.reserve.map((r) => `<span class="chip ${r.locked ? 'locked' : ''}"></span>`).join('');
