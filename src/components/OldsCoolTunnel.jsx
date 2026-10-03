@@ -4,7 +4,6 @@ import React, { useRef, useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { useLanguage } from './LanguageProvider'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
@@ -336,7 +335,10 @@ class FloatingGallery extends THREE.Group {
 }
 
 class WireTunnel extends THREE.LineSegments {
-  constructor() {
+  // canopy: keep only the part of the tunnel that arches over the road.
+  // canopyFloor is the cut height, -1 (bottom) .. 1 (top), measured along the
+  // camera's screen-up at each ring; 0 keeps the half above the horizon.
+  constructor({ canopy = true, canopyFloor = -0.05 } = {}) {
     const basePoints = [
       { x: 6.097824119373165, y: 2.962665382204997, z: 1.7433171949691226 },
       { x: 2.498887329278077, y: 1.876906878980996, z: -6.263607800877008 },
@@ -348,7 +350,43 @@ class WireTunnel extends THREE.LineSegments {
     ]
 
     const curve = new THREE.CatmullRomCurve3(basePoints, true, 'catmullrom', 0.7)
-    const tube = new THREE.TubeGeometry(curve, 130, 0.2, 7, true)
+    const tubularSegments = 130
+    const radialSegments = 7
+    const tube = new THREE.TubeGeometry(curve, tubularSegments, 0.2, radialSegments, true)
+
+    // Height of every tube vertex above its ring's centre, along the same
+    // screen-up the road uses (world up projected off the curve tangent), so
+    // "above the road" means the same thing here as it does for the road.
+    const tubePositions = tube.attributes.position
+    const heights = new Float32Array(tubePositions.count).fill(1)
+    if (canopy) {
+      const up = new THREE.Vector3(0, 1, 0)
+      const centre = new THREE.Vector3()
+      const tangent = new THREE.Vector3()
+      const upDir = new THREE.Vector3()
+      const offset = new THREE.Vector3()
+      for (let i = 0; i <= tubularSegments; i++) {
+        // The closed tube's last ring repeats ring 0.
+        const u = (i % tubularSegments) / tubularSegments
+        curve.getPointAt(u, centre)
+        curve.getTangentAt(u, tangent)
+        upDir.copy(up).addScaledVector(tangent, -up.dot(tangent)).normalize()
+        for (let j = 0; j <= radialSegments; j++) {
+          const k = i * (radialSegments + 1) + j
+          offset.fromBufferAttribute(tubePositions, k).sub(centre)
+          heights[k] = offset.dot(upDir) / offset.length()
+        }
+      }
+      // Drop every face that touches a vertex below the cut; the wire is
+      // then extracted from what remains, so the cut edge reads as a rail.
+      const index = tube.index.array
+      const kept = []
+      for (let f = 0; f < index.length; f += 3) {
+        const a = index[f], b = index[f + 1], c = index[f + 2]
+        if (heights[a] > canopyFloor && heights[b] > canopyFloor && heights[c] > canopyFloor) kept.push(a, b, c)
+      }
+      tube.setIndex(kept)
+    }
     const wire = new THREE.EdgesGeometry(tube, 1.125)
 
     super(
@@ -359,24 +397,24 @@ class WireTunnel extends THREE.LineSegments {
     )
     this.curve = curve
 
-    const gPoints = tube.clone()
-    gPoints.deleteAttribute('uv')
-    gPoints.deleteAttribute('normal')
-    const gPointsMerged = mergeVertices(gPoints)
-    const positions = gPointsMerged.attributes.position
-    
+    // One glowing point per kept tube vertex (the duplicate seam ring and
+    // seam column are skipped so no point is doubled).
     const color = new THREE.Color()
-    const colors = new Float32Array(positions.count * 3)
-    for(let i = 0; i < positions.count; i++) {
-      color.setHSL((Math.random() - 0.5) * 0.15, 1, 0.6).multiplyScalar(7)
-      colors[i * 3] = color.r
-      colors[i * 3 + 1] = color.g
-      colors[i * 3 + 2] = color.b
+    const pointPositions = []
+    const colors = []
+    for (let i = 0; i < tubularSegments; i++) {
+      for (let j = 0; j < radialSegments; j++) {
+        const k = i * (radialSegments + 1) + j
+        if (heights[k] <= canopyFloor) continue
+        pointPositions.push(tubePositions.getX(k), tubePositions.getY(k), tubePositions.getZ(k))
+        color.setHSL((Math.random() - 0.5) * 0.15, 1, 0.6).multiplyScalar(7)
+        colors.push(color.r, color.g, color.b)
+      }
     }
     
     const pointsGeometry = new THREE.BufferGeometry()
-    pointsGeometry.setAttribute('position', positions)
-    pointsGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+    pointsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(pointPositions, 3))
+    pointsGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
     
     const pointsMaterial = new THREE.PointsMaterial({
       size: 0.05,
@@ -411,6 +449,120 @@ class WireTunnel extends THREE.LineSegments {
   }
 }
 
+// The synthwave road from the landing drive (PalmTreeDrive's ground shader),
+// laid as a ribbon along the tunnel curve so it runs out from under the viewer
+// into the centre of the vortex. The ribbon's "down" is the camera's screen-down
+// (world up projected off the tangent), so it always sits straight below the
+// fly-through camera and the ship, through every climb and bank of the curve.
+// It is static in world space: the camera's motion along the curve is what
+// makes the grid stream past, so pausing the tunnel pauses the road too.
+class SynthwaveRoad extends THREE.Mesh {
+  constructor(curve, {
+    segments = 600,
+    halfWidth = 0.24,   // world units; maps to 7.5 road units (the landing road's black edge)
+    drop = 0.2,         // how far below the curve (camera/ship) the surface sits
+    acrossScale = 7.5 / 0.24,
+    alongScale = 8      // road units per world unit along the curve (sets grid pace)
+  } = {}) {
+    const count = (segments + 1) * 2
+    const positions = new Float32Array(count * 3)
+    const uvs = new Float32Array(count * 2)
+    const length = curve.getLength()
+    const up = new THREE.Vector3(0, 1, 0)
+    const point = new THREE.Vector3()
+    const tangent = new THREE.Vector3()
+    const right = new THREE.Vector3(1, 0, 0)
+    const down = new THREE.Vector3()
+    const edge = new THREE.Vector3()
+
+    for (let i = 0; i <= segments; i++) {
+      const u = i / segments
+      curve.getPointAt(u % 1, point)
+      curve.getTangentAt(u % 1, tangent)
+      const side = new THREE.Vector3().crossVectors(tangent, up)
+      if (side.lengthSq() > 1e-6) right.copy(side.normalize())
+      down.crossVectors(tangent, right).normalize()
+      point.addScaledVector(down, drop)
+
+      edge.copy(point).addScaledVector(right, -halfWidth)
+      positions.set([edge.x, edge.y, edge.z], i * 6)
+      edge.copy(point).addScaledVector(right, halfWidth)
+      positions.set([edge.x, edge.y, edge.z], i * 6 + 3)
+
+      // uv.x: road units across (-7.5..7.5); uv.y: road units along the curve
+      const along = u * length * alongScale
+      uvs.set([-halfWidth * acrossScale, along, halfWidth * acrossScale, along], i * 4)
+    }
+
+    const indices = []
+    for (let i = 0; i < segments; i++) {
+      const a = i * 2, b = a + 1, c = a + 2, d = a + 3
+      indices.push(a, b, c, b, d, c)
+    }
+
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+    geometry.setIndex(indices)
+
+    const material = new THREE.ShaderMaterial({
+      uniforms: THREE.UniformsUtils.merge([
+        THREE.UniformsLib.fog,
+        { glow: { value: 1.0 } }
+      ]),
+      vertexShader: `
+        varying vec2 vRoad;
+        void main() {
+          vRoad = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        precision highp float;
+        uniform vec3 fogColor;
+        uniform float fogNear;
+        uniform float fogFar;
+        uniform float glow;
+        varying vec2 vRoad;
+
+        // Same grid as the landing road: magenta lines every 2 road units.
+        float line(vec2 coord, float width) {
+          vec2 grid = abs(fract(coord - 0.5) - 0.5) / (fwidth(coord) * width);
+          return min(min(grid.x, grid.y), 1.0);
+        }
+
+        void main() {
+          float l = line(vRoad / 2.0, 1.0);
+          float x = abs(vRoad.x);
+          // Cyan asphalt to 5 units, black shoulder by 7.5 (PalmTreeDrive's base).
+          vec3 base = mix(vec3(0.0, 0.75, 1.0), vec3(0.0), smoothstep(5.0, 7.5, x));
+          vec3 lineColor = vec3(1.0, 0.0, 0.933); // #ff00ee
+          // Let the grid thin out at the ribbon's edge instead of cutting off.
+          float edgeFade = 1.0 - smoothstep(6.5, 7.5, x);
+          vec3 c = mix(lineColor * edgeFade, base, l);
+
+          // Dashed white centre line: 3 on, 2 off, like the landing road.
+          float dash = step(0.5, fract(vRoad.y / 5.0));
+          float centre = 1.0 - smoothstep(0.0, 0.2, x);
+          c = mix(c, vec3(1.0), centre * dash * 0.8);
+
+          c *= glow;
+
+          float depth = gl_FragCoord.z / gl_FragCoord.w;
+          float fogFactor = smoothstep(fogNear, fogFar, depth);
+          c = mix(c, fogColor, fogFactor);
+          gl_FragColor = vec4(c, 1.0);
+        }
+      `,
+      side: THREE.DoubleSide,
+      fog: true
+    })
+
+    super(geometry, material)
+    this.frustumCulled = false
+  }
+}
+
 class FlyThrough {
   constructor(camera, curve, ship) {
     this.camera = camera
@@ -436,7 +588,7 @@ class FlyThrough {
   }
 }
 
-export default function OldsCoolTunnel({ isFullscreen = false }) {
+export default function OldsCoolTunnel({ isFullscreen = false, road = true, canopy = true }) {
   const { t } = useLanguage()
   const mountRef = useRef(null)
   const sceneRef = useRef(null)
@@ -540,8 +692,10 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
     light.position.setScalar(1)
     scene.add(light, new THREE.AmbientLight(0xffffff, Math.PI * 0.25))
     
-    const wireTunnel = new WireTunnel()
+    const wireTunnel = new WireTunnel({ canopy })
     scene.add(wireTunnel)
+
+    if (road) scene.add(new SynthwaveRoad(wireTunnel.curve))
 
     const gallery = new FloatingGallery(wireTunnel.curve)
     scene.add(gallery)
@@ -788,7 +942,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
         }
       }
     }
-  }, [isFullscreen])
+  }, [isFullscreen, road, canopy])
 
   // Apply translations to focused image data when index changes
   useEffect(() => {
