@@ -87,14 +87,15 @@ export class TarotGame {
   }
   projectedBank(o) { // what the opponent can have banked by the end of their next turn, by every visible route: the Portfolio with its Dividend and bonus, a pass landing doubled, THE VAULT from Providence
     const div = (this.modFirst(o, 'dividend') ?? 1) + this.modSum(o, 'dividendDelta'); const after = o.portfolio + div; const idiv = this.modMin(o, 'interestDiv', this.rules.interestDiv); const bonus = Math.floor(after / idiv) * this.modProduct(o, 'interestMult');
-    const landing = o.pass ? Math.floor(o.inAir * this.rules.passMult) : 0; const vault = this.providence.some((m) => m.id === 'major_9') && o.reserve.length >= 1 ? 5 : 0;
-    const cap = this.modFirst(o, 'bankCap'); const banked = cap == null ? after + bonus + vault : Math.min(after + bonus + vault, cap);
+    const landing = o.pass ? Math.floor(o.inAir * this.rules.passMult) : 0; // THE VAULT banks from the Portfolio and cannot exceed what banking at the start of the turn already reaches
+    const cap = this.modFirst(o, 'bankCap'); const banked = cap == null ? after + bonus : Math.min(after + bonus, cap);
     return o.bank + landing + banked;
   }
   wouldWinNext(o) { return this.projectedBank(o) >= this.rules.winBank; }
-  clockStopped(p) { return this.rules.passLast && this.players.some((q) => q !== p && q.pass); }
+  clockStopped(p) { return this.rules.passLast && this.players.some((q) => q.pass); }
+  majorsLeft() { return this.rules.majorsSeparate ? this.majors.length : this.deck.length; }
   resumeClock() { // a pass has landed or fallen: whoever is over the line now wins, the larger Bank first
-    if (this.over || !this.rules.passLast) return; const s = [...this.players].filter((q) => q.bank >= this.rules.winBank).sort((a, b) => b.bank - a.bank || b.portfolio - a.portfolio);
+    if (this.over || !this.rules.passLast || this.players.some((q) => q.pass)) return; const s = [...this.players].filter((q) => q.bank >= this.rules.winBank).sort((a, b) => b.bank - a.bank || b.portfolio - a.portfolio);
     if (!s.length) return; if (this.rules.finishRound) { this.checkWin(s[0]); return; }
     const w = s[0]; this.over = true; this.winner = w; this.reason = `${w.name} banked ${w.bank}`; if (w.justLanded) w.stats.passWins++; this.log(`*** ${w.name} WINS with ${w.bank} banked${s.length > 1 ? ` (over ${s[1].name}'s ${s[1].bank})` : ''} ***`);
   }
@@ -103,7 +104,7 @@ export class TarotGame {
     if (this.rules.passLast && p.justLanded) return; // the landing resolves through resumeClock, larger Bank first
     if (this.clockStopped(p)) { this.log(`${p.name} has ${p.bank} banked, but a Hail Mary is in the air: the clock is stopped until it lands`); return; }
     if (this.rules.finishRound) { if (!this.closing) { this.closing = true; this.log(`${p.name} reaches ${p.bank}: the round is played out, then the largest Bank wins`); } return; }
-    this.over = true; this.winner = p; this.reason = `${p.name} banked ${p.bank}`; this.log(`*** ${p.name} WINS with ${p.bank} banked ***`);
+    this.over = true; this.winner = p; this.reason = `${p.name} banked ${p.bank}`; if (p.justLanded) p.stats.passWins++; this.log(`*** ${p.name} WINS with ${p.bank} banked ***`);
   }
   loseProfit(p, n, why) {
     if (this.over) return 0; const cur = this.current; const hostile = !cur || cur.attacker !== p;
@@ -189,7 +190,7 @@ export class TarotGame {
     this.majorsSeen++; this.log(`✦ The R-cana reveals ${c.name} (${c.tarot})`);
     this.current = { kind: 'major', card: c, attacker: null, victim: null };
     if (c.kind === 'market') { if (this.market) this.discard.push(this.market); this.market = c; }
-    else if (c.kind === 'event' && this.rules.traders && this.players.some((q) => this.eventHurts(c, q) && this.reaction(q, 'breaker', c.name))) { this.log(`${c.name} does not resolve`); this.bury(c); }
+    else if (c.kind === 'event' && this.rules.traders && !this.rules.majorsSeparate && this.players.some((q) => this.eventHurts(c, q) && this.reaction(q, 'breaker', c.name))) { this.log(`${c.name} does not resolve`); this.bury(c); }
     else if (c.kind === 'event') { c.buried = false; c.resolve(this); if (!c.buried) this.discard.push(c); for (const q of this.players) for (const i of [...q.floor]) if (i.card.onEvent && q.floor.includes(i)) i.card.onEvent(this, q, i); }
     else this.providence.push(c);
     this.current = null;
@@ -252,6 +253,7 @@ export class TarotGame {
     for (const c of p.hand) {
       const cost = this.costOf(p, c); if (cost > liq) continue;
       if (c.type === 'court') { if (!this.rules.v1b || p.floor.length < this.rules.networkCap) A.push({ t: 'hire', card: c, cost }); else if (this.rules.replacePartner) for (const i of p.floor) A.push({ t: 'hire', card: c, cost, replace: i }); continue; }
+      if (c.type !== 'pip') continue;
       if (c.suit === 'coins') A.push({ t: 'pip', card: c, cost, choice: {} });
       else if (c.suit === 'candles') for (const i of this.idleEligible(p)) A.push({ t: 'pip', card: c, cost, choice: { inst: i } });
       else if (c.suit === 'cups') for (const o of this.opps(p)) A.push({ t: 'pip', card: c, cost, choice: { opp: o } });
@@ -344,7 +346,16 @@ export class TarotGame {
       if (amt) this.bankFromPortfolio(p, amt, 'start of turn'); else if (p.portfolio) this.log(`${p.name} keeps ${p.portfolio} in Portfolio`);
     }
   }
-  startOfRound() { if (this.rules.majorsSeparate && this.round >= 1 && !this.over) this.revealOmen(); }
+  async startOfRound() {
+    if (!this.rules.majorsSeparate || this.round < 1 || this.over) return;
+    const c = this.omen;
+    if (c && c.kind === 'event' && this.rules.traders) for (const i of this.turnOrder()) { const q = this.players[i]; if (!this.eventHurts(c, q) || !this.traderInHand(q, 'breaker')) continue;
+      this.log(`✦ The Omen turns over: ${c.name}. ${q.name} holds a Circuit Breaker.`);
+      const yes = q.policy.useReaction ? await q.policy.useReaction(this, q, this.traderInHand(q, 'breaker'), c) : true;
+      if (yes) { this.omen = null; this.majorsSeen++; this.reaction(q, 'breaker', c.name); this.log(`${c.name} does not resolve`); this.bury(c); this.omen = this.majors.shift() || null; if (!this.omen && this.bellRound == null) this.callBell('the last Major has been revealed'); return; }
+      this.log(`${q.name} keeps the Circuit Breaker`); }
+    this.revealOmen();
+  }
   revealOmen() {
     if (!this.omen) { this.callBell('the Majors are spent'); return; }
     const c = this.omen; this.omen = null; this.revealMajor(c);

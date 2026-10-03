@@ -7,6 +7,7 @@ export class RandomPolicy {
   wantHedge(g, p, opts) { return this.rng() < 0.5 ? opts[Math.floor(this.rng() * opts.length)] : null; }
   bottomCard(g, p) { return this.rng() < 0.5; }
   bottomMinors(g, p, cards) { return cards.filter(() => this.rng() < 0.5); }
+  useReaction(g, p) { return this.rng() < 0.5; }
   hailMaryPass(g, p) { return this.rng() < 0.5; }
   reorder(g, p, cards) { return [...cards].sort(() => this.rng() - 0.5); }
   async takeTurn(g, p) {
@@ -63,6 +64,15 @@ export class StrongPolicy {
   }
   bottomCard(g, p, c) { if (c.type !== 'major') return false; if (HARMFUL.has(c.name)) return !(c.name === 'VOLATILITY' && g.richestOpp(p) && g.richestOpp(p).portfolio > p.portfolio); if (c.name === 'THE RECKONING') return g.isUnderdog(p); return false; }
   reorder(g, p, cards) { return [...cards].sort((a, b) => (this.bottomCard(g, p, a) ? 1 : 0) - (this.bottomCard(g, p, b) ? 1 : 0)); }
+  eventHarm(g, q, ev) { // rough cost of an Event to q, in Profit
+    const o = g.opps(q)[0]; switch (ev.name) {
+      case 'THE CRASH': return q.portfolio + (q.pass ? q.inAir * 2 : 0);
+      case 'THE REGULATOR': return Math.min(3, q.portfolio) + (q.pass ? q.inAir * 2 : 0) + q.floor.filter((i) => i.card.suit === 'chains').length;
+      case 'THE AUDIT': return g.eventHurts(ev, q) ? Math.floor(q.portfolio / 2) + (q.pass ? q.inAir * 2 : 0) : 0;
+      case 'THE LIQUIDATION': return q.floor.filter((i) => i.working && i.drawdown + 3 >= i.card.res).reduce((s, i) => s + 2 + g.yieldOf(q, i) * 2, 0) + q.floor.filter((i) => i.working).length;
+      case 'VOLATILITY': return o ? Math.max(0, q.portfolio - o.portfolio) : 0;
+      default: return 0; } }
+  useReaction(g, p, card, ev) { if (card.key !== 'breaker') return true; const o = g.opps(p)[0]; return this.eventHarm(g, p, ev) >= Math.max(2, o ? this.eventHarm(g, o, ev) : 0); }
   bottomMinors(g, p, cards) { return cards.filter((c) => (c.type === 'major' && this.bottomCard(g, p, c)) || (c.type === 'pip' && c.rank <= 3) || (c.type === 'court' && c.cost >= 5 && p.floor.length >= 1)); }
   courtValue(g, p, c, h) {
     const fake = { card: c, owner: p, working: false, drawdown: 0, hiredTurn: 0 }; const y = g.yieldOf(p, fake);
@@ -100,7 +110,7 @@ export class StrongPolicy {
   }
   reserveChoice(g, p) {
     if (!p.hand.length) return null; const liq = g.liquidity(p) + 1; const h = this.horizon(g);
-    const use = (c) => { if (c.type === 'trader') return c.kind === 'reaction' ? 4.5 : 3.5; let v = c.type === 'court' ? this.courtValue(g, p, c, h) : c.rank * (c.suit === 'chains' ? 0.7 : 1); if (c.cost > liq + 2) v *= 0.6; if (c.suit === 'candles' && !p.floor.length) v *= 0.5; return v / Math.max(1, Math.sqrt(c.cost)); };
+    const use = (c) => { if (c.type === 'trader') return c.kind === 'reaction' ? 7 : 6; let v = c.type === 'court' ? this.courtValue(g, p, c, h) : c.rank * (c.suit === 'chains' ? 0.7 : 1); if (c.cost > liq + 2) v *= 0.6; if (c.suit === 'candles' && !p.floor.length) v *= 0.5; return v / Math.max(1, Math.sqrt(c.cost)); };
     return [...p.hand].sort((a, b) => use(a) - use(b))[0];
   }
   async takeTurn(g, p) {
@@ -139,6 +149,7 @@ export class HumanPolicy {
   async takeTurn(g, p) { await this.ui.mainPhase(g, p); }
   async wantHedge(g, p, opts, threat) { return this.ui.hedge(g, p, opts, threat); }
   async bottomCard(g, p, c) { return this.ui.foretell(g, p, c); }
+  async useReaction(g, p, card, ev) { return this.ui.react ? this.ui.react(g, p, card, ev) : true; }
   async bottomMinors(g, p, cards) { return this.ui.chooseCards ? this.ui.chooseCards(g, p, { title: 'INSIDER TIP · the top three Minors. Tap the ones to send to the bottom', cards }) : []; }
   async beforeDraw(g, p) { if (this.ui.draw) await this.ui.draw(g, p); }
   reorder(g, p, cards) { return [...cards].sort((a, b) => (HARMFUL.has(a.name) ? 1 : 0) - (HARMFUL.has(b.name) ? 1 : 0)); }
