@@ -28,6 +28,8 @@ function wrapModule(name) {
 }
 const bundle = `const __m = {};\n` + ORDER.map(wrapModule).join('\n');
 let page = readFileSync(join(here, 'table.src.html'), 'utf8');
+// inline the stylesheet so the built page stays a single file
+page = page.replace('<link rel="stylesheet" href="table.css">', '<style>\n' + readFileSync(join(here, 'table.css'), 'utf8') + '\n</style>');
 // replace the page's own imports with lookups, and inject the bundle at the top of its module script
 page = page.replace(/^\s*import\s*\{[^}]*\}\s*from\s*['"][^'"]+['"];?$/gm, (l) => '  ' + importToConst(l.trim()));
 page = page.replace('<script type="module">\n', '<script type="module">\n' + bundle + '\n');

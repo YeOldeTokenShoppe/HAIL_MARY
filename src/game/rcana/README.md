@@ -47,8 +47,9 @@ cd src/game/rcana && python3 -m http.server 8765
 | `v2-engine.js` | `DuelGame`, a subclass of the tarot engine: private decks, Omen, reversed pips, Collateral, free reversed-Chain hedges, shields. `DUEL_DEFAULTS`. |
 | `v2-sim.js` | CLI and exports for the duel. |
 | `tarot-viewer.html` | The viewer. Loads the modules directly. |
-| `table.src.html` | Source of the card table. Edit this file, not `table.html`. |
-| `build-table.js` | Bundles `table.src.html` and the engine modules into the single-file `table.html` (the claude.ai artifact viewer does not load separate script files). Run `node build-table.js` after editing the source or the engine. |
+| `table.src.html` | Source of the card table's markup and script. Edit this file, not `table.html`. |
+| `table.css` | The table's whole look: a token block (colours, fonts, card size) at the top, then layout, cards and panels, each section commented. Restyle here; rename no selectors. |
+| `build-table.js` | Bundles `table.src.html` and the engine modules into the single-file `table.html` (the claude.ai artifact viewer does not load separate script files). Run `node build-table.js` after editing the source, the stylesheet or the engine. |
 | `table.html` | Built output of the above. |
 
 ## Run the simulator
