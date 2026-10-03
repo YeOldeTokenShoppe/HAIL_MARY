@@ -411,6 +411,120 @@ class WireTunnel extends THREE.LineSegments {
   }
 }
 
+// The synthwave road from the landing drive (PalmTreeDrive's ground shader),
+// laid as a ribbon along the tunnel curve so it runs out from under the viewer
+// into the centre of the vortex. The ribbon's "down" is the camera's screen-down
+// (world up projected off the tangent), so it always sits straight below the
+// fly-through camera and the ship, through every climb and bank of the curve.
+// It is static in world space: the camera's motion along the curve is what
+// makes the grid stream past, so pausing the tunnel pauses the road too.
+class SynthwaveRoad extends THREE.Mesh {
+  constructor(curve, {
+    segments = 600,
+    halfWidth = 0.24,   // world units; maps to 7.5 road units (the landing road's black edge)
+    drop = 0.2,         // how far below the curve (camera/ship) the surface sits
+    acrossScale = 7.5 / 0.24,
+    alongScale = 8      // road units per world unit along the curve (sets grid pace)
+  } = {}) {
+    const count = (segments + 1) * 2
+    const positions = new Float32Array(count * 3)
+    const uvs = new Float32Array(count * 2)
+    const length = curve.getLength()
+    const up = new THREE.Vector3(0, 1, 0)
+    const point = new THREE.Vector3()
+    const tangent = new THREE.Vector3()
+    const right = new THREE.Vector3(1, 0, 0)
+    const down = new THREE.Vector3()
+    const edge = new THREE.Vector3()
+
+    for (let i = 0; i <= segments; i++) {
+      const u = i / segments
+      curve.getPointAt(u % 1, point)
+      curve.getTangentAt(u % 1, tangent)
+      const side = new THREE.Vector3().crossVectors(tangent, up)
+      if (side.lengthSq() > 1e-6) right.copy(side.normalize())
+      down.crossVectors(tangent, right).normalize()
+      point.addScaledVector(down, drop)
+
+      edge.copy(point).addScaledVector(right, -halfWidth)
+      positions.set([edge.x, edge.y, edge.z], i * 6)
+      edge.copy(point).addScaledVector(right, halfWidth)
+      positions.set([edge.x, edge.y, edge.z], i * 6 + 3)
+
+      // uv.x: road units across (-7.5..7.5); uv.y: road units along the curve
+      const along = u * length * alongScale
+      uvs.set([-halfWidth * acrossScale, along, halfWidth * acrossScale, along], i * 4)
+    }
+
+    const indices = []
+    for (let i = 0; i < segments; i++) {
+      const a = i * 2, b = a + 1, c = a + 2, d = a + 3
+      indices.push(a, b, c, b, d, c)
+    }
+
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+    geometry.setIndex(indices)
+
+    const material = new THREE.ShaderMaterial({
+      uniforms: THREE.UniformsUtils.merge([
+        THREE.UniformsLib.fog,
+        { glow: { value: 1.0 } }
+      ]),
+      vertexShader: `
+        varying vec2 vRoad;
+        void main() {
+          vRoad = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        precision highp float;
+        uniform vec3 fogColor;
+        uniform float fogNear;
+        uniform float fogFar;
+        uniform float glow;
+        varying vec2 vRoad;
+
+        // Same grid as the landing road: magenta lines every 2 road units.
+        float line(vec2 coord, float width) {
+          vec2 grid = abs(fract(coord - 0.5) - 0.5) / (fwidth(coord) * width);
+          return min(min(grid.x, grid.y), 1.0);
+        }
+
+        void main() {
+          float l = line(vRoad / 2.0, 1.0);
+          float x = abs(vRoad.x);
+          // Cyan asphalt to 5 units, black shoulder by 7.5 (PalmTreeDrive's base).
+          vec3 base = mix(vec3(0.0, 0.75, 1.0), vec3(0.0), smoothstep(5.0, 7.5, x));
+          vec3 lineColor = vec3(1.0, 0.0, 0.933); // #ff00ee
+          // Let the grid thin out at the ribbon's edge instead of cutting off.
+          float edgeFade = 1.0 - smoothstep(6.5, 7.5, x);
+          vec3 c = mix(lineColor * edgeFade, base, l);
+
+          // Dashed white centre line: 3 on, 2 off, like the landing road.
+          float dash = step(0.5, fract(vRoad.y / 5.0));
+          float centre = 1.0 - smoothstep(0.0, 0.2, x);
+          c = mix(c, vec3(1.0), centre * dash * 0.8);
+
+          c *= glow;
+
+          float depth = gl_FragCoord.z / gl_FragCoord.w;
+          float fogFactor = smoothstep(fogNear, fogFar, depth);
+          c = mix(c, fogColor, fogFactor);
+          gl_FragColor = vec4(c, 1.0);
+        }
+      `,
+      side: THREE.DoubleSide,
+      fog: true
+    })
+
+    super(geometry, material)
+    this.frustumCulled = false
+  }
+}
+
 class FlyThrough {
   constructor(camera, curve, ship) {
     this.camera = camera
@@ -436,7 +550,7 @@ class FlyThrough {
   }
 }
 
-export default function OldsCoolTunnel({ isFullscreen = false }) {
+export default function OldsCoolTunnel({ isFullscreen = false, road = true }) {
   const { t } = useLanguage()
   const mountRef = useRef(null)
   const sceneRef = useRef(null)
@@ -542,6 +656,8 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
     
     const wireTunnel = new WireTunnel()
     scene.add(wireTunnel)
+
+    if (road) scene.add(new SynthwaveRoad(wireTunnel.curve))
 
     const gallery = new FloatingGallery(wireTunnel.curve)
     scene.add(gallery)
@@ -788,7 +904,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
         }
       }
     }
-  }, [isFullscreen])
+  }, [isFullscreen, road])
 
   // Apply translations to focused image data when index changes
   useEffect(() => {
