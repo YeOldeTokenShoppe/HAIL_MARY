@@ -173,7 +173,7 @@
 </div>
 
 <script type="module">
-  import { ALL, SUITS, SUIT_NAME } from './tarot.js';
+  import { ALL, TRADERS, SUITS, SUIT_NAME } from './tarot.js';
   import { ALL_V2, DECK_PRESETS } from './v2.js';
   import { playOne as playOne1, batch as batch1 } from './tarot-sim.js';
   import { playOne as playOne2, batch as batch2, policy as botPolicy2 } from './v2-sim.js';
@@ -437,13 +437,13 @@
   }
 
   // ----- cards tab -----
-  $('fTemp').innerHTML += SUITS.map((t) => `<option value="${t}">${SUIT_NAME[t]}</option>`).join('') + '<option value="major">Major R-cana</option>';
-  $('fType').innerHTML += ['pip', 'court', 'major'].map((t) => `<option value="${t}">${t}</option>`).join('');
+  $('fTemp').innerHTML += SUITS.map((t) => `<option value="${t}">${SUIT_NAME[t]}</option>`).join('') + '<option value="major">Major R-cana</option><option value="trader">Trader cards</option>';
+  $('fType').innerHTML += ['pip', 'court', 'major', 'trader'].map((t) => `<option value="${t}">${t}</option>`).join('');
   function renderCards() {
     const ft = $('fTemp').value, fy = $('fType').value, q = $('fText').value.toLowerCase();
-    const pool = isDuel() ? [...ALL_V2, ...ALL.filter((c) => c.type === 'major')] : ALL;
-    const rows = pool.filter((c) => (!ft || (ft === 'major' ? c.type === 'major' : c.suit === ft)) && (!fy || c.type === fy) && (!q || (c.name + ' ' + (c.title || '') + ' ' + (c.tarot || '') + ' ' + (c.text || '')).toLowerCase().includes(q)));
-    $('cardTable').innerHTML = `<table><thead><tr><th>Card</th><th>Type</th><th class="n">Cost</th><th class="n">Y / R</th><th>Text</th></tr></thead><tbody>${rows.map((c) => `<tr><td>${c.suit ? `<span class="temp ${c.suit}"></span>` : ''}<strong>${esc(c.name)}</strong>${c.title ? `<div class="note">${esc(c.title)}</div>` : ''}${c.tarot ? `<div class="note">${c.n}. ${esc(c.tarot)}</div>` : ''}</td><td>${c.type}${c.kind ? `<div class="note">${c.kind}</div>` : ''}</td><td class="n">${c.cost ?? '&mdash;'}</td><td class="n">${c.type === 'court' ? `${c.yield} / ${c.res}` : '&mdash;'}</td><td>${Object.keys(c.kw || {}).length ? `<em>${esc(Object.entries(c.kw).map(([k, v]) => (v === true ? k : `${k} ${v}`)).join(', '))}.</em> ` : ''}${esc((isV1b() && c.text1b) || c.text || '')}</td></tr>`).join('')}</tbody></table><p class="note">${rows.length} cards, plus two Querents.</p>`;
+    const pool = isDuel() ? [...ALL_V2, ...ALL.filter((c) => c.type === 'major')] : [...ALL, ...TRADERS];
+    const rows = pool.filter((c) => (!ft || (ft === 'major' ? c.type === 'major' : ft === 'trader' ? c.type === 'trader' : c.suit === ft)) && (!fy || c.type === fy) && (!q || (c.name + ' ' + (c.title || '') + ' ' + (c.tarot || '') + ' ' + (c.text || '')).toLowerCase().includes(q)));
+    $('cardTable').innerHTML = `<table><thead><tr><th>Card</th><th>Type</th><th class="n">Cost</th><th class="n">Y / R</th><th>Text</th></tr></thead><tbody>${rows.map((c) => `<tr><td>${c.suit ? `<span class="temp ${c.suit}"></span>` : ''}<strong>${esc(c.name)}</strong>${c.title ? `<div class="note">${esc(c.title)}</div>` : ''}${c.tarot ? `<div class="note">${c.n}. ${esc(c.tarot)}</div>` : ''}${c.type === 'trader' ? `<div class="note">Trader · ${c.kind === 'turn' ? 'move' : 'reaction'}</div>` : ''}</td><td>${c.type}${c.kind ? `<div class="note">${c.kind}</div>` : ''}</td><td class="n">${c.cost ?? '&mdash;'}</td><td class="n">${c.type === 'court' ? `${c.yield} / ${c.res}` : '&mdash;'}</td><td>${Object.keys(c.kw || {}).length ? `<em>${esc(Object.entries(c.kw).map(([k, v]) => (v === true ? k : `${k} ${v}`)).join(', '))}.</em> ` : ''}${esc((isV1b() && c.text1b) || c.text || '')}</td></tr>`).join('')}</tbody></table><p class="note">${rows.length} cards, plus two Querents.</p>`;
   }
   ['fTemp', 'fType', 'fText'].forEach((id) => $(id).addEventListener('input', renderCards)); renderCards();
 
