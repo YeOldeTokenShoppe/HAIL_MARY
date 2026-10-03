@@ -528,7 +528,8 @@ h1 { margin: 0 8px 0 0; color: var(--gold); font: 700 23px/1.2 var(--font-displa
   <section class="center">
     <div id="majorBox" hidden><div class="zl" id="majorLabel">Majors</div><div class="stack" id="majorStack"></div></div>
     <div><div class="zl" id="deckLabel">Deck</div><div class="stack" id="deckStack"></div></div>
-    <div><div class="zl">Market</div><div id="market"></div></div>
+    <div><div class="zl">Market · stays in effect</div><div id="market"></div></div>
+    <div><div class="zl" id="lastEventLabel">Last Event · already happened</div><div id="lastEvent"></div></div>
     <div class="log" id="log"></div>
     <div><div class="zl">Providence</div><div class="hand" id="providence"></div></div>
   </section>
@@ -1798,7 +1799,7 @@ class TarotGame {
     this.current = { kind: 'major', card: c, attacker: null, victim: null };
     if (c.kind === 'market') { if (this.market) this.discard.push(this.market); this.market = c; }
     else if (c.kind === 'event' && this.rules.traders && !this.rules.majorsSeparate && this.players.some((q) => this.eventHurts(c, q) && this.reaction(q, 'breaker', c.name))) { this.log(`${c.name} does not resolve`); this.bury(c); }
-    else if (c.kind === 'event') { c.buried = false; c.resolve(this); if (!c.buried) this.discard.push(c); for (const q of this.players) for (const i of [...q.floor]) if (i.card.onEvent && q.floor.includes(i)) i.card.onEvent(this, q, i); }
+    else if (c.kind === 'event') { c.buried = false; this.lastEvent = { card: c, round: this.round }; c.resolve(this); if (!c.buried) this.discard.push(c); for (const q of this.players) for (const i of [...q.floor]) if (i.card.onEvent && q.floor.includes(i)) i.card.onEvent(this, q, i); }
     else this.providence.push(c);
     this.current = null;
     for (const q of this.players) for (const i of [...q.floor]) if (i.card.onMajor && q.floor.includes(i)) i.card.onMajor(this, q, i);
@@ -2539,7 +2540,7 @@ return { policy, playOne, batch };
     const { card: c, lines, who } = S.reveals.shift(); const host = $('overlayHost');
     const head = hasMajors() ? 'THE OMEN TURNS OVER' : who === S.me ? 'YOU DREW A MAJOR' : 'THE BOT DREW A MAJOR';
     const why = hasMajors() ? 'The face-down Omen is turned up at the start of every round. It resolves for both players at once, and the next Major takes its place face down.' : `The 22 Majors are shuffled into the deck. ${who === S.me ? 'Your' : "The bot's"} draw turned this one up, so it resolves for both players right now, and ${who === S.me ? 'you draw' : 'the bot draws'} again to replace it.`;
-    const kindText = c.kind === 'event' ? 'EVENT · happens now' : c.kind === 'market' ? 'MARKET · stays in effect until the next Market' : `INVOKE ${c.cost} · waits in Providence for whoever pays`;
+    const kindText = c.kind === 'event' ? 'EVENT · happens now, then is discarded (it stays visible as the Last Event beside the Market)' : c.kind === 'market' ? 'MARKET · stays in effect until the next Market' : `INVOKE ${c.cost} · waits in Providence for whoever pays`;
     const did = lines.slice(1).map((e) => { const s = e.replace(/^\[[^\]]*\] /, ''); const cls = /INCOMPLETE|loses|LIQUIDATED|emptied|Drawdown/.test(s) ? 'bad' : /banks|gains|\+\d/.test(s) ? 'good' : ''; return `<div class="${cls}">${esc(s)}</div>`; }).join('');
     let done; S.overlayDone = new Promise((r) => { done = r; });
     host.innerHTML = `<div class="overlay"><div class="box"><div class="ph">${head}</div><div class="note" style="margin-top:-4px">${esc(why)}</div><div class="reveal"><div></div><div><div class="kind ${c.kind}">${kindText}</div><div class="nm" style="font-family:var(--font-display);font-size:18px;color:var(--gold)">${esc(c.name)}</div><div class="note">${esc(c.tarot)}</div><div class="txt">${esc(ctext(c))}</div>${did ? `<div class="did">${did}</div>` : ''}</div></div><div><button class="primary" id="revealOk">Continue</button></div></div></div>`;
@@ -2608,6 +2609,7 @@ return { policy, playOne, batch };
     $('deckLabel').textContent = drawing ? 'TAP THE DECK TO DRAW' : isDuel() ? `Your deck · ${drawPile.length} left` : hasMajors() ? `Minors · ${drawPile.length} left` : `R-cana · ${drawPile.length} left (Majors shuffled in)`;
     const ds = $('deckStack'); ds.innerHTML = ''; ds.classList.toggle('drawable', drawing); ds.onclick = drawing ? () => resolveP(true) : null;
     if (drawPile.length) { ds.appendChild(cardEl(null, { back: true })); const n = document.createElement('span'); n.className = 'count'; n.textContent = drawPile.length; ds.appendChild(n); }
+    $('lastEvent').innerHTML = ''; if (g.lastEvent) { const el = cardEl(g.lastEvent.card); el.classList.add('dim'); el.title = `${g.lastEvent.card.name} resolved in round ${g.lastEvent.round}; Events happen once and are discarded`; $('lastEvent').appendChild(el); $('lastEventLabel').textContent = `Last Event · round ${g.lastEvent.round} · already happened`; } else { $('lastEvent').innerHTML = '<div class="note" style="color:var(--muted);font-size:11px;width:var(--cw)">none yet</div>'; $('lastEventLabel').textContent = 'Last Event · already happened'; }
     $('market').innerHTML = ''; if (g.market) $('market').appendChild(cardEl(g.market)); else $('market').innerHTML = '<div class="note" style="color:var(--muted);font-size:11px;width:var(--cw)">no Market in effect</div>';
     const pv = $('providence'); pv.innerHTML = ''; for (const m of g.providence) { const el = cardEl(m); const a = acts.find((x) => x.t === 'invoke' && x.major === m); if (a) { el.classList.add('playable'); el.title = `Invoke for ${a.cost}`; el.addEventListener('click', () => doAct(a)); } pv.appendChild(el); }
     $('log').innerHTML = logHtml([...g.snapshots.flatMap((x) => x.events), ...g.events]); $('log').scrollTop = $('log').scrollHeight;
