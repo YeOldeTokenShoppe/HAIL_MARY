@@ -4,7 +4,6 @@ import React, { useRef, useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { useLanguage } from './LanguageProvider'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
@@ -336,7 +335,10 @@ class FloatingGallery extends THREE.Group {
 }
 
 class WireTunnel extends THREE.LineSegments {
-  constructor() {
+  // canopy: keep only the part of the tunnel that arches over the road.
+  // canopyFloor is the cut height, -1 (bottom) .. 1 (top), measured along the
+  // camera's screen-up at each ring; 0 keeps the half above the horizon.
+  constructor({ canopy = true, canopyFloor = -0.05 } = {}) {
     const basePoints = [
       { x: 6.097824119373165, y: 2.962665382204997, z: 1.7433171949691226 },
       { x: 2.498887329278077, y: 1.876906878980996, z: -6.263607800877008 },
@@ -348,7 +350,43 @@ class WireTunnel extends THREE.LineSegments {
     ]
 
     const curve = new THREE.CatmullRomCurve3(basePoints, true, 'catmullrom', 0.7)
-    const tube = new THREE.TubeGeometry(curve, 130, 0.2, 7, true)
+    const tubularSegments = 130
+    const radialSegments = 7
+    const tube = new THREE.TubeGeometry(curve, tubularSegments, 0.2, radialSegments, true)
+
+    // Height of every tube vertex above its ring's centre, along the same
+    // screen-up the road uses (world up projected off the curve tangent), so
+    // "above the road" means the same thing here as it does for the road.
+    const tubePositions = tube.attributes.position
+    const heights = new Float32Array(tubePositions.count).fill(1)
+    if (canopy) {
+      const up = new THREE.Vector3(0, 1, 0)
+      const centre = new THREE.Vector3()
+      const tangent = new THREE.Vector3()
+      const upDir = new THREE.Vector3()
+      const offset = new THREE.Vector3()
+      for (let i = 0; i <= tubularSegments; i++) {
+        // The closed tube's last ring repeats ring 0.
+        const u = (i % tubularSegments) / tubularSegments
+        curve.getPointAt(u, centre)
+        curve.getTangentAt(u, tangent)
+        upDir.copy(up).addScaledVector(tangent, -up.dot(tangent)).normalize()
+        for (let j = 0; j <= radialSegments; j++) {
+          const k = i * (radialSegments + 1) + j
+          offset.fromBufferAttribute(tubePositions, k).sub(centre)
+          heights[k] = offset.dot(upDir) / offset.length()
+        }
+      }
+      // Drop every face that touches a vertex below the cut; the wire is
+      // then extracted from what remains, so the cut edge reads as a rail.
+      const index = tube.index.array
+      const kept = []
+      for (let f = 0; f < index.length; f += 3) {
+        const a = index[f], b = index[f + 1], c = index[f + 2]
+        if (heights[a] > canopyFloor && heights[b] > canopyFloor && heights[c] > canopyFloor) kept.push(a, b, c)
+      }
+      tube.setIndex(kept)
+    }
     const wire = new THREE.EdgesGeometry(tube, 1.125)
 
     super(
@@ -359,24 +397,24 @@ class WireTunnel extends THREE.LineSegments {
     )
     this.curve = curve
 
-    const gPoints = tube.clone()
-    gPoints.deleteAttribute('uv')
-    gPoints.deleteAttribute('normal')
-    const gPointsMerged = mergeVertices(gPoints)
-    const positions = gPointsMerged.attributes.position
-    
+    // One glowing point per kept tube vertex (the duplicate seam ring and
+    // seam column are skipped so no point is doubled).
     const color = new THREE.Color()
-    const colors = new Float32Array(positions.count * 3)
-    for(let i = 0; i < positions.count; i++) {
-      color.setHSL((Math.random() - 0.5) * 0.15, 1, 0.6).multiplyScalar(7)
-      colors[i * 3] = color.r
-      colors[i * 3 + 1] = color.g
-      colors[i * 3 + 2] = color.b
+    const pointPositions = []
+    const colors = []
+    for (let i = 0; i < tubularSegments; i++) {
+      for (let j = 0; j < radialSegments; j++) {
+        const k = i * (radialSegments + 1) + j
+        if (heights[k] <= canopyFloor) continue
+        pointPositions.push(tubePositions.getX(k), tubePositions.getY(k), tubePositions.getZ(k))
+        color.setHSL((Math.random() - 0.5) * 0.15, 1, 0.6).multiplyScalar(7)
+        colors.push(color.r, color.g, color.b)
+      }
     }
     
     const pointsGeometry = new THREE.BufferGeometry()
-    pointsGeometry.setAttribute('position', positions)
-    pointsGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+    pointsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(pointPositions, 3))
+    pointsGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
     
     const pointsMaterial = new THREE.PointsMaterial({
       size: 0.05,
@@ -550,7 +588,7 @@ class FlyThrough {
   }
 }
 
-export default function OldsCoolTunnel({ isFullscreen = false, road = true }) {
+export default function OldsCoolTunnel({ isFullscreen = false, road = true, canopy = true }) {
   const { t } = useLanguage()
   const mountRef = useRef(null)
   const sceneRef = useRef(null)
@@ -654,7 +692,7 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true }) {
     light.position.setScalar(1)
     scene.add(light, new THREE.AmbientLight(0xffffff, Math.PI * 0.25))
     
-    const wireTunnel = new WireTunnel()
+    const wireTunnel = new WireTunnel({ canopy })
     scene.add(wireTunnel)
 
     if (road) scene.add(new SynthwaveRoad(wireTunnel.curve))
@@ -904,7 +942,7 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true }) {
         }
       }
     }
-  }, [isFullscreen, road])
+  }, [isFullscreen, road, canopy])
 
   // Apply translations to focused image data when index changes
   useEffect(() => {
