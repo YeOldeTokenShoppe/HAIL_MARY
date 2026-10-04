@@ -3163,8 +3163,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			// Resting camera after the fly-in: a three-quarter view from the sunlit (west) side —
 			// full basin in frame, Our Lady against the facade, palm + lit cloud on the right.
 			// (Was the flat frontal { 0, 1, 4.4 } looking at the origin.)
-			window.introCamEnd    = { x: -2.3,  y: 0.95, z: 4.4 };
-			window.introCamLookAt = { x: -0.15, y: 0.45, z: 0 };
+			window.introCamEnd    = { x: -2.77, y: 0.53, z: 4.79 };
+			window.introCamLookAt = { x: -0.33, y: 0.53, z: -0.07 };
 			window.introOrbitEnabled = false; // master switch for the post-intro auto-orbit (attract mode) — off: camera stays where the fly-in / user leaves it
 			window.introOrbitIdleMs = 10000;  // resume the slow auto-orbit after this many ms of no interaction
 			window.introOrbitSpeed = 1.0;     // target auto-orbit speed (~60s/rev); the resume eases up to this
@@ -4476,7 +4476,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				controls = new OrbitControls( camera, container );
 				if (window.__fountainCam) window.__fountainCam.controls = controls;
 				controls.minDistance = 0.1;
-				controls.maxDistance = 23;
+				controls.maxDistance = 32;
 				controls.zoomToCursor = true;
 				controls.minPolarAngle = 0;
 				controls.maxPolarAngle = Math.PI / 2;
@@ -5178,7 +5178,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				
 				loader.load(
 					// Resource URL - REPLACE WITH YOUR FILE PATH
-					'/models/mission.glb',
+					'/models/mission3.glb',
 					// Called when the resource is loaded
 					function ( gltf ) {
 						clearTimeout(modelLoadTimeout);
@@ -5194,6 +5194,11 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                         node.visible = true;
                     }
                     if (node.name && (node.name.toLowerCase().includes('rayban') || node.name.toLowerCase().includes('sunglasses'))) {
+                        node.visible = false;
+                    }
+                    // The sign post baked into mission2.glb is superseded by the separately
+                    // loaded mission_sign.glb (see window.__missionSign) — hide the copy.
+                    if (node.name && /^(SM_Prop_Sign_01|Sign_Extra)(_\d+)?$/.test(node.name)) {
                         node.visible = false;
                     }
 
@@ -5939,9 +5944,101 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					}, undefined, (error) => console.warn('[Fountain] I-80 sign failed to load:', error));
 				}
 
+				// The mission sign post is its own GLB (not part of mission2.glb) so it can be
+				// staged against the RESTING CAMERA instead of the plaza: it stands `depth`
+				// units in front of the resting pose, `ndcX` of the way to the frame edge
+				// (+1 = right edge), turned to face the lens. Re-placed on resize so it holds
+				// its spot in the frame at any aspect. Tune live via window.__missionSign.
+				{
+					const missionSign = window.__missionSign = {
+						depth: 3.0,   // ground distance in front of the resting camera
+						ndcX: 0.72,  // -1 = left frame edge, +1 = right frame edge
+						scale: 0.7,
+						yawBias: 0,   // extra turn (radians) on top of facing the camera
+						sign: null,
+						links: { Sign_1: '/trade', Sign_2: '/hailmary', Sign_Extra: '/exlibris' }, // board mesh name -> route
+						linkMeshes: [],   // raycast targets (each mesh.userData.href)
+						hovered: null,
+						// Desktop hover: pointer cursor + a slight glow on the board under the mouse.
+						hover(ndc) {
+							let hit = null;
+							if (ndc && missionSign.linkMeshes.length) {
+								raycaster.setFromCamera(ndc, camera);
+								hit = raycaster.intersectObjects(missionSign.linkMeshes, false)[0]?.object || null;
+							}
+							if (hit === missionSign.hovered) return;
+							if (missionSign.hovered) missionSign.hovered.material.emissiveIntensity = 0;
+							if (hit) hit.material.emissiveIntensity = 0.18;
+							missionSign.hovered = hit;
+							renderer.domElement.style.cursor = hit ? 'pointer' : '';
+						},
+						// Tap a board -> go to its page. Returns true on a hit so the caller skips the toss.
+						click(ndc) {
+							if (!missionSign.linkMeshes.length) return false;
+							raycaster.setFromCamera(ndc, camera);
+							const hits = raycaster.intersectObjects(missionSign.linkMeshes, false);
+							if (!hits.length) return false;
+							const href = hits[0].object.userData.href;
+							// Inside the /fountain iframe the outer page owns navigation.
+							if (window.parent !== window) window.parent.postMessage({ type: 'fountainNavigate', href }, window.location.origin);
+							else window.location.assign(href);
+							return true;
+						},
+						place() {
+							const s = missionSign.sign;
+							if (!s) return;
+							const e = window.introCamEnd, l = window.introCamLookAt;
+							const fwd = new THREE.Vector3(l.x - e.x, 0, l.z - e.z).normalize();
+							const halfW = missionSign.depth * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect;
+							// Narrow (portrait) frames: pull it in so the boards (~1.2 wide unscaled) don't clip the edge.
+							const maxSide = Math.max(0, halfW - 0.6 * missionSign.scale);
+							const side = THREE.MathUtils.clamp(missionSign.ndcX * halfW, -maxSide, maxSide);
+							s.position.set(
+								e.x + fwd.x * missionSign.depth - fwd.z * side,
+								-0.958,
+								e.z + fwd.z * missionSign.depth + fwd.x * side
+							);
+							s.rotation.y = Math.atan2(e.x - s.position.x, e.z - s.position.z) + missionSign.yawBias;
+							s.scale.setScalar(missionSign.scale);
+						},
+					};
+					const missionSignDraco = new DRACOLoader();
+					missionSignDraco.setDecoderPath('/draco/');
+					const missionSignLoader = new GLTFLoader();
+					missionSignLoader.setDRACOLoader(missionSignDraco);
+					// Bump ?v= on every re-export: /models is served immutable, so browsers keep the old file otherwise.
+					missionSignLoader.load('/models/mission_sign.glb?v=3', (gltf) => {
+						gltf.scene.traverse((node) => {
+							if (!node.isMesh) return;
+							node.castShadow = true;
+							// Boards that are links (tolerant of GLTFLoader's `_N` collision suffix).
+							// Each gets its own material so hover can brighten one board alone.
+							const href = missionSign.links[node.name.replace(/_\d+$/, '')] || missionSign.links[node.name];
+							if (!href) return;
+							node.userData.href = href;
+							node.material = node.material.clone();
+							node.material.userData = {};
+							node.material.emissive = new THREE.Color(0xffffff);
+							node.material.emissiveMap = node.material.map;
+							node.material.emissiveIntensity = 0;
+							missionSign.linkMeshes.push(node);
+						});
+						// Re-origin to the post's foot so the export's own offset doesn't matter.
+						const box = new THREE.Box3().setFromObject(gltf.scene);
+						const centre = box.getCenter(new THREE.Vector3());
+						gltf.scene.position.set(-centre.x, -box.min.y, -centre.z);
+						const sign = new THREE.Group();
+						sign.name = 'MissionSign';
+						sign.add(gltf.scene);
+						missionSign.sign = sign;
+						missionSign.place();
+						scene.add(sign);
+					}, undefined, (error) => console.warn('[Fountain] mission sign failed to load:', error));
+				}
+
 				// No fog - let the ground shader handle the horizon blend
 				// The sky gradient should remain untouched
-				
+
 				// Add distant mountain range
 				const mountainGeometry = new THREE.PlaneGeometry(600, 80, 200, 1);
 				
@@ -6489,6 +6586,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				camera.updateProjectionMatrix();
 
 				renderer.setSize( window.innerWidth, window.innerHeight );
+
+				window.__missionSign?.place(); // keep the sign post at its spot in the frame
 
 			}
 
@@ -8855,6 +8954,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 								// In candle close-up: tapping another candle hops to it; tapping
 								// anywhere else eases back out (taps don't toss while focused).
 								if (!tryClickCandle(aimedCoords)) startCandleZoomOut();
+							} else if (window.__missionSign?.click(aimedCoords)) {
+								/* tapped a sign-post board -> navigating away */
 							} else if (tryClickBell(aimedCoords)) {
 								/* tapped a bell -> rang the church bell */
 							} else if (tryClickInfoHub(aimedCoords)) {
@@ -8891,7 +8992,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				const dom = renderer.domElement;
 				// Update mouseCoords continuously for water interaction aiming and visual effect
 				mouseCoords.set( ( event.clientX / dom.clientWidth ) * 2 - 1, - ( event.clientY / dom.clientHeight ) * 2 + 1 );
-				// We don't need to raycast here unless we want hover effects on the button
+				// Sign-post boards are links: hover feedback for mice only (touch has no hover).
+				if (event.pointerType === 'mouse') window.__missionSign?.hover(mousedown ? null : mouseCoords);
 			}
 
 			function raycast() {

@@ -36,7 +36,7 @@ import { createPortal } from "react-dom";
  * the button (e.g. MobileBottomNav's MORE slot on /home), so the page passes
  * that element plus `open` / `onRequestClose` and only the disk renders.
  *
- * current: the key of the page it's mounted on — that slot becomes Home,
+ * current: the key of the page it's mounted on — that slot is dropped,
  * since a menu that links to where you already are is a wasted quarter.
  * demoKey: localStorage flag for the one-time first-visit demo, per page.
  */
@@ -67,14 +67,6 @@ function writeFlag(key) {
 }
 
 const DESTINATIONS = [
-  {
-    key: "main",
-    label: "Our Lady",
-    href: "/main",
-    icon: (
-      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
-    ),
-  },
   {
     key: "trade",
     label: "The Liminal Terminal",
@@ -149,18 +141,6 @@ export function TelescopeIcon({ size = 18 }) {
   );
 }
 
-const HOME = {
-  key: "home",
-  label: "ex Machina",
-  href: "/home",
-  icon: (
-    <>
-      <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
-      <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-    </>
-  ),
-};
-
 export default function RadialNavMenu({
   hidden = false,
   ready = true,
@@ -184,7 +164,7 @@ export default function RadialNavMenu({
   const colorVars = {};
   if (colors) for (const [k, v] of Object.entries(colors)) if (v) colorVars[`--frm-${k}`] = v;
   const items = [
-    ...DESTINATIONS.map((d) => (d.key === current ? HOME : d)),
+    ...DESTINATIONS.filter((d) => d.key !== current),
     ...actions,
   ];
   const [open, setOpen] = useState(false);

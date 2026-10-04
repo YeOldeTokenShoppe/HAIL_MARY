@@ -2669,7 +2669,7 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange, onIntroComplete, has
       />
       
       {currentCameraStage === 4 && shouldMorph && (
-        <DriveActions onBuy={() => setShowBuyModal(true)} onExplore={() => router.push('/home')} />
+        <DriveActions onBuy={() => setShowBuyModal(true)} onExplore={() => router.push('/fountain')} />
       )}
 
       {/* CyberNav Menu */}

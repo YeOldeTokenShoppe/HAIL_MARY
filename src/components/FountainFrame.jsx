@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
+import { useRouter } from 'next/navigation';
 
 const FountainFrame = forwardRef(({ onFullyLoaded, onDonateClick }, ref) => {
   const iframeRef = useRef(null);
+  const router = useRouter();
 
   // iOS Safari caches the iframe document aggressively and there's no easy hard-
   // refresh on iOS, so a stale public/fountain.html keeps loading on phones/tablets.
@@ -12,7 +14,7 @@ const FountainFrame = forwardRef(({ onFullyLoaded, onDonateClick }, ref) => {
     const base =
       process.env.NODE_ENV === 'development'
         ? `/fountain.html?dev=${Date.now()}`
-        : '/fountain.html?v=20260927';
+        : '/fountain.html?v=20261003';
     // Forward the dev tuning gates (/fountain?lights, /fountain?fx, /fountain?perf,
     // /fountain?coins) into the iframe doc — the inner HTML reads its OWN
     // location.search, which otherwise only has dev/v. ?fx opens the live Water FX
@@ -42,11 +44,20 @@ const FountainFrame = forwardRef(({ onFullyLoaded, onDonateClick }, ref) => {
       if (event.data?.type === 'openDonation') {
         if (onDonateClick) onDonateClick();
       }
+      // A sign-post board was tapped inside the scene — same-origin, site-relative
+      // paths only. Client-side navigation, so the music (MusicContext) plays through.
+      if (
+        event.data?.type === 'fountainNavigate' &&
+        event.origin === window.location.origin &&
+        /^\/(?!\/)[a-z0-9\-/]*$/i.test(event.data.href || '')
+      ) {
+        router.push(event.data.href);
+      }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [onFullyLoaded, onDonateClick]);
+  }, [onFullyLoaded, onDonateClick, router]);
 
   return (
     <div style={{

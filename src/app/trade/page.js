@@ -6353,7 +6353,7 @@ export default function CyborgTemple() {
                         key: 'home',
                         label: 'Home',
                         title: 'Our Lady of Perpetual Profit',
-                        onClick: () => router.push('/home'),
+                        onClick: () => router.push('/fountain'),
                         icon: (
                           <img src="/favicon.svg" alt="" style={{ width: 24, height: 24, display: 'block' }} />
                         ),
@@ -6470,19 +6470,6 @@ export default function CyborgTemple() {
                           <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024" />
                           <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069" />
                           <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z" />
-                        </>
-                      ),
-                    },
-                    {
-                      path: '/fountain',
-                      label: 'Coin Fountain',
-                      stroke: '#2ad6ee',
-                      icon: (
-                        <>
-                          <path d="M12 10L12 2" />
-                          <path d="M16 6L12 10L8 6" />
-                          <path d="M2 15C2.6 15.5 3.2 16 4.5 16C7 16 7 14 9.5 14C12.1 14 11.9 16 14.5 16C17 16 17 14 19.5 14C20.8 14 21.4 14.5 22 15" />
-                          <path d="M2 21C2.6 21.5 3.2 22 4.5 22C7 22 7 20 9.5 20C12.1 20 11.9 22 14.5 22C17 22 17 20 19.5 20C20.8 20 21.4 20.5 22 21" />
                         </>
                       ),
                     },

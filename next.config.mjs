@@ -92,6 +92,13 @@ const nextConfig = {
         destination: '/hailmary',
         permanent: true, // 308 permanent redirect
       },
+      {
+        // The fountain replaced the old /home page; old links and bookmarks land
+        // there. Temporary (307) so browsers don't cache it if /home ever returns.
+        source: '/home',
+        destination: '/fountain',
+        permanent: false,
+      },
     ];
   },
   async headers() {

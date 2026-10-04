@@ -43,7 +43,7 @@ export default function ToasterPage() {
     }}>
       {/* Back link */}
       <Link
-        href="/home"
+        href="/fountain"
         style={{
           position: 'fixed',
           top: '1rem',

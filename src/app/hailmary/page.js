@@ -8913,7 +8913,7 @@ export default function OilPage() {
         <header style={m.header}>
           <div style={styles.headerLeft}>
             <Link
-              href="/home"
+              href="/fountain"
               title="Return to shrine"
               style={{ ...styles.logoMark, cursor: "pointer", textDecoration: "none" }}
             >

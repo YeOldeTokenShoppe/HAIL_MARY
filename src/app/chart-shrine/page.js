@@ -48,7 +48,7 @@ export default function ChartShrinePage() {
         >
           Live chart on GeckoTerminal
         </a>
-        <Link className="shrine-btn ghost" href="/home">
+        <Link className="shrine-btn ghost" href="/fountain">
           Home
         </Link>
       </div>

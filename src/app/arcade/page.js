@@ -393,7 +393,7 @@ export default function ArcadePage() {
               </svg>
             ),
             label: "BASE",
-            onClick: () => router.push('/home'),
+            onClick: () => router.push('/fountain'),
             colorClass: "mn-lounge",
           },
         }}

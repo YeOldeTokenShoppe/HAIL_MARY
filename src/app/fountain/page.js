@@ -384,7 +384,7 @@ export default function FountainPage() {
                 marginTop: '1rem',
                 pointerEvents: 'auto',
               }}
-              onClick={() => router.push('/home')}
+              onClick={() => router.push('/')}
             >
               <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
               <span className="title-line" style={{ display: 'block', position: 'relative' }}>
@@ -417,7 +417,7 @@ export default function FountainPage() {
           zIndex: 10001,
         }}>
           <Link
-            href="/home"
+            href="/"
             id="text"
             title="ex Machina"
             aria-label="Return to home"
@@ -474,7 +474,7 @@ export default function FountainPage() {
         }}
       >
         {/* <Link
-          href="/home"
+          href="/"
           title="Home"
           aria-label="Home"
           style={{
