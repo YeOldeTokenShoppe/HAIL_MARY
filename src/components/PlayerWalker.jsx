@@ -731,6 +731,24 @@ export default function PlayerWalker({
     return () => window.removeEventListener("hm-vendor-left", onLeft);
   }, [leaveVendor]);
 
+  const clawVisitRef = useRef(false);
+  // A click on the claw can start a visit while walking. Give its controls
+  // and the existing focus camera ownership until hm-vendor-left restores walking.
+  useEffect(() => {
+    const onClaw = (e) => {
+      clawVisitRef.current = !!e.detail?.active;
+      if (!clawVisitRef.current) return;
+      keys.current = {};
+      if (modeRef.current !== "walk") return;
+      modeRef.current = "vendor";
+      setTalkingTo({ id: "claw", label: "Claw machine" });
+      onVendorMode?.(true);
+      playClip(CLIP.idle);
+    };
+    window.addEventListener("hm-claw-active", onClaw);
+    return () => window.removeEventListener("hm-claw-active", onClaw);
+  }, [onVendorMode, playClip]);
+
   const startRide = useCallback(() => {
     const g = group.current, s = saddleRef.current;
     if (!g || !s || modeRef.current !== "walk") return;
@@ -756,6 +774,7 @@ export default function PlayerWalker({
 
   useEffect(() => {
     const dn = (e) => {
+      if (clawVisitRef.current) return;
       if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName)) return;
       if (e.code === "Space") e.preventDefault(); // grip key — don't scroll the page
       keys.current[e.code] = true;
@@ -800,6 +819,7 @@ export default function PlayerWalker({
     };
     const up = (e) => { keys.current[e.code] = false; };
     const wheel = (e) => {
+      if (clawVisitRef.current) return;
       camScaleRef.current = THREE.MathUtils.clamp(
         camScaleRef.current * (e.deltaY > 0 ? 1.08 : 1 / 1.08), 0.45, 3);
     };

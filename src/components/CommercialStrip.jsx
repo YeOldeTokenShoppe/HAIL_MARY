@@ -6,6 +6,8 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { Text, useGLTF, useAnimations } from "@react-three/drei";
 import { extendKTX2, releaseKTX2Workers } from "@/lib/ktx2";
 import useEnvMapSafe from "@/hooks/useEnvMapSafe";
+import ClawMachineController from "@/components/ClawMachineController";
+import GachaponController from "@/components/GachaponController";
 import {
   TATTOOS_IDLE_SITEPAL_CROP,
   TATTOOS_IDLE_SITEPAL_FILTER,
@@ -46,11 +48,11 @@ import {
 // dev server revalidates on every request regardless of the query string, so the
 // fresh file always won locally, while the CDN kept serving whatever it had
 // cached under the unchanged `?v=ktx2` key. BUMP THIS on every rebuild.
-const STRIP_MODEL_V = "9";
+const STRIP_MODEL_V = "14";
 // The chapel's split GLBs (stall + preacher) — bump after re-running scripts/split-tent-revival.mjs.
 export const CHAPEL_ASSET_V = 2;
-const STRIP_MODEL_WEBP = `/models/CommercialStrip3_opt2k.glb?v=${STRIP_MODEL_V}`;
-const STRIP_MODEL_KTX2 = `/models/CommercialStrip3_opt2k_ktx2.glb?v=${STRIP_MODEL_V}`;
+const STRIP_MODEL_WEBP = `/models/CommercialStrip4_opt.glb?v=${STRIP_MODEL_V}`;
+const STRIP_MODEL_KTX2 = `/models/CommercialStrip4_opt_ktx2.glb?v=${STRIP_MODEL_V}`;
 const STRIP_MODEL =
   typeof window !== "undefined" && /[?&]strip=webp\b/.test(window.location.search)
     ? STRIP_MODEL_WEBP
@@ -255,7 +257,7 @@ export const VENDOR_CATALOG = [
     // the only proxy in this stretch of boardwalk. Keep it that way — a
     // PROXY_LOCAL_SIZE box is 5 units on a side, so a second vendor on that
     // tent would put a cube (origin x 1.79) around her too.
-    prop: "SM_Prop_Prize_Wheel_01",
+    prop: "Prize_Wheel",   // renamed from SM_Prop_Prize_Wheel_01 in CommercialStrip4
     // Standing vendor: same close-up framing as the salesman and hot dog cart.
     faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
     // Her GLB also ships "bored" and "thankful". Both key the same bones as
@@ -265,7 +267,8 @@ export const VENDOR_CATALOG = [
     sitepal: "promos" },
   { id: "tacos",     label: "",    awning: "#2f6b4a", accent: "#8fe6b0",
     // RETIRED 2026-09-04: the taco slot is the CHAPEL now (docs/midway-chapel.md).
-    // The trailer is still in the strip GLB — the chapel's hideWindow covers it.
+    // The trailer left the strip GLB in CommercialStrip4, so `prop` below
+    // resolves to nothing — harmless while he stays retired.
     retired: true,
     // Extraterrestrial taco-and-beverage trailer. His GLB was re-exported with
     // idle/talking clips and Face1-3 — an earlier build had neither, so if he
@@ -313,8 +316,9 @@ export const VENDOR_CATALOG = [
     faceDist: 0.28, faceLift: 0, camDrop: 0.2,
     sitepal: "rugs" },
   { id: "carny",     label: "",    awning: "#6b3f1f", accent: "#ffc46b",
-    // The balloon barker, alone at the far -Z end with the hot air balloon as
-    // his only neighbour — so the balloon is his click volume.
+    // The balloon barker, alone at the far -Z end. The hot air balloon was his
+    // click volume until CommercialStrip4 dropped it from the export; with no
+    // prop he is clicked on his own body and framed from his head bone.
     //
     // "yelling" is his talk clip and "pointing" is used per-line (see the carny
     // greetings in vendorSitePal.js) for the lines that reference the balloon.
@@ -333,7 +337,6 @@ export const VENDOR_CATALOG = [
     // so they hide while he is speaking.
     model: "/models/Vendor_Carny.glb", idleClip: "carny_idle",
     offset: [0, 0, 0],
-    prop: "SM_Prop_Hot_Air_Balloon_01.002",
     talkClip: "yelling",
     faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
     sitepal: "carny" },
@@ -3654,7 +3657,7 @@ export function applyStallEmissiveBoost(scene, vendorId) {
     (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m && "emissiveIntensity" in m) m.emissiveIntensity = k; });
   });
 }
-const STALL_WINDOW_EXCLUDE = /^(Boardwalk$|SM_Prop_Bunting_Pole|SM_Prop_Light_0|Spotlight|SC_CincoDeMayo|Photo_booth|Booth_|Text|Point|Wire|StringLight|SM_Prop_Mechanical_Bull|Bull_Tent|Claw_Machine|Vending_Machine|ATM$)/;
+const STALL_WINDOW_EXCLUDE = /^(Boardwalk$|SM_Prop_Bunting_Pole|SM_Prop_Light_0|Spotlight|SC_CincoDeMayo|Photo_booth|Booth_|Text|Point|Wire|StringLight|SM_Prop_Mechanical_Bull|Bull_Tent|Claw_Machine|Toy_Claw_Empty|Vending_Machine|ATM$)/;
 function StallModelMount({ vendor, stripScene, onScene }) {
   const { scene, animations } = useGLTF(vendor.stallModel, true, true, extendKTX2);
   // the stall's own extras (the chapel's seated congregation) loop their clips
@@ -3685,7 +3688,17 @@ function StallModelMount({ vendor, stripScene, onScene }) {
 
 export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPreset, vendors = ACTIVE_VENDORS, onVendorClick, onFocusObject, onZoomOut, onBoothPhoto }) {
   useEffect(() => { preloadVendorModels(); }, []);
-  const { scene: stripScene } = useGLTF(STRIP_MODEL, true, true, extendKTX2);
+  const { scene: stripScene, animations: stripAnimations } = useGLTF(STRIP_MODEL, true, true, extendKTX2);
+  // The claw controller owns Claw_Demo; other strip clips keep their own mixer.
+  const ambientClips = useMemo(() => stripAnimations.filter((clip) => clip.name !== "Claw_Demo"), [stripAnimations]);
+  const { actions: stripActions } = useAnimations(ambientClips, stripScene);
+  useEffect(() => {
+    const running = Object.values(stripActions).filter(Boolean);
+    running.forEach((action) => action.reset().setLoop(THREE.LoopRepeat, Infinity).play());
+    return () => running.forEach((action) => action.stop());
+  }, [stripActions]);
+  const clawInteractionRef = useRef(null);
+  const gachaponInteractionRef = useRef(null);
   const [extraScenes, setExtraScenes] = useState({});
   // Tooling hook for scripts/render-postcards.mjs --plates: hide every top-level
   // strip prop whose strip-local centre falls in a Z window (the stall's own
@@ -3723,6 +3736,7 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
   // deck's own click handler. The booth registers its click handler here so
   // handleStripClick can hand those clicks over instead of flying the camera.
   const boothClickRef = useRef(null);
+
 
   const deckW = worldW + DECK_MARGIN * 2 * cellSize;
   const deckD = DECK_DEPTH * cellSize;
@@ -3874,6 +3888,13 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
     // Without this the same ray keeps going and also lands on the grid/ground
     // handlers behind the strip, which would fly there instead / as well.
     e.stopPropagation();
+    // Gachapon first: mid capsule-reveal it claims every deck click, and the
+    // claw machine is its next-door neighbour.
+    if (gachaponInteractionRef.current?.handleClick(e)) return;
+    if (focus?.id === "gachapon") gachaponInteractionRef.current?.close(false);   // clicked away along the deck
+    // The machine owns its controls; these clicks must not trigger the deck fly-to.
+    if (clawInteractionRef.current?.handleClick(e)) return;
+    if (focus?.id === "claw") clawInteractionRef.current?.close(false);
     // In-booth clicks (snap / exit) land on the cabin's interior walls, which
     // are strip geometry — delegate them to the booth's state machine.
     if (focus?.id === "photobooth" && boothClickRef.current) {
@@ -3941,6 +3962,27 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
       {/* Outside the scaled group on purpose: SpotLight distance/decay are
           world-space and would not inherit fit.scale, while position would. */}
       <VendorSpotlight focus={focus} stripScene={stripScene} envPreset={envPreset} />
+      <ClawMachineController
+        stripScene={stripScene}
+        animations={stripAnimations}
+        interactionRef={clawInteractionRef}
+        focus={focus}
+        onFocusChange={setFocus}
+        onFocusObject={onFocusObject}
+        onZoomOut={onZoomOut}
+        onVendorClick={onVendorClick}
+        stripScale={fit.scale}
+      />
+      <GachaponController
+        stripScene={stripScene}
+        interactionRef={gachaponInteractionRef}
+        focus={focus}
+        onFocusChange={setFocus}
+        onFocusObject={onFocusObject}
+        onZoomOut={onZoomOut}
+        onVendorClick={onVendorClick}
+        stripScale={fit.scale}
+      />
       <WagonLights stripScene={stripScene} envPreset={envPreset} />
       {/* Renders nothing — it swaps a shader-patched clone onto the seven
           festoon strands and drives one uniform. Outside the group with the
@@ -3954,6 +3996,8 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
             air) never become click targets. */}
         <group
           onClick={handleStripClick}
+          /* The gachapon's knob is dragged, not just clicked. */
+          onPointerDown={(e) => gachaponInteractionRef.current?.handlePointerDown(e)}
           onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
           onPointerOut={() => { document.body.style.cursor = "auto"; }}
         >

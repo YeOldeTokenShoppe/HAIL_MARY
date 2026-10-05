@@ -1,17 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import NavControlsHome from '@/components/NavControlsHome';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import CyberNav from '@/components/CyberNav';
-import { UnifiedAccountModal } from '@/components/UnifiedAccountModal';
 import BuyModal from '@/components/BuyModal';
-import { useClerk, useUser } from '@clerk/nextjs';
-import { useWalletAuth } from '@/components/WalletAuthProvider';
+import { useUser } from '@clerk/nextjs';
 import { useMusic } from '@/components/MusicContext';
-import { useWeeklyPrize } from '@/hooks/useWeeklyPrize';
 import CoinLoader from '@/components/CoinLoader';
 
 
@@ -36,18 +33,13 @@ const VendingMachineScene = dynamic(() => import('@/components/VendingMachine'),
 export default function GachaponPage() {
   const [mounted, setMounted] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [showAccountModal, setShowAccountModal] = useState(false);
-  const [accountModalTab, setAccountModalTab] = useState('wallet');
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [fontLoaded, setFontLoaded] = useState(false);
   const [modelLoaded, setModelLoaded] = useState(false);
 
-  const clerk = useClerk();
   const { user } = useUser();
-  const { isWalletConnected } = useWalletAuth();
-  const wasOpenedForWallet = useRef(false);
 
   // Music context
   const {
@@ -58,13 +50,6 @@ export default function GachaponPage() {
     is80sMode: context80sMode,
     setIs80sMode: setContext80sMode
   } = useMusic();
-
-  // Weekly prize for new collectible call-out
-  // Drops not enabled yet — badge hidden until first drop is live
-  const weeklyPrize = useWeeklyPrize();
-  const currentPrize = null;
-  const claimStatus = 'no_prize';
-  const [showCallout, setShowCallout] = useState(true);
 
   useEffect(() => {
     setMounted(true);
@@ -171,39 +156,6 @@ export default function GachaponPage() {
       return () => clearTimeout(timer);
     }
   }, [mounted, fontLoaded, modelLoaded]);
-
-  // Listen for custom events from VendingMachine to open wallet/sign-in
-  useEffect(() => {
-    const handleOpenWalletConnection = () => {
-      // If wallet is already connected, no need to show the modal
-      if (isWalletConnected) {
-        return;
-      }
-      wasOpenedForWallet.current = true;
-      setAccountModalTab('wallet');
-      setShowAccountModal(true);
-    };
-
-    const handleOpenSignIn = () => {
-      clerk.openSignIn();
-    };
-
-    window.addEventListener('openWalletConnection', handleOpenWalletConnection);
-    window.addEventListener('openSignIn', handleOpenSignIn);
-
-    return () => {
-      window.removeEventListener('openWalletConnection', handleOpenWalletConnection);
-      window.removeEventListener('openSignIn', handleOpenSignIn);
-    };
-  }, [clerk, isWalletConnected]);
-
-  // Auto-close the modal when wallet becomes connected (if it was opened for wallet connection)
-  useEffect(() => {
-    if (isWalletConnected && showAccountModal && wasOpenedForWallet.current) {
-      setShowAccountModal(false);
-      wasOpenedForWallet.current = false;
-    }
-  }, [isWalletConnected, showAccountModal]);
 
   return (
     <div style={{
@@ -318,79 +270,6 @@ export default function GachaponPage() {
         />
       )}
 
-      {/* New Collectible Call-out - Simple badge (shown when a prize is actively available) */}
-      {showCallout && currentPrize && (claimStatus === 'available' || claimStatus === 'ineligible') && (
-        <>
-          <style>{`
-            @keyframes badgeBounce {
-              0%, 100% { transform: translateX(-50%) translateY(0); }
-              50% { transform: translateX(-50%) translateY(-4px); }
-            }
-            @keyframes badgeGlow {
-              0%, 100% { box-shadow: 0 0 15px rgba(0, 245, 212, 0.5), 0 4px 15px rgba(0, 0, 0, 0.3); }
-              50% { box-shadow: 0 0 25px rgba(0, 245, 212, 0.7), 0 4px 20px rgba(0, 0, 0, 0.4); }
-            }
-          `}</style>
-          <div
-            style={{
-              position: 'fixed',
-              bottom: isMobileDevice ? '170px' : '100px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 500,
-              animation: 'badgeBounce 2s ease-in-out infinite, badgeGlow 2s ease-in-out infinite',
-              background: 'linear-gradient(135deg, #00f5d4, #00d4aa)',
-              borderRadius: '20px',
-              padding: '8px 12px 8px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-          >
-            <span style={{ fontSize: '1rem' }}>✨</span>
-            <span style={{
-              color: '#000',
-              fontFamily: "'Orbitron', monospace",
-              fontSize: '0.7rem',
-              fontWeight: '700',
-              textTransform: 'uppercase',
-              letterSpacing: '1px',
-            }}>
-              New Drop!
-            </span>
-            <button
-              onClick={() => setShowCallout(false)}
-              style={{
-                background: 'rgba(0, 0, 0, 0.2)',
-                border: 'none',
-                borderRadius: '50%',
-                width: '18px',
-                height: '18px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'rgba(0, 0, 0, 0.6)',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontWeight: 'bold',
-                transition: 'all 0.2s',
-                marginLeft: '2px',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.3)';
-                e.currentTarget.style.color = '#000';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)';
-                e.currentTarget.style.color = 'rgba(0, 0, 0, 0.6)';
-              }}
-            >
-              ×
-            </button>
-          </div>
-        </>
-      )}
-
       {!isLoading && (
         <div style={{
           width: '100%',
@@ -402,13 +281,6 @@ export default function GachaponPage() {
           <VendingMachineScene />
         </div>
       )}
-
-      {/* Account Modal - for wallet connection from status bar */}
-      <UnifiedAccountModal
-        isOpen={showAccountModal}
-        onClose={() => setShowAccountModal(false)}
-        initialTab={accountModalTab}
-      />
 
       {/* CyberNav Menu Panel */}
       <CyberNav

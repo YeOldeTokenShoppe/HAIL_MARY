@@ -9653,6 +9653,7 @@ export default function OilPage() {
                 {/* Orbit mounts in the walker's ORBIT cam mode and during
                     vendor face-to-faces (sky grammar borrows the camera). */}
                 {(!walkMode || walkerCam === "orbit" || walkerVendor) && <OrbitControls
+                  makeDefault
                   ref={controlsRef}
                   enableDamping
                   dampingFactor={0.08}

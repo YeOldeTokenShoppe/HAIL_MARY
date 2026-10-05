@@ -7,15 +7,9 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import InteractiveScroll2 from './InteractiveScroll2';
 import ToyPreviewPortal, { TOY_PREVIEW_CONFIG } from './ToyPreviewPortal';
-import { useWeeklyPrize } from '@/hooks/useWeeklyPrize';
-import { useWalletAuth } from './WalletAuthProvider';
-import { useUser } from '@clerk/nextjs';
 
 // Configure DRACO loader for compressed GLB files
 useGLTF.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
-
-// Set to true when the first collectible drop is ready to go live
-const DROPS_ENABLED = true;
 
 // Capsule base colors that cycle
 const CAPSULE_COLORS = ['#3943BC', '#14A122', '#A81814'];
@@ -1183,132 +1177,56 @@ export function VendingSceneInner({ onToyClick, onZoomComplete, resetKey, capsul
   );
 }
 
-// Main exported component
+// Main exported component — free play: no prize/claim gating, the dial is always live
 export default function VendingMachineScene() {
-  const { user } = useUser();
-  const { isWalletConnected } = useWalletAuth();
-  const weeklyPrize = useWeeklyPrize();
-
-  // Override prize data when drops aren't enabled yet
-  const currentPrize = DROPS_ENABLED ? weeklyPrize.currentPrize : null;
-  const claimStatus = DROPS_ENABLED ? weeklyPrize.claimStatus : 'no_prize';
-  const remainingClaims = DROPS_ENABLED ? weeklyPrize.remainingClaims : 0;
-  const claimPrize = weeklyPrize.claimPrize;
-  const isClaimLoading = weeklyPrize.isClaimLoading;
-  const eligibilityDetails = DROPS_ENABLED ? weeklyPrize.eligibilityDetails : {};
-  const userClaim = weeklyPrize.userClaim;
-
-  const [showMainCanvas, setShowMainCanvas] = useState(true);
   const [resetKey, setResetKey] = useState(0);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [claimedPrize, setClaimedPrize] = useState(null);
-  const [showClaimButton, setShowClaimButton] = useState(false);
+  const [capsuleOpen, setCapsuleOpen] = useState(false);
 
-  // Determine if dial should be interactive
-  const isDialDisabled = claimStatus !== 'available';
-
-  // Handle zoom complete from CenteredCapsule
+  // CenteredCapsule reports true once the capsule has opened, false when it resets
   const handleZoomComplete = useCallback((isComplete) => {
-    setShowClaimButton(isComplete);
+    setCapsuleOpen(isComplete);
   }, []);
 
-  // Handle toy click - this is when the user wants to claim the prize
-  const handleToyClick = useCallback(async () => {
-    if (claimStatus !== 'available' || isClaimLoading) {
-      // Just reset if not available
-      setResetKey(prev => prev + 1);
-      return;
-    }
-
-    try {
-      const claim = await claimPrize();
-      setClaimedPrize({
-        name: currentPrize.name,
-        description: currentPrize.description,
-        modelPath: currentPrize.modelPath,
-        icon: currentPrize.previewConfig?.icon,
-        edition: claim?.claimNumber,
-        maxEditions: currentPrize.maxClaims || 80,
-      });
-      setShowSuccessModal(true);
-    } catch (error) {
-      console.error('Failed to claim prize:', error);
-      alert(error.message || 'Failed to claim prize. Please try again.');
-    }
-
+  // Clicking the revealed toy (or Play Again) puts the machine back to its start state
+  const handlePlayAgain = useCallback(() => {
     setResetKey(prev => prev + 1);
-  }, [claimStatus, isClaimLoading, claimPrize, currentPrize]);
-
-  const handleSuccessModalClose = useCallback(() => {
-    setShowSuccessModal(false);
-    setClaimedPrize(null);
   }, []);
-
-  // Handle sign in click
-  const handleSignIn = useCallback(() => {
-    // Dispatch event to open sign-in modal
-    window.dispatchEvent(new CustomEvent('openSignIn'));
-  }, []);
-
-  // Handle connect wallet click
-  const handleConnectWallet = useCallback(() => {
-    // Dispatch event to open wallet connection
-    window.dispatchEvent(new CustomEvent('openWalletConnection'));
-  }, []);
-
-  // Get model path from current prize or use default
-  const modelPath = currentPrize?.modelPath || '/models/ipadMaryToy.glb';
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column' }}>
-      <style>{`
-        @keyframes claimButtonPulse {
-          0%, 100% {
-            transform: scale(1);
-            box-shadow: 0 0 30px rgba(0, 245, 212, 0.5), 0 0 60px rgba(0, 245, 212, 0.3);
-          }
-          50% {
-            transform: scale(1.02);
-            box-shadow: 0 0 40px rgba(0, 245, 212, 0.7), 0 0 80px rgba(0, 245, 212, 0.4);
-          }
-        }
-      `}</style>
       {/* Main vending machine canvas */}
       <div style={{ flex: 1, position: 'relative' }}>
-        {showMainCanvas && (
-          <Canvas
-            shadows
-            gl={{
-              antialias: true,
-              alpha: true,
-            }}
-            camera={{
-              fov: 45,
-              position: [0, 0.4, 2.1],
-              near: 0.1,
-              far: 500
-            }}
-            style={{
-              width: '100%',
-              height: '100%',
-              background: 'transparent',
-            }}
-          >
-            <Suspense fallback={null}>
-              <VendingSceneInner
-                onToyClick={handleToyClick}
-                onZoomComplete={handleZoomComplete}
-                resetKey={resetKey}
-                capsuleColorIndex={0}
-                modelPath={modelPath}
-                disabled={isDialDisabled}
-              />
-            </Suspense>
-          </Canvas>
-        )}
+        <Canvas
+          shadows
+          gl={{
+            antialias: true,
+            alpha: true,
+          }}
+          camera={{
+            fov: 45,
+            position: [0, 0.4, 2.1],
+            near: 0.1,
+            far: 500
+          }}
+          style={{
+            width: '100%',
+            height: '100%',
+            background: 'transparent',
+          }}
+        >
+          <Suspense fallback={null}>
+            <VendingSceneInner
+              onToyClick={handlePlayAgain}
+              onZoomComplete={handleZoomComplete}
+              resetKey={resetKey}
+              capsuleColorIndex={resetKey}
+              disabled={false}
+            />
+          </Suspense>
+        </Canvas>
 
-        {/* Click to Claim button - shows after zoom completes */}
-        {showClaimButton && claimStatus === 'available' && (
+        {/* Play Again button - shows once the capsule has opened */}
+        {capsuleOpen && (
           <div style={{
             position: 'absolute',
             bottom: '20%',
@@ -1316,12 +1234,11 @@ export default function VendingMachineScene() {
             right: 0,
             display: 'flex',
             justifyContent: 'center',
-            gap: '12px',
             pointerEvents: 'auto',
             zIndex: 10,
           }}>
             <button
-              onClick={() => setResetKey(prev => prev + 1)}
+              onClick={handlePlayAgain}
               style={{
                 padding: '1rem 1.5rem',
                 background: 'rgba(255, 255, 255, 0.1)',
@@ -1346,87 +1263,11 @@ export default function VendingMachineScene() {
                 e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)';
               }}
             >
-              Cancel
+              Play Again
             </button>
-            <button
-              onClick={handleToyClick}
-              style={{
-                padding: '1rem 2.5rem',
-                background: 'linear-gradient(135deg, #00f5d4, #00bbf9)',
-                border: 'none',
-                borderRadius: '50px',
-                color: '#000',
-                fontFamily: "'Orbitron', monospace",
-                fontSize: '1rem',
-                fontWeight: '700',
-                cursor: 'pointer',
-                textTransform: 'uppercase',
-                letterSpacing: '2px',
-                boxShadow: '0 0 30px rgba(0, 245, 212, 0.5), 0 0 60px rgba(0, 245, 212, 0.3)',
-                animation: 'claimButtonPulse 2s ease-in-out infinite',
-                transition: 'all 0.3s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.transform = 'scale(1.05)';
-                e.target.style.boxShadow = '0 0 40px rgba(0, 245, 212, 0.7), 0 0 80px rgba(0, 245, 212, 0.4)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.transform = 'scale(1)';
-                e.target.style.boxShadow = '0 0 30px rgba(0, 245, 212, 0.5), 0 0 60px rgba(0, 245, 212, 0.3)';
-              }}
-            >
-              Claim
-            </button>
-          </div>
-        )}
-
-        {/* Disabled overlay when not available */}
-        {isDialDisabled && claimStatus !== 'loading' && (
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            pointerEvents: 'none',
-          }}>
-            {claimStatus === 'claimed' && (
-              <div style={{
-                background: 'rgba(0, 255, 136, 0.1)',
-                border: '1px solid rgba(0, 255, 136, 0.3)',
-                borderRadius: '10px',
-                padding: '1rem 2rem',
-                color: '#00ff88',
-                fontFamily: "'Orbitron', monospace",
-                fontSize: '0.9rem',
-                textAlign: 'center',
-              }}>
-                Prize Collected!
-              </div>
-            )}
           </div>
         )}
       </div>
-
-      {/* Prize status bar at bottom */}
-      <PrizeStatusBar
-        currentPrize={currentPrize}
-        claimStatus={claimStatus}
-        remainingClaims={remainingClaims}
-        eligibilityDetails={eligibilityDetails}
-        onSignIn={handleSignIn}
-        onConnectWallet={handleConnectWallet}
-      />
-
-      {/* Success modal */}
-      <ClaimSuccessModal
-        isOpen={showSuccessModal}
-        prize={claimedPrize}
-        onClose={handleSuccessModalClose}
-      />
     </div>
   );
 }
