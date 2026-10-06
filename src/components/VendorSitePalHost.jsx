@@ -36,6 +36,7 @@ import {
   activateVendorSitePal,
   primeVendorSitePal,
   speakVendorText,
+  vendorSitePalDebug,
 } from "@/lib/vendorSitePal";
 
 // Vendor tabs for the crop tuner. constName is used by the "Log values"
@@ -175,11 +176,18 @@ function VendorCropTuner() {
       let attrs = null;
       try { attrs = typeof w.getSceneAttributes === "function" ? w.getSceneAttributes() : null; } catch (e) {}
       const cfg = VENDOR_SITEPAL_CONFIG[sitepalId];
+      const d = vendorSitePalDebug();
+      const cb = w.__vendorSitePalLastCb;
       setHostStatus(
         `host · embedded ${w.__vendorSitePalEmbedded ? "yes" : "no"} · loaded ${w.__vendorSitePalSceneLoaded === true ? "yes" : "NO"}` +
         ` · scene ${w.__vendorSitePalCurrentSceneId ?? "-"} (player says ${attrs?.sceneID ?? "-"} · tab wants ${cfg?.sceneId ?? "-"})` +
         ` · say ${typeof w.sayText === "function" ? "ready" : "no"} · tab ${document.visibilityState}` +
-        (cfg?.sceneBroken ? " · SCENE FLAGGED BROKEN — not loading it" : "")
+        (cfg?.sceneBroken ? " · SCENE FLAGGED BROKEN — not loading it" : "") +
+        (w.__vendorSitePalTracksBlocked ? " · TRACKS BLOCKED → TTS" : "") +
+        ` \n line · active ${d.active ?? "-"} · pending ${d.pending ?? "none"} · talking ${d.talking ? "yes" : "no"} · vol ${d.volume}` +
+        (d.notBeforeMs > 0 ? ` · waits ${Math.ceil(d.notBeforeMs / 100) / 10}s` : "") +
+        ` · last cb ${cb ? cb.name + " " + Math.round((Date.now() - cb.at) / 1000) + "s ago" : "none yet"}` +
+        ` · sayText ${typeof w.sayText === "function" ? "ok" : "no"} · sayAudio ${typeof w.sayAudio === "function" ? "ok" : "no"}`
       );
     };
     tick();
@@ -385,7 +393,7 @@ function VendorCropTuner() {
       <div style={{ fontSize: 10, opacity: 0.6 }}>
         press f to flip · pins {active.label} — exactly one face mesh is drawn
       </div>
-      <div style={{ fontSize: 10, opacity: 0.8, color: "#9fd", wordBreak: "break-word" }}>{hostStatus}</div>
+      <div style={{ fontSize: 10, opacity: 0.8, color: "#9fd", wordBreak: "break-word", whiteSpace: "pre-wrap" }}>{hostStatus}</div>
       <canvas ref={previewRef} width={400} height={300} style={{ width: "100%", borderRadius: 4, background: "#222" }} />
       {TUNER_CROP_FIELDS.map(([k, min, max]) => slider(active.crop, k, min, max))}
       <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
@@ -518,11 +526,15 @@ export default function VendorSitePalHost() {
     // Talk-state callbacks → the vendor-model animation bridge. sayText (TTS)
     // fires the vh_talk* pair; the vh_audio* names are kept as belt-and-braces
     // (some player builds fire them for TTS too — notifyVendorTalk dedups).
-    window.vh_talkStarted = () => notifyVendorTalk(true);
-    window.vh_talkEnded = () => notifyVendorTalk(false);
-    window.vh_audioStarted = () => notifyVendorTalk(true);
-    window.vh_audioEnded = () => notifyVendorTalk(false);
-    window.vh_audioStopped = () => notifyVendorTalk(false);
+    const mark = (name) => { window.__vendorSitePalLastCb = { name, at: Date.now() }; };
+    window.vh_talkStarted = () => { mark("talkStarted"); notifyVendorTalk(true); };
+    window.vh_talkEnded = () => { mark("talkEnded"); notifyVendorTalk(false); };
+    window.vh_audioStarted = () => { mark("audioStarted"); notifyVendorTalk(true); };
+    window.vh_audioEnded = () => { mark("audioEnded"); notifyVendorTalk(false); };
+    window.vh_audioStopped = () => { mark("audioStopped"); notifyVendorTalk(false); };
+    // SitePal reports a failed audio/TTS fetch here; nothing else ever hears it.
+    window.vh_audioError = (code) => { mark("audioError " + (code ?? "")); };
+    window.vh_ttsError = (code) => { mark("ttsError " + (code ?? "")); };
     window.vh_speechEnded = () => notifyVendorTalk(false);
 
     const host = ensureHostDiv();

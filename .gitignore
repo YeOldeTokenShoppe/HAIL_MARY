@@ -84,3 +84,6 @@ elevenlabs-dialogue-test/output/
 # Python bytecode, regenerated on every run
 __pycache__/
 *.pyc
+
+# one-off ElevenLabs renders of the chaplain sermons (scripts/render-chapel-sermons.mjs)
+sermons-out/

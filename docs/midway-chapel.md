@@ -69,6 +69,30 @@ Tent_Revival.glb`; copy it to `public/models/` before splitting.
   them (crossfade on each loop boundary); lines play `preaching` over whichever
   is up. The T-pose blink he had was the talk swap crossfading `preaching` from
   itself (lone action 1→0→1 = bind pose); VendorModel now skips a self-crossfade.
+- **Quiet idle (evening export, CHAPEL_ASSET_V 4):** `idle` and `looking` (hand
+  shading the eyes, scanning the congregation) are the `idleCycle` between
+  lines; `talkCycle` rotates preaching / yelling / rapping per line and at each
+  clip's loop during a long sermon. Rest and talk sets are disjoint.
+- **Sermon loop (2026-10-06):** `VENDOR_SITEPAL_CONFIG.chapel.sermons` — twelve
+  canned sermons. Armed by a stall focus (`activateVendorSitePal`), disarmed on
+  step-away; after any line ends he pauses 3–5 s and speaks the next, sequential
+  from a random start. ElevenLabs renders each text once via SitePal, then it is
+  served from SitePal's cache — "pre-recorded" with no recordings. **Recorded tracks (same day):** the ElevenLabs request log showed every
+  play billed a render per player (two fetches each), so the sermons ship as
+  SitePal Audio Manager tracks instead. Pipeline: `node scripts/render-chapel-sermons.mjs`
+  (needs `ELEVENLABS_API_KEY`; writes `sermons-out/chapel_sermon_NN.mp3` + a
+  manifest) → upload each MP3 to the SitePal account's Audio Manager under the
+  exact track name → set `sermonsUseTracks: true` on the chapel config. Until
+  then the loop speaks the texts by TTS. The {day} sermon was reworded so it can
+  be recorded. The ledger speech (section 3) stays TTS by nature — it is per
+  player — so it needs a per-visit cap when it lands. **Greetings joined the track pipeline the same evening**
+  (`chapel_greet_first_NN` / `_return_NN` / `_frequent_NN`, flag
+  `greetingsUseTracks`); the chaplain then makes no TTS call at all. **Tablet (2026-10-06 test):** he did not speak at all —
+  the stall tap unlocks SitePal's TTS stream on iOS, not the element that plays
+  tracks. Now: touch devices greet by TTS, and every track play has a 3.5 s
+  watchdog — no talk-start → that line is said by TTS and the page stays on TTS
+  (`window.__vendorSitePalTracksBlocked`, shown in the tuner readout). So a
+  tablet visit costs one greeting plus any sermons that fail to start.
 
 
 ## 1. Premise
@@ -117,6 +141,7 @@ the public collections.
 | Summoned a demon | `demonBounty` docs where `summonerId == uid` | "One demon loosed on your neighbours. They remember." |
 | Coveted | `oilDrills.<uid>.claimJumpsUsed` and the `oilClaimLog` entries for the player | "You jumped a claim. Whose? It does not matter to you, I see." |
 | Greed | `tankOil` un-banked vs `totalCollected` | "Four hundred barrels sitting in the tank, tempting hell." |
+| *(stale under v2 — the tank is no longer a choice; re-aim Greed at layers passed and left stranded, charges hoarded, and neighbours' passes salvaged. The matching sermon was rewritten 2026-10-06.)* | | |
 | Gambling | Daily Ticket plays this season (`tickets` by uid) | "Nine scratch tickets. Nine." |
 | Violence | `hunters.<uid>.vials` and arena kills from the bounty docs | "You threw blessed water at a demon. The water was blessed by me. You're welcome." |
 | Vanity | premium unlocks count (`unlocked.*`) | "Chrome on a pump. Chrome." |

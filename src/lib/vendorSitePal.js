@@ -10,8 +10,12 @@
 // it resolves account track names only, never URLs (proven by
 // /trade/spike-sayaudio).
 //
-// NOTE: SitePal caches rendered TTS by text — after changing a voice, re-word
-// the greeting lines or the old voice replays from cache.
+// NOTE (corrected 2026-10-06): SitePal does NOT cache TTS by text — the
+// ElevenLabs request log showed a render per play, per player, two fetches
+// each. That is why every vendor line now carries an `audio` track name: render
+// once (scripts/render-chapel-sermons.mjs --vendor <id>), upload to the SitePal
+// Audio Manager, flip that vendor's greetingsUseTracks. Live sayText remains
+// the fallback and the path for anything per-player (the chapel ledger).
 
 export const VENDOR_SITEPAL_CONTAINER_ID = "vendor-sitepal-host";
 export const VENDOR_SITEPAL_ACCOUNT = "9308752";
@@ -313,20 +317,24 @@ export const VENDOR_SITEPAL_CONFIG = {
     regularFaces: ["Face1", "Face2"],
     crop: FORTUNES_SITEPAL_CROP,
     filter: FORTUNES_SITEPAL_FILTER,
+    // Recorded-track names (2026-10-06): `audio` = the SitePal Audio Manager track
+    // for this line (render with scripts/render-chapel-sermons.mjs --vendor fortunes);
+    // flip greetingsUseTracks once they are uploaded. Day-number lines were reworded.
+    greetingsUseTracks: false,
     greetings: {
       first: [
-        "A new face. Sit. The ball has been expecting you, even if you were not expecting the ball.",
-        "So. The field sends me a stranger. Give me your eyes, and I will tell you what the dust will not.",
+        { audio: "fortunes_greet_first_01", text: "A new face. Sit. The ball has been expecting you, even if you were not expecting the ball." },
+        { audio: "fortunes_greet_first_02", text: "So. The field sends me a stranger. Give me your eyes, and I will tell you what the dust will not." },
       ],
       returning: [
-        "Ah. The ball has been restless all afternoon, and now I see why. Sit.",
-        "The cards said nothing about you, stranger. I like that. It means tonight is still negotiable.",
-        "Come closer. Every well out there dreams, and I am the only one on this field who listens.",
-        "Day {day} already. The field grows honest near the end. So do I.",
+        { audio: "fortunes_greet_return_01", text: "Ah. The ball has been restless all afternoon, and now I see why. Sit." },
+        { audio: "fortunes_greet_return_02", text: "The cards said nothing about you, stranger. I like that. It means tonight is still negotiable." },
+        { audio: "fortunes_greet_return_03", text: "Come closer. Every well out there dreams, and I am the only one on this field who listens." },
+        { audio: "fortunes_greet_return_04", text: "The season grows old. The field grows honest near the end. So do I." },
       ],
       frequent: [
-        "Back again. The regulars get the true readings. The tourists get the pretty ones. Sit.",
-        "I have read your face so often I could do it from memory. Tonight, let us read something else.",
+        { audio: "fortunes_greet_frequent_01", text: "Back again. The regulars get the true readings. The tourists get the pretty ones. Sit." },
+        { audio: "fortunes_greet_frequent_02", text: "I have read your face so often I could do it from memory. Tonight, let us read something else." },
       ],
     },
   },
@@ -337,26 +345,30 @@ export const VENDOR_SITEPAL_CONFIG = {
     regularFaces: ["Face1", "Face3"],
     crop: TONICS_SITEPAL_CROP,
     filter: TONICS_SITEPAL_FILTER,
+    // Recorded-track names (2026-10-06): `audio` = the SitePal Audio Manager track
+    // for this line (render with scripts/render-chapel-sermons.mjs --vendor tonics);
+    // flip greetingsUseTracks once they are uploaded. Day-number lines were reworded.
+    greetingsUseTracks: false,
     greetings: {
       first: [
-        "A NEW customer! Friend, you have wandered into the single luckiest moment of your prospecting career.",
-        "First time at my cart? Then the first sip of advice is free: buy the second bottle.",
+        { audio: "tonics_greet_first_01", text: "A NEW customer! Friend, you have wandered into the single luckiest moment of your prospecting career." },
+        { audio: "tonics_greet_first_02", text: "First time at my cart? Then the first sip of advice is free: buy the second bottle." },
       ],
       returning: [
-        "Step right up, friend! You have the look of a prospector who knows value when it winks at him.",
-        "Ah, a discerning customer. One bottle of my patented tonic and that drill of yours practically steers itself.",
-        "Everything on this cart is one hundred percent genuine, friend. Mostly. The mustache included.",
-        "You there! Yes, you. Dry holes got you down? I bottle luck itself, and business is booming.",
-        "This tonic cured a man's rig of squeaking, his boots of pinching, and his marriage of silence. One bottle left.",
-        "I don't sell hope, friend. Hope is free. I sell the bottle you keep it in.",
-        "Free advice, no charge: never trust a salesman. Present company excepted, naturally.",
-        "Rub two drops on your derrick and stand well back. That is all I am legally permitted to say.",
-        "The fortune teller reads your future. I improve it. Small distinction, friend. Big difference.",
-        "Day {day}, and business is booming. Somebody on this field is lucky. Statistically. Probably.",
+        { audio: "tonics_greet_return_01", text: "Step right up, friend! You have the look of a prospector who knows value when it winks at him." },
+        { audio: "tonics_greet_return_02", text: "Ah, a discerning customer. One bottle of my patented tonic and that drill of yours practically steers itself." },
+        { audio: "tonics_greet_return_03", text: "Everything on this cart is one hundred percent genuine, friend. Mostly. The mustache included." },
+        { audio: "tonics_greet_return_04", text: "You there! Yes, you. Dry holes got you down? I bottle luck itself, and business is booming." },
+        { audio: "tonics_greet_return_05", text: "This tonic cured a man's rig of squeaking, his boots of pinching, and his marriage of silence. One bottle left." },
+        { audio: "tonics_greet_return_06", text: "I don't sell hope, friend. Hope is free. I sell the bottle you keep it in." },
+        { audio: "tonics_greet_return_07", text: "Free advice, no charge: never trust a salesman. Present company excepted, naturally." },
+        { audio: "tonics_greet_return_08", text: "Rub two drops on your derrick and stand well back. That is all I am legally permitted to say." },
+        { audio: "tonics_greet_return_09", text: "The fortune teller reads your future. I improve it. Small distinction, friend. Big difference." },
+        { audio: "tonics_greet_return_10", text: "Business is booming. Somebody on this field is lucky. Statistically. Probably." },
       ],
       frequent: [
-        "My favorite customer returns! For you, the regular price. Which is the special price. Which is the price.",
-        "You again! I would offer the loyalty discount, but loyalty, friend, is priceless.",
+        { audio: "tonics_greet_frequent_01", text: "My favorite customer returns! For you, the regular price. Which is the special price. Which is the price." },
+        { audio: "tonics_greet_frequent_02", text: "You again! I would offer the loyalty discount, but loyalty, friend, is priceless." },
       ],
     },
   },
@@ -367,22 +379,26 @@ export const VENDOR_SITEPAL_CONFIG = {
     regularFaces: ["Face1", "Face3"],
     crop: HOTDOGS_SITEPAL_CROP,
     filter: HOTDOGS_SITEPAL_FILTER,
+    // Recorded-track names (2026-10-06): `audio` = the SitePal Audio Manager track
+    // for this line (render with scripts/render-chapel-sermons.mjs --vendor hotdogs);
+    // flip greetingsUseTracks once they are uploaded. Day-number lines were reworded.
+    greetingsUseTracks: false,
     greetings: {
       first: [
-        "New on the field? First rule: never drill hungry. Second rule: I am the only food for forty miles.",
-        "Welcome to the boardwalk, friend. The dogs are hot, the field is cold, and the gossip is free.",
+        { audio: "hotdogs_greet_first_01", text: "New on the field? First rule: never drill hungry. Second rule: I am the only food for forty miles." },
+        { audio: "hotdogs_greet_first_02", text: "Welcome to the boardwalk, friend. The dogs are hot, the field is cold, and the gossip is free." },
       ],
       returning: [
-        "Hot dogs! Get your hot dogs! The only thing on this field that comes up from the ground fully cooked!",
-        "Fresh off the roller, friend. The secret ingredient is that I never discuss the ingredients.",
-        "You cannot drill on an empty stomach. Technically you can. But why suffer?",
-        "Mustard, relish, onions, and my complete discretion regarding the frank. All included.",
-        "One for a dollar, two for two dollars. The bulk discount is imaginary, but the dogs are real.",
-        "Day {day}. I have sold enough dogs to pave a claim. Nobody has struck oil in a hot dog yet. Yet.",
+        { audio: "hotdogs_greet_return_01", text: "Hot dogs! Get your hot dogs! The only thing on this field that comes up from the ground fully cooked!" },
+        { audio: "hotdogs_greet_return_02", text: "Fresh off the roller, friend. The secret ingredient is that I never discuss the ingredients." },
+        { audio: "hotdogs_greet_return_03", text: "You cannot drill on an empty stomach. Technically you can. But why suffer?" },
+        { audio: "hotdogs_greet_return_04", text: "Mustard, relish, onions, and my complete discretion regarding the frank. All included." },
+        { audio: "hotdogs_greet_return_05", text: "One for a dollar, two for two dollars. The bulk discount is imaginary, but the dogs are real." },
+        { audio: "hotdogs_greet_return_06", text: "I have sold enough dogs to pave a claim. Nobody has struck oil in a hot dog yet. Yet." },
       ],
       frequent: [
-        "The usual? Of course the usual. I had it rolling the moment I saw you cross the field.",
-        "You know, you are the only one out here who chews before swallowing. I respect that.",
+        { audio: "hotdogs_greet_frequent_01", text: "The usual? Of course the usual. I had it rolling the moment I saw you cross the field." },
+        { audio: "hotdogs_greet_frequent_02", text: "You know, you are the only one out here who chews before swallowing. I respect that." },
       ],
     },
   },
@@ -402,23 +418,27 @@ export const VENDOR_SITEPAL_CONFIG = {
     // Default / fallback pair. Each pose overrides these in poseOverrides.
     crop: TATTOOS_IDLE_SITEPAL_CROP,
     filter: TATTOOS_IDLE_SITEPAL_FILTER,
+    // Recorded-track names (2026-10-06): `audio` = the SitePal Audio Manager track
+    // for this line (render with scripts/render-chapel-sermons.mjs --vendor tattoos);
+    // flip greetingsUseTracks once they are uploaded. Day-number lines were reworded.
+    greetingsUseTracks: false,
     greetings: {
       first: [
-        "New skin. I can always tell — you are standing like the chair might bite.",
-        "First time in my chair? Then we start small. Something you can hide from your own reflection.",
+        { audio: "tattoos_greet_first_01", text: "New skin. I can always tell — you are standing like the chair might bite." },
+        { audio: "tattoos_greet_first_02", text: "First time in my chair? Then we start small. Something you can hide from your own reflection." },
       ],
       returning: [
-        "Sit. Everyone out here is trying to pull something permanent out of the ground. At least mine goes on the outside.",
-        "I do not do names. Names come off worse than the ink does. Pick something else.",
-        "Derricks, dice, and one little bottle of tonic — I have put all three on somebody this week. The tonic was his idea.",
-        "Hold still and it is a line. Flinch and it is a story. Either way you are paying for it.",
-        "You want the lucky number. Everybody wants the lucky number. It stops being lucky around the fourth guy.",
-        "Day {day}, and I have inked more dry holes than gushers. People commemorate the strangest things.",
-        "I can cover a bad one. I cannot cover a bad decision, but I can make it look deliberate.",
+        { audio: "tattoos_greet_return_01", text: "Sit. Everyone out here is trying to pull something permanent out of the ground. At least mine goes on the outside." },
+        { audio: "tattoos_greet_return_02", text: "I do not do names. Names come off worse than the ink does. Pick something else." },
+        { audio: "tattoos_greet_return_03", text: "Derricks, dice, and one little bottle of tonic — I have put all three on somebody this week. The tonic was his idea." },
+        { audio: "tattoos_greet_return_04", text: "Hold still and it is a line. Flinch and it is a story. Either way you are paying for it." },
+        { audio: "tattoos_greet_return_05", text: "You want the lucky number. Everybody wants the lucky number. It stops being lucky around the fourth guy." },
+        { audio: "tattoos_greet_return_06", text: "I have inked more dry holes than gushers this season. People commemorate the strangest things." },
+        { audio: "tattoos_greet_return_07", text: "I can cover a bad one. I cannot cover a bad decision, but I can make it look deliberate." },
       ],
       frequent: [
-        "You again. At this rate I run out of arm before you run out of ideas.",
-        "Back already? Good. You are the only one out here who lets me finish a piece properly.",
+        { audio: "tattoos_greet_frequent_01", text: "You again. At this rate I run out of arm before you run out of ideas." },
+        { audio: "tattoos_greet_frequent_02", text: "Back already? Good. You are the only one out here who lets me finish a piece properly." },
       ],
     },
   },
@@ -431,26 +451,30 @@ export const VENDOR_SITEPAL_CONFIG = {
     regularFaces: ["Face1", "Face3"],
     crop: CARNY_SITEPAL_CROP,
     filter: CARNY_SITEPAL_FILTER,
+    // Recorded-track names (2026-10-06): `audio` = the SitePal Audio Manager track
+    // for this line (render with scripts/render-chapel-sermons.mjs --vendor carny);
+    // flip greetingsUseTracks once they are uploaded. Day-number lines were reworded.
+    greetingsUseTracks: false,
     greetings: {
       first: [
-        "Well hey there! Step right up, friend. This here's the Time Machine. It's a roller coaster, too. Two rides, one price. I'm practically givin' it away. I ain't, but practically.",
-        { text: "Howdy! See that clown? You ride in through his mouth, and you come out the other side. WHEN you come out is the interestin' part.", gesture: "pointing" },
+        { audio: "carny_greet_first_01", text: "Well hey there! Step right up, friend. This here's the Time Machine. It's a roller coaster, too. Two rides, one price. I'm practically givin' it away. I ain't, but practically." },
+        { audio: "carny_greet_first_02", text: "Howdy! See that clown? You ride in through his mouth, and you come out the other side. WHEN you come out is the interestin' part.", gesture: "pointing" },
       ],
       returning: [
-        "Step right up! One ticket, one loop, one signature on this here waiver. Don't read it. Parts of it ain't been written yet.",
-        "She's safe as houses, buddy. Safe as a house from about nineteen fifty-two, anyhow. Which is where some folks say they ended up.",
-        { text: "Roller coaster AND a time machine! Go up the hill, come down the hill, come down on a Tuesday. We don't get to pick the Tuesday.", gesture: "pointing" },
-        "That rattlin' sound? That's just the track settlin'. Into which century, I couldn't tell you.",
-        "I been runnin' this ride eleven years. Or four. Depends which end of the track you count from.",
-        { text: "Fella rode it yesterday, stepped off, and knew right where the oil was gonna be. Rode it again to be sure. Ain't seen him since.", gesture: "pointing" },
-        "They tell me the smart money's in R-Lady. Folks come off this ride sayin' the same thing, only they say it like they already know.",
-        "Day {day}. Or thereabouts. Ride's been runnin' all mornin', and the calendar out here is more of a suggestion.",
-        { text: "Naw, I don't ride it no more. Somebody's gotta stay in the present and hold the lever. Real important job.", gesture: "pointing" },
-        "Clown ain't part of the ride. Clown's just the door. Try not to look him in the eye on the way in. He takes it personal.",
+        { audio: "carny_greet_return_01", text: "Step right up! One ticket, one loop, one signature on this here waiver. Don't read it. Parts of it ain't been written yet." },
+        { audio: "carny_greet_return_02", text: "She's safe as houses, buddy. Safe as a house from about nineteen fifty-two, anyhow. Which is where some folks say they ended up." },
+        { audio: "carny_greet_return_03", text: "Roller coaster AND a time machine! Go up the hill, come down the hill, come down on a Tuesday. We don't get to pick the Tuesday.", gesture: "pointing" },
+        { audio: "carny_greet_return_04", text: "That rattlin' sound? That's just the track settlin'. Into which century, I couldn't tell you." },
+        { audio: "carny_greet_return_05", text: "I been runnin' this ride eleven years. Or four. Depends which end of the track you count from." },
+        { audio: "carny_greet_return_06", text: "Fella rode it yesterday, stepped off, and knew right where the oil was gonna be. Rode it again to be sure. Ain't seen him since.", gesture: "pointing" },
+        { audio: "carny_greet_return_07", text: "They tell me the smart money's in R-Lady. Folks come off this ride sayin' the same thing, only they say it like they already know." },
+        { audio: "carny_greet_return_08", text: "Whatever day it is. Ride's been runnin' all mornin', and the calendar out here is more of a suggestion." },
+        { audio: "carny_greet_return_09", text: "Naw, I don't ride it no more. Somebody's gotta stay in the present and hold the lever. Real important job.", gesture: "pointing" },
+        { audio: "carny_greet_return_10", text: "Clown ain't part of the ride. Clown's just the door. Try not to look him in the eye on the way in. He takes it personal." },
       ],
       frequent: [
-        "Well, look who it is! My best customer. Or you will be. Or you were. This ride makes the bookkeepin' a nightmare.",
-        "Back for another go? Same price as last time. Same price as next time, too. I went and checked.",
+        { audio: "carny_greet_frequent_01", text: "Well, look who it is! My best customer. Or you will be. Or you were. This ride makes the bookkeepin' a nightmare." },
+        { audio: "carny_greet_frequent_02", text: "Back for another go? Same price as last time. Same price as next time, too. I went and checked." },
       ],
     },
   },
@@ -462,25 +486,29 @@ export const VENDOR_SITEPAL_CONFIG = {
     regularFaces: ["Face1", "Face3"],
     crop: TACOS_SITEPAL_CROP,
     filter: TACOS_SITEPAL_FILTER,
+    // Recorded-track names (2026-10-06): `audio` = the SitePal Audio Manager track
+    // for this line (render with scripts/render-chapel-sermons.mjs --vendor tacos);
+    // flip greetingsUseTracks once they are uploaded. Day-number lines were reworded.
+    greetingsUseTracks: false,
     greetings: {
       first: [
-        "Greetings, organism. You have arrived at the finest taco establishment within four light years. The competition is not close. There is no competition.",
-        "Welcome. Do not be alarmed by my appearance. Be alarmed, if you wish, by the green sauce.",
+        { audio: "tacos_greet_first_01", text: "Greetings, organism. You have arrived at the finest taco establishment within four light years. The competition is not close. There is no competition." },
+        { audio: "tacos_greet_first_02", text: "Welcome. Do not be alarmed by my appearance. Be alarmed, if you wish, by the green sauce." },
       ],
       returning: [
-        "Two tacos, one beverage. This is the correct order. I have run the calculations many times.",
-        "The recipe is from my homeworld. I have adjusted it for your species. Mostly the temperature. Somewhat the legality.",
-        "The green sauce is safe. The other green sauce, we do not speak of.",
-        "Your planet has magnificent food and terrible opinions about which food is best. I am here to correct this, one taco at a time.",
-        "You look tired, prospector. Drilling is hard work. I know. I watched you do it. All day. Through the window.",
-        "This beverage glows a little. That is normal. That is flavor.",
-        "I am told the clever money is in R-Lady. On my world we also had a clever money. It is now a museum.",
-        "Day {day}. I have served two hundred tacos and abducted nobody. I feel this deserves more recognition than it receives.",
-        "No, I will not tell you what is in it. On my world, a chef who reveals the recipe is eaten. It is a strong tradition.",
+        { audio: "tacos_greet_return_01", text: "Two tacos, one beverage. This is the correct order. I have run the calculations many times." },
+        { audio: "tacos_greet_return_02", text: "The recipe is from my homeworld. I have adjusted it for your species. Mostly the temperature. Somewhat the legality." },
+        { audio: "tacos_greet_return_03", text: "The green sauce is safe. The other green sauce, we do not speak of." },
+        { audio: "tacos_greet_return_04", text: "Your planet has magnificent food and terrible opinions about which food is best. I am here to correct this, one taco at a time." },
+        { audio: "tacos_greet_return_05", text: "You look tired, prospector. Drilling is hard work. I know. I watched you do it. All day. Through the window." },
+        { audio: "tacos_greet_return_06", text: "This beverage glows a little. That is normal. That is flavor." },
+        { audio: "tacos_greet_return_07", text: "I am told the clever money is in R-Lady. On my world we also had a clever money. It is now a museum." },
+        { audio: "tacos_greet_return_08", text: "I have served two hundred tacos this season and abducted nobody. I feel this deserves more recognition than it receives." },
+        { audio: "tacos_greet_return_09", text: "No, I will not tell you what is in it. On my world, a chef who reveals the recipe is eaten. It is a strong tradition." },
       ],
       frequent: [
-        "You return. Again. My scanners recognize your walk from forty meters. This is friendship, I am told.",
-        "The usual? I began preparing it while you were still out by the water tower. Efficiency. Not surveillance. Efficiency.",
+        { audio: "tacos_greet_frequent_01", text: "You return. Again. My scanners recognize your walk from forty meters. This is friendship, I am told." },
+        { audio: "tacos_greet_frequent_02", text: "The usual? I began preparing it while you were still out by the water tower. Efficiency. Not surveillance. Efficiency." },
       ],
     },
   },
@@ -501,26 +529,30 @@ export const VENDOR_SITEPAL_CONFIG = {
     regularFaces: ["Face1", "Face3"],
     crop: RUGS_SITEPAL_CROP,
     filter: RUGS_SITEPAL_FILTER,
+    // Recorded-track names (2026-10-06): `audio` = the SitePal Audio Manager track
+    // for this line (render with scripts/render-chapel-sermons.mjs --vendor rugs);
+    // flip greetingsUseTracks once they are uploaded. Day-number lines were reworded.
+    greetingsUseTracks: false,
     greetings: {
       first: [
-        "Ah — a face I do not know. Welcome. Every piece here was carried a very long way, by people who no longer speak to me. That is how you know it is genuine.",
-        "You honor my corner of the boardwalk. Look as long as you wish. Looking is free. Everything after the looking, we discuss.",
+        { audio: "rugs_greet_first_01", text: "Ah — a face I do not know. Welcome. Every piece here was carried a very long way, by people who no longer speak to me. That is how you know it is genuine." },
+        { audio: "rugs_greet_first_02", text: "You honor my corner of the boardwalk. Look as long as you wish. Looking is free. Everything after the looking, we discuss." },
       ],
       returning: [
-        "Silk, wool, and a little something the weaver would not name. Feel it — but only with the eyes, for now.",
-        "A thief? You wound me. I am a merchant. The difference is paperwork, and I have a great deal of paperwork.",
-        "This one crossed three borders to reach you. Two of them legally.",
-        "You ask for my finest price. I have many finest prices. Which would you like?",
-        "I would never take advantage of a customer. Advantage is taken, never given. There is a distinction, and I observe it.",
-        "Every rug carries a story. This one carries a story I have improved a little, for the enjoyment of the customer.",
-        "They say the clever money is in R-Lady. I am a simple dealer in textiles. But my brother deals in R-Lady, and his house is very fine.",
-        "Day {day}. Eleven pieces have found new homes. The twelfth found its own way out. It will return, or it will not.",
-        "The fortune teller warns you against me. She sells what has not yet happened. I sell what you can hold in two hands. Decide which is the better bargain.",
-        "No, no — do not tell me your budget. Tell me your taste, and I will discover your budget.",
+        { audio: "rugs_greet_return_01", text: "Silk, wool, and a little something the weaver would not name. Feel it — but only with the eyes, for now." },
+        { audio: "rugs_greet_return_02", text: "A thief? You wound me. I am a merchant. The difference is paperwork, and I have a great deal of paperwork." },
+        { audio: "rugs_greet_return_03", text: "This one crossed three borders to reach you. Two of them legally." },
+        { audio: "rugs_greet_return_04", text: "You ask for my finest price. I have many finest prices. Which would you like?" },
+        { audio: "rugs_greet_return_05", text: "I would never take advantage of a customer. Advantage is taken, never given. There is a distinction, and I observe it." },
+        { audio: "rugs_greet_return_06", text: "Every rug carries a story. This one carries a story I have improved a little, for the enjoyment of the customer." },
+        { audio: "rugs_greet_return_07", text: "They say the clever money is in R-Lady. I am a simple dealer in textiles. But my brother deals in R-Lady, and his house is very fine." },
+        { audio: "rugs_greet_return_08", text: "This season, eleven pieces have found new homes. The twelfth found its own way out. It will return, or it will not." },
+        { audio: "rugs_greet_return_09", text: "The fortune teller warns you against me. She sells what has not yet happened. I sell what you can hold in two hands. Decide which is the better bargain." },
+        { audio: "rugs_greet_return_10", text: "No, no — do not tell me your budget. Tell me your taste, and I will discover your budget." },
       ],
       frequent: [
-        "My most valued friend returns. The piece I sold you — it has behaved itself? Good. Not all of them do.",
-        "You come often. In my trade this means one of two things, and I am far too polite to say which. Come, there is something new.",
+        { audio: "rugs_greet_frequent_01", text: "My most valued friend returns. The piece I sold you — it has behaved itself? Good. Not all of them do." },
+        { audio: "rugs_greet_frequent_02", text: "You come often. In my trade this means one of two things, and I am far too polite to say which. Come, there is something new." },
       ],
     },
   },
@@ -541,24 +573,28 @@ export const VENDOR_SITEPAL_CONFIG = {
     regularFaces: ["Face1", "Face3", "Eye_L", "Eye_R"],
     crop: PROMOS_SITEPAL_CROP,
     filter: PROMOS_SITEPAL_FILTER,
+    // Recorded-track names (2026-10-06): `audio` = the SitePal Audio Manager track
+    // for this line (render with scripts/render-chapel-sermons.mjs --vendor promos);
+    // flip greetingsUseTracks once they are uploaded. Day-number lines were reworded.
+    greetingsUseTracks: false,
     greetings: {
       first: [
-        "First time at the wheel? Then you get the newcomer spin. One pull, one prize, and I do not check identification.",
-        "Well, a new face. I am the promotions department, the merchandise counter, and the entire marketing budget. Charmed.",
+        { audio: "promos_greet_first_01", text: "First time at the wheel? Then you get the newcomer spin. One pull, one prize, and I do not check identification." },
+        { audio: "promos_greet_first_02", text: "Well, a new face. I am the promotions department, the merchandise counter, and the entire marketing budget. Charmed." },
       ],
       returning: [
-        "Step up and spin! Every pull on that wheel is a shot at R-Lady merchandise, and every miss is a reason to try again.",
-        "Fresh merchandise, straight off the time machine. Caps, patches, and one shirt so loud it got banned in a decade that has not happened yet.",
-        "You look like a prospector who needs a hat. Everyone out here needs a hat. That is not a pitch, that is meteorology.",
-        "Today's promotion: spin the wheel, take the prize, tell absolutely everyone. That last part is the one I care about.",
-        "I am projected, not printed, so the merchandise is more real than I am. Sit with that for a second.",
-        "Ride the coaster next door and you come back knowing the future. Spin my wheel first. Future you already knows what you won, and I hear they were thrilled.",
-        "Day {day} and the wheel has not been fair once. It has been generous, which is better than fair and sells more hats.",
-        "Buy nothing, spin anyway. My job is attention, and you are already giving me some.",
+        { audio: "promos_greet_return_01", text: "Step up and spin! Every pull on that wheel is a shot at R-Lady merchandise, and every miss is a reason to try again." },
+        { audio: "promos_greet_return_02", text: "Fresh merchandise, straight off the time machine. Caps, patches, and one shirt so loud it got banned in a decade that has not happened yet." },
+        { audio: "promos_greet_return_03", text: "You look like a prospector who needs a hat. Everyone out here needs a hat. That is not a pitch, that is meteorology." },
+        { audio: "promos_greet_return_04", text: "Today's promotion: spin the wheel, take the prize, tell absolutely everyone. That last part is the one I care about." },
+        { audio: "promos_greet_return_05", text: "I am projected, not printed, so the merchandise is more real than I am. Sit with that for a second." },
+        { audio: "promos_greet_return_06", text: "Ride the coaster next door and you come back knowing the future. Spin my wheel first. Future you already knows what you won, and I hear they were thrilled." },
+        { audio: "promos_greet_return_07", text: "The wheel has not been fair once this season. It has been generous, which is better than fair and sells more hats." },
+        { audio: "promos_greet_return_08", text: "Buy nothing, spin anyway. My job is attention, and you are already giving me some." },
       ],
       frequent: [
-        "My most loyal customer. You have spun that wheel so often the paint is coming off the good wedge.",
-        "Back for more merchandise? At this point you are less a customer and more a walking advertisement. I approve.",
+        { audio: "promos_greet_frequent_01", text: "My most loyal customer. You have spun that wheel so often the paint is coming off the good wedge." },
+        { audio: "promos_greet_frequent_02", text: "Back for more merchandise? At this point you are less a customer and more a walking advertisement. I approve." },
       ],
     },
   },
@@ -581,26 +617,60 @@ export const VENDOR_SITEPAL_CONFIG = {
     regularFaces: ["Face1", "Face3"],
     crop: CHAPEL_SITEPAL_CROP,
     filter: CHAPEL_SITEPAL_FILTER,
+    // Greetings are recorded tracks too (2026-10-06): same pipeline as the
+    // sermons — scripts/render-chapel-sermons.mjs renders every line that has an
+    // `audio` name; upload to the Audio Manager under that name; then flip
+    // `greetingsUseTracks`. The {day} greeting was reworded to be recordable.
+    greetingsUseTracks: true,
     greetings: {
       first: [
-        "Come in, come in. The tent is open, the bell is rung, and the collection plate is merely resting. Sit wherever the robot is not.",
-        "A new face on the field. Welcome, pilgrim. I offer confession, penance and absolution, in that order, and I am told the order matters.",
+        { audio: "chapel_greet_first_01", text: "Come in, come in. The tent is open, the bell is rung, and the collection plate is merely resting. Sit wherever the robot is not." },
+        { audio: "chapel_greet_first_02", text: "A new face on the field. Welcome, pilgrim. I offer confession, penance and absolution, in that order, and I am told the order matters." },
       ],
       returning: [
-        "Welcome back. The field has sinned since I saw you last. I do not yet know whether you helped.",
-        "Candles are to the left, indulgences are to the right, and the truth is wherever you left it. Take your time.",
-        "Every well on this field is a prayer, friend. Most of them are the asking kind. Very few are the thanking kind.",
-        "I hear the smart money is in R-Lady. I keep a ledger, not a portfolio. The ledger is holding up better.",
-        "Day {day}. I have heard confessions from half this field, and the other half is simply quieter about it.",
-        "The casino is next door. We share a wall. Some nights I can hear the wheel through it. Some nights it can hear me.",
-        "You drilled into something you should not have. I can tell. People walk differently after the sulfur.",
-        "The chairs are free, the sermon is free, and the candle is a modest sum. A preacher has to eat, and the tent does not patch itself.",
+        { audio: "chapel_greet_return_01", text: "Welcome back. The field has sinned since I saw you last. I do not yet know whether you were involved." },
+        { audio: "chapel_greet_return_02", text: "Candles are to the left, indulgences are to the right, and the truth is wherever you left it. Take your time." },
+        { audio: "chapel_greet_return_03", text: "Every well on this field is a prayer, friend. Most of them are the asking kind. Very few are the thanking kind." },
+        { audio: "chapel_greet_return_04", text: "I hear the smart money is in R-Lady. I keep a ledger, not a portfolio. The ledger is holding up better." },
+        { audio: "chapel_greet_return_05", text: "I have heard confessions from half this field by now, and the other half is simply quieter about it." },
+        { audio: "chapel_greet_return_06", text: "The casino is next door. We share a wall. Some nights I can hear the wheel through it. Some nights it can hear me." },
+        { audio: "chapel_greet_return_07", text: "You drilled into something you should not have. I can tell. People walk differently after the sulfur." },
+        { audio: "chapel_greet_return_08", text: "The chairs are free, the sermon is free, and the candle is a modest sum. A preacher has to eat, and the tent does not patch itself." },
       ],
       frequent: [
-        "You again. Either your conscience is very active or my bench is very comfortable. I have checked the bench.",
-        "My most faithful. Not my most virtuous, I keep a separate list for that, but faithful counts for a great deal out here.",
+        { audio: "chapel_greet_frequent_01", text: "You again. Either your conscience is very active or my bench is very comfortable. I have checked the bench." },
+        { audio: "chapel_greet_frequent_02", text: "My most faithful. Not my most virtuous, I keep a separate list for that, but faithful counts for a great deal out here." },
       ],
     },
+    // The sermon loop (2026-10-06). Once the greeting has been spoken and the
+    // stall is still focused, these play one after another with a short pause
+    // between, in order from a random start, until the player steps away. His
+    // idle clips are all mid-sermon poses, so this is what stops him mouthing
+    // at silence. Each text is rendered by ElevenLabs through SitePal ONCE and
+    // then served from SitePal's cache — canned, without a single recording.
+    // "R-Lady" spelling rule; never "child". Keep each to ~15–30 s spoken.
+    // Recorded tracks (2026-10-06): live TTS billed ElevenLabs per play, per
+    // player (request log: every sermon, every press, two fetches each). So the
+    // sermons are rendered ONCE — `node scripts/render-chapel-sermons.mjs` —
+    // and uploaded to the SitePal account's Audio Manager under the `audio`
+    // names below; sayAudio(name) then plays them with lipsync and no TTS.
+    // Flip `sermonsUseTracks` to true once the twelve tracks are uploaded.
+    // Until then `text` is spoken by TTS (and stays as the script of record).
+    sermonsUseTracks: true,
+    sermons: [
+      { audio: "chapel_sermon_01", text: "Let us begin with the ground. The ground does not care who holds the claim. It held oil before any of you arrived, and it will hold your fence posts long after. Humility, friends. The ground has it. Learn from the ground." },
+      { audio: "chapel_sermon_02", text: "There is a wall behind me, and on the other side of that wall is a casino. I did not choose the neighbour. The neighbour did not choose me. Some nights the wheel is loud and some nights the hymns are, and I will not tell you which side has the better odds. I will tell you which side has chairs." },
+      { audio: "chapel_sermon_03", text: "I hear a great deal about the smart money being in R-Lady. I keep a ledger. The ledger does not go up and it does not go down. It simply remembers. You would be surprised how few things on this field can say the same." },
+      { audio: "chapel_sermon_04", text: "Someone on this field drilled past the oil and into the strata beneath it. You know the strata I mean. The one that glows. When the ground opens and something climbs out, that is not a strike. That is a consequence with horns. Confession is to my left. Bring a coat." },
+      { audio: "chapel_sermon_05", text: "I hear a great deal about charges. Who has them, who is saving them, who is waiting for a richer layer before they spend one. Let me tell you what a saved charge is. It is a layer you passed, and a layer you passed is a layer your neighbour is already reaching for. This field does not reward patience, friends. It rewards a decision. Extract or pass, but do not call hesitation a virtue." },
+      { audio: "chapel_sermon_06", text: "The collection plate is not a tax. It is a conversation between you and the tent. The tent says: I am canvas, I tear. You say: here is something toward the canvas. Nobody is absolved by the plate. Nobody is damned by walking past it. But the tent remembers who walked past it in the rain." },
+      { audio: "chapel_sermon_07", text: "A pilgrim asked me this morning whether it is a sin to jump a claim. I asked whose claim. He said it does not matter. Friend, the moment it does not matter whose, you have answered your own question. Penance is one honest day on your own plot. I will know." },
+      { audio: "chapel_sermon_08", text: "Our Lady, at the shrine, blesses. She consoles. She lights candles. She does not absolve, and she will tell you so herself. That office is mine. She has the goddess and the fountain and the view. I have the tent and the ledger and a bell. Between us the field is covered. Do not make us compare notes." },
+      { audio: "chapel_sermon_09", text: "I have buried more dry holes than I have christened gushers, and I have inked neither. That is the tattoo man's trade, next door but one. What I offer is simpler. Say what you did. Hear what it costs. Do the one honest thing I ask. Then go back out there lighter. The oil will still be heavy." },
+      { audio: "chapel_sermon_10", text: "The ride at the end of the boardwalk says it is a time machine. People come off it saying they know where the oil will be. I have noticed none of them come back to tell me whether they were right. Prophecy is cheap on this field, friends. Confession is free, and it has the better record." },
+      { audio: "chapel_sermon_11", text: "Everything on this field is a wager. The claim is a wager. The charge is a wager. The walk to the boardwalk with money in your pocket is a wager, and the boardwalk knows it. I do not say chance is a sin. I say that anything you keep doing in the hope the next one is different deserves a sit-down first, and my chairs are free." },
+      { audio: "chapel_sermon_12", text: "Another day on the field, and I will say what I say every day. Nobody out here is wicked. Everybody out here is tired, and tired people reach for the nearest lever. My job is to stand between you and the lever for the length of one sermon. Sermon is over. Choose well." },
+    ],
   },
 };
 
@@ -623,7 +693,19 @@ const state = {
   activeVendorId: null,
   talking: false,
   gesture: null,   // clip name for the line currently being spoken
+  // Sermon loop: which vendor a stall FOCUS armed it for (prime/tuner never
+  // arm it), the timer for the next one, and the last index spoken per vendor.
+  sermonHost: null,
+  sermonTimer: null,
+  sermonIdx: {},
+  // Recorded-track playback (sayAudio) is not unlocked by the stall tap on iOS
+  // the way TTS is. If a track produces no talk-start in time, that line falls
+  // back to TTS and the session stays on TTS (window.__vendorSitePalTracksBlocked).
+  tracksBlocked: false,
+  trackWatch: null,
 };
+const TRACK_START_TIMEOUT_MS = 3500;
+const SERMON_GAP_MS = [2800, 5200];   // pause after a line ends, before the next sermon
 
 // ── Talk-state bridge: host callbacks → vendor models ──────────────────────
 // The SitePal vh_talk*/vh_audio* callbacks land in VendorSitePalHost; vendor
@@ -635,12 +717,45 @@ export function onVendorTalk(fn) {
   return () => talkListeners.delete(fn);
 }
 export function notifyVendorTalk(talking) {
+  if (talking && state.trackWatch) { clearTimeout(state.trackWatch); state.trackWatch = null; }
   if (talking === state.talking) return;
   state.talking = talking;
   const gesture = talking ? state.gesture : null;
   talkListeners.forEach((fn) => {
     try { fn(state.activeVendorId, talking, gesture); } catch (e) {}
   });
+  if (!talking) scheduleSermon();
+}
+
+// ── Sermon loop ──────────────────────────────────────────────────────────────
+// A vendor whose config carries `sermons` keeps talking while its stall stays
+// focused: each time a line ends, the next sermon is staged after a short gap.
+// Armed only by activateVendorSitePal (a real stall focus) and disarmed by
+// deactivateVendorSitePal, so the tuner's SAY A LINE and a silent prime never
+// start one. desiredVolume doubles as the "still focused" check.
+function scheduleSermon() {
+  const vendorId = state.sermonHost;
+  if (!vendorId || vendorId !== state.activeVendorId) return;
+  const config = VENDOR_SITEPAL_CONFIG[vendorId];
+  if (!config?.sermons?.length || state.desiredVolume <= 0) return;
+  if (state.sermonTimer) clearTimeout(state.sermonTimer);
+  const gap = SERMON_GAP_MS[0] + Math.random() * (SERMON_GAP_MS[1] - SERMON_GAP_MS[0]);
+  state.sermonTimer = setTimeout(() => {
+    state.sermonTimer = null;
+    if (state.sermonHost !== vendorId || state.activeVendorId !== vendorId || state.desiredVolume <= 0 || state.talking) return;
+    const list = config.sermons;
+    // Sequential from a random start, so a return visit does not replay the
+    // same opening sermon; a line whose {token} is unknown yet is skipped.
+    let idx = state.sermonIdx[vendorId];
+    if (idx === undefined) idx = Math.floor(Math.random() * list.length) - 1;
+    let line = null;
+    for (let k = 0; k < list.length && !line; k++) {
+      idx = (idx + 1) % list.length;
+      line = resolveLine(list[idx]);
+    }
+    state.sermonIdx[vendorId] = idx;
+    if (line) speakVendorText(vendorId, line.text, line.gesture, config.sermonsUseTracks ? line.audio : null);
+  }, gap);
 }
 
 const w = () => (typeof window === "undefined" ? null : window);
@@ -726,6 +841,7 @@ function vendorVisits(vendorId, increment) {
 function resolveLine(entry) {
   const line = typeof entry === "string" ? entry : entry?.text;
   const gesture = typeof entry === "string" ? null : entry?.gesture || null;
+  const audio = typeof entry === "string" ? null : entry?.audio || null;
   if (!line) return null;
   let missing = false;
   const out = line.replace(/\{(\w+)\}/g, (m, k) => {
@@ -735,7 +851,7 @@ function resolveLine(entry) {
     }
     return String(greetingContext[k]);
   });
-  return missing ? null : { text: out, gesture };
+  return missing ? null : { text: out, gesture, audio };
 }
 
 function pickGreeting(vendorId, config) {
@@ -761,12 +877,34 @@ function pickGreeting(vendorId, config) {
   return lines[idx];   // { text, gesture }
 }
 
-function speakNow(text, voice) {
+// `audio` names a track in the SitePal account's Audio Manager (uploaded
+// MP3); sayAudio plays it with lipsync and costs no TTS. Falls back to TTS of
+// the text when the player has no sayAudio. (sayAudio takes account track
+// NAMES only — never URLs; see /trade/spike-sayaudio.)
+function speakNow(text, voice, audio = null) {
   const win = w();
-  if (!win || typeof win.sayText !== "function") return;
+  if (!win) return;
+  if (state.trackWatch) { clearTimeout(state.trackWatch); state.trackWatch = null; }
   try {
     if (typeof win.setPlayerVolume === "function") win.setPlayerVolume(7);
-    win.sayText(text, voice.voice, voice.lang, voice.engine);
+    const useTrack = audio && typeof win.sayAudio === "function" && !state.tracksBlocked;
+    if (useTrack) {
+      win.sayAudio(audio);
+      // Watchdog: no vh_talkStarted/vh_audioStarted in time means the track
+      // was blocked or the name did not resolve — say the text instead, and
+      // stop trying tracks for the rest of this page (tablet, 2026-10-06).
+      if (text) {
+        state.trackWatch = setTimeout(() => {
+          state.trackWatch = null;
+          if (state.talking) return;
+          state.tracksBlocked = true;
+          win.__vendorSitePalTracksBlocked = true;
+          try { if (typeof win.sayText === "function") win.sayText(text, voice.voice, voice.lang, voice.engine); } catch (e) {}
+        }, TRACK_START_TIMEOUT_MS);
+      }
+      return;
+    }
+    if (typeof win.sayText === "function") win.sayText(text, voice.voice, voice.lang, voice.engine);
   } catch (e) {}
 }
 
@@ -799,13 +937,13 @@ export function speakPendingVendorLine() {
     }, wait);
     return;
   }
-  const { text, voice, gesture } = state.pending;
+  const { text, voice, gesture, audio } = state.pending;
   state.pending = null;
   // Set BEFORE speaking: SitePal's vh_talkStarted can fire synchronously off
   // sayText, and notifyVendorTalk reads this to tell the model which clip to
   // play. Setting it after would race and the gesture would be missed.
   state.gesture = gesture;
-  if (text) speakNow(text, voice);
+  if (text || audio) speakNow(text, voice, audio);
 }
 
 // Ask the page-level host to boot the SitePal player. On touch devices the
@@ -837,6 +975,10 @@ export function warmVendorSitePal(reason) {
 
 // Focus a vendor: raise volume, stage a greeting, swap scenes if needed.
 // Speaks immediately when the right scene is already loaded.
+function isTouchLike(win) {
+  try { return (win.navigator?.maxTouchPoints || 0) > 0 || "ontouchstart" in win; } catch (e) { return false; }
+}
+
 // A config flagged sceneBroken (see the chapel) must never reach loadSceneByID:
 // a scene the player cannot start wedges the whole host for the page lifetime.
 function sceneUsable(vendorId, config) {
@@ -859,6 +1001,8 @@ export function activateVendorSitePal(vendorId) {
   try {
     state.desiredVolume = 7;
     state.activeVendorId = vendorId;
+    state.sermonHost = config.sermons?.length ? vendorId : null;
+    if (state.sermonTimer) { clearTimeout(state.sermonTimer); state.sermonTimer = null; }
     win.__vendorSitePalDesiredVolume = 7;
     state.speakNotBefore = Date.now() + GREETING_DELAY_MS;
     if (state.speakTimer) { clearTimeout(state.speakTimer); state.speakTimer = null; }
@@ -871,6 +1015,9 @@ export function activateVendorSitePal(vendorId) {
     state.pending = {
       vendorId, sceneId: config.sceneId,
       text: picked?.text, gesture: picked?.gesture || null,
+      // Touch devices greet by TTS: the stall tap primes SitePal's TTS stream, not
+      // the track element, and a silent 3.5 s before the fallback reads as broken.
+      audio: config.greetingsUseTracks && !isTouchLike(win) ? picked?.audio || null : null,
       voice: config.voice,
     };
     if (vendorSitePalReady(config.sceneId)) {
@@ -935,7 +1082,7 @@ export function setVendorExpression(expression = "None", amplitude = 0.8, durati
 // gesture) — same staging as a greeting, no delay, scene swapped if needed.
 // activateVendorSitePal(vendorId) should have run inside the tap that started
 // the conversation (audio unlock + embed); this just queues the words.
-export function speakVendorText(vendorId, text, gesture = null) {
+export function speakVendorText(vendorId, text, gesture = null, audio = null) {
   const win = w();
   const config = VENDOR_SITEPAL_CONFIG[vendorId];
   if (!win || !config || !text || !sceneUsable(vendorId, config)) return false;
@@ -947,7 +1094,7 @@ export function speakVendorText(vendorId, text, gesture = null) {
   // out GREETING_DELAY_MS like a greeting would, so it does not land on top of the saySilent(0)
   // primer and get swallowed (2026-09-12). Later lines find the delay in the past and go at once.
   if (state.speakTimer) { clearTimeout(state.speakTimer); state.speakTimer = null; }
-  state.pending = { vendorId, sceneId: config.sceneId, text, gesture, voice: config.voice };
+  state.pending = { vendorId, sceneId: config.sceneId, text, gesture, voice: config.voice, audio };
   if (vendorSitePalReady(config.sceneId)) speakPendingVendorLine();
   else if (win.__vendorSitePalSceneLoaded === true && typeof win.loadSceneByID === "function") {
     win.__vendorSitePalSceneLoaded = false;
@@ -956,6 +1103,14 @@ export function speakVendorText(vendorId, text, gesture = null) {
   return !!win.__vendorSitePalEmbedded || !!win.__vendorSitePalWanted;
 }
 export function vendorSitePalActiveId() { return state.activeVendorId; }
+// Snapshot for the ?tune=vendor readout — which stage of a line is stuck.
+export function vendorSitePalDebug() {
+  return {
+    active: state.activeVendorId, pending: state.pending ? (state.pending.audio ? "track " + state.pending.audio : "tts") : null,
+    talking: state.talking, volume: state.desiredVolume, sermons: state.sermonHost, tracksBlocked: state.tracksBlocked,
+    notBeforeMs: Math.max(0, state.speakNotBefore - Date.now()),
+  };
+}
 if (typeof window !== "undefined") window.__crewSitePalConfig = VENDOR_SITEPAL_CONFIG.crew;   // dev: tune skinSample/skinTarget from the console
 
 // Unfocus: mute, stop anything in flight, drop staged speech. stopSpeech()
@@ -966,6 +1121,9 @@ export function deactivateVendorSitePal() {
   state.pending = null;
   state.gesture = null;
   if (state.speakTimer) { clearTimeout(state.speakTimer); state.speakTimer = null; }
+  state.sermonHost = null;
+  if (state.sermonTimer) { clearTimeout(state.sermonTimer); state.sermonTimer = null; }
+  if (state.trackWatch) { clearTimeout(state.trackWatch); state.trackWatch = null; }
   state.speakNotBefore = 0;
   state.desiredVolume = 0;
   // Return the character to idle even if no SitePal end-callback lands

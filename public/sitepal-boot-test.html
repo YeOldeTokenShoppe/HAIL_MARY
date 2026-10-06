@@ -1,0 +1,37 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SitePal boot test</title>
+<style>body{margin:0;background:#1b1f27;color:#cfe;font:14px/1.4 -apple-system,monospace}#log{padding:12px;white-space:pre-wrap}button{font:inherit;padding:10px 14px;margin:12px;border-radius:8px;border:1px solid #6a8;background:#243;color:#cfe}</style></head>
+<body>
+<!-- Dev diagnostic (2026-10-06): the vendor host on an iPad booted but never loaded a scene.
+     This page is ONLY the site's own SitePal embed (same params as VendorSitePalHost) plus a
+     log of every lifecycle callback, so a tablet can show whether the first scene ever loads
+     with nothing else on the page. Open /sitepal-boot-test.html on the device. -->
+<button id="tap">tap once (audio unlock) → then speak</button>
+<div id="log">booting…</div>
+<script>
+  var t0 = Date.now();
+  function log(m){ var s=((Date.now()-t0)/1000).toFixed(1)+"s  "+m; document.getElementById("log").textContent += "\n"+s; try{console.log("[boot-test] "+m);}catch(e){} }
+  window.vh_sceneLoaded = function(){ var a=null; try{ a = typeof getSceneAttributes==="function" ? getSceneAttributes() : null; }catch(e){} log("vh_sceneLoaded  scene="+(a&&a.sceneID)+" model="+(a&&a.modelID)); };
+  window.vh_talkStarted = function(){ log("vh_talkStarted"); };
+  window.vh_talkEnded = function(){ log("vh_talkEnded"); };
+  window.vh_audioStarted = function(){ log("vh_audioStarted"); };
+  window.vh_audioEnded = function(){ log("vh_audioEnded"); };
+  window.vh_audioError = function(c){ log("vh_audioError "+c); };
+  window.vh_ttsError = function(c){ log("vh_ttsError "+c); };
+  window.addEventListener("error", function(e){ log("ERROR "+e.message+" @"+(e.filename||"").split("/").pop()+":"+e.lineno); });
+  window.addEventListener("unhandledrejection", function(e){ log("REJECTION "+(e.reason&&e.reason.message||e.reason)); });
+  setInterval(function(){ var a=null; try{ a = typeof getSceneAttributes==="function" ? getSceneAttributes() : null; }catch(e){} document.title = "boot " + (a&&a.sceneID ? "scene "+a.sceneID : "no scene"); }, 1000);
+  document.getElementById("tap").onclick = function(){
+    log("tap: saySilent(0) then sayText");
+    try { if (typeof saySilent==="function") saySilent(0); } catch(e){ log("saySilent threw "+e.message); }
+    try { if (typeof setPlayerVolume==="function") setPlayerVolume(7); } catch(e){}
+    try { sayText("Testing the boardwalk. One, two, three.", "oubi7HGxNVjXMnWLgwBT", 1, 14); log("sayText called (carny voice)"); } catch(e){ log("sayText threw "+e.message); }
+  };
+  log("ua: "+navigator.userAgent.slice(0,90));
+</script>
+<script type="text/javascript" src="//vhss-d.oddcast.com/vhost_embed_functions_v4.php?acc=9308752&js=0"></script>
+<script type="text/javascript">
+  try { AC_VHost_Embed(9308752,600,800,"",1,0,2775386,0,1,1,"NnOEeZgOFXXyFlkCbvkh423d963uH40B",0,1); log("embed called (site params, first scene 2775386)"); }
+  catch (e) { log("embed threw "+e.message); }
+</script>
+</body></html>

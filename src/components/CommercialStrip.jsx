@@ -51,7 +51,7 @@ import {
 // cached under the unchanged `?v=ktx2` key. BUMP THIS on every rebuild.
 const STRIP_MODEL_V = "15";
 // The chapel's split GLBs (stall + preacher) — bump after re-running scripts/split-tent-revival.mjs.
-export const CHAPEL_ASSET_V = 3;
+export const CHAPEL_ASSET_V = 4;
 const STRIP_MODEL_WEBP = `/models/CommercialStrip5_opt.glb?v=${STRIP_MODEL_V}`;
 const STRIP_MODEL_KTX2 = `/models/CommercialStrip5_opt_ktx2.glb?v=${STRIP_MODEL_V}`;
 const STRIP_MODEL =
@@ -89,11 +89,16 @@ const INTERIOR_DIM_EASE = 2.5;     // 1/s — ~0.4s to settle, matched to the fl
 // `interiorContents` ({ level, props[], character } — the same dim at a second,
 // gentler level for the furniture inside that prop and for the character).
 //
-// `idleCycle: ["a", "b", "c"]` — rotate the resting idle through several clips
+// `idleCycle: ["a", "a", "b"]` — rotate the resting idle through several clips
 //   of the SAME placement: each time the running clip completes a loop the
-//   model crossfades to the next (sequential, wrapping). Unlike poseClips the
-//   switch is live, so every clip must leave Root where it found it. A talk
+//   model crossfades to the next (sequential by position, wrapping). Repeat a
+//   clip to weight it — "a","a","b" shows b one loop in three. Unlike poseClips
+//   the switch is live, so every clip must leave Root where it found it. A talk
 //   line plays over whichever cycle clip is up and fades back to it.
+//
+// `talkCycle: ["a", "b"]` — rotate the TALK clip: each new line starts on the
+//   next clip in the list, and a long line moves on again at the clip's loop
+//   boundary. A per-line `gesture` still wins over the cycle for that line.
 //
 // Two ways to give a vendor more than one resting pose. Pick ONE:
 //
@@ -373,18 +378,21 @@ export const VENDOR_CATALOG = [
     // ?v= busts the browser/CDN cache — bump CHAPEL_ASSET_V after every
     // `node scripts/split-tent-revival.mjs` (the file names never change, so a
     // stale stall kept showing the robot without his emissive, 2026-09-05).
-    // Three NLA tracks since 2026-10-06; the idle rotates through them (one
-    // full pass of each, then a crossfade to the next) and a line plays
-    // "preaching" over whichever is up. talkClip === a cycle clip is fine now:
-    // the talk swap no longer crossfades an action from itself (that was the
-    // T-pose flash — a lone action fading 1→0→1 blends with bind pose).
-    model: `/models/Vendor_Chaplain_Character.glb?v=${CHAPEL_ASSET_V}`, idleClip: "preaching",
-    idleCycle: ["preaching", "yelling", "rapping"], talkClip: "preaching",
+    // Five NLA tracks since the 2026-10-06 evening export. Between lines he
+    // rests through the QUIET pair (idle, then shading his eyes to look over
+    // the congregation); while a line plays, the talk swap rotates through the
+    // three sermon poses, moving on at each clip's loop so a 25 s sermon does
+    // not loop one gesture. The earlier T-pose blink (talk clip === idle clip,
+    // crossfaded from itself) cannot recur: the two sets are disjoint.
+    model: `/models/Vendor_Chaplain_Character.glb?v=${CHAPEL_ASSET_V}`, idleClip: "idle",
+    // Repeats weight the cycle: three idles for every look over the crowd.
+    idleCycle: ["idle", "idle", "idle", "looking"], talkClip: "preaching",
+    talkCycle: ["preaching", "yelling", "rapping"],
     offset: [0, 0, 0],
     prop: "SM_Bld_Tent_01",
     stallModel: `/models/stalls/stall_chapel.glb?v=${CHAPEL_ASSET_V}`,
     hideWindow: [0.6, 8],
-    faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
+    faceDist: 0.405, faceLift: -0.0, camDrop: -0.35,
     sitepal: "chapel" },
 ];
 // The line-up the strip and the Midway actually show (retired stalls stay in
@@ -842,12 +850,27 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
   const restClip = poseRef.current || vendor.idleClip;
 
   const restActionRef = useRef(null);
+  const restIdxRef = useRef(0);   // position in vendor.idleCycle (repeats allowed)
   const extrasRef = useRef([]);
   const needsStartRef = useRef(false);
   // Talk state, declared up here because the idle cycler below reads it.
   const talkModeRef = useRef(false);
   // Which action is currently standing in for the idle — talkClip or a gesture.
   const activeTalkRef = useRef(null);
+  // talkCycle: the clip after `name` in the vendor's talk list, skipping any the
+  // export did not ship; without a cycle, the plain talkClip.
+  const talkIdxRef = useRef(-1);
+  const nextTalkAction = (afterName) => {
+    const tc = vendor.talkCycle;
+    if (!tc?.length) return actions?.[vendor.talkClip] || null;
+    let i = afterName ? tc.indexOf(afterName) : talkIdxRef.current;
+    for (let k = 1; k <= tc.length; k++) {
+      const j = (i + k) % tc.length;
+      const a = actions?.[tc[j]];
+      if (a) { talkIdxRef.current = j; return a; }
+    }
+    return actions?.[vendor.talkClip] || null;
+  };
 
   // Start (or restart) this session's resting pose. Returns false if the rig
   // is not ready yet, which is a real state and not an error — see the retry
@@ -908,17 +931,31 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
   // mid-line: the talk swap owns the blend then, and fades back to whatever
   // restActionRef holds when the line ends.
   useEffect(() => {
-    const cycle = vendor.idleCycle;
-    if (!mixer || !cycle || cycle.length < 2) return;
+    const cycle = vendor.idleCycle || [];
+    if (!mixer || (cycle.length < 2 && !(vendor.talkCycle?.length > 1))) return;
     const onLoop = (e) => {
+      // While talking, the TALK clip rotates at its own loop boundary (if the
+      // vendor has a talkCycle); the rest cycle waits for the line to end.
+      if (talkModeRef.current) {
+        const tc = vendor.talkCycle, cur = activeTalkRef.current;
+        if (!tc || tc.length < 2 || !cur || e.action !== cur) return;
+        const next = nextTalkAction(cur.getClip().name);
+        if (!next || next === cur) return;
+        next.reset().crossFadeFrom(cur, 0.4, false).play();
+        activeTalkRef.current = next;
+        return;
+      }
       const cur = restActionRef.current;
-      if (!cur || e.action !== cur || talkModeRef.current) return;
-      const name = cur.getClip().name;
-      const i = cycle.indexOf(name);
-      // Try the following clips in order; skip any the export did not ship.
-      for (let k = 1; k < cycle.length; k++) {
-        const next = actions?.[cycle[(i + k) % cycle.length]];
-        if (!next || next === cur) continue;
+      if (!cur || e.action !== cur) return;
+      // Position, not clip name: the list may repeat a clip to weight it
+      // ("idle","idle","idle","looking"). A repeat of the clip already playing
+      // just lets it loop again — never crossfade an action from itself.
+      for (let k = 1; k <= cycle.length; k++) {
+        const j = (restIdxRef.current + k) % cycle.length;
+        const next = actions?.[cycle[j]];
+        if (!next) continue;                       // the export did not ship it
+        restIdxRef.current = j;
+        if (next === cur) return;                  // same clip again: keep looping
         next.reset().crossFadeFrom(cur, 0.6, false).play();
         restActionRef.current = next;
         return;
@@ -926,7 +963,8 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
     };
     mixer.addEventListener("loop", onLoop);
     return () => mixer.removeEventListener("loop", onLoop);
-  }, [mixer, actions, vendor.idleCycle]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mixer, actions, vendor.idleCycle, vendor.talkCycle]);
 
   // The retry. VendorModel suspends on useGLTF on the way in (the env map used
   // to be a second suspension before it moved to the non-suspending
@@ -1039,7 +1077,7 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
         // A gesture named by THIS line wins over the vendor's default talkClip.
         // An unknown name falls through, so a typo or a re-export that drops a
         // clip degrades to ordinary talking rather than freezing the rig.
-        const next = (gesture && actions?.[gesture]) || actions?.[vendor.talkClip];
+        const next = (gesture && actions?.[gesture]) || nextTalkAction(null);
         if (!next) return;
         talkModeRef.current = true;
         if (next === idle) {
