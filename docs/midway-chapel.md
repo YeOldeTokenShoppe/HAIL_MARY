@@ -48,8 +48,14 @@ Tent_Revival.glb`; copy it to `public/models/` before splitting.
   with `POSTCARD_ONLY=chapel node scripts/render-postcards.mjs`, backplate
   copied from the taco window's plate (same neighbours and sky).
 - The chaplain is a **stand-in body**: the snake-oil salesman's GLB offset to
-  the lectern. No `sitepal` yet, so he is silent. `window.__hmStallHide(re)`
-  is a new dev hook on the phone stage for hiding stall meshes by name.
+  the lectern. `window.__hmStallHide(re)` is a new dev hook on the phone stage
+  for hiding stall meshes by name.
+- **He speaks (2026-10-05):** `Vendor_Chaplain_Character.glb` now carries
+  `Face1`–`Face3`; `sitepal: "chapel"` in the catalog points at SitePal scene
+  **2775640** with his ElevenLabs voice (`3y3Tv5R1v43QNZdfXoU3`, engine 14) and a
+  greeting pool in `vendorSitePal.js`. The crop is the carny's as a seed and the
+  filter is neutral — sweep them on the `?tune=vendor` CHAPEL tab. The ledger
+  speech (section 3) is still unbuilt.
 
 
 ## 1. Premise

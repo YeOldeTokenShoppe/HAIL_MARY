@@ -150,7 +150,7 @@ export const TACOS_SITEPAL_CROP = {
   sepia: 0,
 };
 
-// Balloon-ride carny. The CROP is tuned via /hailmary?tune=vendor (CARNY tab);
+// Roller-coaster / time-machine carny. The CROP is tuned via /hailmary?tune=vendor (CARNY tab);
 // the FILTER below is the promos seed, kept because it read correctly on him by
 // eye rather than because it was swept — so if his colour ever looks off, that
 // block is the one that was never actually measured.
@@ -168,6 +168,27 @@ export const CARNY_SITEPAL_FILTER = {
   brightness: 124,
   hueRotate: 0,
   sepia: 28,
+};
+
+// The Midway chaplain (docs/midway-chapel.md). Scene 2775640 (2026-10-05).
+// The CROP is the carny's as a SEED — SitePal heads land in roughly the same
+// place on the 600×800 canvas — and the FILTER is neutral. Neither has been
+// swept against his face yet: tune via /hailmary?tune=vendor (CHAPEL tab) and
+// paste the logged values back here.
+export const CHAPEL_SITEPAL_CROP = {
+  cropX: 208,
+  cropY: 100,
+  cropW: 191,
+  cropH: 239,
+  rotateZ: 0,
+  rotateX: 0,
+};
+export const CHAPEL_SITEPAL_FILTER = {
+  saturate: 100,
+  contrast: 100,
+  brightness: 100,
+  hueRotate: 0,
+  sepia: 0,
 };
 
 // Tattoo artist — TWO sets, one per pose GLB, because her head sits at a very
@@ -400,7 +421,8 @@ export const VENDOR_SITEPAL_CONFIG = {
       ],
     },
   },
-  // The balloon-ride carny. "R-Lady" spelling rule applies here too.
+  // The roller-coaster / time-machine carny (the clown-mouth entrance).
+  // "R-Lady" spelling rule applies here too.
   carny: {
     sceneId: 2775422,
     voice: { voice: "oubi7HGxNVjXMnWLgwBT", lang: 1, engine: 14 },
@@ -410,23 +432,24 @@ export const VENDOR_SITEPAL_CONFIG = {
     filter: CARNY_SITEPAL_FILTER,
     greetings: {
       first: [
-        "Well hey there! Step right up, friend. First ride's the same price as the second, on account of I don't do discounts.",
-        { text: "Howdy! You are lookin' at the finest hot air balloon ride in the territory. Only one in the territory, too. Them two facts are related.", gesture: "pointing" },
+        "Well hey there! Step right up, friend. This here's the Time Machine. It's a roller coaster, too. Two rides, one price. I'm practically givin' it away. I ain't, but practically.",
+        { text: "Howdy! See that clown? You ride in through his mouth, and you come out the other side. WHEN you come out is the interestin' part.", gesture: "pointing" },
       ],
       returning: [
-        "Step right up! One ticket, one ride, one signature on this here waiver. Don't read it, it's long.",
-        "She's safe as houses, buddy. Well — safe as one house. A small one. With some issues.",
-        { text: "Balloon ride! See the whole field from up top! See your rig, see your neighbor's rig, see how much better his rig's doin'.", gesture: "pointing" },
-        "That creakin' sound? That's just the wicker settlin'. Wicker does that. Constantly. Forever.",
-        "I been runnin' this ride eleven years and ain't lost but a handful. Handful's a figure of speech. Mostly.",
-        { text: "You get a real nice view up there. Real nice perspective, too. Folks come down different. Quieter.", gesture: "pointing" },
-        "They tell me the smart money's in R-Lady. I don't follow it much myself. I take cash, and I take it up front.",
-        "Day {day}. Wind's pickin' up, which means the ride's more excitin' and the price is more flexible. Your call.",
-        { text: "Naw, I don't go up no more. Somebody's gotta hold the rope. That's the important job. Real important job.", gesture: "pointing" },
+        "Step right up! One ticket, one loop, one signature on this here waiver. Don't read it. Parts of it ain't been written yet.",
+        "She's safe as houses, buddy. Safe as a house from about nineteen fifty-two, anyhow. Which is where some folks say they ended up.",
+        { text: "Roller coaster AND a time machine! Go up the hill, come down the hill, come down on a Tuesday. We don't get to pick the Tuesday.", gesture: "pointing" },
+        "That rattlin' sound? That's just the track settlin'. Into which century, I couldn't tell you.",
+        "I been runnin' this ride eleven years. Or four. Depends which end of the track you count from.",
+        { text: "Fella rode it yesterday, stepped off, and knew right where the oil was gonna be. Rode it again to be sure. Ain't seen him since.", gesture: "pointing" },
+        "They tell me the smart money's in R-Lady. Folks come off this ride sayin' the same thing, only they say it like they already know.",
+        "Day {day}. Or thereabouts. Ride's been runnin' all mornin', and the calendar out here is more of a suggestion.",
+        { text: "Naw, I don't ride it no more. Somebody's gotta stay in the present and hold the lever. Real important job.", gesture: "pointing" },
+        "Clown ain't part of the ride. Clown's just the door. Try not to look him in the eye on the way in. He takes it personal.",
       ],
       frequent: [
-        "There he is! My best customer. You keep comin' back, which tells me either the ride's good or your memory ain't.",
-        "Back for another go? Tell you what — same price as last time. Which was already the special price. Which is the price.",
+        "Well, look who it is! My best customer. Or you will be. Or you were. This ride makes the bookkeepin' a nightmare.",
+        "Back for another go? Same price as last time. Same price as next time, too. I went and checked.",
       ],
     },
   },
@@ -524,17 +547,61 @@ export const VENDOR_SITEPAL_CONFIG = {
       ],
       returning: [
         "Step up and spin! Every pull on that wheel is a shot at R-Lady merchandise, and every miss is a reason to try again.",
-        "Fresh merchandise, straight off the balloon. Caps, patches, and one shirt so loud it violates three county ordinances.",
+        "Fresh merchandise, straight off the time machine. Caps, patches, and one shirt so loud it got banned in a decade that has not happened yet.",
         "You look like a prospector who needs a hat. Everyone out here needs a hat. That is not a pitch, that is meteorology.",
         "Today's promotion: spin the wheel, take the prize, tell absolutely everyone. That last part is the one I care about.",
         "I am projected, not printed, so the merchandise is more real than I am. Sit with that for a second.",
-        "The balloon goes up at sundown with a banner on it. If your name is on that banner, you will be the last to find out.",
+        "Ride the coaster next door and you come back knowing the future. Spin my wheel first. Future you already knows what you won, and I hear they were thrilled.",
         "Day {day} and the wheel has not been fair once. It has been generous, which is better than fair and sells more hats.",
         "Buy nothing, spin anyway. My job is attention, and you are already giving me some.",
       ],
       frequent: [
         "My most loyal customer. You have spun that wheel so often the paint is coming off the good wedge.",
         "Back for more merchandise? At this point you are less a customer and more a walking advertisement. I approve.",
+      ],
+    },
+  },
+  // The Midway chaplain: a company-town preacher — sincere, tired, a little
+  // venal (the indulgence table is right there), deadpan in Our Lady's register.
+  // He mocks the FIELD, never the player's faith, and he is the other collar:
+  // she blesses, he absolves. Never "child"/"my son" — seeker, friend, pilgrim.
+  // "R-Lady" spelling rule applies. The ledger speech (he reads the player's
+  // actual record) is a later step and goes through speakVendorText, not here.
+  chapel: {
+    sceneId: 2775640,
+    // SCENE BROKEN (2026-10-05): requesting 2775640 makes the SitePal player throw
+    // "vh_mc.idleLoadedCallback is not a function" and hang on its spinner — and
+    // once it has, the host never swaps or speaks again until the page reloads.
+    // Reproduced standalone with the account's own embed snippet, with both embed
+    // tokens; the carny's scene is fine in the same harness. Until the scene is
+    // fixed in the SitePal account, this flag makes activate/prime/speak for him
+    // a no-op (one console warning) so a stall click or the CHAPEL tuner tab
+    // cannot take every other vendor down with it. Delete the flag once
+    // loadSceneByID(2775640) fires vh_sceneLoaded.
+    sceneBroken: true,
+    voice: { voice: "3y3Tv5R1v43QNZdfXoU3", lang: 1, engine: 14 },
+    projFace: "Face2",
+    regularFaces: ["Face1", "Face3"],
+    crop: CHAPEL_SITEPAL_CROP,
+    filter: CHAPEL_SITEPAL_FILTER,
+    greetings: {
+      first: [
+        "Come in, come in. The tent is open, the bell is rung, and the collection plate is merely resting. Sit wherever the robot is not.",
+        "A new face on the field. Welcome, pilgrim. I offer confession, penance and absolution, in that order, and I am told the order matters.",
+      ],
+      returning: [
+        "Welcome back. The field has sinned since I saw you last. I do not yet know whether you helped.",
+        "Candles are to the left, indulgences are to the right, and the truth is wherever you left it. Take your time.",
+        "Every well on this field is a prayer, friend. Most of them are the asking kind. Very few are the thanking kind.",
+        "I hear the smart money is in R-Lady. I keep a ledger, not a portfolio. The ledger is holding up better.",
+        "Day {day}. I have heard confessions from half this field, and the other half is simply quieter about it.",
+        "The casino is next door. We share a wall. Some nights I can hear the wheel through it. Some nights it can hear me.",
+        "You drilled into something you should not have. I can tell. People walk differently after the sulfur.",
+        "The chairs are free, the sermon is free, and the candle is a modest sum. A preacher has to eat, and the tent does not patch itself.",
+      ],
+      frequent: [
+        "You again. Either your conscience is very active or my bench is very comfortable. I have checked the bench.",
+        "My most faithful. Not my most virtuous, I keep a separate list for that, but faithful counts for a great deal out here.",
       ],
     },
   },
@@ -656,8 +723,8 @@ function vendorVisits(vendorId, increment) {
 
 // A greeting entry is either a plain string or { text, gesture }. `gesture`
 // names a clip in the vendor's own GLB to crossfade to while THAT line plays,
-// instead of the vendor's default talkClip — so a line about the balloon can
-// point at the balloon. Unknown gesture names fall back to talkClip, so a
+// instead of the vendor's default talkClip — so a line about the ride can
+// point at the ride. Unknown gesture names fall back to talkClip, so a
 // typo or a re-export that drops a clip degrades quietly.
 function resolveLine(entry) {
   const line = typeof entry === "string" ? entry : entry?.text;
@@ -773,10 +840,22 @@ export function warmVendorSitePal(reason) {
 
 // Focus a vendor: raise volume, stage a greeting, swap scenes if needed.
 // Speaks immediately when the right scene is already loaded.
+// A config flagged sceneBroken (see the chapel) must never reach loadSceneByID:
+// a scene the player cannot start wedges the whole host for the page lifetime.
+function sceneUsable(vendorId, config) {
+  if (!config?.sceneBroken) return true;
+  const win = w();
+  if (win && !win.__vendorSitePalBrokenWarned?.[vendorId]) {
+    win.__vendorSitePalBrokenWarned = { ...(win.__vendorSitePalBrokenWarned || {}), [vendorId]: true };
+    console.warn("[vendorSitePal] " + vendorId + ": SitePal scene " + config.sceneId + " is flagged sceneBroken — not loading it (see VENDOR_SITEPAL_CONFIG)." );
+  }
+  return false;
+}
+
 export function activateVendorSitePal(vendorId) {
   const win = w();
   const config = VENDOR_SITEPAL_CONFIG[vendorId];
-  if (!win || !config) return;
+  if (!win || !config || !sceneUsable(vendorId, config)) return;
   // A lazily-embedded host boots now; vh_sceneLoaded then speaks the staged
   // line once the vendor's scene is up (the pending mechanism below).
   requestVendorSitePalEmbed("activate:" + vendorId);
@@ -817,7 +896,7 @@ export function activateVendorSitePal(vendorId) {
 export function primeVendorSitePal(vendorId) {
   const win = w();
   const config = VENDOR_SITEPAL_CONFIG[vendorId];
-  if (!win || !config) return false;
+  if (!win || !config || !sceneUsable(vendorId, config)) return false;
   requestVendorSitePalEmbed("prime:" + vendorId);
   try {
     if (state.speakTimer) { clearTimeout(state.speakTimer); state.speakTimer = null; }
@@ -862,7 +941,7 @@ export function setVendorExpression(expression = "None", amplitude = 0.8, durati
 export function speakVendorText(vendorId, text, gesture = null) {
   const win = w();
   const config = VENDOR_SITEPAL_CONFIG[vendorId];
-  if (!win || !config || !text) return false;
+  if (!win || !config || !text || !sceneUsable(vendorId, config)) return false;
   requestVendorSitePalEmbed("speak:" + vendorId);
   state.desiredVolume = 7;
   state.activeVendorId = vendorId;

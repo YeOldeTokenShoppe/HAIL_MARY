@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Html } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -13,11 +13,31 @@ const initialUI = { mode: 'idle', phase: 'ready', busy: false, available: [], co
 const buttonStyle = { minHeight: 40, padding: '8px 12px', border: '1px solid #95714c', borderRadius: 6, background: '#36241b', color: '#fff2db', cursor: 'pointer', font: 'inherit', fontWeight: 600, touchAction: 'manipulation' };
 const under = (object, ancestor) => { for (let o = object; o; o = o.parent) if (o === ancestor) return true; return false; };
 
-export default function ClawMachineController({ stripScene, animations, interactionRef, focus, onFocusChange, onFocusObject, onZoomOut, onVendorClick, stripScale }) {
+// touch (the phone stage): the cabinet is played with the fingers — drag on it
+// to steer, tap a toy to line up, tap the red button to grab, tap the prize to
+// take it (see bindClawPointerControls' direct mode). The control panel shrinks
+// to a status line with the few things the cabinet has no part for (demo, reset,
+// deliver), so the camera can hold the cabinet at full size instead of backing
+// off to make room for a d-pad.
+const TOUCH_STATUS = [
+  [/Press Grab when ready/, 'Lined up — tap the red button to grab.'],
+  [/Aim over a toy, then grab/, 'Drag on the machine to steer, or tap a toy.'],
+  [/Steer to the front-left chute/, 'Got it! Drag to the front-left chute and tap the button — or Deliver.'],
+  [/Collect your prize/, 'You won! Tap the prize to take it.'],
+  [/Missed!/, 'Missed! Drag over a toy and tap the button.'],
+  [/Choose Manual Play/, 'Drag on the machine to steer. The red button grabs.'],
+];
+const touchStatus = (message) => (TOUCH_STATUS.find(([re]) => re.test(message || '')) || [null, message])[1];
+// y: the band of the cabinet's height kept in view (0 = floor, 1 = top of the
+// sign); x: half-width kept, as a share of the cabinet's width (0.5 = all of it).
+const TOUCH_FRAME = { y: [0.11, 0.83], x: 0.43 };
+const chipStyle = { ...buttonStyle, minHeight: 34, padding: '6px 10px', fontSize: 12 };
+export default function ClawMachineController({ stripScene, animations, interactionRef, focus, onFocusChange, onFocusObject, onZoomOut, onVendorClick, stripScale, touch = false }) {
   const clip = useMemo(() => animations.find((a) => a.name === 'Claw_Demo'), [animations]);
   const panelAnchor = useRef(null), directControls = useRef(null);
   const machine = useRef(null), active = useRef(false), keys = useRef(new Set()), pointers = useRef(new Map());
   const callbacks = useRef({}); callbacks.current = { onFocusChange, onFocusObject, onZoomOut, onVendorClick };
+  const touchRef = useRef(touch); touchRef.current = touch;
   const [open, setOpen] = useState(false), [ui, setUI] = useState(initialUI), [error, setError] = useState(null);
   const { camera, size, gl, controls } = useThree();
   const orbitRef = useRef(controls); orbitRef.current = controls;
@@ -34,14 +54,27 @@ export default function ClawMachineController({ stripScene, animations, interact
   const frameMachine = (root) => {
     root.updateWorldMatrix(true, true);
     const bounds = boundsInMachine(root, root), dimensions = bounds.getSize(new THREE.Vector3());
-    const at = root.localToWorld(bounds.getCenter(new THREE.Vector3()));
+    const centre = bounds.getCenter(new THREE.Vector3());
+    // Touch: frame the part that is PLAYED — the glass, the control deck and the
+    // prize door — and let the marquee, the wheels and a sliver of each side
+    // pillar run off the screen. Framing the whole cabinet left the toys and the
+    // button small on a phone for the sake of a sign nobody touches.
+    const crop = touchRef.current ? TOUCH_FRAME : null;
+    if (crop) centre.y = bounds.min.y + dimensions.y * (crop.y[0] + crop.y[1]) / 2;
+    const at = root.localToWorld(centre);
     const normal = new THREE.Vector3(0.18, 0.08, 1).transformDirection(root.matrixWorld);
     const scale = root.getWorldScale(new THREE.Vector3()).y;
     const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov || 50) / 2);
-    // Reserve room beneath the cabinet for the mobile control panel.
-    const reserved = size.width < 700 ? Math.min(440, size.height * 0.56) : 0;
+    // Reserve room beneath the cabinet for the mobile control panel: what the
+    // panel actually takes once it has been measured (it is short until Manual
+    // Play opens the controls), the old worst-case guess before that. The guess
+    // alone left the cabinet a small thing at the top of a tall phone screen,
+    // its lever and button too small to touch.
+    const reserved = size.width < 700 ? (panelH.current ? Math.min(panelH.current + 34, size.height * 0.62) : Math.min(440, size.height * 0.56)) : 0;
     const visibleHeight = Math.max(0.35, (size.height - reserved) / size.height);
-    const dist = (Math.max(dimensions.y * 0.55 / (tanV * visibleHeight), dimensions.x * 0.6 / (tanV * camera.aspect)) + dimensions.z * 0.6) * scale;
+    const halfY = crop ? dimensions.y * (crop.y[1] - crop.y[0]) / 2 * 1.03 : dimensions.y * 0.55;
+    const halfX = crop ? dimensions.x * crop.x : dimensions.x * 0.6;
+    const dist = (Math.max(halfY / (tanV * visibleHeight), halfX / (tanV * camera.aspect)) + dimensions.z * 0.6) * scale;
     if (reserved) at.addScaledVector(new THREE.Vector3(0, 1, 0).transformDirection(root.matrixWorld), -dist * tanV * reserved / size.height);
     callbacks.current.onFocusObject?.(at, normal, dist, Math.min(0.1, dist * 0.2));
   };
@@ -55,9 +88,24 @@ export default function ClawMachineController({ stripScene, animations, interact
     callbacks.current.onVendorClick?.('claw');
     window.dispatchEvent(new CustomEvent('hm-claw-active', { detail: { active: true } }));
     callbacks.current.onFocusChange?.({ id: 'claw', object: root });
+    // nothing to choose first on a phone: the machine is live the moment you step up
+    if (touchRef.current && machine.current && machine.current.state.mode === 'idle') machine.current.manual();
     frameMachine(root);
   };
   const handlers = useRef({}); handlers.current = { enter, close, frame: () => { if (machine.current) frameMachine(machine.current.root); } };
+  // The panel's height, measured: re-frame whenever it changes on a narrow
+  // screen (wide ones dock the panel beside the cabinet and reserve nothing).
+  const panelH = useRef(0), panelObserver = useRef(null), narrow = useRef(false); narrow.current = size.width < 700;
+  const measurePanel = useCallback((el) => {
+    panelObserver.current?.disconnect(); panelObserver.current = null;
+    if (!el || typeof ResizeObserver === 'undefined') { panelH.current = 0; return; }
+    const observer = new ResizeObserver(() => {
+      const h = el.offsetHeight; if (Math.abs(h - panelH.current) < 6) return;
+      panelH.current = h;
+      if (active.current && narrow.current) handlers.current.frame();
+    });
+    observer.observe(el); panelObserver.current = observer;
+  }, []);
 
   useEffect(() => {
     if (active.current) handlers.current.close(false);
@@ -79,11 +127,14 @@ export default function ClawMachineController({ stripScene, animations, interact
         e.stopPropagation();
         if (!active.current) { handlers.current.enter(); return true; }
         const c = machine.current;
+        // Use intersected descendants too: the cabinet glass can be the
+        // first hit in front of a toy or control in the same machine.
+        const hits = e.intersections || [e];
+        const hit = (o) => o && hits.some((h) => under(h.object, o));
+        // Reaching for a toy or the button IS choosing to play: no need to find
+        // Manual Play in the panel first.
+        if (c && c.state.mode !== 'manual' && !c.getStatus().busy && (hit(root.getObjectByName('Button_01')) || c.toys.some((o) => hit(o)))) c.manual();
         if (c?.state.mode === 'manual') {
-          // Use intersected descendants too: the cabinet glass can be the
-          // first hit in front of a toy or control in the same machine.
-          const hits = e.intersections || [e];
-          const hit = (o) => o && hits.some((h) => under(h.object, o));
           if (hit(root.getObjectByName('Button_01'))) c.press();
           else if (c.state.pending && hit(c.box)) c.collect();
           else if (!c.state.held) {
@@ -112,6 +163,19 @@ export default function ClawMachineController({ stripScene, animations, interact
   useEffect(() => {
     if (active.current && focus?.id !== 'claw') handlers.current.close(false);
   }, [focus]);
+  // debug: window.__hmClaw() — the machine's status and where its controls are on
+  // screen (client px), for driving a test by touch
+  useEffect(() => {
+    const onScreen = (o) => {
+      if (!o) return null;
+      const c = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()).project(camera);
+      const r = gl.domElement.getBoundingClientRect();
+      return [Math.round(r.left + (c.x + 1) / 2 * r.width), Math.round(r.top + (1 - c.y) / 2 * r.height)];
+    };
+    const read = () => { const c = machine.current, root = c?.root; return { active: active.current, status: c?.getStatus?.() ?? null, head: c ? [+c.state.x.toFixed(3), +c.state.z.toFixed(3)] : null, at: root ? { lever: onScreen(root.getObjectByName('Lever')), button: onScreen(root.getObjectByName('Button_01')), bear: onScreen(root.getObjectByName('Bear_01')), unicorn: onScreen(root.getObjectByName('Unicorn_01')), box: onScreen(c.box) } : null }; };
+    window.__hmClaw = read;
+    return () => { if (window.__hmClaw === read) delete window.__hmClaw; };
+  }, [camera, gl]);
   useEffect(() => {
     if (active.current) handlers.current.frame();
   }, [size.width, size.height]);
@@ -154,6 +218,12 @@ export default function ClawMachineController({ stripScene, animations, interact
     const binding = bindClawPointerControls({
       canvas: gl.domElement, camera, getMachine: () => machine.current,
       isActive: () => active.current, getControls: () => orbitRef.current, onActivate: () => handlers.current.enter(),
+      isDirect: () => touchRef.current,
+      onTap: ({ hit }) => {
+        const c = machine.current; if (!c) return;
+        if (c.state.pending) { if (hit(c.box) || hit(c.state.pending)) c.collect(); }
+        else if (!c.state.held) { const toy = c.toys.find((o) => hit(o)); if (toy) c.aim(toy.name); }
+      },
     });
     directControls.current = binding;
     return () => { binding.dispose(); directControls.current = null; };
@@ -199,10 +269,27 @@ export default function ClawMachineController({ stripScene, animations, interact
     </button>
   );
   const uiState = () => machine.current?.state || { x: 0, z: 0 };
+  if (touch) return (
+    <group ref={panelAnchor}>
+    <Html fullscreen calculatePosition={CENTER} zIndexRange={[110, 100]} style={{ pointerEvents: 'none' }}>
+      <section ref={measurePanel} aria-label="Claw machine" style={{ position: 'absolute', left: 10, right: 10, bottom: 12, boxSizing: 'border-box', pointerEvents: 'auto', background: 'rgba(27, 18, 14, .92)', color: '#fff2db', border: '1px solid #b48b56', borderRadius: 10, padding: '9px 11px', fontFamily: 'system-ui, sans-serif', fontSize: 13, boxShadow: '0 6px 22px #0007' }}
+        onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+        <p role="status" aria-live="polite" style={{ margin: 0, lineHeight: 1.4, minHeight: 36, textAlign: 'left' }}>{error ? `The claw machine could not start. ${error}` : touchStatus(ui.message)}</p>
+        {!error && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7 }}>
+          {ui.held && btn('Deliver', () => machine.current?.deliver(), ui.busy, { ...chipStyle, background: '#9a6430' })}
+          {ui.pending && btn('Take prize', () => machine.current?.collect(), ui.phase !== 'prize', { ...chipStyle, background: '#69512c' })}
+          {btn(ui.mode === 'demo' ? 'Play' : 'Demo', () => command(ui.mode === 'demo' ? 'manual' : 'demo'), false, chipStyle)}
+          {btn('Reset', () => command('reset'), false, chipStyle)}
+          <span style={{ marginLeft: 'auto', color: '#d5bc98', fontSize: 12, whiteSpace: 'nowrap' }}>{ui.collected} / 2 prizes</span>
+        </div>}
+      </section>
+    </Html>
+    </group>
+  );
   return (
     <group ref={panelAnchor}>
     <Html fullscreen calculatePosition={CENTER} zIndexRange={[110, 100]} style={{ pointerEvents: 'none' }}>
-      <section aria-label="Claw machine controls" style={{ position: 'absolute', right: 16, bottom: 20, width: 'min(340px, calc(100% - 32px))', maxHeight: Math.max(0, size.height - 40), boxSizing: 'border-box', display: 'flex', flexDirection: 'column', overflow: 'hidden', pointerEvents: 'auto', background: 'rgba(27, 18, 14, .97)', color: '#fff2db', border: '1px solid #b48b56', borderRadius: 12, padding: 16, fontFamily: 'system-ui, sans-serif', fontSize: 13, boxShadow: '0 10px 36px #0008' }}
+      <section ref={measurePanel} aria-label="Claw machine controls" style={{ position: 'absolute', right: 16, bottom: 20, width: 'min(340px, calc(100% - 32px))', maxHeight: Math.max(0, size.height - 40), boxSizing: 'border-box', display: 'flex', flexDirection: 'column', overflow: 'hidden', pointerEvents: 'auto', background: 'rgba(27, 18, 14, .97)', color: '#fff2db', border: '1px solid #b48b56', borderRadius: 12, padding: 16, fontFamily: 'system-ui, sans-serif', fontSize: 13, boxShadow: '0 10px 36px #0008' }}
         onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexShrink: 0, marginBottom: 12 }}>
           <strong style={{ fontSize: 18, color: '#f1c77d' }}>PRIZE CLAW</strong>

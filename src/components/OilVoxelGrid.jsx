@@ -121,6 +121,49 @@ const STRATA_PARAM = typeof window !== "undefined"
   ? new URLSearchParams(window.location.search).get("strata") : null;
 const STRATA_SPIKE = STRATA_PARAM === "1" || STRATA_PARAM === "mock";
 const STRATA_FORCE_MOCK = STRATA_PARAM === "mock";
+// Horizon ground (2026-10-05): the field is no longer a floating block — the
+// surface carries on past the claims to a ring of hills on the horizon (see
+// HorizonGround). The block itself is untouched, so the cross-section is still
+// there from below; from above it simply reads as open land. ON by default;
+// ?horizon=0 brings the bare block back for an A/B. Off in the strata spike,
+// whose voxel wall is the cliff face this would bury.
+export const HORIZON_GROUND = !STRATA_SPIKE && (typeof window === "undefined"
+  || new URLSearchParams(window.location.search).get("horizon") !== "0");
+// The land runs solid out to HORIZON_REACH and stops behind a ring of hills,
+// so the horizon is a ridge line rather than a haze. The sky dome is radius
+// 300, so everything stays inside it.
+const HORIZON_REACH = 282;
+// Hill ranges, nearest first: [radius, min height, max height, shade, seed].
+// The farthest never drops to zero, so the land's edge is always covered;
+// shade darkens the land colour (the ridges should read against the plain) and
+// lightens with distance for a little aerial perspective on top of the scene fog. Tune live: window.__hmHills = [[r, lo, hi, shade, seed], ...].
+const HORIZON_HILLS = [
+  [236, 0, 5, 0.5, 11],
+  [256, 1.5, 9, 0.62, 29],
+  [276, 3, 14, 0.74, 47],
+];
+const HORIZON_HILL_SEGMENTS = 160;
+// The fireworks are painted on a sky sphere that normally sits at radius 75 —
+// in FRONT of the hills and the far ground, so bursts drew over both. With the
+// horizon ground the sphere goes out past the hills (still inside the dome),
+// where depth hides whatever falls behind a ridge, and lifts so the lowest
+// bursts clear the ridge line.
+export const HORIZON_FIREWORKS = { radius: 292, lift: 34 };
+// Same problem, same cure, for the rest of the sky: stars, constellation and
+// sun discs were all authored close in (60–150 units), so they drew over the
+// hills instead of setting behind them. Each is pushed out past the hills and
+// enlarged by the same factor, so it looks the same size in the same place.
+// The dome (radius 300) writes no depth, so going beyond it is fine.
+//  - stars follow the CAMERA, which roams ~45 off-centre: 340 clears the hills
+//    from anywhere; sizeScale undoes the point-size falloff (authored at 150).
+//  - sunFar / solsticeSunFar / constellationFar multiply position AND size.
+export const HORIZON_SKY = {
+  stars: { radius: 340, sizeScale: 340 / 150 },
+  sunFar: 4,
+  solsticeSunFar: 5.4,
+  constellationFar: 5,
+};
+const HORIZON_EDGE_STEPS = 12;   // samples per field edge (corners always exact)
 const FOG_NEAR = 6;   // within this distance: no haze (keeps the selected plot clear)
 const FOG_FAR = 24;   // full haze by here (back of the grid recedes)
 // Horizon-haze color per environment — distant rigs fade toward this, so it should
@@ -4807,6 +4850,115 @@ function MesaApron({ worldW, worldD, worldH, cellSize, materials }) {
     </group>
   );
 }
+// The land beyond the claims (HORIZON_GROUND). The inner edge is the field's own
+// perimeter, so it butts the ground block's top face exactly (no overlap,
+// nothing to z-fight); the outer edge pushes the same perimeter samples out to
+// HORIZON_REACH. UVs continue the top face's mapping with a MIRRORED repeat, so
+// the topo lines run unbroken across the field's edge.
+function HorizonGround({ worldW, worldD, topoTex, palette }) {
+  const tex = useMemo(() => {
+    const t = topoTex.clone();
+    t.wrapS = t.wrapT = THREE.MirroredRepeatWrapping;
+    t.anisotropy = 8;
+    t.needsUpdate = true;
+    return t;
+  }, [topoTex]);
+  useEffect(() => () => tex.dispose(), [tex]);
+
+  const geometry = useMemo(() => {
+    const hw = worldW / 2, hd = worldD / 2, n = HORIZON_EDGE_STEPS;
+    // perimeter, counter-clockwise seen from above (+x → −z → −x → +z)
+    const rim = [];
+    for (let i = 0; i < n; i++) rim.push([hw, hd - (i / n) * worldD]);
+    for (let i = 0; i < n; i++) rim.push([hw - (i / n) * worldW, -hd]);
+    for (let i = 0; i < n; i++) rim.push([-hw, -hd + (i / n) * worldD]);
+    for (let i = 0; i < n; i++) rim.push([-hw + (i / n) * worldW, hd]);
+    const pos = [], uv = [], nor = [], idx = [];
+    [false, true].forEach((outer) => {
+      rim.forEach(([x, z]) => {
+        const k = outer ? HORIZON_REACH / Math.hypot(x, z) : 1;
+        const px = x * k, pz = z * k;
+        pos.push(px, 0, pz);
+        nor.push(0, 1, 0);
+        uv.push(px / worldW + 0.5, 0.5 - pz / worldD);
+      });
+    });
+    const m = rim.length;
+    for (let i = 0; i < m; i++) {
+      const a = i, b = (i + 1) % m, c = a + m, d = b + m;
+      idx.push(a, c, b, b, c, d);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+    g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    return g;
+  }, [worldW, worldD]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+
+  // polygonOffset: the boardwalk's sand and the complex's apron sit at y=0 too
+  const material = useMemo(() => new THREE.MeshStandardMaterial({
+    map: tex, color: palette.top, roughness: 0.9, metalness: 0.05,
+    polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2,
+  }), [tex, palette]);
+  useEffect(() => () => material.dispose(), [material]);
+
+  return (
+    <group>
+      <mesh geometry={geometry} material={material} raycast={_NO_RAYCAST} />
+      <HorizonHills palette={palette} />
+    </group>
+  );
+}
+// Ridge height around the compass for one range: a few seeded sine octaves,
+// squared-off toward the low end so ranges read as separate hills with saddles
+// between them rather than one even wave. 0..1.
+function hillProfile(theta, seed) {
+  let h = 0, amp = 1, total = 0;
+  for (let o = 0; o < 5; o++) {
+    const freq = [5, 8, 13, 21, 34][o];
+    h += amp * (0.5 + 0.5 * Math.sin(theta * freq + seed * (o + 1) * 1.7));
+    total += amp;
+    amp *= 0.58;
+  }
+  h /= total;
+  return THREE.MathUtils.smoothstep(h, 0.28, 0.82);
+}
+// Hills on the horizon: each range is an upright band around the field whose
+// top edge follows hillProfile. Flat-shaded bands are enough at this distance —
+// only the silhouette reads. Lit (normals straight up) and fogged like the land, so every environment
+// tints them with no palette of their own.
+function HorizonHills({ palette }) {
+  const [spec, setSpec] = useState(HORIZON_HILLS);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let live = HORIZON_HILLS;
+    Object.defineProperty(window, "__hmHills", { configurable: true, get: () => live, set: (v) => { live = v; setSpec(v); } });
+    return () => { delete window.__hmHills; };
+  }, []);
+  const ranges = useMemo(() => spec.map(([radius, lo, hi, shade, seed]) => {
+    const n = HORIZON_HILL_SEGMENTS, pos = [], nor = [], idx = [];
+    for (let i = 0; i <= n; i++) {
+      const th = (i / n) * Math.PI * 2, cx = Math.cos(th), cz = Math.sin(th);
+      const top = lo + (hi - lo) * hillProfile(th, seed);
+      pos.push(cx * radius, -0.5, cz * radius, cx * radius, top, cz * radius);
+      nor.push(0, 1, 0, 0, 1, 0);   // lit as flat land, so no compass side falls into shadow
+    }
+    for (let i = 0; i < n; i++) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 2, a + 3, a + 1); }   // front face toward the field
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+    g.setIndex(idx);
+    return { g, shade };
+  }), [spec]);
+  useEffect(() => () => ranges.forEach((r) => r.g.dispose()), [ranges]);
+  const materials = useMemo(() => ranges.map(({ shade }) => new THREE.MeshStandardMaterial({
+    color: new THREE.Color(palette.top).multiplyScalar(shade), roughness: 1, metalness: 0,
+  })), [ranges, palette]);
+  useEffect(() => () => materials.forEach((m) => m.dispose()), [materials]);
+  return ranges.map((r, i) => <mesh key={i} geometry={r.g} material={materials[i]} raycast={_NO_RAYCAST} />);
+}
 // ?towerspot=edge (dev, 2026-09-06): the tower stands OFF the grid, past the +X
 // edge at mid-field, so no claim sits under its legs (the strip holds the -Z edge).
 const TOWER_SPOT = (() => {
@@ -8119,6 +8271,7 @@ export default function OilVoxelGrid({
           <boxGeometry args={[worldW, worldH, worldD]} />
         </mesh>
       )}
+      {HORIZON_GROUND && <HorizonGround worldW={worldW} worldD={worldD} topoTex={topoTex} palette={groundPalette} />}
       {STRATA_SPIKE && (
         <StrataVoxels
           oilGrid={oilGrid}
@@ -8325,6 +8478,7 @@ export default function OilVoxelGrid({
           onFocusObject={onFocusObject}
           onZoomOut={onZoomOut}
           onBoothPhoto={onBoothPhoto}
+          braces={!HORIZON_GROUND}
         />
       )}
 

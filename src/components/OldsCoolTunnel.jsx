@@ -12,6 +12,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import { createLowRider, LOW_RIDER_MODEL_URL } from '@/lib/palmTreeDriveCar.mjs'
 import { createCandyEmeraldPaint } from '@/lib/palmTreeDrivePaint.mjs'
+import { loadHubCoaster } from '@/lib/hubCoaster.mjs'
 
 // How far below the camera path the road surface sits (world units). The low
 // rider is parked this far down so its tires touch the road.
@@ -24,6 +25,15 @@ const CURVE_SPEED = 0.017
 const VERTICAL_SCALE = 0.75
 // Length of the low rider in world units; the road is about 0.48 wide.
 const CAR_LENGTH = 0.42
+
+// /hub camera defaults. Players can switch between inside and behind views.
+// Distances are in scene units relative to the cart: +Y up, +Z forward.
+const COASTER_POV = {
+  mode: 'inside',
+  eyeHeight: 0.29,
+  seatOffset: 0.06, // Negative moves toward the back of the cart.
+  fov: 65, // Larger values give a wider view from the seat.
+}
 
 // Custom scanline shader
 const ScanlineShader = {
@@ -354,7 +364,7 @@ class WireTunnel extends THREE.LineSegments {
   // canopy: keep only the part of the tunnel that arches over the road.
   // canopyFloor is the cut height, -1 (bottom) .. 1 (top), measured along the
   // camera's screen-up at each ring; 0 keeps the half above the horizon.
-  constructor({ canopy = true, canopyFloor = -0.75 } = {}) {
+  constructor({ canopy = true, canopyFloor = -0.75, smoothPath = false } = {}) {
     const basePoints = [
       { x: 6.097824119373165, y: 2.962665382204997, z: 1.7433171949691226 },
       { x: 2.498887329278077, y: 1.876906878980996, z: -6.263607800877008 },
@@ -369,6 +379,10 @@ class WireTunnel extends THREE.LineSegments {
       basePoints.map(p => new THREE.Vector3(p.x, p.y * VERTICAL_SCALE, p.z)),
       true, 'catmullrom', 0.7
     )
+    if (smoothPath) {
+      curve.arcLengthDivisions = 4096
+      curve.updateArcLengths()
+    }
     const tubularSegments = 130
     const radialSegments = 7
     const tube = new THREE.TubeGeometry(curve, tubularSegments, 0.2, radialSegments, true)
@@ -585,13 +599,24 @@ class SynthwaveRoad extends THREE.Mesh {
 class FlyThrough {
   // vehicle: an Object3D kept just ahead of the camera on the curve, facing
   // along it (its +Z points forward, the Object3D.lookAt convention).
-  constructor(camera, curve, vehicle) {
+  constructor(camera, curve, vehicle, coasterRide = null) {
     this.camera = camera
     this.curve = curve
     this.vehicle = vehicle
+    this.coasterRide = coasterRide
+    this.cameraMode = COASTER_POV.mode
     this.la = new THREE.Vector3()
     this.tangent = new THREE.Vector3()
     this.laVehicle = new THREE.Vector3()
+  }
+
+  setCameraMode(mode) {
+    this.cameraMode = mode
+    const fov = this.coasterRide && mode === 'inside' ? COASTER_POV.fov : 45
+    if (this.camera.fov !== fov) {
+      this.camera.fov = fov
+      this.camera.updateProjectionMatrix()
+    }
   }
 
   update(t) {
@@ -601,6 +626,7 @@ class FlyThrough {
 
     this.curve.getPointAt(cameraA, this.camera.position)
     this.curve.getPointAt(lookAtA, this.la)
+    this.camera.up.set(0, 1, 0)
     this.camera.lookAt(this.la)
     
     // The vehicle sits at the camera's look-at point and faces along the
@@ -610,6 +636,24 @@ class FlyThrough {
     this.curve.getTangentAt(lookAtA, this.tangent)
     this.laVehicle.copy(this.la).add(this.tangent)
     this.vehicle.lookAt(this.laVehicle)
+    this.coasterRide?.placeVehicle(lookAtA)
+
+    // Apply the rider's POV after the cart's axle-based pose is finalized.
+    // Both the eye and target use that pose, so the camera rides the cart
+    // through turns and hills without drifting off the seat.
+    if (this.coasterRide && this.cameraMode === 'inside') {
+      const { eyeHeight, seatOffset } = COASTER_POV
+      this.camera.position
+        .set(0, eyeHeight, seatOffset)
+        .applyQuaternion(this.vehicle.quaternion)
+        .add(this.vehicle.position)
+      this.laVehicle
+        .set(0, eyeHeight, seatOffset + 1)
+        .applyQuaternion(this.vehicle.quaternion)
+        .add(this.vehicle.position)
+      this.camera.up.set(0, 1, 0).applyQuaternion(this.vehicle.quaternion)
+      this.camera.lookAt(this.laVehicle)
+    }
   }
 }
 
@@ -685,13 +729,16 @@ function loadLowRider({ rig, renderer, cameraSpeed, onError }) {
   }
 }
 
-export default function OldsCoolTunnel({ isFullscreen = false, road = true, canopy = true, car = true }) {
+export default function OldsCoolTunnel({ isFullscreen = false, road = true, canopy = true, car = true, coaster = false }) {
   const { t } = useLanguage()
   const mountRef = useRef(null)
   const sceneRef = useRef(null)
   const rendererRef = useRef(null)
   const frameIdRef = useRef(null)
   const [isPaused, setIsPaused] = React.useState(false)
+  const [cameraMode, setCameraMode] = React.useState(COASTER_POV.mode)
+  const cameraModeRef = useRef(COASTER_POV.mode)
+  const toggleCameraRef = useRef(null)
   const [focusedImage, setFocusedImage] = React.useState(null)
   const [focusedIndex, setFocusedIndex] = React.useState(-1)
   const [focusedImageData, setFocusedImageData] = React.useState(null)
@@ -730,7 +777,7 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
     const containerHeight = mountRef.current?.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : 600)
     
     const camera = new THREE.PerspectiveCamera(
-      45,
+      coaster && cameraModeRef.current === 'inside' ? COASTER_POV.fov : 45,
       containerWidth / containerHeight,
       0.01,
       1000
@@ -798,10 +845,10 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
       new THREE.AmbientLight(0xffffff, Math.PI * 0.2)
     )
     
-    const wireTunnel = new WireTunnel({ canopy })
+    const wireTunnel = new WireTunnel({ canopy, smoothPath: coaster })
     scene.add(wireTunnel)
 
-    if (road) scene.add(new SynthwaveRoad(wireTunnel.curve))
+    if (road && !coaster) scene.add(new SynthwaveRoad(wireTunnel.curve))
 
     const gallery = new FloatingGallery(wireTunnel.curve)
     scene.add(gallery)
@@ -816,18 +863,40 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
     scene.add(vehicle)
     const showShip = () => { vehicle.add(wireTunnel.ship); wireTunnel.ship.visible = true }
     wireTunnel.ship.visible = false
-    const lowRiderLoad = car
+    const coasterLoad = coaster
+      ? loadHubCoaster({
+        scene, rig: vehicle, curve: wireTunnel.curve, drop: ROAD_DROP, carLength: CAR_LENGTH,
+        onError: () => {
+          if (road) scene.add(new SynthwaveRoad(wireTunnel.curve))
+          showShip()
+        }
+      })
+      : null
+    const lowRiderLoad = car && !coaster
       ? loadLowRider({ rig: vehicle, renderer, cameraSpeed: CURVE_SPEED * wireTunnel.curve.getLength(), onError: showShip })
       : null
-    if (!car) showShip()
+    if (!car && !coaster) showShip()
 
-    const flyThrough = new FlyThrough(camera, wireTunnel.curve, vehicle)
+    const flyThrough = new FlyThrough(camera, wireTunnel.curve, vehicle, coasterLoad)
+    flyThrough.setCameraMode(cameraModeRef.current)
 
     let t = 0
     let isPausedLocal = false
     let lastTime = performance.now()
     const targetFPS = 60
     const frameInterval = 1000 / targetFPS
+
+    // Change only the camera, preserving ride progress and pause state. Apply
+    // immediately so switching also works while the simulation is paused.
+    const toggleCamera = () => {
+      if (!coaster || focusStateRef.current.image) return
+      const nextMode = cameraModeRef.current === 'inside' ? 'behind' : 'inside'
+      cameraModeRef.current = nextMode
+      flyThrough.setCameraMode(nextMode)
+      flyThrough.update(t)
+      setCameraMode(nextMode)
+    }
+    toggleCameraRef.current = toggleCamera
 
     const animate = () => {
       frameIdRef.current = requestAnimationFrame(animate)
@@ -874,9 +943,20 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
 
     const handleKeyPress = (e) => {
       // Only handle key presses in fullscreen mode
-      if (!isFullscreen) return
-      
+      if (!isFullscreen || e.defaultPrevented || e.repeat || e.altKey || e.ctrlKey || e.metaKey) return
+      const target = e.target
+      if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]')) return
+
+      if (coaster && e.code === 'KeyV' && !focusStateRef.current.image) {
+        e.preventDefault()
+        toggleCamera()
+        return
+      }
+
       if (e.code === 'Space') {
+        // Let native button/link keyboard activation run without also
+        // pausing the ride when the view button has focus.
+        if (target instanceof HTMLElement && target.closest('button, a')) return
         e.preventDefault()
         isPausedLocal = !isPausedLocal
         wasManuallyPausedRef.current = isPausedLocal // Track manual pause state
@@ -913,7 +993,6 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
         }
       }
       
-      // Removed V and R key handlers - no longer needed
     }
     
     const handleTouch = (e) => {
@@ -1025,7 +1104,9 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
         cancelAnimationFrame(frameIdRef.current)
       }
 
+      toggleCameraRef.current = null
       lowRiderLoad?.dispose()
+      coasterLoad?.dispose()
       
       // Dispose of gallery resources
       if (gallery && gallery.dispose) {
@@ -1063,7 +1144,7 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
         }
       }
     }
-  }, [isFullscreen, road, canopy, car])
+  }, [isFullscreen, road, canopy, car, coaster])
 
   // Apply translations to focused image data when index changes
   useEffect(() => {
@@ -1112,6 +1193,40 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
               (typeof window !== 'undefined' && 'ontouchstart' in window ? (t('oldsCoolTunnel.ui.tapToPause') || 'Tap to Pause') : (t('oldsCoolTunnel.ui.pressSpacePause') || 'Press SPACE to Pause'))
             }
           </div>
+          {coaster && (
+            <button
+              type="button"
+              aria-label={`Switch to ${cameraMode === 'inside' ? 'behind-cart' : 'inside-cart'} view`}
+              aria-keyshortcuts="V"
+              title="Switch camera view (V)"
+              onClick={(event) => {
+                event.stopPropagation()
+                toggleCameraRef.current?.()
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                width: '100%',
+                minHeight: '44px',
+                marginTop: '10px',
+                padding: '8px 12px',
+                border: '1px solid #8af',
+                borderRadius: '4px',
+                background: 'rgba(65, 17, 255, 0.18)',
+                color: '#fff4e8',
+                fontFamily: 'inherit',
+                fontSize: '14px',
+                cursor: 'pointer',
+                pointerEvents: 'auto',
+                touchAction: 'manipulation',
+              }}
+            >
+              <span>View: {cameraMode === 'inside' ? 'Inside cart' : 'Behind cart'}</span>
+              <span aria-hidden="true" style={{ color: '#8af' }}>⇄ V</span>
+            </button>
+          )}
           {isPaused && (
             <div style={{ fontSize: '12px', marginTop: '3px', color: '#fa0' }}>
               🔍 {t('oldsCoolTunnel.ui.selectImageDetail') || 'Select image for detailed view'}

@@ -31,7 +31,7 @@ export default function HubPage() {
   return (
     <main className={styles.hub} aria-labelledby="hub-title">
       <div className={styles.scene}>
-        <OldsCoolTunnel isFullscreen />
+        <OldsCoolTunnel isFullscreen coaster />
       </div>
 
       <header className={styles.header}>

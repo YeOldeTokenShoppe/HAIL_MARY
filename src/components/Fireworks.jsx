@@ -14,12 +14,14 @@ import * as THREE from "three";
  *  - shellSize   : 0–5 (default 2)
  *  - enabled     : boolean (default true)
  *  - radius      : sphere radius (default 75, should be < sky dome 80)
+ *  - lift        : raises the whole sphere (world units), lifting the burst band
  */
 export default function FireworksSky({
   quality: qualityProp = 2,
   shellSize: shellSizeProp = 2,
   enabled = true,
   radius = 75,
+  lift = 0,
   heading = Math.PI / 2, // rotate sky sphere so the burst band faces -Z (the sky-view camera)
   finale = false, // rapid-fire finale: bursts of fast shells with brief pauses
   sound = true, // play launch/burst/crackle sound effects
@@ -769,7 +771,7 @@ export default function FireworksSky({
   });
 
   return (
-    <mesh ref={meshRef} rotation={[0, heading, 0]} renderOrder={-1}>
+    <mesh ref={meshRef} position={[0, lift, 0]} rotation={[0, heading, 0]} renderOrder={-1}>
       <sphereGeometry args={[radius, 32, 16]} />
       <meshBasicMaterial
         map={texture}

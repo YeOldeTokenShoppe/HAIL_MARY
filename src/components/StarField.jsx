@@ -73,7 +73,9 @@ const getRandomParticlePos = (particleCount, radius = 200) => {
   return { positions: arr, sizes, colors };
 };
 
-const StarField = ({ count1 = 250, count2 = 150, is80sMode = false, radius = 200 }) => {
+// sizeScale: multiplies the point sizes — pass radius/authoredRadius when pushing
+// the field further out, so the stars keep their apparent size.
+const StarField = ({ count1 = 250, count2 = 150, is80sMode = false, radius = 200, sizeScale = 1 }) => {
   const starsGroup = useRef();
   const smallStars = useRef();
   const largeStars = useRef();
@@ -129,7 +131,7 @@ const StarField = ({ count1 = 250, count2 = 150, is80sMode = false, radius = 200
   // Define materials without textures initially
   const starMaterial1 = useRef(
     new THREE.PointsMaterial({
-      size: 0.7,
+      size: 0.7 * sizeScale,
       transparent: true,
       opacity: 0.8,
       sizeAttenuation: true,
@@ -144,7 +146,7 @@ const StarField = ({ count1 = 250, count2 = 150, is80sMode = false, radius = 200
 
   const starMaterial2 = useRef(
     new THREE.PointsMaterial({
-      size: 1.0,
+      size: 1.0 * sizeScale,
       transparent: true,
       opacity: 0.7,
       sizeAttenuation: true,

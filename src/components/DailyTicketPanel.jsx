@@ -288,16 +288,19 @@ export default function DailyTicketPanel({ loopV2 = false,
   );
   const onGold = onColor(gold);
   const barBase = { display: "flex", alignItems: "center", width: "100%", minHeight: 28, borderRadius: 3, fontFamily: MONO, textTransform: "uppercase", padding: "0 9px", gap: 8 };
+  // Keyed so each state is its own element. Unkeyed, React patched one button's
+  // styles in place, and going between the gold bar (background + backgroundSize)
+  // and a plain one (background only) is the shorthand/longhand mix it warns about.
   const ticketBar = !ticket
     ? (
-      <button onClick={remoteError ? retryMint : undefined} style={{ ...barBase, justifyContent: "center", gap: 10, cursor: remoteError ? "pointer" : "default", border: `1px solid ${t.border}`, background: t.btnBg, color: remoteError ? K.lose : muted, fontSize: 9, letterSpacing: "0.12em", textAlign: "center" }}>
+      <button key="minting" onClick={remoteError ? retryMint : undefined} style={{ ...barBase, justifyContent: "center", gap: 10, cursor: remoteError ? "pointer" : "default", border: `1px solid ${t.border}`, background: t.btnBg, color: remoteError ? K.lose : muted, fontSize: 9, letterSpacing: "0.12em", textAlign: "center" }}>
         <span>{remoteError ? remoteError : "Minting today's ticket…"}</span>
         {remoteError && <span style={{ color: muted, textDecoration: "underline", whiteSpace: "nowrap" }}>retry</span>}
       </button>
     )
     : !settled
       ? (
-        <button onClick={() => setOpen(true)} style={{
+        <button key="reveal" onClick={() => setOpen(true)} style={{
           ...barBase, justifyContent: "center", minHeight: 30, cursor: "pointer",
           border: `1px solid ${t.goldBorder}`, color: onGold, fontSize: 10, fontWeight: 700, letterSpacing: "0.18em",
           background: `linear-gradient(110deg, ${gold} 0%, ${gold} 38%, #fff3c4 50%, ${gold} 62%, ${gold} 100%)`, backgroundSize: "260% 100%",
@@ -308,7 +311,7 @@ export default function DailyTicketPanel({ loopV2 = false,
         </button>
       )
       : (
-        <button onClick={() => setOpen(true)} style={{ ...barBase, justifyContent: "space-between", cursor: "pointer", border: `1px solid ${t.border}`, background: t.btnBg, color: muted, fontSize: 9, letterSpacing: "0.12em" }}>
+        <button key="settled" onClick={() => setOpen(true)} style={{ ...barBase, justifyContent: "space-between", cursor: "pointer", border: `1px solid ${t.border}`, background: t.btnBg, color: muted, fontSize: 9, letterSpacing: "0.12em" }}>
           <span style={{ color: won ? K.win : muted, fontWeight: 700, whiteSpace: "nowrap" }}>{won ? `✓ ${shortText(ticket.win)}` : "— No match"}</span>
           <span style={{ whiteSpace: "nowrap" }}>Next ticket in {nextIn}</span>
         </button>

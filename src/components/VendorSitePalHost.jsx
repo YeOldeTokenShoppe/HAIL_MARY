@@ -20,6 +20,8 @@ import {
   TACOS_SITEPAL_FILTER,
   CARNY_SITEPAL_CROP,
   CARNY_SITEPAL_FILTER,
+  CHAPEL_SITEPAL_CROP,
+  CHAPEL_SITEPAL_FILTER,
   TATTOOS_IDLE_SITEPAL_CROP,
   TATTOOS_IDLE_SITEPAL_FILTER,
   TATTOOS_SEATED_SITEPAL_CROP,
@@ -32,6 +34,7 @@ import {
   CREW_SITEPAL_CROP,
   CREW_SITEPAL_FILTER,
   activateVendorSitePal,
+  primeVendorSitePal,
   speakVendorText,
 } from "@/lib/vendorSitePal";
 
@@ -48,13 +51,16 @@ const TUNER_VENDORS = {
   rugs: { label: "RUGS", crop: RUGS_SITEPAL_CROP, filter: RUGS_SITEPAL_FILTER, constName: "RUGS" },
   tacos: { label: "TACOS", crop: TACOS_SITEPAL_CROP, filter: TACOS_SITEPAL_FILTER, constName: "TACOS" },
   carny: { label: "CARNY", crop: CARNY_SITEPAL_CROP, filter: CARNY_SITEPAL_FILTER, constName: "CARNY" },
+  // Scene 2775640 is flagged sceneBroken in VENDOR_SITEPAL_CONFIG (2026-10-05): the tab shows,
+  // but nothing is requested for it until that flag goes — see the config comment.
+  chapel: { label: "CHAPEL", crop: CHAPEL_SITEPAL_CROP, filter: CHAPEL_SITEPAL_FILTER, constName: "CHAPEL" },
   // Two poses, two crop sets. Only the pose this page load DREW is on screen —
   // pin it with ?pose=idle / ?pose=tattooing or you are tuning a set nothing is
   // currently using.
   tattoos_idle: { label: "TAT STAND", crop: TATTOOS_IDLE_SITEPAL_CROP, filter: TATTOOS_IDLE_SITEPAL_FILTER, constName: "TATTOOS_IDLE", sitepalId: "tattoos" },
   tattoos_seated: { label: "TAT SIT", crop: TATTOOS_SEATED_SITEPAL_CROP, filter: TATTOOS_SEATED_SITEPAL_FILTER, constName: "TATTOOS_SEATED", sitepalId: "tattoos" },
-  // The rig crew's briefer (RigCrew.jsx, not a stall): picking this tab loads the crew scene
-  // itself, and RigCrew keeps the operator projecting and facing the camera while it is the
+  // The rig crew's briefer (RigCrew.jsx, not a stall): picking this tab ACTIVATES the crew
+  // scene (with a line, not just primed), and RigCrew keeps the operator projecting and facing the camera while it is the
   // tune target (window.__vendorSitePalTuneId) — open the MACHINE PANEL view to get close.
   crew: { label: "CREW", crop: CREW_SITEPAL_CROP, filter: CREW_SITEPAL_FILTER, constName: "CREW", activateOnSelect: true,
     // No greeting pool (the briefing lines are RigCrew's), so the tab speaks one of these on
@@ -158,6 +164,30 @@ function VendorCropTuner() {
   // is aiming, and the gain between them (published per frame while the
   // stall projects). Only meaningful for the vendor whose tab is open.
   const [skin, setSkin] = useState(null);
+  // Live host readout — the first thing to read when a tab does not swap or
+  // nothing is heard. `loaded` is the vh_sceneLoaded flag that EVERY swap and
+  // EVERY line is gated on; `player says` is what the SitePal player itself
+  // reports as up; a hidden tab explains a player that never finishes anything
+  // (it throttles when the document is not visible). "SCENE FLAGGED BROKEN"
+  // means the config carries sceneBroken and nothing will be requested.
+  const [hostStatus, setHostStatus] = useState("");
+  useEffect(() => {
+    const tick = () => {
+      const w = window;
+      let attrs = null;
+      try { attrs = typeof w.getSceneAttributes === "function" ? w.getSceneAttributes() : null; } catch (e) {}
+      const cfg = VENDOR_SITEPAL_CONFIG[sitepalId];
+      setHostStatus(
+        `host · embedded ${w.__vendorSitePalEmbedded ? "yes" : "no"} · loaded ${w.__vendorSitePalSceneLoaded === true ? "yes" : "NO"}` +
+        ` · scene ${w.__vendorSitePalCurrentSceneId ?? "-"} (player says ${attrs?.sceneID ?? "-"} · tab wants ${cfg?.sceneId ?? "-"})` +
+        ` · say ${typeof w.sayText === "function" ? "ready" : "no"} · tab ${document.visibilityState}` +
+        (cfg?.sceneBroken ? " · SCENE FLAGGED BROKEN — not loading it" : "")
+      );
+    };
+    tick();
+    const t = setInterval(tick, 500);
+    return () => clearInterval(t);
+  }, [sitepalId]);
   const skinJsonRef = useRef("");
   // skinTarget is typed freely and applied only once it is a full hex (or
   // cleared, which means "the authored colour").
@@ -172,10 +202,16 @@ function VendorCropTuner() {
   };
 
   // Who is being tuned: characters outside the strip (the rig crew) read this to
-  // project without a focus, and a tab flagged activateOnSelect boots its scene.
+  // project without a focus. Every tab brings ITS scene up in the host when
+  // selected — silently, via primeVendorSitePal — so the preview shows the face
+  // being tuned without first flying into that stall (before 2026-10-05 only the
+  // crew tab did, and the preview sat on whatever scene the host booted with,
+  // i.e. the fortune teller's). A tab flagged activateOnSelect activates with a
+  // line instead, the way a stall click would.
   useEffect(() => {
     window.__vendorSitePalTuneId = sitepalId;
     if (active.activateOnSelect) { try { activateVendorSitePal(sitepalId); } catch (e) {} }
+    else { try { primeVendorSitePal(sitepalId); } catch (e) {} }
     if (active.tuneLines?.length) { try { speakVendorText(sitepalId, active.tuneLines[Math.floor(Math.random() * active.tuneLines.length)]); } catch (e) {} }
     return () => { window.__vendorSitePalTuneId = null; };
   }, [sitepalId, active]);
@@ -351,6 +387,7 @@ function VendorCropTuner() {
       <div style={{ fontSize: 10, opacity: 0.6 }}>
         press f to flip · pins {active.label} — exactly one face mesh is drawn
       </div>
+      <div style={{ fontSize: 10, opacity: 0.8, color: "#9fd", wordBreak: "break-word" }}>{hostStatus}</div>
       <canvas ref={previewRef} width={400} height={300} style={{ width: "100%", borderRadius: 4, background: "#222" }} />
       {TUNER_CROP_FIELDS.map(([k, min, max]) => slider(active.crop, k, min, max))}
       <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>

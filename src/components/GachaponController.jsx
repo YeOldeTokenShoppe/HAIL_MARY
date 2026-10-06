@@ -144,6 +144,7 @@ function CapsuleReveal({ apiRef }) {
         st.current.fromScale = trayHeight / m.height;
         go("rising");
       },
+      open,
       finish,
       stop,
       active: () => st.current.phase !== "off",
@@ -260,9 +261,14 @@ function CapsuleReveal({ apiRef }) {
   );
 }
 
-export default function GachaponController({ stripScene, interactionRef, focus, onFocusChange, onFocusObject, onZoomOut, onVendorClick, stripScale }) {
-  const { camera, controls } = useThree();
+// closeOnCabinetClick: on the desktop a second click on the cabinet pulls the
+// camera back, like a vendor. The phone stage turns it off — a thumb aiming for
+// the knob lands on the cabinet half the time, and STEP BACK is right there.
+export default function GachaponController({ stripScene, interactionRef, focus, onFocusChange, onFocusObject, onZoomOut, onVendorClick, stripScale, closeOnCabinetClick = true }) {
+  const { camera, controls, gl } = useThree();
   const controlsRef = useRef(controls); controlsRef.current = controls;
+  const cameraRef = useRef(camera); cameraRef.current = camera;
+  const glRef = useRef(gl); glRef.current = gl;
   const parts = useRef(null);
   const active = useRef(false);
   const knob = useRef({ target: 0, current: 0, drag: null, orbitWas: true });
@@ -271,7 +277,7 @@ export default function GachaponController({ stripScene, interactionRef, focus, 
   const reveal = useRef(null);
   const revealing = () => !!reveal.current?.active();
   const callbacks = useRef({});
-  callbacks.current = { onFocusChange, onFocusObject, onZoomOut, onVendorClick };
+  callbacks.current = { onFocusChange, onFocusObject, onZoomOut, onVendorClick, closeOnCabinetClick };
 
   useEffect(() => {
     clank.current = new Audio("/clank.mp3");
@@ -432,6 +438,16 @@ export default function GachaponController({ stripScene, interactionRef, focus, 
         window.addEventListener("pointercancel", up);
         return true;
       },
+      // Touch (the phone stage): once the capsule is up, a tap ANYWHERE opens it
+      // and the next puts it away — a thumb should not have to find the glass.
+      // False when there is no capsule up, so the tap falls through to handleClick.
+      tapReveal() {
+        if (!revealing()) return false;
+        const phase = reveal.current.phase();
+        if (phase === "closed") reveal.current.open();
+        else if (phase === "open") reveal.current.finish();
+        return true;
+      },
       handleClick(e) {
         // Mid-reveal, every deck click is ours: the capsule is the only thing to
         // do, and a stray click must not zoom out or fly the camera.
@@ -450,7 +466,7 @@ export default function GachaponController({ stripScene, interactionRef, focus, 
         const hit = (o) => o && hits.some((h) => under(h.object, o));
         if (hit(p.dial)) handlers.current.turnKnob();
         else if (capsule.current.settled && (hit(p.glass) || hit(p.base) || hit(p.toy))) handlers.current.collectCapsule();
-        else handlers.current.close();   // the rest of the cabinet: second click pulls back, like a vendor
+        else if (callbacks.current.closeOnCabinetClick) handlers.current.close();   // the rest of the cabinet: second click pulls back, like a vendor
         return true;
       },
     };
@@ -474,6 +490,21 @@ export default function GachaponController({ stripScene, interactionRef, focus, 
   useEffect(() => {
     if (active.current && focus?.id !== "gachapon") handlers.current.close(false);
   }, [focus]);
+
+  // debug: window.__hmGacha() — where the machine thinks it is
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // `at`: where the knob and the tray capsule are on screen (client px), for driving a test by touch
+    const onScreen = (o) => {
+      if (!o) return null;
+      const c = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()).project(cameraRef.current);
+      const r = glRef.current.domElement.getBoundingClientRect();
+      return [Math.round(r.left + (c.x + 1) / 2 * r.width), Math.round(r.top + (1 - c.y) / 2 * r.height)];
+    };
+    const read = () => ({ active: active.current, knob: { target: +knob.current.target.toFixed(2), current: +knob.current.current.toFixed(2), dragging: !!knob.current.drag }, capsule: { ...capsule.current }, reveal: reveal.current?.phase() ?? null, at: { knob: onScreen(parts.current?.dial), capsule: onScreen(parts.current?.base) } });
+    window.__hmGacha = read;
+    return () => { if (window.__hmGacha === read) delete window.__hmGacha; };
+  }, []);
 
   // Walker registration: stand in front of the machine and press E.
   useEffect(() => {

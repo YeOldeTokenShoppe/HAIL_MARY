@@ -21,19 +21,37 @@ import { MeshPortalMaterial, RoundedBox, Text, useTexture, useGLTF, useAnimation
 import { VendorModel, VENDOR_CATALOG, pinVendorPoseModel, getChosenPoseModel, applyStallEmissiveBoost } from "@/components/CommercialStrip";
 import { activateVendorSitePal, deactivateVendorSitePal, warmVendorSitePal, onVendorTalk } from "@/lib/vendorSitePal";
 import { goodsForVendor } from "@/lib/oilVendor";
+import ClawMachineController from "@/components/ClawMachineController";
+import GachaponController from "@/components/GachaponController";
 
 export const BOARDWALK_NAMES = {
   tonics: "REMEDIES", fortunes: "FORTUNES", hotdogs: "HOT DOGS", tacos: "TACOS", promos: "PROMOS",
-  rugs: "RUGS", tattoos: "TATTOOS", carny: "THRILL RIDE", souvenirs: "SOUVENIRS", chapel: "CHAPEL",
+  rugs: "RUGS", tattoos: "TATTOOS", carny: "CARNY", souvenirs: "SOUVENIRS", chapel: "CHAPEL",
+  claw: "PRIZE CLAW", gachapon: "GACHAPON",
 };
+// The two MACHINES on the deck (2026-10-05). They are not vendors — no
+// character, no SitePal, nothing in VENDOR_CATALOG — so the stage carries its
+// own entries for them. `root` is the machine's top node in its stall GLB (the
+// name its controller looks up); `fitH` is how tall it stands inside the card.
+// Stepped in, the SAME controller the desktop strip mounts runs against the
+// stall scene, so the game is the desktop's game, not a port of it.
+export const GAME_STALLS = [
+  { id: "claw", game: "claw", root: "Toy_Claw_Empty", fitH: 0.62, accent: "#ff7a9c" },
+  { id: "gachapon", game: "gachapon", root: "Gachapon", fitH: 0.5, accent: "#5fe9ff" },
+];
+const stageEntry = (id) => VENDOR_CATALOG.find((v) => v.id === id) || GAME_STALLS.find((g) => g.id === id) || VENDOR_CATALOG[0];
 // Row order on the phone: the salesman first (he sells the holy water). The
 // souvenir tent is off the row: its prop is not in the current strip export.
 // tacos retired 2026-09-04 — the chapel took its stretch of deck (docs/midway-chapel.md)
-export const BOARDWALK_ORDER = ["tonics", "fortunes", "hotdogs", "chapel", "promos", "rugs", "tattoos", "carny"];
+// the machines sit by the fortune teller here as they do on the deck (2026-10-05)
+export const BOARDWALK_ORDER = ["tonics", "fortunes", "claw", "gachapon", "hotdogs", "chapel", "promos", "rugs", "tattoos", "carny"];
 export const postcardUrl = (id) => `/boardwalk/${id}.webp`;
 export const plateUrl = (id) => `/boardwalk/${id}-plate.webp`;
 // a vendor with its own `stallModel` (the chapel) loads that exact, versioned URL
-export const stallUrl = (id) => VENDOR_CATALOG.find((v) => v.id === id)?.stallModel || `/models/stalls/stall_${id}.glb`;
+// STALL_V busts the cache for a stall re-cut from a newer strip export (same
+// file name, different contents — a phone would keep the old one for a year).
+const STALL_V = { carny: 4, claw: 4, gachapon: 4 };
+export const stallUrl = (id) => VENDOR_CATALOG.find((v) => v.id === id)?.stallModel || `/models/stalls/stall_${id}.glb${STALL_V[id] ? `?v=${STALL_V[id]}` : ""}`;
 
 // Step up to a stall: MUST run inside the user's tap. activateVendorSitePal
 // unlocks browser audio and (on touch) boots the lazily embedded player from
@@ -128,7 +146,11 @@ const TUNE = (() => { if (typeof window === "undefined") return {}; const q = ne
 const STRIP_ROT_Y = Math.PI / 2;          // the strip's frame turn
 const VENDOR_LOCAL_FACE_YAW = -Math.PI / 2; // the strip's default facing (CommercialStrip)
 
-function StageCamera({ open }) {
+// gameCam: while a machine is being played its controller frames the cabinet
+// itself (it knows the cabinet's size and how much of the screen its control
+// panel takes) and hands the pose over through the stage's onFocusObject; the
+// stage camera simply goes where it is told until the player steps back.
+function StageCamera({ open, gameCam }) {
   const { camera } = useThree();
   const tmp = useMemo(() => ({ p: new THREE.Vector3(), t: new THREE.Vector3(), cur: new THREE.Vector3(...STAGE_CAMERA.target) }), []);
   useEffect(() => {
@@ -137,8 +159,9 @@ function StageCamera({ open }) {
     camera.updateProjectionMatrix();
   }, [camera]);
   useFrame((_, dt) => {
-    const want = open ? FACE_CAMERA : STAGE_CAMERA;
-    tmp.p.set(...want.position); tmp.t.set(...want.target);
+    const game = open ? gameCam?.current : null;
+    if (game) { tmp.p.copy(game.position); tmp.t.copy(game.target); }
+    else { const want = open ? FACE_CAMERA : STAGE_CAMERA; tmp.p.set(...want.position); tmp.t.set(...want.target); }
     const k = 1 - Math.exp(-dt * 3.5);
     camera.position.lerp(tmp.p, k); tmp.cur.lerp(tmp.t, k); camera.lookAt(tmp.cur);
   });
@@ -185,20 +208,24 @@ function Backdrop({ id }) {
 // `frontRef.current` false = the card is showing its back: the stall's props
 // step aside (the wagon would otherwise fill the window with its rear wall)
 // and only the deck stays under the vendor, seen from behind against the sky.
-function StallProps({ id, frontRef, keepOnBack = false, hideOnBack = null, showOnBack = null, onScene }) {
+// playClips false: the claw's one clip (Claw_Demo) belongs to its controller,
+// which scrubs it by hand — looping it from mount would fight every grab.
+// interaction: a machine's controller ref; clicks on the stall go to it first,
+// exactly as CommercialStrip's deck handlers do.
+function StallProps({ id, frontRef, keepOnBack = false, hideOnBack = null, showOnBack = null, onScene, playClips = true, interaction = null }) {
   const { scene, animations } = useGLTF(stallUrl(id));
   useEffect(() => { scene.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; } }); applyStallEmissiveBoost(scene, id); }, [scene, id]);
   // A stall may carry its own extras — the chapel's seated congregation (a
   // robot and a biker, each with a looping *_Sit clip). Every clip the stall
   // GLB holds plays, looping, from mount; a prop-only stall has none.
   const holder = useRef(null);
-  const { actions } = useAnimations(animations, holder);
+  const { actions } = useAnimations(playClips ? animations : NO_CLIPS, holder);
   useEffect(() => { const list = Object.values(actions || {}).filter(Boolean); list.forEach((a) => a.reset().setLoop(THREE.LoopRepeat, Infinity).play()); return () => list.forEach((a) => a.stop()); }, [actions]);
   const base = (n) => (n || "").replace(/\.\d{3}$/, "");
   // Hand the stall scene up: VendorModel's glow effect looks for the vendor's
   // glowMesh (the fortune teller's crystal ball) in the "strip" scene — here
   // that is the extracted stall — and dresses it in the swirl shader.
-  useEffect(() => { onScene?.(scene); return () => onScene?.(null); }, [scene, onScene]);
+  useEffect(() => { onScene?.(scene, animations); return () => onScene?.(null, NO_CLIPS); }, [scene, animations, onScene]);
   useEffect(() => { if (typeof window !== "undefined") window.__hmStallMats = () => { const out = []; scene.traverse((o) => { if (o.isMesh && /crystal/i.test(o.name || o.parent?.name || "")) out.push(`${o.parent?.name}/${o.name || "mesh"}: ${o.material?.type}${o.material?.uniforms?.uTime ? " (swirl)" : ""}`); }); return out; }; }, [scene]);
   const hideList = useMemo(() => { if (!hideOnBack?.length) return []; const out = []; scene.traverse((o) => { if (hideOnBack.includes(base(o.name))) out.push(o); }); return out; }, [scene, hideOnBack]);
   useFrame(() => {
@@ -210,9 +237,71 @@ function StallProps({ id, frontRef, keepOnBack = false, hideOnBack = null, showO
     if (typeof window !== "undefined") window.__hmStallHide = (re, on = false) => { const rx = new RegExp(re, "i"); let n = 0; scene.traverse((o) => { if (o.isMesh && rx.test(`${o.parent?.name}/${o.name}`)) { o.visible = on; n++; } }); return n; };
     if (typeof window !== "undefined") window.__hmStallBox = (deep = false) => { const out = {}; scene.updateMatrixWorld(true); const list = []; if (deep) scene.traverse((o) => { if (o.isMesh) list.push(o); }); else list.push(...scene.children); for (const child of list) { const b = new THREE.Box3().setFromObject(child); if (!b.isEmpty()) out[child.name || (child.parent?.name + "/mesh")] = [b.min.toArray().map((v) => +v.toFixed(2)), b.max.toArray().map((v) => +v.toFixed(2))]; } return out; };
   });
-  return <group ref={holder}><primitive object={scene} /></group>;
+  // A machine's touches. The desktop strip forwards onClick, but a touch does
+  // not reliably produce the browser "click" R3F builds that from (and a knob
+  // tap is a pointerdown the controller has already claimed as a drag), so the
+  // stage makes its own tap out of a down/up pair in one spot:
+  //  · the pair is watched on the window, ahead of R3F, because the gachapon's
+  //    reveal veil swallows the 3D pointerdown — and once the capsule is up the
+  //    whole screen is its business (tapReveal: a tap anywhere opens it, the
+  //    next puts it away), whether or not the ray lands on the stall;
+  //  · otherwise the 3D pointerup hands the tap to handleClick. It fires once
+  //    per mesh along the ray, nearest first; the first one taken ends the tap.
+  const tap = useRef(null);
+  const gl = useThree((st) => st.gl);
+  useEffect(() => {
+    if (!interaction) return;
+    const fresh = (n) => { const t = tap.current; return t && !t.done && t.id === n.pointerId && performance.now() - t.t < 600 && Math.hypot(n.clientX - t.x, n.clientY - t.y) < 10; };
+    const down = (n) => { tap.current = n.target === gl.domElement ? { id: n.pointerId, x: n.clientX, y: n.clientY, t: performance.now(), done: false } : null; };
+    const up = (n) => { if (fresh(n) && interaction.current?.tapReveal?.()) tap.current.done = true; };
+    window.addEventListener("pointerdown", down, true);
+    window.addEventListener("pointerup", up, true);
+    return () => { window.removeEventListener("pointerdown", down, true); window.removeEventListener("pointerup", up, true); };
+  }, [interaction, gl]);
+  const onDown = (e) => { interaction.current?.handlePointerDown?.(e); };
+  const onUp = (e) => {
+    const t = tap.current, n = e.nativeEvent; if (!t || t.done || !n) return;
+    if (t.id !== n.pointerId || performance.now() - t.t > 600 || Math.hypot(n.clientX - t.x, n.clientY - t.y) > 10) { t.done = true; return; }
+    if (interaction.current?.handleClick?.(e)) t.done = true;
+  };
+  return (
+    <group ref={holder} onPointerDown={interaction ? onDown : undefined} onPointerUp={interaction ? onUp : undefined}>
+      <primitive object={scene} />
+    </group>
+  );
 }
-function StageStall({ vendor, focusedRef, frontRef, cardYawRef, open = false }) {
+const NO_CLIPS = [];
+// A machine, stepped into: mounts the desktop's controller against the stall
+// scene and stands in for the three things CommercialStrip gives it —
+//  · the camera: onFocusObject(at, normal, dist) becomes the stage's gameCam;
+//  · focus: a local state, so "another stall took the camera" still resolves;
+//  · the way out: the controller's own Exit (and the gachapon's click-away)
+//    call onZoomOut, which steps back out of the card.
+// Entry and exit ride the controllers' existing window events, the same door
+// the walker uses on the desktop.
+// The gachapon's controller stays mounted at rest too: it is what hides the
+// prize capsule until one is earned (without it a capsule sits in the tray on
+// the card). The claw's mounts only once stepped in — its lever and button
+// listen on the whole canvas and would start a game through the card.
+function GameHost({ entry, scene, animations, interaction, gameCam, onStepBack, open }) {
+  const [focus, setFocus] = useState(null);
+  const onFocusObject = useMemo(() => (at, normal, dist) => {
+    const n = normal ? normal.clone().normalize() : new THREE.Vector3(0, 0, 1);
+    gameCam.current = { position: at.clone().addScaledVector(n, dist), target: at.clone() };
+  }, [gameCam]);
+  useEffect(() => {
+    if (!open) return;
+    // after the controller's own effects (parts found, listeners bound) and a
+    // frame of matrices, so it frames the cabinet where it actually stands
+    const t = setTimeout(() => window.dispatchEvent(new CustomEvent("hm-vendor-enter", { detail: { id: entry.game } })), 60);
+    return () => { clearTimeout(t); window.dispatchEvent(new CustomEvent("hm-vendor-exit")); gameCam.current = null; };
+  }, [open, entry.game, scene, gameCam]);
+  const shared = { stripScene: scene, interactionRef: interaction, focus, onFocusChange: setFocus, onFocusObject, onZoomOut: onStepBack, stripScale: 1 };
+  return entry.game === "claw"
+    ? <ClawMachineController {...shared} animations={animations} touch />
+    : <GachaponController {...shared} closeOnCabinetClick={false} />;
+}
+function StageStall({ vendor, focusedRef, frontRef, cardYawRef, open = false, gameCam = null, onStepBack }) {
   // Two levels: the OUTER group turns and slides in world space, the INNER group
   // carries the fit (scale + the offset that puts the vendor's bones at the
   // origin). Rotating the outer therefore pivots the whole stall around the
@@ -235,7 +324,10 @@ function StageStall({ vendor, focusedRef, frontRef, cardYawRef, open = false }) 
   const hasCharacter = !!(vendor.model || vendor.poseModels?.length);
   const slide = useRef(0);
   const rest = useRef(open ? 0 : 1);
-  const [stallScene, setStallScene] = useState(null);
+  const [stall, setStall] = useState({ scene: null, animations: NO_CLIPS });
+  const stallScene = stall.scene;
+  const setStallScene = useMemo(() => (scene, animations) => setStall({ scene: scene || null, animations: animations || NO_CLIPS }), []);
+  const interaction = useRef(null);
   // debug: the head's world forward (z toward the camera = facing the viewer)
   useEffect(() => { if (typeof window === "undefined") return; window.__hmHeadFwd = () => { const h = headRef.current; if (!h) return null; const q = h.getWorldQuaternion(new THREE.Quaternion()); const f = new THREE.Vector3(0, 0, 1).applyQuaternion(q); const u = new THREE.Vector3(0, 1, 0).applyQuaternion(q); return { f: f.toArray().map((v) => +v.toFixed(2)), up: u.toArray().map((v) => +v.toFixed(2)) }; }; }, []);
   useFrame((_, dt) => {
@@ -262,6 +354,21 @@ function StageStall({ vendor, focusedRef, frontRef, cardYawRef, open = false }) 
     if (++frames.current < 4) return;
     const w = new THREE.Vector3(); let lo = Infinity, hi = -Infinity, cx = 0, cz = 0, n = 0;
     g.scale.setScalar(1); g.position.set(0, 0, 0); o.rotation.set(0, rotY, 0); o.position.set(0, 0, 0); o.updateMatrixWorld(true);
+    if (vendor.game) {
+      // A machine has no bones to measure: fit its cabinet instead — fitH tall,
+      // standing on the card's floor, centred. Waits for the stall GLB.
+      const root = g.getObjectByName(vendor.root);
+      if (!root) { if (frames.current > 900) fitted.current = true; return; }
+      const box = new THREE.Box3().setFromObject(root); if (box.isEmpty()) return;
+      const sc = vendor.fitH / (box.max.y - box.min.y);
+      const c = box.getCenter(w).applyMatrix4(new THREE.Matrix4().copy(g.matrixWorld).invert());
+      g.scale.setScalar(sc);
+      g.position.set(-c.x * sc, FLOOR_Y - box.min.y * sc, -c.z * sc);
+      o.updateMatrixWorld(true);
+      if (typeof window !== "undefined") window.__hmStallFit = { s: +sc.toFixed(3), inner: g.position.toArray().map((v) => +v.toFixed(3)), game: vendor.game };
+      fitted.current = true;
+      return;
+    }
     // bones in the INNER frame (pre-rotation), so the offset is a local one
     const inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
     g.traverse((obj) => { if (obj.isBone) { obj.getWorldPosition(w); w.applyMatrix4(inv); lo = Math.min(lo, w.y); hi = Math.max(hi, w.y); cx += w.x; cz += w.z; n++; } });
@@ -286,20 +393,27 @@ function StageStall({ vendor, focusedRef, frontRef, cardYawRef, open = false }) 
   return (
     <group ref={outer} rotation={[0, rotY, 0]}>
       <group ref={inner}>
-        <Suspense fallback={null}><StallProps id={vendor.id} frontRef={frontRef} keepOnBack={!!tune?.keepPropsOnBack} hideOnBack={tune?.hideOnBack || null} showOnBack={tune?.showOnBack || null} onScene={setStallScene} /></Suspense>
+        <Suspense fallback={null}><StallProps id={vendor.id} frontRef={frontRef} keepOnBack={!!tune?.keepPropsOnBack || !!vendor.game} hideOnBack={tune?.hideOnBack || null} showOnBack={tune?.showOnBack || null} onScene={setStallScene} playClips={vendor.game !== "claw"} interaction={vendor.game ? interaction : null} /></Suspense>
         {hasCharacter && (
           <group position={vendor.offset || [0, 0, 0]}>
             <VendorModel vendor={vendorEff} focusedRef={focusedRef} headRef={headRef} stripScene={stallScene} stripRotY={rotY} />
           </group>
         )}
       </group>
+      {vendor.game && stallScene && (open || vendor.game === "gachapon") && (
+        <GameHost entry={vendor} scene={stallScene} animations={stall.animations} interaction={interaction} gameCam={gameCam} onStepBack={onStepBack} open={open} />
+      )}
     </group>
   );
 }
 
 export default function VendorStage({ vendorId = "tonics", open = false, onToggle, lowTier = false, sky = null }) {
-  const vendor = useMemo(() => VENDOR_CATALOG.find((v) => v.id === vendorId) || VENDOR_CATALOG[0], [vendorId]);
+  const vendor = useMemo(() => stageEntry(vendorId), [vendorId]);
   const portal = useRef();
+  const gameCam = useRef(null);
+  const isGame = !!vendor.game;
+  const onToggleRef = useRef(onToggle); onToggleRef.current = onToggle;
+  const stepBack = useMemo(() => () => { stepBackVendor(); onToggleRef.current?.(); }, []);
   // Head tracking (VendorModel's focusedRef): the vendor looks up at the viewer
   // when stepped in and whenever SitePal is speaking, then goes back to work
   // (the tattoo artist to her client) a couple of seconds after the last line.
@@ -372,6 +486,8 @@ export default function VendorStage({ vendorId = "tonics", open = false, onToggl
     if (!tap) { sp.vy = THREE.MathUtils.clamp(sp.vy, -14, 14); return; }
     e.stopPropagation();
     if (open) { stepBackVendor(); onToggle?.(); return; }          // inside: a tap steps back
+    // A machine has no back worth showing and nothing to do but play it: one tap steps in.
+    if (isGame) { sp.target = null; stepUpVendor(vendor.id); onToggle?.(); return; }
     if (sp.tapTimer && now - sp.lastTapT < SPIN.doubleMs) {         // double tap: step in
       clearTimeout(sp.tapTimer); sp.tapTimer = null; sp.lastTapT = 0;
       sp.target = null; stepUpVendor(vendor.id); onToggle?.();
@@ -387,7 +503,7 @@ export default function VendorStage({ vendorId = "tonics", open = false, onToggl
   const name = BOARDWALK_NAMES[vendor.id] || vendor.id.toUpperCase();
   return (
     <group name="vendor-stage">
-      <StageCamera open={open} />
+      <StageCamera open={open} gameCam={gameCam} />
       <group ref={card} position={[0, 0.04, 0]}>
       {/* rim in the stall's accent: a border THINNER than the card, centred on it,
           so both portal faces stand proud of it — the back of the card is a
@@ -402,7 +518,10 @@ export default function VendorStage({ vendorId = "tonics", open = false, onToggl
       </Text>
       <RoundedBox name="vendor-card" args={[CARD.w, CARD.h, CARD.depth]} radius={CARD.radius} position={[0, 0, 0]}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onLostPointerCapture={onUp}>
-        <MeshPortalMaterial ref={portal} blend={0} side={THREE.DoubleSide} resolution={lowTier ? 512 : 1024} events={false}>
+        {/* events: a machine being played takes the touches (its knob, lever, toys
+            and capsule are R3F handlers INSIDE the portal); everywhere else the
+            card itself does — flip, spin, step in, tap to step back. */}
+        <MeshPortalMaterial ref={portal} blend={0} side={THREE.DoubleSide} resolution={lowTier ? 512 : 1024} events={isGame && open}>
           <ambientLight intensity={0.9} />
           <directionalLight position={[0.6, 1.2, 1.4]} intensity={1.6} />
           <directionalLight position={[-0.8, 0.6, 0.4]} intensity={0.5} color="#ffd9b0" />
@@ -415,7 +534,7 @@ export default function VendorStage({ vendorId = "tonics", open = false, onToggl
           <PortalSky top={sky?.top} bottom={sky?.bottom} />
           <Suspense fallback={null}>
             <Backdrop id={vendor.id} />
-            <StageStall key={vendor.id} vendor={vendor} focusedRef={focusedRef} frontRef={frontRef} cardYawRef={cardYawRef} open={open} />
+            <StageStall key={vendor.id} vendor={vendor} focusedRef={focusedRef} frontRef={frontRef} cardYawRef={cardYawRef} open={open} gameCam={gameCam} onStepBack={stepBack} />
           </Suspense>
         </MeshPortalMaterial>
       </RoundedBox>
@@ -428,18 +547,14 @@ export default function VendorStage({ vendorId = "tonics", open = false, onToggl
 const mono = { fontFamily: "'Share Tech Mono', monospace", letterSpacing: "0.1em" };
 const panel = { background: "rgba(14,10,12,0.78)", border: "1px solid rgba(255,140,90,0.45)", borderRadius: 6, color: "#ffd9c9", backdropFilter: "blur(4px)" };
 export function BoardwalkStrip({ vendorId, onSelect, open, onToggleOpen, children }) {
-  const name = BOARDWALK_NAMES[vendorId] || vendorId.toUpperCase();
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 4 }}>
       {/* At rest the card and the postcards are the whole scene — a tap on the
-          card steps in. The title, STEP BACK and the vendor's panel only show
-          once the player is inside the portal. */}
+          card steps in. STEP BACK and the vendor's panel only show once the
+          player is inside the portal (no title box: the stall you just tapped
+          is filling the screen). */}
       {open && (
         <div style={{ position: "absolute", top: "calc(8px + env(safe-area-inset-top, 0px))", left: "calc(8px + env(safe-area-inset-left, 0px))", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
-          <div style={{ ...panel, ...mono, padding: "7px 10px", fontSize: 10 }}>
-            <div style={{ color: "#ff8c5a", fontSize: 9 }}>THE MIDWAY</div>
-            <div>{name}</div>
-          </div>
           <button type="button" onClick={onToggleOpen}
             style={{ ...panel, ...mono, padding: "9px 12px", fontSize: 10, cursor: "pointer", pointerEvents: "auto", color: "#ffd9c9" }}>
             ◂ STEP BACK

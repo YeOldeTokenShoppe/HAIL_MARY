@@ -9,7 +9,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import CleanCanvas from "@/components/canvas/CleanCanvas";
 import { Perf } from "r3f-webgpu-perf";
-import OilVoxelGrid, { CctvRenderer } from "@/components/OilVoxelGrid";
+import OilVoxelGrid, { CctvRenderer, HORIZON_GROUND, HORIZON_FIREWORKS, HORIZON_SKY } from "@/components/OilVoxelGrid";
 import { KTX2Init } from "@/lib/ktx2";
 import { isTouchDevice } from "@/lib/deviceTier";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
@@ -572,7 +572,9 @@ const HellSkyEffects = memo(function HellSkyEffects() {
   );
 });
 
-function SolsticeSkyEffects() {
+// far: pushes the disc out from the scene centre and enlarges it to match (the
+// horizon ground needs it behind the hills). The light stays where it is.
+function SolsticeSkyEffects({ far = 1 }) {
   const sunRef = useRef();
 
   // Soft radiant sun: a single camera-facing sprite with a hot white-gold core
@@ -607,9 +609,11 @@ function SolsticeSkyEffects() {
 
   return (
     <group>
-      <sprite ref={sunRef} position={[-18, 28, -45]} scale={[40, 40, 1]}>
-        <spriteMaterial map={sunTexture} transparent opacity={1} depthWrite={false} fog={false} />
-      </sprite>
+      <group scale={far}>
+        <sprite ref={sunRef} position={[-18, 28, -45]} scale={[40, 40, 1]}>
+          <spriteMaterial map={sunTexture} transparent opacity={1} depthWrite={false} fog={false} />
+        </sprite>
+      </group>
       <pointLight position={[-13, 18, -28]} color="#ffd66b" intensity={2.2} distance={90} decay={1.1} />
     </group>
   );
@@ -660,7 +664,7 @@ function ParabolumMoon() {
 // look, and the textured ParabolumMoon (mounted whenever envPreset is "night")
 // is the one night moon. Mounted for auto mode (live hour) AND for pinned
 // day/dusk (fixed representative hour via skySunHour) — solstice keeps its own.
-function TODSkyBodies({ todHour }) {
+function TODSkyBodies({ todHour, far = 1 }) {
   const sunTexture = useMemo(() => {
     if (typeof document === "undefined") return null;
     const s = 256;
@@ -694,9 +698,11 @@ function TODSkyBodies({ todHour }) {
 
   if (!sunTexture || sunO <= 0.01) return null;
   return (
-    <sprite position={place(sunAngle)} scale={[34, 34, 1]}>
-      <spriteMaterial map={sunTexture} transparent opacity={sunO} depthWrite={false} fog={false} />
-    </sprite>
+    <group scale={far}>
+      <sprite position={place(sunAngle)} scale={[34, 34, 1]}>
+        <spriteMaterial map={sunTexture} transparent opacity={sunO} depthWrite={false} fog={false} />
+      </sprite>
+    </group>
   );
 }
 
@@ -9156,8 +9162,10 @@ export default function OilPage() {
               <div style={{ ...styles.cornerBracket, bottom: 6, left: 6, transform: "scaleY(-1)" }} />
               <div style={{ ...styles.cornerBracket, bottom: 6, right: 6, transform: "scale(-1)" }} />
               {/* No field dimensions badge on the phone: the scene is one rig,
-                  and the survey map carries the field. */}
-              {selectedX !== null && (() => {
+                  and the survey map carries the field. The claim badge names
+                  that rig, so it stays off the Midway — there it sat on top of
+                  the stall's own title and STEP BACK in the same corner. */}
+              {selectedX !== null && mobileTab !== "boardwalk" && (() => {
                 const mineCol = userDrill?.col ?? myPlot?.col;
                 const mineRow = userDrill?.row ?? myPlot?.row;
                 const isMine = mineCol === selectedX && mineRow === (sliceY ?? 0);
@@ -9552,12 +9560,12 @@ export default function OilPage() {
             <KTX2Init />
             <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} hell={envPreset === "hell"} lowPoly={quality.clouds === "low"} cloudMode={quality.cloudMode} />
             {envPreset === "hell" && <HellSkyEffects />}
-            {!parabolum && envPreset === "solstice" && <SolsticeSkyEffects />}
+            {!parabolum && envPreset === "solstice" && <SolsticeSkyEffects far={HORIZON_GROUND ? HORIZON_SKY.solsticeSunFar : 1} />}
             {parabolum && <ParabolumMoon />}
-            {skySunHour != null && <TODSkyBodies todHour={skySunHour} />}
-            {envPreset === "night" && <StarField radius={150} count1={500} count2={300} />}
-            {envPreset === "night" && <Suspense fallback={null}><ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} /></Suspense>}
-            {fireworksOn && <Fireworks quality={2} shellSize={2} finale sound={fireworksSound} />}
+            {skySunHour != null && <TODSkyBodies todHour={skySunHour} far={HORIZON_GROUND ? HORIZON_SKY.sunFar : 1} />}
+            {envPreset === "night" && <StarField radius={150} count1={500} count2={300} {...(HORIZON_GROUND ? HORIZON_SKY.stars : null)} />}
+            {envPreset === "night" && <Suspense fallback={null}><ConstellationModel groupScale={Array(3).fill(15 * (HORIZON_GROUND ? HORIZON_SKY.constellationFar : 1))} groupPosition={[0, 8, -60].map((v) => v * (HORIZON_GROUND ? HORIZON_SKY.constellationFar : 1))} isVisible={true} /></Suspense>}
+            {fireworksOn && <Fireworks quality={2} shellSize={2} finale sound={fireworksSound} {...(HORIZON_GROUND ? HORIZON_FIREWORKS : null)} />}
             <EnvLights env={desktopEnv} moodScale={moodScale} />
             {arenaOpen ? (
               <DemonArena

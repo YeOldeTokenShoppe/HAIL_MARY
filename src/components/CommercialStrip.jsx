@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Text, useGLTF, useAnimations } from "@react-three/drei";
 import { extendKTX2, releaseKTX2Workers } from "@/lib/ktx2";
+import VortexPortal from "@/components/VortexPortal";
 import useEnvMapSafe from "@/hooks/useEnvMapSafe";
 import ClawMachineController from "@/components/ClawMachineController";
 import GachaponController from "@/components/GachaponController";
@@ -48,15 +49,18 @@ import {
 // dev server revalidates on every request regardless of the query string, so the
 // fresh file always won locally, while the CDN kept serving whatever it had
 // cached under the unchanged `?v=ktx2` key. BUMP THIS on every rebuild.
-const STRIP_MODEL_V = "14";
+const STRIP_MODEL_V = "15";
 // The chapel's split GLBs (stall + preacher) — bump after re-running scripts/split-tent-revival.mjs.
 export const CHAPEL_ASSET_V = 2;
-const STRIP_MODEL_WEBP = `/models/CommercialStrip4_opt.glb?v=${STRIP_MODEL_V}`;
-const STRIP_MODEL_KTX2 = `/models/CommercialStrip4_opt_ktx2.glb?v=${STRIP_MODEL_V}`;
+const STRIP_MODEL_WEBP = `/models/CommercialStrip5_opt.glb?v=${STRIP_MODEL_V}`;
+const STRIP_MODEL_KTX2 = `/models/CommercialStrip5_opt_ktx2.glb?v=${STRIP_MODEL_V}`;
 const STRIP_MODEL =
   typeof window !== "undefined" && /[?&]strip=webp\b/.test(window.location.search)
     ? STRIP_MODEL_WEBP
     : STRIP_MODEL_KTX2;
+
+// Clown-entrance portal placement, strip-local (see the mount comment).
+const PORTAL_LOCAL = { position: [7.7, 1.5, -34.87], scale: [4.4, 3.4, 1] };
 
 // Strip-local yaw that means "facing the customer side of the boardwalk".
 // Props sit on local +X, so the field-facing direction is local −X; the group's
@@ -321,7 +325,7 @@ export const VENDOR_CATALOG = [
     // prop he is clicked on his own body and framed from his head bone.
     //
     // "yelling" is his talk clip and "pointing" is used per-line (see the carny
-    // greetings in vendorSitePal.js) for the lines that reference the balloon.
+    // greetings in vendorSitePal.js) for the lines that point at the ride.
     //
     // Both are safe to crossfade, but the check needs care: his rig nests as
     // Carny_Empty > Armature(scale 0.01) > Root, so his Root translations are
@@ -357,7 +361,8 @@ export const VENDOR_CATALOG = [
   // and splits it into the stall GLB (`stallModel`, mounted on the desktop
   // strip until she places the props in the strip .blend) and the preacher's
   // GLB (`model`). `hideWindow` hides the strip's own taco dressing under it.
-  // No face plates or `sitepal` yet — he preaches silently.
+  // Face1–Face3 plates shipped 2026-10-05; `sitepal: "chapel"` is scene 2775640
+  // with his ElevenLabs voice (vendorSitePal.js). Crop still the carny seed.
   { id: "chapel",    label: "",    awning: "#5a3a6e", accent: "#e7d4a8",
     // ?v= busts the browser/CDN cache — bump CHAPEL_ASSET_V after every
     // `node scripts/split-tent-revival.mjs` (the file names never change, so a
@@ -367,7 +372,8 @@ export const VENDOR_CATALOG = [
     prop: "SM_Bld_Tent_01",
     stallModel: `/models/stalls/stall_chapel.glb?v=${CHAPEL_ASSET_V}`,
     hideWindow: [0.6, 8],
-    faceDist: 0.18, faceLift: -0.03, camDrop: -0.35 },
+    faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
+    sitepal: "chapel" },
 ];
 // The line-up the strip and the Midway actually show (retired stalls stay in
 // the catalog so their SitePal/pose tables keep resolving).
@@ -3686,7 +3692,10 @@ function StallModelMount({ vendor, stripScene, onScene }) {
   return <group ref={holder}><primitive object={scene} /></group>;
 }
 
-export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPreset, vendors = ACTIVE_VENDORS, onVendorClick, onFocusObject, onZoomOut, onBoothPhoto }) {
+// braces: the knee braces under the deck. They exist to tie the strip to the
+// mesa's cliff face, so the horizon ground (no cliff — the deck just sits on the
+// land) turns them off.
+export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPreset, vendors = ACTIVE_VENDORS, onVendorClick, onFocusObject, onZoomOut, onBoothPhoto, braces = true }) {
   useEffect(() => { preloadVendorModels(); }, []);
   const { scene: stripScene, animations: stripAnimations } = useGLTF(STRIP_MODEL, true, true, extendKTX2);
   // The claw controller owns Claw_Demo; other strip clips keep their own mixer.
@@ -3924,7 +3933,7 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
           be set independently of the deck's depth. */}
       {/* Braces get the same click as the deck — they are part of the structure,
           and from a low angle they are most of what is actually hit. */}
-      <group
+      {braces && <group
         onClick={handleStripClick}
         onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
         onPointerOut={() => { document.body.style.cursor = "auto"; }}
@@ -3955,7 +3964,7 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
           </mesh>
         );
       })}
-      </group>
+      </group>}
       {/* One shared transform for the strip AND every character: the character
           GLBs are exported in the strip's coordinate space, so they must ride
           the identical scale/rotation or they drift off their props. */}
@@ -4011,6 +4020,13 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
         {/* Inside the group: halo positions are strip-local, and the constant
             pixel size is immune to the scale. */}
         <BulbRig stripScene={stripScene} envPreset={envPreset} clipPlanes={clipPlanes} />
+        {/* The clown entrance's swirling portal, just inside the mouth. Strip-local:
+            the Blender guide empty Portal_Empty sat at (8.46, 0.38, −34.87), the
+            floor-centre at the back of the arch (the optimize pass prunes childless
+            empties, so the position is hardcoded rather than looked up). The arch
+            opening is ≈2.4 wide (z) by ≈1.9 tall (y 0.33→2.25); the plane faces −X,
+            toward the customer side, so its width runs along z. */}
+        <VortexPortal position={PORTAL_LOCAL.position} rotation={[0, -Math.PI / 2, 0]} scale={PORTAL_LOCAL.scale} core="#e6ffff" mid="#00e5ff" edge="#000000" arms={5} twist={7} speed={1.4} />
         {vendors.map((v) => (
           <VendorStall
             key={v.id}

@@ -28,22 +28,32 @@ const page = await browser.newPage({ viewport: VIEW, deviceScaleFactor: 1 });
 await page.route((u) => !u.href.startsWith(BASE) && /sitepal|oddcast/i.test(u.href), (r) => r.abort());
 await page.goto(`${BASE}/hailmary?tod=${TOD}&sitepal=lazy`, { waitUntil: "domcontentloaded" });
 await page.waitForFunction(() => document.querySelector("canvas") != null, null, { timeout: 90000 });
+// A signed-out visitor lands on the registration lobby before a season; the
+// field is behind its PREVIEW THE GAME button.
+const preview = page.getByText(/PREVIEW THE GAME/i);
+try { await preview.first().waitFor({ timeout: 15000 }); await preview.first().click(); console.log("lobby: preview"); } catch { /* straight into the field */ }
 // Wait for every stall to register (the strip GLB + vendor GLBs loaded).
 // POSTCARD_ONLY=chapel,tonics renders just those stalls (the rest keep their
 // files); POSTCARD_MIN is how many stalls must register before shooting (8 since
 // the taco stall retired, 2026-09-04).
+// The two machines (claw, gachapon) register for the walker only — a position
+// and an eye height, no approach or framing hints — so they borrow the deck's
+// approach from any vendor and get a medium shot of their own (MACHINE_DIST,
+// in framing units, before SHOT_DIST_MULT).
+const MACHINES = ["claw", "gachapon"];
+const MACHINE_DIST = { claw: 0.17, gachapon: 0.105 };
 const ONLY = (process.env.POSTCARD_ONLY || "").split(",").map((s) => s.trim()).filter(Boolean);
 const MIN = Number(process.env.POSTCARD_MIN || 8);
-const allIds = await page.evaluate(async (MIN) => {
+const allIds = await page.evaluate(async ([MIN, MACHINES]) => {
   const t0 = Date.now();
   while (Date.now() - t0 < 120000) {
     const reg = window.__hmVendorSpots || {};
     const keys = Object.keys(reg);
-    if (keys.length >= MIN && keys.every((k) => reg[k].approach)) return keys;
+    if (keys.length >= MIN && keys.every((k) => reg[k].approach || MACHINES.includes(k))) return keys;
     await new Promise((r) => setTimeout(r, 250));
   }
   return Object.keys(window.__hmVendorSpots || {});
-}, MIN);
+}, [MIN, MACHINES]);
 const ids = ONLY.length ? allIds.filter((id) => ONLY.includes(id)) : allIds;
 console.log("stalls:", ids.join(", "), ONLY.length ? `(of ${allIds.join(", ")})` : "");
 // Clear the panels so the canvas is the whole viewport.
@@ -57,8 +67,14 @@ const PLATES = process.argv.includes("--plates");
 const WINDOWS = PLATES ? JSON.parse(fs.readFileSync("scripts/stall-windows.json", "utf8")) : null;
 const sheet = [];
 for (const id of ids) {
-  const ok = await page.evaluate(([id, dm, lm]) => {
-    const v = window.__hmVendorSpots[id]; if (!v) return false;
+  const ok = await page.evaluate(([id, dm, lm, machineDist]) => {
+    const reg = window.__hmVendorSpots;
+    let v = reg[id]; if (!v) return false;
+    if (!v.approach) {
+      // a vendor who faces straight out across the deck (the fortune teller's approach runs ALONG it, into her wagon)
+      const like = reg.tonics || reg.hotdogs || reg.carny; if (!like?.approach) return false;
+      v = { ...v, approach: like.approach, framingUnit: like.framingUnit, faceDist: machineDist ?? 0.45 };
+    }
     const fu = v.framingUnit || 1;
     // Look a touch above the eyes (the stall's awning stays in frame), level approach.
     // Character-less stalls (the souvenir tent) have no eye height: frame from the deck up.
@@ -66,7 +82,7 @@ for (const id of ids) {
     const n = { x: v.approach.x, y: 0, z: v.approach.z };
     window.__hmFocusObject(point, n, v.faceDist * fu * dm);
     return true;
-  }, [id, SHOT_DIST_MULT, LIFT_MULT]);
+  }, [id, SHOT_DIST_MULT, LIFT_MULT, MACHINE_DIST[id]]);
   if (!ok) { console.log(" skip", id); continue; }
   await page.waitForTimeout(4200);
   if (PLATES) {
@@ -75,7 +91,8 @@ for (const id of ids) {
       window.__hmVendorSpots?.[id]?.hide?.(true);      // the character is not a strip node
       if (!w) return 0;                                 // no window (no stall extracted): plate = the plain shot
       return window.__hmStripHide({ z: w, maxX, exclude: ex });
-    }, [win, WINDOWS.maxX, WINDOWS.exclude, id]);
+      // a machine is on the strip-wide exclude list (it is nobody's dressing), so its OWN plate lifts that
+    }, [win, WINDOWS.maxX, id === "claw" ? WINDOWS.exclude.replace("|Toy_Claw_Empty", "") : id === "gachapon" ? WINDOWS.exclude.replace("|Gachapon$", "") : WINDOWS.exclude, id]);
     await page.waitForTimeout(250);
     console.log(`  plate: hid ${hid} props`);
   }
