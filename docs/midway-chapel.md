@@ -52,10 +52,23 @@ Tent_Revival.glb`; copy it to `public/models/` before splitting.
   for hiding stall meshes by name.
 - **He speaks (2026-10-05):** `Vendor_Chaplain_Character.glb` now carries
   `Face1`–`Face3`; `sitepal: "chapel"` in the catalog points at SitePal scene
-  **2775640** with his ElevenLabs voice (`3y3Tv5R1v43QNZdfXoU3`, engine 14) and a
+  **2775643** (replacing 2775640, which SitePal's player could not start) with his ElevenLabs voice (`3y3Tv5R1v43QNZdfXoU3`, engine 14) and a
   greeting pool in `vendorSitePal.js`. The crop is the carny's as a seed and the
   filter is neutral — sweep them on the `?tune=vendor` CHAPEL tab. The ledger
   speech (section 3) is still unbuilt.
+- **Face plates (2026-10-06):** `Face2` in the current export has NO UVs and
+  `Face1` sits on one atlas texel, so the projection sampled a single skin
+  texel — a blank face, identical on both tuner pins. `CommercialStrip.jsx`
+  (`ensurePlanarProjectionUVs`) now rebuilds planar 0–1 UVs on any projection
+  plate whose authored UVs cover <2% of UV space, so the face shows regardless.
+  Still worth unwrapping `Face2` properly in Blender on the next export; if the
+  projected face reads mirrored, that is the runtime "right" axis sign — flip
+  it there rather than in Blender.
+- **Clips (2026-10-06, CHAPEL_ASSET_V 3):** the export carries `preaching`,
+  `yelling` and `rapping`. The catalog's `idleCycle` rotates the idle through
+  them (crossfade on each loop boundary); lines play `preaching` over whichever
+  is up. The T-pose blink he had was the talk swap crossfading `preaching` from
+  itself (lone action 1→0→1 = bind pose); VendorModel now skips a self-crossfade.
 
 
 ## 1. Premise

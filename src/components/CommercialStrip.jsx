@@ -51,7 +51,7 @@ import {
 // cached under the unchanged `?v=ktx2` key. BUMP THIS on every rebuild.
 const STRIP_MODEL_V = "15";
 // The chapel's split GLBs (stall + preacher) — bump after re-running scripts/split-tent-revival.mjs.
-export const CHAPEL_ASSET_V = 2;
+export const CHAPEL_ASSET_V = 3;
 const STRIP_MODEL_WEBP = `/models/CommercialStrip5_opt.glb?v=${STRIP_MODEL_V}`;
 const STRIP_MODEL_KTX2 = `/models/CommercialStrip5_opt_ktx2.glb?v=${STRIP_MODEL_V}`;
 const STRIP_MODEL =
@@ -88,6 +88,12 @@ const INTERIOR_DIM_EASE = 2.5;     // 1/s — ~0.4s to settle, matched to the fl
 // colour while focused; omit for props you never get inside) and
 // `interiorContents` ({ level, props[], character } — the same dim at a second,
 // gentler level for the furniture inside that prop and for the character).
+//
+// `idleCycle: ["a", "b", "c"]` — rotate the resting idle through several clips
+//   of the SAME placement: each time the running clip completes a loop the
+//   model crossfades to the next (sequential, wrapping). Unlike poseClips the
+//   switch is live, so every clip must leave Root where it found it. A talk
+//   line plays over whichever cycle clip is up and fades back to it.
 //
 // Two ways to give a vendor more than one resting pose. Pick ONE:
 //
@@ -361,13 +367,19 @@ export const VENDOR_CATALOG = [
   // and splits it into the stall GLB (`stallModel`, mounted on the desktop
   // strip until she places the props in the strip .blend) and the preacher's
   // GLB (`model`). `hideWindow` hides the strip's own taco dressing under it.
-  // Face1–Face3 plates shipped 2026-10-05; `sitepal: "chapel"` is scene 2775640
+  // Face1–Face3 plates shipped 2026-10-05; `sitepal: "chapel"` is scene 2775643
   // with his ElevenLabs voice (vendorSitePal.js). Crop still the carny seed.
   { id: "chapel",    label: "",    awning: "#5a3a6e", accent: "#e7d4a8",
     // ?v= busts the browser/CDN cache — bump CHAPEL_ASSET_V after every
     // `node scripts/split-tent-revival.mjs` (the file names never change, so a
     // stale stall kept showing the robot without his emissive, 2026-09-05).
-    model: `/models/Vendor_Chaplain_Character.glb?v=${CHAPEL_ASSET_V}`, idleClip: "preaching", talkClip: "preaching",
+    // Three NLA tracks since 2026-10-06; the idle rotates through them (one
+    // full pass of each, then a crossfade to the next) and a line plays
+    // "preaching" over whichever is up. talkClip === a cycle clip is fine now:
+    // the talk swap no longer crossfades an action from itself (that was the
+    // T-pose flash — a lone action fading 1→0→1 blends with bind pose).
+    model: `/models/Vendor_Chaplain_Character.glb?v=${CHAPEL_ASSET_V}`, idleClip: "preaching",
+    idleCycle: ["preaching", "yelling", "rapping"], talkClip: "preaching",
     offset: [0, 0, 0],
     prop: "SM_Bld_Tent_01",
     stallModel: `/models/stalls/stall_chapel.glb?v=${CHAPEL_ASSET_V}`,
@@ -459,6 +471,69 @@ function findByBaseName(root, name) {
     else if (!suffixed && re.test(n)) suffixed = o;
   });
   return exact || suffixed;
+}
+
+// The projection plate (projFace) needs UVs that span 0–1 across the plate: the
+// crop canvas is mapped straight onto it (flipY=false, so v=0 is the TOP row).
+// Synty-derived plates often ship with the atlas's swatch UVs — every vertex on
+// one skin-tone texel — or, like the chaplain's Face2 (2026-10-06), no UVs at
+// all. Either way the whole plate samples a single texel of the crop: a flat
+// skin-coloured face, indistinguishable from the painted Face1. This rebuilds
+// planar UVs from the plate's own geometry when the authored ones cover less
+// than ~2% of UV space. Axes: the plate normal from its triangle winding, world
+// +Y brought into geometry space as "up", right = up × normal (what a viewer
+// standing in front of the plate calls right). Idempotent, flagged on userData;
+// the geometry is the useGLTF-cached one, so every mount shares the fix.
+// The proper fix is still to unwrap the plate in Blender — this keeps a
+// re-export from silently shipping a blank face.
+function ensurePlanarProjectionUVs(mesh) {
+  const geo = mesh?.geometry;
+  if (!geo || geo.userData.hmPlanarUV) return;
+  const pos = geo.attributes.position;
+  if (!pos || pos.count < 3) return;
+  const uv = geo.attributes.uv;
+  if (uv) {
+    let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+    for (let i = 0; i < uv.count; i++) {
+      const u = uv.getX(i), v = uv.getY(i);
+      if (u < minU) minU = u; if (u > maxU) maxU = u; if (v < minV) minV = v; if (v > maxV) maxV = v;
+    }
+    if ((maxU - minU) * (maxV - minV) >= 0.02) return; // authored unwrap — leave it
+  }
+  // Plate normal from winding (geometry space).
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3(), t = new THREE.Vector3();
+  const idx = geo.index;
+  const triCount = idx ? idx.count / 3 : pos.count / 3;
+  for (let i = 0; i < triCount; i++) {
+    const i0 = idx ? idx.getX(i * 3) : i * 3, i1 = idx ? idx.getX(i * 3 + 1) : i * 3 + 1, i2 = idx ? idx.getX(i * 3 + 2) : i * 3 + 2;
+    a.fromBufferAttribute(pos, i0); b.fromBufferAttribute(pos, i1); c.fromBufferAttribute(pos, i2);
+    n.add(t.copy(b).sub(a).cross(c.sub(a)));
+  }
+  if (n.lengthSq() < 1e-12) return;
+  n.normalize();
+  // World up in geometry space (directions: inverse of the upper 3×3).
+  mesh.updateWorldMatrix(true, false);
+  const up = new THREE.Vector3(0, 1, 0).applyMatrix3(new THREE.Matrix3().setFromMatrix4(mesh.matrixWorld).invert()).normalize();
+  up.addScaledVector(n, -up.dot(n));
+  if (up.lengthSq() < 1e-6) up.set(0, 0, 1).addScaledVector(n, -n.z);
+  up.normalize();
+  const right = new THREE.Vector3().crossVectors(up, n).normalize();
+  let minR = Infinity, maxR = -Infinity, minUp = Infinity, maxUp = -Infinity;
+  const rs = new Float32Array(pos.count), us = new Float32Array(pos.count);
+  for (let i = 0; i < pos.count; i++) {
+    a.fromBufferAttribute(pos, i);
+    const r = a.dot(right), u = a.dot(up);
+    rs[i] = r; us[i] = u;
+    if (r < minR) minR = r; if (r > maxR) maxR = r; if (u < minUp) minUp = u; if (u > maxUp) maxUp = u;
+  }
+  const w = Math.max(maxR - minR, 1e-9), h = Math.max(maxUp - minUp, 1e-9);
+  const out = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    out[i * 2] = (rs[i] - minR) / w;
+    out[i * 2 + 1] = 1 - (us[i] - minUp) / h; // v=0 is the top row (flipY=false)
+  }
+  geo.setAttribute("uv", new THREE.BufferAttribute(out, 2));
+  geo.userData.hmPlanarUV = true;
 }
 
 // Rest-pose face direction in world space. vendor.faceYaw is expressed in the
@@ -769,6 +844,10 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
   const restActionRef = useRef(null);
   const extrasRef = useRef([]);
   const needsStartRef = useRef(false);
+  // Talk state, declared up here because the idle cycler below reads it.
+  const talkModeRef = useRef(false);
+  // Which action is currently standing in for the idle — talkClip or a gesture.
+  const activeTalkRef = useRef(null);
 
   // Start (or restart) this session's resting pose. Returns false if the rig
   // is not ready yet, which is a real state and not an error — see the retry
@@ -822,6 +901,32 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actions, restClip]);
+
+  // Idle rotation (vendor.idleCycle): when the current rest clip finishes a
+  // loop, crossfade to the next in the list. Two playing actions trade weight,
+  // so the summed weight never leaves 1 and bind pose never shows. Skipped
+  // mid-line: the talk swap owns the blend then, and fades back to whatever
+  // restActionRef holds when the line ends.
+  useEffect(() => {
+    const cycle = vendor.idleCycle;
+    if (!mixer || !cycle || cycle.length < 2) return;
+    const onLoop = (e) => {
+      const cur = restActionRef.current;
+      if (!cur || e.action !== cur || talkModeRef.current) return;
+      const name = cur.getClip().name;
+      const i = cycle.indexOf(name);
+      // Try the following clips in order; skip any the export did not ship.
+      for (let k = 1; k < cycle.length; k++) {
+        const next = actions?.[cycle[(i + k) % cycle.length]];
+        if (!next || next === cur) continue;
+        next.reset().crossFadeFrom(cur, 0.6, false).play();
+        restActionRef.current = next;
+        return;
+      }
+    };
+    mixer.addEventListener("loop", onLoop);
+    return () => mixer.removeEventListener("loop", onLoop);
+  }, [mixer, actions, vendor.idleCycle]);
 
   // The retry. VendorModel suspends on useGLTF on the way in (the env map used
   // to be a second suspension before it moved to the non-suspending
@@ -919,9 +1024,6 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
   // and back when it ends or is cut off. Vendors without a talkClip (the
   // seated fortune teller) simply never swap. Crossfades run between two
   // playing actions, so bind pose is never touched.
-  const talkModeRef = useRef(false);
-  // Which action is currently standing in for the idle — talkClip or a gesture.
-  const activeTalkRef = useRef(null);
   useEffect(() => {
     // talkClip is no longer required: a vendor with per-line gestures but no
     // default talk clip still animates on the lines that name one.
@@ -929,7 +1031,9 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
     const off = onVendorTalk((vendorId, talking, gesture) => {
       if (vendorId !== vendor.sitepal) return;
       if (talking === talkModeRef.current) return;
-      const idle = (restClip && actions?.[restClip]) || Object.values(actions || {}).find(Boolean);
+      // The idle is whatever is CURRENTLY resting — with idleCycle that is not
+      // necessarily actions[restClip].
+      const idle = restActionRef.current || (restClip && actions?.[restClip]) || Object.values(actions || {}).find(Boolean);
       if (!idle) return;
       if (talking) {
         // A gesture named by THIS line wins over the vendor's default talkClip.
@@ -938,6 +1042,13 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
         const next = (gesture && actions?.[gesture]) || actions?.[vendor.talkClip];
         if (!next) return;
         talkModeRef.current = true;
+        if (next === idle) {
+          // Same clip for talking and resting (the chaplain preaching through
+          // his line): just keep it running. crossFadeFrom(self) would fade the
+          // ONLY weighted action 1→0→1 and flash bind pose — the T-pose blink.
+          activeTalkRef.current = null;
+          return;
+        }
         activeTalkRef.current = next;
         next.reset().crossFadeFrom(idle, 0.25, false).play();
       } else {
@@ -947,8 +1058,8 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
         const prev = activeTalkRef.current;
         talkModeRef.current = false;
         activeTalkRef.current = null;
-        if (prev) idle.reset().crossFadeFrom(prev, 0.35, false).play();
-        else idle.reset().play();
+        if (prev && prev !== idle) idle.reset().crossFadeFrom(prev, 0.35, false).play();
+        else if (!idle.isRunning()) idle.reset().play();
       }
     });
     return () => { off(); talkModeRef.current = false; activeTalkRef.current = null; };
@@ -1045,6 +1156,7 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
     if (!sp) return;
     const st = projRef.current;
     st.proj = findByBaseName(scene, sp.projFace) || null;
+    if (st.proj) ensurePlanarProjectionUVs(st.proj);
     st.regulars = (sp.regularFaces || [])
       .map((name) => findByBaseName(scene, name))
       .filter(Boolean);

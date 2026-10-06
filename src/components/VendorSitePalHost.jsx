@@ -51,8 +51,6 @@ const TUNER_VENDORS = {
   rugs: { label: "RUGS", crop: RUGS_SITEPAL_CROP, filter: RUGS_SITEPAL_FILTER, constName: "RUGS" },
   tacos: { label: "TACOS", crop: TACOS_SITEPAL_CROP, filter: TACOS_SITEPAL_FILTER, constName: "TACOS" },
   carny: { label: "CARNY", crop: CARNY_SITEPAL_CROP, filter: CARNY_SITEPAL_FILTER, constName: "CARNY" },
-  // Scene 2775640 is flagged sceneBroken in VENDOR_SITEPAL_CONFIG (2026-10-05): the tab shows,
-  // but nothing is requested for it until that flag goes — see the config comment.
   chapel: { label: "CHAPEL", crop: CHAPEL_SITEPAL_CROP, filter: CHAPEL_SITEPAL_FILTER, constName: "CHAPEL" },
   // Two poses, two crop sets. Only the pose this page load DREW is on screen —
   // pin it with ?pose=idle / ?pose=tattooing or you are tuning a set nothing is

@@ -4,6 +4,9 @@ import { useRef, useMemo, useEffect, useCallback, useState, Suspense } from "rea
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Text, Html, useGLTF, useTexture } from "@react-three/drei";
+import Tumbleweeds from "@/components/Tumbleweeds";
+import DesertScatter from "@/components/DesertScatter";
+import DirtRoad from "@/components/DirtRoad";
 import useEnvMapSafe from "@/hooks/useEnvMapSafe";
 import useSkyEnvMap from "@/hooks/useSkyEnvMap";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
@@ -8272,6 +8275,14 @@ export default function OilVoxelGrid({
         </mesh>
       )}
       {HORIZON_GROUND && <HorizonGround worldW={worldW} worldD={worldD} topoTex={topoTex} palette={groundPalette} />}
+      {/* Desert dressing: a few tumbleweeds crossing the sand outside the claims
+          and the strip, on the horizon ground only (there is no ground to roll on
+          when the field is the bare floating block). ?tumbleweeds=0 to disable. */}
+      {HORIZON_GROUND && <Tumbleweeds worldW={worldW} worldD={worldD} cellSize={cellSize} count={3} />}
+      {/* Sparse seeded cacti in the same open desert (three instanced draws). ?cacti=0 hides them. */}
+      {HORIZON_GROUND && <DesertScatter worldW={worldW} worldD={worldD} cellSize={cellSize} />}
+      {/* The access road off the boardwalk's +X end toward the horizon. ?road=0 hides it. */}
+      {HORIZON_GROUND && <DirtRoad worldW={worldW} worldD={worldD} cellSize={cellSize} palette={groundPalette} />}
       {STRATA_SPIKE && (
         <StrataVoxels
           oilGrid={oilGrid}
@@ -8541,4 +8552,4 @@ export function buildPeakDepthMap(grid, gridX, gridY, depthZ) {
   return peak;
 }
 
-export { Pumpjack, PlotSign, HellDemon, PUMPJACK_SCALE };
+export { Pumpjack, PlotSign, HellDemon }; // PUMPJACK_SCALE is exported at its declaration

@@ -170,26 +170,27 @@ export const CARNY_SITEPAL_FILTER = {
   sepia: 28,
 };
 
-// The Midway chaplain (docs/midway-chapel.md). Scene 2775640 (2026-10-05).
+// The Midway chaplain (docs/midway-chapel.md). Scene 2775643 (2026-10-06).
 // The CROP is the carny's as a SEED — SitePal heads land in roughly the same
 // place on the 600×800 canvas — and the FILTER is neutral. Neither has been
 // swept against his face yet: tune via /hailmary?tune=vendor (CHAPEL tab) and
 // paste the logged values back here.
 export const CHAPEL_SITEPAL_CROP = {
-  cropX: 208,
-  cropY: 100,
-  cropW: 191,
-  cropH: 239,
+  cropX: 201,
+  cropY: 143,
+  cropW: 148,
+  cropH: 186,
   rotateZ: 0,
   rotateX: 0,
 };
 export const CHAPEL_SITEPAL_FILTER = {
-  saturate: 100,
+  saturate: 106,
   contrast: 100,
   brightness: 100,
   hueRotate: 0,
   sepia: 0,
 };
+
 
 // Tattoo artist — TWO sets, one per pose GLB, because her head sits at a very
 // different angle standing out front versus bent over the chair. rotateX is the
@@ -568,17 +569,13 @@ export const VENDOR_SITEPAL_CONFIG = {
   // "R-Lady" spelling rule applies. The ledger speech (he reads the player's
   // actual record) is a later step and goes through speakVendorText, not here.
   chapel: {
-    sceneId: 2775640,
-    // SCENE BROKEN (2026-10-05): requesting 2775640 makes the SitePal player throw
-    // "vh_mc.idleLoadedCallback is not a function" and hang on its spinner — and
-    // once it has, the host never swaps or speaks again until the page reloads.
-    // Reproduced standalone with the account's own embed snippet, with both embed
-    // tokens; the carny's scene is fine in the same harness. Until the scene is
-    // fixed in the SitePal account, this flag makes activate/prime/speak for him
-    // a no-op (one console warning) so a stall click or the CHAPEL tuner tab
-    // cannot take every other vendor down with it. Delete the flag once
-    // loadSceneByID(2775640) fires vh_sceneLoaded.
-    sceneBroken: true,
+    // 2775643 (2026-10-06) replaced the first scene, 2775640, which the player
+    // could not start: it threw "vh_mc.idleLoadedCallback is not a function",
+    // hung on its spinner, and left the host unable to swap or speak for the rest
+    // of the page. A scene that does that again gets `sceneBroken: true` here,
+    // which makes activate/prime/speak a no-op (see sceneUsable) instead of
+    // taking every vendor down with it.
+    sceneId: 2775643,
     voice: { voice: "3y3Tv5R1v43QNZdfXoU3", lang: 1, engine: 14 },
     projFace: "Face2",
     regularFaces: ["Face1", "Face3"],

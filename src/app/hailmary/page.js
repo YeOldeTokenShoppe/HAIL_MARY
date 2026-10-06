@@ -9668,7 +9668,10 @@ export default function OilPage() {
                   enablePan
                   panSpeed={2}
                   minDistance={walkMode ? 0.25 : 1.5}
-                  maxDistance={45}
+                  // 16, down from 45 (2026-10-06): every scripted pose (overview, sky view,
+                  // helicopter sweep) sits within ~12 of its look-at, and anything past
+                  // ~16 framed a tiny field in a lot of empty sand.
+                  maxDistance={16}
                   maxPolarAngle={Math.PI}
                   minPolarAngle={0}
                   target={introExitTarget || [3, 5, 3]}
