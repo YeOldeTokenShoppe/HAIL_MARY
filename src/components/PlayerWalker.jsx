@@ -240,6 +240,8 @@ useGLTF.preload(GUN_MODEL);
 export default function PlayerWalker({
   worldW, worldD, cellSize = 1,
   spawnCol = 0, spawnRow = 0,
+  spawnAt = null,           // {x, z, yaw} WORLD: start already placed here (the
+                            // boardwalk's WALK entry) instead of click-to-drop
   frontier = [],            // page's frontierTargets: [{ col, row, layer }]
   onWildcat,                // async ({ col, row, layer }) => result
   onExit,
@@ -306,8 +308,8 @@ export default function PlayerWalker({
   const [brace, setBrace] = useState(0); // 0 riding · 1 coiling · 2 kick window — HUD cue
   // WALK starts in placement: the cowboy is hidden until the player clicks a
   // spot on the field to drop him there.
-  const [placed, setPlaced] = useState(false);
-  const placedRef = useRef(false);
+  const [placed, setPlaced] = useState(!!spawnAt);
+  const placedRef = useRef(!!spawnAt);
   // Camera mode, cycled with C: follow (locked chase) → orbit (free, target
   // glued to the cowboy) → cowboy (his hat — first person on foot, bull-cam
   // in the saddle). Persists across rides within a walk session.
@@ -591,7 +593,18 @@ export default function PlayerWalker({
   // field to place him (the pointer handler below), so the camera stays in
   // the sky while they aim. The follow cam takes over the moment he lands.
   useEffect(() => {
-    if (group.current) group.current.position.set(cellX(spawnCol) + 0.45, 0, cellZ(spawnRow) + 0.25);
+    const g = group.current;
+    if (!g) return;
+    if (spawnAt) {
+      // Boardwalk entry: stand him on the deck at the stall, facing it. The
+      // point arrives in WORLD space; his position is in the field group's.
+      const local = g.parent ? g.parent.worldToLocal(new THREE.Vector3(spawnAt.x, 0, spawnAt.z)) : new THREE.Vector3(spawnAt.x, 0, spawnAt.z);
+      g.position.set(local.x, 0, local.z);
+      heading.current = spawnAt.yaw ?? Math.PI;
+      g.rotation.y = heading.current;
+      return;
+    }
+    g.position.set(cellX(spawnCol) + 0.45, 0, cellZ(spawnRow) + 0.25);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

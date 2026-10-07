@@ -1585,6 +1585,96 @@ const PROXY_LOCAL_SIZE = 5;
 // allocating a fresh [0,0,0] every render (R3F would then see a changed prop).
 const VENDOR_NO_OFFSET = /* @__PURE__ */ Object.freeze([0, 0, 0]);
 
+// ── Talk bubbles (2026-10-06). A "…" bubble over each voiced character that
+// has not been spoken to yet this session — an invitation that cleans itself
+// up as the visitor explores. Shown only within TALK_BUBBLE_NEAR of the camera
+// (the strip view; from the overview ten bubbles would read as HUD), hidden
+// while that character is the close-up, gone once they've been clicked.
+// "Met" survives a reload within the tab via sessionStorage.
+const MET_KEY = "hm_met_vendors";
+const metVendors = /* @__PURE__ */ new Set();
+let metLoaded = false;
+function loadMet() {
+  if (metLoaded) return;
+  metLoaded = true;
+  try { JSON.parse(sessionStorage.getItem(MET_KEY) || "[]").forEach((id) => metVendors.add(id)); } catch (e) {}
+}
+function markVendorMet(id) {
+  loadMet();
+  if (metVendors.has(id)) return;
+  metVendors.add(id);
+  try { sessionStorage.setItem(MET_KEY, JSON.stringify([...metVendors])); } catch (e) {}
+}
+function isVendorMet(id) { loadMet(); return metVendors.has(id); }
+// Drawn once: cream bubble, dark outline, three dots. Normal blending and
+// depthTest ON — CanvasTexture + depthTest:false + additive is the iOS
+// blocky-rectangle gotcha (see r3f_ios_canvas_texture_gotcha).
+let bubbleTexture = null;
+function getBubbleTexture() {
+  if (bubbleTexture || typeof document === "undefined") return bubbleTexture;
+  const W = 192, H = 160, c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const g = c.getContext("2d");
+  const x = 12, y = 12, w = W - 24, h = 104, r = 34;
+  const path = () => {
+    g.beginPath();
+    g.moveTo(x + r, y);
+    g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r);
+    g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    // tail, bottom-centre, pointing down at the head
+    g.lineTo(W / 2 + 18, y + h); g.lineTo(W / 2, y + h + 30); g.lineTo(W / 2 - 18, y + h);
+    g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r);
+    g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y);
+    g.closePath();
+  };
+  path(); g.fillStyle = "#f5e8c8"; g.fill();
+  path(); g.lineWidth = 9; g.lineJoin = "round"; g.strokeStyle = "#2a2420"; g.stroke();
+  g.fillStyle = "#2a2420";
+  for (const dx of [-38, 0, 38]) { g.beginPath(); g.arc(W / 2 + dx, y + h / 2, 10, 0, Math.PI * 2); g.fill(); }
+  bubbleTexture = new THREE.CanvasTexture(c);
+  bubbleTexture.colorSpace = THREE.SRGBColorSpace;
+  bubbleTexture.anisotropy = 4;
+  return bubbleTexture;
+}
+const TALK_BUBBLE_NEAR = 3.0;  // world units from camera to head: fully shown inside this…
+const TALK_BUBBLE_FAR = 4.2;   // …faded out beyond this (the overview sits at 8+)
+const TALK_BUBBLE_LIFT = 0.95; // strip-local units above the head bone: clears hats and the hot dog costume
+const TALK_BUBBLE_SIZE = 0.5;  // strip-local width (characters are ~1.6 tall)
+const _bubbleHead = /* @__PURE__ */ new THREE.Vector3();
+function TalkBubble({ vendorId, headRef, zoomedRef, onClick }) {
+  const sprite = useRef();
+  const { camera } = useThree();
+  const map = useMemo(() => getBubbleTexture(), []);
+  useFrame(({ clock }) => {
+    const sp = sprite.current, head = headRef.current;
+    if (!sp) return;
+    if (!head || zoomedRef.current || isVendorMet(vendorId)) { sp.visible = false; return; }
+    head.getWorldPosition(_bubbleHead);
+    const d = camera.position.distanceTo(_bubbleHead);
+    const a = 1 - THREE.MathUtils.smoothstep(d, TALK_BUBBLE_NEAR, TALK_BUBBLE_FAR);
+    if (a <= 0.02) { sp.visible = false; return; }
+    sp.visible = true;
+    sp.material.opacity = a;
+    // Head world → this stall's local (the stall group is identity inside the
+    // strip group), then a slow bob so it reads as alive, not pinned.
+    sp.parent.worldToLocal(_bubbleHead);
+    sp.position.set(_bubbleHead.x, _bubbleHead.y + TALK_BUBBLE_LIFT + Math.sin(clock.elapsedTime * 2.1) * 0.04, _bubbleHead.z);
+  });
+  if (!map) return null;
+  return (
+    <sprite
+      ref={sprite}
+      visible={false}
+      scale={[TALK_BUBBLE_SIZE, TALK_BUBBLE_SIZE * (160 / 192), 1]}
+      onClick={(e) => { e.stopPropagation(); onClick?.(e); }}
+      onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
+      onPointerOut={() => { document.body.style.cursor = "auto"; }}
+    >
+      <spriteMaterial map={map} transparent depthWrite={false} toneMapped={false} />
+    </sprite>
+  );
+}
+
 function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, propObj, onVendorClick, onFocusObject, onZoomOut, onFocusChange }) {
   // Fold this session's pose framing over the vendor so the close-up matches
   // whichever pose was actually drawn.
@@ -1676,6 +1766,7 @@ function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, p
   // on-foot entry (the "hm-vendor-enter" window event).
   const enterVendor = () => {
     if (zoomedRef.current) return;
+    markVendorMet(vendor.id); // the talk bubble's job is done
     onVendorClick?.(vendor.id);
     // Voiced vendors greet on approach: swap the host to their SitePal scene
     // and speak an ElevenLabs line (engine 14) with real lipsync. The click
@@ -1819,6 +1910,10 @@ function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, p
           />
         </group>
       )}
+      {/* Outside the offset group: it positions itself from the head bone's
+          world position every frame. Voiced vendors only — a speech bubble
+          over someone who cannot speak is a broken promise. */}
+      {vendor.sitepal && <TalkBubble vendorId={vendor.id} headRef={headRef} zoomedRef={zoomedRef} onClick={handleClick} />}
       {p && (
         <mesh position={[p.x, p.y + PROXY_LOCAL_SIZE / 2, p.z]}>
           <boxGeometry args={[PROXY_LOCAL_SIZE, PROXY_LOCAL_SIZE, PROXY_LOCAL_SIZE]} />
@@ -4228,11 +4323,38 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
       if (focusRef.current) { releaseFocused(); zoomOutFromStrip(); }
       else onZoomOut?.();
     };
+    // Deck-centreline world point at a strip-local z (the stops' frame).
+    const deckWorldAt = (z) => {
+      const group = stripGroupRef.current;
+      if (!group || !deckLocal) return null;
+      return group.localToWorld(new THREE.Vector3((deckLocal.min.x + deckLocal.max.x) / 2, deckLocal.max.y, z));
+    };
+    // The stop nearest a WORLD x (the walker's exit hands his position in).
+    const gotoNearest = (worldX) => {
+      const group = stripGroupRef.current, stops = getStops();
+      const ref = deckWorldAt(0);
+      if (!group || !ref || !stops.length) return;
+      const i = nearestStopIndex(stops, group.worldToLocal(new THREE.Vector3(worldX, ref.y, ref.z)).z);
+      if (i >= 0) go(i);
+    };
+    // Where the boardwalk WALK entry drops the prospector: on the deck at the
+    // current stall, facing the props (they sit on world −Z of the centreline).
+    // Half a unit toward the field: the vendors stand ON the centreline, and
+    // spawning there put him inside the hot dog man.
+    const WALK_SPAWN_TOWARD_FIELD = 0.5;
+    const walkSpawn = () => {
+      const stops = getStops(), stop = stops[stopIndexRef.current];
+      const at = stop && deckWorldAt(stop.z);
+      return at ? { x: at.x, z: at.z + WALK_SPAWN_TOWARD_FIELD, yaw: Math.PI } : null;
+    };
     window.__hmStripNav = {
       next: () => go(stopIndexRef.current + 1),
       prev: () => go(stopIndexRef.current - 1),
       goto: go,
+      gotoNearest,
+      gotoCurrent: () => { if (stopIndexRef.current >= 0) go(stopIndexRef.current); },
       back,
+      walkSpawn,
       stops: () => getStops().map((s) => ({ id: s.id, label: s.label })),
     };
     return () => { delete window.__hmStripNav; };

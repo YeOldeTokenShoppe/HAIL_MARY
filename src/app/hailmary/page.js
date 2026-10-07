@@ -1481,7 +1481,7 @@ const TOOLBAR_TRAY = {
 };
 const TOOLBAR_DIVIDER = { width: 1, height: 18, background: "rgba(255,255,255,0.2)", margin: "0 3px", flexShrink: 0 };
 const TOOLBAR_PILL = {
-  padding: "0 12px", height: 28, borderRadius: 8,
+  padding: "0 12px", height: 28, borderRadius: 8, whiteSpace: "nowrap",
   background: "rgba(14,16,24,0.55)",
   backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
   border: "1px solid rgba(255,255,255,0.14)",
@@ -2080,6 +2080,11 @@ export default function OilPage() {
   const [numberOfDeposits, setNumberOfDeposits] = useState(5);
   const [passiveCharges, setPassiveCharges] = useState(8); // v2 extraction budget (20 = can reach the bottom of your own column)
   const [walkMode, setWalkMode] = useState(false); // v1 ground mode: third-person cowboy on the field
+  // Boardwalk WALK entry (2026-10-06): world {x,z,yaw} the prospector starts
+  // at, set by startBoardwalkWalk (below, with the strip nav); null = the
+  // field entry, which spawns at the player's rig and needs a plot.
+  const [walkSpawn, setWalkSpawn] = useState(null);
+  const walkFromStripRef = useRef(false);
   // Walk-mode camera: C cycles follow → orbit → cowboy. Orbit is mounted only
   // in "orbit" (the walker steers its target); in the other two the walker
   // writes the camera directly, and damping fights external writes even when
@@ -2908,10 +2913,10 @@ export default function OilPage() {
   // handler die together, freezing the view with no exit. Fall back to the sky
   // the moment the spawn drill vanishes so the normal camera rig remounts.
   useEffect(() => {
-    if (walkMode && activeUserDrill?.col == null) {
+    if (walkMode && activeUserDrill?.col == null && !walkSpawn) {
       setWalkMode(false); setWalkerCam("follow"); setWalkerVendor(false);
     }
-  }, [walkMode, activeUserDrill?.col]);
+  }, [walkMode, activeUserDrill?.col, walkSpawn]);
 
   // Cell depth from oilPlots (persists across owners) — or computed playerDepth for active players
   const cellDepth = userPlotState?.drillDay ?? userDrill?.drillDay ?? 0;
@@ -3349,6 +3354,32 @@ export default function OilPage() {
     return () => window.removeEventListener("hm-strip-stop", onStop);
   }, []);
   useEffect(() => { if (flyTarget && !flyTarget.focus) setStripStop(null); }, [flyTarget]);
+  // Boardwalk WALK entry: the prospector starts on the deck at the current
+  // stall (no claimed plot needed — the field entry still spawns at the rig).
+  // walkFromStripRef makes his exit land back on the nearest stall instead of
+  // wherever the follow cam left off.
+  // (walkSpawn / walkFromStripRef are declared beside walkMode — the mount
+  // guard up there reads them.)
+  const startBoardwalkWalk = useCallback(() => {
+    const at = window.__hmStripNav?.walkSpawn?.();
+    if (!at) return;
+    walkFromStripRef.current = true;
+    setWalkSpawn(at);
+    setWalkMode(true);
+  }, []);
+  // First-visit hint in the strip nav ("click a character to talk"), retired
+  // the first time anything on the strip takes the close-up. Per tab.
+  const [talkHintDone, setTalkHintDone] = useState(true);
+  useEffect(() => {
+    let seen = false;
+    try { seen = sessionStorage.getItem("hm_talk_hint_done") === "1"; } catch (e) {}
+    setTalkHintDone(seen);
+  }, []);
+  useEffect(() => {
+    if (!stripStop?.focused || talkHintDone) return;
+    setTalkHintDone(true);
+    try { sessionStorage.setItem("hm_talk_hint_done", "1"); } catch (e) {}
+  }, [stripStop?.focused, talkHintDone]);
   // Phase-2 helicopter auto-orbit while the demon is loose (mobile). Driven as a
   // React prop on OrbitControls so frequent re-renders can't silently reset it.
   const [hellOrbit, setHellOrbit] = useState(false);
@@ -9678,16 +9709,31 @@ export default function OilPage() {
                 onBoothPhoto={handleBoothPhoto}
               />
               {/* activeUserDrill, not userDrill — see the mobile mount. */}
-              {walkMode && activeUserDrill?.col != null && (
+              {walkMode && (activeUserDrill?.col != null || walkSpawn) && (
                 <PlayerWalker
                   worldW={gridSize} worldD={gridSize}
-                  spawnCol={activeUserDrill.col} spawnRow={activeUserDrill.row}
+                  spawnCol={activeUserDrill?.col ?? 0} spawnRow={activeUserDrill?.row ?? 0}
+                  spawnAt={walkSpawn}
                   frontier={frontierTargets}
                   onWildcat={handleWildcat}
                   controlsRef={controlsRef}
                   onCam={setWalkerCam}
                   onVendorMode={setWalkerVendor}
-                  onExit={() => { setWalkerCam("follow"); setWalkerVendor(false); setWalkMode(false); }}
+                  onExit={() => {
+                    // Read before the unmount deletes it.
+                    const wp = window.__hmWalkerPos ? { ...window.__hmWalkerPos } : null;
+                    const fromStrip = walkFromStripRef.current;
+                    walkFromStripRef.current = false;
+                    setWalkerCam("follow"); setWalkerVendor(false); setWalkMode(false); setWalkSpawn(null);
+                    if (!fromStrip) return;
+                    // A boardwalk walk ends on the boardwalk: the stall he is
+                    // standing at if he is still on (or beside) the deck, else
+                    // the field overview rather than a stranded follow cam.
+                    const deckEdgeZ = -(gridSize * CELL_SIZE) / 2;
+                    if (!wp) window.__hmStripNav?.gotoCurrent();            // position never published: the stall he started at
+                    else if (wp.z < deckEdgeZ + 0.6) window.__hmStripNav?.gotoNearest(wp.x);
+                    else handleZoomOut();
+                  }}
                 />
               )}
             </group>
@@ -9883,6 +9929,18 @@ export default function OilPage() {
               >
                 {stripStop.focused ? "◂ BOARDWALK" : "▴ FIELD VIEW"}
               </button>
+              {/* Walk the boardwalk from here: the prospector drops onto the deck
+                  at this stall. Hidden during a close-up (leave it first). */}
+              {!stripStop.focused && (
+                <button type="button" title="Walk the boardwalk on foot" onClick={startBoardwalkWalk} style={TOOLBAR_PILL}>
+                  🥾 WALK
+                </button>
+              )}
+              {!talkHintDone && (
+                <div style={{ ...TOOLBAR_PILL, cursor: "default", marginLeft: 8, color: "#ffe08a", borderColor: "rgba(255,210,120,0.45)" }}>
+                  💬 CLICK A CHARACTER TO TALK
+                </div>
+              )}
             </div>
           )}
         </div>
