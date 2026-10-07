@@ -6,7 +6,7 @@ files — the KTX2 build is what the site actually loads, the webp build is the
 **export → optimize (webp) → encode (KTX2) → bump the tag**.
 
 > **Skipping step 3 is the classic failure.** The site loads
-> `CommercialStrip5_opt_ktx2.glb`. Rebuild only the webp file and the strip
+> `Commercial_Strip7_opt_ktx2.glb`. Rebuild only the webp file and the strip
 > silently stays on the previous export — and it will look CORRECT locally
 > (the dev server revalidates every request) while production serves the stale
 > CDN copy. That is exactly what happened on 2026-09-02.
@@ -16,7 +16,7 @@ files — the KTX2 build is what the site actually loads, the webp build is the
 ## 1. Export the base GLB from Blender
 
 `File ▸ Export ▸ glTF 2.0 (.glb/.gltf)`, save as
-`~/HAIL_MARY/public/models/CommercialStrip5.glb` (overwrite the base).
+`~/HAIL_MARY/public/models/Commercial_Strip7_Lossless.glb` (overwrite the base).
 
 Settings that matter (the rest can stay default):
 
@@ -60,8 +60,8 @@ name**, and a plain `optimize` (or instancing) would collapse them.
 ```bash
 cd ~/HAIL_MARY
 npx --yes @gltf-transform/cli optimize \
-  public/models/CommercialStrip5.glb \
-  public/models/CommercialStrip5_opt.glb \
+  public/models/Commercial_Strip7_Lossless.glb \
+  public/models/Commercial_Strip7_opt.glb \
   --instance false --simplify false --flatten false --join false \
   --palette false --prune-solid-textures false --prune-attributes false \
   --texture-compress webp --texture-size 2048
@@ -76,7 +76,7 @@ Never use the bare `optimize` without these flags.
 ```bash
 node -e '
 const fs=require("fs");
-const b=fs.readFileSync("public/models/CommercialStrip5_opt.glb");
+const b=fs.readFileSync("public/models/Commercial_Strip7_opt.glb");
 const g=JSON.parse(b.slice(20,20+b.readUInt32LE(12)).toString());
 const n=g.nodes.map(x=>x.name);
 const crit=["Boardwalk","Steps","Step1","SM_Prop_Mechanical_Bull_01_Saddle_01","Photo_booth_Curtain","FortuneTeller_Wagon_Empty","Bull_Tent"];
@@ -101,7 +101,7 @@ Staged passes are needed because the `ktx` encoder cannot read webp and
 
 ```bash
 cd ~/HAIL_MARY; S=/tmp/strip; mkdir -p $S
-npx --yes @gltf-transform/cli optimize public/models/CommercialStrip5.glb $S/a.glb \
+npx --yes @gltf-transform/cli optimize public/models/Commercial_Strip7_Lossless.glb $S/a.glb \
   --instance false --simplify false --flatten false --join false \
   --palette false --prune-solid-textures false --prune-attributes false \
   --compress false --texture-compress false --texture-size 2048
@@ -110,7 +110,7 @@ npx --yes @gltf-transform/cli resize $S/b.glb $S/c.glb --pattern "BOARDWALK_ATLA
 PATH="$HOME/.local/ktx/bin:$PATH" DYLD_LIBRARY_PATH="$HOME/.local/ktx/lib" \
   npx --yes @gltf-transform/cli etc1s $S/c.glb $S/d.glb
 npx --yes @gltf-transform/cli webp    $S/d.glb $S/e.glb      # anything ktx skipped
-npx --yes @gltf-transform/cli meshopt $S/e.glb public/models/CommercialStrip5_opt_ktx2.glb
+npx --yes @gltf-transform/cli meshopt $S/e.glb public/models/Commercial_Strip7_opt_ktx2.glb
 ```
 
 The `ktx` encoder (v4.4.2) lives in `~/.local/ktx/bin` and is NOT on `PATH` —
@@ -124,8 +124,8 @@ fails silently.
 node -e '
 const fs=require("fs");
 const rd=p=>{const b=fs.readFileSync(p);return JSON.parse(b.slice(20,20+b.readUInt32LE(12)).toString());};
-const a=rd("public/models/CommercialStrip5_opt.glb");
-const k=rd("public/models/CommercialStrip5_opt_ktx2.glb");
+const a=rd("public/models/Commercial_Strip7_opt.glb");
+const k=rd("public/models/Commercial_Strip7_opt_ktx2.glb");
 const nm=g=>g.nodes.map(x=>x.name||"").sort().join("|");
 console.log("nodes  webp/ktx2:", a.nodes.length, k.nodes.length);
 console.log("meshes webp/ktx2:", a.meshes.length, k.meshes.length);
@@ -150,10 +150,10 @@ ONE tag now covers BOTH builds — they are two encodings of the same export, so
 rebuild invalidates both. In `src/components/CommercialStrip.jsx`:
 
 ```js
-const STRIP_MODEL_V = "15";
+const STRIP_MODEL_V = "16";
 ```
 
-Bump the number: `"16"`, `"17"`, … on every re-export. Both URLs interpolate it,
+Bump the number: `"17"`, `"18"`, … on every re-export. Both URLs interpolate it,
 so they can never drift apart.
 
 > **Historical note:** these were once two independent literals
@@ -171,7 +171,7 @@ Then hard-reload the page (the version bump also handles this for other users).
   back in Blender for walking room is the better fix; `STRIP_EXTEND = 1.4` in
   `PlayerWalker.jsx` can stay (it just allows a bit more outer walking range,
   harmless) or drop back to `1.0` if the deck is narrower again.
-- **KTX2 ships (since 2026-09-02):** `CommercialStrip5_opt_ktx2.glb` is the
+- **KTX2 ships (since 2026-09-02):** `Commercial_Strip7_opt_ktx2.glb` is the
   default `STRIP_MODEL`; the webp build stays on disk as the `?strip=webp`
   fallback. Building it is **step 3** — it used to live down here as a note,
   which is precisely how it got skipped on a re-export. There is deliberately

@@ -9,6 +9,10 @@ import VortexPortal from "@/components/VortexPortal";
 import useEnvMapSafe from "@/hooks/useEnvMapSafe";
 import ClawMachineController from "@/components/ClawMachineController";
 import GachaponController from "@/components/GachaponController";
+// Per-stall Z windows along the deck (strip-local), written by
+// scripts/extract-stalls.mjs. The deck-click snap and the ‹ › stall nav read
+// the same windows the stall extraction and postcard plates use.
+import stallWindows from "../../scripts/stall-windows.json";
 import {
   TATTOOS_IDLE_SITEPAL_CROP,
   TATTOOS_IDLE_SITEPAL_FILTER,
@@ -49,11 +53,11 @@ import {
 // dev server revalidates on every request regardless of the query string, so the
 // fresh file always won locally, while the CDN kept serving whatever it had
 // cached under the unchanged `?v=ktx2` key. BUMP THIS on every rebuild.
-const STRIP_MODEL_V = "15";
+const STRIP_MODEL_V = "16";
 // The chapel's split GLBs (stall + preacher) — bump after re-running scripts/split-tent-revival.mjs.
 export const CHAPEL_ASSET_V = 4;
-const STRIP_MODEL_WEBP = `/models/CommercialStrip5_opt.glb?v=${STRIP_MODEL_V}`;
-const STRIP_MODEL_KTX2 = `/models/CommercialStrip5_opt_ktx2.glb?v=${STRIP_MODEL_V}`;
+const STRIP_MODEL_WEBP = `/models/Commercial_Strip7_opt.glb?v=${STRIP_MODEL_V}`;
+const STRIP_MODEL_KTX2 = `/models/Commercial_Strip7_opt_ktx2.glb?v=${STRIP_MODEL_V}`;
 const STRIP_MODEL =
   typeof window !== "undefined" && /[?&]strip=webp\b/.test(window.location.search)
     ? STRIP_MODEL_WEBP
@@ -95,6 +99,9 @@ const INTERIOR_DIM_EASE = 2.5;     // 1/s — ~0.4s to settle, matched to the fl
 //   clip to weight it — "a","a","b" shows b one loop in three. Unlike poseClips
 //   the switch is live, so every clip must leave Root where it found it. A talk
 //   line plays over whichever cycle clip is up and fades back to it.
+//   `farIdleCycle` is the same thing for when the stall is NOT focused (the
+//   model swaps lists on focus change, crossfading at once if the running clip
+//   is not in the new list) — a vendor can look busy from afar and quiet up close.
 //
 // `talkCycle: ["a", "b"]` — rotate the TALK clip: each new line starts on the
 //   next clip in the list, and a long line moves on again at the clip's loop
@@ -351,7 +358,7 @@ export const VENDOR_CATALOG = [
     // already draws a mustache or eyepatch, add those mesh names to regularFaces
     // so they hide while he is speaking.
     model: "/models/Vendor_Carny.glb", idleClip: "carny_idle",
-    offset: [0, 0, 0],
+    offset: [0, 0, -1.0],
     talkClip: "yelling",
     faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
     sitepal: "carny" },
@@ -380,14 +387,18 @@ export const VENDOR_CATALOG = [
     // stale stall kept showing the robot without his emissive, 2026-09-05).
     // Five NLA tracks since the 2026-10-06 evening export. Between lines he
     // rests through the QUIET pair (idle, then shading his eyes to look over
-    // the congregation); while a line plays, the talk swap rotates through the
-    // three sermon poses, moving on at each clip's loop so a 25 s sermon does
-    // not loop one gesture. The earlier T-pose blink (talk clip === idle clip,
+    // the congregation); while a line plays, the talk swap alternates the two
+    // sermon poses, moving on at each clip's loop so a 25 s sermon does not
+    // loop one gesture. The earlier T-pose blink (talk clip === idle clip,
     // crossfaded from itself) cannot recur: the two sets are disjoint.
     model: `/models/Vendor_Chaplain_Character.glb?v=${CHAPEL_ASSET_V}`, idleClip: "idle",
-    // Repeats weight the cycle: three idles for every look over the crowd.
-    idleCycle: ["idle", "idle", "idle", "looking"], talkClip: "preaching",
-    talkCycle: ["preaching", "yelling", "rapping"],
+    // Two rest cycles. Unfocused (seen from the field) he should look busy, so
+    // the FAR cycle is mostly preaching with the odd pause; once a player steps
+    // up, the NEAR cycle is quiet between lines (repeats weight each list).
+    idleCycle: ["idle", "idle", "idle", "looking"],
+    farIdleCycle: ["preaching", "preaching", "preaching", "idle", "preaching", "looking"],
+    talkClip: "preaching",
+    talkCycle: ["preaching", "yelling"],   // "rapping" ships in the GLB but is retired from the rotation (2026-10-06)
     offset: [0, 0, 0],
     prop: "SM_Bld_Tent_01",
     stallModel: `/models/stalls/stall_chapel.glb?v=${CHAPEL_ASSET_V}`,
@@ -850,7 +861,12 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
   const restClip = poseRef.current || vendor.idleClip;
 
   const restActionRef = useRef(null);
-  const restIdxRef = useRef(0);   // position in vendor.idleCycle (repeats allowed)
+  const restIdxRef = useRef(0);   // position in the current rest cycle (repeats allowed)
+  const currentRestCycle = () => {
+    const near = vendor.idleCycle || [];
+    const far = vendor.farIdleCycle || near;
+    return focusedRef?.current ? near : far;
+  };
   const extrasRef = useRef([]);
   const needsStartRef = useRef(false);
   // Talk state, declared up here because the idle cycler below reads it.
@@ -931,8 +947,8 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
   // mid-line: the talk swap owns the blend then, and fades back to whatever
   // restActionRef holds when the line ends.
   useEffect(() => {
-    const cycle = vendor.idleCycle || [];
-    if (!mixer || (cycle.length < 2 && !(vendor.talkCycle?.length > 1))) return;
+    const hasCycle = (vendor.idleCycle?.length > 1) || (vendor.farIdleCycle?.length > 1);
+    if (!mixer || (!hasCycle && !(vendor.talkCycle?.length > 1))) return;
     const onLoop = (e) => {
       // While talking, the TALK clip rotates at its own loop boundary (if the
       // vendor has a talkCycle); the rest cycle waits for the line to end.
@@ -947,6 +963,8 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
       }
       const cur = restActionRef.current;
       if (!cur || e.action !== cur) return;
+      const cycle = currentRestCycle();
+      if (cycle.length < 2) return;
       // Position, not clip name: the list may repeat a clip to weight it
       // ("idle","idle","idle","looking"). A repeat of the clip already playing
       // just lets it loop again — never crossfade an action from itself.
@@ -964,7 +982,28 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
     mixer.addEventListener("loop", onLoop);
     return () => mixer.removeEventListener("loop", onLoop);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mixer, actions, vendor.idleCycle, vendor.talkCycle]);
+  }, [mixer, actions, vendor.idleCycle, vendor.farIdleCycle, vendor.talkCycle]);
+
+  // Focus change → swap rest lists. If the running rest clip is not in the new
+  // list (preaching from afar, then a player steps up), crossfade to the new
+  // list's first clip now rather than waiting for a loop boundary — the quiet
+  // cycle has to be up before the greeting lands. Never during a line.
+  const lastFocusRef = useRef(null);
+  useFrame(() => {
+    if (!vendor.farIdleCycle?.length) return;
+    const f = !!focusedRef?.current;
+    if (f === lastFocusRef.current) return;
+    lastFocusRef.current = f;
+    const cur = restActionRef.current;
+    if (!cur || talkModeRef.current) return;
+    const cycle = currentRestCycle();
+    if (!cycle.length || cycle.includes(cur.getClip().name)) { restIdxRef.current = Math.max(0, cycle.indexOf(cur.getClip().name)); return; }
+    const next = actions?.[cycle[0]];
+    if (!next || next === cur) return;
+    restIdxRef.current = 0;
+    next.reset().crossFadeFrom(cur, 0.6, false).play();
+    restActionRef.current = next;
+  });
 
   // The retry. VendorModel suspends on useGLTF on the way in (the env map used
   // to be a second suspension before it moved to the non-suspending
@@ -1478,15 +1517,45 @@ const DECK_LIFT = 0.004;
 // Framing numbers are in WORLD units, not strip-local, because the focus rig
 // lives outside the auto-fitted group. For scale: a stall is only ~0.49 world
 // units tall at the current fit, so these are small numbers by design.
-// At fov 50 this frames roughly half the strip's length (~5 world units of the
-// 10.4 the deck spans) and about six stall-heights vertically — wide enough to
-// read as "the area you clicked" rather than a single booth, close enough that
-// picking a character out of it is an easy second click. Raise it to see more
-// of the strip, lower it to land tighter on one stall.
-const STRIP_VIEW_DIST = 3.0;   // how far back the camera sits from the hit point
-const STRIP_VIEW_RAISE = 0.35; // lift the LOOK-AT off the deck to awning height
-const STRIP_VIEW_LIFT = 0.45;  // +Y on the approach vector → looking slightly down
+// Retuned 2026-10-06 from a 3.0-back / 24°-down shot that framed half the deck
+// from above: no horizon, pumpjacks filling the lower third, characters ~50 px
+// tall. This is a standing-height three-quarter view instead — ~2 units back,
+// ~10° down, look-at at chest height — so the sky and bunting sit above the
+// awnings, the characters roughly double in size and the pumpjacks become a
+// thin foreground band. At fov 50 it frames one stall and its neighbours.
+// Raise DIST to see more of the strip, lower it to land tighter on one stall.
+const STRIP_VIEW_DIST = 1.6;   // how far back the camera sits from the look-at (2.0 → 1.6, 2026-10-06: "a little closer")
+const STRIP_VIEW_RAISE = 0.25; // lift the LOOK-AT off the deck to chest height
+const STRIP_VIEW_LIFT = 0.18;  // +Y on the approach vector → looking slightly down
 const STRIP_CLICK_DRAG_PX = 4; // beyond this the pointer was orbiting, not clicking
+// Approach from the field side. +Z is the same direction the vendors use
+// (approachDirWorld resolves their default to exactly (0,0,1)), so a strip
+// click and a character click fly in from the same side and the second click
+// after the first never has to swing the camera around.
+const STRIP_VIEW_NORMAL = /* @__PURE__ */ new THREE.Vector3(0, STRIP_VIEW_LIFT, 1).normalize();
+
+// ── Stall stops: the ordered "places" along the deck. A deck click snaps to
+// the nearest stop so every click lands on a composed shot of one stall and
+// its neighbours instead of the seam between two; the ‹ › nav (ArrowLeft /
+// ArrowRight, or the chevrons the page draws while a stop is current) walks
+// this list. Vendor stalls come from stall-windows.json; the two attractions
+// the extraction deliberately skips (they are nobody's dressing) are located
+// by node at click time, as is any vendor whose stall is its own GLB.
+const STRIP_EXTRA_STOPS = [
+  { id: "bull",       node: "Bull_Tent",          label: "Mechanical bull" },
+  { id: "photobooth", node: "Photo_booth_Curtain", label: "Photo booth" },
+];
+// Display names for the nav caption. The catalog's own `label`s are blank on
+// purpose (the signage speaks), so these are read off the signs/props.
+const STRIP_STOP_LABELS = {
+  carny: "Carny ride", promos: "Trader Bros", fortunes: "Fortune teller",
+  claw: "Claw machine", gachapon: "Gachapon", hotdogs: "Hot dog cart",
+  rugs: "Rugs", tonics: "Tonics", tattoos: "Tattoos", chapel: "Chapel",
+};
+// A deck click further than this (strip-local units) past the ends of the
+// nearest stop's window keeps its raw hit point — it is a stretch of empty
+// deck, and snapping it would yank the camera somewhere else.
+const STRIP_SNAP_MARGIN = 2.5;
 const STRUT_COUNT = 4;      // knee braces spaced along the deck's length
 const STRUT_END_INSET = 0.6; // gap from the deck's ends to the outermost brace
 const STRUT_DROP = 1.15;    // how far a brace falls down the mesa face (cellSize units)
@@ -1838,12 +1907,16 @@ const BEAM_ANGLE = 0.30;           // rad, half-angle of the visible shaft
 //
 // Retuned 2026-08-23. The old 1.5 → 4.0 band assumed you only ever reached the
 // strip by orbiting in from the far side, which left you beyond BEAM_FAR at full
-// strength. Click-to-fly now lands you at STRIP_VIEW_DIST (3.0), which sat right
-// inside the fade and dimmed the shafts to ~60%. The band still exists for the
-// case it was written for — a vendor face close-up putting the camera INSIDE a
-// cone, which would just wash the screen — it simply starts later now.
+// strength. Click-to-fly then landed you at 3.0, which sat right inside the
+// fade and dimmed the shafts to ~60%. The band still exists for the case it
+// was written for — a vendor face close-up putting the camera INSIDE a cone,
+// which would just wash the screen — it simply starts later now.
+// 2026-10-06: STRIP_VIEW_DIST dropped to 1.6, so a deck click on the middle
+// stalls parks the camera ~1.6 from the origin; BEAM_FAR came down with it so
+// the strip view keeps the shafts at full strength. Face close-ups (≈0.25 from
+// the head) still land inside the band.
 const BEAM_NEAR = 0.9;             // world units: hidden this close…
-const BEAM_FAR = 2.2;
+const BEAM_FAR = 1.45;
 // PlaneGeometry faces +Z; this lays it flat so its normal points up.
 const FLAT_Q = /* @__PURE__ */ new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
 // Undercarriage glow comes from real PointLights authored in Blender and
@@ -2822,7 +2895,7 @@ function boothMessageScreen(ctx, w, h, t, title, lines) {
 
 const _boothNormal = /* @__PURE__ */ new THREE.Vector3();
 
-function PhotoBoothRig({ boothScene, stripScale, focus, onVendorClick, onFocusObject, onZoomOut, onFocusChange, onBoothPhoto, boothClickRef }) {
+function PhotoBoothRig({ boothScene, stripScale, focus, onVendorClick, onFocusObject, onZoomOut, onFocusChange, onBoothPhoto, boothClickRef, boothExitRef }) {
   const screens = useMemo(() => ({
     cabin: findMaterialMesh(boothScene, BOOTH_SCREEN_CABIN),
     inner: findMaterialMesh(boothScene, BOOTH_SCREEN_INNER),
@@ -3224,10 +3297,15 @@ function PhotoBoothRig({ boothScene, stripScale, focus, onVendorClick, onFocusOb
       if (st.state === "photo") { st.state = "preview"; st.t = 0; st.photoDrawn = false; return; }
     }
     // anywhere else (or "denied"/"boot" anywhere): leave
+    leave();
+  };
+  // flyOut=false is the strip nav's exit (Escape / ◂ BOARDWALK / a ‹ › step):
+  // it flies the camera itself, so the booth only has to let go.
+  const leave = (flyOut = true) => {
     zoomedRef.current = false;
     endSession();
     onFocusChange?.(null);
-    onZoomOut?.();
+    if (flyOut) onZoomOut?.();
   };
 
   // Registered with CommercialStrip so the deck's click handler can hand
@@ -3235,9 +3313,12 @@ function PhotoBoothRig({ boothScene, stripScale, focus, onVendorClick, onFocusOb
   // back to this state machine. No dep array: handleClick closes over fresh
   // props each render, so re-registering every commit keeps it current.
   useEffect(() => {
-    if (!boothClickRef) return;
-    boothClickRef.current = handleClick;
-    return () => { boothClickRef.current = null; };
+    if (boothClickRef) boothClickRef.current = handleClick;
+    if (boothExitRef) boothExitRef.current = leave;
+    return () => {
+      if (boothClickRef) boothClickRef.current = null;
+      if (boothExitRef) boothExitRef.current = null;
+    };
   });
 
   // Another stall taking the shared focus is also "leaving the booth" — the
@@ -3895,7 +3976,16 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
   // deck's own click handler. The booth registers its click handler here so
   // handleStripClick can hand those clicks over instead of flying the camera.
   const boothClickRef = useRef(null);
-
+  // The booth's no-fly-out exit (it does not answer hm-vendor-exit).
+  const boothExitRef = useRef(null);
+  // What is currently zoomed, readable from the nav closures below without
+  // waiting a render (focus itself is state).
+  const focusRef = useRef(null); focusRef.current = focus;
+  // The auto-fitted group below. Stop maths runs in strip-local space and
+  // crosses to world through this ref, so it is immune to the fit.
+  const stripGroupRef = useRef(null);
+  // Index into getStops() of the stall the camera last landed on; -1 = none.
+  const stopIndexRef = useRef(-1);
 
   const deckW = worldW + DECK_MARGIN * 2 * cellSize;
   const deckD = DECK_DEPTH * cellSize;
@@ -4034,6 +4124,134 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
     return planes;
   }, [deckLocal, fit]);
 
+  // The ordered stall stops (see STRIP_EXTRA_STOPS). Computed on demand — a
+  // click or an arrow press — rather than memoised: the node-located stops
+  // need current world matrices (the chapel's stall GLB arrives late), and a
+  // dozen Box3s on a click is nothing.
+  const getStops = () => {
+    const list = Object.entries(stallWindows.windows).map(([id, [z0, z1]]) => ({
+      id, z0, z1, z: (z0 + z1) / 2, label: STRIP_STOP_LABELS[id] || id,
+    }));
+    const group = stripGroupRef.current;
+    if (group) {
+      // Fresh matrices: a stall GLB that mounted this frame (the chapel's)
+      // still carries identity world matrices until the renderer's next
+      // updateMatrixWorld, and Box3.setFromObject only refreshes the node
+      // itself, not its ancestors — which put the chapel past the hot dog
+      // cart on a cold load (2026-10-06). Anything that still resolves off
+      // the deck is dropped rather than flown to.
+      group.updateWorldMatrix(true, false);
+      const inv = new THREE.Matrix4().copy(group.matrixWorld).invert();
+      const box = new THREE.Box3(), c = new THREE.Vector3();
+      const zMin = deckLocal ? deckLocal.min.z : -Infinity, zMax = deckLocal ? deckLocal.max.z : Infinity;
+      const addNode = (id, node, label) => {
+        if (!node) return;
+        node.updateWorldMatrix(true, true);
+        box.setFromObject(node).applyMatrix4(inv);
+        if (box.isEmpty()) return;
+        box.getCenter(c);
+        if (c.z < zMin || c.z > zMax) return;
+        const half = Math.max(1, (box.max.z - box.min.z) / 2);
+        list.push({ id, z: c.z, z0: c.z - half, z1: c.z + half, label });
+      };
+      STRIP_EXTRA_STOPS.forEach((s) => addNode(s.id, findByBaseName(stripScene, s.node), s.label));
+      vendors.forEach((v) => {
+        if (!v.stallModel || stallWindows.windows[v.id] || !v.prop) return;
+        const sc = extraScenes[v.id];
+        addNode(v.id, sc ? findByBaseName(sc, v.prop) : null, STRIP_STOP_LABELS[v.id] || v.id);
+      });
+    }
+    return list.sort((a, b) => a.z - b.z);
+  };
+  const nearestStopIndex = (stops, z) => {
+    let best = -1, bestD = Infinity;
+    stops.forEach((s, i) => { const d = Math.abs(s.z - z); if (d < bestD) { bestD = d; best = i; } });
+    return best;
+  };
+  // Tell the page which stop is current (it draws the ‹ › chevrons and owns
+  // the arrow keys). Off-tree like __hmVendorSpots: OilVoxelGrid sits between
+  // the page and this component and has no business threading nav state.
+  const announceStop = (stops, i, focused = !!focusRef.current) => {
+    const stop = stops[i];
+    window.dispatchEvent(new CustomEvent("hm-strip-stop", {
+      detail: stop ? { id: stop.id, label: stop.label, index: i, count: stops.length, focused } : null,
+    }));
+  };
+  // `focused` drives the page's back control ("◂ BOARDWALK" vs "FIELD VIEW").
+  // A character click announces before its onFocusChange lands, so re-announce
+  // once focus has actually flipped (and when it clears on exit).
+  useEffect(() => {
+    if (stopIndexRef.current < 0) return;
+    announceStop(getStops(), stopIndexRef.current, !!focus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus]);
+  // Standing-height shot of a stop: look-at on the deck's centreline at the
+  // stop's z, lifted to chest height, approached from the field side.
+  const flyToStopIndex = (stops, i) => {
+    const group = stripGroupRef.current;
+    if (!onFocusObject || !group || !stops[i] || !deckLocal) return;
+    const look = group.localToWorld(new THREE.Vector3((deckLocal.min.x + deckLocal.max.x) / 2, deckLocal.max.y, stops[i].z));
+    look.y += STRIP_VIEW_RAISE;
+    onFocusObject(look, STRIP_VIEW_NORMAL.clone(), STRIP_VIEW_DIST);
+    announceStop(stops, i);
+  };
+  // Release whatever is zoomed WITHOUT its fly-out — the caller is about to
+  // fly somewhere itself. hm-vendor-exit is the no-fly-out exit every stall,
+  // the claw and the gachapon answer; the booth has its own hook.
+  const releaseFocused = () => {
+    if (focusRef.current?.id === "photobooth") boothExitRef.current?.(false);
+    window.dispatchEvent(new CustomEvent("hm-vendor-exit"));
+  };
+  // Two-stage zoom-out (2026-10-06). Children's exits (second click on a
+  // character, leaving the booth, closing a machine) used to fly straight to
+  // the field overview, ejecting the visitor from the boardwalk. Stage one now
+  // returns to the current stall's strip view; only from there does a second
+  // back (Escape / FIELD VIEW) leave the strip via the page's real zoom-out.
+  const zoomOutFromStrip = () => {
+    const i = stopIndexRef.current;
+    if (i >= 0) flyToStopIndex(getStops(), i);
+    else onZoomOut?.();
+  };
+  // The nav the page's chevrons / arrow keys drive. Leaving a character for
+  // the next stall releases that character first.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const go = (i) => {
+      const stops = getStops();
+      if (!stops.length) return;
+      const idx = Math.max(0, Math.min(stops.length - 1, i));
+      releaseFocused();
+      stopIndexRef.current = idx;
+      flyToStopIndex(stops, idx);
+    };
+    const back = () => {
+      if (focusRef.current) { releaseFocused(); zoomOutFromStrip(); }
+      else onZoomOut?.();
+    };
+    window.__hmStripNav = {
+      next: () => go(stopIndexRef.current + 1),
+      prev: () => go(stopIndexRef.current - 1),
+      goto: go,
+      back,
+      stops: () => getStops().map((s) => ({ id: s.id, label: s.label })),
+    };
+    return () => { delete window.__hmStripNav; };
+  });
+  // Focus requests from the strip's own children (characters, the booth, the
+  // machines) go through here so the current stop follows the camera: a
+  // character close-up still shows chevrons to the neighbouring stalls. The
+  // page's handler clears the stop on every focus; this re-announces it after.
+  const focusFromStrip = (point, normal, dist, minDist) => {
+    onFocusObject?.(point, normal, dist, minDist);
+    const group = stripGroupRef.current;
+    if (!group || !point) return;
+    const stops = getStops();
+    const i = nearestStopIndex(stops, group.worldToLocal(new THREE.Vector3(point.x, point.y, point.z)).z);
+    if (i < 0) return;
+    stopIndexRef.current = i;
+    announceStop(stops, i);
+  };
+
   // Fly to the stretch of boardwalk that was clicked, rather than to one fixed
   // "the strip" pose — clicking near the tattoo booth should land you at the
   // tattoo booth. Characters never reach this: VendorStall stops propagation,
@@ -4061,13 +4279,24 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
       return;
     }
     if (!onFocusObject || !e.point) return;
-    // Approach from the field side. +Z is the same direction the vendors use
-    // (approachDirWorld resolves their default to exactly (0,0,1)), so a strip
-    // click and a character click fly in from the same side and the second
-    // click after the first never has to swing the camera around.
+    // A deck click while a character is up releases them (no fly-out — we are
+    // about to fly somewhere else). Previously the stall stayed "zoomed" with
+    // its SitePal scene live until some later zoom-out happened to release it.
+    releaseFocused();
+    // Snap to the nearest stall stop when the click falls on or near its
+    // window; a click on a bare stretch of deck keeps its own point.
+    const group = stripGroupRef.current;
+    const stops = getStops();
+    const localZ = group ? group.worldToLocal(e.point.clone()).z : null;
+    const i = localZ === null ? -1 : nearestStopIndex(stops, localZ);
+    if (i >= 0) stopIndexRef.current = i;
+    if (i >= 0 && localZ >= stops[i].z0 - STRIP_SNAP_MARGIN && localZ <= stops[i].z1 + STRIP_SNAP_MARGIN) {
+      flyToStopIndex(stops, i);
+      return;
+    }
     const look = new THREE.Vector3(e.point.x, e.point.y + STRIP_VIEW_RAISE, e.point.z);
-    const normal = new THREE.Vector3(0, STRIP_VIEW_LIFT, 1).normalize();
-    onFocusObject(look, normal, STRIP_VIEW_DIST);
+    onFocusObject(look, STRIP_VIEW_NORMAL.clone(), STRIP_VIEW_DIST);
+    if (i >= 0) announceStop(stops, i);
   };
 
   return (
@@ -4127,8 +4356,8 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
         interactionRef={clawInteractionRef}
         focus={focus}
         onFocusChange={setFocus}
-        onFocusObject={onFocusObject}
-        onZoomOut={onZoomOut}
+        onFocusObject={focusFromStrip}
+        onZoomOut={zoomOutFromStrip}
         onVendorClick={onVendorClick}
         stripScale={fit.scale}
       />
@@ -4137,8 +4366,8 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
         interactionRef={gachaponInteractionRef}
         focus={focus}
         onFocusChange={setFocus}
-        onFocusObject={onFocusObject}
-        onZoomOut={onZoomOut}
+        onFocusObject={focusFromStrip}
+        onZoomOut={zoomOutFromStrip}
         onVendorClick={onVendorClick}
         stripScale={fit.scale}
       />
@@ -4147,7 +4376,7 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
           festoon strands and drives one uniform. Outside the group with the
           other material-only effects. */}
       <StringLights stripScene={stripScene} envPreset={envPreset} />
-      <group position={fit.position} rotation={[0, STRIP_ROT_Y, 0]} scale={fit.scale}>
+      <group ref={stripGroupRef} position={fit.position} rotation={[0, STRIP_ROT_Y, 0]} scale={fit.scale}>
         {/* Only the strip GLB is wrapped, deliberately. The vendor stalls and
             BulbRig's beam/pool cones are SIBLINGS of this group, so neither
             routes through this handler: a character keeps its own click, and
@@ -4186,8 +4415,8 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
             framingUnit={fit.scale / LEGACY_MODEL_SCALE}
             propObj={v.prop ? (v.stallModel ? (extraScenes[v.id] ? findByBaseName(extraScenes[v.id], v.prop) : null) : findByBaseName(stripScene, v.prop)) : null}
             onVendorClick={onVendorClick}
-            onFocusObject={onFocusObject}
-            onZoomOut={onZoomOut}
+            onFocusObject={focusFromStrip}
+            onZoomOut={zoomOutFromStrip}
             onFocusChange={setFocus}
           />
         ))}
@@ -4198,11 +4427,12 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
           stripScale={fit.scale}
           focus={focus}
           onVendorClick={onVendorClick}
-          onFocusObject={onFocusObject}
-          onZoomOut={onZoomOut}
+          onFocusObject={focusFromStrip}
+          onZoomOut={zoomOutFromStrip}
           onFocusChange={setFocus}
           onBoothPhoto={onBoothPhoto}
           boothClickRef={boothClickRef}
+          boothExitRef={boothExitRef}
         />
       </group>
     </>

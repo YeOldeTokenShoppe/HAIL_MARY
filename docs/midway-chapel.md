@@ -71,8 +71,10 @@ Tent_Revival.glb`; copy it to `public/models/` before splitting.
   itself (lone action 1→0→1 = bind pose); VendorModel now skips a self-crossfade.
 - **Quiet idle (evening export, CHAPEL_ASSET_V 4):** `idle` and `looking` (hand
   shading the eyes, scanning the congregation) are the `idleCycle` between
-  lines; `talkCycle` rotates preaching / yelling / rapping per line and at each
-  clip's loop during a long sermon. Rest and talk sets are disjoint.
+  lines; `talkCycle` alternates preaching / yelling per line and at each clip's loop
+  during a long sermon (rapping ships in the GLB but is retired from the rotation). Rest and talk sets are disjoint. **Far vs near (same day):** unfocused he runs `farIdleCycle`
+  (mostly preaching, so he reads as busy from the field); on focus the model
+  crossfades to the quiet `idleCycle` before the greeting lands.
 - **Sermon loop (2026-10-06):** `VENDOR_SITEPAL_CONFIG.chapel.sermons` — twelve
   canned sermons. Armed by a stall focus (`activateVendorSitePal`), disarmed on
   step-away; after any line ends he pauses 3–5 s and speaks the next, sequential

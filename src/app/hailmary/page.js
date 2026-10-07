@@ -304,15 +304,17 @@ const HELL_CLOUDS = [
   { position: [10, 15, 4],   speed: 0.4,  opacity: 0.5,  color: "#999999", width: 15, depth: 3,   segments: 14 },
 ];
 
-// Experiment (2026-09-02, Michelle): a Synty low-poly cloud ring GLB in place
-// of drei's volumetric day clouds on the phone tier. The file is 45 placements
+// A Synty low-poly cloud ring GLB in place of drei's volumetric day clouds.
+// Began as the phone-tier experiment (2026-09-02); promoted to every tier on
+// 2026-10-06 (the drei day clouds now only render under ?clouds=drei; the hell
+// preset still uses its own drei clouds). The file is 45 placements
 // of 3 meshes (≈1k triangles, one lit atlas material, 0.18 MB) authored on a
 // ~400-unit ring at 23–133 high in centimetre scale; scaled 0.04 and lifted 8
 // it sits in the same band as DAY_CLOUDS (≈15 units out, 9–13 high). Lit, so
 // it takes the time-of-day light and fog like everything else; the atlas'
 // emissive channel is dropped so the ring cannot glow at night. Drifts as one
 // slow ring. Switch: SkyDome `cloudMode` ("drei" | "glb"); ?clouds=glb|drei
-// forces it on any tier for A/B.
+// forces either on any tier for A/B.
 const LOW_POLY_CLOUDS_GLB = "/models/clouds_lowPoly.glb";
 const LOW_POLY_CLOUDS_SCALE = 0.04;
 // Height of the ring's base. The field camera looks up and around, so 8 puts
@@ -1674,8 +1676,9 @@ export default function OilPage() {
     if (p.get("arena") === "break") { setArenaRehearsal(true); setBreakRehearsal(Date.now()); }
   }, []);
   const lowGfx = qForce ? qForce === "low" : (isMobile || touchTier);
-  // Cloud experiment (2026-09-02): the low tier gets the low-poly GLB ring;
-  // ?clouds=glb|drei forces either on any tier for the comparison.
+  // Clouds: the low-poly GLB ring on EVERY tier (2026-10-06, Michelle — it
+  // started as the tablet/phone experiment and she preferred it on desktop
+  // too). ?clouds=drei brings the volumetric drei day clouds back for an A/B.
   const [cloudForce, setCloudForce] = useState(null);
   useEffect(() => {
     const c = new URLSearchParams(window.location.search).get("clouds");
@@ -1694,7 +1697,7 @@ export default function OilPage() {
     // gives up what a measurement justified — see LOW_TIER_DPR.
     dpr: lowGfx ? LOW_TIER_DPR : [1, 1.5],
     clouds: lowGfx ? "low" : "full",     // SkyDome renders fewer/flatter clouds
-    cloudMode: cloudForce || (lowGfx ? "glb" : "drei"),
+    cloudMode: cloudForce || "glb",
     lazyVendorAnim: lowGfx,              // vendors hold a static pose until focused
     fireworks: lowGfx ? 1 : 2,
   }), [lowGfx, cloudForce]);
@@ -3333,6 +3336,19 @@ export default function OilPage() {
 
   // Camera fly-to
   const [flyTarget, setFlyTarget] = useState(null);
+  // Boardwalk stall nav (2026-10-06). CommercialStrip announces the current
+  // stall stop (hm-strip-stop, detail {id,label,index,count,focused} | null) whenever
+  // a deck click / character click / ‹ › step lands the camera on the strip;
+  // the page draws the chevrons and owns the arrow keys (+ Escape = back), and clears the stop
+  // on any camera move that leaves the strip (handleFocusObject for other
+  // focus targets, and every non-focus fly: overview, plot, sky, hell).
+  const [stripStop, setStripStop] = useState(null);
+  useEffect(() => {
+    const onStop = (e) => setStripStop(e.detail || null);
+    window.addEventListener("hm-strip-stop", onStop);
+    return () => window.removeEventListener("hm-strip-stop", onStop);
+  }, []);
+  useEffect(() => { if (flyTarget && !flyTarget.focus) setStripStop(null); }, [flyTarget]);
   // Phase-2 helicopter auto-orbit while the demon is loose (mobile). Driven as a
   // React prop on OrbitControls so frequent re-renders can't silently reset it.
   const [hellOrbit, setHellOrbit] = useState(false);
@@ -4464,6 +4480,9 @@ export default function OilPage() {
   const handleFocusObject = useCallback((worldPoint, normal, dist, minDist) => {
     if (!worldPoint) return;
     flyIdRef.current++;
+    // Off the strip unless CommercialStrip says otherwise (it re-announces the
+    // stop right after this call, and React batches the two into one render).
+    setStripStop(null);
     // Focus clicks are navigation intent too — end the intro orbit so the
     // OrbitControls + CameraFlyTo rig mounts and acts on this target (same
     // reason handleFlyTo does it; without this, pre-intro clicks no-op).
@@ -4485,6 +4504,23 @@ export default function OilPage() {
     window.__hmFocusObject = handleFocusObject;
     return () => { if (window.__hmFocusObject === handleFocusObject) delete window.__hmFocusObject; };
   }, [handleFocusObject]);
+  // ← / → step along the boardwalk while a stall stop is current. Desktop
+  // only, and never in walk mode — the walker steers with the arrow keys.
+  useEffect(() => {
+    if (isMobile || !stripStop || walkMode) return;
+    const onKey = (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (e.key === "ArrowRight") { e.preventDefault(); window.__hmStripNav?.next(); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); window.__hmStripNav?.prev(); }
+      // Two-stage back: a character/booth/machine close-up → its stall's strip
+      // view; the strip view → the field overview.
+      else if (e.key === "Escape") { window.__hmStripNav?.back(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isMobile, stripStop, walkMode]);
 
   // The player's own rig cell, if they hold a claimed plot. When set, the page
   // SKIPS the aerial intro orbit and opens focused on that rig instead (both
@@ -9818,6 +9854,37 @@ export default function OilPage() {
               {panelsCollapsed ? "◂ SHOW PANELS" : "HIDE PANELS ▸"}
             </button>
           </div>
+          {/* Boardwalk stall nav: shown while the camera is on a stall stop
+              (deck click, character close-up, or a step). ← / → do the same. */}
+          {!isMobile && stripStop && !walkMode && (
+            <div style={{ position: "absolute", bottom: 22, left: "50%", transform: "translateX(-50%)", zIndex: 10, zoom: uiScale, display: "flex", alignItems: "center", gap: 6 }}>
+              <button
+                type="button" title="Previous stall (←)" aria-label="Previous stall"
+                disabled={stripStop.index <= 0}
+                onClick={() => window.__hmStripNav?.prev()}
+                style={{ ...TOOLBAR_PILL, padding: "0 11px", fontSize: 13, opacity: stripStop.index <= 0 ? 0.35 : 1, cursor: stripStop.index <= 0 ? "default" : "pointer" }}
+              >◂</button>
+              <div style={{ ...TOOLBAR_PILL, cursor: "default", minWidth: 170, justifyContent: "center", gap: 10 }}>
+                <span style={{ textTransform: "uppercase" }}>{stripStop.label}</span>
+                <span style={{ opacity: 0.5 }}>{stripStop.index + 1}/{stripStop.count}</span>
+              </div>
+              <button
+                type="button" title="Next stall (→)" aria-label="Next stall"
+                disabled={stripStop.index >= stripStop.count - 1}
+                onClick={() => window.__hmStripNav?.next()}
+                style={{ ...TOOLBAR_PILL, padding: "0 11px", fontSize: 13, opacity: stripStop.index >= stripStop.count - 1 ? 0.35 : 1, cursor: stripStop.index >= stripStop.count - 1 ? "default" : "pointer" }}
+              >▸</button>
+              {/* Two-stage back (Esc): close-up → this stall's strip view → field overview. */}
+              <button
+                type="button"
+                title={stripStop.focused ? "Back to the boardwalk (Esc)" : "Back to the field overview (Esc)"}
+                onClick={() => window.__hmStripNav?.back()}
+                style={{ ...TOOLBAR_PILL, marginLeft: 8 }}
+              >
+                {stripStop.focused ? "◂ BOARDWALK" : "▴ FIELD VIEW"}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right side panel */}

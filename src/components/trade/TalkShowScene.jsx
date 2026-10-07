@@ -4033,7 +4033,7 @@ function TalkShowModel({
       const isListener = soloKey && soloKey !== key;
       const repaint = show && (!isListener || solotickRef.current === 0);
       if (repaint && st.cropCtx) paintCrop(st, cfg, source, houseDim);
-    });
+a    });
 
     // The viewer camera follows the shot list — the "camera operator". Runs
     // before the monitor feed so the tripod's second render sees this frame's

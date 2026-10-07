@@ -150,9 +150,25 @@ const VENDOR_LOCAL_FACE_YAW = -Math.PI / 2; // the strip's default facing (Comme
 // itself (it knows the cabinet's size and how much of the screen its control
 // panel takes) and hands the pose over through the stage's onFocusObject; the
 // stage camera simply goes where it is told until the player steps back.
+// How far back the card view has to sit so the WHOLE card (rim included) fits
+// the canvas with a margin, whatever its aspect. STAGE_CAMERA's distance was
+// tuned on a landscape-ish canvas; on a narrow phone the card was wider than
+// the view and its sides fell off-screen, so it did not read as a card at all
+// (Michelle, 2026-10-06, small iPhone). Never closer than the tuned distance,
+// so wide canvases are unchanged.
+const CARD_FIT_MARGIN = 1.1;
+function cardFitDistance(camera, size) {
+  const halfTan = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+  const aspect = size.width / Math.max(1, size.height);
+  const needH = (CARD.h + 0.03) / 2 * CARD_FIT_MARGIN / halfTan;
+  const needW = (CARD.w + 0.03) / 2 * CARD_FIT_MARGIN / (halfTan * aspect);
+  const tuned = Math.hypot(STAGE_CAMERA.position[0] - STAGE_CAMERA.target[0], STAGE_CAMERA.position[1] - STAGE_CAMERA.target[1], STAGE_CAMERA.position[2] - STAGE_CAMERA.target[2]);
+  return Math.max(tuned, needH, needW);
+}
+
 function StageCamera({ open, gameCam }) {
-  const { camera } = useThree();
-  const tmp = useMemo(() => ({ p: new THREE.Vector3(), t: new THREE.Vector3(), cur: new THREE.Vector3(...STAGE_CAMERA.target) }), []);
+  const { camera, size } = useThree();
+  const tmp = useMemo(() => ({ p: new THREE.Vector3(), t: new THREE.Vector3(), cur: new THREE.Vector3(...STAGE_CAMERA.target), dir: new THREE.Vector3() }), []);
   useEffect(() => {
     camera.position.set(...STAGE_CAMERA.position);
     camera.lookAt(...STAGE_CAMERA.target);
@@ -161,7 +177,13 @@ function StageCamera({ open, gameCam }) {
   useFrame((_, dt) => {
     const game = open ? gameCam?.current : null;
     if (game) { tmp.p.copy(game.position); tmp.t.copy(game.target); }
-    else { const want = open ? FACE_CAMERA : STAGE_CAMERA; tmp.p.set(...want.position); tmp.t.set(...want.target); }
+    else if (open) { tmp.p.set(...FACE_CAMERA.position); tmp.t.set(...FACE_CAMERA.target); }
+    else {
+      // Card view: the tuned direction, pushed back until the card fits.
+      tmp.t.set(...STAGE_CAMERA.target);
+      tmp.dir.set(...STAGE_CAMERA.position).sub(tmp.t).normalize();
+      tmp.p.copy(tmp.t).addScaledVector(tmp.dir, cardFitDistance(camera, size));
+    }
     const k = 1 - Math.exp(-dt * 3.5);
     camera.position.lerp(tmp.p, k); tmp.cur.lerp(tmp.t, k); camera.lookAt(tmp.cur);
   });
@@ -436,9 +458,12 @@ export default function VendorStage({ vendorId = "tonics", open = false, onToggl
   // Only the unmount mutes from here.
   useEffect(() => () => { deactivateVendorSitePal(); }, []);
   // ── The card as a trading card (wass08/r3f-mesh-portal-material) ────────────
-  // The portal is double-sided, so the card is a window: ONE TAP flips it
-  // (the stall shows through its back — the vendor from behind), a DOUBLE TAP
-  // steps in, a drag spins it and a flick settles on whichever face is nearer.
+  // The portal is double-sided, so the card is a window: a TAP steps in (and
+  // the vendor greets — stepUpVendor runs inside the tap, the audio-unlock
+  // gesture), a drag spins the card and a flick settles on whichever face is
+  // nearer, so the back view (the stall from behind) is a swipe away. Until
+  // 2026-10-06 one tap flipped and only a double tap stepped in; on a phone the
+  // first tap always "won" with a flip and the vendor never spoke (Michelle).
   // Stepping in turns the card to its front first, so the blend never opens on
   // the vendor's back. The name sits on the front face in the stall's accent.
   const card = useRef();
@@ -486,19 +511,12 @@ export default function VendorStage({ vendorId = "tonics", open = false, onToggl
     if (!tap) { sp.vy = THREE.MathUtils.clamp(sp.vy, -14, 14); return; }
     e.stopPropagation();
     if (open) { stepBackVendor(); onToggle?.(); return; }          // inside: a tap steps back
-    // A machine has no back worth showing and nothing to do but play it: one tap steps in.
-    if (isGame) { sp.target = null; stepUpVendor(vendor.id); onToggle?.(); return; }
-    if (sp.tapTimer && now - sp.lastTapT < SPIN.doubleMs) {         // double tap: step in
-      clearTimeout(sp.tapTimer); sp.tapTimer = null; sp.lastTapT = 0;
-      sp.target = null; stepUpVendor(vendor.id); onToggle?.();
-      return;
-    }
-    sp.lastTapT = now;                                              // single tap: flip after the double-tap window
-    sp.tapTimer = setTimeout(() => {
-      sp.tapTimer = null;
-      const base = sp.target ?? Math.round(sp.y / Math.PI) * Math.PI;
-      sp.target = base + Math.PI; sp.vy = 0;
-    }, SPIN.doubleMs);
+    // One tap steps in — stalls and machines alike. (Flipping moved to the
+    // swipe; the double-tap window is no longer waited out, so the greeting
+    // starts on the first tap.)
+    if (sp.tapTimer) { clearTimeout(sp.tapTimer); sp.tapTimer = null; }
+    sp.lastTapT = now;
+    sp.target = null; stepUpVendor(vendor.id); onToggle?.();
   };
   const name = BOARDWALK_NAMES[vendor.id] || vendor.id.toUpperCase();
   return (
