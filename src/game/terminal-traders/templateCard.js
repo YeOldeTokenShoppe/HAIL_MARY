@@ -1,6 +1,7 @@
 import { CARD_TYPES, GENESIS_SET, LENS_LABELS } from "./cards.js";
+import { FLAME_REFLECTION } from "./fxMaterials.js";
 import {
-  frameForRarity, metaTopForFrame, fxSources, FX_BLEND_DEFAULT, FX_OPACITY_DEFAULT,
+  frameForRarity, metaTopForFrame, fxSrc, fxSources, FX_BLEND_DEFAULT, FX_OPACITY_DEFAULT,
 } from "./cardFrames.js";
 
 // Single source of truth for finished card art. As the Genesis 80 art run
@@ -14,12 +15,22 @@ export const CARD_ART = {
   // compositor cover both jobs at 1488px, and stacking them double-framed the
   // card. TradingCard still supports overlayImage — ReliquaryRail uses it.
   "eugene": { src: "/TCG/eugeneFractal.webp", artFocus: "center 28%", artZoom: 1.25, fx: ["Rainbow 1"] },
-  "marisol": { src: "/TCG/traderMarisol.webp", artFocus: "center 28%", artZoom: 1.25, fx: ["Abstract 7"] },
+  "marisol": {
+    src: "/TCG/traderMarisol.webp",
+    artLayers: {
+      background: "/TCG/traderMarisol_bgOnly.png",
+      character: "/TCG/traderMarisol_noBG.png",
+    },
+    artFocus: "center 28%", artZoom: 1.25, fx: ["Abstract 7"],
+  },
   // gr80 + john-barron art shipped long ago but lived only in /card-template's
   // demo constants, so the game rendered both traders art-less. Values carried
   // over from those constants (2026-07-20).
   "gr80": { src: "/TCG/trader_monk.webp", artFocus: "center 30%", artZoom: 1.2, fx: ["Abstract 11"] },
-  "john-barron": { src: "/TCG/traderDemon.webp", artFocus: "center 32%", artZoom: 1.2, fx: ["Flame"] },
+  "john-barron": {
+    src: "/TCG/traderDemon.webp", artFocus: "center 32%", artZoom: 1.2,
+    fx: ["Flame"], fxReflection: FLAME_REFLECTION,
+  },
   // moonpony + pump-signal reimported 2026-07-21 as full 1488×2077 illustrations
   // with the old baked-in frame/text removed, so they crop like every other
   // Genesis card now — artZoom 1.0, no hard zoom into a print card.
@@ -70,7 +81,24 @@ export const CARD_ART = {
   // not the 28% default. artZoom stays 1.0 unless the guide notes otherwise.
   // abilityTone orange: this art is mint/cyan, so the default cyan EFFECT
   // badge and heading read as low contrast against it.
-  "audit-flare": { src: "/TCG/actionAuditFlare.webp", artFocus: "center 28%", artZoom: 1.0, abilityTone: "orange", fx: ["Thunder 3"] },
+  "audit-flare": {
+    src: "/TCG/actionAuditFlare.webp", artFocus: "center 28%", artZoom: 1.0,
+    abilityTone: "orange", fx: ["Thunder 3"],
+    fxReflection: {
+      overlay: "Thunder 3", strength: 1,
+      // Fixed regions of Thunder 3, with independent viewing-angle peaks.
+      // Positions/radii are asset percentages; axes and roughness use the
+      // normalized card tilt. Nothing travels over the artwork.
+      facets: [
+        { x: 20, y: 33, radius: [22, 18], axis: [0.85, 0.5], angle: -0.14, roughness: 0.11, hue: 190 },
+        { x: 36, y: 41, radius: [16, 11], axis: [-0.5, 0.86], angle: 0.18, roughness: 0.12, hue: 265 },
+        { x: 90, y: 60, radius: [14, 19], axis: [0.92, -0.4], angle: 0.27, roughness: 0.1, hue: 180 },
+        { x: 91, y: 81, radius: [16, 16], axis: [0.65, 0.76], angle: 0.1, roughness: 0.095, hue: 265 },
+        { x: 75, y: 96, radius: [28, 11], axis: [-0.9, 0.43], angle: -0.28, roughness: 0.1, hue: 295 },
+        { x: 9, y: 79, radius: [17, 17], axis: [-0.74, -0.67], angle: 0.26, roughness: 0.11, hue: 200 },
+      ],
+    },
+  },
   // guide: 28% in repo; bump to 30-32 if the arrowheads clip.
   "forked-rumor": { src: "/TCG/actionForkedRumor.webp", artFocus: "center 28%", artZoom: 1.0, fx: ["Flame"] },
   "wallet-seance": { src: "/TCG/actionWalletSeance.webp", artFocus: "center 31%", artZoom: 1.0, fx: ["Abstract 16"] },
@@ -145,6 +173,9 @@ export function toTemplateCard(card) {
     startingCred: card.type === CARD_TYPES.TRADER ? card.startingCred : null,
     startingPortfolio: card.type === CARD_TYPES.TRADER ? card.startingPortfolio : null,
     backgroundImage: art.src || null,
+    // Optional aligned scenery + character pair; src remains the flat fallback.
+    artLayers: art.artLayers || null,
+    artDepth: art.artDepth ?? 1,
     artFocus: art.artFocus || "center 38%",
     artZoom: art.artZoom || 1.2,
     overlayImage: art.overlayImage || null,
@@ -161,6 +192,9 @@ export function toTemplateCard(card) {
     fxOverlays: fxSources(art.fx),
     fxBlend: art.fxBlend || FX_BLEND_DEFAULT,
     fxOpacity: art.fxOpacity ?? FX_OPACITY_DEFAULT,
+    fxReflection: art.fxReflection
+      ? { ...art.fxReflection, src: fxSrc(art.fxReflection.overlay) }
+      : null,
     setBadge: art.setBadge === null ? null : SET_BADGE,
   };
 }

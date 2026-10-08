@@ -825,6 +825,12 @@ function applyVendorSkinGain(st, sp, vendorId) {
   }
 }
 const HEAD_EASE = 8;           // 1/s — smoothing rate toward the target angles
+// Approach notice (2026-10-08): a walking prospector inside this radius (world
+// units, from the vendor's head) gets the head turn even before a face-to-face
+// — the same tracking the camera gets once you are talking, minus the clip
+// freeze, the look-up lift and the head cock, which belong to the scene.
+// Per-vendor override: vendor.noticeDist.
+const WALKER_NOTICE_DIST = 1.2;
 
 export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0, dimRef }) {
   const group = useRef();
@@ -1412,15 +1418,23 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
     head.getWorldPosition(_headPos);
     // Gaze target: a nearby walking cowboy outranks the camera — he's a
     // counter-high customer, so the vendor looks DOWN at him while talking
-    // instead of over his hat at the lens.
-    const _wp = window.__hmWalkerPos;
-    if (_wp && (_wp.x - _headPos.x) ** 2 + (_wp.z - _headPos.z) ** 2 < 1.0) {
-      _toCam.set(_wp.x - _headPos.x, _wp.y + 0.12 - _headPos.y, _wp.z - _headPos.z);
+    // instead of over his hat at the lens. NOT while this vendor is the
+    // face-to-face: then the camera IS the player's eyes and the cowboy's
+    // body is parked wherever the visit began — at the top of the wagon
+    // stairs, so the fortune teller looked out of her own door instead of at
+    // the seeker across her table (2026-10-07).
+    const _wp = !focusedRef?.current && window.__hmWalkerPos;
+    const noticeR = vendor.noticeDist ?? WALKER_NOTICE_DIST;
+    const walkerNear = !!_wp && (_wp.x - _headPos.x) ** 2 + (_wp.z - _headPos.z) ** 2 < noticeR * noticeR;
+    if (walkerNear) {
+      _toCam.set(_wp.x - _headPos.x, (_wp.eyeY ?? _wp.y + 0.12) - _headPos.y, _wp.z - _headPos.z);
     } else {
       _toCam.copy(state.camera.position).sub(_headPos);
     }
+    // Noticing: he walked into range, no scene yet — turn to watch him come.
+    const noticing = !engaged && walkerNear;
     let targetYaw = 0, targetPitch = 0, targetRoll = 0;
-    if (engaged) {
+    if (engaged || noticing) {
       faceDirWorld(vendor, _face, stripRotY);
       const flat = Math.hypot(_toCam.x, _toCam.z);
       // gazeLift (rad) corrects a rest pose that carries the head high or
@@ -1429,7 +1443,7 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
       // your work" correction, and headPitchUp raises the clamp so a steeply
       // bowed pose isn't capped before it reaches the viewer.
       targetPitch = THREE.MathUtils.clamp(
-        Math.atan2(_toCam.y, flat) + (vendor.gazeLift ?? 0) + (vendor.focusGazeLift ?? 0),
+        Math.atan2(_toCam.y, flat) + (vendor.gazeLift ?? 0) + (engaged ? (vendor.focusGazeLift ?? 0) : 0),
         -HEAD_PITCH_DOWN, vendor.headPitchUp ?? HEAD_PITCH_UP
       );
       // gazeTurn (rad) corrects a sideways rest-pose bias — positive shifts
@@ -1441,7 +1455,7 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
       // the tilt reads as exactly this angle on screen no matter how far she
       // had to turn or lift to meet you. Rolling about the rest-pose forward
       // instead would smear into yaw/pitch once her head is turned.
-      targetRoll = vendor.focusHeadRoll ?? 0;
+      targetRoll = engaged ? (vendor.focusHeadRoll ?? 0) : 0;
     }
     const k = 1 - Math.exp(-HEAD_EASE * delta);
     t.yaw += (targetYaw - t.yaw) * k;

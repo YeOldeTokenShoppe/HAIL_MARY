@@ -2085,6 +2085,10 @@ export default function OilPage() {
   // field entry, which spawns at the player's rig and needs a plot.
   const [walkSpawn, setWalkSpawn] = useState(null);
   const walkFromStripRef = useRef(false);
+  // The prospector is first person and bodiless by default (2026-10-07);
+  // ?body=1 draws the rig for debugging. Settled after mount like qForce.
+  const [showWalkerBody, setShowWalkerBody] = useState(false);
+  useEffect(() => { setShowWalkerBody(new URLSearchParams(window.location.search).get("body") === "1"); }, []);
   // Walk-mode camera: C cycles follow → orbit → cowboy. Orbit is mounted only
   // in "orbit" (the walker steers its target); in the other two the walker
   // writes the camera directly, and damping fights external writes even when
@@ -2093,6 +2097,14 @@ export default function OilPage() {
   // Walker is face-to-face with a vendor: the sky grammar borrows the camera
   // (CameraFlyTo does the face zoom, orbit rests on it), the walker waits.
   const [walkerVendor, setWalkerVendor] = useState(false);
+  // Where the walker's camera was looking when the face-to-face began — seeds
+  // OrbitControls' target on mount so their first update() doesn't swing the
+  // lens round to the field overview point before the face flight starts.
+  const [walkerGaze, setWalkerGaze] = useState(null);
+  const handleWalkerVendor = useCallback((on, gaze) => {
+    setWalkerGaze(on && gaze ? gaze : null);
+    setWalkerVendor(on);
+  }, []);
   const [numberOfHellPockets, setNumberOfHellPockets] = useState(null); // null ⇒ auto (~3% of grid)
   const [totalOilBudget, setTotalOilBudget] = useState(500);
   const [gridSize, setGridSize] = useState(10);
@@ -3367,6 +3379,21 @@ export default function OilPage() {
     setWalkSpawn(at);
     setWalkMode(true);
   }, []);
+  // Field WALK entry (2026-10-07): drop the prospector where the camera is
+  // looking, facing the way it looks. No plot needed. Clamped a little inside
+  // the mesa edge so he never starts on the lip.
+  const startFieldWalk = useCallback(() => {
+    const c = controlsRef.current, cam = c?.object;
+    if (!c || !cam) return;
+    const half = (gridSize * CELL_SIZE) / 2 - 0.35;
+    const x = THREE.MathUtils.clamp(c.target.x, -half, half);
+    const z = THREE.MathUtils.clamp(c.target.z, -half, half);
+    const dir = new THREE.Vector3();
+    cam.getWorldDirection(dir);
+    walkFromStripRef.current = false;
+    setWalkSpawn({ x, z, yaw: Math.atan2(dir.x, dir.z) });
+    setWalkMode(true);
+  }, [gridSize]);
   // First-visit hint in the strip nav ("click a character to talk"), retired
   // the first time anything on the strip takes the close-up. Per tab.
   const [talkHintDone, setTalkHintDone] = useState(true);
@@ -9714,18 +9741,22 @@ export default function OilPage() {
                   worldW={gridSize} worldD={gridSize}
                   spawnCol={activeUserDrill?.col ?? 0} spawnRow={activeUserDrill?.row ?? 0}
                   spawnAt={walkSpawn}
+                  showBody={showWalkerBody}
                   frontier={frontierTargets}
                   onWildcat={handleWildcat}
                   controlsRef={controlsRef}
                   onCam={setWalkerCam}
-                  onVendorMode={setWalkerVendor}
+                  onVendorMode={handleWalkerVendor}
                   onExit={() => {
                     // Read before the unmount deletes it.
                     const wp = window.__hmWalkerPos ? { ...window.__hmWalkerPos } : null;
                     const fromStrip = walkFromStripRef.current;
                     walkFromStripRef.current = false;
                     setWalkerCam("follow"); setWalkerVendor(false); setWalkMode(false); setWalkSpawn(null);
-                    if (!fromStrip) return;
+                    // A field walk (toolbar WALK) ends back at the sky: the hat-cam
+                    // would otherwise strand OrbitControls at ground level. The legacy
+                    // rig-card entry (no walkSpawn) keeps its old exit.
+                    if (!fromStrip) { if (walkSpawn) handleZoomOut(); return; }
                     // A boardwalk walk ends on the boardwalk: the stall he is
                     // standing at if he is still on (or beside) the deck, else
                     // the field overview rather than a stranded follow cam.
@@ -9756,7 +9787,7 @@ export default function OilPage() {
                   maxDistance={16}
                   maxPolarAngle={Math.PI}
                   minPolarAngle={0}
-                  target={introExitTarget || [3, 5, 3]}
+                  target={(walkerVendor && walkerGaze) || introExitTarget || [3, 5, 3]}
                   zoomToCursor
                 />}
                 {(!walkMode || walkerVendor) && <CameraFlyTo target={flyTarget} controlsRef={controlsRef} />}
@@ -9891,6 +9922,11 @@ export default function OilPage() {
               parabolum={parabolum}
               setFireworksOn={setFireworksOn}
             />
+            {/* Walk the field from wherever the camera is looking (the strip
+                nav has its own WALK while a stall is current). */}
+            {!isMobile && introComplete && !walkMode && !stripStop && (
+              <button type="button" title="Walk the field on foot from here" onClick={startFieldWalk} style={TOOLBAR_PILL}>🥾 WALK</button>
+            )}
             <button type="button" onClick={goToSurveyMap} style={TOOLBAR_PILL}>FIELD SURVEY</button>
             <button
               title={panelsCollapsed ? "Show the player panel" : "Hide the player panel"}

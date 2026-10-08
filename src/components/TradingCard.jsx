@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { fxMaterial } from "../game/terminal-traders/fxMaterials.js";
+
+const REST_TILT = { rx: 0, ry: 0, mx: 50, my: 50, posx: 50, posy: 50, hyp: 0, lift: 0 };
 
 const RARITY_ACCENT = {
   Common: "#9cfce9",
@@ -72,6 +75,118 @@ function ObliqueLabel({ variant = "ability", children, style }) {
   );
 }
 
+// Optional scenery + transparent subject share the same crop and zoom. Keep
+// the original illustration until both files load, and use it for thumbnails.
+function CardArtwork({ data, tilt, interactive, motionEnabled, className, defaultZoom }) {
+  const [loaded, setLoaded] = useState({ background: null, character: null });
+  const layers = interactive ? data.artLayers : null;
+  const hasLayers = Boolean(layers?.background && layers?.character);
+  const ready = hasLayers && loaded.background === layers.background && loaded.character === layers.character;
+  const zoom = data.artZoom || defaultZoom;
+  const depth = motionEnabled ? Math.max(0, Math.min(1.5, data.artDepth ?? 1)) : 0;
+  // A little overscan protects the edges even at the zoom slider's minimum.
+  // Both layers use it so their neutral positions continue to line up.
+  const layerZoom = Math.max(zoom, 1 + (16 * depth) / 744);
+  const dx = tilt.ry / 9;
+  const dy = -tilt.rx / 7;
+
+  return (
+    <>
+      {!ready && data.backgroundImage && (
+        <img
+          key={data.backgroundImage}
+          className={className}
+          src={data.backgroundImage}
+          alt={`${data.name} artwork`}
+          draggable={false}
+          loading="lazy"
+          decoding="async"
+          style={{
+            objectPosition: data.artFocus || "center 38%",
+            transform: `scale(${zoom}) translate(${(50 - tilt.mx) * 0.05}px, ${(50 - tilt.my) * 0.05}px)`,
+          }}
+        />
+      )}
+      {hasLayers && [
+        { id: "background", src: layers.background, travel: -6 },
+        { id: "character", src: layers.character, travel: 8 },
+      ].map(({ id, src, travel }) => (
+        <img
+          key={`${id}:${src}`}
+          className={`${className || ""} tc-art-layer tc-art-layer--${id}`}
+          src={src}
+          alt={id === "character" ? `${data.name} artwork` : ""}
+          draggable={false}
+          decoding="async"
+          onLoad={() => setLoaded((previous) => ({ ...previous, [id]: src }))}
+          style={{
+            visibility: ready ? "visible" : "hidden",
+            objectPosition: data.artFocus || "center 38%",
+            transform: `translate3d(${dx * travel * depth}px, ${dy * travel * depth}px, 0) scale(${layerZoom})`,
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+// A material response, anchored to the texture: each region catches light at
+// a different angle. Narrow peaks create a brief flash during a tilt, while
+// the texture's luminance keeps the bright core and bloom on the artwork.
+function FxReflection({ reflection, tilt, planeStyle, opacity }) {
+  const material = fxMaterial(reflection.material);
+  const strength = Math.max(0, Math.min(1.5, reflection.strength ?? 1));
+  const dx = tilt.ry / 9;
+  const dy = -tilt.rx / 7;
+  if (strength === 0) return null;
+
+  let peak = 0;
+  const surfaces = reflection.facets.map(({ x, y, radius, axis, angle, roughness, hue }) => {
+    const facing = dx * axis[0] + dy * axis[1];
+    const distance = (facing - angle) / roughness;
+    const flash = Math.exp(-0.5 * distance * distance);
+    const sheen = Math.exp(-0.5 * (distance / 3) ** 2);
+    peak = Math.max(peak, flash);
+    const boundHue = (value) => material.hueRange
+      ? Math.max(material.hueRange[0], Math.min(material.hueRange[1], value)) : value;
+    const color = boundHue(hue + facing * material.hueTravel);
+    const lightness = material.coreLightness[0]
+      + flash * (material.coreLightness[1] - material.coreLightness[0]);
+    const alpha = Math.min(1, strength * material.emissionGain * (0.08 + sheen * 0.2 + flash * 0.72));
+    const rim = Math.min(1, strength * material.emissionGain * (0.06 + sheen * 0.15 + flash * 0.45));
+    const glow = Math.min(1, strength * material.bloomGain * flash);
+    const region = `ellipse ${radius[0]}% ${radius[1]}% at ${x}% ${y}%`;
+    return {
+      core: `radial-gradient(${region},
+        hsl(${color} 100% ${lightness}% / ${alpha}) 0%,
+        hsl(${boundHue(color + material.rimHueOffset)} 100% ${material.rimLightness}% / ${rim}) 38%,
+        hsl(${boundHue(color + material.edgeHueOffset)} 100% ${material.edgeLightness}% / ${rim * 0.35}) 68%, transparent 100%)`,
+      bloom: `radial-gradient(${region},
+        rgb(${material.bloomColor} / ${glow}) 0%,
+        hsl(${color} 100% ${material.bloomLightness}% / ${glow * 0.7}) 35%, transparent 85%)`,
+    };
+  });
+
+  return (
+    <div
+      className="tc-fx-reflection"
+      aria-hidden="true"
+      style={{
+        ...planeStyle,
+        "--fx-mask": `url("${reflection.src}")`,
+        "--fx-emission": surfaces.map((surface) => surface.core).join(","),
+        "--fx-bloom": surfaces.map((surface) => surface.bloom).join(","),
+        "--fx-bloom-radius": `${material.bloomRadius[0] + peak * (material.bloomRadius[1] - material.bloomRadius[0])}px`,
+        "--fx-bloom-brightness": material.bloomBrightness,
+        opacity,
+      }}
+    >
+      <div className="tc-fx-bloom"><div className="tc-fx-material" /></div>
+      <div className="tc-fx-material" />
+    </div>
+  );
+}
+
 export default function TradingCard({
   data,
   scale = 1,
@@ -81,9 +196,19 @@ export default function TradingCard({
 }) {
   const cardRef = useRef(null);
   const interactingRef = useRef(false);
-  const [tilt, setTilt] = useState({
-    rx: 0, ry: 0, mx: 50, my: 50, posx: 50, posy: 50, hyp: 0, lift: 0,
-  });
+  const [tilt, setTilt] = useState(REST_TILT);
+  const [reducedMotion, setReducedMotion] = useState(true);
+  const motionEnabled = interactive && !reducedMotion;
+  // Small collection cards stay flat; 0 also restores the printed FX look.
+  const fxDepth = motionEnabled ? Math.max(0, Math.min(1.5, data.fxDepth ?? 1)) : 0;
+
+  useEffect(() => {
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setReducedMotion(preference.matches);
+    sync();
+    preference.addEventListener("change", sync);
+    return () => preference.removeEventListener("change", sync);
+  }, []);
 
   // Hard cap at 3: past that the effects stop reading as distinct and just
   // fog the card (MAX_FX in cardFrames.js).
@@ -122,8 +247,8 @@ export default function TradingCard({
   const applyAt = (clientX, clientY) => {
     if (!cardRef.current) return;
     const rect = cardRef.current.getBoundingClientRect();
-    const x = ((clientX - rect.left) / rect.width) * 100;
-    const y = ((clientY - rect.top) / rect.height) * 100;
+    const x = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+    const y = Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100));
     const dx = (x - 50) / 50;
     const dy = (y - 50) / 50;
     const hyp = Math.min(1, Math.sqrt(dx * dx + dy * dy));
@@ -136,13 +261,13 @@ export default function TradingCard({
   };
 
   const handleMove = (event) => {
-    if (!interactive) return;
+    if (!motionEnabled) return;
     interactingRef.current = true;
     applyAt(event.clientX, event.clientY);
   };
 
   const handleTouch = (event) => {
-    if (!interactive) return;
+    if (!motionEnabled) return;
     interactingRef.current = true;
     const t = event.touches[0];
     if (t) applyAt(t.clientX, t.clientY);
@@ -150,7 +275,7 @@ export default function TradingCard({
 
   const handleLeave = () => {
     interactingRef.current = false;
-    setTilt({ rx: 0, ry: 0, mx: 50, my: 50, posx: 50, posy: 50, hyp: 0, lift: 0 });
+    setTilt(REST_TILT);
   };
 
   useEffect(() => {
@@ -159,7 +284,11 @@ export default function TradingCard({
     // foil (mix-blend-mode + 4 background gradients) and was pushing iOS
     // Safari past its GPU ceiling when the card was also wrapped in a
     // second 3D context for flipping.
-    if (!interactive) return undefined;
+    if (!motionEnabled) {
+      interactingRef.current = false;
+      setTilt(REST_TILT);
+      return undefined;
+    }
     let raf = 0;
     const start = performance.now();
     const tick = (now) => {
@@ -182,10 +311,11 @@ export default function TradingCard({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [interactive]);
+  }, [motionEnabled]);
 
   return (
     <div
+      ref={cardRef}
       className="tc-stage"
       style={{
         "--scale": scale,
@@ -206,9 +336,9 @@ export default function TradingCard({
       <style>{CLASSIC_STYLES}</style>
 
       <div
-        ref={cardRef}
         className={`tc-card tc-card--${templateStyle}${overlayImage ? " is-overlaid" : ""}${data.frameImage ? " is-framed" : ""}`}
         data-foil={foilTier}
+        data-fx-depth={fxDepth > 0 && fxLayers.length > 0}
         onMouseMove={handleMove}
         onMouseLeave={handleLeave}
         onTouchStart={handleTouch}
@@ -226,251 +356,281 @@ export default function TradingCard({
           "--lift": tilt.lift,
         }}
       >
-        {templateStyle === "classic" ? (
-          <ClassicFrame
-            data={data}
-            tilt={tilt}
-            typeAccent={typeAccent}
-            rarityAccent={rarityAccent}
-            headline={headline}
-          />
-        ) : (
-        <>
-        <div className="tc-body-fill" />
+        <div className="tc-card-face">
+          {templateStyle === "classic" ? (
+            <ClassicFrame
+              data={data}
+              tilt={tilt}
+              interactive={interactive}
+              motionEnabled={motionEnabled}
+              typeAccent={typeAccent}
+              rarityAccent={rarityAccent}
+              headline={headline}
+            />
+          ) : (
+          <>
+          <div className="tc-body-fill" />
 
-        {overlayImage && (
-          <img
-            className="tc-overlay"
-            src={overlayImage}
-            alt=""
-            draggable={false}
-            loading="lazy"
-            decoding="async"
-          />
-        )}
+          {overlayImage && (
+            <img
+              className="tc-overlay"
+              src={overlayImage}
+              alt=""
+              draggable={false}
+              loading="lazy"
+              decoding="async"
+            />
+          )}
 
-        <div className="tc-frame">
-          {/* ───── ART WINDOW (image + foil + floating overlays live here) ───── */}
-          <div className="tc-art-window">
-            {data.backgroundImage && (
-              <img
+          <div className="tc-frame">
+            {/* ───── ART WINDOW (image + foil + floating overlays live here) ───── */}
+            <div className="tc-art-window">
+              <CardArtwork
+                data={data}
+                tilt={tilt}
+                interactive={interactive}
+                motionEnabled={motionEnabled}
                 className="tc-art"
-                src={data.backgroundImage}
-                alt={`${data.name} artwork`}
-                draggable={false}
-                loading="lazy"
-                decoding="async"
-                style={{
-                  objectPosition: data.artFocus || "center 38%",
-                  transform: `scale(${data.artZoom || 1.55}) translate(
-                    ${(50 - (tilt.mx ?? 50)) * 0.05}px,
-                    ${(50 - (tilt.my ?? 50)) * 0.05}px
-                  )`,
-                }}
+                defaultZoom={1.55}
               />
-            )}
-            <div className="tc-art-inner-vignette" />
-            <div className="tc-foil" />
-            <div className="tc-shine" />
+              <div className="tc-art-inner-vignette" />
+              <div className="tc-foil" />
+              <div className="tc-shine" />
 
-            {/* Corner brackets */}
-            <div className="tc-art-corner tc-art-corner--tl" />
-            <div className="tc-art-corner tc-art-corner--tr" />
-            <div className="tc-art-corner tc-art-corner--bl" />
-            <div className="tc-art-corner tc-art-corner--br" />
+              {/* Corner brackets */}
+              <div className="tc-art-corner tc-art-corner--tl" />
+              <div className="tc-art-corner tc-art-corner--tr" />
+              <div className="tc-art-corner tc-art-corner--bl" />
+              <div className="tc-art-corner tc-art-corner--br" />
 
-            {/* ───── FLOATING TOP OVERLAY (no panel — elements float on art) ───── */}
-            <div className="tc-art-top">
-              <div className="tc-cardtype-slot">
-                {data.cardTypeBadgeImage ? (
-                  <img
-                    className="tc-cardtype-badge-img"
-                    src={data.cardTypeBadgeImage}
-                    alt={data.cardType}
-                    draggable={false}
-                  />
-                ) : (
-                  <ObliqueLabel
-                    variant="type"
-                    style={badgeTone === "silver" ? { "--label-grad": LABEL_GRADIENTS.typeSilver } : undefined}
-                  >
-                    {data.cardType}
-                  </ObliqueLabel>
-                )}
-              </div>
-
-              <div className="tc-title">
-                <h1>{data.name}</h1>
-                {data.subtitle && (
-                  <span className="tc-subtitle">{data.subtitle}</span>
-                )}
-              </div>
-
-              {statPair && (
-                <div className="tc-stat-pair">
-                  {statPair.map((stat, index) => (
-                    <div
-                      key={stat.label}
-                      className={index === 0 ? "tc-cred" : "tc-portfolio"}
-                      title={stat.title}
+              {/* ───── FLOATING TOP OVERLAY (no panel — elements float on art) ───── */}
+              <div className="tc-art-top">
+                <div className="tc-cardtype-slot">
+                  {data.cardTypeBadgeImage ? (
+                    <img
+                      className="tc-cardtype-badge-img"
+                      src={data.cardTypeBadgeImage}
+                      alt={data.cardType}
+                      draggable={false}
+                    />
+                  ) : (
+                    <ObliqueLabel
+                      variant="type"
+                      style={badgeTone === "silver" ? { "--label-grad": LABEL_GRADIENTS.typeSilver } : undefined}
                     >
-                      <span>{stat.label}</span>
-                      <strong>
-                        {stat.value}
-                        {stat.suffix && <em>{stat.suffix}</em>}
-                      </strong>
-                    </div>
-                  ))}
+                      {data.cardType}
+                    </ObliqueLabel>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* ───── FLOATING BOTTOM OVERLAY (rarity tag only) ───── */}
-            <div className="tc-art-bottom">
-              <ObliqueLabel variant="rarity">{data.rarity}</ObliqueLabel>
-            </div>
+                <div className="tc-title">
+                  <h1>{data.name}</h1>
+                  {data.subtitle && (
+                    <span className="tc-subtitle">{data.subtitle}</span>
+                  )}
+                </div>
 
-            <div className="tc-art-inset" />
-          </div>
-
-          {/* ───── ABILITY (image badge OR oblique-label fallback) ───── */}
-          {data.ability && (
-            <section className="tc-ability">
-              <div className="tc-ability-badge">
-                {data.ability.badgeImage ? (
-                  <img
-                    className="tc-ability-badge-img"
-                    src={data.ability.badgeImage}
-                    alt="Effect"
-                    draggable={false}
-                  />
-                ) : (
-                  <ObliqueLabel variant="ability" style={{ "--label-grad": effectTone.grad }}>
-                    Effect
-                  </ObliqueLabel>
+                {statPair && (
+                  <div className="tc-stat-pair">
+                    {statPair.map((stat, index) => (
+                      <div
+                        key={stat.label}
+                        className={index === 0 ? "tc-cred" : "tc-portfolio"}
+                        title={stat.title}
+                      >
+                        <span>{stat.label}</span>
+                        <strong>
+                          {stat.value}
+                          {stat.suffix && <em>{stat.suffix}</em>}
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-              <div className="tc-ability-body">
-                <h2>{data.ability.name}</h2>
-                <p>{data.ability.text}</p>
-              </div>
-            </section>
-          )}
 
-          {/* ───── FLAVOR (sits just below the Ability) ───── */}
-          {data.flavorText && (
-            <p className="tc-flavor">&ldquo;{data.flavorText}&rdquo;</p>
-          )}
-
-          {/* ───── SIGNATURE MOVE (renders only if data.signatureMove is set) ───── */}
-          {data.signatureMove && (
-            <section className="tc-move">
-              <div className="tc-move-cost" aria-label={`Cost ${data.signatureMove.cost} Cred`}>
-                {Array.from({ length: data.signatureMove.cost }).map((_, i) => (
-                  <span key={i} className="tc-bolt">⚡</span>
-                ))}
+              {/* ───── FLOATING BOTTOM OVERLAY (rarity tag only) ───── */}
+              <div className="tc-art-bottom">
+                <ObliqueLabel variant="rarity">{data.rarity}</ObliqueLabel>
               </div>
-              <div className="tc-move-body">
-                <div className="tc-move-head">
-                  <ObliqueLabel variant="move">Signature Move</ObliqueLabel>
-                  <h3>{data.signatureMove.name}</h3>
+
+              <div className="tc-art-inset" />
+            </div>
+
+            {/* ───── ABILITY (image badge OR oblique-label fallback) ───── */}
+            {data.ability && (
+              <section className="tc-ability">
+                <div className="tc-ability-badge">
+                  {data.ability.badgeImage ? (
+                    <img
+                      className="tc-ability-badge-img"
+                      src={data.ability.badgeImage}
+                      alt="Effect"
+                      draggable={false}
+                    />
+                  ) : (
+                    <ObliqueLabel variant="ability" style={{ "--label-grad": effectTone.grad }}>
+                      Effect
+                    </ObliqueLabel>
+                  )}
                 </div>
-                <p>{data.signatureMove.text}</p>
-              </div>
-              <div className="tc-move-value">
-                <span>GAIN</span>
-                <strong>{data.signatureMove.gain || "+6"}</strong>
-              </div>
-            </section>
-          )}
+                <div className="tc-ability-body">
+                  <h2>{data.ability.name}</h2>
+                  <p>{data.ability.text}</p>
+                </div>
+              </section>
+            )}
 
-          {/* ───── BATTLE STRIP (renders only when battle data is set) ───── */}
-          {(data.weakness || data.resistance || data.pivotCost) && (
-            <footer className="tc-battle">
-              <div className="tc-battle-stat">
-                <span>weakness</span>
-                <strong>{data.weakness || "—"}</strong>
-              </div>
-              <div className="tc-battle-sep" />
-              <div className="tc-battle-stat">
-                <span>resistance</span>
-                <strong>{data.resistance || "—"}</strong>
-              </div>
-              <div className="tc-battle-sep" />
-              <div className="tc-battle-stat">
-                <span>pivot cost</span>
-                <strong className="tc-battle-bolts">
-                  {Array.from({ length: data.pivotCost || 0 }).map((_, i) => (
-                    <span key={i}>⚡</span>
+            {/* ───── FLAVOR (sits just below the Ability) ───── */}
+            {data.flavorText && (
+              <p className="tc-flavor">&ldquo;{data.flavorText}&rdquo;</p>
+            )}
+
+            {/* ───── SIGNATURE MOVE (renders only if data.signatureMove is set) ───── */}
+            {data.signatureMove && (
+              <section className="tc-move">
+                <div className="tc-move-cost" aria-label={`Cost ${data.signatureMove.cost} Cred`}>
+                  {Array.from({ length: data.signatureMove.cost }).map((_, i) => (
+                    <span key={i} className="tc-bolt">⚡</span>
                   ))}
-                </strong>
-              </div>
-            </footer>
+                </div>
+                <div className="tc-move-body">
+                  <div className="tc-move-head">
+                    <ObliqueLabel variant="move">Signature Move</ObliqueLabel>
+                    <h3>{data.signatureMove.name}</h3>
+                  </div>
+                  <p>{data.signatureMove.text}</p>
+                </div>
+                <div className="tc-move-value">
+                  <span>GAIN</span>
+                  <strong>{data.signatureMove.gain || "+6"}</strong>
+                </div>
+              </section>
+            )}
+
+            {/* ───── BATTLE STRIP (renders only when battle data is set) ───── */}
+            {(data.weakness || data.resistance || data.pivotCost) && (
+              <footer className="tc-battle">
+                <div className="tc-battle-stat">
+                  <span>weakness</span>
+                  <strong>{data.weakness || "—"}</strong>
+                </div>
+                <div className="tc-battle-sep" />
+                <div className="tc-battle-stat">
+                  <span>resistance</span>
+                  <strong>{data.resistance || "—"}</strong>
+                </div>
+                <div className="tc-battle-sep" />
+                <div className="tc-battle-stat">
+                  <span>pivot cost</span>
+                  <strong className="tc-battle-bolts">
+                    {Array.from({ length: data.pivotCost || 0 }).map((_, i) => (
+                      <span key={i}>⚡</span>
+                    ))}
+                  </strong>
+                </div>
+              </footer>
+            )}
+
+            <div className="tc-meta">
+              <span>
+                <em>Edition</em>
+                <b>{data.edition}</b>
+              </span>
+              <span>
+                <em>Style</em>
+                <b>{data.style}</b>
+              </span>
+              <span
+                className={`tc-meta-rarity${String(data.rarity || "").length > 8 ? " tc-meta-rarity--long" : ""}`}
+                style={{ "--r": rarityAccent }}
+              >
+                <em>Rarity</em>
+                <b>{data.rarity}</b>
+              </span>
+              <span>
+                <em>Set</em>
+                <b>Genesis</b>
+              </span>
+            </div>
+          </div>
+
+          <div className="tc-edge" />
+          </>
           )}
 
-          <div className="tc-meta">
-            <span>
-              <em>Edition</em>
-              <b>{data.edition}</b>
-            </span>
-            <span>
-              <em>Style</em>
-              <b>{data.style}</b>
-            </span>
-            <span
-              className={`tc-meta-rarity${String(data.rarity || "").length > 8 ? " tc-meta-rarity--long" : ""}`}
-              style={{ "--r": rarityAccent }}
-            >
-              <em>Rarity</em>
-              <b>{data.rarity}</b>
-            </span>
-            <span>
-              <em>Set</em>
-              <b>Genesis</b>
-            </span>
-          </div>
+          {/* Set mark, printed over the art like a TCG set logo. */}
+          {data.setBadge && (
+            <img className="tc-set-badge" src={data.setBadge} alt="" draggable={false} decoding="async" />
+          )}
+
+          {/* Rarity frame, then FX on top of it — the frames are borders with a
+              transparent centre, so they sit above the art without hiding text.
+              Both are outside the template branch so Terminal + Classic share
+              them. */}
+          {/* NOT lazy: these are absolutely positioned inside the card's
+              scale() transform, and Chrome's lazy-load intersection check does
+              not fire reliably there — at collection-grid scale the frames
+              simply never loaded. Only 4 frame files exist set-wide, so they
+              cache after the first card and cost nothing to load eagerly. */}
+          {data.frameImage && (
+            <img className="tc-cardframe" src={data.frameImage} alt="" draggable={false}
+                 decoding="async" />
+          )}
+
+          {cornerBadge && (
+            <div className="tc-corner-badge" aria-hidden="true">
+              <span>{cornerBadge}</span>
+            </div>
+          )}
         </div>
 
-        <div className="tc-edge" />
-        </>
-        )}
-
-        {/* Set mark, printed over the art like a TCG set logo. */}
-        {data.setBadge && (
-          <img className="tc-set-badge" src={data.setBadge} alt="" draggable={false} decoding="async" />
-        )}
-
-        {/* Rarity frame, then FX on top of it — the frames are borders with a
-            transparent centre, so they sit above the art without hiding text.
-            Both are outside the template branch so Terminal + Classic share
-            them. */}
-        {/* NOT lazy: these are absolutely positioned inside the card's
-            scale() transform, and Chrome's lazy-load intersection check does
-            not fire reliably there — at collection-grid scale the frames
-            simply never loaded. Only 4 frame files exist set-wide, so they
-            cache after the first card and cost nothing to load eagerly. */}
-        {data.frameImage && (
-          <img className="tc-cardframe" src={data.frameImage} alt="" draggable={false}
-               decoding="async" />
-        )}
-
-        {fxLayers.map((fx, i) => (
-          <img
-            key={`${fx}-${i}`}
-            className="tc-fx"
-            src={fx}
-            alt=""
-            draggable={false}
-            decoding="async"
-            style={{ mixBlendMode: data.fxBlend || "screen", opacity: data.fxOpacity ?? 0.55 }}
-          />
-        ))}
-
-        {cornerBadge && (
-          <div className="tc-corner-badge" aria-hidden="true">
-            <span>{cornerBadge}</span>
-          </div>
-        )}
+        {/* Unclipped siblings of the printed face: each FX sheet has its own
+            depth and follows the tilt, opposite to the artwork's small drift. */}
+        {fxLayers.map((fx, i) => {
+          const depth = fxDepth * (40 + i * 18);
+          const travel = fxDepth * (10 + i * 4);
+          const planeStyle = {
+            "--fx-z": `${depth}px`,
+            "--fx-x": `${(tilt.ry / 9) * travel}px`,
+            "--fx-y": `${(-tilt.rx / 7) * travel}px`,
+            // Compensate perspective enlargement to keep FX near the border.
+            "--fx-scale": 1 - depth / 1400,
+            zIndex: 13 + i,
+          };
+          const reflection = motionEnabled && data.fxReflection?.src === fx && data.fxReflection.facets?.length
+            ? data.fxReflection : null;
+          const shineStrength = reflection ? Math.max(0, Math.min(1.5, reflection.strength ?? 1)) : 0;
+          const material = fxMaterial(reflection?.material);
+          const hueRotation = ((tilt.ry / 9) * material.baseHueShift[0]
+            + (-tilt.rx / 7) * material.baseHueShift[1]) * shineStrength;
+          return (
+            <React.Fragment key={`${fx}-${i}`}>
+              <img
+                className="tc-fx"
+                src={fx}
+                alt=""
+                draggable={false}
+                decoding="async"
+                style={{
+                  ...planeStyle,
+                  mixBlendMode: data.fxBlend || "screen",
+                  opacity: data.fxOpacity ?? 0.55,
+                  // Color belongs to the same FX pixels, even between flashes.
+                  filter: hueRotation ? `hue-rotate(${hueRotation}deg)` : undefined,
+                }}
+              />
+              {reflection && (
+                <FxReflection
+                  reflection={reflection}
+                  tilt={tilt}
+                  planeStyle={planeStyle}
+                  opacity={data.fxOpacity ?? 0.55}
+                />
+              )}
+            </React.Fragment>
+          );
+        })}
       </div>
     </div>
   );
@@ -500,6 +660,8 @@ const CARD_STYLES = `
     height: calc(var(--h) * var(--scale, 1));
     perspective: 1400px;
     perspective-origin: 50% 35%;
+    /* Contain glow blending at the scene boundary, not on the 3D rotator. */
+    isolation: isolate;
     font-family: "IBM Plex Sans", "Inter", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
@@ -517,11 +679,9 @@ const CARD_STYLES = `
       translateZ(0)
       rotateX(var(--rx, 0))
       rotateY(var(--ry, 0));
-    transform-style: preserve-3d;
+    transform-style: flat;
     transition: transform 180ms cubic-bezier(.2,.7,.2,1), box-shadow 220ms ease;
     border-radius: 32px;
-    overflow: hidden;
-    isolation: isolate;
     color: #effff9;
     box-shadow:
       0 calc(28px + 24px * var(--lift, 0)) calc(60px + 50px * var(--lift, 0)) rgba(0,0,0,.55),
@@ -530,6 +690,18 @@ const CARD_STYLES = `
       0 0 0 13px #d9b44a,
       0 0 0 14px #8a6a1a,
       0 0 60px color-mix(in srgb, var(--rarity) calc(22% + 18% * var(--lift, 0)), transparent);
+  }
+
+  .tc-card[data-fx-depth="true"] { transform-style: preserve-3d; }
+
+  /* Clip and composite the printed card on its own plane. overflow:hidden or
+     isolation:isolate on .tc-card would flatten the raised FX back into it. */
+  .tc-card-face {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    overflow: hidden;
+    isolation: isolate;
   }
 
   .tc-body-fill {
@@ -542,12 +714,13 @@ const CARD_STYLES = `
       linear-gradient(180deg, #110a04 0%, #0a0805 38%, #050306 100%);
   }
 
-  /* Rarity frame (z 9) then FX (z 10) — FX composite over the art AND the
-     frame. Both are object-fit: fill like .tc-overlay, since the frame art is
+  /* Frame and FX share the same sizing, but FX live above the printed face.
+     Both are object-fit: fill like .tc-overlay, since the frame art is
      1488x2083 against the card's 1488x2076 (a ~7px difference that would
      otherwise letterbox the border). */
   .tc-cardframe,
-  .tc-fx {
+  .tc-fx,
+  .tc-fx-reflection {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -569,6 +742,66 @@ const CARD_STYLES = `
      below to clear the band. */
   .tc-cardframe { z-index: 12; }
   .tc-fx { z-index: 13; }
+
+  .tc-card[data-fx-depth="true"] .tc-fx,
+  .tc-card[data-fx-depth="true"] .tc-fx-reflection {
+    transform: translate3d(var(--fx-x), var(--fx-y), var(--fx-z)) scale(var(--fx-scale));
+    transform-origin: 50% 35%;
+    transition: transform 180ms cubic-bezier(.2,.7,.2,1);
+  }
+
+  .tc-card[data-fx-depth="true"] .tc-fx {
+    /* Feather the sheet edges so moving past the frame never reveals a hard
+       rectangular image boundary. Masking is safe here on a leaf element. */
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 2%, #000 98%, transparent),
+                        linear-gradient(0deg, transparent, #000 1.5%, #000 98.5%, transparent);
+    -webkit-mask-composite: source-in;
+    mask-image: linear-gradient(90deg, transparent, #000 2%, #000 98%, transparent),
+                linear-gradient(0deg, transparent, #000 1.5%, #000 98.5%, transparent);
+    mask-composite: intersect;
+  }
+
+  /* Add light to the existing texture. Both passes use its luminance/alpha;
+     transparent areas cannot produce a free-floating sparkle. Blur AFTER the
+     mask so only light from the texture spreads into its surroundings. */
+  .tc-fx-reflection { mix-blend-mode: plus-lighter; }
+
+  .tc-fx-material,
+  .tc-fx-bloom {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+
+  .tc-fx-material {
+    -webkit-mask-image: var(--fx-mask),
+      linear-gradient(90deg, transparent, #000 2%, #000 98%, transparent),
+      linear-gradient(0deg, transparent, #000 1.5%, #000 98.5%, transparent);
+    -webkit-mask-composite: source-in, source-in;
+    mask-image: var(--fx-mask),
+      linear-gradient(90deg, transparent, #000 2%, #000 98%, transparent),
+      linear-gradient(0deg, transparent, #000 1.5%, #000 98.5%, transparent);
+    mask-mode: luminance, alpha, alpha;
+    mask-composite: intersect;
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    background: var(--fx-emission);
+  }
+
+  .tc-fx-bloom {
+    filter: blur(var(--fx-bloom-radius)) brightness(var(--fx-bloom-brightness));
+  }
+
+  .tc-fx-bloom .tc-fx-material { background: var(--fx-bloom); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tc-card, .tc-art, .tc-art-layer, .tc-fx { transition: none !important; }
+    .tc-card { transform: scale(var(--scale, 1)); }
+    .tc-fx-reflection { display: none; }
+    .tc-card[data-fx-depth="true"] .tc-fx { transform: none; mask-image: none; }
+  }
 
   /* Set mark: right-aligned over the art, above the art window (which sits in
      .tc-frame at z 5) but below the frame border and FX. Width is a % of the
@@ -680,8 +913,8 @@ const CARD_STYLES = `
   }
 
   /* Diagonal corner stamp ("COMING SOON" / "PROMO" / etc).
-     Sits inside .tc-card so it inherits the card's tilt + scale; the
-     parent's overflow:hidden + 32px border-radius clip the tail. */
+     Sits inside the printed face so it inherits the card's tilt + scale;
+     the face's overflow:hidden + 32px border-radius clip the tail. */
   .tc-corner-badge {
     position: absolute;
     top: 70px;
@@ -851,6 +1084,12 @@ const CARD_STYLES = `
     pointer-events: none;
     transform-origin: center 35%;
     transition: transform 300ms ease;
+  }
+
+  .tc-art-layer {
+    pointer-events: none;
+    user-select: none;
+    transition: transform 180ms cubic-bezier(.2,.7,.2,1);
   }
 
   .tc-art-inner-vignette {
@@ -1725,7 +1964,7 @@ const CARD_STYLES = `
    resistance / retreat footer), drawn in the RL80 palette. The body tint
    and pip follow --type; flair + retreat follow --rarity.
    ───────────────────────────────────────────────────────────────────── */
-function ClassicFrame({ data, tilt, rarityAccent, headline }) {
+function ClassicFrame({ data, tilt, interactive, motionEnabled, rarityAccent, headline }) {
   const pivots = data.pivotCost || 0;
   const hasBattle = data.weakness || data.resistance || pivots;
   return (
@@ -1750,22 +1989,13 @@ function ClassicFrame({ data, tilt, rarityAccent, headline }) {
         </header>
 
         <div className="cc-art">
-          {data.backgroundImage && (
-            <img
-              src={data.backgroundImage}
-              alt={`${data.name} artwork`}
-              draggable={false}
-              loading="lazy"
-              decoding="async"
-              style={{
-                objectPosition: data.artFocus || "center 38%",
-                transform: `scale(${data.artZoom || 1.1}) translate(
-                  ${(50 - (tilt.mx ?? 50)) * 0.05}px,
-                  ${(50 - (tilt.my ?? 50)) * 0.05}px
-                )`,
-              }}
-            />
-          )}
+          <CardArtwork
+            data={data}
+            tilt={tilt}
+            interactive={interactive}
+            motionEnabled={motionEnabled}
+            defaultZoom={1.1}
+          />
           <div className="cc-art-sheen" />
         </div>
 
@@ -1975,6 +2205,10 @@ const CLASSIC_STYLES = `
     height: 100%;
     object-fit: cover;
     transition: transform 120ms ease-out;
+  }
+
+  .cc-art .tc-art-layer {
+    transition: transform 180ms cubic-bezier(.2,.7,.2,1);
   }
 
   .cc-art-sheen {

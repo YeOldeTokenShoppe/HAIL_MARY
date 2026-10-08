@@ -51,13 +51,14 @@ const CLIP = {
   fx: "Cowboy_SlashMagic", // reserved for the Gauntlet-style bolt powers
 };
 const FADE = 0.18;
-const HEIGHT = 0.22;        // approx world height, used only for camera look-at
+const HEIGHT = 0.29;        // approx world height, used only for camera look-at (scales with WALKER_SCALE)
+const EYE_Y = 0.195;        // hat-cam height above his feet (was 0.15 at scale 0.05)
 // THE size knob. NOTE: three.js skinned meshes IGNORE a parent empty's scale
 // (vertices follow the bones), so the GLB's Cowboy_Empty 0.29 does nothing —
 // scale must be applied here (scales bones + mesh together, can't desync) or
 // applied INTO the armature in Blender (safe for this rig: the clip has zero
 // translation keys). displayed height = 1.02 (bind height) × WALKER_SCALE.
-const WALKER_SCALE = 0.05;
+const WALKER_SCALE = 0.065; // 0.05 → 0.065 (2026-10-07): he read a head shorter than every vendor
 // Export-facing correction: the rig's rest pose doesn't face glTF +Z, so the
 // body reads 90° off the walk direction. Rule: holding W you should see his
 // BACK. If you see his other side → -Math.PI/2; if he faces you → Math.PI;
@@ -71,7 +72,7 @@ const BACK_SPEED = 0.3;     // reverse is a shuffle
 // arc at all. With arcs gone, the pivot rate can be brisk again (the earlier
 // slow rate was compensating for wide arcs).
 const TURN_RATE = 2.2;      // rad/s pivot
-const CAM_BACK = 0.4, CAM_UP = 0.35; // camera is hard-locked — no lerp; scroll wheel dollies live
+const CAM_BACK = 0.46, CAM_UP = 0.4; // camera is hard-locked — no lerp; scroll wheel dollies live (pulled back ~15% with the 2026-10-07 size-up)
 
 // ── EL DIABLO — the mechanical bull (props inside the CommercialStrip GLB:
 // the saddle pivots on the bull body, so the whole ride is procedural saddle
@@ -203,6 +204,19 @@ const TRACER_DUR = 0.12;       // seconds the shot streak + muzzle flash live
 const GUN_MODEL = "/models/SM_Wep_Revolver_01.glb?v=" +
   (process.env.NODE_ENV === "development" ? Date.now() : "1");
 const GUN_BONE = /lower.?arm.?r/i;
+// First-person arm (2026-10-07): with the body hidden, the shootout still
+// needs a hand on the revolver. The gun stays rig-mounted (its draw/recoil
+// come from the clips); a tapered sleeve is drawn each frame from a point
+// low-right of the lens to the grip. Only while the gun is out.
+const ARM_RADIUS = 0.011;          // world units at the shoulder end
+const ARM_COLOR = "#8b6b4a";       // tan shirt sleeve
+const ARM_SHOULDER_RIGHT = 0.055;  // offset from the lens, camera-right…
+const ARM_SHOULDER_DOWN = 0.075;   // …and down, so the sleeve enters from the frame's corner
+const _armHand = /* @__PURE__ */ new THREE.Vector3();
+const _armShoulder = /* @__PURE__ */ new THREE.Vector3();
+const _armDir = /* @__PURE__ */ new THREE.Vector3();
+const _armRight = /* @__PURE__ */ new THREE.Vector3();
+const _armUp = /* @__PURE__ */ new THREE.Vector3(0, 1, 0);
 const GUN_POS = [0, 0.24, 0.02];
 const GUN_ROT = [Math.PI / 2, 0, 0];
 const GUN_SCALE = 0.6;
@@ -242,6 +256,12 @@ export default function PlayerWalker({
   spawnCol = 0, spawnRow = 0,
   spawnAt = null,           // {x, z, yaw} WORLD: start already placed here (the
                             // boardwalk's WALK entry) instead of click-to-drop
+  showBody = false,         // 2026-10-07: the prospector is FIRST PERSON by default.
+                            // The rig still exists (position, collision, vendor
+                            // gaze, the bull seat, the revolver) — it is just not
+                            // drawn, so there is no body to customise for gender,
+                            // race, build or age. ?body=1 shows the chibi cowboy
+                            // again for debugging; follow/front cams return with him.
   frontier = [],            // page's frontierTargets: [{ col, row, layer }]
   onWildcat,                // async ({ col, row, layer }) => result
   onExit,
@@ -290,7 +310,8 @@ export default function PlayerWalker({
   const [demonVuln, setDemonVuln] = useState(false);
   const demonCdRef = useRef(0);
   const [demonCd, setDemonCd] = useState(0); // whole seconds, HUD countdown
-  const gunRef = useRef(null);      // the pistol Object3D riding the arm bone
+  const gunRef = useRef(null);
+  const armRef = useRef(null); // first-person sleeve (bodiless mode)      // the pistol Object3D riding the arm bone
   const shotFxRef = useRef(null);   // { t, from, to } while a fire pulse is alive
   const tracerRef = useRef(null);   // stretched additive pulse mesh
   const flashRef = useRef(null);    // muzzle-flash point light
@@ -310,11 +331,19 @@ export default function PlayerWalker({
   // spot on the field to drop him there.
   const [placed, setPlaced] = useState(!!spawnAt);
   const placedRef = useRef(!!spawnAt);
-  // Camera mode, cycled with C: follow (locked chase) → orbit (free, target
-  // glued to the cowboy) → cowboy (his hat — first person on foot, bull-cam
-  // in the saddle). Persists across rides within a walk session.
-  const camModeRef = useRef("follow");
-  const [camMode, setCamMode] = useState("follow");
+  // Camera mode, cycled with C (or the HUD's cam button): follow (locked
+  // chase) → front (the same rig mirrored ahead of him, looking back at his
+  // face) → orbit (free, target glued to the cowboy) → cowboy (his hat —
+  // first person on foot, bull-cam in the saddle). Persists across rides
+  // within a walk session.
+  // Bodiless (default): only the hat-cam and a free orbit make sense — a
+  // chase cam on an invisible man is an empty frame.
+  const CAM_ORDER = showBody ? ["follow", "front", "orbit", "cowboy"] : ["cowboy", "orbit"];
+  const camModeRef = useRef(CAM_ORDER[0]);
+  const [camMode, setCamMode] = useState(CAM_ORDER[0]);
+  // The page mounts OrbitControls per cam mode; tell it the starting mode.
+  useEffect(() => { onCam?.(camModeRef.current); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     try { setBestT(parseFloat(localStorage.getItem(BEST_KEY) || "0")); } catch {}
   }, []);
@@ -343,9 +372,20 @@ export default function PlayerWalker({
   // collision on the next frame.
   useEffect(() => {
     const dom = gl.domElement;
-    let downX = 0, downY = 0;
-    const down = (e) => { downX = e.clientX; downY = e.clientY; };
+    let downX = 0, downY = 0, lastX = 0, dragging = false;
+    const down = (e) => { downX = lastX = e.clientX; downY = e.clientY; dragging = true; };
+    // Drag to look (2026-10-07): first person without a body reads as an FPS,
+    // and an FPS turns with the mouse. Horizontal drag steers the heading —
+    // the same heading A/D drive, so the hat-cam, the body and W all agree.
+    // Not in ORBIT (OrbitControls own that drag).
+    const move = (e) => {
+      if (!dragging || e.target !== dom || camModeRef.current === "orbit") return;
+      if (modeRef.current !== "walk") return;
+      heading.current -= (e.clientX - lastX) * 0.006; // rad per px
+      lastX = e.clientX;
+    };
     const up = (e) => {
+      dragging = false;
       if (e.target !== dom) return;
       if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) return; // drag, not a click
       if (modeRef.current !== "walk") return;
@@ -375,9 +415,11 @@ export default function PlayerWalker({
       if (!placedRef.current) { placedRef.current = true; setPlaced(true); }
     };
     dom.addEventListener("pointerdown", down);
+    dom.addEventListener("pointermove", move);
     dom.addEventListener("pointerup", up);
     return () => {
       dom.removeEventListener("pointerdown", down);
+      dom.removeEventListener("pointermove", move);
       dom.removeEventListener("pointerup", up);
     };
   }, [gl, camera, raycaster, ndc, worldPos, worldW, worldD]);
@@ -589,6 +631,21 @@ export default function PlayerWalker({
     return () => { bone.remove(gun); gunRef.current = null; };
   }, [gunScene, actions]);
 
+  // Bodiless: hide every mesh of the rig EXCEPT the revolver's subtree (it
+  // mounts in the effect above, so gunRef is set by now). Per mesh rather than
+  // on the primitive, so the gun — a child of the forearm bone — can stay
+  // drawn for the first-person shootout. The useGLTF scene is shared: restore
+  // on unmount.
+  useEffect(() => {
+    const off = inner.current;
+    if (!off) return;
+    const spare = new Set();
+    gunRef.current?.traverse((o) => spare.add(o));
+    const hidden = [];
+    off.traverse((o) => { if (o.isMesh && !spare.has(o) && o.visible && !showBody) { o.visible = false; hidden.push(o); } });
+    return () => { hidden.forEach((o) => { o.visible = true; }); };
+  }, [showBody, gunScene, actions]);
+
   // Fallback position beside the rig — invisible until the player clicks the
   // field to place him (the pointer handler below), so the camera stays in
   // the sky while they aim. The follow cam takes over the moment he lands.
@@ -718,9 +775,30 @@ export default function PlayerWalker({
     rideRef.current = null;
   }, []);
 
+  // Entering a vendor face-to-face hands the camera to the page, which mounts
+  // OrbitControls. Their first update() swings the lens onto THEIR target — the
+  // field overview point — before the face flight starts, so for a frame or two
+  // the view whipped round to the field "as if looking backwards" (2026-10-08,
+  // cresting the wagon stairs). Pass the point he is looking at right now so the
+  // controls mount already aimed where the hat-cam was, and the flight sweeps
+  // from there. Far enough ahead to clear the controls' minDistance (0.3).
+  const vendorGaze = useCallback(() => {
+    camera.getWorldDirection(tmpV);
+    return [
+      camera.position.x + tmpV.x * 0.5,
+      camera.position.y + tmpV.y * 0.5,
+      camera.position.z + tmpV.z * 0.5,
+    ];
+  }, [camera, tmpV]);
+
   // Leaving a vendor face-to-face, by ESC here or by the strip's own exit
   // (clicking the vendor again) — the strip broadcasts "hm-vendor-left".
-  const leaveVendor = useCallback((notifiedByStrip) => {
+  // `stayPut` (2026-10-08): the exit was a movement key. He keeps his spot at
+  // the top of the stairs, facing the door, and the held key does what it
+  // says from there — A/D pivot, S backs him down the steps. The ESC/click
+  // exit below instead cuts to the foot of the stairs facing out, which from
+  // a key press read as being "dumped out of the wagon".
+  const leaveVendor = useCallback((notifiedByStrip, stayPut = false) => {
     if (modeRef.current !== "vendor") return;
     modeRef.current = "walk";
     setTalkingTo(null);
@@ -729,7 +807,7 @@ export default function PlayerWalker({
     // A stair-triggered visit ends back at the FOOT of the stairs, facing the
     // boardwalk — reads as walking out, and re-arms the stair trigger.
     const S = stairSpotRef.current, g = group.current;
-    if (stairVisitRef.current && S && g) {
+    if (stairVisitRef.current && S && g && !stayPut) {
       g.position.set((S.frame.sMinX + S.frame.sMaxX) / 2, 0, S.frame.sMaxZ + 0.08);
       heading.current = 0;
       g.quaternion.set(0, 0, 0, 1);
@@ -790,11 +868,22 @@ export default function PlayerWalker({
       if (clawVisitRef.current) return;
       if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName)) return;
       if (e.code === "Space") e.preventDefault(); // grip key — don't scroll the page
+      const wasHeld = !!keys.current[e.code]; // before this press registers
       keys.current[e.code] = true;
       if (e.code === "Escape") {
         if (modeRef.current === "ride") endRide();
         else if (modeRef.current === "vendor") leaveVendor(false);
         else onExit?.();
+      }
+      // Walking away IS leaving (2026-10-08, "the character can't walk back
+      // out"): any movement key during a face-to-face ends the scene, and the
+      // key stays held in `keys`, so the very next frame walks him off.
+      // A FRESH press only: the stairs fire the scene while W is still held,
+      // and the OS key-repeat kept firing keydown — which walked him straight
+      // back out of the parlor the instant he arrived.
+      if (modeRef.current === "vendor" && !e.repeat && !wasHeld
+          && /^(Key[WASD]|Arrow(Up|Down|Left|Right))$/.test(e.code)) {
+        leaveVendor(false, true);
       }
       if (e.code === "KeyE") {
         // A loose demon outranks every other verb — it's the event.
@@ -804,7 +893,7 @@ export default function PlayerWalker({
           const v = nearVendorRef.current;
           modeRef.current = "vendor";
           setTalkingTo(v);
-          onVendorMode?.(true);
+          onVendorMode?.(true, vendorGaze());
           playClip(CLIP.idle); // stand politely for the scene
           window.dispatchEvent(new CustomEvent("hm-vendor-enter", { detail: { id: v.id } }));
         } else if (modeRef.current === "walk" && demonLooseRef.current) {
@@ -815,7 +904,7 @@ export default function PlayerWalker({
         } else if (modeRef.current === "walk") dig();
       }
       if (e.code === "KeyC") {
-        const order = ["follow", "orbit", "cowboy"];
+        const order = CAM_ORDER;
         const next = order[(order.indexOf(camModeRef.current) + 1) % order.length];
         camModeRef.current = next;
         setCamMode(next);
@@ -844,9 +933,13 @@ export default function PlayerWalker({
       window.removeEventListener("keyup", up);
       window.removeEventListener("wheel", wheel);
     };
-  }, [dig, shoot, onExit, startRide, endRide, onCam, onVendorMode, leaveVendor]);
+  }, [dig, shoot, onExit, startRide, endRide, onCam, onVendorMode, leaveVendor, vendorGaze]);
 
-  useFrame((_, dt) => {
+  useFrame((_, rawDt) => {
+    // Clamp long frames (tab switch, shader compile hitch): at walking speed
+    // a 0.05 s step is 2.5 cm, under the 4 cm depth of a stair tread, so a
+    // hitch slows him instead of teleporting him through the stairs.
+    const dt = Math.min(rawDt, 0.05);
     const g = group.current;
     if (!g) return;
     // Keep the HUD's anchor in front of the camera in every mode (ride and
@@ -895,8 +988,11 @@ export default function PlayerWalker({
     // cowboy outranks the camera as something to look at.
     if (placedRef.current) {
       g.getWorldPosition(worldPos);
-      const wpub = (window.__hmWalkerPos = window.__hmWalkerPos || { x: 0, y: 0, z: 0 });
+      const wpub = (window.__hmWalkerPos = window.__hmWalkerPos || { x: 0, y: 0, z: 0, eyeY: 0 });
       wpub.x = worldPos.x; wpub.y = worldPos.y; wpub.z = worldPos.z;
+      // Eye height for the vendors' gaze (2026-10-08): they were aimed at a
+      // fixed 0.12 above his feet — a pre-size-up number — and looked at his boots.
+      wpub.eyeY = worldPos.y + EYE_Y;
     }
     // Lazily find the bull saddle + pit ring in the strip GLB (loads async).
     if (!saddleRef.current) {
@@ -929,19 +1025,26 @@ export default function PlayerWalker({
         deck.parent.updateWorldMatrix(true, true);
         deck.parent.traverse((o) => {
           if (!o.isMesh || o === deck || !o.geometry) return;
+          // Which NAME a mesh answers to. The meshopt build parks some meshes
+          // on unnamed child nodes, and GLTFLoader then names the object after
+          // the glTF mesh ("Mesh", "Mesh.012") instead of the prop. The wagon
+          // body is one: its exclusion below never matched, so its rotated
+          // AABB walled the foot of its own stairs (2026-10-07 — "I can't get
+          // up the wagon steps"). A generic mesh name defers to the parent.
+          const name = (!o.name || /^(Mesh|mesh_\d+)(\.\d+)?$/.test(o.name)) && o.parent ? (o.parent.name || o.name) : o.name;
           // The fortune wagon body (SM_Veh_Wagon_01, no suffix): its rotated
           // AABB blankets its own staircase and doorway — fully excluded. The
           // .001 sibling wagon stays solid.
-          if (/Mechanical_Bull|Boardwalk|^SM_Veh_Wagon_01$/.test(o.name)) return;
+          if (/Mechanical_Bull|Boardwalk|^SM_Veh_Wagon_01$/.test(name)) return;
           // Stair pieces are FLOOR-ONLY: the frame's box top is the landing,
           // and the treads must never wall (Step2's inflated box overhangs
           // Step1's tread, which forced a jump to start the climb).
-          const floorOnly = /^Steps$|^Step\d+$/.test(o.name);
+          const floorOnly = /^Steps$|^Step\d+$/.test(name);
           o.geometry.computeBoundingBox();
           b.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
           // The booth curtain is a DOORWAY: step through it to leave the
           // field for the sky. Trigger volume, not a wall.
-          if (/photo.?booth.?curtain/i.test(o.name)) {
+          if (/photo.?booth.?curtain/i.test(name)) {
             curtainBoxRef.current = {
               minX: b.min.x - WALKER_RADIUS, maxX: b.max.x + WALKER_RADIUS,
               minZ: b.min.z - WALKER_RADIUS, maxZ: b.max.z + WALKER_RADIUS,
@@ -955,7 +1058,7 @@ export default function PlayerWalker({
           if (b.max.y < deckTop + 0.02) return;    // under-deck — skip
           g.getWorldPosition(worldPos);
           boxes.push({
-            name: o.name,
+            name,
             floorOnly,
             // Inflated footprint: WALLS push one walker-radius early so his
             // body never clips the mesh.
@@ -969,6 +1072,7 @@ export default function PlayerWalker({
           });
         });
         stripBoxesRef.current = boxes;
+        window.__hmWalkerBoxes = boxes; // tooling: inspect colliders from the console
         console.log(`[PlayerWalker] boardwalk colliders: ${boxes.length} prop boxes`);
       }
     }
@@ -1074,11 +1178,11 @@ export default function PlayerWalker({
       if (camModeRef.current === "cowboy") {
         // Cowboy-cam: at his hat, looking wherever the bull points him.
         g.getWorldPosition(worldPos);
-        camera.position.set(worldPos.x, worldPos.y + 0.15, worldPos.z);
+        camera.position.set(worldPos.x, worldPos.y + EYE_Y, worldPos.z);
         lookGoal.set(0, 0, 1).applyQuaternion(g.quaternion);
         lookGoal.y *= 0.3; // keep the horizon mostly level enough to read
         if (lookGoal.lengthSq() < 0.01) lookGoal.set(Math.sin(R.camAz + Math.PI), 0, Math.cos(R.camAz + Math.PI));
-        camera.lookAt(worldPos.x + lookGoal.x, worldPos.y + 0.15 + lookGoal.y, worldPos.z + lookGoal.z);
+        camera.lookAt(worldPos.x + lookGoal.x, worldPos.y + EYE_Y + lookGoal.y, worldPos.z + lookGoal.z);
       } else if (camModeRef.current === "orbit") {
         // Free orbit — the player frames the ride; the target stays glued.
         g.getWorldPosition(camGoal);
@@ -1367,7 +1471,7 @@ export default function PlayerWalker({
           const v = (window.__hmVendorSpots || {}).fortunes || { id: "fortunes", label: "fortunes" };
           modeRef.current = "vendor";
           setTalkingTo(v);
-          onVendorMode?.(true);
+          onVendorMode?.(true, vendorGaze());
           playClip(CLIP.idle); // no treadmill during the scene
           window.dispatchEvent(new CustomEvent("hm-vendor-enter", { detail: { id: v.id } }));
           return;
@@ -1413,6 +1517,16 @@ export default function PlayerWalker({
       const STRIP_EXTEND = 1.4;
       g.position.x = THREE.MathUtils.clamp(g.position.x, -worldW / 2 + m, worldW / 2 - m);
       g.position.z = THREE.MathUtils.clamp(g.position.z, -worldD / 2 - STRIP_EXTEND, worldD / 2 - m);
+      // Standing on the wagon landing after a key-press exit (trigger already
+      // fired): the wagon body is excluded from collision (its box blanketed
+      // its own stairs), so hold him at the door threshold instead of letting
+      // W walk him through the parlor wall and off the far side.
+      const S = stairSpotRef.current;
+      if (S && stairFiredRef.current && g.position.y >= S.minY
+          && g.position.x > S.frame.sMinX && g.position.x < S.frame.sMaxX
+          && g.position.z < S.frame.sMinZ + 0.03) {
+        g.position.z = S.frame.sMinZ + 0.03;
+      }
     }
     g.rotation.y = heading.current;
     // Locomotion state: movement interrupts any one-shot; pivot = half-speed
@@ -1460,6 +1574,7 @@ export default function PlayerWalker({
       }
       camLookWRef.current += (Math.min(0.65, wT) - camLookWRef.current) * Math.min(1, dt * 3);
     }
+    if (armRef.current) armRef.current.visible = false; // re-shown by the hat-cam below
     if (camModeRef.current === "orbit") {
       // The player frames the shot; the target stays on the cowboy.
       followTarget(worldPos.x, worldPos.y + HEIGHT * 0.7, worldPos.z);
@@ -1467,33 +1582,72 @@ export default function PlayerWalker({
       // Hat-cam on foot. Facing a vendor: meet their eyes — the fixed ground
       // tilt aimed at belt buckles. Otherwise: tipped down just enough to
       // read the ground (frontier cells, the pit rim).
-      camera.position.set(worldPos.x, worldPos.y + 0.15, worldPos.z);
+      camera.position.set(worldPos.x, worldPos.y + EYE_Y, worldPos.z);
+      // Default ground-tilt look along the heading.
+      lookGoal.set(
+        worldPos.x + Math.sin(heading.current),
+        worldPos.y + EYE_Y - 0.2,
+        worldPos.z + Math.cos(heading.current));
       const nv2 = nearVendorRef.current;
       if (nv2) {
-        const deckWorldY = worldPos.y - g.position.y;
-        // Per-vendor eye height when the head bone registered; generic
-        // counter height otherwise.
-        camera.lookAt(nv2.x, nv2.eyeY != null ? nv2.eyeY : deckWorldY + VENDOR_EYE_Y, nv2.z);
-      } else {
-        // Default ground-tilt look, lifted toward a loose demon (stronger
-        // pull than the follow cam — first person turns its head).
-        lookGoal.set(
-          worldPos.x + Math.sin(heading.current),
-          worldPos.y + 0.15 - 0.2,
-          worldPos.z + Math.cos(heading.current));
-        if (camLookWRef.current > 0.01) {
-          lookGoal.lerp(camDemonPt, Math.min(0.85, camLookWRef.current * 1.4));
+        // Meet their eyes — but only when you are FACING them. This used to be
+        // a hard lookAt for any vendor in E-range, which yanked the view
+        // sideways at every stall you walked past (2026-10-07). Now the gaze
+        // blends toward their eyes inside a ~35° cone ahead and is zero
+        // beside you, so walking the deck looks down the deck.
+        let ang = Math.atan2(nv2.x - worldPos.x, nv2.z - worldPos.z) - heading.current;
+        ang = Math.atan2(Math.sin(ang), Math.cos(ang)); // wrap to [-π, π]
+        const w = Math.max(0, 1 - Math.abs(ang) / 0.6);
+        if (w > 0) {
+          const deckWorldY = worldPos.y - g.position.y;
+          // Per-vendor eye height when the head bone registered; generic
+          // counter height otherwise.
+          camDemonPt.set(nv2.x, nv2.eyeY != null ? nv2.eyeY : deckWorldY + VENDOR_EYE_Y, nv2.z);
+          lookGoal.lerp(camDemonPt, w);
         }
-        camera.lookAt(lookGoal);
+      }
+      // Lifted toward a loose demon (stronger pull than the follow cam —
+      // first person turns its head). Recomputed after the vendor blend
+      // reused the scratch vector above.
+      if (camLookWRef.current > 0.01) {
+        const D = window.__hmDemonState;
+        if (D) camDemonPt.set(D.x, D.y + 0.1, D.z);
+        lookGoal.lerp(camDemonPt, Math.min(0.85, camLookWRef.current * 1.4));
+      }
+      camera.lookAt(lookGoal);
+      // First-person sleeve, only while the revolver is out (bodiless mode).
+      const arm = armRef.current, gunNow = gunRef.current;
+      if (arm && !showBody && gunNow && gunNow.visible) {
+        gunNow.getWorldPosition(_armHand);
+        camera.getWorldDirection(_armDir);
+        _armRight.crossVectors(_armDir, _armUp).normalize();
+        _armShoulder.copy(camera.position)
+          .addScaledVector(_armRight, ARM_SHOULDER_RIGHT)
+          .addScaledVector(_armUp, -ARM_SHOULDER_DOWN)
+          .addScaledVector(_armDir, 0.01);
+        _armDir.copy(_armHand).sub(_armShoulder);
+        const len = _armDir.length();
+        if (len > 1e-4) {
+          arm.visible = true;
+          arm.position.copy(_armShoulder).add(_armHand).multiplyScalar(0.5);
+          arm.parent.worldToLocal(arm.position);
+          arm.scale.set(ARM_RADIUS, len, ARM_RADIUS);
+          arm.quaternion.setFromUnitVectors(_armUp, _armDir.divideScalar(len));
+        }
       }
     } else {
       // FOLLOW: hard-locked behind the heading — no lerp (smoothing made
       // pivots sweep a lagging arc and was the last source of shake).
+      // FRONT (2026-10-07, "I'd like to see the front of my character"): the
+      // same rig mirrored ahead of him, looking back — W still walks him
+      // toward the camera, which reads fine because the controls are tank
+      // controls (input never derives from the camera).
       const cs = camScaleRef.current; // scroll-wheel dolly
+      const side = camModeRef.current === "front" ? 1 : -1;
       camGoal.set(
-        worldPos.x - Math.sin(heading.current) * CAM_BACK * cs,
+        worldPos.x + side * Math.sin(heading.current) * CAM_BACK * cs,
         worldPos.y + CAM_UP * cs,
-        worldPos.z - Math.cos(heading.current) * CAM_BACK * cs);
+        worldPos.z + side * Math.cos(heading.current) * CAM_BACK * cs);
       camera.position.copy(camGoal);
       lookGoal.set(worldPos.x, worldPos.y + HEIGHT * 0.7, worldPos.z);
       // Soft lock-on: tilt up/over to keep the demon in frame with the cowboy.
@@ -1617,6 +1771,11 @@ export default function PlayerWalker({
           converted into this group's space); invisible between uses.
           Fire pulse + muzzle light, then the continuous aiming beam whose
           color reads out the rules (hot = a shot lands right now). */}
+      {/* First-person sleeve: camera corner → revolver grip, bodiless mode only. */}
+      <mesh ref={armRef} visible={false} frustumCulled={false}>
+        <cylinderGeometry args={[0.6, 1, 1, 10, 1]} />
+        <meshStandardMaterial color={ARM_COLOR} roughness={0.9} metalness={0} />
+      </mesh>
       <mesh ref={tracerRef} visible={false} frustumCulled={false}>
         <cylinderGeometry args={[1, 1, 1, 5, 1, true]} />
         <meshBasicMaterial
@@ -1692,7 +1851,13 @@ export default function PlayerWalker({
               <div style={{ fontSize: 9, opacity: 0.6, marginTop: 2 }}>cam: {camMode.toUpperCase()} (C) · ESC bail</div>
             </div>
           ) : (<>
-            <span style={{ opacity: 0.75 }}>W/S walk · A/D turn · Shift run · SPACE jump · cam: {camMode.toUpperCase()} (C) · </span>
+            <span style={{ opacity: 0.75 }}>W/S walk · A/D or drag to turn · Shift run · SPACE jump · </span>
+            <button
+              type="button" title={`Cycle camera: ${CAM_ORDER.join(" → ")} (C)`}
+              onClick={() => { const order = CAM_ORDER; const next = order[(order.indexOf(camModeRef.current) + 1) % order.length]; camModeRef.current = next; setCamMode(next); onCam?.(next); }}
+              style={{ pointerEvents: "auto", font: "inherit", color: "#ffd75e", background: "transparent", border: "1px solid rgba(255,215,94,0.4)", borderRadius: 3, padding: "0 5px", cursor: "pointer", marginRight: 4 }}
+            >cam: {camMode.toUpperCase()} (C)</button>
+            <span style={{ opacity: 0.75 }}>· </span>
             {nearDemon
               ? demonCd > 0
                 ? <span style={{ color: "#ff6f5f" }}>☠ DODGED — shaken for {demonCd}s</span>
@@ -1721,7 +1886,7 @@ export default function PlayerWalker({
               background: "rgba(232,224,200,0.12)", border: "1px solid rgba(232,224,200,0.4)",
               borderRadius: 3, padding: "1px 7px", cursor: "pointer",
             }}>
-            {talkingTo ? "⏏ WALK AWAY (ESC)" : riding ? "⏏ LET GO (ESC)" : "⏏ BACK TO SKY (ESC)"}
+            {talkingTo ? "⏏ WALK AWAY (ESC · or just walk)" : riding ? "⏏ LET GO (ESC)" : "⏏ BACK TO SKY (ESC)"}
           </button>
         </div>
       </Html>

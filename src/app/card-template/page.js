@@ -100,6 +100,7 @@ export default function CardTemplatePage() {
   const [active, setActive] = useState("eugene");
   const [artFocusY, setArtFocusY] = useState(28);
   const [artZoom, setArtZoom] = useState(1.25);
+  const [artDepth, setArtDepth] = useState(1);
   const [foilStyle, setFoilStyle] = useState("hero");
   const [view, setView] = useState("single");
   // null = follow the card's rarity; a frame id pins an override for preview.
@@ -107,6 +108,8 @@ export default function CardTemplatePage() {
   const [fxPicks, setFxPicks] = useState([]);
   const [fxBlend, setFxBlend] = useState(FX_BLEND_DEFAULT);
   const [fxOpacity, setFxOpacity] = useState(FX_OPACITY_DEFAULT);
+  const [fxDepth, setFxDepth] = useState(1);
+  const [fxShine, setFxShine] = useState(1);
 
   const toggleFx = (src) =>
     setFxPicks((picks) =>
@@ -118,6 +121,7 @@ export default function CardTemplatePage() {
     );
   const base = CARD_BY_ID[active] || NO_ART;
   const hasArt = Boolean(base.backgroundImage);
+  const hasArtLayers = Boolean(base.artLayers?.background && base.artLayers?.character);
 
   // toTemplateCard prints display labels ("Terminal Foil"), while the frame
   // map is keyed by card-data ids ("terminal-foil") — normalise before lookup.
@@ -133,6 +137,7 @@ export default function CardTemplatePage() {
     const focus = String(base.artFocus || "").match(/(\d+(?:\.\d+)?)%/);
     setArtFocusY(focus ? parseFloat(focus[1]) : 28);
     setArtZoom(base.artZoom || 1.2);
+    setArtDepth(base.artDepth ?? 1);
     if (base.foilStyle) setFoilStyle(base.foilStyle);
     // Same reason as foil: the FX picker opens on whatever the card has
     // wired in CARD_ART, so the preview matches the printed card and the
@@ -140,12 +145,15 @@ export default function CardTemplatePage() {
     setFxPicks(base.fxOverlays || []);
     setFxBlend(base.fxBlend || FX_BLEND_DEFAULT);
     setFxOpacity(base.fxOpacity ?? FX_OPACITY_DEFAULT);
+    setFxDepth(base.fxDepth ?? 1);
+    setFxShine(base.fxReflection?.strength ?? 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
   const card = {
     ...base,
     artFocus: hasArt ? `center ${artFocusY}%` : null,
     artZoom: hasArt ? artZoom : 1,
+    artDepth,
     foilStyle,
     frameImage:
       frameOverride === "none" ? null
@@ -160,6 +168,8 @@ export default function CardTemplatePage() {
     fxOverlays: fxPicks,
     fxBlend,
     fxOpacity,
+    fxDepth,
+    fxReflection: base.fxReflection ? { ...base.fxReflection, strength: fxShine } : null,
   };
 
   useEffect(() => {
@@ -477,6 +487,38 @@ export default function CardTemplatePage() {
                   />
                   <span>{Math.round(fxOpacity * 100)}%</span>
                 </label>
+                <label>
+                  FX depth
+                  <input
+                    type="range"
+                    min="0"
+                    max="1.5"
+                    step="0.05"
+                    value={fxDepth}
+                    aria-valuetext={fxDepth === 0 ? "Flat" : `${Math.round(fxDepth * 100)}%`}
+                    onChange={(e) => setFxDepth(parseFloat(e.target.value))}
+                    title="0 keeps FX flat; increase to float the burst above the card"
+                  />
+                  <span>{fxDepth === 0 ? "Flat" : `${Math.round(fxDepth * 100)}%`}</span>
+                </label>
+                {base.fxReflection && fxPicks.includes(base.fxReflection.src) && (
+                  <label>
+                    FX shine
+                    <input
+                      type="range"
+                      min="0"
+                      max="1.5"
+                      step="0.05"
+                      value={fxShine}
+                      aria-valuetext={fxShine === 0 ? "Off" : `${Math.round(fxShine * 100)}%`}
+                      onChange={(e) => setFxShine(parseFloat(e.target.value))}
+                      title={base.fxReflection.material === "fire"
+                        ? "Tilt the card to brighten the flames from ember-orange to hot gold"
+                        : "Tilt the card to shift the overlay color and catch bright flashes"}
+                    />
+                    <span>{fxShine === 0 ? "Off" : `${Math.round(fxShine * 100)}%`}</span>
+                  </label>
+                )}
                 <button className="ct-toggle" onClick={() => setFxPicks([])}>
                   Clear FX
                 </button>
@@ -514,6 +556,22 @@ export default function CardTemplatePage() {
               />
               <span>{artZoom.toFixed(2)}×</span>
             </label>
+            {hasArtLayers && (
+              <label>
+                Art depth
+                <input
+                  type="range"
+                  min="0"
+                  max="1.5"
+                  step="0.05"
+                  value={artDepth}
+                  aria-valuetext={artDepth === 0 ? "Flat" : `${Math.round(artDepth * 100)}%`}
+                  onChange={(e) => setArtDepth(parseFloat(e.target.value))}
+                  title="Separate the character's movement from the background"
+                />
+                <span>{artDepth === 0 ? "Flat" : `${Math.round(artDepth * 100)}%`}</span>
+              </label>
+            )}
           </div>
 
           <div className="ct-group">

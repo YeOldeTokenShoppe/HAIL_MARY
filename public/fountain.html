@@ -5959,16 +5959,40 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						links: { Sign_1: '/trade', Sign_2: '/hailmary', Sign_Extra: '/exlibris' }, // board mesh name -> route
 						linkMeshes: [],   // raycast targets (each mesh.userData.href)
 						hovered: null,
+						// Hover motion: the board under the mouse eases out toward the camera and
+						// lifts a touch, then settles back. World units (post is ~0.7 scale).
+						hoverPush: 0,     // toward the camera (0 = off; the wobble below is the main effect)
+						hoverLift: 0,     // straight up
+						hoverEase: 14,    // higher = snappier (exponential ease rate, 1/s)
+						// "Loose sign" wobble: each board is a damped spring that swings about its
+						// own nail (the axis through the board's centre, perpendicular to its face).
+						// Hover-enter kicks it so the side under the cursor dips, and it holds a small
+						// tilt while hovered, then springs back and settles when the mouse leaves.
+						wobbleKick: 0.5,        // angular impulse on hover-enter (rad/s)
+						wobbleTilt: 0.05,       // held tilt while hovered (rad)
+						wobbleStiffness: 10,    // spring k (higher = faster swing)
+						wobbleDamping: 10,       // velocity damping (lower = swings longer)
 						// Desktop hover: pointer cursor + a slight glow on the board under the mouse.
 						hover(ndc) {
-							let hit = null;
+							let rec = null, hit = null;
 							if (ndc && missionSign.linkMeshes.length) {
 								raycaster.setFromCamera(ndc, camera);
-								hit = raycaster.intersectObjects(missionSign.linkMeshes, false)[0]?.object || null;
+								rec = raycaster.intersectObjects(missionSign.linkMeshes, false)[0] || null;
+								hit = rec?.object || null;
 							}
 							if (hit === missionSign.hovered) return;
 							if (missionSign.hovered) missionSign.hovered.material.emissiveIntensity = 0;
-							if (hit) hit.material.emissiveIntensity = 0.18;
+							if (hit) {
+								hit.material.emissiveIntensity = 0.18;
+								// Which half of the board was touched? Board width runs along local X;
+								// a negative Y-rotation drops the +X side (local +Z is world down).
+								const w = hit.userData.wobble;
+								if (w) {
+									const lp = hit.worldToLocal(rec.point.clone());
+									w.dir = -(Math.sign(lp.x) || 1);
+									w.vel += missionSign.wobbleKick * w.dir;
+								}
+							}
 							missionSign.hovered = hit;
 							renderer.domElement.style.cursor = hit ? 'pointer' : '';
 						},
@@ -6001,6 +6025,39 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 							s.rotation.y = Math.atan2(e.x - s.position.x, e.z - s.position.z) + missionSign.yawBias;
 							s.scale.setScalar(missionSign.scale);
 						},
+						// Per frame: ease every board toward its rest pose, or toward its lifted
+						// pose while hovered. Targets are built in WORLD space (camera direction +
+						// up) then mapped into the board's parent so the post's yaw/scale don't matter.
+						_tmp: { a: new THREE.Vector3(), b: new THREE.Vector3(), c: new THREE.Vector3() },
+						update(dt) {
+							if (!missionSign.linkMeshes.length) return;
+							const k = 1 - Math.exp(-missionSign.hoverEase * dt);
+							const { a, b, c } = missionSign._tmp;
+							for (const m of missionSign.linkMeshes) {
+								const rest = m.userData.restPos;
+								if (!rest) continue;
+								if (m === missionSign.hovered) {
+									m.parent.updateWorldMatrix(true, false);
+									a.copy(rest); m.parent.localToWorld(a);             // rest, world
+									b.copy(camera.position).sub(a); b.y = 0; b.normalize(); // toward camera (flat)
+									c.copy(a).addScaledVector(b, missionSign.hoverPush);
+									c.y += missionSign.hoverLift;
+									m.parent.worldToLocal(c);                             // target, parent-local
+									m.position.lerp(c, k);
+								} else {
+									m.position.lerp(rest, k);
+								}
+								// Nail-axis spring (semi-implicit Euler; stable for the capped dt).
+								const w = m.userData.wobble;
+								if (w) {
+									const target = m === missionSign.hovered ? missionSign.wobbleTilt * w.dir : 0;
+									w.vel += (-missionSign.wobbleStiffness * (w.angle - target) - missionSign.wobbleDamping * w.vel) * dt;
+									w.angle += w.vel * dt;
+									m.quaternion.copy(m.userData.restQuat);
+									m.rotateY(w.angle);
+								}
+							}
+						},
 					};
 					const missionSignDraco = new DRACOLoader();
 					missionSignDraco.setDecoderPath('/draco/');
@@ -6016,6 +6073,17 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 							const href = missionSign.links[node.name.replace(/_\d+$/, '')] || missionSign.links[node.name];
 							if (!href) return;
 							node.userData.href = href;
+							// Every node in the export shares one pivot at the post's foot, so a
+							// rotation there would swing the board around the post. Move the pivot
+							// to the board's own centre: shift the geometry, compensate the node.
+							node.geometry = node.geometry.clone();
+							node.geometry.computeBoundingBox();
+							const c = node.geometry.boundingBox.getCenter(new THREE.Vector3());
+							node.geometry.translate(-c.x, -c.y, -c.z);
+							node.position.add(c.multiply(node.scale).applyQuaternion(node.quaternion));
+							node.userData.restPos = node.position.clone();    // hover motion returns here
+							node.userData.restQuat = node.quaternion.clone(); // wobble rotates from here
+							node.userData.wobble = { angle: 0, vel: 0, dir: 1 };
 							node.material = node.material.clone();
 							node.material.userData = {};
 							node.material.emissive = new THREE.Color(0xffffff);
@@ -9209,6 +9277,9 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 				// Advance the fountain GLB's looping NLA track (Combined_SitStand)
 				if (fountainMixer) fountainMixer.update(deltaTime);
+
+				// Sign-post boards ease out/back on hover.
+				window.__missionSign?.update(deltaTime);
 
 				// Frame-windowed mesh reveal: the DrinkingMouth eases OPEN, holds, then eases
 				// CLOSED across the monk's drink window (it scales on one axis instead of popping
