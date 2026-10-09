@@ -73,19 +73,19 @@ export const TONICS_SITEPAL_FILTER = {
 // tab); re-tune there and paste the logged values back here if his scene's
 // avatar ever changes.
 export const HOTDOGS_SITEPAL_CROP = {
-  cropX: 190,
-  cropY: 140,
+  cropX: 189,
+  cropY: 154,
   cropW: 161,
-  cropH: 222,
+  cropH: 192,
   rotateZ: 0,
   rotateX: 0,
 };
 export const HOTDOGS_SITEPAL_FILTER = {
-  saturate: 174,
-  contrast: 103,
-  brightness: 114,
-  hueRotate: 0,
-  sepia: 36,
+  saturate: 103,
+  contrast: 108,
+  brightness: 64,
+  hueRotate: 1,
+  sepia: 15,
 };
 
 // Promos hologram crop/filter — tuned via /hailmary?tune=vendor (PROMOS tab);
@@ -373,8 +373,8 @@ export const VENDOR_SITEPAL_CONFIG = {
     },
   },
   hotdogs: {
-    sceneId: 2775403,
-    voice: { voice: "KKjzrOiscwOprYdapRQa", lang: 1, engine: 14 },
+    sceneId: 2775653,
+    voice: { voice: "IsG9ecbFYcjNNW9PNXQSEL0fpzAMOVuX", lang: 1, engine: 14 },
     projFace: "Face2",
     regularFaces: ["Face1", "Face3"],
     crop: HOTDOGS_SITEPAL_CROP,

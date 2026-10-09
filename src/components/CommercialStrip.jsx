@@ -201,6 +201,13 @@ export const VENDOR_CATALOG = [
     // Standing cart vendor — same framing as the salesman.
     faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
     talkClip: "talking",
+    // The costume is skinned down the spine AND a third of it to the pelvis
+    // (weights tallied 2026-10-08), so a head turn swings his face behind the
+    // bun and a waist turn (tried: spine_01) visibly shears the bun at the
+    // hips. Pivot the whole suit at the pelvis instead — the feet turn with
+    // him, which reads better than the shear. Tighter yaw so hands and feet
+    // stay near the cart, and a slight lean in place of a head tilt.
+    trackBone: "Pelvis", trackYawLimit: 0.5, trackPitchScale: 0.2,
     sitepal: "hotdogs" },
   { id: "tattoos",   label: "",    awning: "#4a3b6b", accent: "#d6a4ff",
     // Two exported poses, one drawn per page load. Deliberately NO idleClip:
@@ -1162,14 +1169,26 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
     return () => { junk.forEach((o) => { o.visible = true; }); };
   }, [scene]);
 
-  // Locate the head bone once (Synty-style rigs name it "Head"/"head")
+  // Locate the head bone once (Synty-style rigs name it "Head"/"head").
+  // vendor.trackBone names a DIFFERENT bone to drive with the gaze (a spine
+  // bone for the hot dog costume) — the head still marks where he is looking
+  // FROM (framing, bubble, projection); only the rotation moves elsewhere.
+  const trackBoneRef = useRef(null);
   useEffect(() => {
     const want = (vendor.headBone || "head").toLowerCase();
-    let head = null;
-    scene.traverse((o) => { if (!head && o.isBone && o.name.toLowerCase() === want) head = o; });
+    const wantTrack = vendor.trackBone ? vendor.trackBone.toLowerCase() : null;
+    let head = null, track = null;
+    scene.traverse((o) => {
+      if (!o.isBone) return;
+      const n = o.name.toLowerCase();
+      if (!head && n === want) head = o;
+      if (wantTrack && !track && n === wantTrack) track = o;
+    });
     if (headRef) headRef.current = head;
-    return () => { if (headRef) headRef.current = null; };
-  }, [scene, vendor.headBone, headRef]);
+    trackBoneRef.current = track;
+    if (wantTrack && !track) console.warn(`[VendorModel] ${vendor.id}: trackBone "${vendor.trackBone}" not found — tracking the head`);
+    return () => { if (headRef) headRef.current = null; trackBoneRef.current = null; };
+  }, [scene, vendor.id, vendor.headBone, vendor.trackBone, headRef]);
 
   // Glow mesh (e.g. the crystal ball): clone its material(s) before setting
   // emissive — Synty props share one atlas material, so mutating in place
@@ -1445,12 +1464,13 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
       targetPitch = THREE.MathUtils.clamp(
         Math.atan2(_toCam.y, flat) + (vendor.gazeLift ?? 0) + (engaged ? (vendor.focusGazeLift ?? 0) : 0),
         -HEAD_PITCH_DOWN, vendor.headPitchUp ?? HEAD_PITCH_UP
-      );
+      ) * (vendor.trackPitchScale ?? 1); // a torso-driven vendor leans, it doesn't nod
       // gazeTurn (rad) corrects a sideways rest-pose bias — positive shifts
       // the gaze toward the viewer's right.
       let dYaw = Math.atan2(_toCam.x, _toCam.z) - Math.atan2(_face.x, _face.z) + (vendor.gazeTurn ?? 0);
       dYaw = Math.atan2(Math.sin(dYaw), Math.cos(dYaw));
-      targetYaw = THREE.MathUtils.clamp(dYaw, -HEAD_YAW_LIMIT, HEAD_YAW_LIMIT);
+      const yawLim = vendor.trackYawLimit ?? HEAD_YAW_LIMIT;
+      targetYaw = THREE.MathUtils.clamp(dYaw, -yawLim, yawLim);
       // focusHeadRoll cocks the head about the GAZE axis (head -> camera), so
       // the tilt reads as exactly this angle on screen no matter how far she
       // had to turn or lift to meet you. Rolling about the rest-pose forward
@@ -1466,13 +1486,14 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
       // first frames after a loop wrap). If the bone still holds the value WE
       // wrote last frame, restore the clean animated pose first — otherwise
       // the delta compounds on its own output (the recurring head-snap bug).
+      const bone = trackBoneRef.current || head; // what actually turns
       if (!t.lastOut) { t.lastOut = new THREE.Quaternion(); t.lastClean = new THREE.Quaternion(); t.hasLast = false; }
-      if (t.hasLast && head.quaternion.equals(t.lastOut)) {
-        head.quaternion.copy(t.lastClean);
+      if (t.hasLast && bone.quaternion.equals(t.lastOut)) {
+        bone.quaternion.copy(t.lastClean);
       }
-      t.lastClean.copy(head.quaternion);
-      head.parent.getWorldQuaternion(_parentQ);
-      _worldQ.copy(_parentQ).multiply(head.quaternion);
+      t.lastClean.copy(bone.quaternion);
+      bone.parent.getWorldQuaternion(_parentQ);
+      _worldQ.copy(_parentQ).multiply(bone.quaternion);
       _yawQ.setFromAxisAngle(_UP, t.yaw);
       faceDirWorld(vendor, _face, stripRotY);
       _right.crossVectors(_UP, _face).normalize();
@@ -1487,8 +1508,8 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
         _deltaQ.premultiply(_rollQ);
       }
       _worldQ.premultiply(_deltaQ);
-      head.quaternion.copy(_parentQ.invert().multiply(_worldQ));
-      t.lastOut.copy(head.quaternion);
+      bone.quaternion.copy(_parentQ.invert().multiply(_worldQ));
+      t.lastOut.copy(bone.quaternion);
       t.hasLast = true;
     }
   });
