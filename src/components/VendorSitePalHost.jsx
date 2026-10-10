@@ -104,6 +104,29 @@ function loadVendorSitePalScriptOnce(account) {
           }
         }, 500);
       }
+      // Scene descriptors bypass SitePal's CDN cache. The player fetches
+      // `vhss-d.oddcast.com/php/playScene/acc=…/ss=<scene>/…?json=1` by XHR,
+      // and KeyCDN serves that URL with max-age 7 days — so a scene EDITED in
+      // the SitePal editor keeps playing as its old self for up to a week.
+      // Found 2026-10-09: the hot dog scene (2775664) was rebuilt 2D→3D six
+      // times and the player kept receiving the cached 2D descriptor, loading
+      // the 2D engine into the 3D host and throwing
+      // "vh_mc.idleLoadedCallback is not a function" (host wedged, every tab
+      // then shows the fortune teller). A per-page cache-buster on just that
+      // route makes edits visible on the next reload; the JSON is ~1.6 KB.
+      if (!window.__vendorSitePalXhrPatched) {
+        window.__vendorSitePalXhrPatched = true;
+        const origOpen = XMLHttpRequest.prototype.open;
+        const bust = "cb=" + Date.now();
+        XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+          try {
+            if (typeof url === "string" && /oddcast\.com\/php\/playScene\//.test(url)) {
+              url += (url.includes("?") ? "&" : "?") + bust;
+            }
+          } catch (e) {}
+          return origOpen.call(this, method, url, ...rest);
+        };
+      }
       const script = document.createElement("script");
       script.src = `//vhss-d.oddcast.com/vhost_embed_functions_v4.php?acc=${account}&js=0`;
       script.type = "text/javascript";

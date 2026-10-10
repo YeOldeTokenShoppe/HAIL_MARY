@@ -31,10 +31,10 @@ export const VENDOR_SITEPAL_EMBED_PARAMS =
 // Mutable export, read every frame — tune live from the console via
 // window.__vendorSitePalCrop then paste the values back here.
 export const FORTUNES_SITEPAL_CROP = {
-  cropX: 194,
-  cropY: 106,
-  cropW: 187,
-  cropH: 216,
+  cropX: 195,
+  cropY: 124,
+  cropW: 180,
+  cropH: 202,
   rotateZ: 0,
   rotateX: 0,
 };
@@ -54,17 +54,17 @@ export const FORTUNES_SITEPAL_FILTER = {
 // re-tune there and paste the logged values back here if his scene's avatar
 // ever changes.
 export const TONICS_SITEPAL_CROP = {
-  cropX: 206,
-  cropY: 138,
-  cropW: 154,
-  cropH: 232,
+  cropX: 195,
+  cropY: 136,
+  cropW: 183,
+  cropH: 230,
   rotateZ: 2,
   rotateX: 0,
 };
 export const TONICS_SITEPAL_FILTER = {
-  saturate: 117,
-  contrast: 103,
-  brightness: 147,
+  saturate: 57,
+  contrast: 104,
+  brightness: 60,
   hueRotate: 7,
   sepia: 22,
 };
@@ -73,17 +73,17 @@ export const TONICS_SITEPAL_FILTER = {
 // tab); re-tune there and paste the logged values back here if his scene's
 // avatar ever changes.
 export const HOTDOGS_SITEPAL_CROP = {
-  cropX: 189,
-  cropY: 154,
-  cropW: 161,
-  cropH: 192,
+  cropX: 169,
+  cropY: 128,
+  cropW: 205,
+  cropH: 230,
   rotateZ: 0,
   rotateX: 0,
 };
 export const HOTDOGS_SITEPAL_FILTER = {
-  saturate: 103,
-  contrast: 108,
-  brightness: 64,
+  saturate: 117,
+  contrast: 113,
+  brightness: 46,
   hueRotate: 1,
   sepia: 15,
 };
@@ -96,18 +96,18 @@ export const HOTDOGS_SITEPAL_FILTER = {
 // backlit.
 
 export const PROMOS_SITEPAL_CROP = {
-  cropX: 202,
-  cropY: 124,
-  cropW: 151,
-  cropH: 154,
-  rotateZ: 4,
+  cropX: 201,
+  cropY: 131,
+  cropW: 176,
+  cropH: 180,
+  rotateZ: -1,
   rotateX: 0,
 };
 export const PROMOS_SITEPAL_FILTER = {
-  saturate: 110,
-  contrast: 103,
-  brightness: 115,
-  hueRotate: 0,
+  saturate: 78,
+  contrast: 171,
+  brightness: 106,
+  hueRotate: 10,
   sepia: 0,
 };
 
@@ -117,18 +117,18 @@ export const PROMOS_SITEPAL_FILTER = {
 // avatar's skin runs a different hue from the goblin mesh it projects onto, and
 // that shift is what reconciles the two. Don't "clean it up" to 0.
 export const RUGS_SITEPAL_CROP = {
-cropX: 190,
-  cropY: 163,
+cropX: 192,
+  cropY: 151,
   cropW: 171,
-  cropH: 212,
-  rotateZ: 0,
+  cropH: 220,
+  rotateZ: -2,
   rotateX: 0,
 };
 export const RUGS_SITEPAL_FILTER = {
  saturate: 210,
-  contrast: 87,
-  brightness: 183,
-  hueRotate: 27,
+  contrast: 89,
+  brightness: 66,
+  hueRotate: -37,
   sepia: 19,
 };
 
@@ -239,8 +239,8 @@ export const TATTOOS_SEATED_SITEPAL_CROP = {
 };
 export const TATTOOS_SEATED_SITEPAL_FILTER = {
   saturate: 92,
-  contrast: 103,
-  brightness: 133,
+  contrast: 111,
+  brightness: 48,
   hueRotate: 0,
   sepia: 27,
 };
@@ -373,8 +373,8 @@ export const VENDOR_SITEPAL_CONFIG = {
     },
   },
   hotdogs: {
-    sceneId: 2775653,
-    voice: { voice: "IsG9ecbFYcjNNW9PNXQSEL0fpzAMOVuX", lang: 1, engine: 14 },
+    sceneId: 2775664,
+    voice: { voice: "KKjzrOiscwOprYdapRQa", lang: 1, engine: 14 },
     projFace: "Face2",
     regularFaces: ["Face1", "Face3"],
     crop: HOTDOGS_SITEPAL_CROP,
@@ -562,7 +562,7 @@ export const VENDOR_SITEPAL_CONFIG = {
   // every line that names it has to be written phonetically. Keep it that way
   // in any line added here.
   promos: {
-    sceneId: 2775409,
+    sceneId: 2775585,
     voice: { voice: "wRBnwLc9kmVUe7Iim1Qo", lang: 1, engine: 14 },
     projFace: "Face2",
     // Face1/Face3 are her painted face layers, but Eye_L and Eye_R are NOT —

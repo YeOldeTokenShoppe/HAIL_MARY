@@ -195,7 +195,7 @@ export const VENDOR_CATALOG = [
     prop: "SM_Prop_Tent_02 (24)" },
   { id: "hotdogs",   label: "",  awning: "#a33b2a", accent: "#ffd24d",
     model: "/models/Vendor_HotDog_Character.glb", idleClip: "idle",
-    offset: [-0.5, 0, 5.0],
+    offset: [-0.5, 0, 0.0],
     // CommercialStrip2 replaced SM_Prop_HotdogStand_01 with the full cart.
     prop: "SM_Veh_Hotdog_Cart_01",
     // Standing cart vendor — same framing as the salesman.
