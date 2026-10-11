@@ -8,6 +8,17 @@ and the asset split are at the bottom.
 
 ### Built so far (step 1; asset source updated 2026-09-05)
 
+> **Update 2026-10-10 — the tent is in the strip now.** Since `Commercial_Strip8`
+> the tent, stage, chairs and the seated robot + biker are authored in
+> `boardwalk2.blend` (root `Tent_Empty`, strip-local z ≈ −0.85..7.56) and ship in
+> the strip GLB; the chapel catalog entry lost `stallModel`/`hideWindow`, its
+> `prop` resolves on the strip scene, the robot's visor boost is applied there,
+> and `scripts/stall-windows.json` carries a `chapel` window for the stop. Build
+> with `node scripts/build-strip.mjs` (docs/strip-export.md). The preacher is
+> still his own GLB. `Tent_Revival.glb` + `split-tent-revival.mjs` below are
+> history, except that the PHONE card still loads the old `stall_chapel.glb`
+> until the chapel is re-cut from a Strip8 build with `extract-stalls.mjs`.
+
 **Source of truth is now Michelle's `public/models/Tent_Revival.glb`** — the
 whole revival (church stage, big tent + four wall panels, three chairs, cross
 podium, candle rack) and the preacher (`SK_Chr_Priest_Male_01`, one `preaching`

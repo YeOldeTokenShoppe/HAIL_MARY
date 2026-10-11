@@ -73,9 +73,9 @@ export const TONICS_SITEPAL_FILTER = {
 // tab); re-tune there and paste the logged values back here if his scene's
 // avatar ever changes.
 export const HOTDOGS_SITEPAL_CROP = {
-  cropX: 169,
+  cropX: 175,
   cropY: 128,
-  cropW: 205,
+  cropW: 204,
   cropH: 230,
   rotateZ: 0,
   rotateX: 0,
@@ -98,7 +98,7 @@ export const HOTDOGS_SITEPAL_FILTER = {
 export const PROMOS_SITEPAL_CROP = {
   cropX: 201,
   cropY: 131,
-  cropW: 176,
+  cropW: 178,
   cropH: 180,
   rotateZ: -1,
   rotateX: 0,
@@ -126,8 +126,8 @@ cropX: 192,
 };
 export const RUGS_SITEPAL_FILTER = {
  saturate: 210,
-  contrast: 89,
-  brightness: 66,
+  contrast: 100,
+  brightness: 65,
   hueRotate: -37,
   sepia: 19,
 };
@@ -412,7 +412,7 @@ export const VENDOR_SITEPAL_CONFIG = {
   // stillness reads wrong while she is mid-line.
   tattoos: {
     sceneId: 2775451,
-    voice: { voice: "adPLpvbQrUYGySEBoFJu", lang: 1, engine: 14 },
+    voice: { voice: "71LruoBA66E5nxeMdmOb", lang: 1, engine: 14 },
     projFace: "Face2",
     regularFaces: ["Face1", "Face3"],
     // Default / fallback pair. Each pose overrides these in poseOverrides.

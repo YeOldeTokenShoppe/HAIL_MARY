@@ -9051,7 +9051,7 @@ export default function OilPage() {
         <div style={m.tabBar}>
           {[
             { key: "3d", label: "RIG" },
-            { key: "boardwalk", label: "MIDWAY" },
+            { key: "boardwalk", label: "BOARDWALK" },
             { key: "survey", label: "SURVEY" },
           ].map((tab) => (
             <button

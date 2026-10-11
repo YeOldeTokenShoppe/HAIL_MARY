@@ -5,8 +5,23 @@ files — the KTX2 build is what the site actually loads, the webp build is the
 `?strip=webp` fallback. Four steps:
 **export → optimize (webp) → encode (KTX2) → bump the tag**.
 
+## 0. The short way (does steps 2 + 3, 2026-10-10)
+
+```bash
+cd ~/HAIL_MARY
+node scripts/build-strip.mjs public/models/Commercial_Strip8.glb   # → _opt.glb + _opt_ktx2.glb
+node scripts/test-claw-machine.mjs                                 # STRIP=Commercial_Strip9 … for a build not yet wired in
+```
+
+It runs the exact commands below, verifies both builds (named nodes, 14 bulbs,
+Basis on every texture, a `Claw_Demo` clip) and only then copies them into
+`public/models`. Step 4 (the version bump) is still by hand. It also repairs
+an export saved in Blender's **"Scene"** animation mode — see the gotcha
+under step 1 — but a Scene-mode export still loses whatever that mode did not
+bake, so fix the setting rather than lean on the repair.
+
 > **Skipping step 3 is the classic failure.** The site loads
-> `Commercial_Strip7_opt_ktx2.glb`. Rebuild only the webp file and the strip
+> `Commercial_Strip8_opt_ktx2.glb`. Rebuild only the webp file and the strip
 > silently stays on the previous export — and it will look CORRECT locally
 > (the dev server revalidates every request) while production serves the stale
 > CDN copy. That is exactly what happened on 2026-09-02.
@@ -16,7 +31,7 @@ files — the KTX2 build is what the site actually loads, the webp build is the
 ## 1. Export the base GLB from Blender
 
 `File ▸ Export ▸ glTF 2.0 (.glb/.gltf)`, save as
-`~/HAIL_MARY/public/models/Commercial_Strip7_Lossless.glb` (overwrite the base).
+`~/HAIL_MARY/public/models/Commercial_Strip8_Lossless.glb` (overwrite the base).
 
 Settings that matter (the rest can stay default):
 
@@ -44,7 +59,18 @@ The base will be **~11–15 MB uncompressed** — that's expected; step 2 shrink
   choose **NLA Tracks**, and keep its shared track named `Claw_Demo`. Export
   morph/shape-key animation too: `Claw_Piston_02` uses `Shaft extension`.
   Keep `Toy_Claw_Empty`, the named moving parts, and the two prize nodes.
-  Vendor **characters** still use their separate GLBs.
+  Vendor **characters** still use their separate GLBs (the preacher included;
+  the chapel's seated robot and biker ride in the strip since Strip8).
+- **Animation ▸ Animation Mode must be "NLA Tracks", not "Scene".**
+  Commercial_Strip8 (2026-10-10) went out in Scene mode: every object was
+  baked into ONE clip called `Animation` (1665 channels, 507 targets, 35
+  actually moving). The claw controller finds no `Claw_Demo`, the strip's
+  autoplay would pin the prize wheel and wagon doors to constant tracks, and
+  the gachapon's three sacred-geometry spinners (`Animation`, `Animation.001`,
+  `Take 001` in Strip7) were not baked at all. `scripts/build-strip.mjs` splits such a file back into
+  `Claw_Demo` + `Robot_Sit` / `Biker_Sit`, but it cannot invent the clips
+  Scene mode left out. Check with: `node -e` over the GLB's `animations[]`
+  names — you want `Claw_Demo` listed, not a lone `Animation`.
 - After rebuilding both encodings, run `node scripts/test-claw-machine.mjs`.
   This checks the actual exported pickup, delivery, door motion, and reset.
   See [Claw machine controls](claw-machine.md) for the browser integration.
@@ -53,15 +79,15 @@ The base will be **~11–15 MB uncompressed** — that's expected; step 2 shrink
 
 ## 2. Optimize (produces the runtime file)
 
-One command. It preserves every named node — critical: the spotlight rig,
+(`scripts/build-strip.mjs` runs this and step 3 for you.) One command. It preserves every named node — critical: the spotlight rig,
 walker collision, bull saddle, curtain, and vendor anchors are all found **by
 name**, and a plain `optimize` (or instancing) would collapse them.
 
 ```bash
 cd ~/HAIL_MARY
 npx --yes @gltf-transform/cli optimize \
-  public/models/Commercial_Strip7_Lossless.glb \
-  public/models/Commercial_Strip7_opt.glb \
+  public/models/Commercial_Strip8_Lossless.glb \
+  public/models/Commercial_Strip8_opt.glb \
   --instance false --simplify false --flatten false --join false \
   --palette false --prune-solid-textures false --prune-attributes false \
   --texture-compress webp --texture-size 2048
@@ -76,7 +102,7 @@ Never use the bare `optimize` without these flags.
 ```bash
 node -e '
 const fs=require("fs");
-const b=fs.readFileSync("public/models/Commercial_Strip7_opt.glb");
+const b=fs.readFileSync("public/models/Commercial_Strip8_opt.glb");
 const g=JSON.parse(b.slice(20,20+b.readUInt32LE(12)).toString());
 const n=g.nodes.map(x=>x.name);
 const crit=["Boardwalk","Steps","Step1","SM_Prop_Mechanical_Bull_01_Saddle_01","Photo_booth_Curtain","FortuneTeller_Wagon_Empty","Bull_Tent"];
@@ -101,7 +127,7 @@ Staged passes are needed because the `ktx` encoder cannot read webp and
 
 ```bash
 cd ~/HAIL_MARY; S=/tmp/strip; mkdir -p $S
-npx --yes @gltf-transform/cli optimize public/models/Commercial_Strip7_Lossless.glb $S/a.glb \
+npx --yes @gltf-transform/cli optimize public/models/Commercial_Strip8_Lossless.glb $S/a.glb \
   --instance false --simplify false --flatten false --join false \
   --palette false --prune-solid-textures false --prune-attributes false \
   --compress false --texture-compress false --texture-size 2048
@@ -110,7 +136,7 @@ npx --yes @gltf-transform/cli resize $S/b.glb $S/c.glb --pattern "BOARDWALK_ATLA
 PATH="$HOME/.local/ktx/bin:$PATH" DYLD_LIBRARY_PATH="$HOME/.local/ktx/lib" \
   npx --yes @gltf-transform/cli etc1s $S/c.glb $S/d.glb
 npx --yes @gltf-transform/cli webp    $S/d.glb $S/e.glb      # anything ktx skipped
-npx --yes @gltf-transform/cli meshopt $S/e.glb public/models/Commercial_Strip7_opt_ktx2.glb
+npx --yes @gltf-transform/cli meshopt $S/e.glb public/models/Commercial_Strip8_opt_ktx2.glb
 ```
 
 The `ktx` encoder (v4.4.2) lives in `~/.local/ktx/bin` and is NOT on `PATH` —
@@ -124,8 +150,8 @@ fails silently.
 node -e '
 const fs=require("fs");
 const rd=p=>{const b=fs.readFileSync(p);return JSON.parse(b.slice(20,20+b.readUInt32LE(12)).toString());};
-const a=rd("public/models/Commercial_Strip7_opt.glb");
-const k=rd("public/models/Commercial_Strip7_opt_ktx2.glb");
+const a=rd("public/models/Commercial_Strip8_opt.glb");
+const k=rd("public/models/Commercial_Strip8_opt_ktx2.glb");
 const nm=g=>g.nodes.map(x=>x.name||"").sort().join("|");
 console.log("nodes  webp/ktx2:", a.nodes.length, k.nodes.length);
 console.log("meshes webp/ktx2:", a.meshes.length, k.meshes.length);
@@ -171,7 +197,7 @@ Then hard-reload the page (the version bump also handles this for other users).
   back in Blender for walking room is the better fix; `STRIP_EXTEND = 1.4` in
   `PlayerWalker.jsx` can stay (it just allows a bit more outer walking range,
   harmless) or drop back to `1.0` if the deck is narrower again.
-- **KTX2 ships (since 2026-09-02):** `Commercial_Strip7_opt_ktx2.glb` is the
+- **KTX2 ships (since 2026-09-02):** `Commercial_Strip8_opt_ktx2.glb` is the
   default `STRIP_MODEL`; the webp build stays on disk as the `?strip=webp`
   fallback. Building it is **step 3** — it used to live down here as a note,
   which is precisely how it got skipped on a re-export. There is deliberately

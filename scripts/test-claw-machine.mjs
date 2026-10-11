@@ -1,4 +1,5 @@
-// Run: node scripts/test-claw-machine.mjs
+// Run: node scripts/test-claw-machine.mjs            (checks the strip CommercialStrip.jsx loads)
+//      STRIP=Commercial_Strip9 node scripts/test-claw-machine.mjs   (a build not yet wired in)
 // Decode the actual runtime GLBs without textures for deterministic gameplay checks.
 import draco3d from 'draco3d';
 import { BufferGeometry, BufferAttribute } from 'three';
@@ -53,7 +54,8 @@ import { createClawMachine, boundsInMachine } from '../src/lib/clawMachine.mjs';
 import * as T from 'three';
 const near=(a,b,epsilon=1e-5)=>assert.ok(Math.abs(a-b)<epsilon,`${a} != ${b}`);
 function run(c, seconds=6) { for(let i=0;i<seconds*60;i++) c.update(1/60); }
-for(const filename of ['Commercial_Strip7_opt_ktx2.glb','Commercial_Strip7_opt.glb']) {
+const STRIP=process.env.STRIP||'Commercial_Strip8';
+for(const filename of [`${STRIP}_opt_ktx2.glb`,`${STRIP}_opt.glb`]) {
  const {scene,animations}=await loadGLB(new URL(`../public/models/${filename}`, import.meta.url));
  const placement=new T.Group(); placement.position.set(8,3,-4); placement.rotation.y=.73; placement.scale.setScalar(.137); placement.add(scene); placement.updateMatrixWorld(true);
  const outside=[];scene.traverse(o=>{if(!o.name.startsWith('Claw'))outside.push([o,o.position.clone(),o.quaternion.clone(),o.scale.clone()]);});
@@ -96,8 +98,8 @@ for(const filename of ['Commercial_Strip7_opt_ktx2.glb','Commercial_Strip7_opt.g
 }
 
 import { bindClawPointerControls } from '../src/lib/clawPointerControls.mjs';
-const {scene,animations}=await loadGLB(new URL('../public/models/Commercial_Strip7_opt_ktx2.glb', import.meta.url));
-const c=createClawMachine(scene,animations[0]);c.manual();
+const {scene,animations}=await loadGLB(new URL(`../public/models/${STRIP}_opt_ktx2.glb`, import.meta.url));
+const c=createClawMachine(scene,animations.find(a=>a.name==='Claw_Demo'));c.manual();
 const camera=new T.PerspectiveCamera(45,1280/720,.01,100);camera.position.copy(c.root.localToWorld(new T.Vector3(.18,1.4,3.8)));camera.lookAt(c.root.localToWorld(new T.Vector3(0,1.15,0)));camera.updateMatrixWorld(true);
 class Events{map=new Map();addEventListener(n,f){if(!this.map.has(n))this.map.set(n,new Set());this.map.get(n).add(f)} removeEventListener(n,f){this.map.get(n)?.delete(f)} send(n,e){for(const f of this.map.get(n)||[])f(e)}}
 const hub=new Events(), canvas=new Events();canvas.style={};canvas.getBoundingClientRect=()=>({left:0,top:0,width:1280,height:720});let capture=null;canvas.setPointerCapture=id=>capture=id;canvas.hasPointerCapture=id=>id===capture;canvas.releasePointerCapture=()=>capture=null;

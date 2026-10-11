@@ -52,6 +52,11 @@ const STALLS = {
   // the prune with it.
   claw:      { anchor: "Toy_Claw_Empty",                 z: [-4.6, -2.8] },
   gachapon:  { anchor: "Gachapon",                       z: [-2.4, -1.3] },
+  // Commercial_Strip8 (2026-10-10): the tent revival moved INTO the strip under
+  // Tent_Empty (tent, stage, chairs, seated robot + biker; the preacher stays a
+  // vendor GLB). Cutting it needs SRC on the Strip8 build — the file above has
+  // no tent. Until then VendorStage keeps the old stall_chapel.glb.
+  chapel:    { anchor: "SM_Bld_Tent_01",                 z: [-0.8, 7.5] },
   hotdogs:   { anchor: "SM_Veh_Hotdog_Cart_01",          z: [7.6, 12.6] },
   rugs:      { anchor: "SM_Prop_Market_Stall_05",        z: [12.9, 18.6] },
   tonics:    { anchor: "SM_Veh_Wagon_Shop_01",           z: [18.9, 26.2] },

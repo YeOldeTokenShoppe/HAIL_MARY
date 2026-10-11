@@ -18,15 +18,16 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { MeshPortalMaterial, RoundedBox, Text, useTexture, useGLTF, useAnimations } from "@react-three/drei";
-import { VendorModel, VENDOR_CATALOG, pinVendorPoseModel, getChosenPoseModel, applyStallEmissiveBoost } from "@/components/CommercialStrip";
+import { VendorModel, CompanionModel, VENDOR_CATALOG, pinVendorPoseModel, getChosenPoseModel, applyStallEmissiveBoost } from "@/components/CommercialStrip";
 import { activateVendorSitePal, deactivateVendorSitePal, warmVendorSitePal, onVendorTalk } from "@/lib/vendorSitePal";
 import { goodsForVendor } from "@/lib/oilVendor";
 import ClawMachineController from "@/components/ClawMachineController";
 import GachaponController from "@/components/GachaponController";
+import PrizeWheelController from "@/components/PrizeWheelController";
 
 export const BOARDWALK_NAMES = {
   tonics: "REMEDIES", fortunes: "FORTUNES", hotdogs: "HOT DOGS", tacos: "TACOS", promos: "PROMOS",
-  rugs: "RUGS", tattoos: "TATTOOS", carny: "CARNY", souvenirs: "SOUVENIRS", chapel: "CHAPEL",
+  rugs: "TRADER BROS", tattoos: "TATTOOS", carny: "CARNY", souvenirs: "SOUVENIRS", chapel: "CHAPEL",
   claw: "PRIZE CLAW", gachapon: "GACHAPON",
 };
 // The two MACHINES on the deck (2026-10-05). They are not vendors — no
@@ -40,14 +41,19 @@ export const GAME_STALLS = [
   { id: "gachapon", game: "gachapon", root: "Gachapon", fitH: 0.5, accent: "#5fe9ff" },
 ];
 const stageEntry = (id) => VENDOR_CATALOG.find((v) => v.id === id) || GAME_STALLS.find((g) => g.id === id) || VENDOR_CATALOG[0];
-// Row order on the phone: the salesman first (he sells the holy water). The
-// souvenir tent is off the row: its prop is not in the current strip export.
-// tacos retired 2026-09-04 — the chapel took its stretch of deck (docs/midway-chapel.md)
-// the machines sit by the fortune teller here as they do on the deck (2026-10-05)
-export const BOARDWALK_ORDER = ["tonics", "fortunes", "claw", "gachapon", "hotdogs", "chapel", "promos", "rugs", "tattoos", "carny"];
+// Row order on the phone (2026-10-10): the deck walked from the rides end —
+// carny, the prize wheel, the fortune teller, the two machines, the revival
+// tent, the hot dog cart, Trader Bros (the rug seller's card table), the
+// salesman, the tattoo tent. The souvenir tent is off the row (its prop is not
+// in the strip export). The photo booth has no phone card yet (no stall cut, no
+// postcard) — it is the desktop rig only.
+export const BOARDWALK_ORDER = ["carny", "promos", "fortunes", "claw", "gachapon", "chapel", "hotdogs", "rugs", "tonics", "tattoos"];
 export const postcardUrl = (id) => `/boardwalk/${id}.webp`;
 export const plateUrl = (id) => `/boardwalk/${id}-plate.webp`;
-// a vendor with its own `stallModel` (the chapel) loads that exact, versioned URL
+// a vendor with its own `stallModel` loads that exact, versioned URL (none today:
+// the chapel's tent moved into the strip GLB in Commercial_Strip8, 2026-10-10, so
+// its phone card falls through to the old stall_chapel.glb until it is re-cut
+// with scripts/extract-stalls.mjs from a Strip8 build)
 // STALL_V busts the cache for a stall re-cut from a newer strip export (same
 // file name, different contents — a phone would keep the old one for a year).
 const STALL_V = { carny: 4, claw: 4, gachapon: 4 };
@@ -120,7 +126,12 @@ const STAGE_TUNE = {
   // hideOnBack: her rear door is a hand's width behind her back, so no camera
   // fits between them; the flipped card hides that one door and looks in
   // through the open doorway — her back, the table, the ball, the customer's stools.
-  fortunes: { restYaw: 0, openYaw: 0, restShift: [0.02, -0.03, -0.04], restScale: 1.55, noSlide: true, keepPropsOnBack: true, hideOnBack: ["SM_Veh_Wagon_01_Door_02"], backShiftZ: 0.5, backShiftY: 0.14 },
+  // followCamera: the rest shot was composed with the card camera standing IN
+  // her doorway (1.45 out, exactly where the steps meet the wagon). On a narrow
+  // phone cardFitDistance backs the camera off to fit the card (≈2.0 at 390 px)
+  // and it ends up outside, staring at the partition — a brown card (2026-10-10).
+  // The stall comes forward by the same amount, so the camera stays in the doorway.
+  fortunes: { restYaw: 0, openYaw: 0, restShift: [0.02, -0.03, -0.04], restScale: 1.55, noSlide: true, keepPropsOnBack: true, hideOnBack: ["SM_Veh_Wagon_01_Door_02"], backShiftZ: 0.5, backShiftY: 0.14, followCamera: true },
   // The tattoo tent is 1.45 × 1.28 at the plain fit against a 0.56 × 0.78
   // window, so only fragments showed (and seated, she is INSIDE it, its front
   // between her and the camera). At rest the whole stall scales to 0.6 about
@@ -136,10 +147,14 @@ const STAGE_TUNE = {
   // stall (chair, folding tables, card decks, boxes, laptops, the sign) — he's
   // seen from behind with the merch laid out in front of him
   rugs: { keepPropsOnBack: true, backShiftY: 0.04 },   // a hair higher; more would pull the awning into the frame
-  // the chapel (Tent_Revival.glb): the flipped card drops the big tent and its
+  // the chapel (the old stall_chapel.glb cut): the flipped card drops the big tent and its
   // four wall panels (all SM_Bld_Tent_01*) and looks over the preacher's
   // shoulder at the podium, the chairs and the candle rack
-  chapel: { keepPropsOnBack: true, hideOnBack: ["SM_Bld_Tent_01"], backShiftZ: 0.12, backShiftY: 0.02 },
+  // restYaw: straight on, the tent's centre pole (part of the one tent mesh, so it
+  // cannot be hidden alone) stands 1.5 m in front of the preacher and cut him in
+  // half on the card (2026-10-10). A 22° turn swings it off him and opens the
+  // podium side; stepped in, the default facing takes over for the face shot.
+  chapel: { restYaw: Math.PI / 2 - 0.384, keepPropsOnBack: true, hideOnBack: ["SM_Bld_Tent_01"], backShiftZ: 0.12, backShiftY: 0.02 },
 };
 // Tuning overrides (dev): ?stallfront=<z> and ?stallyaw=<deg> — the front limit and an absolute stall yaw.
 const TUNE = (() => { if (typeof window === "undefined") return {}; const q = new URLSearchParams(window.location.search); const f = parseFloat(q.get("stallfront")), y = parseFloat(q.get("stallyaw")), bz = parseFloat(q.get("stallback")), by = parseFloat(q.get("stallbacky")), bp = parseFloat(q.get("stallpitch")); return { front: Number.isFinite(f) ? f : null, yaw: Number.isFinite(y) ? (y * Math.PI) / 180 : null, back: Number.isFinite(bz) ? bz : null, backY: Number.isFinite(by) ? by : null, backPitch: Number.isFinite(bp) ? (bp * Math.PI) / 180 : null }; })();
@@ -157,6 +172,7 @@ const VENDOR_LOCAL_FACE_YAW = -Math.PI / 2; // the strip's default facing (Comme
 // (Michelle, 2026-10-06, small iPhone). Never closer than the tuned distance,
 // so wide canvases are unchanged.
 const CARD_FIT_MARGIN = 1.1;
+const STAGE_TUNED_DIST = Math.hypot(STAGE_CAMERA.position[0] - STAGE_CAMERA.target[0], STAGE_CAMERA.position[1] - STAGE_CAMERA.target[1], STAGE_CAMERA.position[2] - STAGE_CAMERA.target[2]);
 function cardFitDistance(camera, size) {
   const halfTan = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
   const aspect = size.width / Math.max(1, size.height);
@@ -186,6 +202,8 @@ function StageCamera({ open, gameCam }) {
     }
     const k = 1 - Math.exp(-dt * 3.5);
     camera.position.lerp(tmp.p, k); tmp.cur.lerp(tmp.t, k); camera.lookAt(tmp.cur);
+    // debug: window.__hmStageCam() — where the card camera is and the fit it was pushed to
+    if (typeof window !== "undefined") window.__hmStageCam = () => ({ pos: camera.position.toArray().map((v) => +v.toFixed(3)), target: tmp.cur.toArray().map((v) => +v.toFixed(3)), fit: +cardFitDistance(camera, size).toFixed(3), fov: camera.fov, canvas: [size.width, size.height] });
   });
   return null;
 }
@@ -293,6 +311,23 @@ function StallProps({ id, frontRef, keepOnBack = false, hideOnBack = null, showO
   );
 }
 const NO_CLIPS = [];
+// Stall toys: a prop on a CHARACTER vendor's stall that answers taps, without
+// the stall being a game (no GameHost, no step-in camera). The controller is
+// the desktop's, mounted against the stall scene with fly=false — a tap on the
+// wheel spins it, at rest or stepped in.
+const STALL_TOY = { promos: "wheel" };
+// The parts the two-shot frames: the wheel disc and its ticker, NOT the whole
+// prop — the stand reaches the deck and dragged the frame down into the floorboards.
+const TOY_NODE = { wheel: ["SM_Prop_Prize_Wheel_01_Wheel_01", "SM_Prop_Prize_Wheel_01_Ticker_01"] };
+// Stepped into a toy stall, the face close-up (FACE_CAMERA) would hide the
+// toy — it stands beside her. The stall writes a TWO-SHOT into gameCam instead,
+// the same handle a machine's controller uses: a box round the toy and her
+// head, fitted to the canvas with a margin, viewed straight on from +Z.
+// Computed ONCE per step-in (and again on a resize): the wheel's axis-aligned
+// box breathes as the pegs turn and her head moves when she talks, and a frame
+// that follows either shakes the camera.
+const TOY_SHOT_MARGIN = 1.08;
+const TOY_HEAD_PAD = 0.07;
 // A machine, stepped into: mounts the desktop's controller against the stall
 // scene and stands in for the three things CommercialStrip gives it —
 //  · the camera: onFocusObject(at, normal, dist) becomes the stage's gameCam;
@@ -350,6 +385,27 @@ function StageStall({ vendor, focusedRef, frontRef, cardYawRef, open = false, ga
   const stallScene = stall.scene;
   const setStallScene = useMemo(() => (scene, animations) => setStall({ scene: scene || null, animations: animations || NO_CLIPS }), []);
   const interaction = useRef(null);
+  // toy stall two-shot (see TOY_SHOT_MARGIN)
+  const { camera: stageCamera, size: stageSize } = useThree();
+  const toyShot = useMemo(() => ({ box: new THREE.Box3(), c: new THREE.Vector3(), h: new THREE.Vector3(), p: new THREE.Vector3() }), []);
+  useFrame(() => {
+    const toy = STALL_TOY[vendor.id]; if (!toy || !gameCam) return;
+    if (!open || !fitted.current || !stallScene) { if (gameCam.current?.toy) gameCam.current = null; toyShot.key = null; return; }
+    const key = `${stageSize.width}x${stageSize.height}`;
+    if (toyShot.key === key && gameCam.current?.toy) return;          // framed already
+    if (!headRef.current) return;                                     // wait for her rig
+    const t = toyShot; t.box.makeEmpty(); const part = new THREE.Box3();
+    for (const n of TOY_NODE[toy] || []) { const node = stallScene.getObjectByName(n); if (node) { part.setFromObject(node); if (!part.isEmpty()) t.box.union(part); } }
+    if (t.box.isEmpty()) return;
+    headRef.current.getWorldPosition(t.h); t.box.expandByPoint(t.p.set(t.h.x - TOY_HEAD_PAD, t.h.y + TOY_HEAD_PAD, t.h.z)); t.box.expandByPoint(t.p.set(t.h.x + TOY_HEAD_PAD, t.h.y - TOY_HEAD_PAD * 1.5, t.h.z));
+    t.key = key;
+    t.box.getCenter(t.c);
+    const halfTan = Math.tan(THREE.MathUtils.degToRad(stageCamera.fov) / 2), aspect = stageSize.width / Math.max(1, stageSize.height);
+    const hw = (t.box.max.x - t.box.min.x) / 2, hh = (t.box.max.y - t.box.min.y) / 2;
+    const d = Math.max(hh / halfTan, hw / (halfTan * aspect)) * TOY_SHOT_MARGIN + (t.box.max.z - t.c.z);
+    const cam = gameCam.current?.toy ? gameCam.current : (gameCam.current = { position: new THREE.Vector3(), target: new THREE.Vector3(), toy: true });
+    cam.target.copy(t.c); cam.position.set(t.c.x, t.c.y, t.c.z + d);
+  });
   // debug: the head's world forward (z toward the camera = facing the viewer)
   useEffect(() => { if (typeof window === "undefined") return; window.__hmHeadFwd = () => { const h = headRef.current; if (!h) return null; const q = h.getWorldQuaternion(new THREE.Quaternion()); const f = new THREE.Vector3(0, 0, 1).applyQuaternion(q); const u = new THREE.Vector3(0, 1, 0).applyQuaternion(q); return { f: f.toArray().map((v) => +v.toFixed(2)), up: u.toArray().map((v) => +v.toFixed(2)) }; }; }, []);
   useFrame((_, dt) => {
@@ -365,8 +421,10 @@ function StageStall({ vendor, focusedRef, frontRef, cardYawRef, open = false, ga
         // from behind. The world rotates WITH the card, so "toward the camera" in this frame flips sign with its yaw.
         const yaw = cardYawRef ? (cardYawRef.current || 0) : 0;
         const back = (1 - Math.cos(yaw)) / 2, toward = Math.cos(yaw);
+        // followCamera: however far the card fit pushed the camera past the tuned distance, the stall follows
+        const follow = tune.followCamera ? Math.max(0, cardFitDistance(stageCamera, stageSize) - STAGE_TUNED_DIST) : 0;
         // the sideways nudge centres the STALL at rest; on the back the vendor is the subject, so it fades out
-        o.position.set(sh[0] * k * (1 - back), (sh[1] - (TUNE.backY ?? tune.backShiftY ?? 0) * back) * k, slide.current + (sh[2] + (TUNE.back ?? tune.backShiftZ ?? 0) * back) * toward * k);
+        o.position.set(sh[0] * k * (1 - back), (sh[1] - (TUNE.backY ?? tune.backShiftY ?? 0) * back) * k, slide.current + (sh[2] + (TUNE.back ?? tune.backShiftZ ?? 0) * back + follow) * toward * k);
         // backPitch: the level card camera "looks down" over her shoulder by pitching the interior up toward it
         o.rotation.x = (TUNE.backPitch ?? tune.backPitch ?? 0) * back * k;
         o.scale.setScalar(1 + ((tune.restScale || 1) - 1) * k);
@@ -391,9 +449,12 @@ function StageStall({ vendor, focusedRef, frontRef, cardYawRef, open = false, ga
       fitted.current = true;
       return;
     }
-    // bones in the INNER frame (pre-rotation), so the offset is a local one
+    // bones in the INNER frame (pre-rotation), so the offset is a local one.
+    // The VENDOR's bones only: a companion (the tattoo client) has a rig of
+    // his own and would drag the centre and the height between the two.
     const inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
-    g.traverse((obj) => { if (obj.isBone) { obj.getWorldPosition(w); w.applyMatrix4(inv); lo = Math.min(lo, w.y); hi = Math.max(hi, w.y); cx += w.x; cz += w.z; n++; } });
+    const companionBone = (obj) => { for (let p = obj; p && p !== g; p = p.parent) if (p.userData?.hmCompanion) return true; return false; };
+    g.traverse((obj) => { if (obj.isBone && !companionBone(obj)) { obj.getWorldPosition(w); w.applyMatrix4(inv); lo = Math.min(lo, w.y); hi = Math.max(hi, w.y); cx += w.x; cz += w.z; n++; } });
     if (!n || !(hi - lo > 1e-4)) { if (frames.current > 90) fitted.current = true; return; }
     const h = (hi - lo) * 1.12;              // bones stop at the crown; allow for hair/hat
     const sc = CHAR_H / h;
@@ -415,15 +476,24 @@ function StageStall({ vendor, focusedRef, frontRef, cardYawRef, open = false, ga
   return (
     <group ref={outer} rotation={[0, rotY, 0]}>
       <group ref={inner}>
-        <Suspense fallback={null}><StallProps id={vendor.id} frontRef={frontRef} keepOnBack={!!tune?.keepPropsOnBack || !!vendor.game} hideOnBack={tune?.hideOnBack || null} showOnBack={tune?.showOnBack || null} onScene={setStallScene} playClips={vendor.game !== "claw"} interaction={vendor.game ? interaction : null} /></Suspense>
+        <Suspense fallback={null}><StallProps id={vendor.id} frontRef={frontRef} keepOnBack={!!tune?.keepPropsOnBack || !!vendor.game} hideOnBack={tune?.hideOnBack || null} showOnBack={tune?.showOnBack || null} onScene={setStallScene} playClips={vendor.game !== "claw"} interaction={vendor.game || STALL_TOY[vendor.id] ? interaction : null} /></Suspense>
         {hasCharacter && (
           <group position={vendor.offset || [0, 0, 0]}>
             <VendorModel vendor={vendorEff} focusedRef={focusedRef} headRef={headRef} stripScene={stallScene} stripRotY={rotY} />
+            {/* the pose's companion (the tattoo client in the chair), authored in the same frame */}
+            {vendorEff.companionModel && (
+              <group userData={{ hmCompanion: true }}>
+                <Suspense fallback={null}><CompanionModel url={vendorEff.companionModel} /></Suspense>
+              </group>
+            )}
           </group>
         )}
       </group>
       {vendor.game && stallScene && (open || vendor.game === "gachapon") && (
         <GameHost entry={vendor} scene={stallScene} animations={stall.animations} interaction={interaction} gameCam={gameCam} onStepBack={onStepBack} open={open} />
+      )}
+      {STALL_TOY[vendor.id] === "wheel" && stallScene && (
+        <PrizeWheelController stripScene={stallScene} interactionRef={interaction} focus={null} fly={false} />
       )}
     </group>
   );
@@ -539,7 +609,7 @@ export default function VendorStage({ vendorId = "tonics", open = false, onToggl
         {/* events: a machine being played takes the touches (its knob, lever, toys
             and capsule are R3F handlers INSIDE the portal); everywhere else the
             card itself does — flip, spin, step in, tap to step back. */}
-        <MeshPortalMaterial ref={portal} blend={0} side={THREE.DoubleSide} resolution={lowTier ? 512 : 1024} events={isGame && open}>
+        <MeshPortalMaterial ref={portal} blend={0} side={THREE.DoubleSide} resolution={lowTier ? 512 : 1024} events={(isGame || !!STALL_TOY[vendor.id]) && open}>
           <ambientLight intensity={0.9} />
           <directionalLight position={[0.6, 1.2, 1.4]} intensity={1.6} />
           <directionalLight position={[-0.8, 0.6, 0.4]} intensity={0.5} color="#ffd9b0" />

@@ -7,7 +7,10 @@
 // Playwright is not a project dependency; point PLAYWRIGHT_PATH at an install
 // (e.g. the npx cache) — WebKit renders WebGL headlessly, Chromium may not be installed there.
 const PW = process.env.PLAYWRIGHT_PATH || "playwright";
-const { webkit } = await import(PW);
+// A bare "playwright" resolves to named exports; a file path into an npx cache
+// (…/node_modules/playwright/index.js) is CommonJS and lands on `default`.
+const pwMod = await import(PW);
+const { webkit } = pwMod.webkit ? pwMod : pwMod.default;
 import sharp from "sharp";
 import fs from "node:fs";
 import path from "node:path";

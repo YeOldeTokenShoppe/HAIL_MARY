@@ -9,6 +9,7 @@ import VortexPortal from "@/components/VortexPortal";
 import useEnvMapSafe from "@/hooks/useEnvMapSafe";
 import ClawMachineController from "@/components/ClawMachineController";
 import GachaponController from "@/components/GachaponController";
+import PrizeWheelController from "@/components/PrizeWheelController";
 // Per-stall Z windows along the deck (strip-local), written by
 // scripts/extract-stalls.mjs. The deck-click snap and the ‹ › stall nav read
 // the same windows the stall extraction and postcard plates use.
@@ -53,11 +54,22 @@ import {
 // dev server revalidates on every request regardless of the query string, so the
 // fresh file always won locally, while the CDN kept serving whatever it had
 // cached under the unchanged `?v=ktx2` key. BUMP THIS on every rebuild.
-const STRIP_MODEL_V = "16";
-// The chapel's split GLBs (stall + preacher) — bump after re-running scripts/split-tent-revival.mjs.
+const STRIP_MODEL_V = "20";
+// The preacher's GLB (Vendor_Chaplain_Character.glb) — bump after every re-export of it.
 export const CHAPEL_ASSET_V = 4;
-const STRIP_MODEL_WEBP = `/models/Commercial_Strip7_opt.glb?v=${STRIP_MODEL_V}`;
-const STRIP_MODEL_KTX2 = `/models/Commercial_Strip7_opt_ktx2.glb?v=${STRIP_MODEL_V}`;
+// The vendor character GLBs (VENDOR_CATALOG model / poseModels / companionModel).
+// next.config serves /models/*.glb as `immutable, max-age=1y` on the promise that
+// they are versioned by filename — these are not, so a browser that already
+// holds a character never re-fetches it, not even on a hard reload. Found
+// 2026-10-10: the hot dog vendor was re-exported in position (z 4.9 → 10.3) and
+// his catalog offset dropped from 5.0 to 0 in the same commit; Chrome on an
+// iPad still had the old file and drew him 5 m down the deck in the chapel
+// stretch while Safari, with a cold cache, drew him at the cart. BUMP THIS
+// whenever ANY character GLB is re-exported; vendorModelUrl() appends it.
+const VENDOR_MODEL_V = 2;
+const vendorModelUrl = (url) => (!url || url.includes("?") ? url : `${url}?v=${VENDOR_MODEL_V}`);
+const STRIP_MODEL_WEBP = `/models/Commercial_Strip8_opt.glb?v=${STRIP_MODEL_V}`;
+const STRIP_MODEL_KTX2 = `/models/Commercial_Strip8_opt_ktx2.glb?v=${STRIP_MODEL_V}`;
 const STRIP_MODEL =
   typeof window !== "undefined" && /[?&]strip=webp\b/.test(window.location.search)
     ? STRIP_MODEL_WEBP
@@ -280,7 +292,7 @@ export const VENDOR_CATALOG = [
     // strip. Her GLB is exported in strip space like the rest (root at local
     // x 0, z -29.96), so she needs no placement here.
     model: "/models/Vendor_HoloGirl.glb", idleClip: "idle", talkClip: "talking",
-    offset: [-0.3, 0, 2.5],
+    offset: [-0.3, 0, 0],
     // The wheel, NOT the tent she happens to stand inside: SM_Prop_Tent_02
     // (23) has no vendor now, so it has no click volume either, and hers is
     // the only proxy in this stretch of boardwalk. Keep it that way — a
@@ -381,17 +393,21 @@ export const VENDOR_CATALOG = [
     talkClip: "hard_sell",
     sitepal: "tonics" },
   // THE CHAPEL (docs/midway-chapel.md, 2026-09-04) — a tent revival in the
-  // taco truck's stretch of deck. Michelle's Tent_Revival.glb (2026-09-05) is
-  // the source: scripts/split-tent-revival.mjs re-seats it into the strip frame
-  // and splits it into the stall GLB (`stallModel`, mounted on the desktop
-  // strip until she places the props in the strip .blend) and the preacher's
-  // GLB (`model`). `hideWindow` hides the strip's own taco dressing under it.
+  // taco truck's stretch of deck. Since Commercial_Strip8 (2026-10-10) the tent,
+  // stage, chairs and the seated robot and biker live IN the strip GLB under
+  // Tent_Empty, like every other stall (`prop` resolves on the strip scene; the
+  // sit clips autoplay with the strip's other ambient clips; the robot's visor
+  // boost is applied to the strip scene in CommercialStrip). Only the preacher
+  // stays a separate GLB (`model`) — the vendor pipeline needs him there.
+  // Before Strip8 the tent came from a separate stall GLB (`stallModel` +
+  // `hideWindow`; source and split script deleted 2026-10-10); the
+  // phone card (VendorStage) still loads that stall_chapel.glb until the chapel
+  // is re-cucextract-stalls.mjs.
   // Face1–Face3 plates shipped 2026-10-05; `sitepal: "chapel"` is scene 2775643
   // with his ElevenLabs voice (vendorSitePal.js). Crop still the carny seed.
   { id: "chapel",    label: "",    awning: "#5a3a6e", accent: "#e7d4a8",
-    // ?v= busts the browser/CDN cache — bump CHAPEL_ASSET_V after every
-    // `node scripts/split-tent-revival.mjs` (the file names never change, so a
-    // stale stall kept showing the robot without his emissive, 2026-09-05).
+    // ?v= busts the browser/CDN cache for the preacher's GLB — bump
+    // CHAPEL_ASSET_V after every re-export of Vendor_Chaplain_Character.glb.
     // Five NLA tracks since the 2026-10-06 evening export. Between lines he
     // rests through the QUIET pair (idle, then shading his eyes to look over
     // the congregation); while a line plays, the talk swap alternates the two
@@ -408,8 +424,6 @@ export const VENDOR_CATALOG = [
     talkCycle: ["preaching", "yelling"],   // "rapping" ships in the GLB but is retired from the rotation (2026-10-06)
     offset: [0, 0, 0],
     prop: "SM_Bld_Tent_01",
-    stallModel: `/models/stalls/stall_chapel.glb?v=${CHAPEL_ASSET_V}`,
-    hideWindow: [0.6, 8],
     faceDist: 0.405, faceLift: -0.0, camDrop: -0.35,
     sitepal: "chapel" },
 ];
@@ -459,12 +473,12 @@ VENDOR_CATALOG.forEach((v) => {
 // decoding nine characters it never shows (2026-09-02). drei's preload is
 // idempotent, so the desktop field still gets them on its first render.
 function preloadVendorModels() {
-  Object.values(CHOSEN_POSE_MODEL).forEach((url) => useGLTF.preload(url, true, true, extendKTX2));
+  Object.values(CHOSEN_POSE_MODEL).forEach((url) => useGLTF.preload(vendorModelUrl(url), true, true, extendKTX2));
   // ...and the companion belonging to whichever pose was drawn, so it arrives
   // with the character rather than popping in a beat later.
   VENDOR_CATALOG.forEach((v) => {
     const companion = v.poseOverrides?.[CHOSEN_POSE_MODEL[v.id]]?.companionModel;
-    if (companion) useGLTF.preload(companion, true, true, extendKTX2);
+    if (companion) useGLTF.preload(vendorModelUrl(companion), true, true, extendKTX2);
   });
 }
 
@@ -843,7 +857,7 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
   const group = useRef();
   // Stable for the whole session: chosen at module load, so the hook's URL
   // never changes under it and Suspense fetches exactly one file.
-  const { scene, animations } = useGLTF(CHOSEN_POSE_MODEL[vendor.id] || vendor.model, true, true, extendKTX2);
+  const { scene, animations } = useGLTF(vendorModelUrl(CHOSEN_POSE_MODEL[vendor.id] || vendor.model), true, true, extendKTX2);
   const { actions, mixer } = useAnimations(animations, group);
 
   // Cap per-frame animation advance: on a main-thread hitch the mixer would
@@ -1580,12 +1594,32 @@ const STRIP_EXTRA_STOPS = [
   { id: "bull",       node: "Bull_Tent",          label: "Mechanical bull" },
   { id: "photobooth", node: "Photo_booth_Curtain", label: "Photo booth" },
 ];
+// Click-to-close-up props that are neither stalls nor stops: the two face-in-
+// the-hole photo boards (2026-10-10). A click on either frames the board
+// straight on from the customer side instead of flying to the deck stop.
+// `fit` scales the board's largest world dimension into the camera distance;
+// `lift` moves the look-at up the board as a fraction of its height; `yaw`
+// (strip-local, default = facing off the deck) is the side the camera comes in
+// from — flip it to +Math.PI / 2 if a board's art turns out to face the stalls.
+const PROP_CLOSEUPS = {
+  SM_Prop_Photo_Stand_01: { id: "photostand1", fit: 1.4, lift: 0 },
+  SM_Prop_Photo_Stand_02: { id: "photostand2", fit: 1.4, lift: 0 },
+};
+// Slight downward tilt so the camera sits a touch above the board's centre.
+const PROP_CLOSEUP_TILT = 0.12;
+// The hit mesh is usually a child of the named node (meshopt moves meshes onto
+// unnamed children; Stand_01's art is on a child named after its Boolean
+// cutter), so walk up to the first ancestor the table knows.
+function propCloseupFor(obj) {
+  for (let o = obj; o; o = o.parent) { const cfg = PROP_CLOSEUPS[sanitizeName(o.name)]; if (cfg) return { node: o, ...cfg }; }
+  return null;
+}
 // Display names for the nav caption. The catalog's own `label`s are blank on
 // purpose (the signage speaks), so these are read off the signs/props.
 const STRIP_STOP_LABELS = {
-  carny: "Carny ride", promos: "Trader Bros", fortunes: "Fortune teller",
+  carny: "Carny ride", promos: "Promos", fortunes: "Fortune teller",
   claw: "Claw machine", gachapon: "Gachapon", hotdogs: "Hot dog cart",
-  rugs: "Rugs", tonics: "Tonics", tattoos: "Tattoos", chapel: "Chapel",
+  rugs: "Trader Bros", tonics: "Tonics", tattoos: "Tattoos", chapel: "Chapel",
 };
 // A deck click further than this (strip-local units) past the ends of the
 // nearest stop's window keeps its raw hit point — it is a stretch of empty
@@ -1602,6 +1636,9 @@ const WOOD_POST = "#4e3b26";
 // The strip GLB is authored running along its own local Z; +90° about Y lays
 // that onto the mesa's X edge, and maps local (x,y,z) → world (z, y, −x).
 const STRIP_ROT_Y = Math.PI / 2;
+// World-space "come in from the customer side" direction (strip-local −X
+// carried through the group's yaw) — the approach every prop close-up uses.
+const STRIP_APPROACH_NORMAL = /* @__PURE__ */ new THREE.Vector3(Math.sin(VENDOR_LOCAL_FACE_YAW + STRIP_ROT_Y), 0, Math.cos(VENDOR_LOCAL_FACE_YAW + STRIP_ROT_Y)).normalize();
 
 // The per-vendor face-framing numbers (faceDist/faceLift) were tuned when the
 // characters rendered at this scale. framingUnit rescales them to whatever the
@@ -2067,6 +2104,17 @@ const WAGON_LIGHT_FALLBACK = {
 };
 // Multiplier on the AUTHORED intensity, so Blender still owns the brightness.
 const WAGON_LIGHT_BY_ENV = { night: 1.0, dusk: 0.7, hell: 1.0 };
+// Ceiling on authored intensity, by light name. The chapel's two lights arrived
+// in Commercial_Strip8 (2026-10-10) at 2.72 (Point.003, the tent's ceiling) and
+// 1.63 (Point.004, on the floor by the candles) against 0.16–0.27 for the wagon
+// lights the strip was tuned around — and a point light's falloff is in WORLD
+// units, so inside the auto-fitted group (scale ≈ 0.14) everything sits seven
+// times closer to it than in Blender. A cap, not a set: once the .blend authors
+// a value at or under it, this does nothing. Tune here, then carry it back.
+const WAGON_LIGHT_CAP = {
+  Point003: 0.6,
+  Point004: 0.25,
+};
 
 const POOL_LIFT = 0.05;            // strip-local nudge off the boards (no z-fight)
 const POOL_SPREAD = 1.15;          // pool radius vs. the cone base, a touch wider
@@ -2387,9 +2435,11 @@ function BulbRig({ stripScene, envPreset, clipPlanes }) {
 // export stays a simple one-armature job.
 //
 // Exported in position like every other character, so it renders at identity.
-function CompanionModel({ url }) {
+// Exported for VendorStage: the phone card pins her tattooing pose, so the
+// client belongs in its chair there too (he was missing until 2026-10-10).
+export function CompanionModel({ url }) {
   const group = useRef();
-  const { scene, animations } = useGLTF(url);
+  const { scene, animations } = useGLTF(vendorModelUrl(url));
   const { actions, mixer } = useAnimations(animations, group);
 
   useEffect(() => {
@@ -3778,7 +3828,8 @@ function WagonLights({ stripScene, envPreset }) {
       const fallback = WAGON_LIGHT_FALLBACK[sanitizeName(l.name)];
       if (white && fallback) l.color.set(fallback);   // export regressed — stand in
       else l.color.copy(color);                       // authored colour wins
-      l.intensity = intensity * gain;
+      const cap = WAGON_LIGHT_CAP[sanitizeName(l.name)];
+      l.intensity = (cap == null ? intensity : Math.min(intensity, cap)) * gain;
       l.castShadow = false;
     });
 
@@ -3813,6 +3864,13 @@ function WagonLights({ stripScene, envPreset }) {
 const STRING_RE = /^SM_Prop_Light_04\d*$/;
 // sanitizeName deletes dots, so "Face1.001" arrives as "Face1001".
 const STRIP_FACE_JUNK_RE = /^Face\d*$/;
+// Boolean cutter objects: Commercial_Strip8 shipped "Baby Face - Oval Cylinder
+// Cutter", the cylinder that cuts the face hole in SM_Prop_Photo_Stand_01, as a
+// grey puck sitting IN the hole. Its display type (Bounds/Wire) hides it in the
+// Blender viewport but it is still a visible object to the exporter. Fix at
+// source: hide the cutter (eye + camera) or move it to glTF_not_exported — do
+// not delete it, the modifier that cuts the hole needs it.
+const STRIP_CUTTER_JUNK_RE = /cutter$/i;
 // The bulb island, padded a hair past the measured box (u 0.0211-0.0225,
 // v 0.9741-0.9858) so no rim vert sitting exactly on the boundary drops out.
 // The wire (v~0.929) and sockets (u~0.076) are nowhere near, so padding is free.
@@ -4012,10 +4070,32 @@ function VendorSpotlight({ focus, stripScene, envPreset }) {
 // Emissive boosts for a stall's own extras, by vendor id → mesh name → intensity.
 // There is no bloom pass (kept off for the phone), so an emissive texture at
 // strength 1 reads as flat colour; pushing intensity past white is how the
-// strip fakes glow (the festoon bulbs do the same). Applied by both mounts.
+// strip fakes glow (the festoon bulbs do the same). Applied to the strip scene
+// (the robot sits in the strip GLB since Commercial_Strip8), to a `stallModel`
+// mount, and by VendorStage to the phone card's stall.
 export const STALL_EMISSIVE_BOOST = {
   chapel: { SK_Character_Robot_01: 2.6 },   // the robot's visor and chest lights
 };
+// Ceiling on authored emissive strength, by MATERIAL name. The chapel's candle
+// and cross flames shipped at Emission Strength 10 / 9.4 (Commercial_Strip8,
+// 2026-10-10), which with no bloom pass just clips to white. A cap, not a set:
+// once Blender authors a value at or under it, this does nothing. Tune here,
+// then carry the number back into the .blend.
+const STRIP_EMISSIVE_CAP = {
+  "FLAME.002": 3,   // the two candle stands
+  "Flame.001": 3,   // the cross
+};
+function applyStripEmissiveCap(scene) {
+  const seen = new Set();
+  scene.traverse((o) => {
+    if (!o.isMesh) return;
+    (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
+      if (!m || seen.has(m)) return; seen.add(m);
+      const cap = STRIP_EMISSIVE_CAP[m.name]; if (cap == null || !("emissiveIntensity" in m)) return;
+      if (m.emissiveIntensity > cap) m.emissiveIntensity = cap;
+    });
+  });
+}
 export function applyStallEmissiveBoost(scene, vendorId) {
   const table = STALL_EMISSIVE_BOOST[vendorId]; if (!table) return;
   scene.traverse((o) => {
@@ -4067,8 +4147,12 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
     running.forEach((action) => action.reset().setLoop(THREE.LoopRepeat, Infinity).play());
     return () => running.forEach((action) => action.stop());
   }, [stripActions]);
+  // The chapel's seated robot ships in the strip GLB (Commercial_Strip8); his
+  // visor needs the same over-white emissive the stall mount used to apply.
+  useEffect(() => { vendors.forEach((v) => applyStallEmissiveBoost(stripScene, v.id)); applyStripEmissiveCap(stripScene); }, [stripScene, vendors]);
   const clawInteractionRef = useRef(null);
   const gachaponInteractionRef = useRef(null);
+  const wheelInteractionRef = useRef(null);
   const [extraScenes, setExtraScenes] = useState({});
   // Tooling hook for scripts/render-postcards.mjs --plates: hide every top-level
   // strip prop whose strip-local centre falls in a Z window (the stall's own
@@ -4093,7 +4177,8 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
       return n;
     };
     window.__hmStripShowAll = () => { hidden.splice(0).forEach((o) => { o.visible = true; }); };
-    return () => { window.__hmStripShowAll?.(); delete window.__hmStripHide; delete window.__hmStripShowAll; };
+    window.__hmStripScene = stripScene;   // inspection handle (console / headless probes)
+    return () => { window.__hmStripShowAll?.(); delete window.__hmStripHide; delete window.__hmStripShowAll; delete window.__hmStripScene; };
   }, [stripScene]);
   // The strip is the only KTX2 asset: once it is in, the transcoder worker and
   // its wasm heap are dead weight in the page process (see getKTX2Loader).
@@ -4203,11 +4288,15 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
   // click and fly the camera 22 units into empty air.
   //
   // Fix at source by deleting them from the Blender scene and re-exporting.
-  // This costs nothing once they are gone.
+  // This costs nothing once they are gone. Boolean cutters (see
+  // STRIP_CUTTER_JUNK_RE) ride the same effect; meshopt can move a cutter's
+  // mesh onto an unnamed child, hence the parent-name test.
   useEffect(() => {
     const junk = [];
     stripScene.traverse((o) => {
-      if (o.isMesh && !o.isSkinnedMesh && STRIP_FACE_JUNK_RE.test(sanitizeName(o.name))) junk.push(o);
+      if (!o.isMesh || o.isSkinnedMesh) return;
+      const n = sanitizeName(o.name);
+      if (STRIP_FACE_JUNK_RE.test(n) || STRIP_CUTTER_JUNK_RE.test(n) || STRIP_CUTTER_JUNK_RE.test(sanitizeName(o.parent?.name))) junk.push(o);
     });
     if (!junk.length) return;
     const rays = junk.map((o) => o.raycast);
@@ -4330,7 +4419,27 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
   // the claw and the gachapon answer; the booth has its own hook.
   const releaseFocused = () => {
     if (focusRef.current?.id === "photobooth") boothExitRef.current?.(false);
+    // A photo board has no component of its own to answer hm-vendor-exit.
+    if (focusRef.current?.id?.startsWith("photostand")) setFocus(null);
     window.dispatchEvent(new CustomEvent("hm-vendor-exit"));
+  };
+  // Fly to a PROP_CLOSEUPS board: straight on, fitted to its world bounds.
+  const flyToPropCloseup = ({ node, id, fit: fitK, lift, yaw }) => {
+    if (!onFocusObject) return;
+    releaseFocused();
+    node.updateWorldMatrix(true, true);
+    const box = new THREE.Box3().setFromObject(node);
+    if (box.isEmpty()) return;
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    center.y += (lift ?? 0) * size.y;
+    const a = (yaw ?? VENDOR_LOCAL_FACE_YAW) + STRIP_ROT_Y;
+    const normal = new THREE.Vector3(Math.sin(a), PROP_CLOSEUP_TILT, Math.cos(a)).normalize();
+    const dist = Math.max(size.x, size.y, size.z) * (fitK ?? 1.4);
+    // Same OrbitControls floor the gachapon uses: these targets can sit under
+    // the 0.3 default at the strip's auto-fit scale.
+    focusFromStrip(center, normal, dist, Math.min(0.1, dist * 0.5));
+    setFocus({ id, object: node });   // the vendor spotlight picks it out
   };
   // Two-stage zoom-out (2026-10-06). Children's exits (second click on a
   // character, leaving the booth, closing a machine) used to fly straight to
@@ -4429,12 +4538,17 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
     // The machine owns its controls; these clicks must not trigger the deck fly-to.
     if (clawInteractionRef.current?.handleClick(e)) return;
     if (focus?.id === "claw") clawInteractionRef.current?.close(false);
+    // The prize wheel: a click anywhere on it spins it (and flies in first).
+    if (wheelInteractionRef.current?.handleClick(e)) return;
     // In-booth clicks (snap / exit) land on the cabin's interior walls, which
     // are strip geometry — delegate them to the booth's state machine.
     if (focus?.id === "photobooth" && boothClickRef.current) {
       boothClickRef.current(e);
       return;
     }
+    // The photo boards get their own close-up instead of the deck stop.
+    const closeup = propCloseupFor(e.object);
+    if (closeup) { flyToPropCloseup(closeup); return; }
     if (!onFocusObject || !e.point) return;
     // A deck click while a character is up releases them (no fly-out — we are
     // about to fly somewhere else). Previously the stall stayed "zoomed" with
@@ -4527,6 +4641,14 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
         onZoomOut={zoomOutFromStrip}
         onVendorClick={onVendorClick}
         stripScale={fit.scale}
+      />
+      <PrizeWheelController
+        stripScene={stripScene}
+        interactionRef={wheelInteractionRef}
+        focus={focus}
+        onFocusChange={setFocus}
+        onFocusObject={focusFromStrip}
+        approach={STRIP_APPROACH_NORMAL}
       />
       <WagonLights stripScene={stripScene} envPreset={envPreset} />
       {/* Renders nothing — it swaps a shader-patched clone onto the seven
