@@ -5,7 +5,7 @@ import localFont from 'next/font/local';
 const plainBlack = localFont({ src: '../../public/fonts/PlainBlack/Plain_Black.woff2', weight: '400', style: 'normal', display: 'swap' });
 const interItalic = localFont({ src: '../../public/fonts/Inter-Italic-Variable.ttf', weight: '100 900', style: 'italic', display: 'swap' });
 
-export default function DriveTitles({ moment }) {
+export default function DriveTitles({ moment, actions }) {
   return <div className="drive-titles">
     <div className={`title opening ${moment === 'opening' ? 'visible' : ''}`} aria-hidden={moment !== 'opening'}>
       <div className={`opening-headline lettering ${plainBlack.className}`}>
@@ -21,6 +21,7 @@ export default function DriveTitles({ moment }) {
         Perpetual<br />Profit
       </div>
       <div className={`tagline finale-subheading ${interItalic.className}`}>Get on Her Watchlist.</div>
+      {actions}
     </div>
     <style jsx>{`
       .drive-titles { pointer-events: none; position: fixed; inset: 0; z-index: 1000; }
@@ -59,12 +60,19 @@ export default function DriveTitles({ moment }) {
       }
       .opening.visible .opening-subheading { animation: titleFadeIn .65s ease 2.4s both; }
       .finale-subheading { opacity: 0; }
-      .finale { right: 4vw; top: 35%; width: 31vw; max-width: 440px; text-align: center; }
-      .finale .lettering { font-size: clamp(28px, 4.5vw, 64px); line-height: 1; letter-spacing: 0; }
+      .finale { right: 4vw; top: 30%; width: 32vw; max-width: 480px; text-align: center; }
+      .finale .lettering { font-size: clamp(40px, min(6.3vw, 10vh), 90px); line-height: 1; letter-spacing: 0; }
+      .finale .finale-subheading { font-size: clamp(22px, 1.875vw, 27.5px); margin-top: 24px; }
       .finale-prefix { display: block; font-size: .72em; line-height: 1.08; margin-bottom: .08em; }
       .finale.visible .lettering { animation: titleFadeIn .85s ease .4s both; }
       .finale.visible .finale-subheading { animation: titleFadeIn .9s ease 1.6s both; }
       @keyframes titleFadeIn { from { opacity: 0; } to { opacity: 1; } }
+      /* Keep the finale proportional to the scene beyond laptop widths. */
+      @media (min-width: 1441px) and (min-aspect-ratio: 1/1) {
+        .finale { max-width: none; }
+        .finale .lettering { font-size: min(6.25vw, 10vh); }
+        .finale .finale-subheading { font-size: min(1.91vw, 3.06vh); margin-top: min(1.67vw, 2.67vh); }
+      }
       @media (max-aspect-ratio: 1/1) {
         .opening { left: 4%; top: 20%; width: 92%; }
         .opening .lettering, .finale .lettering { -webkit-text-stroke-width: 2.5px; text-shadow: 2px 3px 0 #171019; }
@@ -72,7 +80,7 @@ export default function DriveTitles({ moment }) {
         .finale { top: auto; bottom: max(20%, 150px); right: 5%; width: 90%; max-width: none; }
         .finale .lettering { font-size: clamp(40px, 14vw, 84px); }
         .tagline { font-size: clamp(18px, 5vw, 26px); margin-top: 18px; }
-        .opening .opening-subheading, .finale .finale-subheading { font-size: clamp(19px, 5.4vw, 26px); }
+        .opening .opening-subheading, .finale .finale-subheading { font-size: clamp(19px, 5.4vw, 26px); margin-top: 20px; }
       }
       @media (prefers-reduced-motion: reduce) {
         .title { transition: none; }

@@ -1,0 +1,29 @@
+.page {
+  --fountain-control: 48px;
+  --fountain-icon: 24px;
+  --fountain-edge: 1rem;
+  --fountain-gap: 8px;
+  --fountain-social: 44px;
+  --fountain-social-icon: 20px;
+  --fountain-social-gap: 12px;
+  --fountain-social-right: 2rem;
+}
+@media (min-width: 1200px) and (min-aspect-ratio: 1/1) {
+  .page {
+    --fountain-control: clamp(56px, 3.2vw, 112px);
+    --fountain-icon: clamp(26px, 1.5vw, 52px);
+    --fountain-edge: 1.5vw;
+    --fountain-gap: clamp(10px, .6vw, 21px);
+    --fountain-social: var(--fountain-control);
+    --fountain-social-icon: clamp(24px, 1.4vw, 48px);
+    --fountain-social-gap: clamp(14px, .85vw, 30px);
+    --fountain-social-right: 1.5vw;
+    --music-control-size: var(--fountain-control);
+    --music-icon-size: var(--fountain-icon);
+    --music-secondary-size: clamp(44px, 2.4vw, 84px);
+    --music-secondary-icon: clamp(20px, 1.1vw, 38px);
+    --music-close-size: clamp(40px, 2vw, 70px);
+    --music-close-icon: clamp(16px, .85vw, 30px);
+    --music-control-gap: var(--fountain-gap);
+  }
+}

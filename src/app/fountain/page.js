@@ -1,5 +1,7 @@
 "use client";
 
+import controls from "./controls.module.css";
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -234,7 +236,7 @@ export default function FountainPage() {
 
 
   return (
-    <div style={{
+    <div className={controls.page} style={{
       backgroundColor: "#000000",
       // Anchor to top AND bottom instead of height:100vh. On iOS Safari 100vh is
       // the toolbar-collapsed height, so a 100vh box (and the fountain iframe that
@@ -463,8 +465,8 @@ export default function FountainPage() {
       <div
         style={{
           position: "fixed",
-          top: "calc(1rem + env(safe-area-inset-top))",
-          right: "1rem",
+          top: "calc(var(--fountain-edge) + env(safe-area-inset-top, 0px))",
+          right: "var(--fountain-edge)",
           zIndex: 30000,
           display: "flex",
           alignItems: "center",
@@ -648,12 +650,12 @@ export default function FountainPage() {
           style={{
             position: "fixed",
             bottom: "5rem",
-            right: "2rem",
+            right: "var(--fountain-social-right)",
             left: "auto",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: "12px",
+            gap: "var(--fountain-social-gap)",
             zIndex: 1001,
             // Yield to the Coin Guide panel while it's open (it lives in the iframe
             // and can't out-z-index these parent-page icons).
@@ -677,8 +679,8 @@ export default function FountainPage() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: "44px",
-                height: "44px",
+                width: "var(--fountain-social)",
+                height: "var(--fountain-social)",
                 borderRadius: "50%",
                 border: "2px solid rgba(212, 175, 55, 0.65)",
                 background: "rgba(0, 0, 0, 0.5)",
@@ -702,8 +704,8 @@ export default function FountainPage() {
                 aria-hidden="true"
                 style={{
                   display: "block",
-                  width: `${s.size}px`,
-                  height: `${s.size}px`,
+                  width: `var(--fountain-social-icon, ${s.size}px)`,
+                  height: `var(--fountain-social-icon, ${s.size}px)`,
                   backgroundColor: "#d4a854",
                   WebkitMaskImage: `url(${s.icon})`,
                   maskImage: `url(${s.icon})`,
@@ -736,9 +738,9 @@ export default function FountainPage() {
           // top:1rem) with an 8px gap.
           ...(isMobileView
             ? { bottom: "calc(1rem + env(safe-area-inset-bottom))", left: "1rem" }
-            : { top: "calc(1rem + 56px)", right: "1rem" }),
-          width: isMobileView ? "44px" : "48px",
-          height: isMobileView ? "44px" : "48px",
+            : { top: "calc(var(--fountain-edge) + env(safe-area-inset-top, 0px) + var(--fountain-control) + var(--fountain-gap))", right: "var(--fountain-edge)" }),
+          width: isMobileView ? "44px" : "var(--fountain-control)",
+          height: isMobileView ? "44px" : "var(--fountain-control)",
           borderRadius: "10px",
           border: GOLD_CONTROL.border,
           background: GOLD_CONTROL.background,
@@ -762,8 +764,8 @@ export default function FountainPage() {
           ) : (
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
+              width={isMobileView ? "24" : "var(--fountain-icon)"}
+              height={isMobileView ? "24" : "var(--fountain-icon)"}
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"

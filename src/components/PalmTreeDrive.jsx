@@ -17,6 +17,7 @@ import { useRouter } from 'next/navigation';
 // import SynthwaveText from './SynthwaveText';
 import DriveTitles from './DriveTitles';
 import DriveActions from './DriveActions';
+import introControls from './DriveIntroControls.module.css';
 import RL80SceneIntro, { INTRO_DURATION_MS, REDUCED_INTRO_DURATION_MS } from './RL80SceneIntro';
 import BuyModal from './BuyModal';
 import CyberNav from './CyberNav';
@@ -2542,10 +2543,18 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange, onIntroComplete, has
 
       </div>
 
-      {hasEntered && introDone && !isSceneLoading && scrollCameraActive && <DriveTitles moment={introDone ? titleMoment : 'hidden'} />}
-
-      {/* Scroll Camera Indicator removed for production */}
       </div>
+
+      {/* Keep interactive overlays outside the scene's fixed stacking context
+          so the transparent scroll spacer cannot intercept their clicks. */}
+      {hasEntered && introDone && !isSceneLoading && scrollCameraActive && (
+        <DriveTitles
+          moment={titleMoment}
+          actions={currentCameraStage === 4 && shouldMorph ? (
+            <DriveActions onBuy={() => setShowBuyModal(true)} onExplore={() => router.push('/fountain')} />
+          ) : null}
+        />
+      )}
 
       {!isSceneLoading && !introDone && <RL80SceneIntro onComplete={finishIntro} started={hasEntered} />}
 
@@ -2621,16 +2630,14 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange, onIntroComplete, has
       {/* Skip Animation Button - bottom right - Outside pointer-events:none container */}
       {hasEntered && introDone && currentCameraStage < 4 && (
         <button
+          className={introControls.skip}
           onClick={skipAnimation}
           style={{
             position: 'fixed',
             bottom: isMobile ? '60px' : '30px',
-            right: '30px',
             backgroundColor: 'transparent',
             border: '1px solid rgba(255, 255, 255, 0.5)',
             color: 'white',
-            padding: '10px 20px',
-            fontSize: '14px',
             fontFamily: 'monospace',
             cursor: 'pointer',
             borderRadius: '4px',
@@ -2668,9 +2675,6 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange, onIntroComplete, has
         }} 
       />
       
-      {currentCameraStage === 4 && shouldMorph && (
-        <DriveActions onBuy={() => setShowBuyModal(true)} onExplore={() => router.push('/fountain')} />
-      )}
 
       {/* CyberNav Menu */}
       <CyberNav

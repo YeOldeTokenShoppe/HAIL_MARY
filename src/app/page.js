@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import PalmTreeDrive from '@/components/PalmTreeDrive';
 import DriveSocialLinks from '@/components/DriveSocialLinks';
+import introControls from '@/components/DriveIntroControls.module.css';
 import { useMusic } from '@/components/MusicContext';
 import CyberNav from '@/components/CyberNav';
 import CoinLoader from '@/components/CoinLoader';
@@ -499,7 +500,7 @@ export default function Home() {
       )}
 
       {hasEntered && introComplete && !isSceneLoading && titleMoment !== 'final' && (
-        <div style={{ position: 'fixed', bottom: 'calc(128px + env(safe-area-inset-bottom, 0px))', right: '2rem', zIndex: 1001 }}>
+        <div className={introControls.socials}>
           <DriveSocialLinks vertical />
         </div>
       )}

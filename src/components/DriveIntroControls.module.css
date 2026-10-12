@@ -1,0 +1,29 @@
+.skip {
+  right: 30px;
+  padding: 10px 20px;
+  font-size: 14px;
+}
+
+.socials {
+  position: fixed;
+  bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+  right: 2rem;
+  z-index: 1001;
+}
+
+@media (min-width: 1200px) and (min-aspect-ratio: 1/1) {
+  .skip {
+    right: 2vw;
+    padding: .7vw 1.25vw;
+    font-size: clamp(18px, 1.05vw, 36px);
+    min-height: 3.2vw;
+  }
+
+  .socials {
+    right: 2vw;
+    bottom: calc(30px + 3.2vw + 2vw);
+    --drive-social-size: clamp(56px, 3.2vw, 112px);
+    --drive-social-icon: clamp(24px, 1.4vw, 48px);
+    --drive-social-gap: clamp(14px, .85vw, 30px);
+  }
+}

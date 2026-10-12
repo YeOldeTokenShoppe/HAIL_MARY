@@ -20,6 +20,29 @@ import Numerology from '@/components/Numerology';
 import ScrollTransition from '@/components/ScrollTransition';
 import CleanCanvas from '@/components/CleanCanvas';
 import { useLanguage } from './LanguageProvider';
+
+const SCROLL_INTRO = 'Explore the writings of Saint GR80: android, metaphysicist, medieval scholar, and devoted follower of RL80.';
+const scrollHeadingStyle = {
+  color: '#c9a568',
+  fontFamily: 'UnifrakturCook, Georgia, serif',
+  fontWeight: 700,
+  lineHeight: 1.06,
+  textShadow: '0 2px 8px rgba(0, 0, 0, 0.6)',
+  margin: 0,
+  textWrap: 'balance',
+};
+const scrollIntroStyle = {
+  color: '#d5c8b0',
+  fontFamily: 'Georgia, "Times New Roman", serif',
+  fontSize: 'clamp(0.9rem, 1.05vw, 1.05rem)',
+  fontWeight: 400,
+  lineHeight: 1.55,
+  letterSpacing: 'normal',
+  margin: 0,
+  textAlign: 'center',
+  textWrap: 'pretty',
+};
+
 function createChartTexture(data, chartType = 'line', label = '') {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
@@ -1414,12 +1437,21 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
         width: '50%',
         height: '95%'
       },
-      // Desktop
+      // Desktop: a tight box under the intro card, left column only. The
+      // old box was the full page width offset -20% with a 350px scroll
+      // floating in it — it read small and its (transparent, but still
+      // hit-testing) iframe sat over the desk scrolls. `scale` enlarges
+      // the whole scroll (text included) by laying the iframe out at
+      // 1/scale and transforming it up, the way the magnifier does, so
+      // nothing inside the scroll documents changes; `ch` is the share of
+      // the box the flat body takes (see public/scroll.js).
       'desktop': {
-        left: '-20%',
-        bottom: '1rem',
-        width: '100%',
-        height: '60%'
+        left: '4%',
+        bottom: '5rem',
+        width: '34%',
+        height: 'calc(100% - 20rem)',
+        scale: 1.45,
+        ch: 62
       },
       // Mobile
       'mobile': {
@@ -1658,43 +1690,62 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
         </div>
       )}
       
-      {/* Heading - Show only after loading is complete */}
-      {(isDesktop || isTablet || deviceType.includes('ipad')) && !isLoading && (
+      {/* Library title and introduction share one responsive composition. */}
+      {!isLoading && !(isMobile && showMagnifiedScroll) && (
         <div style={{
           position: 'absolute',
-          left: '0',
-          top: isMobile ? '4rem' : '2rem',
-          width: '50%',
+          left: isDesktop ? '4%' : '0',
+          top: isMobile ? 'calc(0.75rem + env(safe-area-inset-top, 0px))' : 'clamp(1.25rem, 3vh, 2.25rem)',
+          width: isMobile ? '100%' : isDesktop ? '34%' : '50%',
+          boxSizing: 'border-box',
+          padding: '0 1rem',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          padding: '1rem',
+          textAlign: 'center',
+          gap: isMobile ? '0.6rem' : '1rem',
           zIndex: 100,
           pointerEvents: 'none',
-          // backgroundColor: 'rgba(0, 0, 0, 0.3)', // Subtle black background
-          borderRadius: '10px' // Rounded corners
         }}>
-          <h1 style={{ 
-            color: '#8e662b', // Golden brown color
-            fontFamily: 'UnifrakturCook, serif', // Use UnifrakturCook font
-            textShadow: '3px 3px 5px #000, -1px -1px 5px pink',
-            fontSize: '4rem',
-            fontWeight: 700,
-            lineHeight: 0.8,
-            transform: 'rotate(-8deg) skew(-15deg)',
-            margin: 0,
-            opacity: 1,
-            visibility: 'visible',
-            display: 'block',
-            position: 'relative',
-            zIndex: 101
-          }}>The Scrolls <br/>of St. GR80</h1>
+          <h1 style={{
+            ...scrollHeadingStyle,
+            fontSize: isMobile ? 'clamp(1.85rem, 8vw, 2.25rem)' : 'clamp(2.25rem, 3.6vw, 3.75rem)',
+          }}>The Scrolls<br />of St. GR80</h1>
+          {showIntroText && (
+            <div style={{
+              position: 'relative',
+              width: '100%',
+              maxWidth: isMobile ? '22rem' : '24rem',
+              padding: isMobile ? '0.6rem 1.4rem 0' : '0.85rem 1.25rem 0',
+              borderTop: '1px solid rgba(201, 165, 104, 0.35)',
+              boxSizing: 'border-box',
+            }}>
+              <p style={{ ...scrollIntroStyle, ...(isMobile ? { fontSize: '0.85rem', lineHeight: 1.45 } : {}) }}>{SCROLL_INTRO}</p>
+              <button
+                onClick={() => setShowIntroText(false)}
+                aria-label="Hide introduction"
+                title="Hide introduction"
+                style={{
+                  position: 'absolute',
+                  top: '0.3rem',
+                  right: '-0.5rem',
+                  width: isMobile ? '2.75rem' : '1.75rem',
+                  height: isMobile ? '2.75rem' : '1.75rem',
+                  padding: 0,
+                  border: 0,
+                  background: 'transparent',
+                  color: '#b6a78c',
+                  fontSize: '1.1rem',
+                  cursor: 'pointer',
+                  pointerEvents: 'auto',
+                }}
+              >×</button>
+            </div>
+          )}
         </div>
       )}
-      
-      {/* Mobile heading + intro text moved to the bottom overlay; see the
-          block rendered alongside the scroll viewer in the mobile overlays
-          section below. Keeps the top clear so the 3D scrolls are tappable. */}
+
+      {/* The title is an overlay: only its dismiss button captures taps. */}
 
       {/* Main content - hidden while loading */}
       <div style={{
@@ -1715,143 +1766,6 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
         {/* Left Column Overlay - Intro text and Scroll (Desktop, Tablet, and iPads) */}
         {(isDesktop || isTablet || deviceType.includes('ipad')) && (
           <>
-            {/* Intro text Section - positioned below heading */}
-            <div style={{
-              position: 'absolute',
-              left: '0',
-              top: '0',
-              width: '50%',
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'flex-start',
-              alignItems: 'center',
-              padding: '1rem',
-              paddingTop: isMobile ? '8rem' : '8rem',
-              zIndex: 1000,
-              pointerEvents: 'none'  // Allow clicks to pass through to the 3D scene
-            }}>
-              {/* Heading placeholder - keep structure */}
-              <div style={{
-                marginBottom: '1rem',
-                textAlign: 'center',
-                pointerEvents: 'none'
-              }}>
-                <div style={{ height: '4rem' }}></div>
-                
-                {/* Introduction text - Parchment style */}
-                {showIntroText && (
-                  <div style={{
-                    // marginTop: isTablet ? '0' : '0.5rem',
-                    padding: '0.5rem',
-                    background: 'linear-gradient(135deg, rgba(194, 154, 77, 0.2) 0%, rgba(142, 102, 43, 0.15) 50%, rgba(194, 154, 77, 0.2) 100%)',
-                    border: '3px double #8e662b',
-                    borderRadius: '0',
-                    maxWidth: '320px',
-                    margin: `${isTablet ? '1rem' : '0'} auto 0`,
-                    position: 'relative',
-                    pointerEvents: 'none', // Allow clicks to pass through the container
-                    boxShadow: `
-                      inset 0 0 30px rgba(142, 102, 43, 0.3),
-                      0 4px 8px rgba(0, 0, 0, 0.5),
-                      0 0 20px rgba(212, 175, 55, 0.1)
-                    `,
-                    clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%)'
-                  }}>
-                    {/* Decorative corner flourish */}
-                    <div style={{
-                      position: 'absolute',
-                      top: '-5px',
-                      left: '-5px',
-                      fontSize: '1.5rem',
-                      color: '#8e662b',
-                      opacity: 0.7,
-                      pointerEvents: 'none'
-                    }}>✦</div>
-                    <div style={{
-                      position: 'absolute',
-                      top: '-5px',
-                      right: '-5px',
-                      fontSize: '1.5rem',
-                      color: '#8e662b',
-                      opacity: 0.7,
-                      pointerEvents: 'none'
-                    }}>✦</div>
-                    
-                    {/* Main text content */}
-                    <p style={{
-                      color: '#d4af37',
-                      fontSize: '0.9rem',
-                      fontWeight: 500,
-                      letterSpacing: '0.03em',
-                      lineHeight: 1,
-                      margin: '0 0 0.5rem 0',
-                      textAlign: 'center',
-                      textShadow: `
-                        2px 2px 4px rgba(0, 0, 0, 0.9),
-                        0 0 20px rgba(212, 175, 55, 0.3)
-                      `,
-                      fontStyle: 'italic',
-                      pointerEvents: 'none'
-                    }}>
-                      Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, metaphysicist and medieval scholar.
-                    </p>
-                    
-                    {/* Additional flavor text */}
-                    {/* <p style={{
-                      color: '#c29a4d',
-                      fontFamily: 'Georgia, "Times New Roman", serif',
-                      fontSize: '0.95rem',
-                      lineHeight: 1.5,
-                      margin: 0,
-                      textAlign: 'center',
-                      textShadow: '1px 1px 3px rgba(0, 0, 0, 0.8)',
-                      opacity: 0.9,
-                      pointerEvents: 'none'
-                    }}>
-                      ✧ Click the scrolls to explore ancient wisdom ✧<br/>
-                    </p> */}
-                    
-                    {/* Close button - needs pointer events */}
-                    <button
-                      onClick={() => setShowIntroText(false)}
-                      style={{
-                        position: 'absolute',
-                        bottom: '-8px',
-                        right: '-8px',
-                        background: 'rgba(142, 102, 43, 0.4)',
-                        border: '1px solid #8e662b',
-                        color: '#8e662b',
-                        width: '1.2rem',
-                        height: '1.2rem',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.2s ease',
-                        padding: 0,
-                        opacity: 0.6,
-                        pointerEvents: 'auto' // Button needs to be clickable
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.opacity = '1';
-                        e.target.style.background = 'rgba(142, 102, 43, 0.6)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.opacity = '0.6';
-                        e.target.style.background = 'rgba(142, 102, 43, 0.4)';
-                      }}
-                      aria-label="Hide introduction"
-                      title="Hide this message"
-                    >
-                      ×
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-            
             {/* Scroll iframe - separate positioning based on device */}
             <div style={{
               position: 'absolute',
@@ -1859,7 +1773,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
               bottom: iframePos.bottom,
               width: iframePos.width,
               height: iframePos.height,
-              padding: '2rem',
+              padding: iframePos.scale ? 0 : '2rem',
               zIndex: 1000,
               pointerEvents: 'none'
             }}>
@@ -1891,13 +1805,15 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
                 
                 <iframe
                   ref={scrollIframeRef}
-                  src={currentScrollSrc}
+                  src={`${currentScrollSrc}${iframePos.ch ? `&ch=${iframePos.ch}` : ''}`}
                   onLoad={() => {
                     setIframeLoaded(true);
                   }}
                   style={{
-                    width: '100%',
-                    height: '100%',
+                    width: iframePos.scale ? `${100 / iframePos.scale}%` : '100%',
+                    height: iframePos.scale ? `${100 / iframePos.scale}%` : '100%',
+                    transform: iframePos.scale ? `scale(${iframePos.scale})` : undefined,
+                    transformOrigin: 'top left',
                     border: 'none',
                     pointerEvents: 'auto', // Allow iframe interaction
                     background: 'transparent',
@@ -2052,78 +1968,6 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
         {/* Mobile overlays - only show on actual mobile devices */}
         {windowWidth <= 768 && !deviceType.includes('ipad') && (
           <>
-            {/* MiniApp intro text - positioned above scroll area */}
-            {isMiniApp && showIntroText && (
-              <div style={{
-                position: 'absolute',
-                bottom: 'calc(40%)',
-                left: '1rem',
-                // right: '0.5rem',
-                zIndex: 6,
-                pointerEvents: 'none',
-              }}>
-                <div style={{
-                  padding: '0.4rem',
-                  background: 'linear-gradient(135deg, rgba(194, 154, 77, 0.2) 0%, rgba(142, 102, 43, 0.15) 50%, rgba(194, 154, 77, 0.2) 100%)',
-                  border: '2px double #8e662b',
-                  maxWidth: '280px',
-                  margin: '0 auto',
-                  position: 'relative',
-                  boxShadow: 'inset 0 0 20px rgba(142, 102, 43, 0.3), 0 3px 6px rgba(0, 0, 0, 0.5)',
-                  clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%)',
-                }}>
-                  <p style={{
-                    color: '#d4af37',
-                    fontSize: '0.72rem',
-                    fontWeight: 500,
-                    letterSpacing: '0.02em',
-                    lineHeight: 1.2,
-                    margin: 0,
-                    textAlign: 'center',
-                    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9), 0 0 15px rgba(212, 175, 55, 0.3)',
-                    fontStyle: 'italic',
-                  }}>
-                    Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, metaphysicist and medieval scholar.
-                  </p>
-                  <p style={{
-                    color: '#8e662b',
-                    fontSize: '0.65rem',
-                    margin: '0.3rem 0 0',
-                    textAlign: 'center',
-                    letterSpacing: '0.05em',
-                    textShadow: '1px 1px 3px rgba(0, 0, 0, 0.8)',
-                  }}>
-                    Tap the glowing scrolls to read
-                  </p>
-                  <button
-                    onClick={() => setShowIntroText(false)}
-                    style={{
-                      position: 'absolute',
-                      bottom: '-6px',
-                      right: '-6px',
-                      background: 'rgba(142, 102, 43, 0.4)',
-                      border: '1px solid #8e662b',
-                      color: '#8e662b',
-                      width: '1rem',
-                      height: '1rem',
-                      cursor: 'pointer',
-                      fontSize: '0.7rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: 0,
-                      opacity: 0.6,
-                      pointerEvents: 'auto'
-                    }}
-                    aria-label="Hide introduction"
-                    title="Hide this message"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* Scroll overlay for mobile/iPad - repositioned and resized based on device */}
             <div
               style={{
@@ -2273,32 +2117,14 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
                 >
                   <h1
                     style={{
-                      color: '#8e662b',
-                      fontFamily: 'UnifrakturCook, serif',
-                      textShadow: '3px 3px 5px #000, -1px -1px 5px pink',
+                      ...scrollHeadingStyle,
                       fontSize: windowWidth <= 480 ? '2.1rem' : '2.6rem',
-                      fontWeight: 700,
-                      lineHeight: 0.9,
-                      margin: 0,
                     }}
                   >
                     The Scrolls of St. GR80
                   </h1>
-                  <p
-                    style={{
-                      color: '#d4af37',
-                      fontSize: '1.2rem',
-                      fontWeight: 500,
-                      letterSpacing: '0.02em',
-                      lineHeight: 1.3,
-                      margin: 0,
-                      maxWidth: '30ch',
-                      textShadow:
-                        '2px 2px 4px rgba(0, 0, 0, 0.9), 0 0 15px rgba(212, 175, 55, 0.3)',
-                      fontStyle: 'italic',
-                    }}
-                  >
-                    Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, metaphysicist and medieval scholar.
+                  <p style={{ ...scrollIntroStyle, maxWidth: '36ch' }}>
+                    {SCROLL_INTRO}
                   </p>
                 </div>
               )}

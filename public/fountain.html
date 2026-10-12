@@ -11052,6 +11052,14 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			.coin-pocket.pulse .coin-pocket-btn {
 				animation: chipNudge 0.4s ease;
 			}
+            @media (min-width: 1200px) and (min-aspect-ratio: 1/1) {
+                .coin-pocket { bottom: max(1.25vw, env(safe-area-inset-bottom, 0px)); gap: max(8px, .5vw); }
+                .coin-pocket-btn { min-height: max(56px, 3.2vw); gap: max(12px, .7vw); padding: max(6px, .35vw) max(18px, 1vw) max(6px, .35vw) max(6px, .35vw); }
+                .coin-pocket-slot { width: max(42px, 2.5vw); height: max(42px, 2.5vw); }
+                .coin-pocket-coin { width: max(32px, 1.85vw); height: max(32px, 1.85vw); }
+                .coin-pocket-hint { font-size: max(16px, 1vw); }
+                .coin-pocket-cam { width: max(56px, 3.2vw); font-size: max(22px, 1.4vw); }
+            }
 			@media (max-width: 768px) {
 				/* The parent sizes this iframe to the VISIBLE viewport (top/bottom
 				   anchored, not 100vh), so a small lift is enough to clear the edge;

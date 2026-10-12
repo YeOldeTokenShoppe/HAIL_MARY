@@ -125,16 +125,16 @@ export default function ModernMusicPlayer({
           {...goldHover}
           style={{
             ...control,
-            width: "48px",
-            height: "48px",
+            width: "var(--music-control-size, 48px)",
+            height: "var(--music-control-size, 48px)",
             borderRadius: "10px",
           }}
           title="Play music"
           aria-label="Play music"
         >
           <svg
-            width="24"
-            height="24"
+            width="var(--music-icon-size, 24px)"
+            height="var(--music-icon-size, 24px)"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -152,7 +152,7 @@ export default function ModernMusicPlayer({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "8px",
+            gap: "var(--music-control-gap, 8px)",
           }}
         >
           {/* Spinning album art — play/pause. The ring is drawn over the art's
@@ -163,8 +163,8 @@ export default function ModernMusicPlayer({
             title={isPlaying ? "Pause music" : "Play music"}
             aria-label={isPlaying ? "Pause music" : "Play music"}
             style={{
-              width: "48px",
-              height: "48px",
+              width: "var(--music-control-size, 48px)",
+              height: "var(--music-control-size, 48px)",
               padding: 0,
               border,
               borderRadius: "50%",
@@ -185,14 +185,14 @@ export default function ModernMusicPlayer({
             {...goldHover}
             style={{
               ...control,
-              width: "36px",
-              height: "36px",
+              width: "var(--music-secondary-size, 36px)",
+              height: "var(--music-secondary-size, 36px)",
               borderRadius: "8px",
             }}
             title="Next Track"
             aria-label="Next track"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="var(--music-secondary-icon, 16px)" height="var(--music-secondary-icon, 16px)" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="5 4 15 12 5 20 5 4"/>
               <line x1="19" y1="5" x2="19" y2="19"/>
             </svg>
@@ -208,14 +208,14 @@ export default function ModernMusicPlayer({
             {...goldHover}
             style={{
               ...control,
-              width: "30px",
-              height: "30px",
+              width: "var(--music-close-size, 30px)",
+              height: "var(--music-close-size, 30px)",
               borderRadius: "8px",
             }}
             title="Close Music"
             aria-label="Close music"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="var(--music-close-icon, 12px)" height="var(--music-close-icon, 12px)" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"/>
               <line x1="6" y1="6" x2="18" y2="18"/>
             </svg>

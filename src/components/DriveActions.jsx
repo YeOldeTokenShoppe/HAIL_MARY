@@ -12,7 +12,7 @@ export default function DriveActions({ onBuy, onExplore }) {
     </div>
     <DriveSocialLinks />
     <style jsx>{`
-      .actions { position: fixed; right: 4vw; top: 69%; width: 31vw; z-index: 1001; pointer-events: auto; display: flex; flex-direction: column; align-items: center; gap: 24px; animation: action-reveal .7s ease both; }
+      .actions { position: relative; margin-top: clamp(24px, 3vh, 36px); width: 100%; z-index: 1001; pointer-events: auto; display: flex; flex-direction: column; align-items: center; gap: 24px; animation: action-reveal .7s ease both; }
       .buttons { display: flex; align-items: center; gap: 18px; width: 100%; max-width: 380px; }
       button { flex: 1; min-width: 0; min-height: 50px; padding: 12px 16px; white-space: nowrap; font-family: inherit; font-size: 18px; font-weight: 400; line-height: 1.2; letter-spacing: .025em; border: 2px solid transparent; border-radius: 2px; cursor: pointer; transition: transform .16s ease, background .16s ease, box-shadow .16s ease; }
       .buy { color: #171310; background: #fff4e8; border-color: #171310; box-shadow: 4px 4px 0 #171310; }
@@ -24,7 +24,12 @@ export default function DriveActions({ onBuy, onExplore }) {
       .explore:hover span, .explore:focus-visible span { transform: translateX(4px); }
       button:focus-visible { outline: 3px solid #fff4e8; outline-offset: 6px; }
       @keyframes action-reveal { from { opacity: 0; } to { opacity: 1; } }
-      @media (max-aspect-ratio: 1/1) { .actions { top: auto; bottom: max(4vh, env(safe-area-inset-bottom)); right: 5%; width: 90%; gap: 12px; } button { font-size: 17px; } }
+      @media (min-width: 1441px) and (min-aspect-ratio: 1/1) {
+        .actions { margin-top: 3vh; gap: min(1.67vw, 2.67vh); --drive-social-size: min(3.06vw, 4.89vh); --drive-social-icon: min(1.25vw, 2vh); --drive-social-gap: min(.83vw, 1.33vh); }
+        .buttons { max-width: 26.4vw; gap: 1.25vw; }
+        button { font-size: min(1.25vw, 2vh); min-height: min(3.47vw, 5.56vh); padding: min(.83vw, 1.33vh) 1.11vw; }
+      }
+      @media (max-aspect-ratio: 1/1) { .actions { position: fixed; margin-top: 0; top: auto; bottom: max(4vh, env(safe-area-inset-bottom)); right: 5%; width: 90%; gap: 12px; } button { font-size: 17px; } }
       @media (prefers-reduced-motion: reduce) { .actions { animation: none; } button, .explore span { transition: none; } .buy:hover, .buy:active, .explore:hover span, .explore:focus-visible span { transform: none; } }
     `}</style>
   </div>;

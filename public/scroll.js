@@ -125,7 +125,8 @@ if (/iPhone|Android/.test(navigator.userAgent)) {
 var $ = document.querySelector.bind(document);
 
 var container = $("#container");
-var isFlat = new URLSearchParams(window.location.search).get("flat") === "true";
+var query = new URLSearchParams(window.location.search);
+var isFlat = query.get("flat") === "true";
 
 if (isFlat) {
   container.style.transform = "translate(-50%, -50%)";
@@ -154,5 +155,14 @@ if (isFlat) {
     img.style.objectFit = "contain";
   });
 } else {
+  // ?ch=<percent>: how much of the iframe the flat body takes (the curls
+  // ride above and below it). The stylesheet's 50% / 500px cap left half
+  // of a tall desktop box empty; the host passes a figure that fits its
+  // box instead. Text size is the host's job (it scales the iframe).
+  var ch = parseFloat(query.get("ch"));
+  if (ch > 0) {
+    container.style.height = ch + "%";
+    container.style.maxHeight = "none";
+  }
   createScrollOverlay($("#content"), 20, num, theta);
 }
