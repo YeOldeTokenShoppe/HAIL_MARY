@@ -1675,6 +1675,12 @@ export default function OilPage() {
     if (p.get("arena") === "break") { setArenaRehearsal(true); setBreakRehearsal(Date.now()); }
   }, []);
   const lowGfx = qForce ? qForce === "low" : (isMobile || touchTier);
+  // Walk mode is keyboard-and-mouse (WASD + pointer look, C for the camera,
+  // Esc out), so it is desktop-only: phones never had it, and tablets lost it
+  // 2026-10-12 (Michelle) — an iPad reports a desktop layout but has no keys
+  // to steer with. Gates every WALK entry: toolbar, strip nav, the V2 core-
+  // sample card and the test-mode sandbox.
+  const walkAvailable = !isMobile && !touchTier;
   // Clouds: the low-poly GLB ring on EVERY tier (2026-10-06, Michelle — it
   // started as the tablet/phone experiment and she preferred it on desktop
   // too). ?clouds=drei brings the volumetric drei day clouds back for an A/B.
@@ -8288,7 +8294,7 @@ export default function OilPage() {
       {/* Test-mode walk entry — the real button lives on the V2 core-sample
           card (signed-in only); the sandbox needs its own door so the ground
           game (and the demon encounter) can be exercised without a claim. */}
-      {selectedX !== null && introComplete && !isMobile && (
+      {selectedX !== null && introComplete && walkAvailable && (
         <button
           onClick={() => setWalkMode(true)}
           style={{ ...drillBtnStyles.active, padding: "4px 10px", fontSize: 11, marginTop: 8, width: "100%" }}
@@ -8767,7 +8773,7 @@ export default function OilPage() {
         orders={{ autopilot: userDrill.autopilot === true, salvage: userDrill.orders?.salvage === true, caseOnHeat: userDrill.orders?.caseOnHeat === true }}
         casingArmed={userDrill.casingArmed === true}
         onSetOrders={handleSetOrders}
-        onWalk={introComplete ? () => setWalkMode(true) : undefined}
+        onWalk={introComplete && walkAvailable ? () => setWalkMode(true) : undefined}
       />
     </PanelSection>
   )) || coreSampleSpectator;
@@ -9902,7 +9908,7 @@ export default function OilPage() {
             />
             {/* Walk the field from wherever the camera is looking (the strip
                 nav has its own WALK while a stall is current). */}
-            {!isMobile && introComplete && !walkMode && !stripStop && (
+            {walkAvailable && introComplete && !walkMode && !stripStop && (
               <button type="button" title="Walk the field on foot from here" onClick={startFieldWalk} style={TOOLBAR_PILL}>🥾 WALK</button>
             )}
             <button type="button" onClick={goToSurveyMap} style={TOOLBAR_PILL}>FIELD SURVEY</button>
@@ -9945,7 +9951,7 @@ export default function OilPage() {
               </button>
               {/* Walk the boardwalk from here: the prospector drops onto the deck
                   at this stall. Hidden during a close-up (leave it first). */}
-              {!stripStop.focused && (
+              {walkAvailable && !stripStop.focused && (
                 <button type="button" title="Walk the boardwalk on foot" onClick={startBoardwalkWalk} style={TOOLBAR_PILL}>
                   🥾 WALK
                 </button>

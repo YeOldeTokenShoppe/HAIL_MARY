@@ -1447,9 +1447,9 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
       // the box the flat body takes (see public/scroll.js).
       'desktop': {
         left: '4%',
-        bottom: '5rem',
+        bottom: 'var(--exlibris-dock-clearance, 5rem)',
         width: '34%',
-        height: 'calc(100% - 20rem)',
+        height: 'calc(100% - 15rem - var(--exlibris-dock-clearance, 5rem))',
         scale: 1.45,
         ch: 62
       },

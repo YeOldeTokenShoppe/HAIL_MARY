@@ -8459,7 +8459,10 @@ export default function OilVoxelGrid({
         ))}
       </group>
 
-      {/* X axis labels (along front edge of top surface) */}
+      {/* X axis labels (along front edge of top surface). Cream + a thin dark
+          outline: the old #6b5b47 brown sank into every ground palette
+          (2026-10-12), and the outline keeps them legible on the pale day sand
+          as well as the night / Lyquid80 purples. */}
       {Array.from({ length: gridX }, (_, i) => {
         const x = -worldW / 2 + i * cellSize + cellSize / 2;
         return (
@@ -8467,7 +8470,10 @@ export default function OilVoxelGrid({
             key={`xl${i}`}
             position={[x, 0.3, worldD / 2 + 0.8]}
             fontSize={0.35}
-            color="#6b5b47"
+            color="#f4e7c6"
+            outlineWidth={0.025}
+            outlineColor="#2a1c0e"
+            outlineOpacity={0.85}
             anchorX="center"
             anchorY="middle"
             font={undefined}
@@ -8501,7 +8507,10 @@ export default function OilVoxelGrid({
             key={`yl${i}`}
             position={[-worldW / 2 - 0.8, 0.3, z]}
             fontSize={0.35}
-            color="#6b5b47"
+            color="#f4e7c6"
+            outlineWidth={0.025}
+            outlineColor="#2a1c0e"
+            outlineOpacity={0.85}
             anchorX="center"
             anchorY="middle"
             font={undefined}

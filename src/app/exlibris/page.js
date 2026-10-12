@@ -1,5 +1,7 @@
 "use client";
 
+import controls from "./controls.module.css";
+
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
@@ -83,7 +85,7 @@ export default function ModelViewerPage() {
 
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100dvh' }}>
+    <div className={controls.page} style={{ position: 'relative', width: '100%', height: '100dvh' }}>
       <Philosophy
         modelPath="/models/saint_robot3.glb"
         onLoadingChange={setIsPageLoading}
@@ -148,7 +150,7 @@ export default function ModelViewerPage() {
            reopens the last one after it's put away (see openScroll). */
         onBuyClick={openScroll}
         centerLabel={
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 30, height: 30, display: "block" }} aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: "var(--exlibris-scroll-icon, 30px)", height: "var(--exlibris-scroll-icon, 30px)", display: "block" }} aria-hidden="true">
             <path d="M15 12h-5" />
             <path d="M15 8h-5" />
             <path d="M19 17V5a2 2 0 0 0-2-2H4" />
@@ -166,7 +168,7 @@ export default function ModelViewerPage() {
           setShowMoreMenu((v) => !v);
         }}
         menuIcon={
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#2ad6ee" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, color: "#2ad6ee" }} aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#2ad6ee" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: "var(--exlibris-menu-icon, 24px)", height: "var(--exlibris-menu-icon, 24px)", color: "#2ad6ee" }} aria-hidden="true">
             <circle cx="12" cy="12" r="10" />
             <path d="M17 12h.01" />
             <path d="M12 12h.01" />
@@ -186,7 +188,7 @@ export default function ModelViewerPage() {
         bookLabel="BUY"
         bookTitle="Buy RL80"
         bookIcon={
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: "#39ff14", filter: "drop-shadow(0 0 4px rgba(57, 255, 20, 0.6))" }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: "var(--exlibris-buy-icon, 22px)", height: "var(--exlibris-buy-icon, 22px)", color: "#39ff14", filter: "drop-shadow(0 0 4px rgba(57, 255, 20, 0.6))" }}>
             <line x1="12" y1="1" x2="12" y2="23" />
             <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>

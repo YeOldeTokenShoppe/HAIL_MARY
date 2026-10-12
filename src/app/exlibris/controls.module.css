@@ -1,0 +1,31 @@
+@media (min-width: 1200px) and (min-aspect-ratio: 1/1) {
+  .page {
+    --exlibris-nav-unit: clamp(1px, .075vw, 2.8px);
+    --exlibris-dock-clearance: calc(96 * var(--exlibris-nav-unit));
+    --exlibris-scroll-icon: calc(30 * var(--exlibris-nav-unit));
+    --exlibris-menu-icon: calc(24 * var(--exlibris-nav-unit));
+    --exlibris-buy-icon: calc(22 * var(--exlibris-nav-unit));
+  }
+  .page :global(.btm-nav-bar) {
+    padding: calc(6 * var(--exlibris-nav-unit)) calc(4 * var(--exlibris-nav-unit)) calc(8 * var(--exlibris-nav-unit) + env(safe-area-inset-bottom, 0px));
+  }
+  .page :global(.btm-nav-item) {
+    max-width: calc(88 * var(--exlibris-nav-unit));
+    gap: calc(4 * var(--exlibris-nav-unit));
+    padding: calc(6 * var(--exlibris-nav-unit)) calc(2 * var(--exlibris-nav-unit));
+  }
+  .page :global(.btm-nav-icon) {
+    width: calc(32 * var(--exlibris-nav-unit));
+    height: calc(32 * var(--exlibris-nav-unit));
+  }
+  .page :global(.btm-nav-label), .page :global(.btm-buy-label) {
+    font-size: calc(11 * var(--exlibris-nav-unit));
+    letter-spacing: calc(.5 * var(--exlibris-nav-unit));
+  }
+  .page :global(.btm-buy-wrapper) { margin-top: calc(-28 * var(--exlibris-nav-unit)); }
+  .page :global(.btm-buy-fab), .page :global(.btm-buy-fab-wrap) {
+    width: calc(60 * var(--exlibris-nav-unit));
+    height: calc(60 * var(--exlibris-nav-unit));
+  }
+  .page :global(.btm-buy-label) { margin-top: calc(4 * var(--exlibris-nav-unit)); }
+}
