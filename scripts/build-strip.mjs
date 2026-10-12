@@ -201,7 +201,7 @@ cli("ktx2 f (meshopt)", ["meshopt", `${S}/e.glb`, K]);
 const rd = (p) => { const b = fs.readFileSync(p); return JSON.parse(b.slice(20, 20 + b.readUInt32LE(12)).toString()); };
 const a = rd(W), k = rd(K);
 const names = (g) => g.nodes.map((x) => x.name || "");
-const CRIT = ["Boardwalk", "Steps", "Step1", "SM_Prop_Mechanical_Bull_01_Saddle_01", "Photo_booth_Curtain", "FortuneTeller_Wagon_Empty", "Bull_Tent", "Toy_Claw_Empty", "Gachapon"];
+const CRIT = ["Boardwalk", "Steps", "Step1", "SM_Prop_Mechanical_Bull_01_Saddle_01", "Photo_booth_Curtain", "FortuneTeller_Wagon_Empty", "Bull_Tent", "Toy_Claw_Empty"];
 const problems = [];
 for (const [label, g] of [["webp", a], ["ktx2", k]]) {
   const n = names(g);

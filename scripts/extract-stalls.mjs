@@ -29,33 +29,37 @@ const { MeshoptDecoder } = await import("/Users/michellepaulson/HAIL_MARY/node_m
 const { MeshoptEncoder } = await import("meshoptimizer");
 await Promise.all([MeshoptDecoder.ready, MeshoptEncoder.ready]);
 
-// CommercialStrip4 (2026-10-05): the hot air balloon and the taco trailer left
-// the export, the prize wheel was renamed, and the claw machine and gachapon
-// arrived. Only carny / claw / gachapon have been re-extracted from it so far —
-// the other stall files on disk are still the CommercialStrip3 cut, whose
-// staging (VendorStage's STAGE_TUNE) was tuned against them. Re-cut those one
-// at a time with STALL_ONLY and check the card before keeping the result.
-const SRC = "public/models/CommercialStrip4_opt.glb";
+// Commercial_Strip8 (2026-10-10/11): every stall is cut from this build —
+// the tent revival now lives in the strip under Tent_Empty, the gachapon is
+// gone (too high-poly), the RIDES sign and the fold-out signs left with the
+// re-import, and the fortune teller's wagon exports at 0.9. All nine stalls
+// were re-cut from it on 2026-10-11 (bump VendorStage's STALL_V for any stall
+// re-cut again, or phones keep the old file for a year). After a strip
+// re-export, re-cut with STALL_ONLY one at a time and check the card before
+// keeping the result: VendorStage's STAGE_TUNE was tuned against these cuts.
+// The webp build, not the KTX2 one: the stall textures are re-encoded to 1k
+// webp here, so they need to arrive as pixels.
+const SRC = "public/models/Commercial_Strip8_opt.glb";
 const OUT = "public/models/stalls";
 // Z windows along the deck (strip-local), read off the node list; the anchor
 // is the catalog's `prop`. Everything top-level whose bounds centre falls in
 // the window (and is not strip-wide dressing) comes along.
 const STALLS = {
-  // The barker has no prop of his own any more: the anchor is the RIDES sign he
-  // stands by, and the window takes in the barricades and fold-out signs.
-  carny:     { anchor: "SM_Prop_Sign_Rides_01",          z: [-38.6, -30.25] },
+  // The barker has no prop of his own any more: the anchor is the RIDES
+  // barricade he stands by (SM_Prop_Sign_Rides_01 and the fold-out signs left
+  // the export in Strip8), and the window takes in the other barricades, the
+  // balloon and the trolley end of the ride.
+  carny:     { anchor: "SM_Prop_Barricade_03",           z: [-38.6, -30.25] },
   promos:    { anchor: "Prize_Wheel",                    z: [-30.2, -23.4] },
   fortunes:  { anchor: "FortuneTeller_Wagon_Empty",      z: [-15.6, -5.0] },
-  // The two machines: each is one top-level EMPTY holding every part its
-  // controller looks up by name, so the anchor alone is the whole stall. The
-  // claw's Claw_Demo clip targets only nodes under Toy_Claw_Empty and survives
-  // the prune with it.
+  // The claw machine: one top-level EMPTY holding every part its controller
+  // looks up by name, so the anchor alone is the whole stall. Its Claw_Demo
+  // clip targets only nodes under Toy_Claw_Empty and survives the prune with it.
   claw:      { anchor: "Toy_Claw_Empty",                 z: [-4.6, -2.8] },
-  gachapon:  { anchor: "Gachapon",                       z: [-2.4, -1.3] },
-  // Commercial_Strip8 (2026-10-10): the tent revival moved INTO the strip under
+  // Commercial_Strip8 (2026-10-10): the tent revival lives IN the strip under
   // Tent_Empty (tent, stage, chairs, seated robot + biker; the preacher stays a
-  // vendor GLB). Cutting it needs SRC on the Strip8 build — the file above has
-  // no tent. Until then VendorStage keeps the old stall_chapel.glb.
+  // vendor GLB). The anchor is the tent itself; the cut walks up to Tent_Empty
+  // so the whole revival comes along, with its Robot_Sit / Biker_Sit clips.
   chapel:    { anchor: "SM_Bld_Tent_01",                 z: [-0.8, 7.5] },
   hotdogs:   { anchor: "SM_Veh_Hotdog_Cart_01",          z: [7.6, 12.6] },
   rugs:      { anchor: "SM_Prop_Market_Stall_05",        z: [12.9, 18.6] },
@@ -64,7 +68,7 @@ const STALLS = {
   // souvenirs: the catalog's "SM_Prop_Tent_02 (24)" is not in the strip — no stall to extract (off the phone row for now).
 };
 const ONLY = (process.env.STALL_ONLY || "").split(",").map((x) => x.trim()).filter(Boolean);
-const EXCLUDE = /^(Boardwalk$|SM_Prop_Bunting_Pole|SM_Prop_Light_0|Spotlight|SC_CincoDeMayo|Photo_booth|Booth_|Text|Point|Wire|StringLight|SM_Prop_Mechanical_Bull|Bull_Tent|Claw_Machine|Toy_Claw_Empty|Gachapon$|Vending_Machine|ATM$)/;
+const EXCLUDE = /^(Boardwalk$|SM_Prop_Bunting_Pole|SM_Prop_Light_0|Spotlight|SC_CincoDeMayo|Photo_booth|Booth_|Text|Point|Wire|StringLight|SM_Prop_Mechanical_Bull|Bull_Tent|Claw_Machine|Toy_Claw_Empty|Vending_Machine|ATM$)/;
 const DECK = "Boardwalk";
 const MAX_X = 4.7;   // beyond the deck edge = the strip's back-of-house dressing
 const SIZE = Number(process.env.STALL_TEX || 1024);

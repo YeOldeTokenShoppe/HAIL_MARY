@@ -31,10 +31,10 @@ export const VENDOR_SITEPAL_EMBED_PARAMS =
 // Mutable export, read every frame — tune live from the console via
 // window.__vendorSitePalCrop then paste the values back here.
 export const FORTUNES_SITEPAL_CROP = {
-  cropX: 195,
-  cropY: 124,
-  cropW: 180,
-  cropH: 202,
+  cropX: 186,
+  cropY: 109,
+  cropW: 209,
+  cropH: 235,
   rotateZ: 0,
   rotateX: 0,
 };
@@ -42,11 +42,11 @@ export const FORTUNES_SITEPAL_CROP = {
 // Color correction (CSS filter values; 100 = identity) — SitePal frames come
 // back washed out. Also mutable/live like the crop.
 export const FORTUNES_SITEPAL_FILTER = {
-  saturate: 265,
-  contrast: 181,
-  brightness: 30,
-  hueRotate: -9,
-  sepia: 51,
+  saturate: 186,
+  contrast: 124,
+  brightness: 32,
+  hueRotate: -35,
+  sepia: 29,
 };
 
 
@@ -317,6 +317,7 @@ export const VENDOR_SITEPAL_CONFIG = {
     regularFaces: ["Face1", "Face2"],
     crop: FORTUNES_SITEPAL_CROP,
     filter: FORTUNES_SITEPAL_FILTER,
+    skinTarget: "#eab094",
     // Recorded-track names (2026-10-06): `audio` = the SitePal Audio Manager track
     // for this line (render with scripts/render-chapel-sermons.mjs --vendor fortunes);
     // flip greetingsUseTracks once they are uploaded. Day-number lines were reworded.

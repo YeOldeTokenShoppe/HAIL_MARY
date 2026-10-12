@@ -22,41 +22,41 @@ import { VendorModel, CompanionModel, VENDOR_CATALOG, pinVendorPoseModel, getCho
 import { activateVendorSitePal, deactivateVendorSitePal, warmVendorSitePal, onVendorTalk } from "@/lib/vendorSitePal";
 import { goodsForVendor } from "@/lib/oilVendor";
 import ClawMachineController from "@/components/ClawMachineController";
-import GachaponController from "@/components/GachaponController";
 import PrizeWheelController from "@/components/PrizeWheelController";
 
 export const BOARDWALK_NAMES = {
-  tonics: "REMEDIES", fortunes: "FORTUNES", hotdogs: "HOT DOGS", tacos: "TACOS", promos: "PROMOS",
-  rugs: "TRADER BROS", tattoos: "TATTOOS", carny: "CARNY", souvenirs: "SOUVENIRS", chapel: "CHAPEL",
-  claw: "PRIZE CLAW", gachapon: "GACHAPON",
+  tonics: "REMEDIES", fortunes: "FORTUNES", hotdogs: "HOT DOGS", tacos: "TACOS", promos: "MERCH",
+  rugs: "TRADER BROS", tattoos: "TATTOOS", carny: "RIDES", souvenirs: "SOUVENIRS", chapel: "REVIVAL TENT",
+  claw: "CLAW MACHINE",
 };
-// The two MACHINES on the deck (2026-10-05). They are not vendors — no
-// character, no SitePal, nothing in VENDOR_CATALOG — so the stage carries its
-// own entries for them. `root` is the machine's top node in its stall GLB (the
+// The MACHINE on the deck (2026-10-05; the gachapon was cut 2026-10-11 — too
+// high-poly). It is not a vendor — no character, no SitePal, nothing in
+// VENDOR_CATALOG — so the stage carries its own entry for it. `root` is the machine's top node in its stall GLB (the
 // name its controller looks up); `fitH` is how tall it stands inside the card.
 // Stepped in, the SAME controller the desktop strip mounts runs against the
 // stall scene, so the game is the desktop's game, not a port of it.
 export const GAME_STALLS = [
   { id: "claw", game: "claw", root: "Toy_Claw_Empty", fitH: 0.62, accent: "#ff7a9c" },
-  { id: "gachapon", game: "gachapon", root: "Gachapon", fitH: 0.5, accent: "#5fe9ff" },
 ];
 const stageEntry = (id) => VENDOR_CATALOG.find((v) => v.id === id) || GAME_STALLS.find((g) => g.id === id) || VENDOR_CATALOG[0];
 // Row order on the phone (2026-10-10): the deck walked from the rides end —
-// carny, the prize wheel, the fortune teller, the two machines, the revival
+// carny, the prize wheel, the fortune teller, the claw machine, the revival
 // tent, the hot dog cart, Trader Bros (the rug seller's card table), the
 // salesman, the tattoo tent. The souvenir tent is off the row (its prop is not
 // in the strip export). The photo booth has no phone card yet (no stall cut, no
 // postcard) — it is the desktop rig only.
-export const BOARDWALK_ORDER = ["carny", "promos", "fortunes", "claw", "gachapon", "chapel", "hotdogs", "rugs", "tonics", "tattoos"];
+export const BOARDWALK_ORDER = ["carny", "promos", "fortunes", "claw", "chapel", "hotdogs", "rugs", "tonics", "tattoos"];
 export const postcardUrl = (id) => `/boardwalk/${id}.webp`;
 export const plateUrl = (id) => `/boardwalk/${id}-plate.webp`;
-// a vendor with its own `stallModel` loads that exact, versioned URL (none today:
-// the chapel's tent moved into the strip GLB in Commercial_Strip8, 2026-10-10, so
-// its phone card falls through to the old stall_chapel.glb until it is re-cut
-// with scripts/extract-stalls.mjs from a Strip8 build)
+// the row's tile: a tight close-up (render-postcards.mjs --thumbs), not the card's medium shot
+export const thumbUrl = (id) => `/boardwalk/${id}-thumb.webp`;
+// a vendor with its own `stallModel` loads that exact, versioned URL (none today;
+// every stall, the chapel included, is cut from the strip by scripts/extract-stalls.mjs).
 // STALL_V busts the cache for a stall re-cut from a newer strip export (same
 // file name, different contents — a phone would keep the old one for a year).
-const STALL_V = { carny: 4, claw: 4, gachapon: 4 };
+// All nine were re-cut from Commercial_Strip8 on 2026-10-11 (v5); bump the one
+// you re-cut.
+const STALL_V = { carny: 5, promos: 6, fortunes: 5, claw: 5, chapel: 5, hotdogs: 5, rugs: 5, tonics: 5, tattoos: 5 };
 export const stallUrl = (id) => VENDOR_CATALOG.find((v) => v.id === id)?.stallModel || `/models/stalls/stall_${id}.glb${STALL_V[id] ? `?v=${STALL_V[id]}` : ""}`;
 
 // Step up to a stall: MUST run inside the user's tap. activateVendorSitePal
@@ -131,7 +131,21 @@ const STAGE_TUNE = {
   // phone cardFitDistance backs the camera off to fit the card (≈2.0 at 390 px)
   // and it ends up outside, staring at the partition — a brown card (2026-10-10).
   // The stall comes forward by the same amount, so the camera stays in the doorway.
-  fortunes: { restYaw: 0, openYaw: 0, restShift: [0.02, -0.03, -0.04], restScale: 1.55, noSlide: true, keepPropsOnBack: true, hideOnBack: ["SM_Veh_Wagon_01_Door_02"], backShiftZ: 0.5, backShiftY: 0.14, followCamera: true },
+  // restPitch: since the Strip8 re-cut (2026-10-11) the crystal ball sat squarely
+  // over her face from the level card camera. Turning the stall (restYaw) swings
+  // the ball aside but drags the doorway post across the card; tipping the stall
+  // 0.22 rad toward the camera instead looks down on the table, the ball drops
+  // below her chin and she stays centred (the stall sits 0.03 lower to keep her
+  // hat off the top edge). Rest only — stepped in, the face camera takes over.
+  // lightScale: the card's four-light rig at 0.7 — at full strength her face
+  // (and the projected one, matched to it) read pale and washed out.
+  // faceCamera: the shared FACE_CAMERA sits under her eyeline, 0.4 out, and
+  // from there the ball (0.9 strip units in front of her face) fills the
+  // screen over her mouth. Hers comes in a little higher, a hand to the right
+  // and looks down at the bridge of her nose, so the ball drops to the lower
+  // left and her face is clear. (A blank face in a headless shot of this view
+  // means SitePal was blocked: the projection plate is live but no crop came.)
+  fortunes: { restYaw: 0, restPitch: 0.22, lightScale: 0.5, faceCamera: { position: [0.12, 0.15, 0.42], target: [0.02, 0.085, 0] }, openYaw: 0, restShift: [0.02, -0.06, -0.04], restScale: 1.55, noSlide: true, keepPropsOnBack: true, hideOnBack: ["SM_Veh_Wagon_01_Door_02"], backShiftZ: 0.5, backShiftY: 0.14, followCamera: true },
   // The tattoo tent is 1.45 × 1.28 at the plain fit against a 0.56 × 0.78
   // window, so only fragments showed (and seated, she is INSIDE it, its front
   // between her and the camera). At rest the whole stall scales to 0.6 about
@@ -182,7 +196,7 @@ function cardFitDistance(camera, size) {
   return Math.max(tuned, needH, needW);
 }
 
-function StageCamera({ open, gameCam }) {
+function StageCamera({ open, gameCam, faceCam = FACE_CAMERA }) {
   const { camera, size } = useThree();
   const tmp = useMemo(() => ({ p: new THREE.Vector3(), t: new THREE.Vector3(), cur: new THREE.Vector3(...STAGE_CAMERA.target), dir: new THREE.Vector3() }), []);
   useEffect(() => {
@@ -193,7 +207,7 @@ function StageCamera({ open, gameCam }) {
   useFrame((_, dt) => {
     const game = open ? gameCam?.current : null;
     if (game) { tmp.p.copy(game.position); tmp.t.copy(game.target); }
-    else if (open) { tmp.p.set(...FACE_CAMERA.position); tmp.t.set(...FACE_CAMERA.target); }
+    else if (open) { tmp.p.set(...faceCam.position); tmp.t.set(...faceCam.target); }
     else {
       // Card view: the tuned direction, pushed back until the card fits.
       tmp.t.set(...STAGE_CAMERA.target);
@@ -280,23 +294,18 @@ function StallProps({ id, frontRef, keepOnBack = false, hideOnBack = null, showO
   // A machine's touches. The desktop strip forwards onClick, but a touch does
   // not reliably produce the browser "click" R3F builds that from (and a knob
   // tap is a pointerdown the controller has already claimed as a drag), so the
-  // stage makes its own tap out of a down/up pair in one spot:
-  //  · the pair is watched on the window, ahead of R3F, because the gachapon's
-  //    reveal veil swallows the 3D pointerdown — and once the capsule is up the
-  //    whole screen is its business (tapReveal: a tap anywhere opens it, the
-  //    next puts it away), whether or not the ray lands on the stall;
-  //  · otherwise the 3D pointerup hands the tap to handleClick. It fires once
-  //    per mesh along the ray, nearest first; the first one taken ends the tap.
+  // stage makes its own tap out of a down/up pair in one spot: the pointerdown
+  // is noted on the canvas, and the 3D pointerup hands the tap to handleClick.
+  // It fires once per mesh along the ray, nearest first; the first one taken
+  // ends the tap. (The window-level pair that fed the gachapon's full-screen
+  // capsule reveal went with the gachapon, 2026-10-11.)
   const tap = useRef(null);
   const gl = useThree((st) => st.gl);
   useEffect(() => {
     if (!interaction) return;
-    const fresh = (n) => { const t = tap.current; return t && !t.done && t.id === n.pointerId && performance.now() - t.t < 600 && Math.hypot(n.clientX - t.x, n.clientY - t.y) < 10; };
     const down = (n) => { tap.current = n.target === gl.domElement ? { id: n.pointerId, x: n.clientX, y: n.clientY, t: performance.now(), done: false } : null; };
-    const up = (n) => { if (fresh(n) && interaction.current?.tapReveal?.()) tap.current.done = true; };
     window.addEventListener("pointerdown", down, true);
-    window.addEventListener("pointerup", up, true);
-    return () => { window.removeEventListener("pointerdown", down, true); window.removeEventListener("pointerup", up, true); };
+    return () => { window.removeEventListener("pointerdown", down, true); };
   }, [interaction, gl]);
   const onDown = (e) => { interaction.current?.handlePointerDown?.(e); };
   const onUp = (e) => {
@@ -332,13 +341,11 @@ const TOY_HEAD_PAD = 0.07;
 // scene and stands in for the three things CommercialStrip gives it —
 //  · the camera: onFocusObject(at, normal, dist) becomes the stage's gameCam;
 //  · focus: a local state, so "another stall took the camera" still resolves;
-//  · the way out: the controller's own Exit (and the gachapon's click-away)
-//    call onZoomOut, which steps back out of the card.
-// Entry and exit ride the controllers' existing window events, the same door
+//  · the way out: the controller's own Exit calls onZoomOut, which steps back
+//    out of the card.
+// Entry and exit ride the controller's existing window events, the same door
 // the walker uses on the desktop.
-// The gachapon's controller stays mounted at rest too: it is what hides the
-// prize capsule until one is earned (without it a capsule sits in the tray on
-// the card). The claw's mounts only once stepped in — its lever and button
+// The claw's controller mounts only once stepped in — its lever and button
 // listen on the whole canvas and would start a game through the card.
 function GameHost({ entry, scene, animations, interaction, gameCam, onStepBack, open }) {
   const [focus, setFocus] = useState(null);
@@ -354,11 +361,9 @@ function GameHost({ entry, scene, animations, interaction, gameCam, onStepBack, 
     return () => { clearTimeout(t); window.dispatchEvent(new CustomEvent("hm-vendor-exit")); gameCam.current = null; };
   }, [open, entry.game, scene, gameCam]);
   const shared = { stripScene: scene, interactionRef: interaction, focus, onFocusChange: setFocus, onFocusObject, onZoomOut: onStepBack, stripScale: 1 };
-  return entry.game === "claw"
-    ? <ClawMachineController {...shared} animations={animations} touch />
-    : <GachaponController {...shared} closeOnCabinetClick={false} />;
+  return <ClawMachineController {...shared} animations={animations} touch />;
 }
-function StageStall({ vendor, focusedRef, frontRef, cardYawRef, open = false, gameCam = null, onStepBack }) {
+function StageStall({ vendor, focusedRef, openRef = null, frontRef, cardYawRef, open = false, gameCam = null, onStepBack }) {
   // Two levels: the OUTER group turns and slides in world space, the INNER group
   // carries the fit (scale + the offset that puts the vendor's bones at the
   // origin). Rotating the outer therefore pivots the whole stall around the
@@ -426,7 +431,9 @@ function StageStall({ vendor, focusedRef, frontRef, cardYawRef, open = false, ga
         // the sideways nudge centres the STALL at rest; on the back the vendor is the subject, so it fades out
         o.position.set(sh[0] * k * (1 - back), (sh[1] - (TUNE.backY ?? tune.backShiftY ?? 0) * back) * k, slide.current + (sh[2] + (TUNE.back ?? tune.backShiftZ ?? 0) * back + follow) * toward * k);
         // backPitch: the level card camera "looks down" over her shoulder by pitching the interior up toward it
-        o.rotation.x = (TUNE.backPitch ?? tune.backPitch ?? 0) * back * k;
+        // restPitch: tip the stall toward the camera at rest, so the level card camera looks a little
+        // DOWN on the scene — what lifts a seated face clear of a prop standing in front of it.
+        o.rotation.x = ((tune.restPitch ?? 0) * (1 - back) + (TUNE.backPitch ?? tune.backPitch ?? 0) * back) * k;
         o.scale.setScalar(1 + ((tune.restScale || 1) - 1) * k);
       }
       return;
@@ -479,7 +486,7 @@ function StageStall({ vendor, focusedRef, frontRef, cardYawRef, open = false, ga
         <Suspense fallback={null}><StallProps id={vendor.id} frontRef={frontRef} keepOnBack={!!tune?.keepPropsOnBack || !!vendor.game} hideOnBack={tune?.hideOnBack || null} showOnBack={tune?.showOnBack || null} onScene={setStallScene} playClips={vendor.game !== "claw"} interaction={vendor.game || STALL_TOY[vendor.id] ? interaction : null} /></Suspense>
         {hasCharacter && (
           <group position={vendor.offset || [0, 0, 0]}>
-            <VendorModel vendor={vendorEff} focusedRef={focusedRef} headRef={headRef} stripScene={stallScene} stripRotY={rotY} />
+            <VendorModel vendor={vendorEff} focusedRef={focusedRef} projectRef={openRef} headRef={headRef} stripScene={stallScene} stripRotY={rotY} />
             {/* the pose's companion (the tattoo client in the chair), authored in the same frame */}
             {vendorEff.companionModel && (
               <group userData={{ hmCompanion: true }}>
@@ -489,7 +496,7 @@ function StageStall({ vendor, focusedRef, frontRef, cardYawRef, open = false, ga
           </group>
         )}
       </group>
-      {vendor.game && stallScene && (open || vendor.game === "gachapon") && (
+      {vendor.game && stallScene && open && (
         <GameHost entry={vendor} scene={stallScene} animations={stall.animations} interaction={interaction} gameCam={gameCam} onStepBack={onStepBack} open={open} />
       )}
       {STALL_TOY[vendor.id] === "wheel" && stallScene && (
@@ -512,6 +519,9 @@ export default function VendorStage({ vendorId = "tonics", open = false, onToggl
   // Without a voice the greeting window alone covers the first FOCUS_GRACE seconds.
   const FOCUS_GRACE = 7, FOCUS_LINGER = 2.5;
   const focusedRef = useRef(open);
+  // The SitePal face projection follows the STEP-IN, not the talk window:
+  // it stays on her for the whole visit and fades only on the way out.
+  const openRef = useRef(open); openRef.current = open;
   const talk = useRef({ talking: false, endedAt: 0, openedAt: 0 });
   useEffect(() => { talk.current.openedAt = open ? performance.now() : 0; if (!open) focusedRef.current = false; }, [open]);
   useEffect(() => {
@@ -589,9 +599,10 @@ export default function VendorStage({ vendorId = "tonics", open = false, onToggl
     sp.target = null; stepUpVendor(vendor.id); onToggle?.();
   };
   const name = BOARDWALK_NAMES[vendor.id] || vendor.id.toUpperCase();
+  const lightScale = STAGE_TUNE[vendor.id]?.lightScale ?? 1;
   return (
     <group name="vendor-stage">
-      <StageCamera open={open} gameCam={gameCam} />
+      <StageCamera open={open} gameCam={gameCam} faceCam={STAGE_TUNE[vendor.id]?.faceCamera || FACE_CAMERA} />
       <group ref={card} position={[0, 0.04, 0]}>
       {/* rim in the stall's accent: a border THINNER than the card, centred on it,
           so both portal faces stand proud of it — the back of the card is a
@@ -610,19 +621,23 @@ export default function VendorStage({ vendorId = "tonics", open = false, onToggl
             and capsule are R3F handlers INSIDE the portal); everywhere else the
             card itself does — flip, spin, step in, tap to step back. */}
         <MeshPortalMaterial ref={portal} blend={0} side={THREE.DoubleSide} resolution={lowTier ? 512 : 1024} events={(isGame || !!STALL_TOY[vendor.id]) && open}>
-          <ambientLight intensity={0.9} />
-          <directionalLight position={[0.6, 1.2, 1.4]} intensity={1.6} />
-          <directionalLight position={[-0.8, 0.6, 0.4]} intensity={0.5} color="#ffd9b0" />
+          {/* lightScale (STAGE_TUNE): one knob over the whole rig for a stall
+              whose scene reads washed out — the fortune teller's wagon is
+              lit by one glowing ball on the desktop, and her face went pale
+              under the card's full daylight rig (2026-10-11). */}
+          <ambientLight intensity={0.9 * lightScale} />
+          <directionalLight position={[0.6, 1.2, 1.4]} intensity={1.6 * lightScale} />
+          <directionalLight position={[-0.8, 0.6, 0.4]} intensity={0.5 * lightScale} color="#ffd9b0" />
           {/* The lights ride inside the portal, so they turn with the card: on the
               flipped card the key sits BEHIND whatever faces the camera — the
               chapel's congregation looked unlit while the preacher's back shone.
               A fill from the card's back side lights that view (and rims the
               front view a little). */}
-          <directionalLight position={[-0.3, 0.9, -1.4]} intensity={1.5} />
+          <directionalLight position={[-0.3, 0.9, -1.4]} intensity={1.5 * lightScale} />
           <PortalSky top={sky?.top} bottom={sky?.bottom} />
           <Suspense fallback={null}>
             <Backdrop id={vendor.id} />
-            <StageStall key={vendor.id} vendor={vendor} focusedRef={focusedRef} frontRef={frontRef} cardYawRef={cardYawRef} open={open} gameCam={gameCam} onStepBack={stepBack} />
+            <StageStall key={vendor.id} vendor={vendor} focusedRef={focusedRef} openRef={openRef} frontRef={frontRef} cardYawRef={cardYawRef} open={open} gameCam={gameCam} onStepBack={stepBack} />
           </Suspense>
         </MeshPortalMaterial>
       </RoundedBox>
@@ -634,7 +649,33 @@ export default function VendorStage({ vendorId = "tonics", open = false, onToggl
 // ── DOM: the postcard row + the step-up control, overlaid on the phone canvas ──
 const mono = { fontFamily: "'Share Tech Mono', monospace", letterSpacing: "0.1em" };
 const panel = { background: "rgba(14,10,12,0.78)", border: "1px solid rgba(255,140,90,0.45)", borderRadius: 6, color: "#ffd9c9", backdropFilter: "blur(4px)" };
+// Postcard row sizing (2026-10-11: 64×86 / 7px → 80×107 / 9px, "a little
+// bigger"). The deck strip under the row and the ‹ › handles size off these.
+const POSTCARD_W = 80, POSTCARD_H = 107, POSTCARD_GAP = 10, POSTCARD_FONT = 9;
+const POSTCARD_ROW_BOTTOM = 10;
 export function BoardwalkStrip({ vendorId, onSelect, open, onToggleOpen, children }) {
+  // Keep the selected postcard in view: the ‹ › handles step through
+  // BOARDWALK_ORDER (wrapping), and whichever way a card was chosen the row
+  // scrolls it to the centre.
+  const rowRef = useRef(null);
+  useEffect(() => {
+    const row = rowRef.current; if (!row || open) return;
+    const el = row.querySelector(`[data-postcard="${vendorId}"]`);
+    if (el && typeof el.scrollIntoView === "function") { try { el.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }); } catch {} }
+  }, [vendorId, open]);
+  const step = (dir) => {
+    const i = BOARDWALK_ORDER.indexOf(vendorId);
+    const next = BOARDWALK_ORDER[(i + dir + BOARDWALK_ORDER.length) % BOARDWALK_ORDER.length];
+    warmBoardwalk("postcard:" + next); onSelect?.(next);
+  };
+  const handle = (dir) => (
+    <button type="button" aria-label={dir < 0 ? "Previous stall" : "Next stall"} onClick={() => step(dir)}
+      style={{ ...panel, ...mono, position: "absolute", [dir < 0 ? "left" : "right"]: `calc(4px + env(safe-area-inset-${dir < 0 ? "left" : "right"}, 0px))`,
+        bottom: POSTCARD_ROW_BOTTOM + POSTCARD_H / 2 - 24, width: 36, height: 48, padding: 0, fontSize: 24, lineHeight: "46px", textAlign: "center",
+        cursor: "pointer", pointerEvents: "auto", color: "#ffd27a", background: "rgba(14,10,12,0.92)", border: "1px solid rgba(255,210,122,0.75)", boxShadow: "0 0 10px rgba(0,0,0,0.6)", zIndex: 1 }}>
+      {dir < 0 ? "‹" : "›"}
+    </button>
+  );
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 4 }}>
       {/* At rest the card and the postcards are the whole scene — a tap on the
@@ -654,17 +695,19 @@ export function BoardwalkStrip({ vendorId, onSelect, open, onToggleOpen, childre
       {open && children && <div style={{ position: "absolute", left: "calc(8px + env(safe-area-inset-left, 0px))", bottom: "calc(10px + env(safe-area-inset-bottom, 0px))", pointerEvents: "auto" }}>{children}</div>}
       {/* the deck under the postcards — Wood_FloorBoards turned 90° so the planks
           run away from the viewer (public/boardwalk/deck.webp), tiled along the row */}
-      {!open && <div aria-hidden style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 110, backgroundImage: "linear-gradient(to bottom, rgba(10,6,8,0.45), rgba(0,0,0,0) 18%), url(/boardwalk/deck.webp)", backgroundRepeat: "no-repeat, repeat-x", backgroundSize: "100% 100%, auto 260%", backgroundPosition: "0 0, 0 35%", filter: "brightness(1.35) saturate(1.1)", boxShadow: "inset 0 8px 12px -8px rgba(0,0,0,0.8)" }} />}
+      {!open && <div aria-hidden style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: POSTCARD_ROW_BOTTOM + POSTCARD_H + 16, backgroundImage: "linear-gradient(to bottom, rgba(10,6,8,0.45), rgba(0,0,0,0) 18%), url(/boardwalk/deck.webp)", backgroundRepeat: "no-repeat, repeat-x", backgroundSize: "100% 100%, auto 260%", backgroundPosition: "0 0, 0 35%", filter: "brightness(1.35) saturate(1.1)", boxShadow: "inset 0 8px 12px -8px rgba(0,0,0,0.8)" }} />}
       {/* postcards — the boardwalk at rest; hidden while stepped into a stall */}
-      {!open && <div style={{ position: "absolute", left: 0, right: 0, bottom: 10, display: "flex", gap: 8, overflowX: "auto", padding: "0 8px", pointerEvents: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
+      {!open && handle(-1)}
+      {!open && handle(1)}
+      {!open && <div ref={rowRef} style={{ position: "absolute", left: 0, right: 0, bottom: POSTCARD_ROW_BOTTOM, display: "flex", gap: POSTCARD_GAP, overflowX: "auto", padding: "0 40px", pointerEvents: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", scrollSnapType: "x proximity" }}>
         {BOARDWALK_ORDER.map((id) => {
           const on = id === vendorId;
           return (
-            <button key={id} type="button" aria-label={BOARDWALK_NAMES[id] || id} aria-pressed={on} onClick={() => { warmBoardwalk("postcard:" + id); onSelect?.(id); }}
-              style={{ flex: "0 0 auto", width: 64, height: 86, padding: 0, borderRadius: 6, overflow: "hidden", cursor: "pointer", background: "#1a1214",
-                border: on ? "2px solid #ffd27a" : "1px solid rgba(255,140,90,0.45)", boxShadow: on ? "0 0 10px rgba(255,210,122,0.45)" : "none", position: "relative" }}>
-              <img src={postcardUrl(id)} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: on ? 1 : 0.8 }} />
-              <span style={{ ...mono, position: "absolute", left: 0, right: 0, bottom: 0, fontSize: 7, padding: "3px 2px", background: "rgba(0,0,0,0.55)", color: on ? "#ffd27a" : "#ffd9c9", textAlign: "center" }}>{BOARDWALK_NAMES[id]}</span>
+            <button key={id} type="button" data-postcard={id} aria-label={BOARDWALK_NAMES[id] || id} aria-pressed={on} onClick={() => { warmBoardwalk("postcard:" + id); onSelect?.(id); }}
+              style={{ flex: "0 0 auto", width: POSTCARD_W, height: POSTCARD_H, padding: 0, borderRadius: 7, overflow: "hidden", cursor: "pointer", background: "#1a1214", scrollSnapAlign: "center",
+                border: on ? "2px solid #ffd27a" : "1px solid rgba(255,140,90,0.45)", boxShadow: on ? "0 0 12px rgba(255,210,122,0.5)" : "none", position: "relative" }}>
+              <img src={thumbUrl(id)} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: on ? 1 : 0.8 }} />
+              <span style={{ ...mono, position: "absolute", left: 0, right: 0, bottom: 0, fontSize: POSTCARD_FONT, padding: "4px 2px", background: "rgba(0,0,0,0.6)", color: on ? "#ffd27a" : "#ffd9c9", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{BOARDWALK_NAMES[id]}</span>
             </button>
           );
         })}

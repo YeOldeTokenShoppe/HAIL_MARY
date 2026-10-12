@@ -39,12 +39,12 @@ try { await preview.first().waitFor({ timeout: 15000 }); await preview.first().c
 // POSTCARD_ONLY=chapel,tonics renders just those stalls (the rest keep their
 // files); POSTCARD_MIN is how many stalls must register before shooting (8 since
 // the taco stall retired, 2026-09-04).
-// The two machines (claw, gachapon) register for the walker only — a position
-// and an eye height, no approach or framing hints — so they borrow the deck's
-// approach from any vendor and get a medium shot of their own (MACHINE_DIST,
-// in framing units, before SHOT_DIST_MULT).
-const MACHINES = ["claw", "gachapon"];
-const MACHINE_DIST = { claw: 0.17, gachapon: 0.105 };
+// The claw machine registers for the walker only — a position and an eye
+// height, no approach or framing hints — so it borrows the deck's approach
+// from any vendor and gets a medium shot of its own (MACHINE_DIST, in framing
+// units, before SHOT_DIST_MULT).
+const MACHINES = ["claw"];
+const MACHINE_DIST = { claw: 0.17 };
 const ONLY = (process.env.POSTCARD_ONLY || "").split(",").map((s) => s.trim()).filter(Boolean);
 const MIN = Number(process.env.POSTCARD_MIN || 8);
 const allIds = await page.evaluate(async ([MIN, MACHINES]) => {
@@ -67,6 +67,17 @@ await page.waitForFunction(() => typeof window.__hmFocusObject === "function", n
 // windows come from scripts/stall-windows.json, written by extract-stalls.mjs)
 // — the phone portal's backdrop behind the 3D stall.
 const PLATES = process.argv.includes("--plates");
+// --thumbs: a third still per stall, a tight close-up of the vendor (or the
+// machine) for the phone's postcard ROW — the medium shot is too wide to read
+// at 80 px (2026-10-11). Output <id>-thumb.webp at 240×320; the row's
+// thumbUrl() in VendorStage points at it.
+const THUMBS = process.argv.includes("--thumbs");
+const THUMB_DIST_MULT = 1.7, THUMB_LIFT_MULT = 0.0, THUMB_W = 240, THUMB_H = 320;
+// Per-stall thumb distance (× faceDist). The fortune teller sits deep in her
+// wagon (her approach runs along the deck into it), the preacher stands back
+// from the tent mouth and the goblin is low behind his card table — all three
+// need the camera closer than the row default to fill the tile.
+const THUMB_DIST = { fortunes: 0.8, chapel: 1.0, rugs: 1.1 };
 const WINDOWS = PLATES ? JSON.parse(fs.readFileSync("scripts/stall-windows.json", "utf8")) : null;
 const sheet = [];
 for (const id of ids) {
@@ -85,7 +96,7 @@ for (const id of ids) {
     const n = { x: v.approach.x, y: 0, z: v.approach.z };
     window.__hmFocusObject(point, n, v.faceDist * fu * dm);
     return true;
-  }, [id, SHOT_DIST_MULT, LIFT_MULT, MACHINE_DIST[id]]);
+  }, [id, THUMBS ? (THUMB_DIST[id] ?? THUMB_DIST_MULT) : SHOT_DIST_MULT, THUMBS ? THUMB_LIFT_MULT : LIFT_MULT, MACHINE_DIST[id]]);
   if (!ok) { console.log(" skip", id); continue; }
   await page.waitForTimeout(4200);
   if (PLATES) {
@@ -95,18 +106,19 @@ for (const id of ids) {
       if (!w) return 0;                                 // no window (no stall extracted): plate = the plain shot
       return window.__hmStripHide({ z: w, maxX, exclude: ex });
       // a machine is on the strip-wide exclude list (it is nobody's dressing), so its OWN plate lifts that
-    }, [win, WINDOWS.maxX, id === "claw" ? WINDOWS.exclude.replace("|Toy_Claw_Empty", "") : id === "gachapon" ? WINDOWS.exclude.replace("|Gachapon$", "") : WINDOWS.exclude, id]);
+    }, [win, WINDOWS.maxX, id === "claw" ? WINDOWS.exclude.replace("|Toy_Claw_Empty", "") : WINDOWS.exclude, id]);
     await page.waitForTimeout(250);
     console.log(`  plate: hid ${hid} props`);
   }
   const canvas = await page.$("canvas");
   const box = await canvas.boundingBox();
   // Centre crop at 3:4 of the canvas height.
-  const ch = Math.min(box.height, 840), cw = Math.round(ch * 0.75);
+  // thumbs crop tighter still (60% of the canvas height) so the face fills the tile
+  const ch = Math.min(box.height, 840) * (THUMBS ? 0.6 : 1), cw = Math.round(ch * 0.75);
   const clip = { x: Math.round(box.x + box.width / 2 - cw / 2), y: Math.round(box.y + (box.height - ch) / 2), width: cw, height: Math.round(ch) };
   const png = await page.screenshot({ clip, type: "png" });
-  const out = path.join(OUT, PLATES ? `${id}-plate.webp` : `${id}.webp`);
-  await sharp(png).resize(W, H, { fit: "cover" }).webp({ quality: 82 }).toFile(out);
+  const out = path.join(OUT, PLATES ? `${id}-plate.webp` : THUMBS ? `${id}-thumb.webp` : `${id}.webp`);
+  await sharp(png).resize(THUMBS ? THUMB_W : W, THUMBS ? THUMB_H : H, { fit: "cover" }).webp({ quality: 82 }).toFile(out);
   sheet.push({ id, out, bytes: fs.statSync(out).size });
   console.log(` ${id}: ${out} (${Math.round(fs.statSync(out).size / 1024)} KB)`);
   if (PLATES) await page.evaluate((id) => { window.__hmStripShowAll?.(); window.__hmVendorSpots?.[id]?.hide?.(false); }, id);
@@ -118,7 +130,7 @@ await browser.close();
 // contact sheet for a quick look
 const tiles = await Promise.all(sheet.map((s) => sharp(s.out).resize(200, 267).toBuffer()));
 const cols = 5, rows = Math.ceil(tiles.length / cols);
-const sheetPath = process.env.POSTCARD_SHEET || path.join(OUT, PLATES ? "_contact-sheet-plates.png" : "_contact-sheet.png");
+const sheetPath = process.env.POSTCARD_SHEET || path.join(OUT, PLATES ? "_contact-sheet-plates.png" : THUMBS ? "_contact-sheet-thumbs.png" : "_contact-sheet.png");
 await sharp({ create: { width: cols * 200, height: rows * 267, channels: 3, background: "#222" } })
   .composite(tiles.map((input, i) => ({ input, left: (i % cols) * 200, top: Math.floor(i / cols) * 267 })))
   .png().toFile(sheetPath);

@@ -66,8 +66,7 @@ The base will be **~11–15 MB uncompressed** — that's expected; step 2 shrink
   baked into ONE clip called `Animation` (1665 channels, 507 targets, 35
   actually moving). The claw controller finds no `Claw_Demo`, the strip's
   autoplay would pin the prize wheel and wagon doors to constant tracks, and
-  the gachapon's three sacred-geometry spinners (`Animation`, `Animation.001`,
-  `Take 001` in Strip7) were not baked at all. `scripts/build-strip.mjs` splits such a file back into
+  object-level clips that were never baked are simply missing. `scripts/build-strip.mjs` splits such a file back into
   `Claw_Demo` + `Robot_Sit` / `Biker_Sit`, but it cannot invent the clips
   Scene mode left out. Check with: `node -e` over the GLB's `animations[]`
   names — you want `Claw_Demo` listed, not a lone `Animation`.

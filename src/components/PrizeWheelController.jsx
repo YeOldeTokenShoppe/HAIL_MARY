@@ -20,7 +20,7 @@ import { playClick } from "@/lib/uiSfx";
 // and the sign of the flap from the cross products — a re-export that moves or
 // re-pegs the wheel keeps working. Falls back to 20 evenly spaced pegs.
 //
-// Interaction follows the gachapon's shape: CommercialStrip's deck click
+// Interaction follows the claw machine's shape: CommercialStrip's deck click
 // handler calls interactionRef.current.handleClick(e) first; a hit anywhere
 // under Prize_Wheel is ours. From afar the first click flies in AND spins, so
 // the camera arrives on a turning wheel; once close, each click re-spins a

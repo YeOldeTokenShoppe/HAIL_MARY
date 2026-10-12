@@ -347,10 +347,12 @@ function VendorCropTuner() {
 
   return (
     <div style={{
-      position: "fixed", right: 10, bottom: 10, zIndex: 9999, width: 420,
+      position: "fixed", right: 10, bottom: 10, zIndex: 9999, width: "min(420px, calc(100vw - 20px))",
       // The panel grew past a short viewport once there were this many vendors
       // and eleven sliders, so it scrolls rather than running off the screen.
-      maxHeight: "calc(100vh - 20px)", overflowY: "auto",
+      // On a phone it takes the lower third only, so the face stays in view
+      // above it while the sliders move (2026-10-11).
+      maxHeight: typeof window !== "undefined" && window.innerWidth < 700 ? "36vh" : "calc(100vh - 20px)", overflowY: "auto",
       background: "rgba(16,20,26,0.94)", color: "#cde", padding: 12,
       borderRadius: 8, fontFamily: "monospace", display: "flex",
       flexDirection: "column", gap: 5,

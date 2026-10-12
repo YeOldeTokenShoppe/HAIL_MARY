@@ -8,7 +8,6 @@ import { extendKTX2, releaseKTX2Workers } from "@/lib/ktx2";
 import VortexPortal from "@/components/VortexPortal";
 import useEnvMapSafe from "@/hooks/useEnvMapSafe";
 import ClawMachineController from "@/components/ClawMachineController";
-import GachaponController from "@/components/GachaponController";
 import PrizeWheelController from "@/components/PrizeWheelController";
 // Per-stall Z windows along the deck (strip-local), written by
 // scripts/extract-stalls.mjs. The deck-click snap and the ‹ › stall nav read
@@ -54,7 +53,7 @@ import {
 // dev server revalidates on every request regardless of the query string, so the
 // fresh file always won locally, while the CDN kept serving whatever it had
 // cached under the unchanged `?v=ktx2` key. BUMP THIS on every rebuild.
-const STRIP_MODEL_V = "20";
+const STRIP_MODEL_V = "23";
 // The preacher's GLB (Vendor_Chaplain_Character.glb) — bump after every re-export of it.
 export const CHAPEL_ASSET_V = 4;
 // The vendor character GLBs (VENDOR_CATALOG model / poseModels / companionModel).
@@ -172,6 +171,9 @@ export const VENDOR_CATALOG = [
     // it — at the shell's 0.05 they would vanish, at 1.0 they read as lit by a
     // different sun than the room they are sitting in.
     interiorDim: 0.15,
+    // IBL fill on her materials (default 0.45): see the env-map effect in
+    // VendorModel — the full strength washed her face out in the wagon.
+    envIntensity: 0.15,
     interiorContents: {
       level: 0.35,
       // Booth furniture: everything within ~2.5 units of the wagon EXCEPT the
@@ -184,8 +186,10 @@ export const VENDOR_CATALOG = [
         "SM_Prop_Stool_01.002", "SM_Prop_Stool_01.003",
       ],
       // Her own GLB, kept a touch brighter than the furniture so she still
-      // reads as the subject of the shot.
-      character: 0.5,
+      // reads as the subject of the shot. 0.5 → 0.4 (2026-10-11): at 0.5 her
+      // face — painted or projected, they now measure the same — sat on the
+      // tone-mapper's shoulder and read pale with its features flattened.
+      character: 0.4,
     },
     // She sits square to the boardwalk rather than facing off it, so her
     // strip-local face yaw is 0 (90° off the VENDOR_LOCAL_FACE_YAW default).
@@ -292,13 +296,20 @@ export const VENDOR_CATALOG = [
     // strip. Her GLB is exported in strip space like the rest (root at local
     // x 0, z -29.96), so she needs no placement here.
     model: "/models/Vendor_HoloGirl.glb", idleClip: "idle", talkClip: "talking",
-    offset: [-0.3, 0, 0],
+    offset: [0.3, 0, 0],
     // The wheel, NOT the tent she happens to stand inside: SM_Prop_Tent_02
     // (23) has no vendor now, so it has no click volume either, and hers is
     // the only proxy in this stretch of boardwalk. Keep it that way — a
     // PROXY_LOCAL_SIZE box is 5 units on a side, so a second vendor on that
     // tent would put a cube (origin x 1.79) around her too.
     prop: "Prize_Wheel",   // renamed from SM_Prop_Prize_Wheel_01 in CommercialStrip4
+    // The wheel is PrizeWheelController's, not hers: a click that lands on the
+    // wheel (or its stand) passes through her click box to the deck handler,
+    // which spins it. Without this the 5-unit box — which encloses the whole
+    // wheel — is the nearest hit from anywhere on the deck, R3F stops at the
+    // first handler that stops propagation, and every wheel click zoomed to
+    // her instead (2026-10-11). Clicks on the box around the wheel still enter.
+    propClickThrough: true,
     // Standing vendor: same close-up framing as the salesman and hot dog cart.
     faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
     // Her GLB also ships "bored" and "thankful". Both key the same bones as
@@ -701,7 +712,14 @@ const PROJ_FADE_S = 0.28;       // painted ↔ projected crossfade, seconds
 const SKIN_SAMPLE_MS = 900;     // how often the crop is re-measured
 const SKIN_EMA = 0.35;          // smoothing on the measured skin colour
 const SKIN_GAIN_MIN = 0.2;
-const SKIN_GAIN_MAX = 5;
+// Was 5 while the crop filter ran on the 8-bit canvas: a filter like the
+// fortune teller's brightness(32%) left ~80 grey levels and a big gain banded
+// them. The filter now runs in the shader in float (HM_CSS_FILTER_GLSL), the
+// canvas holds the full-range frame, and the gain multiplies that — so the
+// ceiling only needs to keep a runaway measurement sane. At 5 her match sat
+// pinned on all three channels (needs ~13×) and could not correct hue at all:
+// the face was the filter's own pink on every platform (2026-10-11).
+const SKIN_GAIN_MAX = 24;
 // ?skinmatch=0 leaves the projection lit but un-corrected — the A/B for
 // judging what the gain is doing.
 const SKIN_MATCH_ENABLED =
@@ -711,6 +729,68 @@ const _skinSample = new THREE.Color();
 // Lazily builds the 512² crop canvas + CanvasTexture and dresses the
 // projection face in a LIT material derived from the painted face's own.
 // flipY=false matches glTF UVs.
+// The vendor's crop filter (saturate / contrast / brightness / hue-rotate /
+// sepia, tuned per vendor in vendorSitePal.js) used to be a 2D-canvas
+// `ctx.filter` string. WebKit has never implemented
+// CanvasRenderingContext2D.filter (Safari 18.4 included: the property is not
+// on the prototype, assigning it just sets a plain JS field), so every iPhone
+// and iPad — Chrome on iOS is WebKit too — drew the RAW SitePal frame while
+// desktop Chrome drew the filtered one. The fortune teller's face read
+// pink-grey against her painted neck on a phone (2026-10-11). The filter now
+// runs in the projection material's fragment shader, in sRGB like CSS, with
+// the same matrices as the Filter Effects spec and the same order, so every
+// platform computes the same pixels and ONE tuning serves both.
+const HM_CSS_FILTER_GLSL = /* glsl */`
+uniform float hmSat, hmCon, hmBri, hmHue, hmSep;
+vec3 hmCssFilter(vec3 c) {
+  float s = hmSat;
+  mat3 S = mat3(0.213 + 0.787 * s, 0.213 - 0.213 * s, 0.213 - 0.213 * s,
+                0.715 - 0.715 * s, 0.715 + 0.285 * s, 0.715 - 0.715 * s,
+                0.072 - 0.072 * s, 0.072 - 0.072 * s, 0.072 + 0.928 * s);
+  c = clamp(S * c, 0.0, 1.0);
+  c = clamp(c * hmCon + (0.5 - 0.5 * hmCon), 0.0, 1.0);
+  c = clamp(c * hmBri, 0.0, 1.0);
+  float cs = cos(hmHue), sn = sin(hmHue);
+  mat3 H = mat3(0.213 + cs * 0.787 - sn * 0.213, 0.213 - cs * 0.213 + sn * 0.143, 0.213 - cs * 0.213 - sn * 0.787,
+                0.715 - cs * 0.715 - sn * 0.715, 0.715 + cs * 0.285 + sn * 0.140, 0.715 - cs * 0.715 + sn * 0.715,
+                0.072 - cs * 0.072 + sn * 0.928, 0.072 - cs * 0.072 - sn * 0.283, 0.072 + cs * 0.928 + sn * 0.072);
+  c = clamp(H * c, 0.0, 1.0);
+  mat3 P = mat3(0.393, 0.349, 0.272,  0.769, 0.686, 0.534,  0.189, 0.168, 0.131);
+  c = clamp(mix(c, P * c, hmSep), 0.0, 1.0);
+  return c;
+}
+// the texture is sRGB-decoded by the GPU; CSS filters work on sRGB values
+vec4 hmFilterTexel(vec4 t) {
+  vec3 srgb = sRGBTransferOETF(vec4(t.rgb, 1.0)).rgb;
+  return vec4(sRGBTransferEOTF(vec4(hmCssFilter(srgb), 1.0)).rgb, t.a);
+}
+`;
+// The same filter on the CPU, for the skin match: the crop canvas is now
+// unfiltered, so the measured skin must be pushed through the filter before
+// it is compared with the painted target the shader output has to land on.
+const _hmF = [0, 0, 0];
+function hmCssFilterColor(out, color, f) {
+  const v = color.getRGB({ r: 0, g: 0, b: 0 }, THREE.SRGBColorSpace);
+  let r = v.r, g = v.g, b = v.b;
+  const cl = (x) => Math.min(1, Math.max(0, x));
+  const s = f.saturate / 100;
+  [r, g, b] = [cl((0.213 + 0.787 * s) * r + (0.715 - 0.715 * s) * g + (0.072 - 0.072 * s) * b),
+               cl((0.213 - 0.213 * s) * r + (0.715 + 0.285 * s) * g + (0.072 - 0.072 * s) * b),
+               cl((0.213 - 0.213 * s) * r + (0.715 - 0.715 * s) * g + (0.072 + 0.928 * s) * b)];
+  const c = f.contrast / 100; r = cl(r * c + 0.5 - 0.5 * c); g = cl(g * c + 0.5 - 0.5 * c); b = cl(b * c + 0.5 - 0.5 * c);
+  const br = f.brightness / 100; r = cl(r * br); g = cl(g * br); b = cl(b * br);
+  const h = (f.hueRotate * Math.PI) / 180, cs = Math.cos(h), sn = Math.sin(h);
+  [r, g, b] = [cl((0.213 + cs * 0.787 - sn * 0.213) * r + (0.715 - cs * 0.715 - sn * 0.715) * g + (0.072 - cs * 0.072 + sn * 0.928) * b),
+               cl((0.213 - cs * 0.213 + sn * 0.143) * r + (0.715 + cs * 0.285 + sn * 0.140) * g + (0.072 - cs * 0.072 - sn * 0.283) * b),
+               cl((0.213 - cs * 0.213 - sn * 0.787) * r + (0.715 - cs * 0.715 + sn * 0.715) * g + (0.072 + cs * 0.928 + sn * 0.072) * b)];
+  const a = f.sepia / 100;
+  _hmF[0] = cl(r + a * ((0.393 * r + 0.769 * g + 0.189 * b) - r));
+  _hmF[1] = cl(g + a * ((0.349 * r + 0.686 * g + 0.168 * b) - g));
+  _hmF[2] = cl(b + a * ((0.272 * r + 0.534 * g + 0.131 * b) - b));
+  return out.setRGB(_hmF[0], _hmF[1], _hmF[2], THREE.SRGBColorSpace);
+}
+const _skinFiltered = new THREE.Color();
+
 function ensureVendorProjectionMaterial(st) {
   if (!st.cropCanvas) {
     const c = document.createElement("canvas");
@@ -762,6 +842,21 @@ function ensureVendorProjectionMaterial(st) {
     m.polygonOffsetFactor = -2;
     m.polygonOffsetUnits = -2;
     m.userData.hmProjectionClone = true;
+    // The crop filter, in the shader (see HM_CSS_FILTER_GLSL). Uniform objects
+    // live on st so the per-frame draw can update them without recompiling.
+    st.filterUniforms = st.filterUniforms || { hmSat: { value: 1 }, hmCon: { value: 1 }, hmBri: { value: 1 }, hmHue: { value: 0 }, hmSep: { value: 0 } };
+    m.onBeforeCompile = (shader) => {
+      st.shaderPatched = (st.shaderPatched || 0) + 1;   // debug
+      Object.assign(shader.uniforms, st.filterUniforms);
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", "#include <common>\n" + HM_CSS_FILTER_GLSL)   // sRGBTransfer* already live in three's fragment prefix
+        // onBeforeCompile sees the UNEXPANDED template, so the chunk directives
+        // are what to replace — matching the expanded chunk text silently
+        // misses, and the raw texel then rides a ×5 gain into a flat white face.
+        .replace("#include <map_fragment>", "#ifdef USE_MAP\n\tvec4 sampledDiffuseColor = hmFilterTexel( texture2D( map, vMapUv ) );\n\tdiffuseColor *= sampledDiffuseColor;\n#endif")
+        .replace("#include <emissivemap_fragment>", "#ifdef USE_EMISSIVEMAP\n\tvec4 emissiveColor = hmFilterTexel( texture2D( emissiveMap, vEmissiveMapUv ) );\n\ttotalEmissiveRadiance *= emissiveColor.rgb;\n#endif");
+    };
+    m.customProgramCacheKey = () => "hmVendorProjectionFilter";
     m.needsUpdate = true;
     st.material = m;
   }
@@ -821,26 +916,30 @@ function sampleVendorSkin(st, sp, nowMs) {
 // target ÷ measured as the material colour: exposure and white balance in one
 // per-channel gain the shader applies for free. Publishes the numbers for the
 // ?tune=vendor panel.
-function applyVendorSkinGain(st, sp, vendorId) {
+function applyVendorSkinGain(st, sp, vendorId, f) {
   const m = st.material;
   if (!m) return;
   const skin = st.skin;
   const active = SKIN_MATCH_ENABLED && sp.skinMatch !== false && !!skin.target && !!skin.measured;
   let gain = null;
   if (active) {
-    const t = skin.target, s = skin.measured;
+    // measured is the raw crop; the shader filters it before the gain lands
+    const t = skin.target, s = f ? hmCssFilterColor(_skinFiltered, skin.measured, f) : skin.measured;
     const g = (a, b) => Math.min(SKIN_GAIN_MAX, Math.max(SKIN_GAIN_MIN, a / Math.max(b, 1e-3)));
     gain = [g(t.r, s.r), g(t.g, s.g), g(t.b, s.b)];
-    m.color.setRGB(gain[0], gain[1], gain[2]);
+    st.gainColor.setRGB(gain[0], gain[1], gain[2]);
   } else {
-    m.color.set(0xffffff);
+    st.gainColor.set(0xffffff);
   }
+  m.color.copy(st.gainColor);   // the per-frame dim multiplies in after this
   if (typeof window !== "undefined") {
     window.__vendorSitePalSkinMatch = {
       vendorId,
       active,
       measured: skin.measured ? "#" + skin.measured.getHexString() : null,
       target: skin.target ? "#" + skin.target.getHexString() : null,
+      filtered: active && f ? "#" + _skinFiltered.getHexString() : null,
+      filter: f ? { ...f } : null,
       gain,
     };
   }
@@ -853,7 +952,12 @@ const HEAD_EASE = 8;           // 1/s — smoothing rate toward the target angle
 // Per-vendor override: vendor.noticeDist.
 const WALKER_NOTICE_DIST = 1.2;
 
-export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0, dimRef }) {
+// projectRef: when a host gates focusedRef on SPEECH (the phone card drops it
+// 2.5 s after the line so the vendor's head can go back to work), the SitePal
+// projection must not follow it — the face blinked out to the painted one
+// mid-visit (2026-10-11). This ref says "the visitor is still here"; absent,
+// focusedRef serves both, as on the desktop strip where they coincide.
+export function VendorModel({ vendor, focusedRef, projectRef = null, headRef, stripScene, stripRotY = 0, dimRef }) {
   const group = useRef();
   // Stable for the whole session: chosen at module load, so the hook's URL
   // never changes under it and Suspense fetches exactly one file.
@@ -1081,10 +1185,14 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
       mats.forEach((m) => {
         if (!m || !m.isMeshStandardMaterial) return;
         if (m.envMap !== envMap) { m.envMap = envMap; m.needsUpdate = true; }
-        m.envMapIntensity = 0.45;
+        // envIntensity (catalog): the IBL fill per vendor. The fortune teller's
+        // face plates stand square to the camera inside her wagon, and at 0.45
+        // the warehouse map's sheen — which no dim or skin gain touches —
+        // read as a pale, washed-out face (2026-10-11).
+        m.envMapIntensity = vendor.envIntensity ?? 0.45;
       });
     });
-  }, [scene, envMap]);
+  }, [scene, envMap, vendor.envIntensity]);
 
   // Character half of the interior dim (VendorStall owns the eased factor).
   // Clones for the same reason the stall does: a Synty character shares one
@@ -1265,6 +1373,7 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
     texture: null, material: null, materialApplied: false,
     authoredMaterial: null,
     fade: 0,   // 0 = painted face, 1 = projection; crossfaded per frame
+    gainColor: new THREE.Color(1, 1, 1),   // the skin-match gain, before the interior dim
     skin: { measured: null, target: null, targetKey: undefined, lastSampleAt: 0, sceneVersion: -1 },
   });
   useEffect(() => {
@@ -1299,6 +1408,8 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
       st.cropCanvas = null; st.cropCtx = null;
       st.materialApplied = false;
       st.fade = 0;
+      st.hasFrame = false;
+      st.probeCtx = null;
       st.regulars.forEach((m) => { m.visible = true; });
       if (st.proj) st.proj.visible = false;
     };
@@ -1341,7 +1452,7 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
     const sp = vendor.sitepal ? VENDOR_SITEPAL_CONFIG[vendor.sitepal] : null;
     if (sp) {
       const st = projRef.current;
-      const focusedNow = !!focusedRef?.current;
+      const focusedNow = !!(projectRef ? projectRef.current : focusedRef?.current);
       const source = focusedNow ? getVendorSitePalSource() : null;
       const onScene =
         typeof window !== "undefined" &&
@@ -1361,7 +1472,13 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
       // its geometry sits against the painted one.
       const ab = typeof window !== "undefined" ? window.__vendorSitePalFaceOverride : null;
       const pinned = ab && ab.vendorId === vendor.sitepal ? ab.mode : null;
-      let show = !!(focusedNow && source && onScene && st.proj);
+      // Once a frame has been painted, the projection STAYS up for as long as
+      // the vendor is focused — it holds the last good frame if the host's
+      // canvas or scene goes away (end of the greeting on a phone dropped the
+      // source and the face blinked out to nothing, 2026-10-11). It only
+      // paints while a live frame of the right scene exists; stepping away
+      // (focusedNow false) fades it out as before.
+      let show = !!(focusedNow && st.proj && ((source && onScene) || st.hasFrame));
       if (pinned === "face1") show = false;
       else if (pinned === "face2") show = !!st.proj;
       // Painting is gated separately from visibility. Without a live frame of
@@ -1375,7 +1492,7 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
         // A scene swap in the host is a different avatar: drop the old skin
         // measurement rather than easing out of it.
         const ver = window.__vendorSitePalSceneVersion || 0;
-        if (ver !== skin.sceneVersion) { skin.sceneVersion = ver; skin.measured = null; skin.lastSampleAt = 0; }
+        if (ver !== skin.sceneVersion) { skin.sceneVersion = ver; skin.measured = null; skin.lastSampleAt = 0; st.hasFrame = false; }
         refreshVendorSkinTarget(st, sp);
         const ctx = st.cropCtx;
         const canvas = st.cropCanvas;
@@ -1388,22 +1505,34 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
         ctx.fillStyle = skin.measured ? skin.measured.getStyle()
           : skin.target ? skin.target.getStyle() : "#9F7854";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (typeof window !== "undefined") window.__hmVendorCropCanvas = canvas; window.__hmVendorProj = st;   // debug: the raw crop + state
+        const fu = st.filterUniforms;
+        fu.hmSat.value = f.saturate / 100; fu.hmCon.value = f.contrast / 100; fu.hmBri.value = f.brightness / 100;
+        fu.hmHue.value = (f.hueRotate * Math.PI) / 180; fu.hmSep.value = f.sepia / 100;
         try {
+          // A host canvas that is still there but no longer painting (the
+          // player idles after a line on a phone) reads as transparent black.
+          // Probe one texel at the crop's centre first and hold the last good
+          // frame instead of painting a blank one over the face.
+          if (!st.probeCtx) { const p = document.createElement("canvas"); p.width = 1; p.height = 1; st.probeCtx = p.getContext("2d", { willReadFrequently: true }); }
+          st.probeCtx.clearRect(0, 0, 1, 1);
+          st.probeCtx.drawImage(source, cropX + cropW / 2, cropY + cropH / 2, 2, 2, 0, 0, 1, 1);
+          const px = st.probeCtx.getImageData(0, 0, 1, 1).data;
+          if (px[3] < 8 || px[0] + px[1] + px[2] < 12) throw new Error("blank frame");
           ctx.save();
-          ctx.filter = `saturate(${f.saturate}%) contrast(${f.contrast}%) brightness(${f.brightness}%) hue-rotate(${f.hueRotate}deg) sepia(${f.sepia}%)`;
           ctx.translate(canvas.width / 2, canvas.height / 2);
           ctx.rotate((rotateZ * Math.PI) / 180);
           ctx.scale(1, Math.cos((rotateX * Math.PI) / 180));
           ctx.translate(-canvas.width / 2, -canvas.height / 2);
           ctx.drawImage(source, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
           ctx.restore();
-          ctx.filter = "none";
+          st.hasFrame = true;
         } catch (e) {
           // Source canvas not yet renderable (preserveDrawingBuffer race).
         }
         if (st.texture) st.texture.needsUpdate = true;
         sampleVendorSkin(st, sp, performance.now());
-        applyVendorSkinGain(st, sp, vendor.sitepal);
+        applyVendorSkinGain(st, sp, vendor.sitepal, f);
       }
       // Crossfade rather than cut: the projection eases in over the painted
       // face (transparent, no depth write) and only once it is fully opaque
@@ -1418,6 +1547,14 @@ export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY
       const fade = st.fade;
       if (st.proj) st.proj.visible = fade > 0;
       if (st.material) {
+        // The interior dim (fortunes: her painted body eases to 0.5 inside the
+        // wagon) is applied through material clones that the projection
+        // material, created later, never joins. Fold the same factor into its
+        // colour every frame, or the projected face sits at full brightness
+        // beside a half-dimmed neck — pale and washed out (2026-10-11).
+        const dimF = charLevel && dimRef?.current ? 1 + (charLevel - 1) * dimRef.current.t : 1;
+        st.material.color.copy(st.gainColor).multiplyScalar(dimF);
+        st.lastDimF = dimF;   // debug readout
         const mid = fade > 0 && fade < 1;
         st.material.opacity = fade;
         st.material.transparent = mid;
@@ -1618,7 +1755,7 @@ function propCloseupFor(obj) {
 // purpose (the signage speaks), so these are read off the signs/props.
 const STRIP_STOP_LABELS = {
   carny: "Carny ride", promos: "Promos", fortunes: "Fortune teller",
-  claw: "Claw machine", gachapon: "Gachapon", hotdogs: "Hot dog cart",
+  claw: "Claw machine", hotdogs: "Hot dog cart",
   rugs: "Trader Bros", tonics: "Tonics", tattoos: "Tattoos", chapel: "Chapel",
 };
 // A deck click further than this (strip-local units) past the ends of the
@@ -1657,95 +1794,7 @@ const PROXY_LOCAL_SIZE = 5;
 // allocating a fresh [0,0,0] every render (R3F would then see a changed prop).
 const VENDOR_NO_OFFSET = /* @__PURE__ */ Object.freeze([0, 0, 0]);
 
-// ── Talk bubbles (2026-10-06). A "…" bubble over each voiced character that
-// has not been spoken to yet this session — an invitation that cleans itself
-// up as the visitor explores. Shown only within TALK_BUBBLE_NEAR of the camera
-// (the strip view; from the overview ten bubbles would read as HUD), hidden
-// while that character is the close-up, gone once they've been clicked.
-// "Met" survives a reload within the tab via sessionStorage.
-const MET_KEY = "hm_met_vendors";
-const metVendors = /* @__PURE__ */ new Set();
-let metLoaded = false;
-function loadMet() {
-  if (metLoaded) return;
-  metLoaded = true;
-  try { JSON.parse(sessionStorage.getItem(MET_KEY) || "[]").forEach((id) => metVendors.add(id)); } catch (e) {}
-}
-function markVendorMet(id) {
-  loadMet();
-  if (metVendors.has(id)) return;
-  metVendors.add(id);
-  try { sessionStorage.setItem(MET_KEY, JSON.stringify([...metVendors])); } catch (e) {}
-}
-function isVendorMet(id) { loadMet(); return metVendors.has(id); }
-// Drawn once: cream bubble, dark outline, three dots. Normal blending and
-// depthTest ON — CanvasTexture + depthTest:false + additive is the iOS
-// blocky-rectangle gotcha (see r3f_ios_canvas_texture_gotcha).
-let bubbleTexture = null;
-function getBubbleTexture() {
-  if (bubbleTexture || typeof document === "undefined") return bubbleTexture;
-  const W = 192, H = 160, c = document.createElement("canvas");
-  c.width = W; c.height = H;
-  const g = c.getContext("2d");
-  const x = 12, y = 12, w = W - 24, h = 104, r = 34;
-  const path = () => {
-    g.beginPath();
-    g.moveTo(x + r, y);
-    g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r);
-    g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    // tail, bottom-centre, pointing down at the head
-    g.lineTo(W / 2 + 18, y + h); g.lineTo(W / 2, y + h + 30); g.lineTo(W / 2 - 18, y + h);
-    g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r);
-    g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y);
-    g.closePath();
-  };
-  path(); g.fillStyle = "#f5e8c8"; g.fill();
-  path(); g.lineWidth = 9; g.lineJoin = "round"; g.strokeStyle = "#2a2420"; g.stroke();
-  g.fillStyle = "#2a2420";
-  for (const dx of [-38, 0, 38]) { g.beginPath(); g.arc(W / 2 + dx, y + h / 2, 10, 0, Math.PI * 2); g.fill(); }
-  bubbleTexture = new THREE.CanvasTexture(c);
-  bubbleTexture.colorSpace = THREE.SRGBColorSpace;
-  bubbleTexture.anisotropy = 4;
-  return bubbleTexture;
-}
-const TALK_BUBBLE_NEAR = 3.0;  // world units from camera to head: fully shown inside this…
-const TALK_BUBBLE_FAR = 4.2;   // …faded out beyond this (the overview sits at 8+)
-const TALK_BUBBLE_LIFT = 0.95; // strip-local units above the head bone: clears hats and the hot dog costume
-const TALK_BUBBLE_SIZE = 0.5;  // strip-local width (characters are ~1.6 tall)
-const _bubbleHead = /* @__PURE__ */ new THREE.Vector3();
-function TalkBubble({ vendorId, headRef, zoomedRef, onClick }) {
-  const sprite = useRef();
-  const { camera } = useThree();
-  const map = useMemo(() => getBubbleTexture(), []);
-  useFrame(({ clock }) => {
-    const sp = sprite.current, head = headRef.current;
-    if (!sp) return;
-    if (!head || zoomedRef.current || isVendorMet(vendorId)) { sp.visible = false; return; }
-    head.getWorldPosition(_bubbleHead);
-    const d = camera.position.distanceTo(_bubbleHead);
-    const a = 1 - THREE.MathUtils.smoothstep(d, TALK_BUBBLE_NEAR, TALK_BUBBLE_FAR);
-    if (a <= 0.02) { sp.visible = false; return; }
-    sp.visible = true;
-    sp.material.opacity = a;
-    // Head world → this stall's local (the stall group is identity inside the
-    // strip group), then a slow bob so it reads as alive, not pinned.
-    sp.parent.worldToLocal(_bubbleHead);
-    sp.position.set(_bubbleHead.x, _bubbleHead.y + TALK_BUBBLE_LIFT + Math.sin(clock.elapsedTime * 2.1) * 0.04, _bubbleHead.z);
-  });
-  if (!map) return null;
-  return (
-    <sprite
-      ref={sprite}
-      visible={false}
-      scale={[TALK_BUBBLE_SIZE, TALK_BUBBLE_SIZE * (160 / 192), 1]}
-      onClick={(e) => { e.stopPropagation(); onClick?.(e); }}
-      onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
-      onPointerOut={() => { document.body.style.cursor = "auto"; }}
-    >
-      <spriteMaterial map={map} transparent depthWrite={false} toneMapped={false} />
-    </sprite>
-  );
-}
+// (The "…" talk bubbles over unmet voiced vendors were removed 2026-10-11.)
 
 function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, propObj, onVendorClick, onFocusObject, onZoomOut, onFocusChange }) {
   // Fold this session's pose framing over the vendor so the close-up matches
@@ -1838,7 +1887,6 @@ function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, p
   // on-foot entry (the "hm-vendor-enter" window event).
   const enterVendor = () => {
     if (zoomedRef.current) return;
-    markVendorMet(vendor.id); // the talk bubble's job is done
     onVendorClick?.(vendor.id);
     // Voiced vendors greet on approach: swap the host to their SitePal scene
     // and speak an ElevenLabs line (engine 14) with real lipsync. The click
@@ -1956,8 +2004,30 @@ function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, p
   // both the strip GLB and the character GLBs are authored in that same frame.
   // The click volume over the paired prop is what makes the tent itself
   // clickable — for character-less vendors it is the ONLY click target.
-  const p = propObj?.position;
+  // The prop's origin in the STRIP frame, not `propObj.position`: that is local
+  // to the prop's parent, which only coincided with the strip frame while every
+  // anchor prop sat at the GLB root. Since Strip8 the chapel's SM_Bld_Tent_01
+  // lives under Tent_Empty (strip z 3.12), and the local value put its 5-unit
+  // click box 3 units down the deck — over SM_Prop_Photo_Stand_01 at z −2.27
+  // — so a click on the photo board entered the chapel instead (2026-10-11).
+  const p = useMemo(() => {
+    if (!propObj || !stripScene) return null;
+    propObj.updateWorldMatrix(true, false);
+    stripScene.updateWorldMatrix(true, false);
+    return stripScene.worldToLocal(propObj.getWorldPosition(new THREE.Vector3()));
+  }, [propObj, stripScene]);
   const labelSize = 0.75 / (framingUnit || 1);
+  // propClickThrough: the proxy box yields to any hit on the prop's own
+  // geometry, so a controller that owns the prop (the prize wheel) gets the
+  // click via the strip's deck handler instead of the stall swallowing it.
+  const proxyRaycast = useMemo(() => {
+    if (!vendor.propClickThrough || !propObj) return null;
+    const base = THREE.Mesh.prototype.raycast;
+    return function (raycaster, intersects) {
+      if (raycaster.intersectObject(propObj, true).length) return;
+      base.call(this, raycaster, intersects);
+    };
+  }, [vendor.propClickThrough, propObj]);
   return (
     <group
       ref={rootRef}
@@ -1982,12 +2052,8 @@ function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, p
           />
         </group>
       )}
-      {/* Outside the offset group: it positions itself from the head bone's
-          world position every frame. Voiced vendors only — a speech bubble
-          over someone who cannot speak is a broken promise. */}
-      {vendor.sitepal && <TalkBubble vendorId={vendor.id} headRef={headRef} zoomedRef={zoomedRef} onClick={handleClick} />}
       {p && (
-        <mesh position={[p.x, p.y + PROXY_LOCAL_SIZE / 2, p.z]}>
+        <mesh position={[p.x, p.y + PROXY_LOCAL_SIZE / 2, p.z]} {...(proxyRaycast ? { raycast: proxyRaycast } : null)}>
           <boxGeometry args={[PROXY_LOCAL_SIZE, PROXY_LOCAL_SIZE, PROXY_LOCAL_SIZE]} />
           {/* transparent, not `visible={false}` — invisible objects are skipped
               by the raycaster and would take no clicks at all */}
@@ -4151,7 +4217,6 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
   // visor needs the same over-white emissive the stall mount used to apply.
   useEffect(() => { vendors.forEach((v) => applyStallEmissiveBoost(stripScene, v.id)); applyStripEmissiveCap(stripScene); }, [stripScene, vendors]);
   const clawInteractionRef = useRef(null);
-  const gachaponInteractionRef = useRef(null);
   const wheelInteractionRef = useRef(null);
   const [extraScenes, setExtraScenes] = useState({});
   // Tooling hook for scripts/render-postcards.mjs --plates: hide every top-level
@@ -4416,7 +4481,7 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
   };
   // Release whatever is zoomed WITHOUT its fly-out — the caller is about to
   // fly somewhere itself. hm-vendor-exit is the no-fly-out exit every stall,
-  // the claw and the gachapon answer; the booth has its own hook.
+  // and the claw answer; the booth has its own hook.
   const releaseFocused = () => {
     if (focusRef.current?.id === "photobooth") boothExitRef.current?.(false);
     // A photo board has no component of its own to answer hm-vendor-exit.
@@ -4436,8 +4501,8 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
     const a = (yaw ?? VENDOR_LOCAL_FACE_YAW) + STRIP_ROT_Y;
     const normal = new THREE.Vector3(Math.sin(a), PROP_CLOSEUP_TILT, Math.cos(a)).normalize();
     const dist = Math.max(size.x, size.y, size.z) * (fitK ?? 1.4);
-    // Same OrbitControls floor the gachapon uses: these targets can sit under
-    // the 0.3 default at the strip's auto-fit scale.
+    // Same OrbitControls floor the claw uses: these targets can sit under the
+    // 0.3 default at the strip's auto-fit scale.
     focusFromStrip(center, normal, dist, Math.min(0.1, dist * 0.5));
     setFocus({ id, object: node });   // the vendor spotlight picks it out
   };
@@ -4531,10 +4596,6 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
     // Without this the same ray keeps going and also lands on the grid/ground
     // handlers behind the strip, which would fly there instead / as well.
     e.stopPropagation();
-    // Gachapon first: mid capsule-reveal it claims every deck click, and the
-    // claw machine is its next-door neighbour.
-    if (gachaponInteractionRef.current?.handleClick(e)) return;
-    if (focus?.id === "gachapon") gachaponInteractionRef.current?.close(false);   // clicked away along the deck
     // The machine owns its controls; these clicks must not trigger the deck fly-to.
     if (clawInteractionRef.current?.handleClick(e)) return;
     if (focus?.id === "claw") clawInteractionRef.current?.close(false);
@@ -4632,16 +4693,6 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
         onVendorClick={onVendorClick}
         stripScale={fit.scale}
       />
-      <GachaponController
-        stripScene={stripScene}
-        interactionRef={gachaponInteractionRef}
-        focus={focus}
-        onFocusChange={setFocus}
-        onFocusObject={focusFromStrip}
-        onZoomOut={zoomOutFromStrip}
-        onVendorClick={onVendorClick}
-        stripScale={fit.scale}
-      />
       <PrizeWheelController
         stripScene={stripScene}
         interactionRef={wheelInteractionRef}
@@ -4663,8 +4714,6 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
             air) never become click targets. */}
         <group
           onClick={handleStripClick}
-          /* The gachapon's knob is dragged, not just clicked. */
-          onPointerDown={(e) => gachaponInteractionRef.current?.handlePointerDown(e)}
           onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
           onPointerOut={() => { document.body.style.cursor = "auto"; }}
         >
