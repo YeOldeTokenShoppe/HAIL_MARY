@@ -6,8 +6,9 @@ import { createPortal } from "react-dom";
 /**
  * RadialNavMenu — a button that blooms into a dark disk with four
  * destinations round the rim (adapted from a CodePen expanding
- * circle menu). Used on /fountain instead of MobileBottomNav so the scene
- * keeps its whole bottom edge, and on /hailmary off the header brand mark.
+ * circle menu). Used on /trade (lobby), /home and /exlibris. /fountain and
+ * /hailmary dropped it 2026-10-12 — /fountain navigates by its in-scene
+ * signs, /hailmary's brand mark is a plain link to /fountain.
  *
  * Differences from the original pen:
  *  - a mouse opens it on hover like the pen, but touch/pen/keyboard get a
@@ -30,7 +31,7 @@ import { createPortal } from "react-dom";
  *
  * actions: extra non-navigation items ({ key, label, icon, onSelect }) that
  * join the ring after the destinations —
- * /hailmary puts How to play + Account here once its header had no room.
+ * (/hailmary once put How to play + Account here; no page uses it now.)
  *
  * Controlled mode (`open` given, no trigger): another component owns
  * the button (e.g. MobileBottomNav's MORE slot on /home), so the page passes

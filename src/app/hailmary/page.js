@@ -53,7 +53,6 @@ import useCctvRecorder from "@/hooks/useCctvRecorder";
 import PumpPurchaseModal from "@/components/PumpPurchaseModal";
 import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
 import MusicButton from '@/components/MusicButton';
-import RadialNavMenu, { TelescopeIcon } from '@/components/RadialNavMenu';
 import CoinLoader from "@/components/CoinLoader";
 
 // ── Milestone caption pools ──────────────────────────────────────────────────
@@ -8948,54 +8947,6 @@ export default function OilPage() {
     setTimeout(() => document.getElementById("your-rig")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
   };
 
-  // Site nav (same radial menu as /fountain; Home takes this page's slot).
-  // Desktop: the header brand mark is the trigger. Phones: a telescope at
-  // the far right of the header, where the leaderboard trophy used to be
-  // (the leaderboard is already a section in the page body).
-  // Colours follow the page theme (day/night/Lyquid80…): disk in the page
-  // background, icons in its strong text, accent for hover + the x.
-  // Phones: the header is just music + telescope, so How to play and
-  // Account (the old ? and gear buttons) ride in the menu instead.
-  const mobileMenuActions = [
-    {
-      key: "help",
-      label: "How to play",
-      onSelect: openWelcome,
-      icon: (
-        <>
-          <circle cx="12" cy="12" r="10" />
-          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-          <path d="M12 17h.01" />
-        </>
-      ),
-    },
-    {
-      key: "account",
-      label: user ? "Account" : "Sign in",
-      onSelect: () => (user ? setShowAccountModal(true) : router.push("/sign-in?redirect_url=/hailmary")),
-      icon: (
-        <>
-          <circle cx="12" cy="8" r="5" />
-          <path d="M20 21a8 8 0 0 0-16 0" />
-        </>
-      ),
-    },
-  ];
-
-  const navMenuProps = {
-    current: "hailmary",
-    demoKey: "oil_nav_demo_seen",
-    ready: !isLoading,
-    triggerLabel: "Site navigation",
-    colors: {
-      disk: `color-mix(in srgb, ${theme.bg} 96%, transparent)`,
-      hub: theme.bg,
-      icon: theme.textStrong,
-      accent: theme.accent,
-      ring: theme.goldBorder,
-      glyph: theme.accent,
-    },
-  };
 
   // ═══════════════════════════════════════════════════════════
   // MOBILE LAYOUT — tabbed views + scrollable panel below
@@ -9029,21 +8980,46 @@ export default function OilPage() {
           </div>
           <div style={styles.headerRight}>
             <MusicButton accent={theme.accent} />
-            <RadialNavMenu
-              {...navMenuProps}
-              triggerStyle={{
+            <button
+              onClick={openWelcome}
+              className={helpNudge ? "help-nudge" : undefined}
+              title="How to play"
+              style={{
                 display: "inline-flex", alignItems: "center", justifyContent: "center",
                 width: 40, height: 40, borderRadius: 10,
                 background: "rgba(212, 175, 55, 0.05)",
                 border: "1.5px solid rgba(212, 175, 55, 0.2)",
-                color: theme.accent, flexShrink: 0,
+                color: theme.accent, cursor: "pointer", padding: 0,
+                flexShrink: 0, fontSize: 18, fontWeight: "bold", fontFamily: "inherit",
+                // The pulse itself is the .help-nudge CLASS, not an inline
+                // animation: inline styles cannot carry the reduced-motion
+                // media query, and a stylesheet cannot override them without
+                // !important.
               }}
-              trigger={<TelescopeIcon />}
-              actions={mobileMenuActions}
-              // The old ? button's first-visit pulse now points at the menu
-              // that holds How to play.
-              triggerClassName={helpNudge ? "help-nudge" : ""}
-            />
+            >
+              ?
+            </button>
+            {/* Account: the phone has no bottom nav (it duplicated the stack's
+                own buttons and its FAB sat over them), so identity lives here —
+                sign-in when signed out, the account modal when in. */}
+            <button
+              onClick={() => (user ? setShowAccountModal(true) : router.push("/sign-in?redirect_url=/hailmary"))}
+              title={user ? "Account" : "Sign in"}
+              aria-label={user ? "Account" : "Sign in"}
+              style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: 40, height: 40, borderRadius: 10,
+                background: "rgba(212, 175, 55, 0.05)",
+                border: "1.5px solid rgba(212, 175, 55, 0.2)",
+                color: theme.accent, cursor: "pointer", padding: 0,
+                flexShrink: 0, fontFamily: "inherit",
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="8" r="5" />
+                <path d="M20 21a8 8 0 0 0-16 0" />
+              </svg>
+            </button>
           </div>
         </header>
 
@@ -9556,11 +9532,13 @@ export default function OilPage() {
 
       <header style={{ ...styles.header, zoom: uiScale }}>
         <div style={styles.headerLeft}>
-          <RadialNavMenu
-            {...navMenuProps}
-            triggerStyle={{ ...styles.logoMark, flexShrink: 0 }}
-            trigger={<img src="/brand-mark-cyan.svg" alt="" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} />}
-          />
+          <Link
+            href="/fountain"
+            title="Return to shrine"
+            style={{ ...styles.logoMark, flexShrink: 0, cursor: "pointer", textDecoration: "none" }}
+          >
+            <img src="/brand-mark-cyan.svg" alt="Home" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} />
+          </Link>
           <div>
             <h1 style={{ ...styles.title, display: "flex", alignItems: "center", gap: 8 }}>
               <span>HAIL MARY PROSPECTING CO.{modeBadge}</span>

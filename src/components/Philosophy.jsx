@@ -770,14 +770,14 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
   const rotation = [0, baseRotationY + userRotation, 0];
   
   const position = isDesktop 
-    ? [centerOffset.x + 1, centerOffset.y - 0, centerOffset.z + 2] // Desktop: offset to right side
+    ? [centerOffset.x + 1, centerOffset.y + 1.5, centerOffset.z + 2] // Desktop: offset to right side
     : isTabletPortrait
     ? [centerOffset.x + 1, centerOffset.y - 0, centerOffset.z] // Tablet portrait: offset right
     : isTablet
     ? [centerOffset.x + 2, centerOffset.y + 0.5, centerOffset.z + 1] // Tablet landscape: closer and higher
     : [centerOffset.x, centerOffset.y - 0.4, centerOffset.z - 1]; // Mobile: centered, lowered to fill the portrait screen (no bottom heading strip any more)
   
-  const scale = isDesktop ? 2 : isTablet ? 1.8 : 1.5; // Tablet: between desktop and mobile
+  const scale = isDesktop ? 2.5 : isTablet ? 1.8 : 1.5; // Tablet: between desktop and mobile
 
   // Orbit around the model, not the world origin. The model is placed off
   // to one side (desktop: right of the reading panel), so orbiting [0,0,0]
@@ -1416,10 +1416,10 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
       },
       // Desktop
       'desktop': {
-        left: '0',
+        left: '-20%',
         bottom: '1rem',
-        width: '50%',
-        height: '55%'
+        width: '100%',
+        height: '60%'
       },
       // Mobile
       'mobile': {
