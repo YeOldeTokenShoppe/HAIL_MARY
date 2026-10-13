@@ -17,9 +17,194 @@ import { loadHubCoaster } from '@/lib/hubCoaster.mjs'
 // How far below the camera path the road surface sits (world units). The low
 // rider is parked this far down so its tires touch the road.
 const ROAD_DROP = 0.2
-// The camera covers this fraction of the curve per second (FlyThrough).
-// 0.025 was the original ship pace; the car drives it at about two thirds.
-const CURVE_SPEED = 0.017
+// Multiplies the track's control points. The tunnel width, cart, road and
+// every pacing distance below are in world units, so a longer track means
+// more rail between stations at the same ride speed, not a faster ride.
+// 1 = the original loop (about 54 units); 2 = about 108.
+const TRACK_SCALE = 2
+// Ride speed in world units per second (0.92 was the original 0.017 of a
+// 54-unit lap; the ship ran at about one and a half times that).
+const RIDE_SPEED = 0.92
+// Seconds of dark tunnel before the first station's light strikes. The ride
+// starts this far (at full speed) before that strike point rather than at
+// the top of the loop, so the first stage is always seen switching on.
+const LEAD_IN_SECONDS = 4
+// The camera looks (and the vehicle sits) this far ahead along the track.
+const LOOK_AHEAD = 1.35
+const WORLD_UP = new THREE.Vector3(0, 1, 0)
+// Stations: gallery entries with a `model` slow the ride as the vehicle
+// passes. Distances are world units along the track.
+const STATION = {
+  crawl: 0.05,      // speed multiplier at the station (1 = full pace)
+  hold: 0.43,       // half-width of the window held at crawl
+  approach: 3.25,   // ramp length before the hold window (slowing down)
+  release: 1.35,    // ramp length after it (speeding back up)
+  gaze: 0.9,        // how far the camera turns toward the station (1 = straight at it)
+  spot: 50,         // spotlight intensity (candela) once the station is lit
+  spotLead: 4.9,    // the light switches on this far before the slow-down begins
+  spotRise: 0.11,   // and takes this long to come up (short = a stage light snapping on)
+  spotFlash: 0.4,   // ignition overshoot (fraction above full) that settles over spotFlashLen
+  spotFlashLen: 0.65,
+}
+// Length of one lap in world units, set when the track is built. Ride
+// positions are lap fractions, so pacing distances convert through it.
+let LAP = 1
+const frac = (units) => units / LAP
+// Debug: /hub?spothelper=1 draws each station spotlight's cone and exposes
+// the lights and STATION constants as window.__hubStation for live tuning.
+const SPOT_HELPER = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('spothelper') === '1'
+
+// Where a station's light strikes, relative to the station (negative =
+// before it). Never before the previous stage has gone dark, so only one
+// stage is ever lit; `stations` must be sorted by u.
+function strikeOffset(index, stations) {
+  const lead = -frac(STATION.hold + STATION.approach + STATION.spotLead)
+  if (stations.length < 2) return lead
+  const s = stations[index]
+  const prev = stations[(index + stations.length - 1) % stations.length]
+  // Measured backward from this station, so it is always in (-1, 0].
+  let prevDark = prev.u + frac(STATION.hold + STATION.release) - s.u
+  prevDark = ((prevDark % 1) + 1) % 1 - 1
+  return Math.max(lead, prevDark)
+}
+
+// Spotlight level for a station: snaps on at the strike point, holds
+// through the pass, then fades with the release ramp.
+function spotWeight(u, station, on = -frac(STATION.hold + STATION.approach + STATION.spotLead)) {
+  let d = u - station.u
+  d -= Math.round(d)
+  if (d >= 0) return stationWeight(u, station)
+  if (d < on) return 0
+  const x = STATION.spotRise > 0 ? Math.min((d - on) / frac(STATION.spotRise), 1) : 1
+  const rise = x * x * (3 - 2 * x)
+  // Lamp strike: overshoot on ignition, decaying to the held level.
+  const f = STATION.spotFlashLen > 0 ? Math.min((d - on) / frac(STATION.spotFlashLen), 1) : 1
+  return rise * (1 + STATION.spotFlash * (1 - f))
+}
+
+// One station's influence at ride position `u` (0..1, wrapping): 1 within
+// the hold window, smoothstepped to 0 over the approach ramp before it and
+// the release ramp after it.
+function stationWeight(u, station) {
+  let d = u - station.u
+  d -= Math.round(d) // wrap to -0.5..0.5; negative = still approaching
+  const ramp = frac(d < 0 ? STATION.approach : STATION.release)
+  const x = Math.min(Math.max((Math.abs(d) - frac(STATION.hold)) / ramp, 0), 1)
+  return 1 - x * x * (3 - 2 * x)
+}
+
+// The strongest station at `u` and its weight, for pacing and the gaze.
+function stationAt(u, stations) {
+  let best = null
+  let weight = 0
+  for (const s of stations) {
+    const w = stationWeight(u, s)
+    if (w > weight) { weight = w; best = s }
+  }
+  return { station: best, weight }
+}
+
+// Speed multiplier: 1 on open track, STATION.crawl at a station.
+function rideSpeedAt(u, stations) {
+  return 1 - (1 - STATION.crawl) * stationAt(u, stations).weight
+}
+
+// Candle flames for dioramas: any node named Flame_Empty* in a station's
+// glTF gets a small flickering flame (the shrine's votive shader, trimmed).
+// Height is in world units so it reads the same at every station scale.
+const FLAME = {
+  height: 0.02,     // world height of a flame
+  intensity: 0.7,   // colour multiplier; the full-frame bloom adds the glow
+  speed: 0.5,       // flicker rate (the shrine votives run at 3)
+  prefix: /^Flame_Empty/i,
+}
+const flameUniforms = { uTime: { value: 0 } }
+
+// Teardrop profile, 0.6 tall with its base at y = -0.1 (the shader maps
+// that range to 0..1), bulging low and tapering to a point.
+function createFlameGeometry() {
+  const points = []
+  const steps = 10
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps
+    const r = 0.2 * Math.sin(Math.PI * Math.pow(t, 0.6)) * (1 - t * 0.35)
+    points.push(new THREE.Vector2(Math.max(r, 0.0001), -0.1 + 0.6 * t))
+  }
+  return new THREE.LatheGeometry(points, 8)
+}
+
+function createFlameMaterial(phase) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: flameUniforms.uTime,
+      uPhase: { value: phase },
+      uSpeed: { value: FLAME.speed },
+      uIntensity: { value: FLAME.intensity },
+    },
+    vertexShader: `
+      uniform float uTime;
+      uniform float uPhase;
+      uniform float uSpeed;
+      varying float vHeight;
+      void main() {
+        vec3 pos = position;
+        vHeight = clamp((pos.y + 0.1) / 0.6, 0.0, 1.0);
+        float ft = uTime * uSpeed + uPhase;
+        pos.x += (sin(ft * 1.5) * 0.06 * vHeight + sin(ft * 2.3) * 0.03) * vHeight;
+        pos.z += cos(ft * 1.8) * 0.02 * vHeight * vHeight;
+        pos.y += (sin(ft * 2.0) * 0.02 + sin(ft * 3.7) * 0.02 * vHeight) * vHeight;
+        pos.y *= 1.0 + sin(ft * 2.5) * 0.1 * vHeight;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform float uPhase;
+      uniform float uSpeed;
+      uniform float uIntensity;
+      varying float vHeight;
+      void main() {
+        float time = uTime * uSpeed + uPhase;
+        vec3 inner = vec3(1.0, 0.95, 0.8);
+        vec3 mid = vec3(1.0, 0.55, 0.05);
+        vec3 outer = vec3(1.0, 0.25, 0.0);
+        vec3 color = vHeight < 0.3 ? mix(inner, mid, vHeight / 0.3)
+                   : vHeight < 0.7 ? mix(mid, outer, (vHeight - 0.3) / 0.4)
+                   : mix(outer, vec3(1.0, 0.8, 0.0), (vHeight - 0.7) / 0.3);
+        float flicker = sin(time * 4.0) * 0.25 + sin(time * 9.0) * 0.15 + 1.0;
+        float alpha = (1.0 - vHeight * 0.5) * (0.8 + flicker * 0.2);
+        gl_FragColor = vec4(color * uIntensity * flicker, alpha);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    fog: false,
+  })
+}
+
+// Parent a flame to every Flame_Empty under `model`, scaled so each stands
+// FLAME.height tall in world units whatever the empty's own scale.
+function addStationFlames(model, geometry, track) {
+  const empties = []
+  model.traverse((node) => { if (FLAME.prefix.test(node.name)) empties.push(node) })
+  model.updateMatrixWorld(true)
+  const worldScale = new THREE.Vector3()
+  empties.forEach((empty, i) => {
+    const material = createFlameMaterial(i * 1.7)
+    const flame = new THREE.Mesh(geometry, material)
+    flame.name = 'StationFlame'
+    flame.frustumCulled = false
+    empty.getWorldScale(worldScale)
+    flame.scale.setScalar(FLAME.height / 0.6 / Math.max(worldScale.y, 1e-6))
+    flame.position.y = 0.1 * flame.scale.y // base of the profile sits on the empty
+    empty.add(flame)
+    track.materials.push(material)
+  })
+  return empties.length
+}
 // Scales the control points' height so the climbs and drops are gentler
 // for the car (1 is the original tunnel).
 const VERTICAL_SCALE = 0.75
@@ -81,156 +266,179 @@ class FloatingGallery extends THREE.Group {
     this.materials = [] // Track materials for disposal
     this.geometries = [] // Track geometries for disposal
     this.imageData = [
-      { 
-        url: '/carousel_images/img1.jpg',
-        year: '67 CE',
-        description: 'Driving back a bear market',
-        curvePosition: 0.09,  // Position along curve (0-1)
-        width: 1.2,
-        height: 1.2,
-        radialOffset: -1,     // Distance from center of tunnel
+      {
+        // Test station: a glTF diorama in place of the image. `width` is
+        // the fitted size of its longest side; the ride slows here.
+        model: '/models/alchemyDiorama2.glb',
+        year: 'ALCHEMY',
+        description: 'The first station',
+        curvePosition: 0.12,  // Position along curve (0-1)
+        width: 3.5,
+        height: 3.5,
+        radialOffset: 1.9,      // Distance from center of tunnel (sign = side)
         angle: -Math.PI,             // Angle around tunnel (radians)
-        verticalOffset: 0.2,     // Additional vertical offset
-        rotateY: Math.PI       // Rotate 180 degrees around Y-axis
+        verticalOffset: 1.1,     // Additional vertical offset
+        rotateY: Math.PI/1.2       // Rotate 180 degrees around Y-axis
       },
       {
-        url: '/carousel_images/img12.jpg',
-        year: '599 CE',
-        description: 'Our Lady shows how followers how to find their own four tunas',
-        curvePosition: 0.26,
-        width: 1,
-        height: 1,
-        radialOffset: 0.7,
-        angle: Math.PI,
-        verticalOffset: 0.1,
-        rotateY: Math.PI,
-        rotateZ: Math.PI / 8
-      },
-      {
-        url: '/carousel_images/img8.jpg',
-        year: '380 CE',
-        description: 'Pre-meme era patronage of the arts',
+        // Second station: same model on the opposite side of the track,
+        // yaw mirrored so it faces the rail the same way as the first.
+        model: '/models/alchemyDiorama2.glb',
+        year: 'ALCHEMY II',
+        description: 'The second station',
         curvePosition: 0.34,
-        width: 1,
-        height: 1,
-        radialOffset: -0.6,
-        // angle: -Math.PI,
-        rotateY: Math.PI,
-    rotateZ: -Math.PI * 0.02,  // Flip upside down (180 degrees)
-        verticalOffset: 0.5
-      },
-      { 
-        url: '/carousel_images/img13.jpg',
-        year: '1100 CE',
-      description: 'Early Carpathian staking protocol',
-        curvePosition: 0.39,
-        width: 1,
-        height: 1,
-        radialOffset: 0.7,
-        angle: Math.PI,
-        rotateY: Math.PI,
-
-        verticalOffset: 0.2
-
-      },
-      { 
-        url: '/carousel_images/img3.jpg',
-        year: '1350 CE',
-        description: 'Early clown encounter turns ugly',
-        curvePosition: 0.47,
-        width: 1,
-        height: 1,
-        radialOffset: -0.65,
+        width: 3.5,
+        height: 3.5,
+        radialOffset: -1.9,
         angle: -Math.PI,
-        verticalOffset: 0.3,
-
-        rotateY: Math.PI       // Rotate 180 degrees around Y-axis
-
+        verticalOffset: 1.1,
+        rotateY: Math.PI * 0.5
       },
-      { 
-        url: '/carousel_images/img9.jpg',
-        year: '1680',
-        description: 'Monetary theory for a young privateer',
-        curvePosition: 0.54,
-        width: 1.3,
-        height: 1.3,
-        radialOffset: -0.5,
-        // angle: -Math.PI/6,
-        verticalOffset: 0.5,
-        rotateY: Math.PI       // Rotate 180 degrees around Y-axis
+    //   {
+    //     url: '/carousel_images/img12.jpg',
+    //     year: '599 CE',
+    //     description: 'Our Lady shows how followers how to find their own four tunas',
+    //     curvePosition: 0.26,
+    //     width: 1,
+    //     height: 1,
+    //     radialOffset: 0.7,
+    //     angle: Math.PI,
+    //     verticalOffset: 0.1,
+    //     rotateY: Math.PI,
+    //     rotateZ: Math.PI / 8
+    //   },
+    //   {
+    //     url: '/carousel_images/img8.jpg',
+    //     year: '380 CE',
+    //     description: 'Pre-meme era patronage of the arts',
+    //     curvePosition: 0.34,
+    //     width: 1,
+    //     height: 1,
+    //     radialOffset: -0.6,
+    //     // angle: -Math.PI,
+    //     rotateY: Math.PI,
+    // rotateZ: -Math.PI * 0.02,  // Flip upside down (180 degrees)
+    //     verticalOffset: 0.5
+    //   },
+    //   { 
+    //     url: '/carousel_images/img13.jpg',
+    //     year: '1100 CE',
+    //   description: 'Early Carpathian staking protocol',
+    //     curvePosition: 0.39,
+    //     width: 1,
+    //     height: 1,
+    //     radialOffset: 0.7,
+    //     angle: Math.PI,
+    //     rotateY: Math.PI,
 
-      },
-      { 
-        url: '/carousel_images/img11.jpg',
-        year: '1790',
-        description: 'Heroine of Mythology',
-        curvePosition: 0.63,
-        width: 1.4,
-        height: 1.4,
-        radialOffset: 1,
-        angle: -Math.PI,
-        verticalOffset: 0.1,
-        rotateY: Math.PI       // Rotate 180 degrees around Y-axis
+    //     verticalOffset: 0.2
 
-      },
-      {
-        url: '/carousel_images/img2.jpg',
-        year: '1991 CE',
-        description: 'The Guardian of Good Times',
-        curvePosition: 0.71,
-        width: 1.1,
-        height: 1.1,
-        radialOffset: -0.8,
-        angle: -Math.PI,
-        verticalOffset: 0.3,
-        rotateY: Math.PI
-      },
-      {
-     url: '/carousel_images/img4.jpg',
-        year: '2010',
-        description: 'Featured in popular manga series',
-        curvePosition: 0.78,
-        width: 1.2,
-        height: 1.2,
-        radialOffset: 0.6,
-        angle: -Math.PI,
-        verticalOffset: 0.4,
-        rotateY: Math.PI,
-        rotateZ: -Math.PI / 2.25
+    //   },
+    //   { 
+    //     url: '/carousel_images/img3.jpg',
+    //     year: '1350 CE',
+    //     description: 'Early clown encounter turns ugly',
+    //     curvePosition: 0.47,
+    //     width: 1,
+    //     height: 1,
+    //     radialOffset: -0.65,
+    //     angle: -Math.PI,
+    //     verticalOffset: 0.3,
 
-      },
-      {
-        url: '/carousel_images/img5.jpg',
-        year: '2031',
-        description: 'Laying down DeFi Beats',
-        curvePosition: 0.86,
-        width: 1,
-        height: 1,
-        radialOffset: 0.75,
-        angle: -Math.PI,
-        verticalOffset: 0.2,
-        rotateY: Math.PI,  // 180° + 30° to fix mirror and rotation
-        rotateZ: 0                      // No vertical flip needed
-      },
-      { 
-       url: '/carousel_images/img6.jpg', 
-        year: '2077',
-        description: 'A popular virtue signal among avant-garde automatons',
-        curvePosition: 0.98,
-        width: 1,
-        height: 1,
-        radialOffset: -0.5,
-        angle: -Math.PI,
-        verticalOffset: 0.5,
-            rotateZ: -Math.PI/7,  // Flip upside down (180 degrees)
+    //     rotateY: Math.PI       // Rotate 180 degrees around Y-axis
 
-        rotateY: Math.PI       // Rotate 180 degrees around Y-axis
+    //   },
+    //   { 
+    //     url: '/carousel_images/img9.jpg',
+    //     year: '1680',
+    //     description: 'Monetary theory for a young privateer',
+    //     curvePosition: 0.54,
+    //     width: 1.3,
+    //     height: 1.3,
+    //     radialOffset: -0.5,
+    //     // angle: -Math.PI/6,
+    //     verticalOffset: 0.5,
+    //     rotateY: Math.PI       // Rotate 180 degrees around Y-axis
 
-      },
+    //   },
+    //   { 
+    //     url: '/carousel_images/img11.jpg',
+    //     year: '1790',
+    //     description: 'Heroine of Mythology',
+    //     curvePosition: 0.63,
+    //     width: 1.4,
+    //     height: 1.4,
+    //     radialOffset: 1,
+    //     angle: -Math.PI,
+    //     verticalOffset: 0.1,
+    //     rotateY: Math.PI       // Rotate 180 degrees around Y-axis
+
+    //   },
+    //   {
+    //     url: '/carousel_images/img2.jpg',
+    //     year: '1991 CE',
+    //     description: 'The Guardian of Good Times',
+    //     curvePosition: 0.71,
+    //     width: 1.1,
+    //     height: 1.1,
+    //     radialOffset: -0.8,
+    //     angle: -Math.PI,
+    //     verticalOffset: 0.3,
+    //     rotateY: Math.PI
+    //   },
+    //   {
+    //  url: '/carousel_images/img4.jpg',
+    //     year: '2010',
+    //     description: 'Featured in popular manga series',
+    //     curvePosition: 0.78,
+    //     width: 1.2,
+    //     height: 1.2,
+    //     radialOffset: 0.6,
+    //     angle: -Math.PI,
+    //     verticalOffset: 0.4,
+    //     rotateY: Math.PI,
+    //     rotateZ: -Math.PI / 2.25
+
+    //   },
+    //   {
+    //     url: '/carousel_images/img5.jpg',
+    //     year: '2031',
+    //     description: 'Laying down DeFi Beats',
+    //     curvePosition: 0.86,
+    //     width: 1,
+    //     height: 1,
+    //     radialOffset: 0.75,
+    //     angle: -Math.PI,
+    //     verticalOffset: 0.2,
+    //     rotateY: Math.PI,  // 180° + 30° to fix mirror and rotation
+    //     rotateZ: 0                      // No vertical flip needed
+    //   },
+    //   { 
+    //    url: '/carousel_images/img6.jpg', 
+    //     year: '2077',
+    //     description: 'A popular virtue signal among avant-garde automatons',
+    //     curvePosition: 0.98,
+    //     width: 1,
+    //     height: 1,
+    //     radialOffset: -0.5,
+    //     angle: -Math.PI,
+    //     verticalOffset: 0.5,
+    //         rotateZ: -Math.PI/7,  // Flip upside down (180 degrees)
+
+    //     rotateY: Math.PI       // Rotate 180 degrees around Y-axis
+
+    //   },
      
     ]
     
     const loader = new THREE.TextureLoader()
+    this.stations = [] // { u, position } for each diorama slot (ride pacing + gaze)
+    this.modelLoads = [] // cancel flags for in-flight glTF loads
+    this.dracoLoader = null
+    this.flameGeometry = null // shared by every station flame
+    this.mixers = [] // { mixer, root } per animated station
+    this.lastT = null
+    this.helpers = [] // SpotLightHelpers when ?spothelper=1
     
     this.imageData.forEach((imageInfo, i) => {
       const position = new THREE.Vector3()
@@ -251,6 +459,25 @@ class FloatingGallery extends THREE.Group {
       position.add(binormal.clone().multiplyScalar(zOffset))
       position.y += imageInfo.verticalOffset
       
+      if (imageInfo.model) {
+        const towardTrack = normal.clone().multiplyScalar(-xOffset)
+          .add(binormal.clone().multiplyScalar(-zOffset)).normalize()
+        const root = this.buildStation(imageInfo, position, tangent, towardTrack)
+        root.userData = {
+          ...root.userData,
+          initPosition: root.position.clone(),
+          year: imageInfo.year,
+          floatOffset: 0,
+          floatSpeed: 0,
+          floatAmplitude: 0 // dioramas sit still; only the image planes hover
+        }
+        root.visible = false // revealed when its spotlight strikes (setRide)
+        this.add(root)
+        this.images.push(root)
+        this.stations.push({ u: imageInfo.curvePosition, position: root.position.clone(), spot: root.userData.spot, root })
+        return
+      }
+
       const geometry = new THREE.PlaneGeometry(imageInfo.width, imageInfo.height)
       const material = new THREE.MeshBasicMaterial({
         side: THREE.DoubleSide,
@@ -334,10 +561,157 @@ class FloatingGallery extends THREE.Group {
       this.images.push(mesh)
     })
     
+    this.stations.sort((a, b) => a.u - b.u)
     this.frustumCulled = false
   }
   
+  // A diorama slot: an empty group posed like an image plane (facing back
+  // along the track), filled by the glTF once it loads. The model is centred
+  // on the group and scaled so its longest side equals `width`. It stays
+  // invisible until its spotlight strikes, so it never shows through the
+  // canopy from another pass of the loop and appears all at once, lit.
+  buildStation(info, position, tangent, towardTrack) {
+    const root = new THREE.Group()
+    root.name = `Station:${info.year}`
+    root.position.copy(position)
+    // Face along the track but stay level: the raw tangent carries the
+    // rail's pitch, which would tilt the diorama on every hill.
+    const level = tangent.clone().setY(0)
+    if (level.lengthSq() < 1e-6) level.set(0, 0, 1)
+    root.lookAt(position.clone().add(level.normalize()))
+
+    // A warm spotlight above the slot, pulled toward the track so it lights
+    // the diorama's facing side. Off until the cart approaches (see update).
+    // Hard-edged cone (no penumbra) so it reads as a stage light; tuned
+    // live via ?spothelper=1 on the alchemy station (width 1.2).
+    const spot = new THREE.SpotLight(0xffe2b8, 0, 0, 0.7, 0, 2)
+    spot.name = `StationSpot:${info.year}`
+    spot.position.copy(position)
+      .addScaledVector(towardTrack, info.width * 0.5)
+      .add(new THREE.Vector3(0, info.width * 0.57, 0))
+    spot.target.position.copy(position)
+    this.add(spot, spot.target)
+    root.userData.spot = spot
+    if (SPOT_HELPER) {
+      const helper = new THREE.SpotLightHelper(spot, 0xffe2b8)
+      this.add(helper)
+      this.helpers.push(helper)
+    }
+    root.rotation.y += info.rotateY !== undefined ? info.rotateY : Math.PI
+    root.rotation.x += info.rotateX || 0
+    root.rotation.z += info.rotateZ || 0
+
+    if (!this.dracoLoader) {
+      this.dracoLoader = new DRACOLoader()
+      this.dracoLoader.setDecoderPath('/draco/')
+      this.dracoLoader.setWorkerLimit(1)
+    }
+    const gltfLoader = new GLTFLoader()
+    gltfLoader.setDRACOLoader(this.dracoLoader)
+    const load = { cancelled: false }
+    this.modelLoads.push(load)
+
+    gltfLoader.load(info.model, (gltf) => {
+      if (load.cancelled) return
+      const model = gltf.scene
+      // Exported lights (key/fill rigs, one point light per candle) would
+      // light the whole tunnel at Blender wattages and cost a shader variant
+      // each; the stage spotlight and the authored emissives carry the look.
+      const lights = []
+      model.traverse((child) => { if (child.isLight) lights.push(child) })
+      lights.forEach((light) => light.parent?.remove(light))
+      model.updateMatrixWorld(true)
+      const box = new THREE.Box3().setFromObject(model)
+      const size = box.getSize(new THREE.Vector3())
+      const scale = info.width / Math.max(size.x, size.y, size.z, 1e-6)
+      const centre = box.getCenter(new THREE.Vector3())
+      const fit = new THREE.Group()
+      fit.name = 'StationFit'
+      fit.scale.setScalar(scale)
+      model.position.sub(centre)
+      fit.add(model)
+      model.traverse((child) => {
+        if (!child.isMesh) return
+        child.frustumCulled = false
+        const materials = Array.isArray(child.material) ? child.material : [child.material]
+        for (const material of materials) {
+          if (!material) continue
+          this.materials.push(material)
+          if (material.map) this.textures.push(material.map)
+          if (material.emissiveMap) this.textures.push(material.emissiveMap)
+          // No fog: the station is hidden until its light strikes, then
+          // shown whole, instead of fading in through the tunnel fog.
+          material.fog = false
+          // Solid things exported with alphaMode BLEND (the Tripo alchemist:
+          // blended AND double-sided) render as transparent, which disables
+          // depth sorting inside the mesh — far faces paint over near ones.
+          // Make them opaque with an alpha cutout, so a texture that does
+          // carry holes still keeps them. Real glass stays blended.
+          if (material.transparent && !/glas|glass|crystal|water|swirl/i.test(material.name || '')) {
+            material.transparent = false
+            material.alphaTest = 0.5
+            material.depthWrite = true
+          }
+          material.needsUpdate = true
+          // Authored emissive strengths are trusted: the diorama's candle
+          // flames and sparks are built to bloom (threshold 1 in this scene).
+        }
+        if (child.geometry) this.geometries.push(child.geometry)
+      })
+      root.add(fit)
+      root.updateMatrixWorld(true)
+      // Animation: a Blender "Scene" export merges everything into one clip
+      // (the alchemist's rig, the candle flicker, the gold motes); play every
+      // clip the file ships, looping. Advanced from update() while visible.
+      if (gltf.animations?.length) {
+        const mixer = new THREE.AnimationMixer(model)
+        for (const clip of gltf.animations) mixer.clipAction(clip).setLoop(THREE.LoopRepeat, Infinity).play()
+        this.mixers.push({ mixer, root })
+      }
+      // Shader flames only for models that do not bring their own: a mesh
+      // named "Candle flame …" means the flames were authored in Blender.
+      let authoredFlames = false
+      model.traverse((child) => { if (child.isMesh && /^Candle flame/i.test(child.name)) authoredFlames = true })
+      if (!authoredFlames) {
+        if (!this.flameGeometry) {
+          this.flameGeometry = createFlameGeometry()
+          this.geometries.push(this.flameGeometry)
+        }
+        addStationFlames(model, this.flameGeometry, this)
+      }
+    }, undefined, (error) => {
+      if (!load.cancelled) console.warn(`Station model could not load: ${info.model}`, error)
+    })
+
+    return root
+  }
+
+  // The gallery root an intersected mesh belongs to (planes carry label and
+  // edge children; stations are whole glTF trees).
+  rootOf(object) {
+    let node = object
+    while (node && !this.images.includes(node)) node = node.parent
+    return node || null
+  }
+
+  // Called with the vehicle's ride position: each station's spotlight
+  // comes up as the cart approaches and fades after it passes.
+  setRide(u) {
+    this.stations.forEach((s, i) => {
+      const w = spotWeight(u, s, strikeOffset(i, this.stations))
+      if (s.spot) s.spot.intensity = STATION.spot * w
+      s.root.visible = w > 0
+    })
+  }
+
   update(t) {
+    flameUniforms.uTime.value = t
+    // Wall-clock step for the station mixers (clamped so a background tab
+    // does not lurch); hidden stations are not advanced.
+    const dt = this.lastT === null ? 0 : Math.min(Math.max(t - this.lastT, 0), 0.1)
+    this.lastT = t
+    for (const { mixer, root } of this.mixers) if (root.visible) mixer.update(dt)
+    for (const helper of this.helpers) helper.update()
     this.images.forEach((image) => {
       const userData = image.userData
       
@@ -347,6 +721,14 @@ class FloatingGallery extends THREE.Group {
   }
   
   dispose() {
+    this.modelLoads.forEach(load => { load.cancelled = true })
+    this.mixers.forEach(({ mixer }) => { mixer.stopAllAction(); mixer.uncacheRoot(mixer.getRoot()) })
+    this.mixers = []
+    this.helpers.forEach(helper => helper.dispose())
+    this.helpers = []
+    if (SPOT_HELPER && typeof window !== 'undefined') delete window.__hubStation
+    this.dracoLoader?.dispose()
+    this.dracoLoader = null
     // Dispose of all tracked resources
     this.textures.forEach(texture => texture.dispose())
     this.materials.forEach(material => material.dispose())
@@ -376,14 +758,16 @@ class WireTunnel extends THREE.LineSegments {
     ]
 
     const curve = new THREE.CatmullRomCurve3(
-      basePoints.map(p => new THREE.Vector3(p.x, p.y * VERTICAL_SCALE, p.z)),
+      basePoints.map(p => new THREE.Vector3(p.x, p.y * VERTICAL_SCALE, p.z).multiplyScalar(TRACK_SCALE)),
       true, 'catmullrom', 0.7
     )
     if (smoothPath) {
       curve.arcLengthDivisions = 4096
       curve.updateArcLengths()
     }
-    const tubularSegments = 130
+    LAP = curve.getLength()
+    // Rings per lap; scaled with the track so their spacing stays the same.
+    const tubularSegments = Math.round(130 * TRACK_SCALE)
     const radialSegments = 7
     const tube = new THREE.TubeGeometry(curve, tubularSegments, 0.2, radialSegments, true)
 
@@ -599,11 +983,12 @@ class SynthwaveRoad extends THREE.Mesh {
 class FlyThrough {
   // vehicle: an Object3D kept just ahead of the camera on the curve, facing
   // along it (its +Z points forward, the Object3D.lookAt convention).
-  constructor(camera, curve, vehicle, coasterRide = null) {
+  constructor(camera, curve, vehicle, coasterRide = null, stations = []) {
     this.camera = camera
     this.curve = curve
     this.vehicle = vehicle
     this.coasterRide = coasterRide
+    this.stations = stations
     this.cameraMode = COASTER_POV.mode
     this.la = new THREE.Vector3()
     this.tangent = new THREE.Vector3()
@@ -619,22 +1004,29 @@ class FlyThrough {
     }
   }
 
-  update(t) {
-    const move = t * CURVE_SPEED
-    const cameraA = move % 1
-    const lookAtA = (move + 0.025) % 1
+  // ride: position along the curve in laps (fraction, may exceed 1).
+  update(ride) {
+    const cameraA = ride % 1
+    const lookAtA = (ride + frac(LOOK_AHEAD)) % 1
+
+    // Turn toward a station as the vehicle passes it (same window as the
+    // slow-down). The blend is on the look target, so the camera still
+    // rides the track and settles back to forward on the way out.
+    const { station, weight } = stationAt(lookAtA, this.stations)
+    const gaze = station ? weight * STATION.gaze : 0
 
     this.curve.getPointAt(cameraA, this.camera.position)
     this.curve.getPointAt(lookAtA, this.la)
+    if (gaze > 0) this.la.lerp(station.position, gaze)
     this.camera.up.set(0, 1, 0)
     this.camera.lookAt(this.la)
     
-    // The vehicle sits at the camera's look-at point and faces along the
-    // road under it (the curve tangent there), rather than cutting across
-    // bends toward a point further ahead.
-    this.vehicle.position.copy(this.la)
+    // The vehicle sits at the camera's look-ahead point on the curve and
+    // faces along the road under it (the curve tangent there), rather than
+    // cutting across bends toward a point further ahead.
+    this.curve.getPointAt(lookAtA, this.vehicle.position)
     this.curve.getTangentAt(lookAtA, this.tangent)
-    this.laVehicle.copy(this.la).add(this.tangent)
+    this.laVehicle.copy(this.vehicle.position).add(this.tangent)
     this.vehicle.lookAt(this.laVehicle)
     this.coasterRide?.placeVehicle(lookAtA)
 
@@ -651,7 +1043,12 @@ class FlyThrough {
         .set(0, eyeHeight, seatOffset + 1)
         .applyQuaternion(this.vehicle.quaternion)
         .add(this.vehicle.position)
+      if (gaze > 0) this.laVehicle.lerp(station.position, gaze)
+      // The seat's up follows the cart's pitch and bank; looking sideways
+      // from a slope turns that into a rolled horizon, so level the view
+      // as the gaze takes over and let it return on the way out.
       this.camera.up.set(0, 1, 0).applyQuaternion(this.vehicle.quaternion)
+      if (gaze > 0) this.camera.up.lerp(WORLD_UP, gaze).normalize()
       this.camera.lookAt(this.laVehicle)
     }
   }
@@ -729,8 +1126,12 @@ function loadLowRider({ rig, renderer, cameraSpeed, onError }) {
   }
 }
 
-export default function OldsCoolTunnel({ isFullscreen = false, road = true, canopy = true, car = true, coaster = false }) {
+export default function OldsCoolTunnel({ isFullscreen = false, road = true, canopy = true, car = true, coaster = false, onReady = null }) {
   const { t } = useLanguage()
+  // Fires once, after the first frame is on screen (the /hub curtain waits
+  // for it). A ref so the loop never closes over a stale prop.
+  const onReadyRef = useRef(onReady)
+  onReadyRef.current = onReady
   const mountRef = useRef(null)
   const sceneRef = useRef(null)
   const rendererRef = useRef(null)
@@ -753,6 +1154,7 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
   const getTranslatedImageData = useMemo(() => {
     const translatedImages = t('oldsCoolTunnel.images')
     return (index, baseData) => {
+      if (baseData.model) return baseData
       if (translatedImages && Array.isArray(translatedImages) && translatedImages[index]) {
         return {
           ...baseData,
@@ -820,7 +1222,7 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
 
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(containerWidth, containerHeight),
-      0.75,
+      0.3,
       0,
       1
     )
@@ -853,6 +1255,11 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
     const gallery = new FloatingGallery(wireTunnel.curve)
     scene.add(gallery)
     galleryRef.current = gallery
+    if (SPOT_HELPER) {
+      // e.g. __hubStation.STATION.spot = 24; __hubStation.spots[0].angle = 0.5;
+      // __hubStation.spots[0].position.y += 0.2 (helpers follow every frame)
+      window.__hubStation = { STATION, spots: gallery.stations.map(s => s.spot), stations: gallery.stations }
+    }
     
     // Removed position arrow - no longer needed
     
@@ -873,15 +1280,25 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
       })
       : null
     const lowRiderLoad = car && !coaster
-      ? loadLowRider({ rig: vehicle, renderer, cameraSpeed: CURVE_SPEED * wireTunnel.curve.getLength(), onError: showShip })
+      ? loadLowRider({ rig: vehicle, renderer, cameraSpeed: RIDE_SPEED, onError: showShip })
       : null
     if (!car && !coaster) showShip()
 
-    const flyThrough = new FlyThrough(camera, wireTunnel.curve, vehicle, coasterLoad)
+    const flyThrough = new FlyThrough(camera, wireTunnel.curve, vehicle, coasterLoad, gallery.stations)
     flyThrough.setCameraMode(cameraModeRef.current)
 
-    let t = 0
+    let t = 0      // wall clock (seconds) for shader and float animation
+    // Ride position in laps, advanced by the speed profile. Starts a lead-in
+    // before the first station's strike (the vehicle rides LOOK_AHEAD ahead).
+    let ride = 0
+    if (gallery.stations.length) {
+      const first = gallery.stations[0] // sorted by u
+      const strikeU = first.u + strikeOffset(0, gallery.stations)
+      ride = strikeU - frac(LEAD_IN_SECONDS * RIDE_SPEED + LOOK_AHEAD)
+      ride = ((ride % 1) + 1) % 1
+    }
     let isPausedLocal = false
+    let firstFrameDone = false
     let lastTime = performance.now()
     const targetFPS = 60
     const frameInterval = 1000 / targetFPS
@@ -893,7 +1310,7 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
       const nextMode = cameraModeRef.current === 'inside' ? 'behind' : 'inside'
       cameraModeRef.current = nextMode
       flyThrough.setCameraMode(nextMode)
-      flyThrough.update(t)
+      flyThrough.update(ride)
       setCameraMode(nextMode)
     }
     toggleCameraRef.current = toggleCamera
@@ -909,12 +1326,17 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
         const dt = elapsed / 1000 // Convert to seconds
         lastTime = currentTime - (elapsed % frameInterval)
         
+        t += dt
         if (!isPausedLocal) {
-          t += dt
-          flyThrough.update(t)
-          lowRiderLoad?.update(dt)
+          // Slow through stations, measured at the vehicle, not the camera.
+          const pace = rideSpeedAt((ride + frac(LOOK_AHEAD)) % 1, gallery.stations)
+          ride += frac(RIDE_SPEED) * pace * dt
+          flyThrough.update(ride)
+          lowRiderLoad?.update(dt * pace)
         }
         
+        // Every frame, paused or not, so spotlight tuning applies live.
+        gallery.setRide((ride + frac(LOOK_AHEAD)) % 1)
         gallery.update(t)
         
         // Update scanline shader time
@@ -926,6 +1348,10 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
           composer.render()
         } else {
           renderer.render(scene, camera)
+        }
+        if (!firstFrameDone) {
+          firstFrameDone = true
+          onReadyRef.current?.()
         }
       }
     }
@@ -1026,10 +1452,10 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
         raycasterRef.current.setFromCamera(mouseRef.current, camera)
         
         if (galleryRef.current && galleryRef.current.images) {
-          const intersects = raycasterRef.current.intersectObjects(galleryRef.current.images, false)
+          const intersects = raycasterRef.current.intersectObjects(galleryRef.current.images, true)
           
           if (intersects.length > 0) {
-            const clickedImage = intersects[0].object
+            const clickedImage = galleryRef.current.rootOf(intersects[0].object)
             const imageIndex = galleryRef.current.images.indexOf(clickedImage)
             
             if (imageIndex !== -1) {
@@ -1262,7 +1688,7 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
           }}
         >
           {/* Image Display */}
-          <img 
+          {focusedImageData.url && <img 
             src={focusedImageData.url} 
             alt={focusedImageData.year}
             style={{
@@ -1274,7 +1700,7 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
               boxShadow: '0 0 30px rgba(65, 17, 255, 0.5)'
             }}
             onClick={(e) => e.stopPropagation()}
-          />
+          />}
           
           {/* Info Panel */}
           <div 

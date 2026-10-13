@@ -21,7 +21,7 @@ import usePushAlerts from "@/hooks/usePushAlerts";
 import PimpMyPumpPanel, { getDefaultPumpConfig, THEME_PRESETS } from "@/components/PimpMyPumpPanel";
 import RigScene, { RIG_CAMERA, RIG_FOV } from "@/components/RigScene";
 import DemonArena, { WEAPONS } from "@/components/DemonArena";
-import VendorStage, { BoardwalkStrip, VendorCart, stepUpVendor, stepBackVendor, warmBoardwalk } from "@/components/VendorStage";
+import VendorStage, { BoardwalkStrip, VendorCart, RideTicketPrompt, stepUpVendor, stepBackVendor, warmBoardwalk } from "@/components/VendorStage";
 import { playSfx, startSfxLoop } from "@/lib/uiSfx";
 import { panelChrome, PanelSection, PanelTitle, PANEL_ICONS } from "@/components/HailMaryPanel";
 import { HudTitleStatus } from "@/components/HmHud";
@@ -1422,6 +1422,18 @@ const SeasonCountdown = memo(function SeasonCountdown({ gameStartDate, style }) 
 // scale would squeeze it further — portrait gets its own layout later.
 const TOUCH_UI_SCALE_MIN = 1.15;
 
+// Ticket hand-off to the ride (see rideTimeMachine). Distances are multiples
+// of the vortex plane's world height; times in ms. /hub reads the key.
+const RIDE_OUT = {
+  frame: 1.2,      // camera distance for the head-on framing of the mouth
+  frameMs: 1100,   // how long that framing holds before the push
+  push: 0.12,      // camera distance at the end of the push into the swirl
+  curtainMs: 1500, // the curtain's rise, started with the push
+  light: "#e6ffff", // the VortexPortal core colour
+};
+// Not exported: an app-router page module may only export page fields.
+const RIDE_TICKET_KEY = "hm_ride_ticket";
+
 function useUiScale(base = 1440, max = 2.5) {
   const [scale, setScale] = useState(1);
   useEffect(() => {
@@ -2530,6 +2542,10 @@ export default function OilPage() {
   // enter via onVendorClick and the exit via the hm-vendor-left window event).
   const [focusedVendor, setFocusedVendor] = useState(null);
   const handleVendorClick = useCallback((id) => setFocusedVendor(id || null), []);
+  // Set while the ticket hand-off plays (camera into the vortex + curtain);
+  // hides the booth and shows the curtain. rideTimeMachine is defined after
+  // handleFocusObject, which it flies with.
+  const [ridingOut, setRidingOut] = useState(false);
   useEffect(() => {
     const onLeft = () => setFocusedVendor(null);
     window.addEventListener("hm-vendor-left", onLeft);
@@ -4567,6 +4583,30 @@ export default function OilPage() {
     window.__hmFocusObject = handleFocusObject;
     return () => { if (window.__hmFocusObject === handleFocusObject) delete window.__hmFocusObject; };
   }, [handleFocusObject]);
+  // The carny's ticket (2026-10-12): the Time Machine is the /hub coaster.
+  // Desktop: fly to the clown mouth's vortex (CommercialStrip exposes it),
+  // then push the camera into it while the curtain rises to the vortex's own
+  // light; /hub lowers a curtain of the same colour, so the cut reads as
+  // passing through the portal into the dark tunnel. The phone card has no
+  // strip to fly through, so it gets the curtain alone. Mute the booth first.
+  const rideTimeMachine = useCallback(() => {
+    stepBackVendor();
+    setRidingOut(true);
+    const entrance = window.__hmStripNav?.rideEntrance?.();
+    const go = () => {
+      try { sessionStorage.setItem(RIDE_TICKET_KEY, "1"); } catch (e) {}
+      router.push("/hub");
+    };
+    if (!entrance) { setTimeout(go, RIDE_OUT.curtainMs); return; }
+    const { point, normal, height } = entrance;
+    // Frame the whole mouth head-on (fov 50: frame height ≈ 0.93 × distance).
+    handleFocusObject(point, normal, height * RIDE_OUT.frame);
+    setTimeout(() => {
+      // Push in through the swirl as the light takes over.
+      handleFocusObject(point, normal, height * RIDE_OUT.push, 0.02);
+      setTimeout(go, RIDE_OUT.curtainMs);
+    }, RIDE_OUT.frameMs);
+  }, [router, handleFocusObject]);
   // ← / → step along the boardwalk while a stall stop is current. Desktop
   // only, and never in walk mode — the walker steers with the arrow keys.
   useEffect(() => {
@@ -8962,6 +9002,8 @@ export default function OilPage() {
       <div style={{ ...m.root, ...(isLoading ? LOADING_ROOT : null) }}>
         <SceneLoadGate stateRef={loadGateRef} onReady={finishLoading} />
         <CoinLoader loading={isLoading} />
+        {/* Ride-out curtain: rises to the vortex's light over the hand-off. */}
+        <div aria-hidden="true" style={{ position: "fixed", inset: 0, zIndex: 20000, background: RIDE_OUT.light, opacity: ridingOut ? 1 : 0, transition: `opacity ${RIDE_OUT.curtainMs}ms ease-in`, pointerEvents: ridingOut ? "auto" : "none" }} />
         {previewBanner}
         <div style={styles.scanlines} />
         <div style={styles.grain} />
@@ -9193,6 +9235,7 @@ export default function OilPage() {
               {mobileTab === "boardwalk" && !arenaOpen && (
                 <BoardwalkStrip vendorId={boardwalkVendor} onSelect={(id) => { if (boardwalkOpen) stepBackVendor(); setBoardwalkVendor(id); setBoardwalkOpen(false); }} open={boardwalkOpen} onToggleOpen={toggleBoardwalk}>
                   <VendorCart vendorId={boardwalkVendor} tank={userDrill?.tankOil ?? 0} owned={userDrill?.supplies} signedIn={!!user} onBuy={handleVendorBuy} compact />
+                  {boardwalkVendor === "carny" && <RideTicketPrompt vendorId="carny" active={boardwalkOpen && !ridingOut} onRide={rideTimeMachine} compact />}
                 </BoardwalkStrip>
               )}
               {activeUserDrill?.col == null && mobileTab === "3d" && !editorOpen && !arenaOpen && (
@@ -9531,6 +9574,8 @@ export default function OilPage() {
     <div style={{ ...styles.root, ...(isLoading ? LOADING_ROOT : null) }}>
       <SceneLoadGate stateRef={loadGateRef} onReady={finishLoading} />
       <CoinLoader loading={isLoading} />
+      {/* Ride-out curtain: rises to the vortex's light over the hand-off. */}
+      <div aria-hidden="true" style={{ position: "fixed", inset: 0, zIndex: 20000, background: RIDE_OUT.light, opacity: ridingOut ? 1 : 0, transition: `opacity ${RIDE_OUT.curtainMs}ms ease-in`, pointerEvents: ridingOut ? "auto" : "none" }} />
       {previewBanner}
       <div style={styles.scanlines} />
       <div style={styles.grain} />
@@ -9787,6 +9832,12 @@ export default function OilPage() {
           {focusedVendor === "tonics" && !arenaOpen && (
             <div style={{ position: "fixed", left: 16, bottom: 16, zIndex: 1001 }}>
               <VendorCart vendorId="tonics" tank={userDrill?.tankOil ?? 0} owned={userDrill?.supplies} signedIn={!!user} onBuy={handleVendorBuy} />
+            </div>
+          )}
+          {/* Bottom-centre, above the stall chevrons: a dialog, not a cart. */}
+          {focusedVendor === "carny" && !arenaOpen && !ridingOut && (
+            <div style={{ position: "fixed", left: "50%", bottom: "clamp(72px, 7vh, 110px)", transform: "translateX(-50%)", zIndex: 1001 }}>
+              <RideTicketPrompt vendorId="carny" active onRide={rideTimeMachine} />
             </div>
           )}
           {arenaOpen && (

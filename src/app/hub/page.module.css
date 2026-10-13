@@ -18,6 +18,15 @@
   height: 100% !important;
 }
 
+/* Arrival curtain (see page.js): colour set inline, fades once the ride draws. */
+.curtain {
+  position: absolute;
+  inset: 0;
+  z-index: 1200;
+  pointer-events: none;
+  transition: opacity 1.6s ease-out;
+}
+
 .loading {
   display: grid;
   place-items: center;

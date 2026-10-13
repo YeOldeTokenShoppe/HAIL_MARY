@@ -768,3 +768,55 @@ export function VendorCart({ vendorId, tank = 0, owned = {}, signedIn = false, o
     </div>
   );
 }
+
+// ── Ride ticket (2026-10-12) ──────────────────────────────────────────────────
+// The carny sells the Time Machine, which is the /hub coaster. Once his
+// greeting ENDS (the talk bus's talking→false edge for his scene) the booth
+// offers a ticket; YES hands off to the page (onRide), NO closes it for this
+// visit. If no line ever plays — host muted, TTS down — the offer still comes
+// after RIDE_PROMPT_FALLBACK_MS, so a silent carny can still sell. The
+// fallback is cancelled the moment a line starts, so it never interrupts him.
+// Desktop mounts this beside the vendor cart while he is focused; the phone
+// card mounts it inside the boardwalk row while his card is stepped in.
+const RIDE_PROMPT_FALLBACK_MS = 9000;
+export function RideTicketPrompt({ vendorId = "carny", active = false, onRide, compact = false }) {
+  const [phase, setPhase] = useState("waiting"); // waiting | offered | declined
+  useEffect(() => {
+    if (!active) { setPhase("waiting"); return; }
+    const offer = () => setPhase((p) => (p === "waiting" ? "offered" : p));
+    let fallback = setTimeout(offer, RIDE_PROMPT_FALLBACK_MS);
+    let spoke = false;
+    const off = onVendorTalk((id, talking) => {
+      if (id !== vendorId) return;
+      if (talking) { spoke = true; if (fallback) { clearTimeout(fallback); fallback = null; } return; }
+      if (spoke) offer();
+    });
+    return () => { if (typeof off === "function") off(); if (fallback) clearTimeout(fallback); };
+  }, [active, vendorId]);
+  if (!active || phase !== "offered") return null;
+  // Everything inside is in em, off one root size: the phone card keeps the
+  // cart's 10px (its row is tight), the desktop scales with the viewport so
+  // the booth reads as a dialog, not a caption, on a wide screen.
+  const rootSize = compact ? "10px" : "clamp(13px, 0.9vw + 5px, 20px)";
+  const btn = (primary) => ({
+    ...mono, padding: "0.8em 1.2em", fontSize: "1em", borderRadius: "0.35em", cursor: "pointer",
+    background: primary ? "rgba(255,196,107,0.18)" : "transparent",
+    color: primary ? "#ffc46b" : "rgba(255,217,201,0.7)",
+    border: `1px solid ${primary ? "#ffc46b" : "rgba(255,217,201,0.3)"}`,
+  });
+  return (
+    <div role="dialog" aria-label="Ride ticket" style={{ ...panel, ...mono, fontSize: rootSize, padding: "1.2em", display: "grid", gap: "0.8em", width: compact ? 260 : "clamp(320px, 30vw, 540px)", maxWidth: "calc(100vw - 24px)", boxSizing: "border-box", borderRadius: "0.5em" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", color: "#ffc46b", fontSize: "0.85em" }}>
+        <span>TICKET BOOTH</span><span>THE TIME MACHINE</span>
+      </div>
+      <div style={{ color: "#ffd27a", fontSize: "1.25em" }}>Buy a ticket and ride?</div>
+      <div style={{ opacity: 0.85, fontSize: "0.95em", lineHeight: 1.5, letterSpacing: "0.04em" }}>
+        One ticket, one loop. Roller coaster on the way in, time machine on the way out. The waiver is implied.
+      </div>
+      <div style={{ display: "flex", gap: "0.8em", justifyContent: "flex-end", marginTop: "0.2em" }}>
+        <button type="button" onClick={() => setPhase("declined")} style={btn(false)}>NOT TODAY</button>
+        <button type="button" autoFocus onClick={() => onRide?.()} style={btn(true)}>BUY A TICKET</button>
+      </div>
+    </div>
+  );
+}

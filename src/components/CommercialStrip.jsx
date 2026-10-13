@@ -53,7 +53,7 @@ import {
 // dev server revalidates on every request regardless of the query string, so the
 // fresh file always won locally, while the CDN kept serving whatever it had
 // cached under the unchanged `?v=ktx2` key. BUMP THIS on every rebuild.
-const STRIP_MODEL_V = "25";
+const STRIP_MODEL_V = "26";
 // The preacher's GLB (Vendor_Chaplain_Character.glb) — bump after every re-export of it.
 export const CHAPEL_ASSET_V = 4;
 // The vendor character GLBs (VENDOR_CATALOG model / poseModels / companionModel).
@@ -67,8 +67,8 @@ export const CHAPEL_ASSET_V = 4;
 // whenever ANY character GLB is re-exported; vendorModelUrl() appends it.
 const VENDOR_MODEL_V = 2;
 const vendorModelUrl = (url) => (!url || url.includes("?") ? url : `${url}?v=${VENDOR_MODEL_V}`);
-const STRIP_MODEL_WEBP = `/models/Commercial_Strip7_20261012_r2_opt.glb?v=${STRIP_MODEL_V}`;
-const STRIP_MODEL_KTX2 = `/models/Commercial_Strip7_20261012_r2_opt_ktx2.glb?v=${STRIP_MODEL_V}`;
+const STRIP_MODEL_WEBP = `/models/Commercial_Strip8_101226_opt.glb?v=${STRIP_MODEL_V}`;
+const STRIP_MODEL_KTX2 = `/models/Commercial_Strip8_101226_opt_ktx2.glb?v=${STRIP_MODEL_V}`;
 const STRIP_MODEL =
   typeof window !== "undefined" && /[?&]strip=webp\b/.test(window.location.search)
     ? STRIP_MODEL_WEBP
@@ -1710,9 +1710,9 @@ const DECK_LIFT = 0.004;
 // awnings, the characters roughly double in size and the pumpjacks become a
 // thin foreground band. At fov 50 it frames one stall and its neighbours.
 // Raise DIST to see more of the strip, lower it to land tighter on one stall.
-const STRIP_VIEW_DIST = 1.6;   // how far back the camera sits from the look-at (2.0 → 1.6, 2026-10-06: "a little closer")
-const STRIP_VIEW_RAISE = 0.25; // lift the LOOK-AT off the deck to chest height
-const STRIP_VIEW_LIFT = 0.18;  // +Y on the approach vector → looking slightly down
+const STRIP_VIEW_DIST = 1.2;   // how far back the camera sits from the look-at (2.0 → 1.6, 2026-10-06: "a little closer")
+const STRIP_VIEW_RAISE = 0.15; // lift the LOOK-AT off the deck to chest height
+const STRIP_VIEW_LIFT = 0.06;  // +Y on the approach vector → looking slightly down
 const STRIP_CLICK_DRAG_PX = 4; // beyond this the pointer was orbiting, not clicking
 // Approach from the field side. +Z is the same direction the vendors use
 // (approachDirWorld resolves their default to exactly (0,0,1)), so a strip
@@ -4565,6 +4565,20 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
       back,
       walkSpawn,
       stops: () => getStops().map((s) => ({ id: s.id, label: s.label })),
+      // The ride entrance (2026-10-12): the clown mouth's vortex in WORLD
+      // space, for the ticket hand-off to /hub. The portal plane faces −X
+      // strip-local (toward the deck), so that is the approach normal; `height`
+      // is the plane's world height, which the page frames the camera from.
+      rideEntrance: () => {
+        const group = stripGroupRef.current;
+        if (!group) return null;
+        group.updateMatrixWorld(true);
+        const point = group.localToWorld(new THREE.Vector3(...PORTAL_LOCAL.position));
+        const normal = new THREE.Vector3(-1, 0, 0).transformDirection(group.matrixWorld).normalize();
+        const scale = new THREE.Vector3();
+        group.matrixWorld.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
+        return { point, normal, height: PORTAL_LOCAL.scale[1] * scale.y };
+      },
     };
     return () => { delete window.__hmStripNav; };
   });
