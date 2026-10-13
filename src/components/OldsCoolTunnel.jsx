@@ -9,6 +9,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { gltfEmissiveAnimation } from '@/lib/gltfEmissiveAnimation.mjs'
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import { createLowRider, LOW_RIDER_MODEL_URL } from '@/lib/palmTreeDriveCar.mjs'
 import { createCandyEmeraldPaint } from '@/lib/palmTreeDrivePaint.mjs'
@@ -114,10 +115,16 @@ function rideSpeedAt(u, stations) {
 // glTF gets a small flickering flame (the shrine's votive shader, trimmed).
 // Height is in world units so it reads the same at every station scale.
 const FLAME = {
-  height: 0.02,     // world height of a flame
+  // Shader flames (models WITHOUT authored "Candle flame" meshes). The alchemy
+  // export brings its own, so these three do nothing for it:
+  height: 0.01,     // world height of a flame
   intensity: 0.7,   // colour multiplier; the full-frame bloom adds the glow
-  speed: 0.5,       // flicker rate (the shrine votives run at 3)
+  speed: 0.05,      // flicker rate (the shrine votives run at 3)
   prefix: /^Flame_Empty/i,
+  // Authored flames (the alchemy export): the clip animates their node scale
+  // every frame, so a scale set on the mesh is overwritten at once. This
+  // scales the GEOMETRY about the flame's base instead, once, at load.
+  authoredScale: 0.5,
 }
 const flameUniforms = { uTime: { value: 0 } }
 
@@ -198,7 +205,7 @@ function addStationFlames(model, geometry, track) {
     flame.name = 'StationFlame'
     flame.frustumCulled = false
     empty.getWorldScale(worldScale)
-    flame.scale.setScalar(FLAME.height / 0.6 / Math.max(worldScale.y, 1e-6))
+    flame.scale.setScalar(FLAME.height / 4 / Math.max(worldScale.y, 1e-6))
     flame.position.y = 0.1 * flame.scale.y // base of the profile sits on the empty
     empty.add(flame)
     track.materials.push(material)
@@ -269,7 +276,7 @@ class FloatingGallery extends THREE.Group {
       {
         // Test station: a glTF diorama in place of the image. `width` is
         // the fitted size of its longest side; the ride slows here.
-        model: '/models/alchemyDiorama2.glb',
+        model: '/models/alchemyDiorama2.glb?v=potion-fx-2',
         year: 'ALCHEMY',
         description: 'The first station',
         curvePosition: 0.12,  // Position along curve (0-1)
@@ -283,7 +290,7 @@ class FloatingGallery extends THREE.Group {
       {
         // Second station: same model on the opposite side of the track,
         // yaw mirrored so it faces the rail the same way as the first.
-        model: '/models/alchemyDiorama2.glb',
+        model: '/models/alchemyDiorama2.glb?v=potion-fx-2',
         year: 'ALCHEMY II',
         description: 'The second station',
         curvePosition: 0.34,
@@ -607,6 +614,7 @@ class FloatingGallery extends THREE.Group {
       this.dracoLoader.setWorkerLimit(1)
     }
     const gltfLoader = new GLTFLoader()
+    gltfLoader.register(gltfEmissiveAnimation)
     gltfLoader.setDRACOLoader(this.dracoLoader)
     const load = { cancelled: false }
     this.modelLoads.push(load)
@@ -671,7 +679,17 @@ class FloatingGallery extends THREE.Group {
       // Shader flames only for models that do not bring their own: a mesh
       // named "Candle flame …" means the flames were authored in Blender.
       let authoredFlames = false
-      model.traverse((child) => { if (child.isMesh && /^Candle flame/i.test(child.name)) authoredFlames = true })
+      model.traverse((child) => {
+        if (!child.isMesh || !/^Candle flame/i.test(child.name)) return
+        authoredFlames = true
+        if (FLAME.authoredScale !== 1 && child.geometry) {
+          // Scale about the base (min y) so the flame stays on its wick.
+          const g = child.geometry
+          g.computeBoundingBox()
+          const base = g.boundingBox.min.y
+          g.translate(0, -base, 0).scale(FLAME.authoredScale, FLAME.authoredScale, FLAME.authoredScale).translate(0, base, 0)
+        }
+      })
       if (!authoredFlames) {
         if (!this.flameGeometry) {
           this.flameGeometry = createFlameGeometry()
