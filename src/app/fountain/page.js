@@ -128,31 +128,40 @@ export default function FountainPage() {
   }, [contextIsPlaying, isLoading]);
 
   // --- Desktop audio-reactive window light show -------------------------------
-  // Tap the shared music element with an AnalyserNode and stream per-band energies
-  // to the iframe each frame so the windows pulse in sync with the song. Desktop
-  // only: createMediaElementSource is silent on iOS Safari, so mobile keeps the
-  // simulated beat (the iframe auto-falls-back when no levels arrive). The context
-  // + source are created ONCE and stashed on the audio manager — re-creating
-  // createMediaElementSource throws, and the element must stay routed to
-  // destination or music goes silent app-wide.
+  // Meter the shared music element with an AnalyserNode and stream per-band
+  // energies to the iframe each frame so the windows pulse in sync with the song.
+  // The analyser reads a captureStream() COPY of the element, never the element
+  // itself: createMediaElementSource takes over the element's output, and WebKit
+  // then stops applying audio.volume, so the music jumped from 20% to 100% on
+  // arriving here in Safari (and the MusicContext duck/volume ramps went dead for
+  // the rest of the session). With a copy the element keeps its native output
+  // path and the graph is never connected to the destination. Browsers without
+  // media-element captureStream (Safari) skip the analyser, and the iframe falls
+  // back to its simulated beat (it does so whenever no levels arrive — mobile
+  // uses the same path). Context + stream are created ONCE and stashed on the
+  // audio manager so a revisit reuses them.
   const ensureAnalyser = useCallback(() => {
     const mgr = globalAudioManager;
     if (!mgr || typeof window === 'undefined') return null;
     if (mgr.__fountainAnalyser) return mgr.__fountainAnalyser;
     const audio = mgr.getAudio?.();
     if (!audio) return null;
+    const capture = audio.captureStream || audio.mozCaptureStream;
+    if (typeof capture !== 'function') return null; // Safari: beat-sim fallback
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return null;
       const ctx = mgr.__fountainAudioCtx || new Ctx();
       mgr.__fountainAudioCtx = ctx;
-      const source = mgr.__fountainSource || ctx.createMediaElementSource(audio);
+      const stream = mgr.__fountainStream || capture.call(audio);
+      if (!stream.getAudioTracks().length) return null;
+      mgr.__fountainStream = stream;
+      const source = mgr.__fountainSource || ctx.createMediaStreamSource(stream);
       mgr.__fountainSource = source;
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.6;
-      source.connect(analyser);
-      analyser.connect(ctx.destination); // keep the music audible through the graph
+      source.connect(analyser); // analysis only — NOT connected to ctx.destination
       mgr.__fountainAnalyser = analyser;
       return analyser;
     } catch (e) {
