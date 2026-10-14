@@ -10,6 +10,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { gltfEmissiveAnimation } from '@/lib/gltfEmissiveAnimation.mjs'
+import { ShelfTrack } from '@/lib/shelfTrack.mjs'
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import { createLowRider, LOW_RIDER_MODEL_URL } from '@/lib/palmTreeDriveCar.mjs'
 import { createCandyEmeraldPaint } from '@/lib/palmTreeDrivePaint.mjs'
@@ -23,6 +24,11 @@ const ROAD_DROP = 0.2
 // more rail between stations at the same ride speed, not a faster ride.
 // 1 = the original loop (about 54 units); 2 = about 108.
 const TRACK_SCALE = 2
+// Level shelves for the dioramas (ShelfTrack): each is exactly flat for this
+// many world units; the ramps between them share the rest of the loop. The
+// heights (world units, before VERTICAL_SCALE) set the climbs and drops.
+// /hub?spothelper=1 logs each shelf's curvePosition range.
+const SHELF = { length: 8, heights: [0, 4, 9, 13, 3, -4] }
 // Ride speed in world units per second (0.92 was the original 0.017 of a
 // 54-unit lap; the ship ran at about one and a half times that).
 const RIDE_SPEED = 0.92
@@ -36,16 +42,18 @@ const WORLD_UP = new THREE.Vector3(0, 1, 0)
 // Stations: gallery entries with a `model` slow the ride as the vehicle
 // passes. Distances are world units along the track.
 const STATION = {
-  crawl: 0.05,      // speed multiplier at the station (1 = full pace)
-  hold: 0.43,       // half-width of the window held at crawl
+  crawl: 0.07,      // speed multiplier at the station (1 = full pace)
+  hold: 0.315,      // half-width of the window held at crawl (a gallery entry's `hold` overrides it)
   approach: 3.25,   // ramp length before the hold window (slowing down)
   release: 1.35,    // ramp length after it (speeding back up)
   gaze: 0.9,        // how far the camera turns toward the station (1 = straight at it)
   spot: 50,         // spotlight intensity (candela) once the station is lit
-  spotLead: 4.9,    // the light switches on this far before the slow-down begins
+  spotLead: 4.9,    // the light switches on this far before the slow-down begins (entry `spotLead` overrides)
   spotRise: 0.11,   // and takes this long to come up (short = a stage light snapping on)
   spotFlash: 0.4,   // ignition overshoot (fraction above full) that settles over spotFlashLen
   spotFlashLen: 0.65,
+  houseLead: 2.0,   // the tunnel lights start fading out this far before the slow-down begins
+  houseFade: 2.0,   // and take this long to go dark; they return with the release ramp
 }
 // Length of one lap in world units, set when the track is built. Ride
 // positions are lap fractions, so pacing distances convert through it.
@@ -60,19 +68,19 @@ const SPOT_HELPER = typeof window !== 'undefined'
 // before it). Never before the previous stage has gone dark, so only one
 // stage is ever lit; `stations` must be sorted by u.
 function strikeOffset(index, stations) {
-  const lead = -frac(STATION.hold + STATION.approach + STATION.spotLead)
-  if (stations.length < 2) return lead
   const s = stations[index]
+  const lead = -frac(s.hold + STATION.approach + s.spotLead)
+  if (stations.length < 2) return lead
   const prev = stations[(index + stations.length - 1) % stations.length]
   // Measured backward from this station, so it is always in (-1, 0].
-  let prevDark = prev.u + frac(STATION.hold + STATION.release) - s.u
+  let prevDark = prev.u + frac(prev.hold + STATION.release) - s.u
   prevDark = ((prevDark % 1) + 1) % 1 - 1
   return Math.max(lead, prevDark)
 }
 
 // Spotlight level for a station: snaps on at the strike point, holds
 // through the pass, then fades with the release ramp.
-function spotWeight(u, station, on = -frac(STATION.hold + STATION.approach + STATION.spotLead)) {
+function spotWeight(u, station, on = -frac(station.hold + STATION.approach + station.spotLead)) {
   let d = u - station.u
   d -= Math.round(d)
   if (d >= 0) return stationWeight(u, station)
@@ -88,11 +96,27 @@ function spotWeight(u, station, on = -frac(STATION.hold + STATION.approach + STA
 // the hold window, smoothstepped to 0 over the approach ramp before it and
 // the release ramp after it.
 function stationWeight(u, station) {
+  return windowWeight(u, station, station.hold, STATION.approach, station.hold, STATION.release)
+}
+// 1 within `before`..`after` units of the station, smoothstepped to 0 over
+// the ramps outside those edges (world units; the before side is approaching).
+function windowWeight(u, station, before, beforeRamp, after, afterRamp) {
   let d = u - station.u
   d -= Math.round(d) // wrap to -0.5..0.5; negative = still approaching
-  const ramp = frac(d < 0 ? STATION.approach : STATION.release)
-  const x = Math.min(Math.max((Math.abs(d) - frac(STATION.hold)) / ramp, 0), 1)
+  const edge = frac(d < 0 ? before : after)
+  const ramp = frac(d < 0 ? beforeRamp : afterRamp)
+  const x = Math.min(Math.max((Math.abs(d) - edge) / ramp, 0), 1)
   return 1 - x * x * (3 - 2 * x)
+}
+// House-light fade: like the slow-down window but opening houseLead units
+// earlier (fading over houseFade) and closing with the same release ramp.
+function houseWeight(u, stations) {
+  const lead = STATION.approach + STATION.houseLead - STATION.houseFade
+  let weight = 0
+  for (const s of stations) {
+    weight = Math.max(weight, windowWeight(u, s, s.hold + lead, STATION.houseFade, s.hold, STATION.release))
+  }
+  return weight
 }
 
 // The strongest station at `u` and its weight, for pacing and the gaze.
@@ -115,16 +139,13 @@ function rideSpeedAt(u, stations) {
 // glTF gets a small flickering flame (the shrine's votive shader, trimmed).
 // Height is in world units so it reads the same at every station scale.
 const FLAME = {
-  // Shader flames (models WITHOUT authored "Candle flame" meshes). The alchemy
-  // export brings its own, so these three do nothing for it:
-  height: 0.01,     // world height of a flame
-  intensity: 0.7,   // colour multiplier; the full-frame bloom adds the glow
-  speed: 0.05,      // flicker rate (the shrine votives run at 3)
+  height: 0.03,     // world height of a flame (the dioramas are ~3.5 wide)
+  intensity: 1.2,   // colour multiplier; the full-frame bloom adds the glow
+  speed: 0.2,      // flicker rate (the shrine votives run at 3)
   prefix: /^Flame_Empty/i,
-  // Authored flames (the alchemy export): the clip animates their node scale
-  // every frame, so a scale set on the mesh is overwritten at once. This
-  // scales the GEOMETRY about the flame's base instead, once, at load.
-  authoredScale: 0.5,
+  // Flames authored in Blender (meshes named "Candle flame …") are hidden so
+  // every station uses the same shader flames and the knobs above apply.
+  authored: /^Candle flame/i,
 }
 const flameUniforms = { uTime: { value: 0 } }
 
@@ -205,7 +226,9 @@ function addStationFlames(model, geometry, track) {
     flame.name = 'StationFlame'
     flame.frustumCulled = false
     empty.getWorldScale(worldScale)
-    flame.scale.setScalar(FLAME.height / 4 / Math.max(worldScale.y, 1e-6))
+    // The lathe profile is 0.6 tall, so this makes the flame FLAME.height
+    // world units tall regardless of the empty's inherited scale.
+    flame.scale.setScalar(FLAME.height / 0.6 / Math.max(worldScale.y, 1e-6))
     flame.position.y = 0.1 * flame.scale.y // base of the profile sits on the empty
     empty.add(flame)
     track.materials.push(material)
@@ -276,30 +299,35 @@ class FloatingGallery extends THREE.Group {
       {
         // Test station: a glTF diorama in place of the image. `width` is
         // the fitted size of its longest side; the ride slows here.
-        model: '/models/alchemyDiorama2.glb?v=potion-fx-2',
+        model: '/models/alchemyDiorama2.glb?v=potion-fx-4',
+        animationSpeed: 1 / 3, // Eight-second source clip plays over 24 seconds.
         year: 'ALCHEMY',
         description: 'The first station',
-        curvePosition: 0.12,  // Position along curve (0-1)
+        curvePosition: 0.038, // shelf 1 mid (see SHELF; ?spothelper=1 logs every shelf's range)
         width: 3.5,
         height: 3.5,
-        radialOffset: 1.9,      // Distance from center of tunnel (sign = side)
+        radialOffset: -2.1,      // Distance from center of tunnel (sign = side)
         angle: -Math.PI,             // Angle around tunnel (radians)
-        verticalOffset: 1.1,     // Additional vertical offset
-        rotateY: Math.PI/1.2       // Rotate 180 degrees around Y-axis
+        verticalOffset: 1.2,     // Additional vertical offset
+        rotateY: Math.PI/0.7       // Rotate 180 degrees around Y-axis
       },
       {
-        // Second station: same model on the opposite side of the track,
-        // yaw mirrored so it faces the rail the same way as the first.
-        model: '/models/alchemyDiorama2.glb?v=potion-fx-2',
-        year: 'ALCHEMY II',
-        description: 'The second station',
-        curvePosition: 0.34,
+        // Tulipmania: the merchant's speculative bubble rises and bursts.
+        model: '/models/tulipmania.glb?v=tulip-fx-5',
+        focusPoint: [-0.1, 1.15, 8.4], // Merchant's upper body in exported scene coordinates.
+        animationSpeed: 1 / 3, // Ten-second source clip plays over 30 seconds.
+        animationDelay: 3, // Real seconds holding the opening pose after the station lights up.
+        year: 'TULIPMANIA',
+        description: 'A fortune blooms, then the bubble bursts.',
+        hold: 0.73,           // crawl half-window for this station only (STATION.hold elsewhere)
+        spotLead: 1.5,        // light strikes later here: the cart climbs up to this shelf
+        curvePosition: 0.180, // shelf 2
         width: 3.5,
         height: 3.5,
-        radialOffset: -1.9,
+        radialOffset: 2.2,
         angle: -Math.PI,
         verticalOffset: 1.1,
-        rotateY: Math.PI * 0.5
+        rotateY: -Math.PI /0.7
       },
     //   {
     //     url: '/carousel_images/img12.jpg',
@@ -481,7 +509,12 @@ class FloatingGallery extends THREE.Group {
         root.visible = false // revealed when its spotlight strikes (setRide)
         this.add(root)
         this.images.push(root)
-        this.stations.push({ u: imageInfo.curvePosition, position: root.position.clone(), spot: root.userData.spot, root })
+        this.stations.push({
+          u: imageInfo.curvePosition,
+          hold: imageInfo.hold ?? STATION.hold,
+          spotLead: imageInfo.spotLead ?? STATION.spotLead,
+          position: root.userData.focusTarget, spot: root.userData.spot, root,
+        })
         return
       }
 
@@ -581,6 +614,7 @@ class FloatingGallery extends THREE.Group {
     const root = new THREE.Group()
     root.name = `Station:${info.year}`
     root.position.copy(position)
+    root.userData.focusTarget = position.clone()
     // Face along the track but stay level: the raw tangent carries the
     // rail's pitch, which would tilt the diorama on every hill.
     const level = tangent.clone().setY(0)
@@ -655,7 +689,7 @@ class FloatingGallery extends THREE.Group {
           // depth sorting inside the mesh — far faces paint over near ones.
           // Make them opaque with an alpha cutout, so a texture that does
           // carry holes still keeps them. Real glass stays blended.
-          if (material.transparent && !/glas|glass|crystal|water|swirl/i.test(material.name || '')) {
+          if (material.transparent && !/glas|glass|crystal|water|swirl|bubble/i.test(material.name || '')) {
             material.transparent = false
             material.alphaTest = 0.5
             material.depthWrite = true
@@ -668,35 +702,39 @@ class FloatingGallery extends THREE.Group {
       })
       root.add(fit)
       root.updateMatrixWorld(true)
+      // Large sets can frame a performer instead of their bounding-box centre.
+      if (info.focusPoint) {
+        model.localToWorld(root.userData.focusTarget.fromArray(info.focusPoint))
+        spot.target.position.copy(root.userData.focusTarget)
+      }
       // Animation: a Blender "Scene" export merges everything into one clip
       // (the alchemist's rig, the candle flicker, the gold motes); play every
       // clip the file ships, looping. Advanced from update() while visible.
-      if (gltf.animations?.length) {
+      for (const clip of gltf.animations || []) {
+        const scenery = clip.name === 'WindmillBlade_SlowRotation'
         const mixer = new THREE.AnimationMixer(model)
-        for (const clip of gltf.animations) mixer.clipAction(clip).setLoop(THREE.LoopRepeat, Infinity).play()
-        this.mixers.push({ mixer, root })
+        // The exported windmill loop has its own speed and no opening hold.
+        mixer.timeScale = scenery ? 1 : (info.animationSpeed ?? 1)
+        mixer.clipAction(clip).setLoop(THREE.LoopRepeat, Infinity).play()
+        mixer.update(0)
+        this.mixers.push({
+          mixer, root,
+          delay: scenery ? 0 : Math.max(0, info.animationDelay ?? 0),
+          delayRemaining: 0,
+          wasVisible: false,
+        })
       }
-      // Shader flames only for models that do not bring their own: a mesh
-      // named "Candle flame …" means the flames were authored in Blender.
-      let authoredFlames = false
+      // Hide any flames authored in Blender (kept in the tree so the clip's
+      // tracks still find their nodes) and light the Flame_Empty nodes with
+      // the shared shader flames instead.
       model.traverse((child) => {
-        if (!child.isMesh || !/^Candle flame/i.test(child.name)) return
-        authoredFlames = true
-        if (FLAME.authoredScale !== 1 && child.geometry) {
-          // Scale about the base (min y) so the flame stays on its wick.
-          const g = child.geometry
-          g.computeBoundingBox()
-          const base = g.boundingBox.min.y
-          g.translate(0, -base, 0).scale(FLAME.authoredScale, FLAME.authoredScale, FLAME.authoredScale).translate(0, base, 0)
-        }
+        if (child.isMesh && FLAME.authored.test(child.name)) child.visible = false
       })
-      if (!authoredFlames) {
-        if (!this.flameGeometry) {
-          this.flameGeometry = createFlameGeometry()
-          this.geometries.push(this.flameGeometry)
-        }
-        addStationFlames(model, this.flameGeometry, this)
+      if (!this.flameGeometry) {
+        this.flameGeometry = createFlameGeometry()
+        this.geometries.push(this.flameGeometry)
       }
+      addStationFlames(model, this.flameGeometry, this)
     }, undefined, (error) => {
       if (!load.cancelled) console.warn(`Station model could not load: ${info.model}`, error)
     })
@@ -728,7 +766,23 @@ class FloatingGallery extends THREE.Group {
     // does not lurch); hidden stations are not advanced.
     const dt = this.lastT === null ? 0 : Math.min(Math.max(t - this.lastT, 0), 0.1)
     this.lastT = t
-    for (const { mixer, root } of this.mixers) if (root.visible) mixer.update(dt)
+    for (const entry of this.mixers) {
+      const { mixer, root, delay } = entry
+      if (!root.visible) {
+        entry.wasVisible = false
+        continue
+      }
+      if (!entry.wasVisible && delay > 0) {
+        mixer.setTime(0)
+        entry.delayRemaining = delay
+      }
+      entry.wasVisible = true
+      // Count the hold in real seconds, independently of animationSpeed.
+      const held = Math.min(entry.delayRemaining, dt)
+      entry.delayRemaining -= held
+      const playback = dt - held
+      if (playback > 0) mixer.update(playback)
+    }
     for (const helper of this.helpers) helper.update()
     this.images.forEach((image) => {
       const userData = image.userData
@@ -775,14 +829,13 @@ class WireTunnel extends THREE.LineSegments {
       { x: -6.004952702196002, y: 0.16039311931742395, z: -3.59371911696846 }
     ]
 
-    const curve = new THREE.CatmullRomCurve3(
-      basePoints.map(p => new THREE.Vector3(p.x, p.y * VERTICAL_SCALE, p.z).multiplyScalar(TRACK_SCALE)),
-      true, 'catmullrom', 0.7
+    // The plan of the loop comes from the original points; the heights are
+    // replaced by the shelf profile (the points' own y is no longer used).
+    const curve = new ShelfTrack(
+      basePoints.map(p => ({ x: p.x * TRACK_SCALE, z: p.z * TRACK_SCALE })),
+      { shelfLength: SHELF.length, heights: SHELF.heights.map(h => h * VERTICAL_SCALE) }
     )
-    if (smoothPath) {
-      curve.arcLengthDivisions = 4096
-      curve.updateArcLengths()
-    }
+    if (smoothPath) curve.updateArcLengths()
     LAP = curve.getLength()
     // Rings per lap; scaled with the track so their spacing stays the same.
     const tubularSegments = Math.round(130 * TRACK_SCALE)
@@ -827,7 +880,8 @@ class WireTunnel extends THREE.LineSegments {
     super(
       wire, 
       new THREE.LineBasicMaterial({ 
-        color: new THREE.Color('#41f').multiplyScalar(10) 
+        color: new THREE.Color('#41f').multiplyScalar(10),
+        transparent: true, // fades with the house lights (setHouseLights)
       })
     )
     this.curve = curve
@@ -858,6 +912,15 @@ class WireTunnel extends THREE.LineSegments {
       opacity: 0.9,
       sizeAttenuation: true
     })
+    // House lights: the whole point cloud fades out (colour and opacity) as
+    // the cart slows for a station and back in as it leaves; see setHouseLights.
+    this.houseLights = { uDim: { value: 0 } }
+    pointsMaterial.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, this.houseLights)
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\n uniform float uDim;')
+        .replace('#include <color_fragment>', '#include <color_fragment>\n diffuseColor *= 1.0 - uDim;')
+    }
     
     const points = new THREE.Points(pointsGeometry, pointsMaterial)
     points.frustumCulled = false
@@ -881,6 +944,12 @@ class WireTunnel extends THREE.LineSegments {
       })
     )
     ship.add(shipWire)
+  }
+
+  // weight 0..1: the active station's slow-down weight.
+  setHouseLights(weight) {
+    this.houseLights.uDim.value = weight
+    this.material.opacity = 1 - weight // the wire itself
   }
 }
 
@@ -1276,7 +1345,8 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
     if (SPOT_HELPER) {
       // e.g. __hubStation.STATION.spot = 24; __hubStation.spots[0].angle = 0.5;
       // __hubStation.spots[0].position.y += 0.2 (helpers follow every frame)
-      window.__hubStation = { STATION, spots: gallery.stations.map(s => s.spot), stations: gallery.stations }
+      window.__hubStation = { STATION, spots: gallery.stations.map(s => s.spot), stations: gallery.stations, shelves: wireTunnel.curve.shelfSpans() }
+      console.table(wireTunnel.curve.shelfSpans().map(s => ({ shelf: s.index + 1, from: s.start.toFixed(3), to: s.end.toFixed(3), mid: s.mid.toFixed(3), height: s.height })))
     }
     
     // Removed position arrow - no longer needed
@@ -1356,6 +1426,7 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
         // Every frame, paused or not, so spotlight tuning applies live.
         gallery.setRide((ride + frac(LOOK_AHEAD)) % 1)
         gallery.update(t)
+        wireTunnel.setHouseLights(houseWeight((ride + frac(LOOK_AHEAD)) % 1, gallery.stations))
         
         // Update scanline shader time
         if (scanlinePass && scanlinePass.uniforms.time) {
@@ -1394,6 +1465,30 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
       if (coaster && e.code === 'KeyV' && !focusStateRef.current.image) {
         e.preventDefault()
         toggleCamera()
+        return
+      }
+
+      // N: skip ahead. Inside a station's window it jumps to the end of
+      // that window (release); on open track it jumps to just before the
+      // next station's spotlight strikes, cutting the dark travel.
+      if (coaster && e.code === 'KeyN' && gallery.stations.length) {
+        e.preventDefault()
+        const vehicle = (ride + frac(LOOK_AHEAD)) % 1
+        const wrap = (x) => ((x % 1) + 1) % 1
+        const { station: current, weight } = stationAt(vehicle, gallery.stations)
+        let target
+        if (weight > 0) {
+          target = current.u + frac(current.hold + STATION.release)
+        } else {
+          let best = Infinity
+          gallery.stations.forEach((s, i) => {
+            const strike = wrap(s.u + strikeOffset(i, gallery.stations) - frac(0.5))
+            const ahead = wrap(strike - vehicle)
+            if (ahead < best) { best = ahead; target = strike }
+          })
+        }
+        ride = wrap(target - frac(LOOK_AHEAD))
+        flyThrough.update(ride)
         return
       }
 
