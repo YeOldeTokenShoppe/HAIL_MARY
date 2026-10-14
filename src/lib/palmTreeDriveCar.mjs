@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 
-export const LOW_RIDER_MODEL_URL = '/models/lowRider_scene_V2_optimized.glb?v=lowrider-20260925-0141';
+export const LOW_RIDER_MODEL_URL = '/models/lowRider_scene_V3_optimized.glb?v=lowrider-20261014-0932';
 
 // Character clips loop during the drive; the car model is static.
 // 'HaloRotation' was dropped when the halo was deleted from the scene — restore it here if it comes back.
+// 'driver' replaced 'mixamo.com' in the V3 scene export (new Polygon driver rig, NLA track).
 const LOOPING_CLIPS = new Set([
-  'mixamo.com',
+  'driver',
   'Unicorn_Seated_Music_Sway',
   'Shiba_Sitting_Baked',
   'Hologirl_Seated_Sway_RestingForearm_SlowTap',

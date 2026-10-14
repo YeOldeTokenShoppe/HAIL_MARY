@@ -313,7 +313,7 @@ class FloatingGallery extends THREE.Group {
       },
       {
         // Tulipmania: the merchant's speculative bubble rises and bursts.
-        model: '/models/tulipmania.glb?v=tulip-fx-5',
+        model: '/models/tulipmania.glb?v=tulip-fx-6',
         focusPoint: [-0.1, 1.15, 8.4], // Merchant's upper body in exported scene coordinates.
         animationSpeed: 1 / 3, // Ten-second source clip plays over 30 seconds.
         animationDelay: 3, // Real seconds holding the opening pose after the station lights up.
@@ -328,6 +328,23 @@ class FloatingGallery extends THREE.Group {
         angle: -Math.PI,
         verticalOffset: 1.1,
         rotateY: -Math.PI /0.7
+      },
+      {
+        // Gold rush: the miner works his claim. The export carries five
+        // clips on one rig, so only the named one plays.
+        model: '/models/goldRushDiorama.glb?v=2',
+        clips: ['MiningGround'],
+        animationSpeed: 0.5,  // the swing plays at half speed
+        hide: ['Shovel', 'Icosphere'], // node names to hide (unused by the pickaxe loop)
+        year: 'GOLD RUSH',
+        description: 'Everyone digs; a few strike it rich.',
+        curvePosition: 0.362, // shelf 3
+        width: 3.5,
+        height: 3.5,
+        radialOffset: -2.1,   // same side as Alchemy (stations alternate)
+        angle: -Math.PI,
+        verticalOffset: -0.2,
+        rotateY: Math.PI / 0.5
       },
     //   {
     //     url: '/carousel_images/img12.jpg',
@@ -711,6 +728,8 @@ class FloatingGallery extends THREE.Group {
       // (the alchemist's rig, the candle flicker, the gold motes); play every
       // clip the file ships, looping. Advanced from update() while visible.
       for (const clip of gltf.animations || []) {
+        // An entry's `clips` lists the clip names to play (default: all).
+        if (info.clips && !info.clips.includes(clip.name)) continue
         const scenery = clip.name === 'WindmillBlade_SlowRotation'
         const mixer = new THREE.AnimationMixer(model)
         // The exported windmill loop has its own speed and no opening hold.
@@ -726,9 +745,11 @@ class FloatingGallery extends THREE.Group {
       }
       // Hide any flames authored in Blender (kept in the tree so the clip's
       // tracks still find their nodes) and light the Flame_Empty nodes with
-      // the shared shader flames instead.
+      // the shared shader flames instead. An entry's `hide` lists further
+      // node names to hide (props that the chosen clip does not use).
       model.traverse((child) => {
         if (child.isMesh && FLAME.authored.test(child.name)) child.visible = false
+        if (info.hide?.includes(child.name)) child.visible = false
       })
       if (!this.flameGeometry) {
         this.flameGeometry = createFlameGeometry()
