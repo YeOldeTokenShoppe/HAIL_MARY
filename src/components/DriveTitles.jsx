@@ -9,9 +9,9 @@ export default function DriveTitles({ moment, actions }) {
   return <div className="drive-titles">
     <div className={`title opening ${moment === 'opening' ? 'visible' : ''}`} aria-hidden={moment !== 'opening'}>
       <div className={`opening-headline lettering ${plainBlack.className}`}>
-        <span className="opening-first"> </span>
-        <span className="opening-second"> </span>
-        <span className="opening-third"><span className="opening-the"></span>{' '}<span className="opening-fun"> </span></span>
+        <span className="opening-first">The Original</span>
+        <span className="opening-second">Enigma</span>
+        <span className="opening-third"><span className="opening-the"></span>{' '}<span className="opening-fun">Machine</span></span>
       </div>
       <div className={`tagline opening-subheading ${interItalic.className}`}> </div>
     </div>
@@ -46,9 +46,22 @@ export default function DriveTitles({ moment, actions }) {
       .opening-third { font-size: 1.05em; margin-left: .18em; }
       .opening-the { font-size: .7em; }
       .opening-fun { font-size: 1.25em; }
-      .opening.visible .opening-first { animation: titleFadeIn .45s ease .7s both; }
-      .opening.visible .opening-second { animation: titleFadeIn .45s ease 1.05s both; }
-      .opening.visible .opening-third { animation: titleFadeIn .5s ease 1.4s both; }
+      /* Slow, staggered reveal: each line drifts in over ~1.1s, the stack holds for a
+         beat, then the lines fade back out in the same order — all on their own clock,
+         well before the sweep retires the opening title at 65%. Tune here. */
+      .opening {
+        --line-in: 1.1s;
+        --line-out: 1.3s;
+        --in-1: .8s;  --in-2: 2.1s;  --in-3: 3.4s;  --in-sub: 4.8s;
+        --out-1: 7.4s; --out-2: 7.7s; --out-3: 8s;  --out-sub: 7.4s;
+      }
+      .opening.visible .opening-first  { animation: titleFadeIn var(--line-in) ease-out var(--in-1) both, titleFadeOut var(--line-out) ease-in var(--out-1) forwards; }
+      .opening.visible .opening-second { animation: titleFadeIn var(--line-in) ease-out var(--in-2) both, titleFadeOut var(--line-out) ease-in var(--out-2) forwards; }
+      .opening.visible .opening-third  { animation: titleFadeIn 1.2s ease-out var(--in-3) both, titleFadeOut var(--line-out) ease-in var(--out-3) forwards; }
+      /* The opening lines fade themselves out, so when .visible drops they are already at 0
+         (their base). The finale subheading has no self fade-out — hold it at 1 so the
+         .title opacity transition does the fade. */
+      .finale:not(.visible) .finale-subheading { opacity: 1; }
       .tagline { font-size: clamp(20px, 2vw, 28px); font-weight: 400; font-style: italic; line-height: 1.45; color: #fff4e8; text-shadow: 0 2px 3px rgba(0,0,0,.95), 0 4px 10px rgba(0,0,0,.8); margin-top: clamp(18px, 2vw, 28px); text-wrap: balance; }
       .opening .opening-subheading, .finale .finale-subheading {
         font-size: clamp(18px, 1.5vw, 22px);
@@ -58,7 +71,7 @@ export default function DriveTitles({ moment, actions }) {
         text-shadow: 0 2px 4px rgba(23,16,25,.85);
         opacity: 0;
       }
-      .opening.visible .opening-subheading { animation: titleFadeIn .65s ease 2.4s both; }
+      .opening.visible .opening-subheading { animation: titleFadeIn .9s ease-out var(--in-sub) both, titleFadeOut var(--line-out) ease-in var(--out-sub) forwards; }
       .finale-subheading { opacity: 0; }
       .finale { right: 4vw; top: 30%; width: 32vw; max-width: 480px; text-align: center; }
       .finale .lettering { font-size: clamp(40px, min(6.3vw, 10vh), 90px); line-height: 1; letter-spacing: 0; }
@@ -67,6 +80,7 @@ export default function DriveTitles({ moment, actions }) {
       .finale.visible .lettering { animation: titleFadeIn .85s ease .4s both; }
       .finale.visible .finale-subheading { animation: titleFadeIn .9s ease 1.6s both; }
       @keyframes titleFadeIn { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes titleFadeOut { from { opacity: 1; } to { opacity: 0; } }
       /* Keep the finale proportional to the scene beyond laptop widths. */
       @media (min-width: 1441px) and (min-aspect-ratio: 1/1) {
         .finale { max-width: none; }

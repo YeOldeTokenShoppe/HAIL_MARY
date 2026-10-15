@@ -106,6 +106,9 @@ export const PUMP_ZONES = [
   // the silo shell (translucent glass in code — the theme tints the glass; keep tints light or the oil inside hides).
   // Tank_* are the three compartments once the shell is split.
   { id: "tank",           label: "STORAGE TANK",    meshes: ["Fuel_Tank", "Tank_Betroleum", "Tank_Paraboleum", "Tank_Vitriol"] },
+  // The 2026-10-14 rig tank's top fitting. Tank_End / Tank_Side stay UNZONED — they are
+  // the livery decal plates (badge + name banner), not paint.
+  { id: "tankCap",        label: "TANK CAP",        meshes: ["Tank_Cap"] },
 ];
 
 export const MATERIAL_PRESETS = {
@@ -166,9 +169,9 @@ export const ADDON_SLOTS = [
 export const BLOCKED_ADDON_SLOTS = new Set(["1", "6"]);
 
 export const FENCE_CATALOG = [
-  { id: "chainlink",    label: "CHAIN LINK",    model: "/models/addons/Fence_Chainlink.glb",    scale: 0.1 },
-  { id: "iron",         label: "IRON",          model: "/models/addons/Fence_Iron.glb",         scale: 0.1 },
-  { id: "whitePicket",  label: "WHITE PICKET",  model: "/models/addons/Fence_WhitePicket.glb",  scale: 0.1 },
+  { id: "chainlink",    label: "CHAIN LINK",    model: "/models/addons/Fence_Chainlink.glb",    scale: 0.12 },
+  { id: "iron",         label: "IRON",          model: "/models/addons/Fence_Iron.glb",         scale: 0.11 },
+  { id: "whitePicket",  label: "WHITE PICKET",  model: "/models/addons/Fence_WhitePicket.glb",  scale: 0.11 },
 ];
 
 // Sign styles — each its own GLB (separate from the rig). Internal mesh names per
@@ -183,6 +186,9 @@ export const SIGN_CATALOG = [
 
 const BASE_MAX_ADDONS = 3;
 
+// Longest banner the tank side can carry legibly (shared with the field renderer).
+export const TANK_TEXT_MAX = 20;
+
 // Default config: all zones use stock (original model materials)
 export function getDefaultPumpConfig() {
   const config = {};
@@ -194,6 +200,11 @@ export function getDefaultPumpConfig() {
   config.signFit = "fill";    // how the uploaded image maps onto the sign face: fill | fit | stretch
   config.showCamera = false;
   config.showSign = false;
+  // Tank livery (2026-10-14) — always-on branding baked into the rig, no toggle: the round
+  // Tank_End carries a badge image, the long Tank_Side a name banner. Empty tankText falls
+  // back to the owner's username on the field.
+  config.tankImageUrl = null;
+  config.tankText = "";
   config.fenceType = null;
   config.addons = {};
   return config;
@@ -212,6 +223,7 @@ function completeTheme(config) {
   inherit("platform", "motorBox", "brushed");
   inherit("wellCurb", "foundation", "matte");
   inherit("valve", "counterweight");
+  inherit("tankCap", "valve");
   return config;
 }
 
@@ -891,7 +903,7 @@ metalAF: {
 
 // ── Panel component ──────────────────────────────────────────────────────────
 
-export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode = false, theme = null, hasSelection, onSave, saving, dirty, isSignedIn, defaultExpanded = false, onExpandedChange = null, userId, readOnly = false, unlockedItems = new Set(), onPurchaseRequest }) {
+export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode = false, theme = null, hasSelection, onSave, saving, dirty, isSignedIn, defaultExpanded = false, onExpandedChange = null, userId, readOnly = false, unlockedItems = new Set(), onPurchaseRequest, username = "" }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   // Lets the page react to the editor opening — mobile pins a compact live view
   // of the rig above it. Reports closed on unmount.
@@ -987,13 +999,15 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
     newConfig.signImageUrl = config.signImageUrl;
     newConfig.showSign = config.showSign;
     newConfig.showCamera = config.showCamera;
+    newConfig.tankImageUrl = config.tankImageUrl || null;
+    newConfig.tankText = config.tankText || "";
     newConfig.fenceType = config.fenceType;
     newConfig.addons = config.addons || {};
     newConfig.poop = config.poop || false;
     onChange(newConfig);
     setActiveZone(null);
     setPreviewThemeKey(themeKey);
-  }, [onChange, config.signImageUrl, config.showSign, config.showCamera, config.fenceType, config.addons]);
+  }, [onChange, config.signImageUrl, config.showSign, config.showCamera, config.tankImageUrl, config.tankText, config.fenceType, config.addons]);
 
   // Section chrome follows the page theme; the editor body keeps its own palette (c).
   const t = theme || { border: c.sectionBorder, accent: c.accent, muted: c.muted };
@@ -1145,6 +1159,96 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                 })}
               </div>
             )}
+          </div>
+
+          <div style={{ ...styles.divider, background: c.border }} />
+
+          {/* ── TANK group: livery that is part of the rig (no toggle). Round end = badge
+              image (square-cropped to a disc); long side = name banner, defaulting to the
+              owner's username when left blank. ── */}
+          <div style={{ ...styles.presetLabel, fontSize: mFs, color: c.accent, marginBottom: 6, letterSpacing: "0.16em" }}>TANK</div>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: isMobile ? 10 : 6,
+            opacity: hasSelection ? 1 : 0.4,
+            pointerEvents: hasSelection ? "auto" : "none",
+            marginBottom: 8,
+          }}>
+            {/* Round end badge */}
+            <div>
+              <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>END BADGE</span>
+              <div style={styles.signInputWrap}>
+                <label style={{ ...styles.signUploadBtn, fontSize: mFs, padding: isMobile ? "5px 10px" : "3px 7px", color: c.btnText, borderColor: c.btnBorder, background: c.btnBg }}>
+                  {config.tankImageUrl ? "CHANGE" : "UPLOAD"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!file) return;
+                      let blob = null;
+                      try {
+                        // The badge is a ~0.7-unit disc; 1024px is already more than it can show.
+                        blob = await resizeSignImage(file, 1024, 0.92);
+                      } catch {
+                        blob = null;
+                      }
+                      const url = URL.createObjectURL(blob || file);
+                      onChange({ ...config, tankImageUrl: url });
+                    }}
+                  />
+                </label>
+                {config.tankImageUrl && (
+                  <button
+                    onClick={() => {
+                      if (config.tankImageUrl?.startsWith("blob:")) {
+                        URL.revokeObjectURL(config.tankImageUrl);
+                      }
+                      onChange({ ...config, tankImageUrl: null });
+                    }}
+                    style={{ ...styles.resetBtn, fontSize: mFs, color: c.muted, borderColor: c.btnBorder }}
+                  >
+                    CLEAR
+                  </button>
+                )}
+              </div>
+              <div style={{ fontSize: mFs - 1, color: c.muted, marginTop: 3, letterSpacing: "0.04em" }}>
+                Square crop, trimmed to a disc.
+              </div>
+            </div>
+
+            {/* Side banner text */}
+            <div>
+              <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>SIDE TEXT</span>
+              <input
+                type="text"
+                value={config.tankText || ""}
+                maxLength={TANK_TEXT_MAX}
+                placeholder={(username || "YOUR NAME").toUpperCase().slice(0, TANK_TEXT_MAX)}
+                spellCheck={false}
+                onChange={(e) => onChange({ ...config, tankText: e.target.value.replace(/[\u0000-\u001f\u007f]/g, "") })}
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: isMobile ? "5px 8px" : "3px 7px",
+                  background: c.btnBg,
+                  border: `1px solid ${c.btnBorder}`,
+                  borderRadius: 2,
+                  color: c.btnText,
+                  fontFamily: "'Share Tech Mono', monospace",
+                  fontSize: mFs + 1,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  outline: "none",
+                }}
+              />
+              <div style={{ fontSize: mFs - 1, color: c.muted, marginTop: 3, letterSpacing: "0.04em" }}>
+                Blank = your username. {TANK_TEXT_MAX} max.
+              </div>
+            </div>
           </div>
 
           <div style={{ ...styles.divider, background: c.border }} />

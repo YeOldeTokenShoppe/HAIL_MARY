@@ -1820,8 +1820,8 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange, onIntroComplete, has
 
       // Single onUpdate for the entire timeline
       tl.eventCallback("onUpdate", () => {
-        // Leave time to read the delayed opening subheading after its 8.5s reveal.
-        setTitleMoment(desktopSweep.progress >= 0.985 ? 'final' : desktopSweep.progress < 0.37 ? 'opening' : 'hidden');
+        // Opening title holds until ~65% of the sweep (≈24s of desktop autoplay, doubled from 0.37 / ≈12s).
+        setTitleMoment(desktopSweep.progress >= 0.985 ? 'final' : desktopSweep.progress < 0.65 ? 'opening' : 'hidden');
         sampleResponsiveCamera(desktopSweep.progress, camera.aspect, cameraPath);
         if (camera) {
           // Always update camera during scroll animation, regardless of controls state

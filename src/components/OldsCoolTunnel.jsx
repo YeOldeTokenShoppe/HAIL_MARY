@@ -29,6 +29,10 @@ const TRACK_SCALE = 2
 // heights (world units, before VERTICAL_SCALE) set the climbs and drops.
 // /hub?spothelper=1 logs each shelf's curvePosition range.
 const SHELF = { length: 8, heights: [0, 4, 9, 13, 3, -4] }
+// Full-frame bloom. Only pixels brighter than `threshold` glow: the wire
+// (x10), its points (x7) and authored emissives (ore x4.8) stay well above
+// it, while lit cloth under a 50-candela stage light stays below.
+const BLOOM = { strength: 0.3, radius: 0, threshold: 1.8 }
 // Ride speed in world units per second (0.92 was the original 0.017 of a
 // 54-unit lap; the ship ran at about one and a half times that).
 const RIDE_SPEED = 0.92
@@ -286,6 +290,53 @@ const ScanlineShader = {
   `
 }
 
+// Drop a clip's tracks that target nodes outside `rootName`'s hierarchy
+// (an NLA export can carry a second rig's bones in its rest pose).
+function restrictClip(clip, model, rootName) {
+  const root = model.getObjectByName(rootName)
+  if (!root) { console.warn(`Clip ${clip.name}: node ${rootName} not found`); return }
+  const inside = new Set()
+  root.traverse((node) => { inside.add(node.name); if (node.uuid) inside.add(node.uuid) })
+  clip.tracks = clip.tracks.filter((track) => {
+    try {
+      return inside.has(THREE.PropertyBinding.parseTrackName(track.name).nodeName)
+    } catch (e) {
+      return true // unparseable name: leave the track alone
+    }
+  })
+  clip.resetDuration()
+}
+
+// Every `every` loops of `main`, cross-fade to one pass of `clip` and back.
+// Both actions share the entry's mixer, so they blend on the same rig.
+function attachInterlude(entry, main, clip, { every = 10, fade = 0.25 }) {
+  const { mixer } = entry
+  const interlude = mixer.clipAction(clip).setLoop(THREE.LoopOnce, 1)
+  interlude.clampWhenFinished = true // hold the last pose while fading back
+  let loops = 0
+  let playing = false
+  mixer.addEventListener('loop', (e) => {
+    if (e.action !== main || playing || ++loops < every) return
+    loops = 0
+    playing = true
+    interlude.reset().play()
+    main.crossFadeTo(interlude, fade, false)
+  })
+  mixer.addEventListener('finished', (e) => {
+    if (e.action !== interlude) return
+    playing = false
+    main.reset().play()
+    interlude.crossFadeTo(main, fade, false)
+  })
+  // Each time the station is revealed it starts on the main loop again.
+  entry.restart = () => {
+    loops = 0
+    playing = false
+    interlude.stop()
+    main.reset().play()
+  }
+}
+
 class FloatingGallery extends THREE.Group {
   constructor(curve) {
     super()
@@ -332,10 +383,21 @@ class FloatingGallery extends THREE.Group {
       {
         // Gold rush: the miner works his claim. The export carries five
         // clips on one rig, so only the named one plays.
-        model: '/models/goldRushDiorama.glb?v=2',
-        clips: ['MiningGround'],
-        animationSpeed: 0.5,  // the swing plays at half speed
-        hide: ['Shovel', 'Icosphere'], // node names to hide (unused by the pickaxe loop)
+        model: '/models/goldRushDiorama.glb?v=4',
+        // Miner 2 swings the pickaxe (first clip = the interlude's main loop);
+        // miner 1 shovels at full speed. The Shoveling export also carries
+        // miner 2's bones, so it is limited to miner 1's hierarchy, and the
+        // shovel's own clip is stretched to the shoveling loop so they stay in step.
+        clips: [
+          'MiningGround2',
+          { name: 'Shoveling', under: 'Miner1_Empty', speed: 1 },
+          { name: 'ShovelAction', speed: 1, syncTo: 'Shoveling' },
+        ],
+        animationSpeed: 0.5,  // default speed for the clips above (the swing)
+        interlude: { clip: 'wipe_sweat', every: 10 }, // one wipe after every ten swings
+        hide: ['Icosphere'],  // node names to hide
+        // emissive: { lambert1727: 0 } would switch off the gold ore's glow
+        // (material name -> emissive intensity).
         year: 'GOLD RUSH',
         description: 'Everyone digs; a few strike it rich.',
         curvePosition: 0.362, // shelf 3
@@ -701,6 +763,8 @@ class FloatingGallery extends THREE.Group {
           // No fog: the station is hidden until its light strikes, then
           // shown whole, instead of fading in through the tunnel fog.
           material.fog = false
+          // An entry's `emissive` map overrides a material's emissive intensity.
+          if (info.emissive && material.name in info.emissive) material.emissiveIntensity = info.emissive[material.name]
           // Solid things exported with alphaMode BLEND (the Tripo alchemist:
           // blended AND double-sided) render as transparent, which disables
           // depth sorting inside the mesh — far faces paint over near ones.
@@ -727,21 +791,43 @@ class FloatingGallery extends THREE.Group {
       // Animation: a Blender "Scene" export merges everything into one clip
       // (the alchemist's rig, the candle flicker, the gold motes); play every
       // clip the file ships, looping. Advanced from update() while visible.
+      // An entry's `interlude` names a clip played once, in place of the main
+      // loop (the first of `clips`), after every N loops of it.
+      const interludeClip = info.interlude
+        && (gltf.animations || []).find((clip) => clip.name === info.interlude.clip)
+      if (info.interlude && !interludeClip) console.warn(`Station interlude clip not found: ${info.interlude.clip}`)
+      // An entry's `clips` lists the clips to play (default: all), each a
+      // name or { name, speed, under, syncTo }: `speed` overrides
+      // animationSpeed for that clip, `under` keeps only its tracks inside
+      // that node's hierarchy, `syncTo` gives it another clip's duration.
+      const clipOptions = (info.clips || []).map((c) => (typeof c === 'string' ? { name: c } : c))
+      const optionsFor = (clip) => clipOptions.find((c) => c.name === clip.name)
       for (const clip of gltf.animations || []) {
-        // An entry's `clips` lists the clip names to play (default: all).
-        if (info.clips && !info.clips.includes(clip.name)) continue
+        if (clip === interludeClip) continue
+        const options = optionsFor(clip)
+        if (info.clips && !options) continue
+        if (options?.under) restrictClip(clip, model, options.under)
+        if (options?.syncTo) {
+          const other = gltf.animations.find((c) => c.name === options.syncTo)
+          if (other) clip.duration = other.duration
+        }
         const scenery = clip.name === 'WindmillBlade_SlowRotation'
         const mixer = new THREE.AnimationMixer(model)
         // The exported windmill loop has its own speed and no opening hold.
-        mixer.timeScale = scenery ? 1 : (info.animationSpeed ?? 1)
-        mixer.clipAction(clip).setLoop(THREE.LoopRepeat, Infinity).play()
+        mixer.timeScale = scenery ? 1 : (options?.speed ?? info.animationSpeed ?? 1)
+        const action = mixer.clipAction(clip).setLoop(THREE.LoopRepeat, Infinity).play()
         mixer.update(0)
-        this.mixers.push({
+        const entry = {
           mixer, root,
           delay: scenery ? 0 : Math.max(0, info.animationDelay ?? 0),
           delayRemaining: 0,
           wasVisible: false,
-        })
+          restart: null,
+        }
+        if (interludeClip && clip.name === (clipOptions[0]?.name ?? clip.name)) {
+          attachInterlude(entry, action, interludeClip, info.interlude)
+        }
+        this.mixers.push(entry)
       }
       // Hide any flames authored in Blender (kept in the tree so the clip's
       // tracks still find their nodes) and light the Flame_Empty nodes with
@@ -793,9 +879,12 @@ class FloatingGallery extends THREE.Group {
         entry.wasVisible = false
         continue
       }
-      if (!entry.wasVisible && delay > 0) {
-        mixer.setTime(0)
-        entry.delayRemaining = delay
+      if (!entry.wasVisible) {
+        entry.restart?.()
+        if (delay > 0) {
+          mixer.setTime(0)
+          entry.delayRemaining = delay
+        }
       }
       entry.wasVisible = true
       // Count the hold in real seconds, independently of animationSpeed.
@@ -1330,9 +1419,7 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
 
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(containerWidth, containerHeight),
-      0.3,
-      0,
-      1
+      BLOOM.strength, BLOOM.radius, BLOOM.threshold
     )
     composer.addPass(bloomPass)
     

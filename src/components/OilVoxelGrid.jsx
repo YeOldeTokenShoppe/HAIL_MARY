@@ -11,7 +11,7 @@ import useEnvMapSafe from "@/hooks/useEnvMapSafe";
 import useSkyEnvMap from "@/hooks/useSkyEnvMap";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
 import { generateArtifactDistribution3D } from "@/lib/artifactDistribution";
-import { PUMP_ZONES, MATERIAL_PRESETS, ADDON_CATALOG, ADDON_SLOTS, FENCE_CATALOG, SIGN_CATALOG } from "@/components/PimpMyPumpPanel";
+import { PUMP_ZONES, MATERIAL_PRESETS, ADDON_CATALOG, ADDON_SLOTS, FENCE_CATALOG, SIGN_CATALOG, TANK_TEXT_MAX } from "@/components/PimpMyPumpPanel";
 import RogueCharacter from "@/components/RogueCharacter";
 import { playSfx, preloadSfx, startSfxLoop } from "@/lib/uiSfx";
 import CommercialStrip from "@/components/CommercialStrip";
@@ -1929,7 +1929,7 @@ function PlotPoop() {
   );
 }
 
-function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, depositLayer = -1, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, gusherTier = "gusher", hasMessages = false, onEnvelopeClick, hellActive = false, worldW = 10, worldD = 10, cameraViewable = true, onFocusObject, panelZoomed = null, onPanelTap = null, yaw = 0, crewEnabled = null, plotId = null, decideMode = null, orders = null }) {
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, depositLayer = -1, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, gusherTier = "gusher", hasMessages = false, onEnvelopeClick, hellActive = false, worldW = 10, worldD = 10, cameraViewable = true, onFocusObject, panelZoomed = null, onPanelTap = null, yaw = 0, crewEnabled = null, plotId = null, decideMode = null, orders = null, ownerName = null }) {
   // `decideMode` = "v2" on the player's own rig in an extract-or-pass season: the
   // panel's verbs then fire the layer decision (window events the page listens
   // to, each carrying `plotId`) instead of the v1 tank drain. null = v1 rules.
@@ -2526,6 +2526,25 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
   }, [signImageUrl, signMeshReady]);
 
+  // ── Tank livery (badge disc + name banner) ────────────────────────────────
+  // Same readiness gate as the sign: the traversal above populates the refs, then
+  // these effects paint. Clear just hides the overlay — the plate itself is untouched.
+  const tankEndRef = useRef();
+  const tankSideRef = useRef();
+  const [tankMeshReady, setTankMeshReady] = useState(false);
+  const { gl: tankGl } = useThree();
+  const tankImageUrl = pumpConfig?.tankImageUrl || null;
+  const tankText = tankSideText(pumpConfig, ownerName);
+  const tankBadgeTex = useTankBadgeTexture(tankMeshReady ? tankImageUrl : null, tankGl);
+  const tankTextTex = useTankTextTexture(tankMeshReady ? tankText : "", tankSideRef.current?.geometry || null, tankGl);
+  useEffect(() => { setTankOverlay(tankEndRef.current, tankBadgeTex); }, [tankBadgeTex, tankMeshReady]);
+  useEffect(() => { setTankOverlay(tankSideRef.current, tankTextTex); }, [tankTextTex, tankMeshReady]);
+  // Overlays die with this rig's clonedScene (walk the scene, not the refs — React
+  // nulls element refs before cleanups run; these are manual, but the walk is safer).
+  useEffect(() => () => {
+    clonedScene.traverse((c) => { if (c.name === "Tank_End" || c.name === "Tank_Side") disposeTankOverlay(c); });
+  }, [clonedScene]);
+
   // ── Fuel Tank liquid fill ──────────────────────────────────────────────────
   // Find the tank mesh and compute its group-local bounding box (after all GLB
   // hierarchy transforms but before the PUMPJACK_SCALE). We store this once and
@@ -2737,6 +2756,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         }
         child.visible = false; // embedded camera retired — catalog renders it
       }
+      // Tank livery plates — the badge/banner overlays parent to these (setTankOverlay).
+      if ((child.name === "Tank_End" || child.name === "Tank_Side") && child.isMesh) {
+        (child.name === "Tank_End" ? tankEndRef : tankSideRef).current = child;
+      }
       // Sign — custom image texture (front + back)
       if (child.name === "Sign" && child.isMesh) {
         child.visible = false; // embedded sign retired — catalog renders it
@@ -2823,6 +2846,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     // Signal that signRef/signBackRef are now populated so the sign-image effect
     // (re)runs and applies the custom texture, even if the URL was already set at mount.
     setSignMeshReady(true);
+    setTankMeshReady(true);
   }, [clonedScene]);
 
   // Steam vent particles — triggered by wheel click
@@ -5381,6 +5405,11 @@ function buildBaseRig(scene) {
   let signGeo = null;
   const frameGeoms = [];
   const camGeoms = [];
+  // Tank livery plates (2026-10-14). The blank plates STAY in the merge (so every rig
+  // shows a tank); these UV-bearing copies let PlotTankField lay a per-plot badge/banner
+  // decal over them — only plots with livery pay the extra draw calls.
+  let tankEndGeo = null;
+  let tankSideGeo = null;
   let strawXZ = null; // Straw (drill pipe) world XZ → the true wellhead center
   // Optional Blender markers (Empty or mesh) naming the EXACT pitman pivots — when
   // present they override the bbox estimates for a precise linkage. Read once here;
@@ -5442,6 +5471,12 @@ function buildBaseRig(scene) {
       return;
     }
     if (child.name === "Sign_Back") return; // sign quad is double-sided
+    if (child.name === "Tank_End" || child.name === "Tank_Side") {
+      const tg = plateDecalGeometry(child.geometry); // UVs stretched to 0–1 (see helper)
+      tg.applyMatrix4(child.matrixWorld);
+      if (child.name === "Tank_End") tankEndGeo = tg; else tankSideGeo = tg;
+      // No return: the plate itself still merges below as the blank base.
+    }
     if (child.name.startsWith("SignFrame")) {
       let fg = child.geometry.clone();
       fg.applyMatrix4(child.matrixWorld);
@@ -5713,7 +5748,7 @@ function buildBaseRig(scene) {
     ? [strawXZ[0] * PUMPJACK_SCALE, wellY, strawXZ[1] * PUMPJACK_SCALE]
     : [WELLHEAD_OFFSET[0], wellY, WELLHEAD_OFFSET[2]];
   _rigWellhead = wellhead;
-  return { geometry, vZone, vBase, total, signGeo, signFrameGeo, signCamGeo, wellhead, rock };
+  return { geometry, vZone, vBase, total, signGeo, signFrameGeo, signCamGeo, tankEndGeo, tankSideGeo, wellhead, rock };
 }
 
 function rigColorAttribute(base, config) {
@@ -6288,6 +6323,212 @@ function PlotSign({ position, signImageUrl, signStyle, signFit = "fill", showCam
   );
 }
 
+// ── Tank livery (2026-10-14) ───────────────────────────────────────────────────
+// Two decal plates authored on the rig's tank: `Tank_End` (a disc) takes the player's
+// badge image, `Tank_Side` (a ~4.6:1 strip) takes a name banner — `tankText`, or the
+// owner's username when blank. Unlike the catalog sign this is part of the rig, so
+// there is no toggle: livery shows wherever an image or a name resolves.
+const TANK_TEXT_INK = "#1c1c22";
+// The banner text a tank side shows for this config (owner name is the fallback).
+function tankSideText(cfg, ownerName) {
+  const t = String(cfg?.tankText || "").trim() || String(ownerName || "").trim();
+  return t ? t.slice(0, TANK_TEXT_MAX) : "";
+}
+// The plates are authored onto the rig's shared atlas: their UVs sit in a ~1% swatch
+// (u≈0.01–0.03, v≈0.98–1.0), NOT a 0–1 unwrap. A decal texture sampled there is blank,
+// so the overlay gets its own copy with the swatch stretched to the full 0–1 square.
+// Rescaling (rather than re-projecting) keeps the author's orientation, so "up" and
+// "reading direction" on the plate are whatever Blender showed.
+function plateDecalGeometry(geometry) {
+  const g = geometry.clone();
+  deinterleaveGeometry(g);
+  if (!g.attributes.normal) g.computeVertexNormals();
+  Object.keys(g.attributes).forEach((a) => {
+    if (a !== "position" && a !== "normal" && a !== "uv") g.deleteAttribute(a);
+  });
+  const uv = g.attributes.uv;
+  if (uv) {
+    let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+    for (let i = 0; i < uv.count; i++) {
+      const u = uv.getX(i), v = uv.getY(i);
+      if (u < u0) u0 = u; if (u > u1) u1 = u; if (v < v0) v0 = v; if (v > v1) v1 = v;
+    }
+    const du = u1 - u0 || 1, dvv = v1 - v0 || 1;
+    const out = new Float32Array(uv.count * 2);
+    for (let i = 0; i < uv.count; i++) {
+      out[i * 2] = (uv.getX(i) - u0) / du;
+      out[i * 2 + 1] = (uv.getY(i) - v0) / dvv;
+    }
+    g.setAttribute("uv", new THREE.BufferAttribute(out, 2));
+  }
+  return g;
+}
+// Display aspect of a flat plate = its two largest extents (the smallest is thickness).
+// The field bakes the plate in rig space, where Tank_Side lies along a horizontal axis.
+function plateAspect(geometry) {
+  if (!geometry.boundingBox) geometry.computeBoundingBox();
+  const bb = geometry.boundingBox;
+  const e = [bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z].sort((a, b) => b - a);
+  return (e[0] > 1e-6 && e[1] > 1e-6) ? e[0] / e[1] : 1;
+}
+// Badge: cover-crop the image to a square, clip to a disc; outside the disc is clear so
+// the plate's own paint shows (no black corners on a white tank).
+function buildTankBadgeTexture(image, gl) {
+  const S = Math.min(1024, Math.max(256, Math.max(image.width || 0, image.height || 0) || 512));
+  const canvas = document.createElement("canvas");
+  canvas.width = S; canvas.height = S;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, S, S);
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(S / 2, S / 2, S / 2 - 1, 0, Math.PI * 2);
+  ctx.clip();
+  const ia = (image.width || 1) / (image.height || 1);
+  let dw, dh;
+  if (ia >= 1) { dh = S; dw = S * ia; } else { dw = S; dh = S / ia; }
+  ctx.drawImage(image, (S - dw) / 2, (S - dh) / 2, dw, dh);
+  ctx.restore();
+  return tuneSignTexture(new THREE.CanvasTexture(canvas), gl);
+}
+// Banner: one line of stencil-style text on a clear strip, shrunk to fit the plate.
+function buildTankTextTexture(text, aspect, gl) {
+  const H = 256;
+  const W = Math.max(256, Math.min(4096, Math.round(H * aspect)));
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, W, H);
+  const t = String(text).toUpperCase();
+  if ("letterSpacing" in ctx) ctx.letterSpacing = "0.12em";
+  let size = Math.round(H * 0.7);
+  const maxW = W * 0.9;
+  for (;;) {
+    ctx.font = `700 ${size}px 'Share Tech Mono', monospace`;
+    if (ctx.measureText(t).width <= maxW || size <= 24) break;
+    size -= 4;
+  }
+  ctx.fillStyle = TANK_TEXT_INK;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(t, W / 2, H / 2 + size * 0.04);
+  return tuneSignTexture(new THREE.CanvasTexture(canvas), gl);
+}
+// Decal finish: matte paint, clear where the texture is clear. polygonOffset lifts the
+// field overlay off the coplanar merged plate; harmless on the full rig's own plate.
+function applyTankDecal(m, tex) {
+  m.map = tex;
+  m.color.set(0xffffff);
+  m.emissive?.set(0x000000);
+  m.emissiveMap = null;
+  m.metalness = 0;
+  m.roughness = 0.55;
+  m.normalMap = null; m.roughnessMap = null; m.metalnessMap = null; m.aoMap = null;
+  m.transparent = true;
+  m.alphaTest = 0.04;
+  m.polygonOffset = true;
+  m.polygonOffsetFactor = -2;
+  m.polygonOffsetUnits = -2;
+  m.needsUpdate = true;
+}
+// Full-rig overlays: one decal mesh parented to each plate (inherits its transform), so
+// the authored plate stays opaque underneath — the tank is hollow, and a transparent
+// swap on the plate itself opened a window into it. Kept in a WeakMap, not userData
+// (Object3D.clone JSON-serializes userData; see gotcha_material_clone_userdata_textures).
+const _tankOverlays = new WeakMap();
+function setTankOverlay(plate, tex) {
+  if (!plate) return;
+  let ov = _tankOverlays.get(plate);
+  if (!tex) { if (ov) ov.visible = false; return; }
+  if (!ov) {
+    ov = new THREE.Mesh(plateDecalGeometry(plate.geometry), makeTankDecalMaterial(tex));
+    ov.name = `${plate.name}_Decal`;
+    ov.raycast = () => {};
+    _tankOverlays.set(plate, ov);
+    plate.add(ov);
+  } else if (ov.material.map !== tex) {
+    ov.material.map = tex;
+    ov.material.needsUpdate = true;
+  }
+  ov.visible = true;
+}
+function disposeTankOverlay(plate) {
+  const ov = plate && _tankOverlays.get(plate);
+  if (!ov) return;
+  ov.removeFromParent();
+  ov.geometry.dispose();
+  ov.material.dispose();
+  _tankOverlays.delete(plate);
+}
+function makeTankDecalMaterial(tex) {
+  const m = new THREE.MeshStandardMaterial();
+  applyTankDecal(m, tex);
+  return m;
+}
+// Load a badge image URL into a disc texture; null while loading / when no URL.
+function useTankBadgeTexture(imageUrl, gl) {
+  const [tex, setTex] = useState(null);
+  useEffect(() => {
+    if (!imageUrl) { setTex(null); return undefined; }
+    let alive = true;
+    let built = null;
+    const loader = new THREE.TextureLoader();
+    loader.crossOrigin = "anonymous";
+    loader.load(imageUrl, (loaded) => {
+      if (!alive) { loaded.dispose(); return; }
+      built = buildTankBadgeTexture(loaded.image, gl);
+      loaded.dispose();
+      setTex(built);
+    });
+    return () => { alive = false; setTex(null); built?.dispose(); };
+  }, [imageUrl, gl]);
+  return tex;
+}
+function useTankTextTexture(text, geometry, gl) {
+  const tex = useMemo(() => (text && geometry) ? buildTankTextTexture(text, plateAspect(geometry), gl) : null, [text, geometry, gl]);
+  useEffect(() => () => tex?.dispose(), [tex]);
+  return tex;
+}
+function TankDecal({ geometry, texture }) {
+  const mat = useMemo(() => makeTankDecalMaterial(texture), [texture]);
+  useEffect(() => () => mat.dispose(), [mat]);
+  return <mesh geometry={geometry} material={mat} />;
+}
+// Per-plot overlay for the merged field — rides the same position/yaw/scale as the rig.
+function PlotTankDecals({ position, yaw, endGeo, sideGeo, imageUrl, text }) {
+  const { gl } = useThree();
+  const badgeTex = useTankBadgeTexture(endGeo ? imageUrl : null, gl);
+  const textTex = useTankTextTexture(text, sideGeo, gl);
+  if (!badgeTex && !textTex) return null;
+  return (
+    <group position={position} rotation={[0, yaw, 0]} scale={PUMPJACK_SCALE}>
+      {badgeTex && <TankDecal geometry={endGeo} texture={badgeTex} />}
+      {textTex && <TankDecal geometry={sideGeo} texture={textTex} />}
+    </group>
+  );
+}
+// Every merged plot whose config resolves to an image or a banner. Full-rig cells (the
+// selected plot, live gushers) are skipped — their Pumpjack paints its own plates.
+function PlotTankField({ items, allPumpConfigs, selectedCol, selectedRow, fullRigCells, base, ownerNames, plotOwnerIds }) {
+  const list = useMemo(() => {
+    const out = [];
+    items.forEach((it) => {
+      const key = `${it.col}_${it.row}`;
+      if ((it.col === selectedCol && it.row === selectedRow) || fullRigCells?.has(key)) return;
+      const entry = allPumpConfigs[key];
+      const cfg = entry?.config;
+      const imageUrl = cfg?.tankImageUrl || null;
+      const text = tankSideText(cfg, ownerNames?.[entry?.userId || plotOwnerIds?.[key]]);
+      if (!imageUrl && !text) return;
+      out.push({ key: it.key, position: it.position, imageUrl, text });
+    });
+    return out;
+  }, [items, allPumpConfigs, selectedCol, selectedRow, fullRigCells, ownerNames, plotOwnerIds]);
+  if (!base.tankEndGeo && !base.tankSideGeo) return null;
+  return list.map((d) => (
+    <PlotTankDecals key={d.key} position={d.position} yaw={plotYaw(d.position)} endGeo={base.tankEndGeo} sideGeo={base.tankSideGeo} imageUrl={d.imageUrl} text={d.text} />
+  ));
+}
+
 // One sign per plot with showSign (the image is optional — a blank panel shows until
 // one is set). The selected plot uses the LIVE pumpConfig so toggles show instantly;
 // other plots read the saved allPumpConfigs map.
@@ -6398,7 +6639,7 @@ function PinMarkers({ rigs, rock }) {
   );
 }
 
-function MergedRigField({ nightStrength = 0, scene, items, allPumpConfigs, pumpConfig, envMap, cellSize, selectedCol, selectedRow, fullRigCells, onSelectCell, onFlyTo, onZoomOut, cameraViewable = true }) {
+function MergedRigField({ nightStrength = 0, scene, items, allPumpConfigs, pumpConfig, envMap, cellSize, selectedCol, selectedRow, fullRigCells, onSelectCell, onFlyTo, onZoomOut, cameraViewable = true, ownerNames = {}, plotOwnerIds = {} }) {
   const base = useMemo(() => buildBaseRig(scene), [scene]);
   // Captured uniforms of the shared merged material's compiled shader — so the
   // per-frame loop can advance the beam-bob clock (ANIM_FIELD only).
@@ -6593,6 +6834,8 @@ function MergedRigField({ nightStrength = 0, scene, items, allPumpConfigs, pumpC
     base.signGeo?.dispose();
     base.signFrameGeo?.dispose();
     base.signCamGeo?.dispose();
+    base.tankEndGeo?.dispose();
+    base.tankSideGeo?.dispose();
   }, [base]);
   useEffect(() => () => mat.dispose(), [mat]);
 
@@ -6653,11 +6896,13 @@ function MergedRigField({ nightStrength = 0, scene, items, allPumpConfigs, pumpC
       {/* Catalog signs (+ cameras) — one per plot with showSign, all plots incl. the
           selected one, since signs are no longer part of the rig. */}
       <PlotSignField items={items} allPumpConfigs={allPumpConfigs} pumpConfig={pumpConfig} selectedCol={selectedCol} selectedRow={selectedRow} cameraViewable={cameraViewable} />
+      {/* Tank livery decals — badge disc + name banner over the merged plates. */}
+      <PlotTankField items={items} allPumpConfigs={allPumpConfigs} selectedCol={selectedCol} selectedRow={selectedRow} fullRigCells={fullRigCells} base={base} ownerNames={ownerNames} plotOwnerIds={plotOwnerIds} />
     </>
   );
 }
 
-function PumpjackInstances({ loopV2 = false, orders = null, gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, peakDepthMap = {}, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, envMapPreset = "warehouse", skyEnv = null, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherEvents = [], plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null, cameraViewable = true, onFocusObject }) {
+function PumpjackInstances({ loopV2 = false, orders = null, gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, peakDepthMap = {}, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, envMapPreset = "warehouse", skyEnv = null, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherEvents = [], plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null, cameraViewable = true, onFocusObject, ownerNames = {}, plotOwnerIds = {}, selectedOwnerName = null }) {
   // ?stock=1 — every rig unpainted (see STOCK_RIGS).
   if (STOCK_RIGS) { pumpConfig = null; allPumpConfigs = {}; }
   // Cells with a live gusher event. Each renders a full animated rig (instead of
@@ -6796,6 +7041,8 @@ function PumpjackInstances({ loopV2 = false, orders = null, gridX, gridY, cellSi
           onFlyTo={onFlyTo}
           onZoomOut={onZoomOut}
           cameraViewable={cameraViewable}
+          ownerNames={ownerNames}
+          plotOwnerIds={plotOwnerIds}
           />
       )}
       {items.map(({ key, position, col, row }) => {
@@ -6825,6 +7072,7 @@ function PumpjackInstances({ loopV2 = false, orders = null, gridX, gridY, cellSi
             depositLayer={peakDepthMap[cellKey] ?? -1}
             highlighted={isSelected}
             pumpConfig={cellConfig}
+            ownerName={(isSelected && selectedOwnerName) || ownerNames[cellEntry?.userId || plotOwnerIds[cellKey]] || null}
             envMap={envMap}
             oilStrike={oilStrike}
             drillEvent={isSelected ? drillEvent : 0}
@@ -8047,6 +8295,9 @@ export default function OilVoxelGrid({
   onZoomOut,
   pumpConfig,
   allPumpConfigs = {},
+  ownerNames = {},          // userId → username, for the tank banner fallback
+  plotOwnerIds = {},        // "col_row" → owner userId (oilPlots), for rigs with no saved config
+  selectedOwnerName = null, // name for the selected plot when it has no saved config yet
   oilStrike,
   drillEvent = 0,
   drillProximity = 0,
@@ -8324,6 +8575,9 @@ export default function OilVoxelGrid({
             onZoomOut={onZoomOut}
             pumpConfig={pumpConfig}
             allPumpConfigs={allPumpConfigs}
+            ownerNames={ownerNames}
+            plotOwnerIds={plotOwnerIds}
+            selectedOwnerName={selectedOwnerName}
             oilStrike={oilStrike}
             drillEvent={drillEvent}
             drillProximity={drillProximity}

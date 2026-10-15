@@ -3307,6 +3307,44 @@ export default function OilPage() {
 
   // Can the current user edit this cell's config? Check oilPlots ownership first, fallback to pumpConfigs
   const plotOwnerForCell = selectedX !== null ? allPlotsMap[`${selectedX}_${sliceY}`]?.currentOwnerId : null;
+
+  // userId → username for the tank banner fallback (blank tankText shows the owner's
+  // name). Keyed on a string of id:name pairs so the map only changes when a NAME
+  // changes — allDrillers itself churns every tick and must not rebuild the field.
+  const ownerNamesKey = useMemo(
+    () => allDrillers.map((d) => `${d.id}\u0001${d.username || ""}`).join("\u0002"),
+    [allDrillers],
+  );
+  const ownerNames = useMemo(() => {
+    const m = {};
+    ownerNamesKey.split("\u0002").forEach((pair) => {
+      const i = pair.indexOf("\u0001");
+      if (i < 0) return;
+      const id = pair.slice(0, i), n = pair.slice(i + 1).trim();
+      if (id && n) m[id] = n;
+    });
+    return m;
+  }, [ownerNamesKey]);
+  // plot key → owner id, so a claimed rig shows its owner's name even before its first
+  // config save. Same string-key trick: allPlotsMap churns, ownership rarely changes.
+  const plotOwnerIdsKey = useMemo(
+    () => Object.values(allPlotsMap).map((pl) => `${pl.id}\u0001${pl.currentOwnerId || ""}`).join("\u0002"),
+    [allPlotsMap],
+  );
+  const plotOwnerIds = useMemo(() => {
+    const m = {};
+    plotOwnerIdsKey.split("\u0002").forEach((pair) => {
+      const i = pair.indexOf("\u0001");
+      if (i < 0) return;
+      const k = pair.slice(0, i), id = pair.slice(i + 1);
+      if (k && id) m[k] = id;
+    });
+    return m;
+  }, [plotOwnerIdsKey]);
+  // Name for the selected plot even before its first config save (no pumpConfigs doc yet).
+  const selectedOwnerName = (plotOwnerForCell && ownerNames[plotOwnerForCell])
+    || (plotOwnerForCell && plotOwnerForCell === user?.id ? (username?.trim() || user?.firstName || null) : null)
+    || null;
   const isConfigOwner = !!user?.id && (plotOwnerForCell === user.id || (plotOwnerForCell == null && (configOwnerId === user.id || configOwnerId === null)));
 
   // Save pump config (called from SAVE button)
@@ -3332,6 +3370,18 @@ export default function OilPage() {
         // Update local state with the permanent URL
         setPumpConfig(configToSave);
       }
+      // Tank badge blob → Storage (same per-user folder/rules as the sign image).
+      if (configToSave.tankImageUrl?.startsWith("blob:")) {
+        const resp = await fetch(configToSave.tankImageUrl);
+        const blob = await resp.blob();
+        const ext = blob.type.split("/")[1] || "png";
+        const path = `signImages/${user.id}/${selectedX}_${sliceY}_tank.${ext}`;
+        const storageRef = ref(storage, path);
+        await uploadBytes(storageRef, blob);
+        configToSave.tankImageUrl = await getDownloadURL(storageRef);
+        setPumpConfig(configToSave);
+      }
+      if (typeof configToSave.tankText === "string") configToSave.tankText = configToSave.tankText.slice(0, 20);
 
       await setDoc(doc(db, "pumpConfigs", docId), {
         userId: user.id,
@@ -9434,7 +9484,7 @@ export default function OilPage() {
             </div>
           )}
           <div id="pimp-my-pump" style={{ scrollMarginTop: Math.round(editorSceneH / MOBILE_PANEL_ZOOM) }}>
-          <PimpMyPumpPanel theme={theme} config={pumpConfig} onChange={handleConfigChange} onExpandedChange={handlePimpExpanded} hasSelection={selectedX !== null} isMobile darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
+          <PimpMyPumpPanel theme={theme} config={pumpConfig} onChange={handleConfigChange} onExpandedChange={handlePimpExpanded} hasSelection={selectedX !== null} isMobile darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} username={username?.trim() || user?.firstName || ""} />
           </div>
           {fieldDispatchSection}
           {isAdmin && pendingFeedPanel}
@@ -9730,6 +9780,9 @@ export default function OilPage() {
                 onZoomOut={handleZoomOut}
                 pumpConfig={pumpConfig}
                 allPumpConfigs={allPumpConfigs}
+                ownerNames={ownerNames}
+                plotOwnerIds={plotOwnerIds}
+                selectedOwnerName={selectedOwnerName}
                 oilStrike={combinedStrike}
                 forceStrikeGusher={isAdmin || isReport || isTest}
                 gusherTrigger={gusherTest}
@@ -10073,7 +10126,7 @@ export default function OilPage() {
             {(isAdmin || isReport) && dryZonesPanel}
             {(isAdmin || isReport) && fieldIntelPanel}
             {(isAdmin || isReport) && hellPocketsPanel}
-            <PimpMyPumpPanel theme={theme} config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
+            <PimpMyPumpPanel theme={theme} config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} username={username?.trim() || user?.firstName || ""} />
             {fieldDispatchSection}
             {isAdmin && pendingFeedPanel}
             {(isAdmin || isReport) && (
