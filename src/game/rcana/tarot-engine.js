@@ -1,5 +1,5 @@
 // Shared-deck engine for the tarot configuration of R-cana.
-import { MINORS, MAJORS, TRADERS, byId } from './tarot.js';
+import { MINORS, MAJORS, TRADERS, LEADERS, leaderById, hedgeValue, byId } from './tarot.js';
 import { makeRng } from './engine.js';
 
 export const DEFAULTS = { winBank: 80, openingHand: 8, minorsPerTurn: 1, firstTurnDraw: 0, interestDiv: 5, rotateLead: false, finishRound: false, passMult: 2, passMin: 10, passUnderdogOnly: false, maxRounds: 40, cupsDraw: true,
@@ -14,7 +14,10 @@ export const DEFAULTS = { winBank: 80, openingHand: 8, minorsPerTurn: 1, firstTu
   // Trader cards: the eight one-shot moves shuffled into the Minor deck (88 cards)
   traders: false,
   // actions per main phase (0 = unlimited). Reserving one card is free; everything else counts.
-  actionsPerTurn: 0 };
+  actionsPerTurn: 0,
+  // prototypes after the One Piece review: Leaders (each Trader sits as a cast character with a suit affinity and an ability),
+  // Hedge values on every pip (a Counter: any pip may be thrown from the hand to absorb a Chain), and a draw when a loss of 3+ lands.
+  leaders: false, hedgeAny: false, lossDraw: false, lossDrawMin: 3 };
 export const V1C_PRESET = { v1b: true, majorsSeparate: true, replacePartner: true, hedgeFree: true, copyFavor: false, spareMin: 3, passMax: 20, firstHandPenalty: 0, firstTurnDraw: 1, seatProfit: 8 };
 let UID = 1;
 
@@ -22,15 +25,21 @@ export class TarotGame {
   constructor({ players, seed = 1, snapshots = false, rules = {}, hiddenInfo = false }) {
     this.hiddenInfo = hiddenInfo;
     this.rules = { ...DEFAULTS, ...rules }; if (this.rules.v1c) this.rules = { ...this.rules, ...V1C_PRESET, ...rules, v1c: true }; this.rng = makeRng(seed); this.seed = seed; this.snapshotsOn = snapshots;
-    this.players = players.map((cfg, idx) => ({ idx, name: cfg.name, policy: cfg.policy, deckList: cfg.deckList || null, deckPreset: cfg.deckPreset || null, hand: [], reserve: [], floor: [], portfolio: 0, bank: 0,
+    this.players = players.map((cfg, idx) => ({ idx, name: cfg.name, policy: cfg.policy, deckList: cfg.deckList || null, deckPreset: cfg.deckPreset || null, leaderKey: cfg.leader || null, leader: null, hand: [], reserve: [], floor: [], portfolio: 0, bank: 0,
       hailMaryUsed: false, pass: null, inAir: 0, bankedThisTurn: 0, reservedThisTurn: 0, foretold: false, turnBonusLiquidity: 0, favor: 0, copiedThisTurn: false, traderHold: {}, actionsThisTurn: 0,
-      stats: { worked: 0, pips: 0, coins: 0, candles: 0, chains: 0, cups: 0, hedges: 0, hires: 0, invokes: 0, liquidated: 0, frontrun: 0, unbankedSum: 0, sets: 0, foretells: 0, passes: 0, completions: 0, interceptions: 0, passBanked: 0, passWins: 0, passOffers: 0, traderPlays: 0, copies: 0, favorGained: 0, favorSpent: 0, spared: 0 } }));
+      stats: { worked: 0, pips: 0, coins: 0, candles: 0, chains: 0, cups: 0, hedges: 0, hires: 0, invokes: 0, liquidated: 0, frontrun: 0, unbankedSum: 0, sets: 0, foretells: 0, passes: 0, completions: 0, interceptions: 0, passBanked: 0, passWins: 0, passOffers: 0, traderPlays: 0, copies: 0, favorGained: 0, favorSpent: 0, spared: 0, lossDraws: 0, hedgesOff: 0 } }));
     this.deck = []; this.discard = []; this.market = null; this.providence = []; this.events = []; this.snapshots = []; this.cardPlays = {};
     this.round = 0; this.turnIdx = 0; this.turnCounter = 1; this.active = null; this.over = false; this.winner = null; this.reason = ''; this.bellRound = null; this.current = null; this.majorsSeen = 0; this.closing = false;
     this.setup();
   }
   shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(this.rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
   setup() {
+    if (this.rules.leaders) { // each Trader sits as a Leader: the one named in the config, else a random one not already taken
+      const pool = this.shuffle([...LEADERS]);
+      for (const p of this.players) { p.leader = (p.leaderKey && p.leaderKey !== 'random' && leaderById[p.leaderKey]) || null; if (p.leader) pool.splice(pool.indexOf(p.leader), 1); }
+      for (const p of this.players) if (!p.leader) p.leader = pool.shift() || LEADERS[0];
+      this.log(`Leaders: ${this.players.map((p) => `${p.name} sits as ${p.leader.name}`).join('; ')}`);
+    }
     const minors = this.shuffle(this.rules.traders ? [...MINORS, ...TRADERS] : [...MINORS]);
     for (const p of this.players) { const n = this.rules.openingHand - (p.idx === 0 ? (this.rules.firstHandPenalty || 0) : 0); for (let i = 0; i < n; i++) p.hand.push(minors.shift()); }
     const second = this.players[1]; if (second) { for (let i = 0; i < (this.rules.seatLiq || 0); i++) second.reserve.push({ card: null, locked: false }); second.portfolio += this.rules.seatProfit || 0; second.favor += this.rules.v1b ? (this.rules.seatFavor || 0) : 0; if (this.rules.seatLiq || this.rules.seatProfit || this.rules.seatFavor) this.log(`${second.name} goes second and opens with${this.rules.seatLiq ? ` ${this.rules.seatLiq} Liquidity` : ''}${this.rules.seatProfit ? ` ${this.rules.seatProfit} Profit` : ''}${this.rules.seatFavor && this.rules.v1b ? ` ${this.rules.seatFavor} Favor` : ''}`); }
@@ -46,7 +55,7 @@ export class TarotGame {
   makeSnapshot(label) {
     return { label, round: this.round, turn: this.turnCounter, active: this.active ? this.active.name : null, bell: this.bellRound, market: this.market ? this.market.name : null,
       providence: this.providence.map((m) => m.name), deckLeft: this.deck.length, majorsLeft: this.majors ? this.majors.length : null, omen: !!this.omen, projected: this.players.map((q) => this.projectedBank(q)), over: this.over, winner: this.winner ? this.winner.name : null, reason: this.reason, events: this.events,
-      players: this.players.map((p) => ({ name: p.name, bank: p.bank, portfolio: p.portfolio, favor: p.favor, pass: p.pass ? p.inAir : null, passUsed: p.hailMaryUsed, hand: p.hand.map((c) => c.name), reserve: p.reserve.length, locked: p.reserve.filter((r) => r.locked).length, archetype: this.archetype(p),
+      players: this.players.map((p) => ({ name: p.name, leader: p.leader ? p.leader.name : null, bank: p.bank, portfolio: p.portfolio, favor: p.favor, pass: p.pass ? p.inAir : null, passUsed: p.hailMaryUsed, hand: p.hand.map((c) => c.name), reserve: p.reserve.length, locked: p.reserve.filter((r) => r.locked).length, archetype: this.archetype(p),
         floor: p.floor.map((i) => ({ name: i.card.name, title: i.card.title, suit: i.card.suit, working: i.working, drawdown: i.drawdown, res: i.card.res, yield: this.yieldOf(p, i), shielded: !!i.shielded, armor: i.armor || 0, canWork: this.canWork(p, i) })) })) };
   }
   // ── queries ──
@@ -61,7 +70,10 @@ export class TarotGame {
   isUnderdog(p) { return this.opps(p).some((o) => o.bank > p.bank); }
   marketIs(n) { return !!this.market && this.market.name === n; }
   coin() { const h = this.rng() < 0.5; this.log(`Coin: ${h ? 'heads' : 'tails'}`); return h; }
-  modSources(p) { const s = p.floor.map((i) => i.card); if (this.market) s.push(this.market); return s; }
+  modSources(p) { const s = p.floor.map((i) => i.card); if (p.leader) s.push(p.leader); if (this.market) s.push(this.market); return s; }
+  hasForetell(p) { return p.floor.some((i) => i.card.foretell) || !!(p.leader && p.leader.foretell); }
+  hedgeValue(c) { return hedgeValue(c, this.rules); }
+  leaderHook(p, k, ...a) { if (p.leader && p.leader[k]) p.leader[k](this, p, ...a); }
   modSum(p, k, ...a) { let n = 0; for (const s of this.modSources(p)) if (s.mods && s.mods[k]) n += s.mods[k](this, p, ...a) || 0; return n; }
   modAny(p, k, ...a) { for (const s of this.modSources(p)) if (s.mods && s.mods[k] && s.mods[k](this, p, ...a)) return true; return false; }
   modProduct(p, k, ...a) { let n = 1; for (const s of this.modSources(p)) if (s.mods && s.mods[k]) n *= s.mods[k](this, p, ...a) || 1; return n; }
@@ -118,6 +130,7 @@ export class TarotGame {
     if (fromEvent && p.pass) this.knockDown(p, why, null);
     if (hostile && Math.min(n, p.portfolio) >= 3 && this.reaction(p, 'stoploss', why)) n = 2;
     const a = Math.min(n, p.portfolio); if (a <= 0) return 0; p.portfolio -= a; this.log(`${p.name} loses ${a} Profit (${why}) → Portfolio ${p.portfolio}`);
+    if (this.rules.lossDraw && hostile && a >= this.rules.lossDrawMin && (fromEvent || (cur && cur.kind === 'chain'))) { p.stats.lossDraws = (p.stats.lossDraws || 0) + 1; this.log(`${p.name} draws for the loss`); this.drawMinors(p, 1); }
     return a;
   }
   // ── Trader cards ──
@@ -193,10 +206,10 @@ export class TarotGame {
     this.current = { kind: 'major', card: c, attacker: null, victim: null };
     if (c.kind === 'market') { if (this.market) this.discard.push(this.market); this.market = c; }
     else if (c.kind === 'event' && this.rules.traders && !this.rules.majorsSeparate && this.players.some((q) => this.eventHurts(c, q) && this.reaction(q, 'breaker', c.name))) { this.log(`${c.name} does not resolve`); this.bury(c); }
-    else if (c.kind === 'event') { c.buried = false; this.lastEvent = { card: c, round: this.round }; c.resolve(this); if (!c.buried) this.discard.push(c); for (const q of this.players) for (const i of [...q.floor]) if (i.card.onEvent && q.floor.includes(i)) i.card.onEvent(this, q, i); }
+    else if (c.kind === 'event') { c.buried = false; this.lastEvent = { card: c, round: this.round }; c.resolve(this); if (!c.buried) this.discard.push(c); for (const q of this.players) { for (const i of [...q.floor]) if (i.card.onEvent && q.floor.includes(i)) i.card.onEvent(this, q, i); this.leaderHook(q, 'onEvent'); } }
     else this.providence.push(c);
     this.current = null;
-    for (const q of this.players) for (const i of [...q.floor]) if (i.card.onMajor && q.floor.includes(i)) i.card.onMajor(this, q, i);
+    for (const q of this.players) { for (const i of [...q.floor]) if (i.card.onMajor && q.floor.includes(i)) i.card.onMajor(this, q, i); this.leaderHook(q, 'onMajor'); }
   }
   byId(id) { return byId[id]; }
   buryThreshold() { return this.rules.majorsSeparate ? 10 : 34; }
@@ -225,7 +238,7 @@ export class TarotGame {
     this.log(`${p.name} plays ${c.name} for ${cost}${choice && choice.target ? ` → ${choice.target.card ? choice.target.card.name : choice.target.name}` : ''}`);
     if (c.suit === 'coins') this.profit(p, r + this.modSum(p, 'coinsBonus'), c.name);
     else if (c.suit === 'candles') { const inst = choice.inst; this.work(p, inst, { bonus: r * this.modProduct(p, 'candlesMult') + this.modSum(p, 'candlesBonus') }); }
-    else if (c.suit === 'cups') { const o = choice.opp; const give = Math.ceil(r / 2); const mult = this.modProduct(p, 'cupsMult'); this.profit(o, give * mult, `${c.name} from ${p.name}`); this.profit(p, r * mult + this.modSum(p, 'cupsBonus'), c.name); if (this.rules.cupsDraw) this.drawMinors(p, 1); this.gainFavor(p, this.rules.favorPerShare, c.name); for (const i of [...p.floor]) if (i.card.onCup && p.floor.includes(i)) i.card.onCup(this, p, i); }
+    else if (c.suit === 'cups') { const o = choice.opp; const give = Math.ceil(r / 2); const mult = this.modProduct(p, 'cupsMult'); this.profit(o, give * mult, `${c.name} from ${p.name}`); this.profit(p, r * mult + this.modSum(p, 'cupsBonus'), c.name); if (this.rules.cupsDraw) this.drawMinors(p, 1); this.gainFavor(p, this.rules.favorPerShare, c.name); for (const i of [...p.floor]) if (i.card.onCup && p.floor.includes(i)) i.card.onCup(this, p, i); this.leaderHook(p, 'onCup'); for (const q of this.opps(p)) this.leaderHook(q, 'onOppCup', p); }
     else if (c.suit === 'chains') {
       const amount = r * this.modProduct(p, 'chainsMult') + this.modSum(p, 'chainsBonus'); const t = choice.target; const victim = t.card || t.isPass ? t.owner : t;
       this.current = { kind: 'chain', card: c, attacker: p, victim, reduce: 0, amount };
@@ -237,10 +250,10 @@ export class TarotGame {
   }
   async offerHedge(victim, threat) {
     if (this.rules.passNoHedge && threat.target && threat.target.isPass) return; // a pass in the air cannot be Hedged
-    const opts = victim.hand.filter((c) => c.type === 'pip' && c.suit === 'chains' && (this.rules.hedgeFree || this.costOf(victim, c) <= this.liquidity(victim)));
+    const opts = victim.hand.filter((c) => this.hedgeValue(c) > 0 && (this.rules.hedgeFree || c.suit !== 'chains' || this.costOf(victim, c) <= this.liquidity(victim)));
     if (!opts.length) return; const ch = await victim.policy.wantHedge(this, victim, opts, threat); if (!ch) return;
-    if (!this.rules.hedgeFree) this.pay(victim, this.costOf(victim, ch)); victim.hand.splice(victim.hand.indexOf(ch), 1); this.discard.push(ch); victim.stats.hedges++; this.count(ch);
-    this.current.reduce += ch.rank; this.log(`${victim.name} HEDGES with ${ch.name} (reduces by ${ch.rank})`);
+    if (!this.rules.hedgeFree && ch.suit === 'chains') this.pay(victim, this.costOf(victim, ch)); victim.hand.splice(victim.hand.indexOf(ch), 1); this.discard.push(ch); victim.stats.hedges++; if (ch.suit !== 'chains') victim.stats.hedgesOff++; this.count(ch);
+    const hv = this.hedgeValue(ch); this.current.reduce += hv; this.log(`${victim.name} HEDGES with ${ch.name} (reduces by ${hv})`);
   }
   copyTrade(p, inst) {
     if (!this.pay(p, this.rules.copyCost)) return; const o = inst.owner; p.copiedThisTurn = true; p.stats.copies++;
@@ -269,7 +282,7 @@ export class TarotGame {
       else if (c.key === 'rebalance') { if (p.portfolio > 0 && this.bankRoom(p) > 0) A.push({ t: 'trader', card: c, cost, choice: {} }); }
       else if (c.key === 'pump') { for (const i of p.floor) if (i.working) A.push({ t: 'trader', card: c, cost, choice: { inst: i } }); }
       else if (c.key === 'insider') { if (this.deck.length || this.omen) A.push({ t: 'trader', card: c, cost, choice: {} }); } }
-    const virgil = p.floor.some((i) => i.card.foretell);
+    const virgil = this.hasForetell(p);
     if (!p.foretold && (this.rules.majorsSeparate ? !!this.omen : this.deck.length) && (virgil || this.hasFavor(p, this.rules.foretellFavor))) A.push({ t: 'foretell', cost: 0, favor: virgil ? 0 : this.rules.foretellFavor });
     if (spent) return A.filter((a) => a.t === 'reserve' || a.t === 'foretell');
     if (this.rules.v1b && !p.copiedThisTurn && liq >= this.rules.copyCost) for (const o of this.opps(p)) for (const i of this.working(o)) A.push({ t: 'copy', inst: i, cost: this.rules.copyCost });
@@ -340,6 +353,7 @@ export class TarotGame {
   landPasses() { for (const q of this.players) if (q.pass) { this.log(`✝ The Final Bell catches ${q.name}'s Hail Mary Pass in the air: ${q.inAir} returns to their Portfolio, undoubled.`); this.passNews(q, { result: 'returned', stake: q.inAir, amount: q.inAir, by: 'the Final Bell' }); q.portfolio += q.inAir; q.inAir = 0; q.pass = null; } }
   async doSet(p) {
     for (const i of p.floor) i.working = false; p.reserve.forEach((r) => { r.locked = false; }); p.reservedThisTurn = 0; p.copiedThisTurn = false; p.actionsThisTurn = 0; p.foretold = false; p.turnBonusLiquidity = 0; p.bankedThisTurn = 0;
+    this.leaderHook(p, 'onSet');
     // Start of turn: pass lands, Dividend, bonus, bank or throw
     if (p.pass) { const stake = p.inAir; const n = Math.floor(stake * this.rules.passMult); p.inAir = 0; p.pass = null; p.stats.completions++; p.stats.passBanked += n; this.passNews(p, { result: 'complete', stake, amount: n, by: null }); this.log(`✝ COMPLETE: ${p.name}'s Hail Mary Pass comes down. ${stake} in the air banks as ${n}.`); p.justLanded = true; this.bank(p, n, 'Hail Mary Pass'); this.resumeClock(); p.justLanded = false; if (this.over) return; }
     const div = (this.modFirst(p, 'dividend') ?? 1) + this.modSum(p, 'dividendDelta'); this.profit(p, div, 'Dividend');
@@ -380,5 +394,5 @@ export class TarotGame {
     return Object.entries(sc).sort((a, b) => b[1] - a[1])[0][0];
   }
   result() { return { winner: this.winner ? this.winner.name : null, winnerIdx: this.winner ? this.winner.idx : -1, reason: this.reason, rounds: this.round, finalBell: this.reason.startsWith('Final Bell'), majorsSeen: this.majorsSeen,
-    players: this.players.map((p) => ({ name: p.name, bank: p.bank, portfolio: p.portfolio, archetype: this.archetype(p), stats: { ...p.stats } })), cardPlays: this.cardPlays }; }
+    players: this.players.map((p) => ({ name: p.name, leader: p.leader ? p.leader.key : null, bank: p.bank, portfolio: p.portfolio, archetype: this.archetype(p), stats: { ...p.stats } })), cardPlays: this.cardPlays }; }
 }

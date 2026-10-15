@@ -88,6 +88,22 @@ export const TRADERS = [
   T('rebalance', 'Rebalance', 'turn', 1, 'Bank up to 5 Profit from your Portfolio right now.'),
   T('pump', 'Pump', 'turn', 1, 'One of your Trading Personalities Trades again this turn.'),
 ];
+// ── Leaders (prototype): the Trader you sit as. Not in any deck; chosen before the game and face up all game.
+// Each has a suit affinity (that suit's pips give +1 for you) and one ability. The deck-building hook: a Leader wants its suit.
+const L = (id, name, suit, text, o = {}) => ({ type: 'leader', id: 'leader_' + id, key: id, name, suit, text, mods: {}, kw: {}, ...o });
+export const LEADERS = [
+  L('eugene', 'Eugene, Pattern Prophet', 'candles', 'Your Candles give +1. Your Foretells cost no Favor.',
+    { foretell: true, mods: { candlesBonus: () => 1 } }),
+  L('marisol', 'Marisol, Investigator', 'coins', 'Your Coins give +1. At the start of your turn, if you hold fewer than five cards, draw one.',
+    { mods: { coinsBonus: () => 1 }, onSet: (g, p) => { if (p.hand.length < 5) g.drawMinors(p, 1); } }),
+  L('gr80', 'GR80, Monk', 'cups', 'Your Cups give +1 to you. Whenever the opponent plays a Cup, you gain 1 Profit and 1 Favor.',
+    { mods: { cupsBonus: () => 1 }, onOppCup: (g, p) => { g.profit(p, 1, 'GR80 blesses the share'); g.gainFavor(p, 1, 'GR80 blesses the share'); } }),
+  L('connor', 'Connor, Demon', 'chains', 'Your Chains deal +1. Whenever an Event resolves, gain 2 Profit into your Portfolio.',
+    { mods: { chainsBonus: () => 1 }, onEvent: (g, p) => g.profit(p, 2, 'Connor feeds on the Event') }),
+];
+export const leaderById = Object.fromEntries(LEADERS.map((c) => [c.key, c]));
+// Hedge value (prototype --hedgeAny): what a card absorbs when thrown from the hand as a Hedge. Chains their rank; other pips 1, or 2 from the 6 up.
+export function hedgeValue(c, rules) { if (c.type !== 'pip') return 0; if (c.suit === 'chains') return c.rank; return rules && rules.hedgeAny ? (c.rank >= 6 ? 2 : 1) : 0; }
 export const ALL = [...MINORS, ...MAJORS];
 export const ALL_88 = [...MINORS, ...TRADERS, ...MAJORS];
 export const byId = Object.fromEntries(ALL.map((c) => [c.id, c]));

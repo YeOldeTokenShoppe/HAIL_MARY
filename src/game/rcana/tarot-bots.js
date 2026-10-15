@@ -52,15 +52,19 @@ export class StrongPolicy {
     if (g.modAny(p, 'portfolioSafe')) return Math.max(0, p.portfolio - 10); // safe to leave 10 for Interest
     return Math.max(0, p.portfolio - this.keep);
   }
+  // What the threat costs if it lands with `absorbed` taken off the top.
+  threatHarm(g, p, threat, absorbed) {
+    const t = threat.target; const amt = Math.max(0, threat.amount - absorbed);
+    if (t.isPass) return amt > 0 ? p.inAir * 1.2 : 0;
+    if (t.card) { const kills = t.drawdown + amt >= t.card.res; return kills ? 2 + g.yieldOf(p, t) * this.horizon(g) + (t.card.kw.exitScam || 0) : amt * 0.4; }
+    return Math.min(amt, p.portfolio);
+  }
+  // Opportunity cost of throwing a card away as a Hedge: a Chain's rank is its attack; another pip's rank is roughly its play value.
+  hedgeCardCost(g, p, c) { if (c.suit === 'chains') return (g.rules.hedgeFree ? 0 : g.costOf(p, c) * 0.5) + c.rank * 0.3; return c.rank * (c.suit === 'coins' ? 0.5 : 0.4) + 0.3; }
   wantHedge(g, p, opts, threat) {
-    const t = threat.target; let harm;
-    if (t.isPass) harm = p.inAir * 1.2;
-    else if (t.card) { const kills = t.drawdown + threat.amount >= t.card.res; harm = kills ? 2 + g.yieldOf(p, t) * this.horizon(g) + (t.card.kw.exitScam || 0) : threat.amount * 0.4; }
-    else harm = Math.min(threat.amount, p.portfolio);
-    const best = opts.filter((c) => c.rank <= threat.amount + 1).sort((a, b) => a.rank - b.rank).find((c) => c.rank >= Math.min(threat.amount, t.card ? threat.amount - (t.card.res - t.drawdown - 1) : threat.amount)) || [...opts].sort((a, b) => b.rank - a.rank)[0];
-    if (!best) return null;
-    const value = harm - (g.rules.hedgeFree ? 0 : g.costOf(p, best) * 0.5) - best.rank * 0.3;
-    return value >= 1.5 ? best : null;
+    const base = this.threatHarm(g, p, threat, 0); let best = null, bv = 1.5;
+    for (const c of opts) { const v = base - this.threatHarm(g, p, threat, g.hedgeValue(c)) - this.hedgeCardCost(g, p, c); if (v > bv) { bv = v; best = c; } }
+    return best;
   }
   bottomCard(g, p, c) { if (c.type !== 'major') return false; if (HARMFUL.has(c.name)) return !(c.name === 'VOLATILITY' && g.richestOpp(p) && g.richestOpp(p).portfolio > p.portfolio); if (c.name === 'THE RECKONING') return g.isUnderdog(p); return false; }
   reorder(g, p, cards) { return [...cards].sort((a, b) => (this.bottomCard(g, p, a) ? 1 : 0) - (this.bottomCard(g, p, b) ? 1 : 0)); }
@@ -110,7 +114,7 @@ export class StrongPolicy {
   }
   reserveChoice(g, p) {
     if (!p.hand.length) return null; const liq = g.liquidity(p) + 1; const h = this.horizon(g);
-    const use = (c) => { if (c.type === 'trader') return c.kind === 'reaction' ? 7 : 6; let v = c.type === 'court' ? this.courtValue(g, p, c, h) : c.rank * (c.suit === 'chains' ? 0.7 : 1); if (c.cost > liq + 2) v *= 0.6; if (c.suit === 'candles' && !p.floor.length) v *= 0.5; return v / Math.max(1, Math.sqrt(c.cost)); };
+    const use = (c) => { if (c.type === 'trader') return c.kind === 'reaction' ? 7 : 6; let v = c.type === 'court' ? this.courtValue(g, p, c, h) : c.rank * (c.suit === 'chains' ? 0.7 : 1) + (p.leader && p.leader.suit === c.suit ? 1 : 0); if (c.cost > liq + 2) v *= 0.6; if (c.suit === 'candles' && !p.floor.length) v *= 0.5; return v / Math.max(1, Math.sqrt(c.cost)); };
     return [...p.hand].sort((a, b) => use(a) - use(b))[0];
   }
   async takeTurn(g, p) {
@@ -130,7 +134,7 @@ export class NaivePolicy extends RandomPolicy {
   constructor(rng) { super(rng); this.name = 'Naive'; }
   bankAmount(g, p) { return p.portfolio; }
   hailMaryPass() { return true; }
-  wantHedge(g, p, opts) { return opts.sort((a, b) => b.rank - a.rank)[0]; }
+  wantHedge(g, p, opts) { return [...opts].sort((a, b) => g.hedgeValue(b) - g.hedgeValue(a))[0]; }
   async takeTurn(g, p) {
     let guard = 0;
     while (!g.over && guard++ < 30) { const acts = g.actions(p); if (!acts.length) break; await g.act(p, acts[Math.floor(this.rng() * acts.length)]); }

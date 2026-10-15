@@ -95,6 +95,13 @@ Trader cards (`--traders 1`: eight one-shot moves and reactions shuffled into th
 prototype described there; the table turns them on by default too. The game is won at once at 80; `--finish 1 --firstHand -1 --first 1` is the
 balanced played-out-round alternative.
 
+### Prototypes after the One Piece review (`LEADERS.md`)
+
+`--leaders 1` seats each Trader as a Leader from the cast (`--la eugene --lb connor` to pick; `eugene`, `marisol`, `gr80`, `connor`),
+with a suit affinity and an ability; the batch reports wins per Leader and per matchup. `--hedgeAny 1` gives every pip a Hedge value.
+`--lossDraw 1` draws a card when a hostile loss of 3 or more lands (`--lossDrawMin N`). All three are off at the table. Results and
+the design notes on deck-building, cooperation and caprice are in `LEADERS.md`.
+
 ### Version 2 defaults and flags
 
 Deck presets: `upright`, `revChains`, `revChainsAll`, `revCoins`, `revCups`, `cautious`, `aggressive`, `chainsLowRev`,
