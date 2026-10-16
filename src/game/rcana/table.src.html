@@ -6,19 +6,33 @@
 <div class="table">
   <div class="bar">
     <h1>R-CANA</h1>
-    <select id="mode"><option value="reading1c">Shared reading 1c: Omen, free Hedges, capped pass</option><option value="reading1b">Shared reading 1b: Favor &amp; Network</option><option value="reading">Shared reading (version 1)</option><option value="duel">Duel (version 2)</option></select>
+    <select id="mode"><option value="reading1c">Shared reading 1c: prototype playtest</option><option value="reading1b">Shared reading 1b: Favor &amp; Network</option><option value="reading">Shared reading (version 1)</option><option value="duel">Duel (version 2)</option></select>
     <select id="deckA"></select>
     <select id="deckB"></select>
     <select id="bot"><option value="strong">Strong bot</option><option value="naive">Naive bot</option><option value="random">Random bot</option></select>
+    <label class="table-size">Table size <select id="tableSize"><option value="auto">Auto</option><option value="compact">Compact</option><option value="large">Large</option></select></label>
     <button class="primary" id="start">Deal</button>
     <label class="note" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="coach" checked> coach</label>
     <button id="review" disabled title="Step back through every turn of this game">Review</button>
-    <details class="settings" id="tableSettings"><summary>Table settings</summary><div class="settings-menu">
+    <details class="settings" id="tableSettings"><summary>Table settings · prototypes</summary><div class="settings-menu">
       <label class="note">Seed <input type="number" id="seed" value="7" min="1" style="width:70px"></label>
       <label class="note" data-v1c="only" style="display:flex;gap:6px;align-items:center" title="A Hail Mary may only be thrown when the bot could win by banking at its next turn; no cap; nobody wins while it is in the air"><input type="checkbox" id="passLast" checked> last-play Hail Mary</label>
       <label class="note" data-v1c="only" style="display:flex;gap:6px;align-items:center" title="Eight one-shot Trader cards shuffled into the deck: an 88-card R-cana"><input type="checkbox" id="traders" checked> Trader cards (88)</label>
       <label class="note" data-v1c="only" style="display:flex;gap:6px;align-items:center" title="Up to three actions in your main phase; Reserving one card is free"><input type="checkbox" id="actions3" checked> 3 actions</label>
       <label class="note" data-v1c="only" style="display:flex;gap:6px;align-items:center">pass <select id="passMult"><option value="2">doubles</option><option value="1.5">×1.5</option></select></label>
+      <fieldset data-v1c="only" class="prototype-options">
+        <legend>Prototype playtest</legend>
+        <p class="note">Changes apply when you Deal a new game. Uncheck all three to compare with standard 1c.</p>
+        <label><input type="checkbox" id="leaders" checked> Leaders</label>
+        <label>Your Leader <select id="leaderA"></select></label>
+        <p class="note" id="leaderAPreview"></p>
+        <label>Bot Leader <select id="leaderB"></select></label>
+        <p class="note" id="leaderBPreview"></p>
+        <label><input type="checkbox" id="hedgeAny" checked> All-suit Hedges</label>
+        <p class="note">Spend one pip to defend. Chains absorb their rank; other suits absorb 1 (2 at rank 6+). No Liquidity cost.</p>
+        <label><input type="checkbox" id="lossDraw" checked> Draw after a loss</label>
+        <p class="note">Draw one card when a hostile Chain or Event takes at least 3 Profit.</p>
+      </fieldset>
     </div></details>
     <span class="note" id="status">Loading the engine&hellip;</span>
   </div>
@@ -27,6 +41,7 @@
     <summary>How to play</summary>
     <div class="primer-copy">
     <ol>
+      <li data-v1c="only"><strong>Prototype playtest.</strong> Table settings lets you toggle Leaders, all-suit Hedges and loss draws for the next deal. Each Leader stays beside its owner's scores with a suit bonus and an ability. With all-suit Hedges on, every pip shows its defensive value. Loss draws grant one card after an actual hostile Chain or Event loss of 3+ Profit; prevented losses do not count.</li>
       <li><strong>Three numbers.</strong> <strong>Liquidity</strong> pays for cards. <strong>Portfolio</strong> is Profit you have earned but can still lose. <strong>Bank</strong> is Profit nobody can touch. First to 80 in the Bank wins.</li>
       <li><strong>Your turn has three steps.</strong> START: Profit arrives (Dividend, plus a bonus for a big Portfolio), then you bank some or all of your Portfolio. DRAW one card. MAIN: play cards, then End turn.</li>
       <li><strong>Getting Liquidity.</strong> Once a turn, drag a card you don't need onto Reserve. It's gone, but it pays 1 Liquidity every turn from now on. Spent Liquidity comes back next turn. Do this every turn early on.</li>
@@ -45,36 +60,42 @@
   </details>
 
   <section class="side opp">
-    <div class="querent" id="oppQ"><div class="who">BOT</div><div class="num"><span>Bank<small>safe</small></span><b id="oppBank">0</b></div><div class="num port"><span>Portfolio<small>exposed</small></span><b id="oppPort">0</b></div><div class="num" id="oppFavorRow" hidden><span>Favor<small>Our Lady's regard</small></span><b id="oppFavor">0</b></div><div class="num"><span>Next turn<small>banks to</small></span><b id="oppNext">0</b></div><div id="oppDanger"></div><div id="oppPass"></div><div class="num"><span>Hand</span><b id="oppHand">0</b></div><div class="reserve" id="oppReserve"></div></div>
+    <div class="leader-panel" id="oppLeader"><span class="leader-suit">Leader</span><strong>Choose your character</strong><span>Deal to reveal the Leader and ability.</span></div>
+    <div class="querent" id="oppQ"><div class="who">BOT</div><div class="num"><span>Bank<small>safe</small></span><b id="oppBank">0</b></div><div class="num port"><span>Portfolio<small>exposed</small></span><b id="oppPort">0</b></div><div class="num" id="oppFavorRow" hidden><span>Favor<small>Our Lady's regard</small></span><b id="oppFavor">0</b></div><div class="num"><span>Next turn<small>banks to</small></span><b id="oppNext">0</b></div><div id="oppDanger"></div><div id="oppPass"></div><div class="num"><span>Hand</span><b id="oppHand">0</b></div></div>
     <div class="zones">
-      <div class="zone" id="oppFloor"><span class="zl" id="oppFloorLabel">Bot's floor</span></div>
+      <div class="zone reserve-zone" id="oppReserveZone"><span class="zl">Bot Reserve</span><div id="oppReserve" class="reserve"></div><div id="oppReserveCount" class="reserve-count">No Liquidity yet</div></div>
+      <div class="zone network" id="oppFloor"><span class="zl" id="oppFloorLabel">Bot Network</span><div class="network-slot"><span>Partner</span><small>Empty Network slot</small></div><div class="network-slot"><span>Partner</span><small>Empty Network slot</small></div></div>
     </div>
   </section>
 
   <section class="center">
     <div id="majorBox" hidden><div class="zl" id="majorLabel">Majors</div><div class="stack" id="majorStack"></div></div>
-    <div><div class="zl" id="deckLabel">Deck</div><div class="stack" id="deckStack"></div></div>
-    <div><div class="zl">Market · stays in effect</div><div id="market"></div></div>
-    <div><div class="zl" id="lastEventLabel">Last Event · already happened</div><div id="lastEvent"></div></div>
-    <div class="log" id="log"></div>
-    <div><div class="zl">Providence</div><div class="hand" id="providence"></div></div>
+    <div id="minorBox"><div class="zl" id="deckLabel">Deck</div><div class="stack" id="deckStack"></div></div>
+    <div id="marketBox"><div class="zl">Active Market</div><div id="market"></div></div>
+    <div id="eventBox"><div class="zl" id="lastEventLabel">Last Event · already happened</div><div id="lastEvent"></div></div>
+
+    <div id="providenceBox"><div class="zl">Providence</div><div class="hand" id="providence"></div></div>
+    <div id="discardBox"><div class="zl" id="discardLabel">Discard</div><div id="discardPile" class="empty-reading">No spent Minors</div></div>
   </section>
 
   <section class="side me">
-    <div class="querent" id="meQ"><div class="who">YOU</div><div class="num"><span>Bank<small>safe for good</small></span><b id="meBank">0</b></div><div class="num port"><span>Portfolio<small>exposed until banked</small></span><b id="mePort">0</b></div><div class="num"><span>Liquidity<small>pays for cards</small></span><b id="meLiq">0</b></div><div class="num" id="meFavorRow" hidden><span>Favor<small>Our Lady's regard</small></span><b id="meFavor">0</b></div><div class="num"><span>Next turn<small>you bank to</small></span><b id="meNext">0</b></div><div id="mePass"></div><div class="reserve" id="meReserve"></div><button id="endTurn" class="primary" disabled>End turn</button></div>
+    <div class="leader-panel" id="meLeader"><span class="leader-suit">Leader</span><strong>Choose your character</strong><span>Deal to reveal the Leader and ability.</span></div>
+    <div class="querent" id="meQ"><div class="who">YOU</div><div class="num"><span>Bank<small>safe for good</small></span><b id="meBank">0</b></div><div class="num port"><span>Portfolio<small>exposed until banked</small></span><b id="mePort">0</b></div><div class="num"><span>Liquidity<small>pays for cards</small></span><b id="meLiq">0</b></div><div class="num" id="meFavorRow" hidden><span>Favor<small>Our Lady's regard</small></span><b id="meFavor">0</b></div><div class="num"><span>Next turn<small>you bank to</small></span><b id="meNext">0</b></div><div id="mePass"></div><button id="endTurn" class="primary" disabled>End turn</button></div>
     <div class="zones">
-      <div class="zone" id="meFloor"><span class="zl" id="meFloorLabel">Your floor · Personalities live here; tap an idle one to Work it for its earnings</span></div>
-      <div class="zone" id="meReserveZone" style="min-height:calc(var(--ch) * .7)"><span class="zl">Reserve · drop one card a turn here: it is gone, but pays 1 Liquidity every turn</span></div>
-      <div id="prompt"></div>
-      <div class="ask" id="ask" hidden>
+      <div class="zone network" id="meFloor"><span class="zl" id="meFloorLabel">Your Network</span><div class="network-slot"><span>Partner</span><small>Empty Network slot</small></div><div class="network-slot"><span>Partner</span><small>Empty Network slot</small></div></div>
+      <div class="zone reserve-zone" id="meReserveZone"><span class="zl">Your Reserve</span><div id="meReserve" class="reserve"></div><div id="meReserveCount" class="reserve-count">No Liquidity yet</div><span class="reserve-help">Drop one card here each turn to add 1 Liquidity.</span></div>
+
+
+    </div>
+  </section>
+      <div class="zone" id="meHand" style="border-style:none;padding:0"><span class="zl">Your hand</span></div>
+  <aside class="decision-rail"><div id="prompt"><div class="prompt"><div class="ph">Your next move</div><span class="note">Choose your Leaders in Table settings, then Deal to begin.</span></div></div>      <div class="ask" id="ask" hidden>
         <div class="ask-row"><span class="who">ASK THE COACH</span><input type="text" id="askQ" maxlength="400" placeholder="Why not attack? What does this Market do? Should I throw the pass?"><button class="primary" id="askGo">Ask</button><button id="askStop" hidden>Stop</button></div>
         <div class="ask-q" id="askQShown" hidden></div>
         <div class="ask-out" id="askOut" hidden></div>
         <div class="note" id="askNote" hidden></div>
       </div>
-      <div class="zone" id="meHand" style="border-style:none;padding:0"><span class="zl">Your hand</span></div>
-    </div>
-  </section>
+<details class="history"><summary>Table history</summary><div class="log" id="log"></div></details></aside>
 </div>
 <div id="overlayHost"></div>
 <div id="reviewHost"></div>
@@ -94,17 +115,35 @@
   import { DuelGame } from './v2-engine.js';
   import { HumanPolicy } from './tarot-bots.js';
   import { buildDeck, DECK_PRESETS } from './v2.js';
-  import { cardText, TRADERS } from './tarot.js';
+  import { cardText, TRADERS, LEADERS } from './tarot.js';
   import { makeRng } from './engine.js';
   import { policy as botPolicy2 } from './v2-sim.js';
   import { policy as botPolicy1 } from './tarot-sim.js';
 
   const $ = (id) => document.getElementById(id);
+  const sizes = ['auto', 'compact', 'large'];
+  try { const saved = localStorage.getItem('rcana-table-size'); if (sizes.includes(saved)) $('tableSize').value = saved; } catch (e) {}
+  const applyTableSize = () => {
+    document.documentElement.dataset.tableSize = $('tableSize').value;
+    try { localStorage.setItem('rcana-table-size', $('tableSize').value); } catch (e) {}
+  };
+  $('tableSize').addEventListener('change', applyTableSize); applyTableSize();
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX', 'XXI'];
   for (const id of ['deckA', 'deckB']) $(id).innerHTML = Object.entries(DECK_PRESETS).map(([k, v]) => `<option value="${k}">${id === 'deckA' ? 'You: ' : 'Bot: '}${esc(v.name)}</option>`).join('');
   $('deckA').value = 'random'; $('deckB').value = 'random';
+  for (const id of ['leaderA', 'leaderB']) $(id).innerHTML = '<option value="random">Random Leader</option>' + LEADERS.map((l) => `<option value="${l.key}">${esc(l.name)}</option>`).join('');
+  $('leaderA').value = 'eugene'; $('leaderB').value = 'connor';
+  function syncLeaders() {
+    for (const id of ['leaderA', 'leaderB']) {
+      $(id).disabled = !$('leaders').checked;
+      const leader = LEADERS.find((l) => l.key === $(id).value);
+      $(id + 'Preview').textContent = leader ? leader.text : 'Chosen at Deal from the available Leaders.';
+    }
+  }
+  for (const id of ['leaders', 'leaderA', 'leaderB']) $(id).addEventListener('change', syncLeaders);
+  syncLeaders();
   const isDuel = () => $('mode').value === 'duel';
   const isV1b = () => $('mode').value === 'reading1b' || $('mode').value === 'reading1c';
   const isV1c = () => $('mode').value === 'reading1c';
@@ -113,7 +152,7 @@
   const ctext = (c) => cardText(c, S && S.g);
   const syncMode = () => { $('deckA').hidden = !isDuel(); $('deckB').hidden = !isDuel(); document.querySelectorAll('[data-v1b]').forEach((el) => { el.hidden = el.dataset.v1b === 'only' ? !isV1b() : isV1b(); }); document.querySelectorAll('[data-v1c]').forEach((el) => { el.hidden = el.dataset.v1c === 'only' ? !isV1c() : isV1c(); }); };
   $('mode').addEventListener('change', syncMode); syncMode();
-  window.__rcanaReady = true; $('status').textContent = 'Press Deal. Drag cards from your hand onto the table; tap a card to read it.'; $('status').style.color = '';
+  window.__rcanaReady = true; $('status').textContent = 'Press Deal to try the prototypes. Choose Leaders or toggle rules in Table settings.'; $('status').style.color = '';
 
   // ───────── state ─────────
   let S = null; // { g, me, bot, human, coach, prompt, resolve, mainResolve, busy, seen }
@@ -133,6 +172,8 @@
   function endTurn() { const r = S.mainResolve; S.mainResolve = null; S.passNews = null; S.prompt = { kind: 'wait' }; render(); if (r) r(); }
 
   $('start').addEventListener('click', async () => {
+    if (S && (S.busy || S.overlayDone || S.prompt.kind === 'wait')) return;
+    $('reviewHost').innerHTML = ''; $('popHost').innerHTML = '';
     $('primer').open = false; $('tableSettings').open = false;
     try { localStorage.setItem('rcana-table-played', '1'); } catch (e) {}
     try {
@@ -142,9 +183,9 @@
     const rng = makeRng(seed * 977 + 3);
     const players = isDuel()
       ? [{ name: 'YOU', policy: human, deckList: buildDeck($('deckA').value, rng), deckPreset: $('deckA').value }, { name: 'BOT', policy: bot, deckList: buildDeck($('deckB').value, rng), deckPreset: $('deckB').value }]
-      : [{ name: 'YOU', policy: human }, { name: 'BOT', policy: bot }];
+      : [{ name: 'YOU', policy: human, leader: $('leaderA').value }, { name: 'BOT', policy: bot, leader: $('leaderB').value }];
     const G = isDuel() ? DuelGame : TarotGame;
-    const g = new G({ players, seed, snapshots: true, rules: isV1c() ? { v1c: true, passLast: $('passLast').checked, traders: $('traders').checked, passMult: +$('passMult').value, actionsPerTurn: $('actions3').checked ? 3 : 0 } : isV1b() ? { v1b: true } : {}, hiddenInfo: true });
+    const g = new G({ players, seed, snapshots: true, rules: isV1c() ? { v1c: true, leaders: $('leaders').checked, hedgeAny: $('hedgeAny').checked, lossDraw: $('lossDraw').checked, passLast: $('passLast').checked, traders: $('traders').checked, passMult: +$('passMult').value, actionsPerTurn: $('actions3').checked ? 3 : 0 } : isV1b() ? { v1b: true } : {}, hiddenInfo: true });
     S = { g, human, coach, prompt: { kind: 'wait' }, resolve: null, mainResolve: null, busy: false, seen: new Set(), reveals: [], overlayDone: null };
     S.me = g.players.find((p) => p.policy === human); S.bot = g.players.find((p) => p.policy !== human);
     S.askTurns = []; if (askCtl) askCtl.abort(); ['askQShown', 'askOut', 'askNote'].forEach((id) => { $(id).hidden = true; $(id).textContent = ''; });
@@ -163,12 +204,12 @@
     const el = document.createElement('div'); el.className = 'card';
     if (back) { el.classList.add('back'); return el; }
     el.dataset.id = c.id; if (c.suit) el.dataset.suit = c.suit; if (c.reversed) el.classList.add('rev');
-    if (c.type === 'major') { el.classList.add('major'); el.innerHTML = `<div class="hd"><span>${ROMAN[c.n]}</span><span style="font-size:9px;color:#b9b0d8">${esc(c.kind)}</span></div><div class="mid"><div><div class="nm">${esc(c.name)}</div><div style="font-size:9px;color:#b9b0d8;margin-top:2px">${esc(c.tarot)}</div></div></div><div class="ft" style="color:#b9b0d8;white-space:normal;font-family:var(--font-body)">${esc(ctext(c)).slice(0, 70)}${ctext(c).length > 70 ? '…' : ''}</div>`; return el; }
+    if (c.type === 'major') { el.classList.add('major'); el.innerHTML = `<div class="hd"><span>${ROMAN[c.n]}</span><span style="font-size:0.75rem;color:#b9b0d8">${esc(c.kind)}</span></div><div class="mid"><div><div class="nm">${esc(c.name)}</div><div style="font-size:0.75rem;color:#b9b0d8;margin-top:2px">${esc(c.tarot)}</div></div></div><div class="ft" style="color:#b9b0d8;white-space:normal;font-family:var(--font-body)">${esc(ctext(c)).slice(0, 70)}${ctext(c).length > 70 ? '…' : ''}</div>`; return el; }
     const cost = S && S.me ? S.g.costOf(S.me, c) : c.cost; const liq = S && S.me ? S.g.liquidity(S.me) : 99;
-    if (c.type === 'trader') { el.classList.add('trader'); const mine = S && S.me && S.me.hand.includes(c); const held = mine && !!S.me.traderHold[c.key]; el.innerHTML = `<div class="hd"><span style="font-size:9px;letter-spacing:.08em">${c.kind === 'turn' ? 'MOVE' : 'REACTION'}</span><span class="cost ${c.kind === 'turn' && cost > liq ? 'no' : ''}">${cost}</span></div><div class="mid"><div><div class="nm">${esc(c.name)}</div><div class="txt">${esc(c.text)}</div></div></div><div class="ft"><span>TRADER</span><span>${c.kind === 'reaction' && mine ? (held ? '<span class="held">HELD</span>' : '<span class="armed">ARMED</span>') : ''}</span></div>`; return el; }
+    if (c.type === 'trader') { el.classList.add('trader'); const mine = S && S.me && S.me.hand.includes(c); const held = mine && !!S.me.traderHold[c.key]; el.innerHTML = `<div class="hd"><span style="font-size:0.75rem;letter-spacing:.08em">${c.kind === 'turn' ? 'MOVE' : 'REACTION'}</span><span class="cost ${c.kind === 'turn' && cost > liq ? 'no' : ''}">${cost}</span></div><div class="mid"><div><div class="nm">${esc(c.name)}</div><div class="txt">${esc(c.text)}</div></div></div><div class="ft"><span>TRADER</span><span>${c.kind === 'reaction' && mine ? (held ? '<span class="held">HELD</span>' : '<span class="armed">ARMED</span>') : ''}</span></div>`; return el; }
     if (c.type === 'pip') {
       const pips = Array.from({ length: Math.min(c.rank, 10) }, () => '<span class="pip"></span>').join('');
-      el.innerHTML = `<div class="hd"><span>${c.rank === 1 ? 'A' : c.rank}</span><span class="suit"></span><span class="cost ${cost > liq && !inst ? 'no' : ''}">${cost}</span></div><div class="mid"><div class="stack2"><div class="pips">${pips}</div><div class="verb">${esc(pipVerb(c))}</div></div></div><div class="ft"><span>${esc(c.suit.toUpperCase())}</span><span>${c.reversed ? 'reversed' : ''}</span></div>`;
+      el.innerHTML = `<div class="hd"><span>${c.rank === 1 ? 'A' : c.rank}</span><span class="suit"></span><span class="cost ${cost > liq && !inst ? 'no' : ''}">${cost}</span></div><div class="mid"><div class="stack2"><div class="pips">${pips}</div><div class="verb">${esc(pipVerb(c))}</div></div></div><div class="ft"><span>${esc(c.suit.toUpperCase())}</span><span>${S && S.g.rules.hedgeAny ? `Hedge ${S.g.hedgeValue(c)}` : c.reversed ? 'reversed' : ''}</span></div>`;
     } else {
       const y = inst && owner ? S.g.yieldOf(owner, inst) : c.yield;
       el.innerHTML = `<div class="hd"><span>${esc(c.rank[0])}</span><span class="suit"></span><span class="cost ${cost > liq && !inst ? 'no' : ''}">${cost}</span></div><div class="mid"><div class="nm">${esc(c.name)}</div></div><div class="ft"><span>earns ${y}</span><span>resists ${c.res}</span></div>`;
@@ -178,6 +219,14 @@
   }
   function pipVerb(c) { // what the card does, in a verb, for the card face
     const r = c.rank, h = Math.ceil(r / 2);
+    if (S && S.g.rules.v1c) {
+      const g = S.g, p = S.me, bonus = g.modSum(p, c.suit + 'Bonus');
+      if (c.suit === 'coins') return `EARN +${r + bonus}`;
+      const mult = g.modProduct(p, c.suit + 'Mult');
+      if (c.suit === 'candles') return `BOOST a worker +${r * mult + bonus}`;
+      if (c.suit === 'chains') return `ATTACK ${r * mult + bonus} · or HEDGE`;
+      return `SHARE: you +${r * mult + bonus}, bot +${h * mult}`;
+    }
     if (c.suit === 'coins') return c.reversed ? `BANK ${h}` : `EARN +${r}`;
     if (c.suit === 'candles') return c.reversed ? `BOOST +${h} & shield` : `BOOST a worker +${r}`;
     if (c.suit === 'chains') return c.reversed ? `COLLATERAL ${r} · free HEDGE` : `ATTACK ${r} · or HEDGE`;
@@ -205,16 +254,16 @@
     const kindText = c.kind === 'event' ? 'EVENT · happens now, then is discarded (it stays visible as the Last Event beside the Market)' : c.kind === 'market' ? 'MARKET · stays in effect until the next Market' : `INVOKE ${c.cost} · waits in Providence for whoever pays`;
     const did = lines.slice(1).map((e) => { const s = e.replace(/^\[[^\]]*\] /, ''); const cls = /INCOMPLETE|loses|LIQUIDATED|emptied|Drawdown/.test(s) ? 'bad' : /banks|gains|\+\d/.test(s) ? 'good' : ''; return `<div class="${cls}">${esc(s)}</div>`; }).join('');
     let done; S.overlayDone = new Promise((r) => { done = r; });
-    host.innerHTML = `<div class="overlay"><div class="box"><div class="ph">${head}</div><div class="note" style="margin-top:-4px">${esc(why)}</div><div class="reveal"><div></div><div><div class="kind ${c.kind}">${kindText}</div><div class="nm" style="font-family:var(--font-display);font-size:18px;color:var(--gold)">${esc(c.name)}</div><div class="note">${esc(c.tarot)}</div><div class="txt">${esc(ctext(c))}</div>${did ? `<div class="did">${did}</div>` : ''}</div></div><div><button class="primary" id="revealOk">Continue</button></div></div></div>`;
+    host.innerHTML = `<div class="overlay"><div class="box"><div class="ph">${head}</div><div class="note" style="margin-top:-4px">${esc(why)}</div><div class="reveal"><div></div><div><div class="kind ${c.kind}">${kindText}</div><div class="nm" style="font-family:var(--font-display);font-size:1.125rem;color:var(--gold)">${esc(c.name)}</div><div class="note">${esc(c.tarot)}</div><div class="txt">${esc(ctext(c))}</div>${did ? `<div class="did">${did}</div>` : ''}</div></div><div><button class="primary" id="revealOk">Continue</button></div></div></div>`;
     host.querySelector('.reveal > div').appendChild(cardEl(c));
-    const close = () => { host.innerHTML = ''; const r = S.overlayDone; S.overlayDone = null; done(); if (S.reveals.length) render(); };
+    const close = () => { host.innerHTML = ''; const r = S.overlayDone; S.overlayDone = null; done(); render(); };
     host.querySelector('#revealOk').addEventListener('click', close); host.querySelector('.overlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) close(); });
   }
   // ───────── review: step back through the turns ─────────
   function openReview(idx) {
     if (!S) return; const g = S.g, snaps = g.snapshots; if (!snaps.length) return; idx = Math.max(0, Math.min(snaps.length - 1, idx)); const sn = snaps[idx];
     const title = sn.label === 'setup' ? 'SETUP' : sn.label === 'end' ? 'THE END' : `TURN ${idx} · ${sn.active === S.me.name ? 'YOU' : 'THE BOT'} · round ${sn.round}`;
-    const col = (p) => { const mine = p.name === S.me.name; return `<div class="col"><div class="who">${mine ? 'YOU' : 'BOT'}</div>Bank <b>${p.bank}</b> · Portfolio <b>${p.portfolio}</b>${p.favor != null && V() ? ` · Favor <b>${p.favor}</b>` : ''} · Liquidity ${p.reserve - p.locked}/${p.reserve}${p.pass != null ? ` · <b>pass in the air: ${p.pass}</b>` : ''}<br>${mine ? `Hand: ${p.hand.map(esc).join(', ') || 'empty'}` : `Hand: ${p.hand.length} cards`}<div>${p.floor.length ? p.floor.map((i) => `<span class="chip ${i.working ? 'working' : ''}">${esc(i.name)} · ${i.working ? 'Trading' : 'idle'} · earns ${i.yield}${i.drawdown ? ` · ${i.drawdown}/${i.res} dd` : ''}</span>`).join('') : '<span class="note">no Personalities</span>'}</div></div>`; };
+    const col = (p) => { const mine = p.name === S.me.name; return `<div class="col"><div class="who">${mine ? 'YOU' : 'BOT'}</div>${p.leader ? `<div class="note">Leader: ${esc(p.leader)}</div>` : ''}Bank <b>${p.bank}</b> · Portfolio <b>${p.portfolio}</b>${p.favor != null && V() ? ` · Favor <b>${p.favor}</b>` : ''} · Liquidity ${p.reserve - p.locked}/${p.reserve}${p.pass != null ? ` · <b>pass in the air: ${p.pass}</b>` : ''}<br>${mine ? `Hand: ${p.hand.map(esc).join(', ') || 'empty'}` : `Hand: ${p.hand.length} cards`}<div>${p.floor.length ? p.floor.map((i) => `<span class="chip ${i.working ? 'working' : ''}">${esc(i.name)} · ${i.working ? 'Trading' : 'idle'} · earns ${i.yield}${i.drawdown ? ` · ${i.drawdown}/${i.res} dd` : ''}</span>`).join('') : '<span class="note">no Personalities</span>'}</div></div>`; };
     const lines = (sn.events || []).map((e) => { const t = esc(e.replace(/^\[[^\]]*\] /, '')); const cls = /WINS|COMPLETE:|reveals|HAIL MARY PASS/.test(e) ? 'win' : /loses|LIQUIDATED|INTERCEPTED|INCOMPLETE|Drawdown|Front-run/.test(e) ? 'bad' : /banks|\+\d/.test(e) ? 'good' : ''; return `<div class="${cls}">${t}</div>`; }).join('');
     const host = $('reviewHost');
     host.innerHTML = `<div class="overlay"><div class="box review"><div class="ph">REVIEW · ${title}</div><div class="note">The table as it stood at the end of this turn${sn.market ? ` · Market: ${esc(sn.market)}` : ''}${sn.providence && sn.providence.length ? ` · Providence: ${sn.providence.map(esc).join(', ')}` : ''}${sn.projected ? ` · next turn banks to ${sn.projected.map((n, i) => `${g.players[i].name === S.me.name ? 'you' : 'bot'} ${n}`).join(', ')}` : ''}</div><div class="cols">${g.players.map((q, i) => col(sn.players[i])).join('')}</div><div class="zl">What happened this turn</div><div class="lines">${lines || '<span class="note">nothing logged</span>'}</div><div class="nav"><button id="rvPrev" ${idx === 0 ? 'disabled' : ''}>‹ Earlier</button><span class="note">${idx + 1} of ${snaps.length}</span><button id="rvNext" ${idx === snaps.length - 1 ? 'disabled' : ''}>Later ›</button><button class="primary" id="rvClose" style="margin-left:auto">Back to the table</button></div></div></div>`;
@@ -231,7 +280,7 @@
     return { cls: 'flat', text: `✝ ${who} HAIL MARY was still in the air at the end: ${n.stake} returns to the Portfolio, undoubled.` };
   }
   function phaseStrip(kind) {
-    const steps = [['START', 'Profit arrives (Dividend, plus the bonus for exposed Profit). Bank some or all of your Portfolio, or throw the Hail Mary.'], ['DRAW', 'Tap the deck to draw one card.'], ['MAIN', V() ? `Reserve one card for Liquidity (free)${S.g.rules.actionsPerTurn ? `, then up to ${S.g.rules.actionsPerTurn} actions` : ''}: partner with or Trade with Personalities, Copy trade one of the bot's, play pips. Then End turn.` : 'Reserve one card for Liquidity, hire Personalities, Work them, play pips. Then End turn.'], ['BOT', 'The bot takes its turn. If it attacks you, you may Hedge with a Chain.']];
+    const steps = [['START', 'Profit arrives (Dividend, plus the bonus for exposed Profit). Bank some or all of your Portfolio, or throw the Hail Mary.'], ['DRAW', 'Tap the deck to draw one card.'], ['MAIN', V() ? `Reserve one card for Liquidity (free)${S.g.rules.actionsPerTurn ? `, then up to ${S.g.rules.actionsPerTurn} actions` : ''}: partner with or Trade with Personalities, Copy trade one of the bot's, play pips. Then End turn.` : 'Reserve one card for Liquidity, hire Personalities, Work them, play pips. Then End turn.'], ['BOT', `The bot takes its turn. If it attacks you, you may Hedge with ${S.g.rules.hedgeAny ? 'any pip' : 'a Chain'}.`]];
     const cur = kind === 'set' ? 0 : kind === 'draw' ? 1 : kind === 'main' ? 2 : 3;
     return `<div class="phases">${steps.map((st, i) => `<span class="${i === cur ? 'on' : ''}">${st[0]}</span>`).join('<i>›</i>')}<span class="ptxt">${esc(steps[cur][1])}</span></div>`;
   }
@@ -241,14 +290,25 @@
   function render() {
     if (!S) return; const g = S.g, me = S.me, bot = S.bot; const main = S.prompt.kind === 'main';
     showReveal();
+    $('start').disabled = !!(S.busy || S.overlayDone || S.prompt.kind === 'wait');
     acts = main ? g.actions(me) : [];
     const hint = $('coach').checked && ['set', 'draw', 'main', 'hedge', 'foretell', 'react'].includes(S.prompt.kind) ? advice() : null;
     for (const q of [me, bot]) if (q.lastTrader && q.lastTrader.seq > (S.seenTrader || 0)) { S.seenTrader = q.lastTrader.seq; toast(`▲ ${q === me ? 'YOU PLAY' : 'THE BOT PLAYS'} ${q.lastTrader.name.toUpperCase()}${q.lastTrader.why ? ': ' + q.lastTrader.why : ''}`); }
     for (const q of [me, bot]) if (q.lastPass && q.lastPass.seq > (S.seenPass || 0)) { S.seenPass = q.lastPass.seq; const n = passNewsText(q); toast(n.text); if (q === me) S.passNews = n; }
+    // Show the active game's rules, independently of next-deal settings.
+    for (const [id, player] of [['meLeader', me], ['oppLeader', bot]]) {
+      const host = $(id), leader = player.leader;
+      host.hidden = false;
+      host.innerHTML = leader ? `<span class="leader-suit">${esc(leader.suit)} Leader</span><div class="leader-seal" aria-hidden="true">${({coins:"◈",candles:"✧",chains:"⛓",cups:"♜"})[leader.suit]}</div><strong>${esc(leader.name)}</strong><span>${esc(leader.text)}</span>` : '<span class="leader-suit">Querent</span><strong>Your place at the table</strong><span>Leaders are off for this game.</span>';
+    }
+    for (const [prefix, p] of [['me', me], ['opp', bot]]) {
+      const available = g.liquidity(p);
+      $(prefix + 'ReserveCount').textContent = `${available} ready / ${p.reserve.length} total`;
+    }
     // querents
     $('oppBank').textContent = bot.bank; $('oppPort').textContent = bot.portfolio; $('oppHand').textContent = bot.hand.length;
     $('oppPass').innerHTML = bot.pass ? `<div class="pass-badge" id="oppPassBadge">PASS IN THE AIR: ${bot.inAir}</div>` : '';
-    $('oppReserve').innerHTML = bot.reserve.map((r) => `<span class="chip ${r.locked ? 'locked' : ''}"></span>`).join('');
+    $('oppReserve').innerHTML = bot.reserve.map((r) => `<span class="chip ${r.locked ? 'locked' : ''}" title="${r.locked ? 'Spent Liquidity' : 'Ready Liquidity'}">${r.locked ? '−' : '1'}</span>`).join('');
     $('meBank').textContent = me.bank; $('mePort').textContent = me.portfolio; $('meLiq').textContent = `${g.liquidity(me)}/${me.reserve.length}`;
     $('mePass').innerHTML = me.pass ? `<div class="pass-badge">HAIL MARY: ${me.inAir} · doubles if untouched</div><div class="hm">Lands next turn${g.rules.passLast ? ' · nobody wins until it lands' : ''}. Chains, the Regulator, the Crash or the Audit can stop it.</div>`
       : me.hailMaryUsed ? '<div class="hm">Hail Mary: used</div>'
@@ -256,29 +316,42 @@
       : g.rules.passLast && !g.opps(me).some((o) => g.wouldWinNext(o)) ? `<div class="hm">Hail Mary: available when the bot can win next turn</div>`
       : me.portfolio >= (g.rules.passLast ? 1 : g.rules.passMin) ? `<div class="hm ready">HAIL MARY READY at the start of your next turn: ${g.rules.passLast ? `the bot can win next turn. Throw all ${me.portfolio}; nobody wins while it is in the air` : `throw ${g.rules.passMax ? Math.min(me.portfolio, g.rules.passMax) : me.portfolio} to double it`}</div>`
       : `<div class="hm">Hail Mary: ${g.rules.passLast ? 'the bot could win next turn, but you have nothing exposed to throw' : `needs ${g.rules.passMin} in Portfolio, you have ${me.portfolio}`}</div>`;
-    $('meReserve').innerHTML = me.reserve.map((r) => `<span class="chip ${r.locked ? 'locked' : ''}"></span>`).join('');
+    $('meReserve').innerHTML = me.reserve.map((r) => `<span class="chip ${r.locked ? 'locked' : ''}" title="${r.locked ? 'Spent Liquidity' : 'Ready Liquidity'}">${r.locked ? '−' : '1'}</span>`).join('');
     $('meFavorRow').hidden = $('oppFavorRow').hidden = !V(); $('meFavor').textContent = me.favor; $('oppFavor').textContent = bot.favor;
     const pb = g.projectedBank(bot), pm = g.projectedBank(me); $('oppNext').textContent = pb; $('meNext').textContent = pm; const danger = !g.over && pb >= g.rules.winBank;
     $('oppDanger').innerHTML = danger ? `<div class="pass-badge" style="background:var(--bad);color:#fff">CAN WIN AT ITS NEXT TURN${g.rules.passLast ? (g.canPass(me) ? ' · your last play' : me.hailMaryUsed || me.pass ? '' : ' · nothing exposed to throw') : ''}</div>` : '';
     if (danger && S.dangerShown !== g.turnCounter) { S.dangerShown = g.turnCounter; if (g.active === me) toast('THE BOT CAN WIN AT ITS NEXT TURN'); }
-    $('meFloorLabel').textContent = V() ? `Your network · ${me.floor.length}/${g.rules.networkCap} partners; tap an idle one to Trade for its earnings` : 'Your floor · Personalities live here; tap an idle one to Work it for its earnings'; $('oppFloorLabel').textContent = V() ? "Bot's network · tap a Trading Personality to Copy trade it for 1 Liquidity" : "Bot's floor";
+    $('meFloorLabel').textContent = V() ? `Your Network · ${me.floor.length}/${g.rules.networkCap} partners` : 'Your floor · Personalities live here; tap an idle one to Work it for its earnings'; $('oppFloorLabel').textContent = V() ? `Bot Network · ${bot.floor.length}/${g.rules.networkCap} partners` : "Bot's floor";
     document.querySelector('#oppQ .who').classList.toggle('active', g.active === bot && !g.over); document.querySelector('#meQ .who').classList.toggle('active', g.active === me && !g.over);
-    $('endTurn').disabled = !main;
+    $('endTurn').disabled = !main || S.busy;
     // center
     $('majorBox').hidden = !hasMajors();
-    if (hasMajors()) { $('majorLabel').textContent = `MAJOR DECK · ${g.majors.length} left · nobody draws from it: the Omen on top turns itself over at the start of each round`; const ms = $('majorStack'); ms.innerHTML = ''; if (g.omen) { ms.appendChild(cardEl(null, { back: true })); const n = document.createElement('span'); n.className = 'count'; n.textContent = 'Omen'; ms.appendChild(n); } }
+    if (hasMajors()) { $('majorLabel').textContent = `Major deck · ${g.majors.length} left`; const ms = $('majorStack'); ms.innerHTML = ''; if (g.omen) { ms.appendChild(cardEl(null, { back: true })); const n = document.createElement('span'); n.className = 'count'; n.textContent = 'Omen'; ms.appendChild(n); } }
     const drawPile = isDuel() ? me.deck : g.deck; const drawing = S.prompt.kind === 'draw';
-    $('deckLabel').textContent = drawing ? 'TAP THE DECK TO DRAW' : isDuel() ? `YOUR DECK · ${drawPile.length} left` : hasMajors() ? `MINOR DECK · ${drawPile.length} left · you and the bot draw from here (${g.discard.filter((c) => c.type !== 'major').length} discarded)` : `R-CANA · ${drawPile.length} left (Majors shuffled in)`;
+    $('deckLabel').textContent = drawing ? 'TAP THE DECK TO DRAW' : isDuel() ? `YOUR DECK · ${drawPile.length} left` : hasMajors() ? `Shared Minor deck · ${drawPile.length} left` : `R-CANA · ${drawPile.length} left (Majors shuffled in)`;
     const ds = $('deckStack'); ds.innerHTML = ''; ds.classList.toggle('drawable', drawing); ds.onclick = drawing ? () => { flyCard($('deckStack'), $('meHand')); resolveP(true); } : null;
     if (drawPile.length) { ds.appendChild(cardEl(null, { back: true })); const n = document.createElement('span'); n.className = 'count'; n.textContent = drawPile.length; ds.appendChild(n); }
-    $('lastEvent').innerHTML = ''; if (g.lastEvent) { const el = cardEl(g.lastEvent.card); el.classList.add('dim'); el.title = `${g.lastEvent.card.name} resolved in round ${g.lastEvent.round}; Events happen once and are discarded`; $('lastEvent').appendChild(el); $('lastEventLabel').textContent = `Last Event · round ${g.lastEvent.round} · already happened`; } else { $('lastEvent').innerHTML = '<div class="note" style="color:var(--muted);font-size:11px;width:var(--cw)">none yet</div>'; $('lastEventLabel').textContent = 'Last Event · already happened'; }
-    $('market').innerHTML = ''; if (g.market) $('market').appendChild(cardEl(g.market)); else $('market').innerHTML = '<div class="note" style="color:var(--muted);font-size:11px;width:var(--cw)">no Market in effect</div>';
+    $('lastEvent').innerHTML = ''; if (g.lastEvent) { const el = cardEl(g.lastEvent.card); el.classList.add('dim'); el.title = `${g.lastEvent.card.name} resolved in round ${g.lastEvent.round}; Events happen once and are discarded`; $('lastEvent').appendChild(el); $('lastEventLabel').textContent = `Resolved Event · round ${g.lastEvent.round}`; } else { $('lastEvent').innerHTML = '<div class="note" style="color:var(--muted);font-size:0.75rem;width:var(--cw)">none yet</div>'; $('lastEventLabel').textContent = 'Resolved Event'; }
+    $('market').innerHTML = ''; if (g.market) $('market').appendChild(cardEl(g.market)); else $('market').innerHTML = '<div class="note" style="color:var(--muted);font-size:0.75rem;width:var(--cw)">no Market in effect</div>';
     const pv = $('providence'); pv.innerHTML = ''; for (const m of g.providence) { const el = cardEl(m); const a = acts.find((x) => x.t === 'invoke' && x.major === m); if (a) { el.classList.add('playable'); el.title = `Invoke for ${a.cost}`; el.addEventListener('click', () => doAct(a)); } pv.appendChild(el); }
     $('log').innerHTML = logHtml([...g.snapshots.flatMap((x) => x.events), ...g.events]); $('log').scrollTop = $('log').scrollHeight;
     // floors
     const of = $('oppFloor'); of.querySelectorAll('.card').forEach((x) => x.remove()); for (const i of bot.floor) { const el = cardEl(i.card, { inst: i, owner: bot }); el.dataset.uid = i.uid; const cp = acts.find((a) => a.t === 'copy' && a.inst === i); if (cp) { el.classList.add('playable'); el.title = `Copy trade for ${cp.cost}: you take ${g.yieldOf(bot, i)}`; el.addEventListener('click', () => doAct(cp)); } if (hint && hint.act && hint.act.t === 'copy' && hint.act.inst === i) el.classList.add('hint'); of.appendChild(el); }
     const mf = $('meFloor'); mf.querySelectorAll('.card').forEach((x) => x.remove());
     for (const i of me.floor) { const el = cardEl(i.card, { inst: i, owner: me }); el.dataset.uid = i.uid; const w = acts.filter((a) => a.t === 'work' && a.inst === i); if (w.length) { el.classList.add('playable'); el.addEventListener('click', (ev) => { if (dragging) return; if (w.length === 1) doAct(w[0]); else popMenu(ev, i.card, w.map((a) => [a.ability ? `${V() ? 'Trade' : 'Work'}: ability` : `${V() ? 'Trade' : 'Work'} for ${g.yieldOf(me, i)}`, () => doAct(a)])); }); } if (hint && hint.act && hint.act.inst === i) el.classList.add('hint'); mf.appendChild(el); }
+    for (const [floor, p] of [[mf, me], [of, bot]]) {
+      floor.querySelectorAll('.network-slot').forEach((el) => el.remove());
+      const cap = g.rules.v1b ? g.rules.networkCap : 0;
+      for (let i = p.floor.length; i < cap; i++) {
+        const slot = document.createElement('div'); slot.className = 'network-slot';
+        slot.innerHTML = '<span>Partner</span><small>Empty Network slot</small>'; floor.appendChild(slot);
+      }
+    }
+    const discarded = g.discard.filter((c) => c.type !== 'major');
+    $('discardLabel').textContent = `Minor discard · ${discarded.length}`;
+    $('discardPile').innerHTML = '';
+    if (discarded.length) { const card = cardEl(discarded[discarded.length - 1]); card.classList.add('resolved-card'); $('discardPile').appendChild(card); }
+    else $('discardPile').textContent = 'No spent Minors';
     // hand
     const hz = $('meHand'); hz.querySelectorAll('.card').forEach((x) => x.remove());
     me.hand.forEach((c, ix) => { const el = cardEl(c); el.dataset.hix = ix; const mine = acts.filter((a) => a.card === c); if (main) el.classList.add(mine.length ? 'playable' : 'dim'); if (S.prompt.kind === 'hedge' && S.prompt.opts.includes(c)) { el.classList.add('target'); el.addEventListener('click', () => resolveP(c)); } if (hint && hint.act && hint.act.card === c) el.classList.add('hint'); if (!S.seen.has(c)) { el.classList.add('dealt'); S.seen.add(c); } attachDrag(el, c); hz.appendChild(el); });
@@ -289,12 +362,12 @@
     if (pr.kind === 'wait') html = `<div class="prompt">${strip}<div class="ph">${g.over ? 'GAME OVER' : 'THE BOT IS PLAYING'}</div></div>`;
     else if (pr.kind === 'set') html = `<div class="prompt">${strip}<div class="ph">START OF YOUR TURN · ${me.portfolio} in your Portfolio</div><button class="primary" id="bankAll">Bank all ${me.portfolio}${me.bank + me.portfolio >= g.rules.winBank ? ' and WIN' : ''}</button><label class="note" style="display:flex;gap:6px;align-items:center">Bank <input type="number" id="bankN" min="0" max="${me.portfolio}" value="0" style="width:70px"> <button id="bankSome">keep the rest exposed</button></label>${pr.canPass ? `<button class="danger" id="throwPass" title="Lost to any Chain aimed at it that you cannot Hedge, or to THE REGULATOR, THE CRASH or THE AUDIT">Throw a HAIL MARY PASS with ${g.rules.passMax && !g.rules.passLast ? Math.min(me.portfolio, g.rules.passMax) : me.portfolio}${g.rules.passMax && !g.rules.passLast && me.portfolio > g.rules.passMax ? ` (the cap; the other ${me.portfolio - g.rules.passMax} stays exposed)` : ''}</button>` : ''}${hintTxt}</div>`;
     else if (pr.kind === 'draw') html = `<div class="prompt">${strip}<div class="ph">DRAW · tap the deck in the middle of the table</div><button class="primary" id="drawBtn">Draw</button>${hintTxt}</div>`;
-    else if (pr.kind === 'main') html = `<div class="prompt">${strip}<div class="ph">YOUR MAIN PHASE · Liquidity ${g.liquidity(me)} to spend${g.rules.actionsPerTurn ? ` · ${g.actionsLeft(me)} of ${g.rules.actionsPerTurn} actions left` : ''}${me.reservedThisTurn ? '' : ' · you may still Reserve one card (free)'}</div>${fa ? `<button id="foretell">${isDuel() ? 'Foretell the Omen' : 'Foretell the next card'}${fa.favor ? ` (${fa.favor} Favor)` : V() ? ' (free: Virgil)' : ''}</button>` : ''}<span class="note" style="color:var(--muted)">Drag a glowing card onto a glowing zone. Tap any card to read it.</span>${hintTxt}</div>`;
-    else if (pr.kind === 'hedge') { const t = pr.threat; const tgt = t.target && t.target.isPass ? `your Hail Mary Pass (${me.inAir} in the air)` : t.target && t.target.card ? t.target.card.name : 'your Portfolio'; html = `<div class="prompt danger"><div class="ph">INCOMING · ${esc(t.attacker ? t.attacker.name : 'The R-cana')} plays ${esc(t.card.name)} at ${esc(tgt)} for ${t.amount}</div><span class="note">Tap a glowing Chain in your hand to Hedge${g.rules.hedgeFree ? ' (free: the card is spent, no Liquidity)' : ''}, or</span><button id="takeIt" class="primary">Take it</button>${hintTxt}</div>`; }
+    else if (pr.kind === 'main') html = `<div class="prompt">${strip}<div class="ph">YOUR MAIN PHASE · Liquidity ${g.liquidity(me)} to spend${g.rules.actionsPerTurn ? ` · ${g.actionsLeft(me)} of ${g.rules.actionsPerTurn} actions left` : ''}${me.reservedThisTurn ? '' : ' · you may still Reserve one card (free)'}</div>${fa ? `<button id="foretell">${hasMajors() ? 'Foretell the Omen' : 'Foretell the next card'}${fa.favor ? ` (${fa.favor} Favor)` : V() ? ' (free)' : ''}</button>` : ''}<span class="note" style="color:var(--muted)">Drag a glowing card onto a glowing zone. Tap any card to read it.</span>${hintTxt}</div>`;
+    else if (pr.kind === 'hedge') { const t = pr.threat; const tgt = t.target && t.target.isPass ? `your Hail Mary Pass (${me.inAir} in the air)` : t.target && t.target.card ? t.target.card.name : 'your Portfolio'; html = `<div class="prompt danger"><div class="ph">INCOMING · ${esc(t.attacker ? t.attacker.name : 'The R-cana')} plays ${esc(t.card.name)} at ${esc(tgt)} for ${t.amount}</div><span class="note">Tap a glowing ${g.rules.hedgeAny ? 'pip' : 'Chain'} in your hand to Hedge${g.rules.hedgeFree ? ' (free: the card is spent, no Liquidity)' : ''}, or</span><button id="takeIt" class="primary">Take it</button>${hintTxt}</div>`; }
     else if (pr.kind === 'foretell') html = `<div class="prompt"><div class="ph">THE OMEN IS ${esc(pr.card.name)}</div><span class="note">${esc(pr.card.text)}</span><button class="primary" id="bury">Bury it</button><button id="leave">Leave it</button>${hintTxt}</div>`;
     else if (pr.kind === 'react') html = `<div class="prompt danger"><div class="ph">THE OMEN TURNS OVER: ${esc(pr.ev.name)} · you hold ${esc(pr.card.name)}</div><span class="note">${esc(ctext(pr.ev))} Play the Circuit Breaker to bury it unresolved (it spares the bot too), or keep it for a worse one.</span><button class="primary" id="reactPlay">Play ${esc(pr.card.name)}</button><button id="reactKeep">Keep it</button>${hintTxt}</div>`;
     else if (pr.kind === 'choose') html = `<div class="prompt"><div class="ph">${esc(pr.title)}</div><div class="choose" id="chooseBox"></div><button class="primary" id="chooseOk">Done</button><span class="note">Tapped cards go to the bottom; the rest stay on top in order.</span></div>`;
-    else if (pr.kind === 'over') { const r = pr.result; html = `<div class="prompt"><div class="ph">${r.winner === me.name ? 'YOU WIN' : r.winner ? 'THE BOT WINS' : 'DRAW'} · ${esc(r.reason)}</div><span class="note">The R-cana named you a ${esc(g.archetype(me))}. Press Deal for another.</span><button id="reviewEnd">Review the last turns</button><div class="did" style="width:100%;font-family:var(--font-mono);font-size:11px;line-height:1.5;border-top:1px solid var(--line);padding-top:6px">${[...g.snapshots.flatMap((x) => x.events), ...g.events].slice(-6).map((e) => esc(e.replace(/^\[[^\]]*\] /, ''))).join('<br>')}</div></div>`; }
+    else if (pr.kind === 'over') { const r = pr.result; html = `<div class="prompt"><div class="ph">${r.winner === me.name ? 'YOU WIN' : r.winner ? 'THE BOT WINS' : 'DRAW'} · ${esc(r.reason)}</div><span class="note">The R-cana named you a ${esc(g.archetype(me))}. Press Deal for another.</span><button id="reviewEnd">Review the last turns</button><div class="did" style="width:100%;font-family:var(--font-mono);font-size:0.75rem;line-height:1.5;border-top:1px solid var(--line);padding-top:6px">${[...g.snapshots.flatMap((x) => x.events), ...g.events].slice(-6).map((e) => esc(e.replace(/^\[[^\]]*\] /, ''))).join('<br>')}</div></div>`; }
     else if (pr.kind === 'error') html = `<div class="prompt danger"><div class="ph">ENGINE ERROR</div><pre class="note">${esc(String(pr.error && pr.error.stack || pr.error))}</pre></div>`;
     $('prompt').innerHTML = html;
     if (pr.kind === 'set') { $('bankAll').onclick = () => resolveP({ bank: me.portfolio }); $('bankSome').onclick = () => resolveP({ bank: +$('bankN').value || 0 }); if (pr.canPass) $('throwPass').onclick = () => resolveP({ pass: true }); }
@@ -306,7 +379,8 @@
     if (pr.kind === 'hedge') $('takeIt').onclick = () => resolveP(null);
     if (pr.kind === 'foretell') { $('bury').onclick = () => resolveP(true); $('leave').onclick = () => resolveP(false); }
     if (hint) { const d = $('coachDo'); if (d) d.onclick = () => hint.run(); const f = $('coachFinish'); if (f) f.onclick = coachFinish; const tz = hintTarget(hint.act); if (tz) tz.classList.add(tz.classList.contains('card') ? 'hint' : 'hint'); }
-    $('status').textContent = g.over ? 'Game over.' : `Round ${g.round}${g.bellRound != null ? ' · Final Bell' : ''}`;
+    const prototypes = [g.rules.leaders && 'Leaders', g.rules.hedgeAny && 'all-suit Hedges', g.rules.lossDraw && 'loss draws'].filter(Boolean);
+    $('status').textContent = (g.over ? 'Game over' : `Round ${g.round}${g.bellRound != null ? ' · Final Bell' : ''}`) + (prototypes.length ? ' · ' + prototypes.join(' · ') : ' · standard rules');
     $('review').disabled = g.snapshots.length < 2;
     $('ask').hidden = !askFn;
   }
@@ -347,7 +421,7 @@
     }
     if (pr.kind === 'draw') return { text: 'Draw your card.', run: () => resolveP(true) };
     if (pr.kind === 'react') { const yes = c.useReaction(g, me, pr.card, pr.ev); return { text: yes ? `Play it: ${pr.ev.name} costs you about ${c.eventHarm(g, me, pr.ev)} and the bot about ${c.eventHarm(g, S.bot, pr.ev)}.` : `Keep it: ${pr.ev.name} hurts the bot (about ${c.eventHarm(g, S.bot, pr.ev)}) more than you (about ${c.eventHarm(g, me, pr.ev)}).`, run: () => resolveP(yes) }; }
-    if (pr.kind === 'hedge') { const ch = c.wantHedge(g, me, pr.opts, pr.threat); return ch ? { text: `Hedge with ${ch.name}. What you'd lose is worth more than the card.`, act: { card: ch }, run: () => resolveP(ch) } : { text: 'Take it. The hit is small and the Chain in your hand is worth more later.', run: () => resolveP(null) }; }
+    if (pr.kind === 'hedge') { const ch = c.wantHedge(g, me, pr.opts, pr.threat); return ch ? { text: `Hedge with ${ch.name}. What you'd lose is worth more than the card.`, act: { card: ch }, run: () => resolveP(ch) } : { text: 'Take it. The hit is small and the card in your hand is worth more later.', run: () => resolveP(null) }; }
     if (pr.kind === 'foretell') { const b = c.bottomCard(g, me, pr.card); return { text: b ? `Bury it. ${pr.card.name} would hurt you.` : `Leave it. ${pr.card.name} is fine for you, or hurts the bot more.`, run: () => resolveP(b) }; }
     if (pr.kind !== 'main') return null;
     if (me.reservedThisTurn < 1 && (me.hand.length >= 3 || g.liquidity(me) < 2)) { const rc = c.reserveChoice(g, me); if (rc) { const a = { t: 'reserve', card: rc }; return { text: actText(a), act: a, run: () => doAct(a) }; } }
@@ -415,6 +489,9 @@
   function boardText() {
     const g = S.g, me = S.me, bot = S.bot, pr = S.prompt; const L = [];
     L.push(`Format: ${isDuel() ? 'Duel (version 2: private decks with reversed cards, shared Majors, Omen face down)' : V() ? 'Shared reading 1b (one shared deck, no reversed cards, plus Favor and Network: see the 1b rules)' : 'Shared reading (version 1: one shared deck, no reversed cards)'}.`);
+    for (const p of [me, bot]) if (p.leader) L.push(`${p.name}'s Leader: ${p.leader.name}. ${p.leader.text}`);
+    if (g.rules.hedgeAny) L.push('All-suit Hedges enabled: spend one pip, no Liquidity. Chains absorb rank; other suits absorb 1, or 2 at rank 6+.');
+    if (g.rules.lossDraw) L.push(`Loss draws enabled: an actual hostile Chain or Event loss of ${g.rules.lossDrawMin}+ Profit draws one card.`);
     L.push(`Round ${g.round}${g.bellRound != null ? ' (FINAL BELL: the game ends after this round)' : ''}. ${hasMajors() ? `${g.majors.length} Majors left (the next lies face down as the Omen); ${isDuel() ? 'your deck has ' + me.deck.length : 'the Minor deck has ' + g.deck.length} cards.` : `${g.deck.length} cards left in the shared deck.`} ${g.active === me ? 'It is your turn.' : "It is the bot's turn."}`);
     L.push(`YOU: Bank ${me.bank}, Portfolio ${me.portfolio},${V() ? ` Favor ${me.favor},` : ''} Liquidity ${g.liquidity(me)} of ${me.reserve.length} Reserve, ${me.hand.length} cards in hand${me.reservedThisTurn ? ', already Reserved this turn' : ''}. ${me.pass ? `Your Hail Mary Pass is in the air with ${me.inAir}.` : me.hailMaryUsed ? 'Your Hail Mary Pass is used.' : 'Your Hail Mary Pass is still available.'}`);
     L.push(me.floor.length ? 'Your Floor:\n' + me.floor.map((i) => '  - ' + cardBrief(i.card, i, me)).join('\n') : 'Your Floor: empty.');

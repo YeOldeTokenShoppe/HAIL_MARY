@@ -4,7 +4,15 @@ The R-cana is an 80-card game in a tarot configuration: 22 Major R-cana, 56 Mino
 Chains, Cups: Ace–10 pips plus Page, Knight, Queen, King), and two Querents. Theme is general markets and money.
 Plain JavaScript modules, no dependencies, Node 18+ and the browser.
 
-Three rule sets share one engine:
+## Start here
+
+- [Current game overview](OVERVIEW.md): the playable 1c experience, core decisions, and new mechanics.
+- [Complete current rules](RULES-v1c.md): timing, options, and all card effects.
+- [Prototype research](LEADERS.md): historical simulations and clearly separated future proposals.
+
+The initial `/rcana` playtest includes Leaders, all-suit Hedges, loss draws, Trader cards, three actions, and last-play Hail Mary at ×2. These table defaults are broader than the engine's bare `v1c` preset. Earlier version guides below remain historical or separate experiments.
+
+Four rule sets share the tarot engine family:
 
 | Version | What it is | Rulebook | Status |
 |---|---|---|---|
@@ -99,7 +107,7 @@ balanced played-out-round alternative.
 
 `--leaders 1` seats each Trader as a Leader from the cast (`--la eugene --lb connor` to pick; `eugene`, `marisol`, `gr80`, `connor`),
 with a suit affinity and an ability; the batch reports wins per Leader and per matchup. `--hedgeAny 1` gives every pip a Hedge value.
-`--lossDraw 1` draws a card when a hostile loss of 3 or more lands (`--lossDrawMin N`). All three are off at the table. Results and
+`--lossDraw 1` draws a card when a hostile loss of 3 or more lands (`--lossDrawMin N`). All three are available and enabled initially in the table’s Version 1c playtest. Use Table settings to choose each Leader or switch prototypes off, then Deal to apply the settings. Active Leaders and rules stay visible during play. Results and
 the design notes on deck-building, cooperation and caprice are in `LEADERS.md`.
 
 ### Version 2 defaults and flags
@@ -199,3 +207,9 @@ node sim.js --verbose --seed 7
 node sim.js --games 500 --a degen --b analyst --pa banker --pb hodler --cards
 node sim.js --matrix --games 50
 ```
+
+### Playmat layout
+
+The table uses mirrored player areas with a permanent Leader position, Network slots reflecting the active rules, and Reserve tokens showing ready versus spent Liquidity. Shared decks, Market, Providence, Minor discard and the resolved Event occupy the center. Turn decisions and collapsible history sit beside the board on desktop and stack below it on narrow screens. The hand stays along the bottom.
+
+The Table size control offers Auto, Compact, and Large, applies immediately, and remembers the choice locally. It changes presentation only.

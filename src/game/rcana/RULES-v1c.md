@@ -2,11 +2,14 @@
 
 The whole game in one document, for two players: the shared reading of an 88-card R-cana. Nothing here depends on the earlier rulebooks. Where the card table lets you switch a rule off, this document says so.
 
+**Current table defaults · Updated October 15, 2026.** Start with [the game overview](OVERVIEW.md). This rulebook covers the playable 1c table with Leaders, all-suit Hedges, loss draws, Trader cards, three actions, and last-play Hail Mary enabled; pass payout is ×2. Change these in Table settings before Deal. Engine/CLI defaults alone do not enable all these options.
+
 ## What you need
 
 - The R-cana: 22 **Major** cards, 56 **Minor** cards in four suits (Coins, Candles, Chains, Cups: Ace through 10, then Page, Knight, Queen, King), and 8 **Trader** cards. 88 cards.
 - Two Querents, one per Trader. Your Querent holds your Bank and your Favor.
 - Profit counters and Drawdown counters.
+- One Leader per player when Leaders are enabled; Leaders are separate from the 88-card deck.
 
 ## The goal
 
@@ -24,7 +27,7 @@ Be the first Trader to hold **80 Profit in your Bank**. Banked Profit can never 
 
 ## Setup
 
-1. Shuffle the 8 Trader cards into the 56 Minors. Shuffle the 22 Majors separately and turn the top one face down as the Omen.
+1. Choose each player’s Leader (or Random) when enabled. Shuffle the 8 Trader cards into the 56 Minors. Shuffle the 22 Majors separately and turn the top one face down as the Omen.
 2. Each Trader draws eight.
 3. Choose a first Trader. Turn order is fixed for the game. The second Trader opens with **8 Profit** in their Portfolio: going second means meeting every Omen a turn later.
 
@@ -40,22 +43,22 @@ The next Major then lies face down as the new Omen. When the last Major has been
 
 ## The turn
 
-1. **Start of your turn.** In order: your Trading Personalities go idle, your locked Reserve cards unlock, your shields expire. If you threw a Hail Mary last turn, it lands (see The Hail Mary). Your Profit arrives: the **Dividend** of 1, plus the **Dividend bonus** of 1 for every full 5 already in your Portfolio. Then **bank** any amount from Portfolio to Bank, or throw a Hail Mary instead.
+1. **Start of your turn.** In order: your Trading Personalities go idle, your locked Reserve cards unlock, your start-of-turn Leader ability resolves. If you threw a Hail Mary last turn, it lands (see The Hail Mary). Your Profit arrives: the **Dividend** of 1, then the **Dividend bonus** of 1 for every full 5 in your Portfolio after the Dividend arrives (before the bonus itself). Then **bank** any amount from Portfolio to Bank, or throw a Hail Mary instead.
 2. **Draw** one card from the Minor deck. If the Minor deck is empty, shuffle the Minor discards into a new deck.
-3. **Main phase**, any number of actions in any order:
+3. **Main phase**, up to three actions in any order. Reserve and Foretell do not use an action:
    - **Reserve** one card from your hand, once per turn, face down: it is 1 Liquidity every turn from now on.
    - **Partner** with a Personality from your hand by paying its cost, up to two in your Network. It rests the turn it arrives unless it is Fast. With two already, you may still partner by letting one go: pay the new card's full cost; the departing Personality's departure effects apply.
-   - **Trade** with an idle Personality that has been in your Network since the start of your turn: its earnings go to your Portfolio. A Trading Personality is the only thing Chains can hit.
+   - **Trade** with an idle Personality that has been in your Network since the start of your turn: its earnings go to your Portfolio. Only Trading Personalities can be targeted by Chains; exposed Portfolios and airborne passes are also eligible targets. Fast partners may Trade on their arrival turn.
    - **Copy trade**, once per turn: pay 1 Liquidity to take the full earnings of one of the opponent's Trading Personalities. The opponent gains 1 Profit for being followed.
    - **Play a pip** by paying its cost (see The suits).
    - **Play a Trader move** by paying its cost (see Trader cards).
-   - **Foretell**, once per turn, for 1 Favor (free if Virgil is in your Network): look at the Omen. You may put it on the bottom of the Major deck; the next Major becomes the Omen.
+   - **Foretell**, once per turn, for 1 Favor (free if Virgil is in your Network or Eugene is your Leader): look at the Omen. You may put it on the bottom of the Major deck; the next Major becomes the Omen.
    - **Invoke** a Major in Providence by paying its cost. It is spent afterwards.
 4. **End.** The opponent's turn.
 
 ## The suits
 
-Every pip has a rank R from 1 (the Ace) to 10. Its cost in Liquidity is half of R, rounded up; Cups cost one less.
+Every pip has a rank R from 1 (the Ace) to 10. Its cost in Liquidity is half of R, rounded up; Cups cost one less, to a minimum of zero. Markets, Personality abilities, and Leader affinities modify these base effects.
 
 | Suit | On its face | Effect |
 |---|---|---|
@@ -70,11 +73,32 @@ A court is a Personality with a cost, earnings (Yield), Resilience, and one abil
 
 ## Hedging
 
-When a Chain targets your Trading Personality, your Portfolio or your Hail Mary, you may play one Chain from your hand as a **Hedge** before it lands. It costs nothing and the card is spent. It absorbs its rank; whatever is left gets through. Margin Call (a Trader card) cannot be Hedged.
+When a Chain targets your Trading Personality, your Portfolio or your Hail Mary, you may spend **one pip** from your hand as a free Hedge before it lands. Chains absorb their rank. Coins, Candles and Cups absorb **1 at Ace–5, or 2 at 6–10**. The card is spent; any remaining attack gets through. Leader attack bonuses do not increase Hedge value. Personalities and Trader cards cannot be used as Hedges. Margin Call cannot be Hedged.
+
+*Switch “All-suit Hedges” off to allow only Chains as Hedges, still free.*
+
+## Leaders
+
+Leaders are permanent, cost nothing, and take no Network slot. Each gives +1 to its owner's affinity suit's pip effect, added after multipliers. For Cups this increases the owner's gain, not the opponent's; for Chains it increases attack, not defense. These bonuses stack with Personality abilities. A Leader and a Personality of the same character may coexist.
+
+| Leader | Affinity | Ability |
+|---|---|---|
+| Eugene, Pattern Prophet | Candles | Foretell costs no Favor. |
+| Marisol, Investigator | Coins | At the start of your turn, before the pass and Dividend, draw one card if you hold fewer than five. |
+| GR80, Monk | Cups | Whenever the opponent plays Cups, gain 1 Profit into Portfolio and 1 Favor. |
+| Connor, Demon | Chains | Whenever an Event resolves, gain 2 Profit into Portfolio. |
+
+*Choose Leaders or Random in Table settings; switch “Leaders” off to play without them. Deal applies your choices.*
+
+## Draw after a loss
+
+When a hostile Chain or Event actually takes **3 or more Profit from your Portfolio**, draw one card. Check the actual loss after protection: a Hedge that prevents the loss, Our Lady's protection, or Stop-Loss reducing it to 2 prevents this draw. Each qualifying loss can trigger a draw.
+
+This does not reward spending, self-inflicted costs, damage to a Personality, or the loss of an airborne stake by itself. Liquidating a Personality already has its own draw. Switch “Draw after a loss” off to disable this mechanic.
 
 ## Favor
 
-Our Lady notices generosity. Each Cups you play gives you 1 Favor. Favor is spent three ways:
+Our Lady notices generosity. Each Cups you play gives you 1 Favor. GR80’s Leader ability can also earn Favor when the opponent plays Cups. Favor is spent three ways:
 
 - **Foretell** for 1 Favor, as above.
 - **Our Lady's protection**, automatic: when an Event would take 3 or more Profit from your Portfolio, or would bring down your Hail Mary, and you hold at least 2 Favor, you lose 2 Favor instead and the Event does not touch you.
@@ -98,15 +122,15 @@ Once per game, at the start of your turn, instead of banking you may throw your 
 
 *The table lets you switch the last play off; the pass may then be thrown at any start of turn with at least 10 in your Portfolio, with the stake capped at 20. The table also lets you set the pass to ×1.5 instead of doubling.*
 
-## Three actions (prototype option, on by default at the table)
+## Three actions (on by default at the table)
 
 In your main phase you take **up to three actions**, in any order: partner, Trade, Copy trade, play a pip, play a Trader move, Invoke. **Reserving one card and Foretelling are free** and do not count. The table shows how many actions remain; the "3 actions" box switches the limit off.
 
-Simulator flag: `--actions N` (0 for unlimited). Strong against strong over 2,000 games the limit changes little on the surface (8.1 rounds against 7.9, seat balance 49%), because the strong bot rarely wanted more than three paid actions; what it changes is who wins between unequal players: the strong bot's edge over the naive bot rises from 72% to 77%, since choosing which three now matters. With Foretell counted as an action, Foretells fell by two thirds; it is now free of the count and Foretells return to their usual rate (about two a game), with the seat balance at 50% and the strong bot beating the naive bot 75% of the time.
+Simulator flag: `--actions N` (0 for unlimited). **Historical action-limit experiment, before the current three new prototypes:** Strong against strong over 2,000 games the limit changes little on the surface (8.1 rounds against 7.9, seat balance 49%), because the strong bot rarely wanted more than three paid actions; what it changes is who wins between unequal players: the strong bot's edge over the naive bot rises from 72% to 77%, since choosing which three now matters. With Foretell counted as an action, Foretells fell by two thirds; it is now free of the count and Foretells return to their usual rate (about two a game), with the seat balance at 50% and the strong bot beating the naive bot 75% of the time.
 
 ## Ending the game
 
-The first Bank to reach 80 wins at once, subject to the stopped clock above. The game also ends after the round in which THE RECKONING tolls (it is buried instead if more than ten Majors remain), or when the last Major has been revealed; then the larger Bank wins, ties to the larger Portfolio.
+The first Bank to reach 80 wins at once, subject to the stopped clock above. The game also ends after the round in which THE RECKONING tolls (it is buried instead if more than ten Majors remain), or when the last Major has been revealed; then any passes still in the air return to their owners’ Portfolios undoubled. The larger Bank wins, ties to the larger Portfolio; equal Banks and Portfolios produce a draw.
 
 ## The cards
 
@@ -155,7 +179,7 @@ The first Bank to reach 80 wins at once, subject to the stopped clock above. The
 | THE WINDFALL (The Star) | Event | Every Trader draws two Minors and gains 3 Profit into their Portfolio. |
 | THE PANIC (The Moon) | Market | Chains cost 0. |
 | GOLDEN AGE (The Sun) | Market | Cups cost 0 and give double. |
-| THE RECKONING (Judgement) | Event | The Final Bell: the game ends at the end of this round. If more than half the R-cana remains, it is instead buried in the bottom half of the deck. |
+| THE RECKONING (Judgement) | Event | The Final Bell: the game ends at the end of this round. If more than ten Majors remain, it is instead buried in the bottom half of the Major deck. |
 | OUR LADY OF PERPETUAL PROFIT (The World) | Event | The Trader with the most Favor banks their entire Portfolio. |
 
 ### The eight Trader cards
@@ -171,7 +195,9 @@ The first Bank to reach 80 wins at once, subject to the stopped clock above. The
 | Rebalance | move | 1 | Bank up to 5 Profit from your Portfolio right now. |
 | Pump | move | 1 | One of your Trading Personalities Trades again this turn. |
 
-## Tuning notes
+## Historical tuning notes
+
+These recorded runs predate the current Leaders/all-suit Hedges/loss-draw combination. They are retained for design history, not presented as fresh validation of this edition. See [prototype research](LEADERS.md) for the later experiments.
 
 Strong bot against strong bot over 2,000 games per setting, after the second outside review's corrections.
 
@@ -179,7 +205,7 @@ Strong bot against strong bot over 2,000 games per setting, after the second out
 |---|---|---|---|---|---|
 | Last play off, Trader cards off | 50% | 7.2 | about half | 6% | 0 |
 | Trader cards on, last play off | 50% | 7.4 | about a third | 8% | 2.2 |
-| Both on, pass doubles (the table's default) | 51% | 7.8 | about a third | 22% | 2.3 |
+| Both on, pass doubles (default at the time) | 51% | 7.8 | about a third | 22% | 2.3 |
 | Both on, pass ×1.5 | 50% | 7.7 | about a third | 8% | 2.3 |
 
 The strong bot beats the naive bot 59% of the time without Trader cards and 66% with them: the cards reward aiming and timing. Hedges fall when Trader cards are in because Stop-Loss and Bailout do some of the Hedge's work. The multiplier is the open question for human play: at 2x the last play decides one game in five, at 1.5x one in twelve.

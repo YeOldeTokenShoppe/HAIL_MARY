@@ -1,15 +1,18 @@
 # R-cana — Leaders, Hedge values, loss draws (prototype, 2026-10-15)
 
-Three mechanics borrowed from the One Piece card game and tried against Version 1c in the simulator. All three are
-flags in `DEFAULTS`, off by default; the table does not know about them yet. Strong bot against strong bot over
-2,000–4,000 games per setting, table defaults otherwise (`--v1c --passLast 1 --traders 1 --actions 3`).
+## Current status — October 15, 2026
+
+All three mechanics are now playable and initially enabled in the Version 1c table at `/rcana`. Use Table settings to choose Leaders or disable a mechanic, then Deal. The generic engine flags remain off unless requested; the table explicitly enables them.
+
+Start with [the current game overview](OVERVIEW.md) and [complete current rules](RULES-v1c.md). This file preserves **historical prototype research**, not the canonical rulebook. The figures below were recorded during earlier simulator experiments; they have not been rerun for this documentation update. Bot results do not establish human balance or enjoyment.
+
+The baseline comparisons below describe 1c **before** these additions. Private deck construction, resource redesign, cooperation, and caprice below remain proposals, not features of the current table.
 
 ## Why One Piece
 
-The One Piece TCG grew faster than any card game of its generation on four mechanical ideas, each of which maps onto
-something R-cana half-has already:
+Four One Piece design ideas motivated these experiments:
 
-| One Piece | What it does for the game | R-cana today | Prototype |
+| One Piece | What it does for the game | R-cana before these prototypes | Prototype |
 |---|---|---|---|
 | **Leader card**: chosen before play, face up all game, sets the deck's colour, has one ability | Identity, a reason to build a deck, the chase card | The Querent is a scoreboard | `--leaders 1` |
 | **Counter values**: every Character has a number you can throw from hand to defend | Hand is offense and defense at once; the opponent's turn is interactive without "instants" | Only Chains Hedge; three suits are dead on the opponent's turn | `--hedgeAny 1` |
@@ -124,4 +127,4 @@ node tarot-sim.js --verbose --seed 5 --a strong --b strong --v1c --passLast 1 --
 Code: `LEADERS`, `leaderById`, `hedgeValue` in `tarot.js`; `leaders`, `hedgeAny`, `lossDraw`, `lossDrawMin` in
 `DEFAULTS`; `p.leader`, `leaderHook`, `hasForetell`, `hedgeValue` on the engine; `threatHarm`/`hedgeCardCost` in the
 strong bot; `--leaders --la --lb --hedgeAny --lossDraw --lossDrawMin` in the sim, which now reports wins per Leader and
-per matchup. The snapshot carries `leader` per player for the table when it is ready.
+per matchup. The snapshot carries `leader` per player, which the table now displays.
