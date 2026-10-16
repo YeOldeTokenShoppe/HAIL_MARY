@@ -12,6 +12,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { gltfEmissiveAnimation } from '@/lib/gltfEmissiveAnimation.mjs'
 import { ShelfTrack } from '@/lib/shelfTrack.mjs'
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
+import { GEYSER_VERTEX_SHADER, GEYSER_FRAGMENT_SHADER, geyserUniforms } from '@/lib/gusherShader'
 import { createLowRider, LOW_RIDER_MODEL_URL } from '@/lib/palmTreeDriveCar.mjs'
 import { createCandyEmeraldPaint } from '@/lib/palmTreeDrivePaint.mjs'
 import { loadHubCoaster } from '@/lib/hubCoaster.mjs'
@@ -36,6 +37,150 @@ const BLOOM = { strength: 0.3, radius: 0, threshold: 1.8 }
 // Ride speed in world units per second (0.92 was the original 0.017 of a
 // 54-unit lap; the ship ran at about one and a half times that).
 const RIDE_SPEED = 0.92
+// Daytime stations: a gallery entry with `daylight` (true, or an object
+// overriding these) is lit by a sun and a sky instead of the stage lamp
+// alone, and the tunnel's black background and fog lerp toward its sky for
+// the length of the pass. The lights exist from the start at
+// zero (like the spotlights) so switching them on compiles no new shaders.
+// /hub?day=0 disables it for comparison.
+const DAYLIGHT = {
+  sky: '#9fc9ef',        // background and fog colour at full day
+  sun: '#fff1d6',        // DirectionalLight colour
+  sunIntensity: 2.6,
+  skyColor: '#bcd9f5',   // HemisphereLight sky
+  groundColor: '#c9a977', // HemisphereLight ground (the diorama's sand)
+  skyIntensity: 1.0,
+  dawn: 2.0,             // world units after the light strikes for day to come up
+  dawnDelay: 0,          // world units after the strike before the dawn begins (the cart covers ~0.92 per second at full speed)
+  // Sky props around the station (world space, shown with it, fading with
+  // the dawn): a gradient dome, a bloomed sun disc and drifting clouds.
+  domeRadius: 14,
+  zenith: '#5a9be6',     // dome colour overhead
+  horizon: '#d3e7fa',    // dome colour at the horizon
+  sunDisc: [0.5, 0.2, 0.6], // direction from the station: [away from track, up, along track]; the camera looks about level, so keep `up` low
+  sunDistance: 10,
+  sunSize: 1.3,
+  clouds: 7,
+  cloudDrift: 0.35,      // world units of sway
+  // A station's `gloom: { at, over }` (seconds after it lights) drags the
+  // day toward this overcast look over `over` seconds: the sun goes, the
+  // dome and clouds darken and the clouds swell.
+  storm: {
+    sky: '#4f5861',      // background/fog at full gloom
+    dome: '#4b525b',     // tint multiplied over the dome gradient
+    cloud: '#3e434a',    // cloud sprite colour
+    cloudScale: 1.7,     // clouds swell by this factor
+    sun: 0.08,           // sun light left at full gloom (fraction)
+    skyLight: 0.5,       // hemisphere light left (fraction)
+    skyColor: '#6a737d', // hemisphere sky at full gloom
+    groundColor: '#3a3733',
+  },
+}
+const DAY_ENABLED = typeof window === 'undefined'
+  || new URLSearchParams(window.location.search).get('day') !== '0'
+// Debug: /hub?station=OIL%20FIELD starts the ride just before that station's
+// light strikes (its `year`, case-insensitive) instead of the first one.
+const START_STATION = typeof window !== 'undefined'
+  ? (new URLSearchParams(window.location.search).get('station') || '').toUpperCase()
+  : ''
+
+// Canvas textures for the daylight sky props (built once per station).
+// This scene renders through the composer with no OutputPass, so nothing
+// tone-maps or sRGB-encodes the frame (toneMappingExposure has no effect
+// here): colours reach the screen as stored. The textures are therefore
+// tagged NoColorSpace (no sRGB decode) and the sky colours set as linear,
+// so the painted values are what is seen.
+function makeSkyDomeTexture(zenith, horizon) {
+  const canvas = document.createElement('canvas')
+  canvas.width = 2
+  canvas.height = 256
+  const ctx = canvas.getContext('2d')
+  // The horizon sits at the station's height (v = 0.5); the camera looks
+  // about level, so the visible sky is the band just above it. The haze
+  // gives way to the zenith colour within that band, not at the top.
+  const g = ctx.createLinearGradient(0, 0, 0, 256)
+  g.addColorStop(0, zenith)
+  g.addColorStop(0.3, zenith)
+  g.addColorStop(0.5, horizon)
+  g.addColorStop(1, horizon)
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, 2, 256)
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.NoColorSpace
+  return texture
+}
+function makeSunTexture() {
+  // Raw RGBA like the clouds (see makeCloudTexture): a hot core, a short
+  // soft edge, then a long faint corona.
+  const size = 128
+  const data = new Uint8Array(size * size * 4)
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const d = Math.hypot(x + 0.5 - size / 2, y + 0.5 - size / 2) / (size / 2)
+      let alpha
+      if (d < 0.28) alpha = 1
+      else if (d < 0.36) alpha = 1 - (d - 0.28) / 0.08 * 0.45
+      else alpha = Math.max(0, 0.55 * (1 - (d - 0.36) / 0.64))
+      const warm = Math.min(d / 0.36, 1) // white core shading to a warm rim
+      const o = (y * size + x) * 4
+      data[o] = 255
+      data[o + 1] = Math.round(252 - warm * 20)
+      data[o + 2] = Math.round(240 - warm * 70)
+      data[o + 3] = Math.round(alpha * 255)
+    }
+  }
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat)
+  texture.colorSpace = THREE.NoColorSpace
+  texture.magFilter = THREE.LinearFilter
+  texture.minFilter = THREE.LinearMipmapLinearFilter
+  texture.generateMipmaps = true
+  texture.needsUpdate = true
+  return texture
+}
+// A soft cumulus: overlapping white puffs on a flatter base. `seed` varies
+// the shape so a sky of a few shared textures does not repeat visibly.
+// Built as raw RGBA data rather than a canvas: a translucent canvas goes
+// through a premultiplied-alpha round trip on upload that WebKit turns into
+// coloured noise in the low-alpha texels.
+function makeCloudTexture(seed) {
+  let r = seed * 9301 + 49297
+  const rand = () => { r = (r * 9301 + 49297) % 233280; return r / 233280 }
+  const width = 256
+  const height = 128
+  const puffs = []
+  const count = 7 + Math.floor(rand() * 4)
+  for (let i = 0; i < count; i++) {
+    puffs.push({ x: 50 + rand() * 156, y: 44 + rand() * 30, radius: 22 + rand() * 26 })
+  }
+  const data = new Uint8Array(width * height * 4)
+  for (let y = 0; y < height; y++) {
+    // Row 0 is the bottom of the texture (flipY is off for data textures).
+    // The underside fades out over the base band so the cloud sits flat.
+    const base = Math.min(Math.max((y - 10) / 34, 0), 1)
+    for (let x = 0; x < width; x++) {
+      let clear = 1
+      for (const puff of puffs) {
+        const dx = x - puff.x
+        const dy = y - puff.y
+        const d = Math.sqrt(dx * dx + dy * dy) / puff.radius
+        if (d >= 1) continue
+        const falloff = d < 0.55 ? 1 - d * 0.6 : (1 - d) / 0.45 * 0.67
+        clear *= 1 - falloff * 0.95
+      }
+      const alpha = (1 - clear) * base
+      const o = (y * width + x) * 4
+      data[o] = data[o + 1] = data[o + 2] = 255
+      data[o + 3] = Math.round(Math.min(alpha, 1) * 255)
+    }
+  }
+  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat)
+  texture.colorSpace = THREE.NoColorSpace
+  texture.magFilter = THREE.LinearFilter
+  texture.minFilter = THREE.LinearMipmapLinearFilter
+  texture.generateMipmaps = true
+  texture.needsUpdate = true
+  return texture
+}
 // Seconds of dark tunnel before the first station's light strikes. The ride
 // starts this far (at full speed) before that strike point rather than at
 // the top of the loop, so the first stage is always seen switching on.
@@ -94,6 +239,21 @@ function spotWeight(u, station, on = -frac(station.hold + STATION.approach + sta
   // Lamp strike: overshoot on ignition, decaying to the held level.
   const f = STATION.spotFlashLen > 0 ? Math.min((d - on) / frac(STATION.spotFlashLen), 1) : 1
   return rise * (1 + STATION.spotFlash * (1 - f))
+}
+
+// Daylight level for a daylight station: comes up over `dawn` units from
+// the strike point (a sunrise, not a lamp), holds through the pass and
+// fades with the release ramp, so night returns before the next station.
+function daylightWeight(u, station, on) {
+  let d = u - station.u
+  d -= Math.round(d)
+  if (d >= 0) return stationWeight(u, station)
+  const dawn = station.daylight.dawn ?? DAYLIGHT.dawn
+  // The dawn may start later than the strike, but always completes by the station.
+  const start = Math.min(on + frac(station.daylight.dawnDelay ?? DAYLIGHT.dawnDelay), -frac(dawn))
+  if (d < start) return 0
+  const x = dawn > 0 ? Math.min((d - start) / frac(dawn), 1) : 1
+  return x * x * (3 - 2 * x)
 }
 
 // One station's influence at ride position `u` (0..1, wrapping): 1 within
@@ -337,6 +497,129 @@ function attachInterlude(entry, main, clip, { every = 10, fade = 0.25 }) {
   }
 }
 
+const _gusherCam = new THREE.Vector3()
+const _gusherPos = new THREE.Vector3()
+const _gloomColor = new THREE.Color()
+
+// A scripted station (entry `sequence`), timed in seconds after the station
+// lights, advanced like the mixers (a paused ride still plays it out):
+//   idle                 the rig's looping clip from the reveal
+//   tremor: { at, for }  the diorama shivers in place, building over `for` seconds
+//   shake: { at, for }   the camera trembles, building over `for` seconds
+//   erupt: { at, rise, delay }  the gusher column rises over `rise`; `delay`
+//                        later the celebration starts
+//   then: [steps]        each a clip name or { name, times, reverse, for }:
+//                        played `times` through (default once), backwards
+//                        with `reverse`, or for `for` seconds (a timed idle);
+//                        crossfaded in turn, then back to idle
+// Returns a mixer entry for FloatingGallery.mixers: `restart` resets it on
+// each reveal, `tick` runs the timeline, `shake` is read by the frame loop.
+function buildSequence(info, model, animations, root, gusher) {
+  const seq = info.sequence
+  const byName = (name) => animations.find((clip) => clip.name === name)
+  const mixer = new THREE.AnimationMixer(model)
+  mixer.timeScale = info.animationSpeed ?? 1
+  const fade = seq.fade ?? 0.35
+  const idleClip = byName(seq.idle || 'idle')
+  if (!idleClip) console.warn(`Station ${info.year}: idle clip not found: ${seq.idle || 'idle'}`)
+  const idle = idleClip ? mixer.clipAction(idleClip).setLoop(THREE.LoopRepeat, Infinity) : null
+  const queue = []
+  for (const item of seq.then || []) {
+    const { name, times = 1, reverse = false, for: seconds = null } = typeof item === 'string' ? { name: item } : item
+    const clip = byName(name)
+    if (!clip) { console.warn(`Station ${info.year}: sequence clip not found: ${name}`); continue }
+    // One action per clip: a repeated or reversed step reconfigures it.
+    queue.push({ action: mixer.clipAction(clip), clip, times, reverse, seconds })
+  }
+  const shakeAt = seq.shake?.at ?? 4
+  const shakeFor = Math.max(seq.shake?.for ?? 3, 0.01)
+  const tremorAt = seq.tremor?.at ?? Infinity
+  const tremorFor = Math.max(seq.tremor?.for ?? 3, 0.01)
+  const fit = model.parent // the station's scaled group; jogged in place for the tremor
+  const eruptAt = seq.erupt?.at ?? shakeAt + shakeFor
+  const rise = Math.max(seq.erupt?.rise ?? 1.2, 0.01)
+  const celebrateAt = eruptAt + (seq.erupt?.delay ?? 0.5)
+
+  const entry = { mixer, root, delay: 0, delayRemaining: 0, wasVisible: false, restart: null, tick: null, shake: 0 }
+  let time = 0
+  let step = -1
+  let current = null
+  let celebrating = false
+  let stepEndsAt = Infinity // a timed step advances at this sequence time
+  // Start a step: its action restarts with the step's loop count and
+  // direction and fades in over the one playing (the same action, as with
+  // Rallying forward then back, just turns around in place).
+  const play = ({ action, clip, times = 1, reverse = false, seconds = null }) => {
+    if (!action) return
+    const timed = seconds != null
+    action.reset()
+    action.setLoop(timed || times > 1 ? THREE.LoopRepeat : THREE.LoopOnce, timed ? Infinity : times)
+    action.clampWhenFinished = !timed
+    action.timeScale = reverse ? -1 : 1
+    if (reverse) action.time = clip.duration
+    action.play()
+    if (current && current !== action) current.crossFadeTo(action, fade, false)
+    current = action
+    stepEndsAt = timed ? time + seconds : Infinity
+  }
+  const idleStep = { action: idle, clip: idleClip, seconds: Infinity }
+  const advance = () => {
+    step += 1
+    play(step < queue.length ? queue[step] : idleStep)
+  }
+  mixer.addEventListener('finished', (e) => {
+    if (e.action === current && stepEndsAt === Infinity && step < queue.length) advance()
+  })
+  entry.restart = () => {
+    time = 0
+    step = -1
+    celebrating = false
+    mixer.stopAllAction()
+    current = null
+    play(idleStep)
+    entry.shake = 0
+    fit.position.set(0, 0, 0)
+    if (gusher) {
+      gusher.active = false
+      gusher.material.uniforms.uTime.value = 0
+      gusher.material.uniforms.uOpacity.value = 0
+      gusher.mesh.scale.y = gusher.height * 0.02
+    }
+  }
+  entry.tick = (dt) => {
+    time += dt
+    // Tremor envelope: builds to the blow, spikes with it, settles in a
+    // second and a half. Shared by the diorama shiver and the camera shake.
+    const envelope = (at, len) => {
+      if (time < at) return 0
+      if (time < eruptAt) { const x = Math.min((time - at) / len, 1); return x * x * (3 - 2 * x) }
+      return 1.4 * Math.max(0, 1 - (time - eruptAt) / 1.5)
+    }
+    entry.shake = envelope(shakeAt, shakeFor)
+    // The diorama jogs in place (mostly vertical, a ground rumble) by a few
+    // millimetres, from incommensurate sines.
+    const tremor = envelope(tremorAt, tremorFor) * 0.008
+    fit.position.set(
+      Math.sin(time * 43.1) * tremor * 0.5,
+      (Math.sin(time * 53.7) + 0.5 * Math.sin(time * 31.1 + 1.0)) * tremor,
+      Math.sin(time * 37.3 + 2.0) * tremor * 0.5
+    )
+    if (gusher && time >= eruptAt) {
+      const e = Math.min((time - eruptAt) / rise, 1)
+      gusher.active = true
+      gusher.mesh.scale.y = gusher.height * Math.max(e * e * (3 - 2 * e), 0.02)
+      gusher.material.uniforms.uOpacity.value = Math.min(e * 2, 1)
+    }
+    if (!celebrating && time >= celebrateAt) {
+      celebrating = true
+      advance()
+    } else if (time >= stepEndsAt) {
+      advance()
+    }
+  }
+  return entry
+}
+
 class FloatingGallery extends THREE.Group {
   constructor(curve) {
     super()
@@ -354,6 +637,7 @@ class FloatingGallery extends THREE.Group {
         animationSpeed: 1 / 3, // Eight-second source clip plays over 24 seconds.
         year: 'ALCHEMY',
         description: 'The first station',
+        spotLead: 1.0,        // light strikes ~3 s later than the default 4.9 (full speed: ~0.92 units/s)
         curvePosition: 0.038, // shelf 1 mid (see SHELF; ?spothelper=1 logs every shelf's range)
         width: 3.5,
         height: 3.5,
@@ -368,10 +652,18 @@ class FloatingGallery extends THREE.Group {
         focusPoint: [-0.1, 1.15, 8.4], // Merchant's upper body in exported scene coordinates.
         animationSpeed: 1 / 3, // Ten-second source clip plays over 30 seconds.
         animationDelay: 3, // Real seconds holding the opening pose after the station lights up.
+        once: true,        // the bubble rises and bursts once per pass, then holds (no loop)
+        // The windmill: its exported clip is static, so the blade turns by script
+        // about its own axle (the mesh's thin axis), slowly, while the station shows.
+        spin: [{ node: 'Blade', axis: 'x', rpm: 4 }],
         year: 'TULIPMANIA',
         description: 'A fortune blooms, then the bubble bursts.',
         hold: 0.73,           // crawl half-window for this station only (STATION.hold elsewhere)
         spotLead: 1.5,        // light strikes later here: the cart climbs up to this shelf
+        // A sunlit market (sun + sky lights, sky-blue tunnel; see DAYLIGHT) that
+        // clouds over when the bubble pops: clip time 6.3 s at a third speed,
+        // after the 3 s opening hold, is ~22 s after the station lights.
+        daylight: { gloom: { at: 22, over: 5 } },
         curvePosition: 0.180, // shelf 2
         width: 3.5,
         height: 3.5,
@@ -400,6 +692,7 @@ class FloatingGallery extends THREE.Group {
         // (material name -> emissive intensity).
         year: 'GOLD RUSH',
         description: 'Everyone digs; a few strike it rich.',
+        spotLead: 2.1,        // light strikes ~3 s later than the default 4.9
         curvePosition: 0.362, // shelf 3
         width: 3.5,
         height: 3.5,
@@ -407,6 +700,63 @@ class FloatingGallery extends THREE.Group {
         angle: -Math.PI,
         verticalOffset: -0.2,
         rotateY: Math.PI / 0.5
+      },
+      {
+        // Oil field: the wildcatter's gusher under a desert sun. The rig
+        // ships several Mixamo clips; only the idle plays.
+        model: '/models/Oil_Field_Gusher.glb?v=2',
+        hold: 1.2,            // a long stop: 14 s of idle anticipation, then the strike and a ~30 s celebration
+        // The strike, in seconds after the station lights (see buildSequence):
+        // the wildcatter idles, the ground trembles, the well blows, and he
+        // celebrates through the clips below before idling again. Rallying
+        // walks him off his mark, so it is played back in reverse to return.
+        sequence: {
+          idle: 'idle',
+          tremor: { at: 14, for: 3 },   // the diorama itself shivers first
+          shake: { at: 15.5, for: 1.5 }, // the camera joins, faintly, just before the blow
+          erupt: { at: 18, rise: 1.2, delay: 0.5 },
+          then: [
+            { name: 'Victory', times: 2 },
+            { name: 'Jumping', times: 2 },
+            'Rallying',
+            { name: 'Rallying', reverse: true },
+            { name: 'idle', for: 3 },
+            'Victory',
+            'Victory',
+            'Victory'
+          ],
+        },
+        // The gusher column (the field's geyser shader): x/z from the
+        // `opening` empty at the derrick's crown, floor from the derrick's own
+        // origin, so it blows up through the lattice and fountains above it.
+        // Sizes are model units (the derrick is about 1 tall).
+        // Narrow jet up to the opening, then opens (`flare`, 1 = the field's
+        // full cap). `parabolum: 0` = plain black crude, 1 = the field's opal.
+        gusher: { anchor: 'opening', ground: 'tripo_node_fb7245ff', width: 0.6, height: 2.0, flare: 0.6, parabolum: 0 },
+        animationSpeed: 1,
+        year: 'OIL FIELD',
+        description: 'Strike oil, and the desert turns to gold.',
+        daylight: {           // desert noon: deep zenith, dusty horizon, a blaring sun
+          sky: '#bcd8f2',
+          zenith: '#3f86d6',
+          horizon: '#e9e3cf',
+          sun: '#fff6e0',
+          sunIntensity: 1.5,  // pale sand and the white plume cross the bloom threshold above this
+          skyColor: '#c7dcf2',
+          groundColor: '#d9b77a',
+          skyIntensity: 0.6,
+          sunSize: 2.0,
+          clouds: 2,
+          dawnDelay: 4.6,     // the sky stays dark for ~5 s after the light strikes, then day comes up
+        },
+        focusPoint: [0.45, 0.45, 0.1], // low on the derrick itself: the wildcatter lands beside the HUD, the plume's cap stays in frame
+        curvePosition: 0.522, // shelf 4
+        width: 3.5,
+        height: 3.5,
+        radialOffset: 1.7,    // same side as Tulipmania
+        angle: -Math.PI,
+        verticalOffset: 0.3,  // the sand (0.65 below the fitted centre) sits just under eye level
+        rotateY: -Math.PI / 0.7
       },
     //   {
     //     url: '/carousel_images/img12.jpg',
@@ -551,8 +901,14 @@ class FloatingGallery extends THREE.Group {
     this.dracoLoader = null
     this.flameGeometry = null // shared by every station flame
     this.mixers = [] // { mixer, root } per animated station
+    this.gushers = [] // { mesh, material, root } geyser columns (entry `gusher`)
+    this.spinners = [] // { node, axis, speed, root } nodes turned by script (entry `spin`)
     this.lastT = null
     this.helpers = [] // SpotLightHelpers when ?spothelper=1
+    this.daylight = 0 // 0..1, strongest daylight station at the ride position (setRide)
+    this.gloom = 0 // 0..1, that station's overcast mix (update)
+    this.shake = 0 // camera shake requested by a scripted station this frame (update)
+    this.daylightStation = null
     
     this.imageData.forEach((imageInfo, i) => {
       const position = new THREE.Vector3()
@@ -593,6 +949,7 @@ class FloatingGallery extends THREE.Group {
           hold: imageInfo.hold ?? STATION.hold,
           spotLead: imageInfo.spotLead ?? STATION.spotLead,
           position: root.userData.focusTarget, spot: root.userData.spot, root,
+          daylight: root.userData.daylight, // { ...DAYLIGHT overrides, sun, sky } or undefined
         })
         return
       }
@@ -717,6 +1074,119 @@ class FloatingGallery extends THREE.Group {
       this.add(helper)
       this.helpers.push(helper)
     }
+    if (info.daylight && DAY_ENABLED) {
+      // A daytime station: a sun high over the slot, from the track side and
+      // a little along it so the facing side is lit with some modelling,
+      // plus a sky/ground hemisphere for the shadow side. Both start at zero
+      // and are driven by daylightWeight (setRide) for this pass only.
+      const cfg = { ...DAYLIGHT, ...(typeof info.daylight === 'object' ? info.daylight : {}) }
+      const sun = new THREE.DirectionalLight(cfg.sun, 0)
+      sun.name = `StationSun:${info.year}`
+      sun.position.copy(position)
+        .addScaledVector(towardTrack, info.width * 0.6)
+        .addScaledVector(tangent, info.width * 0.4)
+        .add(new THREE.Vector3(0, info.width * 1.2, 0))
+      sun.target.position.copy(position)
+      const sky = new THREE.HemisphereLight(cfg.skyColor, cfg.groundColor, 0)
+      sky.name = `StationSky:${info.year}`
+      sky.position.set(0, 1, 0)
+      this.add(sun, sun.target, sky)
+
+      // Sky props in world space around the station (the root is rotated to
+      // face the track, so world placement is simpler). Shown with the
+      // station and faded by the same dawn weight (setRide).
+      const props = new THREE.Group()
+      props.name = `StationSky:${info.year}`
+      props.position.copy(position)
+      props.visible = false
+      const fading = [] // materials whose opacity follows the daylight
+      const domeGeometry = new THREE.SphereGeometry(cfg.domeRadius, 24, 16)
+      const domeMaterial = new THREE.MeshBasicMaterial({
+        map: makeSkyDomeTexture(cfg.zenith, cfg.horizon),
+        side: THREE.BackSide, fog: false, transparent: true, opacity: 0, depthWrite: false,
+      })
+      const dome = new THREE.Mesh(domeGeometry, domeMaterial)
+      dome.renderOrder = -10 // behind everything, before the stations
+      props.add(dome)
+      fading.push(domeMaterial)
+      this.geometries.push(domeGeometry)
+      this.materials.push(domeMaterial)
+      this.textures.push(domeMaterial.map)
+
+      const up = new THREE.Vector3(0, 1, 0)
+      const away = towardTrack.clone().negate()
+      const along = tangent.clone().setY(0).normalize()
+      const sunDir = new THREE.Vector3()
+        .addScaledVector(away, cfg.sunDisc[0])
+        .addScaledVector(up, cfg.sunDisc[1])
+        .addScaledVector(along, cfg.sunDisc[2])
+        .normalize()
+      const sunTexture = makeSunTexture()
+      this.textures.push(sunTexture)
+      // The disc itself is pushed past the bloom threshold so it glows; a
+      // wider, faint halo sits behind it below the threshold.
+      const discMaterial = new THREE.SpriteMaterial({ map: sunTexture, fog: false, transparent: true, opacity: 0, depthWrite: false })
+      discMaterial.color.setRGB(2.2, 2.2, 2.1) // near-neutral: a warm tint fringes green once red clips
+      const haloMaterial = new THREE.SpriteMaterial({ map: sunTexture, fog: false, transparent: true, opacity: 0, depthWrite: false })
+      haloMaterial.color.setRGB(1.0, 0.95, 0.8)
+      haloMaterial.userData.maxOpacity = 0.35
+      const disc = new THREE.Sprite(discMaterial)
+      const halo = new THREE.Sprite(haloMaterial)
+      disc.position.copy(sunDir).multiplyScalar(cfg.sunDistance)
+      halo.position.copy(disc.position)
+      disc.scale.setScalar(cfg.sunSize)
+      halo.scale.setScalar(cfg.sunSize * 3.2)
+      disc.renderOrder = halo.renderOrder = -9
+      props.add(halo, disc)
+      fading.push(discMaterial, haloMaterial)
+      this.materials.push(discMaterial, haloMaterial)
+
+      // Clouds: sprites scattered through the upper sky, most of them on the
+      // far side of the station where the camera looks, swaying gently.
+      const cloudTextures = [0, 1, 2].map((i) => makeCloudTexture(i + 1))
+      this.textures.push(...cloudTextures)
+      const clouds = []
+      let r = 7
+      const rand = () => { r = (r * 9301 + 49297) % 233280; return r / 233280 }
+      for (let i = 0; i < cfg.clouds; i++) {
+        const material = new THREE.SpriteMaterial({
+          map: cloudTextures[i % cloudTextures.length], fog: false, transparent: true,
+          opacity: 0, depthWrite: false,
+        })
+        material.userData.maxOpacity = 0.75 + rand() * 0.25
+        const cloud = new THREE.Sprite(material)
+        const distance = 6 + rand() * 6
+        const dir = new THREE.Vector3()
+          .addScaledVector(away, 0.35 + rand() * 0.6)
+          .addScaledVector(along, (rand() - 0.5) * 1.6)
+          .addScaledVector(up, 0.1 + rand() * 0.3)
+          .normalize()
+        cloud.position.copy(dir).multiplyScalar(distance)
+        const width = 2.2 + rand() * 2.6
+        cloud.scale.set(width, width * 0.5, 1)
+        cloud.renderOrder = -8
+        cloud.userData = { base: cloud.position.clone(), phase: rand() * Math.PI * 2, speed: 0.08 + rand() * 0.08 }
+        props.add(cloud)
+        clouds.push(cloud)
+        fading.push(material)
+        this.materials.push(material)
+      }
+      this.add(props)
+      for (const cloud of clouds) cloud.userData.scale = cloud.scale.clone()
+      root.userData.daylight = {
+        ...cfg, sun, sky, props, fading, clouds, along,
+        dome: domeMaterial, sunMaterials: [discMaterial, haloMaterial],
+        // Gloom state (update): seconds since the station lit, and the 0..1 mix
+        // (`gloom` itself is the entry's { at, over } config, if any).
+        gloomTime: 0, gloomMix: 0, wasVisible: false,
+        baseSkyColor: sky.color.clone(), baseGroundColor: sky.groundColor.clone(),
+      }
+      if (SPOT_HELPER) {
+        const helper = new THREE.DirectionalLightHelper(sun, info.width * 0.3, cfg.sun)
+        this.add(helper)
+        this.helpers.push(helper)
+      }
+    }
     root.rotation.y += info.rotateY !== undefined ? info.rotateY : Math.PI
     root.rotation.x += info.rotateX || 0
     root.rotation.z += info.rotateZ || 0
@@ -783,6 +1253,48 @@ class FloatingGallery extends THREE.Group {
       })
       root.add(fit)
       root.updateMatrixWorld(true)
+      // An entry's `gusher` hangs the field's geyser column off a named empty:
+      // a plane in model space, Y-locked to face the camera each frame
+      // (update), scrolling while the station is visible. `ground` names a
+      // node whose height is the column's floor (default: the anchor's).
+      let gusherRecord = null
+      if (info.gusher) {
+        const anchor = model.getObjectByName(info.gusher.anchor)
+        const ground = info.gusher.ground ? model.getObjectByName(info.gusher.ground) : anchor
+        if (!anchor || !ground) console.warn(`Station ${info.year}: gusher node not found: ${!anchor ? info.gusher.anchor : info.gusher.ground}`)
+        else {
+          const { width = 0.5, height = 1.2, parabolum = 1, flare = 1 } = info.gusher
+          // Column floor and the anchor's height above it (model space); the
+          // anchor becomes the shader's neck when it sits above the floor.
+          const anchorY = model.worldToLocal(anchor.getWorldPosition(_gusherPos)).y
+          const groundY = model.worldToLocal(ground.getWorldPosition(_gusherPos)).y
+          const neck = Math.min(Math.max((anchorY - groundY) / height, 0), 0.9)
+          // Origin at the plane's bottom edge, so scaling y grows it upward.
+          const geometry = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0)
+          const material = new THREE.ShaderMaterial({
+            vertexShader: GEYSER_VERTEX_SHADER,
+            fragmentShader: GEYSER_FRAGMENT_SHADER,
+            uniforms: geyserUniforms({ parabolum, neck, flare }),
+            transparent: true,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+          })
+          const mesh = new THREE.Mesh(geometry, material)
+          mesh.name = `StationGusher:${info.year}`
+          mesh.renderOrder = 10
+          mesh.frustumCulled = false
+          // The plane's bottom edge sits at the floor, under the anchor (model space).
+          model.worldToLocal(anchor.getWorldPosition(mesh.position))
+          mesh.position.y = groundY
+          mesh.scale.set(width, height, 1)
+          model.add(mesh)
+          this.geometries.push(geometry)
+          this.materials.push(material)
+          // `active` false parks the column (a sequence erupts it, see buildSequence).
+          gusherRecord = { mesh, material, root, height, active: true }
+          this.gushers.push(gusherRecord)
+        }
+      }
       // Large sets can frame a performer instead of their bounding-box centre.
       if (info.focusPoint) {
         model.localToWorld(root.userData.focusTarget.fromArray(info.focusPoint))
@@ -800,12 +1312,32 @@ class FloatingGallery extends THREE.Group {
       // name or { name, speed, under, syncTo }: `speed` overrides
       // animationSpeed for that clip, `under` keeps only its tracks inside
       // that node's hierarchy, `syncTo` gives it another clip's duration.
-      const clipOptions = (info.clips || []).map((c) => (typeof c === 'string' ? { name: c } : c))
+      // A scripted station builds its own mixer (buildSequence) in place of
+      // the per-clip mixers below.
+      const sequenced = info.sequence ? buildSequence(info, model, gltf.animations || [], root, gusherRecord) : null
+      if (sequenced) this.mixers.push(sequenced)
+      // An entry's `spin` lists nodes turned by script ({ node, axis, rpm });
+      // their own (static) Scene-export clips are skipped so they cannot
+      // overwrite the rotation every frame.
+      const spun = new Set()
+      for (const { node: name, axis = 'y', rpm = 1 } of info.spin || []) {
+        const node = model.getObjectByName(name)
+        if (!node) { console.warn(`Station ${info.year}: spin node not found: ${name}`); continue }
+        spun.add(name)
+        this.spinners.push({ node, axis, speed: (rpm * Math.PI * 2) / 60, root })
+      }
+      let clipOptions = (info.clips || []).map((c) => (typeof c === 'string' ? { name: c } : c))
+      const shipped = (gltf.animations || []).map((clip) => clip.name)
+      const missing = clipOptions.filter((c) => !shipped.includes(c.name)).map((c) => c.name)
+      if (missing.length) console.warn(`Station ${info.year}: clips not in ${info.model}: ${missing.join(', ')} (shipped: ${shipped.join(', ') || 'none'})`)
+      // None of the listed clips exported: play what shipped rather than freeze.
+      const useListed = clipOptions.length > missing.length
+      if (!useListed) clipOptions = []
       const optionsFor = (clip) => clipOptions.find((c) => c.name === clip.name)
-      for (const clip of gltf.animations || []) {
-        if (clip === interludeClip) continue
+      for (const clip of sequenced ? [] : gltf.animations || []) {
+        if (clip === interludeClip || spun.has(clip.name)) continue
         const options = optionsFor(clip)
-        if (info.clips && !options) continue
+        if (useListed && !options) continue
         if (options?.under) restrictClip(clip, model, options.under)
         if (options?.syncTo) {
           const other = gltf.animations.find((c) => c.name === options.syncTo)
@@ -815,14 +1347,20 @@ class FloatingGallery extends THREE.Group {
         const mixer = new THREE.AnimationMixer(model)
         // The exported windmill loop has its own speed and no opening hold.
         mixer.timeScale = scenery ? 1 : (options?.speed ?? info.animationSpeed ?? 1)
-        const action = mixer.clipAction(clip).setLoop(THREE.LoopRepeat, Infinity).play()
+        // An entry's `once` plays its clips a single time per pass and
+        // holds the final pose; each reveal starts them over.
+        const once = Boolean(info.once) && !scenery
+        const action = mixer.clipAction(clip)
+          .setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity)
+          .play()
+        if (once) action.clampWhenFinished = true
         mixer.update(0)
         const entry = {
           mixer, root,
           delay: scenery ? 0 : Math.max(0, info.animationDelay ?? 0),
           delayRemaining: 0,
           wasVisible: false,
-          restart: null,
+          restart: once ? () => action.reset().play() : null,
         }
         if (interludeClip && clip.name === (clipOptions[0]?.name ?? clip.name)) {
           attachInterlude(entry, action, interludeClip, info.interlude)
@@ -860,19 +1398,34 @@ class FloatingGallery extends THREE.Group {
   // Called with the vehicle's ride position: each station's spotlight
   // comes up as the cart approaches and fades after it passes.
   setRide(u) {
+    // Strongest daylight at this ride position, 0..1 (read by the frame
+    // loop for the background and fog).
+    let daylight = 0
     this.stations.forEach((s, i) => {
-      const w = spotWeight(u, s, strikeOffset(i, this.stations))
+      const on = strikeOffset(i, this.stations)
+      const w = spotWeight(u, s, on)
       if (s.spot) s.spot.intensity = STATION.spot * w
       s.root.visible = w > 0
+      if (s.daylight) {
+        const d = daylightWeight(u, s, on)
+        s.daylight.sun.intensity = s.daylight.sunIntensity * d
+        s.daylight.sky.intensity = s.daylight.skyIntensity * d
+        s.daylight.props.visible = d > 0
+        for (const material of s.daylight.fading) material.opacity = (material.userData.maxOpacity ?? 1) * d
+        if (d > daylight) { daylight = d; this.daylightStation = s }
+      }
     })
+    this.daylight = daylight
+    this.gloom = this.daylightStation?.daylight.gloomMix ?? 0
   }
 
-  update(t) {
+  update(t, camera) {
     flameUniforms.uTime.value = t
     // Wall-clock step for the station mixers (clamped so a background tab
     // does not lurch); hidden stations are not advanced.
     const dt = this.lastT === null ? 0 : Math.min(Math.max(t - this.lastT, 0), 0.1)
     this.lastT = t
+    let shake = 0 // strongest camera shake asked for by a scripted station (0..1+)
     for (const entry of this.mixers) {
       const { mixer, root, delay } = entry
       if (!root.visible) {
@@ -892,8 +1445,56 @@ class FloatingGallery extends THREE.Group {
       entry.delayRemaining -= held
       const playback = dt - held
       if (playback > 0) mixer.update(playback)
+      entry.tick?.(playback)
+      if (entry.shake > shake) shake = entry.shake
     }
+    this.shake = shake
     for (const helper of this.helpers) helper.update()
+    for (const { node, axis, speed, root } of this.spinners) {
+      if (!root.visible) continue
+      if (axis === 'x') node.rotateX(speed * dt)
+      else if (axis === 'z') node.rotateZ(speed * dt)
+      else node.rotateY(speed * dt)
+    }
+    for (const { mesh, material, root, active } of this.gushers) {
+      mesh.visible = root.visible && active
+      if (!mesh.visible) continue
+      material.uniforms.uTime.value += dt
+      if (camera) {
+        // Y-locked billboard, like the field's geyser plane.
+        const cam = camera.getWorldPosition(_gusherCam)
+        const at = mesh.getWorldPosition(_gusherPos)
+        mesh.lookAt(cam.x, at.y, cam.z)
+      }
+    }
+    for (const s of this.stations) {
+      if (!s.daylight) continue
+      const day = s.daylight
+      // Gloom clock: counts from the reveal, like the mixers.
+      if (!s.root.visible) { day.wasVisible = false; day.gloomMix = 0; continue }
+      if (!day.wasVisible) { day.wasVisible = true; day.gloomTime = 0 }
+      day.gloomTime += dt
+      let g = 0
+      if (day.gloom && day.gloom.at != null && typeof day.gloom === 'object') {
+        const x = Math.min(Math.max((day.gloomTime - day.gloom.at) / Math.max(day.gloom.over ?? 4, 0.01), 0), 1)
+        g = x * x * (3 - 2 * x)
+      }
+      day.gloomMix = g
+      if (!day.props.visible) continue
+      for (const cloud of day.clouds) {
+        const { base, phase, speed, scale } = cloud.userData
+        cloud.position.copy(base).addScaledVector(day.along, Math.sin(t * speed + phase) * day.cloudDrift)
+        cloud.scale.copy(scale).multiplyScalar(1 + (day.storm.cloudScale - 1) * g)
+        cloud.material.color.set('#ffffff').lerp(_gloomColor.set(day.storm.cloud), g)
+      }
+      // Overcast: over the daylight values setRide just set.
+      day.sun.intensity *= 1 - (1 - day.storm.sun) * g
+      day.sky.intensity *= 1 - (1 - day.storm.skyLight) * g
+      day.sky.color.copy(day.baseSkyColor).lerp(_gloomColor.set(day.storm.skyColor), g)
+      day.sky.groundColor.copy(day.baseGroundColor).lerp(_gloomColor.set(day.storm.groundColor), g)
+      day.dome.color.set('#ffffff').lerp(_gloomColor.setStyle(day.storm.dome, THREE.LinearSRGBColorSpace), g)
+      for (const material of day.sunMaterials) material.opacity *= 1 - g
+    }
     this.images.forEach((image) => {
       const userData = image.userData
       
@@ -1335,6 +1936,15 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
   const frameIdRef = useRef(null)
   const [isPaused, setIsPaused] = React.useState(false)
   const [cameraMode, setCameraMode] = React.useState(COASTER_POV.mode)
+  // Ride HUD dimming: idle a few seconds after any change while riding.
+  const [hudIdle, setHudIdle] = React.useState(false)
+  const [hudHover, setHudHover] = React.useState(false)
+  React.useEffect(() => {
+    setHudIdle(false)
+    if (isPaused) return undefined
+    const timer = setTimeout(() => setHudIdle(true), 4000)
+    return () => clearTimeout(timer)
+  }, [isPaused, cameraMode])
   const cameraModeRef = useRef(COASTER_POV.mode)
   const toggleCameraRef = useRef(null)
   const [focusedImage, setFocusedImage] = React.useState(null)
@@ -1453,7 +2063,8 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
     if (SPOT_HELPER) {
       // e.g. __hubStation.STATION.spot = 24; __hubStation.spots[0].angle = 0.5;
       // __hubStation.spots[0].position.y += 0.2 (helpers follow every frame)
-      window.__hubStation = { STATION, spots: gallery.stations.map(s => s.spot), stations: gallery.stations, shelves: wireTunnel.curve.shelfSpans() }
+      // Daylight: __hubStation.stations[1].daylight.sunIntensity = 3 (live); DAYLIGHT.* needs a reload
+      window.__hubStation = { STATION, DAYLIGHT, gallery, spots: gallery.stations.map(s => s.spot), stations: gallery.stations, shelves: wireTunnel.curve.shelfSpans() }
       console.table(wireTunnel.curve.shelfSpans().map(s => ({ shelf: s.index + 1, from: s.start.toFixed(3), to: s.end.toFixed(3), mid: s.mid.toFixed(3), height: s.height })))
     }
     
@@ -1488,13 +2099,24 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
     // before the first station's strike (the vehicle rides LOOK_AHEAD ahead).
     let ride = 0
     if (gallery.stations.length) {
-      const first = gallery.stations[0] // sorted by u
-      const strikeU = first.u + strikeOffset(0, gallery.stations)
+      const at = Math.max(0, gallery.stations.findIndex((s) => s.root.name === `Station:${START_STATION}`))
+      const first = gallery.stations[at] // sorted by u; the first unless ?station= names another
+      const strikeU = first.u + strikeOffset(at, gallery.stations)
       ride = strikeU - frac(LEAD_IN_SECONDS * RIDE_SPEED + LOOK_AHEAD)
       ride = ((ride % 1) + 1) % 1
     }
     let isPausedLocal = false
     let firstFrameDone = false
+    let lastDaylight = 0
+    let lastGloom = 0
+    const stormSky = new THREE.Color()
+    // Camera shake from a scripted station: an offset added after the camera
+    // is posed and removed again before the next pose, so a paused ride
+    // (no re-pose) does not accumulate it.
+    const shakeOffset = new THREE.Vector3()
+    let shakeRoll = 0
+    const NIGHT_SKY = new THREE.Color('#000')
+    const daySky = new THREE.Color().setStyle(DAYLIGHT.sky, THREE.LinearSRGBColorSpace)
     let lastTime = performance.now()
     const targetFPS = 60
     const frameInterval = 1000 / targetFPS
@@ -1523,6 +2145,8 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
         lastTime = currentTime - (elapsed % frameInterval)
         
         t += dt
+        camera.position.sub(shakeOffset)
+        if (shakeRoll) camera.rotateZ(-shakeRoll)
         if (!isPausedLocal) {
           // Slow through stations, measured at the vehicle, not the camera.
           const pace = rideSpeedAt((ride + frac(LOOK_AHEAD)) % 1, gallery.stations)
@@ -1533,8 +2157,38 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
         
         // Every frame, paused or not, so spotlight tuning applies live.
         gallery.setRide((ride + frac(LOOK_AHEAD)) % 1)
-        gallery.update(t)
+        gallery.update(t, camera)
+        // Camera shake: a jitter of a few millimetres plus a faint roll, from
+        // incommensurate sines so it never settles into a rhythm.
+        const shake = focusStateRef.current.image ? 0 : gallery.shake
+        if (shake > 0) {
+          const k = 0.0002 * shake
+          shakeOffset.set(
+            (Math.sin(t * 37.1) + 0.5 * Math.sin(t * 23.7 + 1.3)) * k,
+            (Math.sin(t * 41.3 + 0.7) + 0.5 * Math.sin(t * 19.1 + 2.1)) * k,
+            (Math.sin(t * 29.7 + 2.9) + 0.5 * Math.sin(t * 47.3)) * k
+          )
+          shakeRoll = (Math.sin(t * 31.3 + 0.4) + 0.5 * Math.sin(t * 17.9 + 1.9)) * 0.0012 * shake
+        } else {
+          shakeOffset.set(0, 0, 0)
+          shakeRoll = 0
+        }
+        camera.position.add(shakeOffset)
+        if (shakeRoll) camera.rotateZ(shakeRoll)
         wireTunnel.setHouseLights(houseWeight((ride + frac(LOOK_AHEAD)) % 1, gallery.stations))
+        // Daytime station: the black tunnel and fog lerp toward the
+        // station's sky for the pass, then back to night.
+        if (gallery.daylight !== lastDaylight || gallery.gloom !== lastGloom) {
+          lastDaylight = gallery.daylight
+          lastGloom = gallery.gloom
+          const sky = gallery.daylightStation?.daylight
+          if (sky) {
+            daySky.setStyle(sky.sky, THREE.LinearSRGBColorSpace)
+            if (lastGloom > 0) daySky.lerp(stormSky.setStyle(sky.storm.sky, THREE.LinearSRGBColorSpace), lastGloom)
+          }
+          scene.background.copy(NIGHT_SKY).lerp(daySky, lastDaylight)
+          scene.fog.color.copy(scene.background)
+        }
         
         // Update scanline shader time
         if (scanlinePass && scanlinePass.uniforms.time) {
@@ -1815,31 +2469,42 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
         }} 
       />
       {isFullscreen && !focusedImage && (
-        <div 
+        // Ride HUD: a one-line pill in the bottom-left corner, out of the
+        // dioramas' way (they sit centre-frame when the cart turns to them).
+        // It dims after a few seconds of riding and returns on pause or hover.
+        <div
+          onMouseEnter={() => setHudHover(true)}
+          onMouseLeave={() => setHudHover(false)}
           style={{
             position: 'absolute',
-            bottom: '2rem',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            left: 'max(1rem, env(safe-area-inset-left))',
+            bottom: 'calc(1rem + env(safe-area-inset-bottom))',
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '6px 12px',
+            maxWidth: 'calc(100vw - 2rem)',
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
             color: '#fa0',
-            padding: '10px 20px',
-            borderRadius: '5px',
+            padding: '6px 12px',
+            borderRadius: '999px',
             fontFamily: 'Tourney, monospace',
-            fontSize: '16px',
-            border: '2px solid #41f',
+            fontSize: '13px',
+            lineHeight: 1.2,
+            border: '1px solid #41f',
             zIndex: 1000,
-            textAlign: 'center',
-            pointerEvents: 'none'
+            opacity: hudIdle && !hudHover && !isPaused ? 0.35 : 1,
+            transition: 'opacity 0.6s ease',
+            pointerEvents: 'none',
           }}
         >
-          <div>{isPaused ? `⏸ ${t('oldsCoolTunnel.ui.paused') || 'PAUSED'}` : `▶ ${t('oldsCoolTunnel.ui.playing') || 'PLAYING'}`}</div>
-          <div style={{ fontSize: '14px', marginTop: '5px', color: '#8af' }}>
+          <span style={{ whiteSpace: 'nowrap' }}>{isPaused ? `⏸ ${t('oldsCoolTunnel.ui.paused') || 'PAUSED'}` : `▶ ${t('oldsCoolTunnel.ui.playing') || 'PLAYING'}`}</span>
+          <span style={{ color: '#8af', whiteSpace: 'nowrap' }}>
             {isPaused ?
               (typeof window !== 'undefined' && 'ontouchstart' in window ? (t('oldsCoolTunnel.ui.tapImageFocus') || 'Tap an image to focus') : (t('oldsCoolTunnel.ui.clickImageFocus') || 'Click an image to focus')) :
               (typeof window !== 'undefined' && 'ontouchstart' in window ? (t('oldsCoolTunnel.ui.tapToPause') || 'Tap to Pause') : (t('oldsCoolTunnel.ui.pressSpacePause') || 'Press SPACE to Pause'))
             }
-          </div>
+          </span>
           {coaster && (
             <button
               type="button"
@@ -1851,33 +2516,31 @@ export default function OldsCoolTunnel({ isFullscreen = false, road = true, cano
                 toggleCameraRef.current?.()
               }}
               style={{
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                width: '100%',
-                minHeight: '44px',
-                marginTop: '10px',
-                padding: '8px 12px',
+                gap: '8px',
+                minHeight: '32px',
+                padding: '4px 10px',
                 border: '1px solid #8af',
-                borderRadius: '4px',
+                borderRadius: '999px',
                 background: 'rgba(65, 17, 255, 0.18)',
                 color: '#fff4e8',
                 fontFamily: 'inherit',
-                fontSize: '14px',
+                fontSize: '13px',
                 cursor: 'pointer',
                 pointerEvents: 'auto',
                 touchAction: 'manipulation',
+                whiteSpace: 'nowrap',
               }}
             >
-              <span>View: {cameraMode === 'inside' ? 'Inside cart' : 'Behind cart'}</span>
+              <span>{cameraMode === 'inside' ? 'Inside cart' : 'Behind cart'}</span>
               <span aria-hidden="true" style={{ color: '#8af' }}>⇄ V</span>
             </button>
           )}
           {isPaused && (
-            <div style={{ fontSize: '12px', marginTop: '3px', color: '#fa0' }}>
+            <span style={{ fontSize: '12px', color: '#fa0', whiteSpace: 'nowrap' }}>
               🔍 {t('oldsCoolTunnel.ui.selectImageDetail') || 'Select image for detailed view'}
-            </div>
+            </span>
           )}
         </div>
       )}
