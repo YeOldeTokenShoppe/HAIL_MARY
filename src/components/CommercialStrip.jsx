@@ -53,7 +53,7 @@ import {
 // dev server revalidates on every request regardless of the query string, so the
 // fresh file always won locally, while the CDN kept serving whatever it had
 // cached under the unchanged `?v=ktx2` key. BUMP THIS on every rebuild.
-const STRIP_MODEL_V = "26";
+const STRIP_MODEL_V = "28";
 // The preacher's GLB (Vendor_Chaplain_Character.glb) — bump after every re-export of it.
 export const CHAPEL_ASSET_V = 4;
 // The vendor character GLBs (VENDOR_CATALOG model / poseModels / companionModel).
@@ -67,8 +67,8 @@ export const CHAPEL_ASSET_V = 4;
 // whenever ANY character GLB is re-exported; vendorModelUrl() appends it.
 const VENDOR_MODEL_V = 2;
 const vendorModelUrl = (url) => (!url || url.includes("?") ? url : `${url}?v=${VENDOR_MODEL_V}`);
-const STRIP_MODEL_WEBP = `/models/Commercial_Strip8_101226_opt.glb?v=${STRIP_MODEL_V}`;
-const STRIP_MODEL_KTX2 = `/models/Commercial_Strip8_101226_opt_ktx2.glb?v=${STRIP_MODEL_V}`;
+const STRIP_MODEL_WEBP = `/models/Commercial_Strip8_opt.glb?v=${STRIP_MODEL_V}`;
+const STRIP_MODEL_KTX2 = `/models/Commercial_Strip8_opt_ktx2.glb?v=${STRIP_MODEL_V}`;
 const STRIP_MODEL =
   typeof window !== "undefined" && /[?&]strip=webp\b/.test(window.location.search)
     ? STRIP_MODEL_WEBP

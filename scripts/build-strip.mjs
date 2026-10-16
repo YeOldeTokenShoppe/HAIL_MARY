@@ -8,7 +8,8 @@
 //
 // Then bump STRIP_MODEL_V in CommercialStrip.jsx and point STRIP_MODEL_* at the
 // new names. Nothing is copied into public/models unless both builds pass the
-// checks at the bottom (named nodes, bulbs, Basis coverage, clip names).
+// checks at the bottom (named nodes, bulbs, Basis coverage, clip names). A claw
+// prize exported outside Toy_Claw_Empty is reparented with its world pose kept.
 //
 // Why a script and not the six shell lines in the doc: the 2026-10-10 export
 // (Commercial_Strip8) was saved with Blender's animation mode set to "Scene"
@@ -164,6 +165,38 @@ function normalizeClips() {
 describeClips("clips in export");
 normalizeClips();
 describeClips("clips after repair");
+
+// ---------------------------------------------------------------- 1b. stray claw prizes
+// clawMachine.mjs finds every claw part BY NAME UNDER Toy_Claw_Empty. Two exports
+// in a row (Strip8_101226 on 2026-10-12, Strip8 on 2026-10-16) shipped Bear_01 at
+// the scene root — Blender's Clear Parent + Keep Transform leaves the world pose
+// identical but the test dies with "Claw part missing: Bear_01". Copying the old
+// build's local TRS is WRONG (the mesh is 20× bigger than it used to be and a
+// 3-unit bear fills the machine); keep the world pose instead:
+//   local = inv(clawWorld) × prizeWorld
+// Permanent fix is in Commercial_Strip7.blend: select the prize, then
+// Toy_Claw_Empty, Ctrl+P → Object (Keep Transform). Until then this repairs it.
+function reparentClawPrizes() {
+  const THREE = require("three");
+  const byName = (n) => root.listNodes().find((x) => x.getName() === n);
+  const claw = byName("Toy_Claw_Empty");
+  if (!claw) { log("!! no Toy_Claw_Empty node"); return; }
+  const invClaw = new THREE.Matrix4().fromArray(claw.getWorldMatrix()).invert();
+  for (const name of ["Unicorn_01", "Bear_01"]) {
+    const prize = byName(name);
+    if (!prize) { log(`!! claw prize ${name} missing from export`); continue; }
+    if (hasAncestor(prize, "Toy_Claw_Empty")) continue;
+    const local = new THREE.Matrix4().fromArray(prize.getWorldMatrix()).premultiply(invClaw);
+    const p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+    local.decompose(p, q, sc);
+    prize.getParentNode()?.removeChild(prize);
+    for (const scene of root.listScenes()) scene.removeChild(prize);
+    claw.addChild(prize);
+    prize.setTranslation(p.toArray()).setRotation(q.toArray()).setScale(sc.toArray());
+    log(`!! ${name} was exported OUTSIDE Toy_Claw_Empty — reparented with its world pose kept (local t ${p.toArray().map((v) => v.toFixed(3)).join(",")} s ${sc.x.toFixed(4)}). Fix the parent in Blender.`);
+  }
+}
+reparentClawPrizes();
 
 // The optimize stages re-compress with meshopt; a Draco export must be written
 // out plain first or every CLI stage would re-encode Draco on the way through.
