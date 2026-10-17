@@ -16,10 +16,10 @@ export const CARD_ART = {
   // card. TradingCard still supports overlayImage — ReliquaryRail uses it.
   "eugene": { src: "/TCG/eugeneFractal.webp", artFocus: "center 28%", artZoom: 1.25, fx: ["Rainbow 1"] },
   "marisol": {
-    src: "/TCG/traderMarisol.webp",
+    src: "/TCG/traderMarisol_Byzantine.png",
     artLayers: {
-      background: "/TCG/traderMarisol_bgOnly.png",
-      character: "/TCG/traderMarisol_noBG.png",
+      // background: "/TCG/traderMarisol_bgOnly.png",
+      // character: "/TCG/traderMarisol_noBG.png",
     },
     artFocus: "center 28%", artZoom: 1.25, fx: ["Abstract 7"],
   },
@@ -28,7 +28,7 @@ export const CARD_ART = {
   // over from those constants (2026-07-20).
   "gr80": { src: "/TCG/trader_monk.webp", artFocus: "center 30%", artZoom: 1.2, fx: ["Abstract 11"] },
   "john-barron": {
-    src: "/TCG/traderDemon.webp", artFocus: "center 32%", artZoom: 1.2,
+    src: "/TCG/traderDemon_Byzantine.png", artFocus: "center 32%", artZoom: 1.2,
     fx: ["Flame"], fxReflection: FLAME_REFLECTION,
   },
   // moonpony + pump-signal reimported 2026-07-21 as full 1488×2077 illustrations
@@ -123,7 +123,7 @@ export const CARD_ART = {
 
 // Set mark printed on every Genesis card, the way a TCG prints its set logo
 // over the art. Set `setBadge: null` on a card to suppress it.
-export const SET_BADGE = "/TCG/badges/genesis-edition-badge.webp";
+export const SET_BADGE = "/TCG/badges/ByzantineEdition.png";
 
 export function getCardArt(cardId) {
   return CARD_ART[cardId]?.src || null;

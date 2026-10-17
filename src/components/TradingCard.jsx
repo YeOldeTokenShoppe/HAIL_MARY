@@ -64,6 +64,113 @@ const LABEL_GRADIENTS = {
   rarity:   "linear-gradient(180deg, var(--r-lite) 0%, var(--r-mid) 55%, var(--r-dark) 100%)",
 };
 
+// Badge vocabulary (2026-10-16). "oblique" = the original Pokémon-style
+// parallelogram chips; "ticket" = the inked time-stamps a trade ticket
+// collects on the floor — one for the card type (rarity ink), one beside the
+// ability line (lens ink), one for the rarity. This is a markets TCG, not the
+// Case Table, so the words are desk vocabulary. Flip here to compare.
+const BADGE_STYLE = "ticket";
+
+// Type stamp word, keyed by the lower-cased TYPE_LABELS value.
+const TICKET_LABELS = {
+  trader: "Trader",
+  coin: "Asset",
+  action: "Order",
+  market: "Macro",
+};
+// Stamp word beside the ability, per card type. Never a generic "Effect".
+const STAMP_LABELS = {
+  trader: "Edge",
+  coin: "Listed",
+  action: "Filled",
+  market: "Printed",
+};
+
+// Rarity glyph: a silhouette icon (public/images, white-on-transparent) used
+// as a CSS mask so the tier metal pours through it, plus a grail for the
+// terminal foils. Count and metal climb like star systems: 1 silver common,
+// 2 silver uncommon, 1 gold rare, 2 gold mythic, golden grail for the
+// terminal foils. Metal colours are fixed (not the
+// rarity ink) so the tier reads the same inside every stamp; the footer
+// still prints the rarity word, so this carries no text.
+// Swap the icon here: "/images/flame.png" | "/images/lightning.png".
+const RARITY_ICON = "/images/flame.png";
+
+const RARITY_GLYPHS = {
+  "Common": { count: 1, metal: "silver" },
+  "Uncommon": { count: 2, metal: "silver" },
+  "Rare": { count: 1, metal: "gold" },
+  "Mythic": { count: 2, metal: "gold" },
+  "Terminal Foil": { grail: true, metal: "gold" },
+};
+const GLYPH_METALS = {
+  silver: { lit: "#f4f7fa", shade: "#aab5c1", side: "#4a535d" },
+  gold:   { lit: "#ffe58a", shade: "#d9a21b", side: "#6e4f0c" },
+};
+
+// Masked icon: ::before is the dark extruded copy, ::after the metal face.
+function IconGlyph({ metal, size = 26 }) {
+  const m = GLYPH_METALS[metal];
+  return (
+    <span
+      className="tc-ricon"
+      style={{
+        "--icon": `url(${RARITY_ICON})`,
+        "--lit": m.lit, "--shade": m.shade, "--side": m.side,
+        width: size, height: size,
+      }}
+    />
+  );
+}
+
+// Chalice in a 16x22 box, extruded, rainbow glint on the bowl.
+function GrailGlyph({ metal, id }) {
+  const m = GLYPH_METALS[metal];
+  const bowl = "M1 2 H15 C15 8.5 12 11.5 8 11.5 C4 11.5 1 8.5 1 2 Z";
+  const stem = "M6.8 11.5 H9.2 V16 H6.8 Z";
+  const foot = "M3 18.4 C3 16.8 5.3 16 8 16 C10.7 16 13 16.8 13 18.4 C13 19.6 10.7 20 8 20 C5.3 20 3 19.6 3 18.4 Z";
+  return (
+    <svg className="tc-rgrail" viewBox="0 0 17 23" width="19" height="26" aria-hidden>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#ff6b6b" stopOpacity=".6" />
+          <stop offset=".5" stopColor="#53ffd6" stopOpacity=".6" />
+          <stop offset="1" stopColor="#c597ff" stopOpacity=".6" />
+        </linearGradient>
+      </defs>
+      <g transform="translate(0.9 1.2)" fill={m.side}>
+        <path d={bowl} /><path d={stem} /><path d={foot} />
+      </g>
+      <path d={bowl} fill={m.lit} />
+      <path d="M8 2 H15 C15 8.5 12 11.5 8 11.5 Z" fill={m.shade} />
+      <path d={stem} fill={m.shade} />
+      <path d={foot} fill={m.lit} />
+      <path d="M2.5 3.5 H13.5 C13.2 5.5 12.4 7 11.4 8 H4.6 C3.6 7 2.8 5.5 2.5 3.5 Z" fill={`url(#${id})`} />
+    </svg>
+  );
+}
+
+function RarityGlyph({ rarity }) {
+  const spec = RARITY_GLYPHS[rarity] || RARITY_GLYPHS.Common;
+  const key = String(rarity).replace(/\s+/g, "-");
+  return (
+    <span className="tc-rglyph" role="img" aria-label={rarity}>
+      {spec.grail
+        ? <GrailGlyph metal={spec.metal} id={`grail-glint-${key}`} />
+        : Array.from({ length: spec.count }, (_, i) => <IconGlyph key={i} metal={spec.metal} />)}
+    </span>
+  );
+}
+
+function TimeStamp({ children, style, small = false, tilt }) {
+  const cls = ["tc-stamp", small && "tc-stamp--small", tilt === "left" && "tc-stamp--tilt-left"].filter(Boolean).join(" ");
+  return (
+    <span className={cls} style={style}>
+      <span className="tc-stamp__inner">{children}</span>
+    </span>
+  );
+}
+
 function ObliqueLabel({ variant = "ability", children, style }) {
   return (
     <span
@@ -218,6 +325,19 @@ export default function TradingCard({
   const effectTone = EFFECT_TONES[data.abilityTone] || EFFECT_TONES.cyan;
 
   const rarityAccent = RARITY_ACCENT[data.rarity] || "#ffd166";
+  // Title fit (2026-10-16): the title column is ~359px wide at the card's
+  // 744px layout width. Trader and coin names stay on ONE line (a stacked
+  // "Saint GR80" under a halo reads wrong, and CamelCase coin names can't
+  // wrap anyway) and step down in size by length; action/market names are
+  // two words and may stack, so they size by their longest word instead.
+  const titleFit = (() => {
+    const name = String(data.name || "");
+    const type = String(data.cardType || "").toLowerCase();
+    const oneLine = type === "trader" || type === "coin";
+    const len = oneLine ? name.length : Math.max(...name.split(/\s+/).map((w) => w.length));
+    const size = len <= 7 ? 70 : len <= 9 ? 60 : len <= 11 ? 52 : len <= 13 ? 46 : 40;
+    return { oneLine, size };
+  })();
   const typeAccent = TYPE_ACCENT[data.cardType] || "#ffd166";
   // Overlay PNGs have "TRADER" + "MYTHIC" baked into the art, so they only fit
   // Trader cards. Every other type ignores the overlay and shows the live
@@ -336,7 +456,7 @@ export default function TradingCard({
       <style>{CLASSIC_STYLES}</style>
 
       <div
-        className={`tc-card tc-card--${templateStyle}${overlayImage ? " is-overlaid" : ""}${data.frameImage ? " is-framed" : ""}`}
+        className={`tc-card tc-card--${templateStyle}${overlayImage ? " is-overlaid" : ""}${data.frameImage ? " is-framed" : ""}${BADGE_STYLE === "ticket" ? " is-ticket" : ""}`}
         data-foil={foilTier}
         data-fx-depth={fxDepth > 0 && fxLayers.length > 0}
         onMouseMove={handleMove}
@@ -413,6 +533,10 @@ export default function TradingCard({
                       alt={data.cardType}
                       draggable={false}
                     />
+                  ) : BADGE_STYLE === "ticket" ? (
+                    <TimeStamp style={{ "--effect-ink": "var(--r-lite)" }} tilt="left">
+                      {TICKET_LABELS[String(data.cardType).toLowerCase()] || data.cardType}
+                    </TimeStamp>
                   ) : (
                     <ObliqueLabel
                       variant="type"
@@ -423,7 +547,7 @@ export default function TradingCard({
                   )}
                 </div>
 
-                <div className="tc-title">
+                <div className={`tc-title${titleFit.oneLine ? " tc-title--oneline" : ""}`} style={{ "--title-size": `${titleFit.size}px` }}>
                   <h1>{data.name}</h1>
                   {data.subtitle && (
                     <span className="tc-subtitle">{data.subtitle}</span>
@@ -451,7 +575,22 @@ export default function TradingCard({
 
               {/* ───── FLOATING BOTTOM OVERLAY (rarity tag only) ───── */}
               <div className="tc-art-bottom">
-                <ObliqueLabel variant="rarity">{data.rarity}</ObliqueLabel>
+                {BADGE_STYLE === "ticket" ? (
+                  <TimeStamp style={{ "--effect-ink": "var(--r-lite)" }} small>
+                    <RarityGlyph rarity={data.rarity} />
+                  </TimeStamp>
+                ) : (
+                  <ObliqueLabel variant="rarity">{data.rarity}</ObliqueLabel>
+                )}
+                {BADGE_STYLE === "ticket" && (
+                  /* Collector number: replaces the EDITION/STYLE/RARITY/SET
+                     strip (2026-10-16), which was unreadable under the FX.
+                     Rarity is the glyph opposite; style/set live in the
+                     set badge and the card data. */
+                  <span className="tc-collector" title={`${data.style} · Genesis`}>
+                    {String(data.edition).toUpperCase()}
+                  </span>
+                )}
               </div>
 
               <div className="tc-art-inset" />
@@ -459,23 +598,37 @@ export default function TradingCard({
 
             {/* ───── ABILITY (image badge OR oblique-label fallback) ───── */}
             {data.ability && (
-              <section className="tc-ability">
-                <div className="tc-ability-badge">
-                  {data.ability.badgeImage ? (
-                    <img
-                      className="tc-ability-badge-img"
-                      src={data.ability.badgeImage}
-                      alt="Effect"
-                      draggable={false}
-                    />
-                  ) : (
-                    <ObliqueLabel variant="ability" style={{ "--label-grad": effectTone.grad }}>
-                      Effect
-                    </ObliqueLabel>
-                  )}
-                </div>
+              <section className={`tc-ability${BADGE_STYLE === "ticket" && !data.ability.badgeImage ? " tc-ability--inline" : ""}`}>
+                {/* Ticket style seats the stamp inline, just left of the
+                    heading, so the pair reads as one connected mark
+                    (2026-10-16). Image badges keep the side column. */}
+                {!(BADGE_STYLE === "ticket" && !data.ability.badgeImage) && (
+                  <div className="tc-ability-badge">
+                    {data.ability.badgeImage ? (
+                      <img
+                        className="tc-ability-badge-img"
+                        src={data.ability.badgeImage}
+                        alt="Effect"
+                        draggable={false}
+                      />
+                    ) : (
+                      <ObliqueLabel variant="ability" style={{ "--label-grad": effectTone.grad }}>
+                        Effect
+                      </ObliqueLabel>
+                    )}
+                  </div>
+                )}
                 <div className="tc-ability-body">
-                  <h2>{data.ability.name}</h2>
+                  {BADGE_STYLE === "ticket" && !data.ability.badgeImage ? (
+                    <div className="tc-ability-head">
+                      <TimeStamp style={{ "--label-grad": effectTone.grad }}>
+                        {STAMP_LABELS[String(data.cardType).toLowerCase()] || "Filled"}
+                      </TimeStamp>
+                      <h2>{data.ability.name}</h2>
+                    </div>
+                  ) : (
+                    <h2>{data.ability.name}</h2>
+                  )}
                   <p>{data.ability.text}</p>
                 </div>
               </section>
@@ -651,7 +804,7 @@ function shade(hex, percent) {
 }
 
 const CARD_STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Lilita+One&family=Bowlby+One&family=Russo+One&family=Anton&family=Concert+One&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Lilita+One&family=Bowlby+One&family=Russo+One&family=Anton&family=Concert+One&family=Cinzel+Decorative:wght@700;900&family=Caesar+Dressing&display=swap');
 
   .tc-stage {
     --w: 744px;
@@ -758,6 +911,40 @@ const CARD_STYLES = `
     -webkit-mask-composite: source-in;
     mask-image: linear-gradient(90deg, transparent, #000 2%, #000 98%, transparent),
                 linear-gradient(0deg, transparent, #000 1.5%, #000 98.5%, transparent);
+    mask-composite: intersect;
+  }
+
+  /* Stamp knock-outs (BADGE_STYLE = "ticket"). The FX sheets are raised
+     planes (translateZ), so no z-index puts a stamp above them; instead the
+     foil is masked out in four soft ellipses where the stamps sit, so flames
+     and lightning curl around the ink like a real stamp pressed over foil.
+     Centres/radii measured against the card box (2026-10-16): type stamp
+     (14%,5.5%), stat pair (85%,7%), ability heading row — stamp + title,
+     centred, so a wide band at (50%,72.5%) — rarity stamp (12.5%,95%),
+     collector number (90%,95.5%), and a wide band at (50%,87.4%) for the
+     flavor quote that now sits in the divider slot. Each
+     hole is ~4% larger than its stamp to cover the sheet's parallax drift.
+     Feather layers are repeated so this rule fully replaces the depth one. */
+  .tc-card.is-ticket .tc-fx {
+    -webkit-mask-image:
+      linear-gradient(90deg, transparent, #000 2%, #000 98%, transparent),
+      linear-gradient(0deg, transparent, #000 1.5%, #000 98.5%, transparent),
+      radial-gradient(15% 6.5% at 14% 5.5%, transparent 45%, #000 100%),
+      radial-gradient(14% 7% at 85% 7%, transparent 50%, #000 100%),
+      radial-gradient(44% 8% at 50% 72.5%, transparent 55%, #000 100%),
+      radial-gradient(11% 4.5% at 12.5% 95%, transparent 45%, #000 100%),
+      radial-gradient(9% 3.5% at 90% 95.5%, transparent 45%, #000 100%),
+      radial-gradient(48% 7% at 50% 87.4%, transparent 72%, #000 100%);
+    -webkit-mask-composite: source-in;
+    mask-image:
+      linear-gradient(90deg, transparent, #000 2%, #000 98%, transparent),
+      linear-gradient(0deg, transparent, #000 1.5%, #000 98.5%, transparent),
+      radial-gradient(15% 6.5% at 14% 5.5%, transparent 45%, #000 100%),
+      radial-gradient(14% 7% at 85% 7%, transparent 50%, #000 100%),
+      radial-gradient(44% 8% at 50% 72.5%, transparent 55%, #000 100%),
+      radial-gradient(11% 4.5% at 12.5% 95%, transparent 45%, #000 100%),
+      radial-gradient(9% 3.5% at 90% 95.5%, transparent 45%, #000 100%),
+      radial-gradient(48% 7% at 50% 87.4%, transparent 72%, #000 100%);
     mask-composite: intersect;
   }
 
@@ -892,6 +1079,50 @@ const CARD_STYLES = `
   .tc-card.is-framed .tc-meta > span.tc-meta-rarity--long { font-size: 10px; }
   .tc-card.is-framed .tc-art-top { top: 36px; left: 40px; right: 40px; }
   .tc-card.is-framed .tc-art-bottom { bottom: 36px; left: 40px; right: 40px; }
+
+  /* Ticket style retires the meta strip; the collector number carries the
+     edition in the corner. The frame's printed divider bars stay as a band. */
+  .tc-card.is-ticket .tc-meta { display: none; }
+
+  /* The flavor quote takes the strip's slot (2026-10-16): pinned to the
+     frame's divider band under the ability block, so the portrait keeps the
+     room the quote used to float in. Centred on the slot via translateY;
+     the band's bars are being re-exported out of the frame art. */
+  .tc-card.is-ticket.is-framed .tc-flavor {
+    position: absolute;
+    top: calc(var(--meta-top, 86.6%) + 0.8%);
+    left: 40px;
+    right: 40px;
+    bottom: auto;
+    transform: translateY(-50%);
+    max-width: none;
+    width: fit-content;
+    margin: 0 auto;
+    padding: 6px 22px 8px;
+    font-size: 23px;
+    line-height: 1.3;
+    z-index: 7;
+    /* The frame's printed gold bars do the framing here, so the plate is
+       stripped to a plain backing: no hairline, no corners, no lift — just a
+       dark wash that fades out sideways under the bars. */
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: linear-gradient(90deg, rgba(8,5,2,0) 0%, rgba(8,5,2,.42) 12%, rgba(8,5,2,.42) 88%, rgba(8,5,2,0) 100%);
+  }
+  .tc-collector {
+    font-family: "IBM Plex Mono", "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .14em;
+    color: rgba(247, 239, 220, .88);
+    text-shadow:
+      0 0 2px rgba(0,0,0,.95),
+      0 0 6px rgba(0,0,0,.85),
+      0 1px 3px rgba(0,0,0,.8);
+    align-self: end;
+    padding-bottom: 2px;
+  }
   .tc-card.is-framed .tc-art-window {
     box-shadow:
       inset 0 0 0 2px rgba(0,0,0,.65),
@@ -1519,23 +1750,38 @@ const CARD_STYLES = `
   .tc-title {
     text-align: center;
     align-self: center;
-    /* slight nudge down so the title baseline lands under the type label cap */
-    padding-top: 2px;
+    /* Plain Black has tall ascenders — push the title down so they clear
+       the frame's top edge */
+    padding-top: 18px;
   }
+
+  @font-face {
+    font-family: "Plain Black";
+    src: url("/fonts/PlainBlack/Plain_Black.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  .tc-title--oneline h1 { white-space: nowrap; }
 
   .tc-title h1 {
     margin: 0;
-    font-family: "Bebas Neue", "Oswald", Impact, sans-serif;
-    font-size: 70px;
+    font-family: "Plain Black", "Bebas Neue", "Oswald", Impact, sans-serif;
+    font-size: var(--title-size, 70px);
     line-height: .82;
     font-weight: 900;
     letter-spacing: .03em;
-    color: #d9ef13;
-    // text-transform: uppercase;
-    -webkit-text-stroke: 4px #ffffff;
+    /* Ivory on a deep-gold edge (2026-10-16). Was lime #d9ef13 on white —
+       once the ability name moved to Nabla's yellow-orange, two warm yellows
+       fought for the eye. The title now reads as parchment blackletter and
+       cedes the saturated colour to the ability line. */
+    color: #f7efdc;
+    -webkit-text-stroke: 4px #8a6414;
     paint-order: stroke fill;
     text-shadow:
-      0 4px 10px rgba(0,0,0,.55),
+      0 1px 0 #5a3f0a,
+      0 4px 10px rgba(0,0,0,.6),
       0 0 22px rgba(0,0,0,.45);
   }
 
@@ -1631,7 +1877,117 @@ const CARD_STYLES = `
     vertical-align: 8px;
   }
 
+  /* Stat chips as time-stamps (BADGE_STYLE = "ticket"): the same double-
+     ruled ink box as the badges, one ink per stat, number set in the ink so
+     the whole chip reads as pressed. Tilts mirror each other. */
+  .tc-card.is-ticket .tc-cred,
+  .tc-card.is-ticket .tc-portfolio {
+    width: 66px;
+    height: 60px;
+    border-radius: 6px;
+    border-width: 2.5px;
+    background: rgba(0,0,0,.28);
+    box-shadow:
+      inset 0 0 0 3px transparent,
+      inset 0 0 0 4px var(--stamp-ink),
+      0 3px 8px rgba(0,0,0,.45);
+    -webkit-mask-image: radial-gradient(120% 90% at 42% 55%, #000 55%, rgba(0,0,0,.55) 100%);
+            mask-image: radial-gradient(120% 90% at 42% 55%, #000 55%, rgba(0,0,0,.55) 100%);
+    row-gap: 0;
+  }
+  .tc-card.is-ticket .tc-cred      { --stamp-ink: #d9b44a; transform: rotate(-2deg); }
+  .tc-card.is-ticket .tc-portfolio { --stamp-ink: #53ffd6; transform: rotate(2deg); }
+  .tc-card.is-ticket .tc-cred span,
+  .tc-card.is-ticket .tc-portfolio span {
+    color: var(--stamp-ink);
+    font-weight: 700;
+    letter-spacing: .24em;
+    padding-top: 4px;
+  }
+  .tc-card.is-ticket .tc-cred strong,
+  .tc-card.is-ticket .tc-portfolio strong {
+    font-family: "IBM Plex Mono", "SF Mono", Menlo, monospace;
+    font-weight: 700;
+    font-size: 24px;
+    color: var(--stamp-ink);
+    text-shadow: 0 0 6px rgba(0,0,0,.6);
+    padding-bottom: 4px;
+  }
+  .tc-card.is-ticket .tc-portfolio strong em {
+    color: var(--stamp-ink);
+    opacity: .75;
+  }
+
   /* ───── OBLIQUE LABELS (parallelogram, leaning right) ───── */
+  /* ───── TIME-STAMP BADGES (BADGE_STYLE = "ticket") ───── */
+  /* Time-stamp: double-ruled ink box, lens-coloured ink, worn with a
+     radial mask so it reads as pressed onto the ticket, not printed. */
+  .tc-stamp {
+    display: inline-block;
+    padding: 3px;
+    border: 2.5px solid var(--effect-ink, #07ddf0);
+    border-radius: 6px;
+    transform: rotate(-5deg);
+    background: rgba(0,0,0,.28);
+    box-shadow: 0 3px 8px rgba(0,0,0,.45);
+    -webkit-mask-image: radial-gradient(120% 90% at 42% 55%, #000 55%, rgba(0,0,0,.55) 100%);
+            mask-image: radial-gradient(120% 90% at 42% 55%, #000 55%, rgba(0,0,0,.55) 100%);
+  }
+  .tc-stamp__inner {
+    display: block;
+    padding: 4px 16px;
+    border: 1px solid var(--effect-ink, #07ddf0);
+    border-radius: 3px;
+    font-family: "IBM Plex Mono", "SF Mono", Menlo, monospace;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: .26em;
+    text-transform: uppercase;
+    color: var(--effect-ink, #07ddf0);
+    text-shadow: 0 0 6px rgba(0,0,0,.6);
+  }
+
+  /* Type stamp (top-left): full size, rarity ink, tilted a touch less than
+     the ability stamp so the three never line up. */
+  .tc-stamp--tilt-left { transform: rotate(-3deg); }
+
+  /* Rarity stamp: same object, smaller, inked in the rarity colour and
+     tilted the other way so the stamps don't read as a pattern. */
+  .tc-stamp--small {
+    transform: rotate(3deg);
+    border-width: 2px;
+    padding: 2px;
+  }
+  .tc-stamp--small .tc-stamp__inner {
+    padding: 2px 10px;
+    font-size: 13px;
+    letter-spacing: .22em;
+  }
+  .tc-rglyph {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    height: 26px;
+    margin: 1px 0;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,.7));
+  }
+  .tc-ricon {
+    position: relative;
+    display: inline-block;
+    flex: none;
+  }
+  .tc-ricon::before,
+  .tc-ricon::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    -webkit-mask: var(--icon) center / contain no-repeat;
+            mask: var(--icon) center / contain no-repeat;
+  }
+  .tc-ricon::before { background: var(--side); transform: translate(1px, 1.4px); }
+  .tc-ricon::after  { background: linear-gradient(135deg, var(--lit) 0%, var(--lit) 42%, var(--shade) 58%, var(--shade) 100%); }
+  .tc-rgrail { display: block; }
+
   .tc-ob {
     position: relative;
     display: inline-block;
@@ -1719,6 +2075,18 @@ const CARD_STYLES = `
     padding-top: 28px;
   }
 
+  /* Inline stamp + heading, centred as one unit over the description. */
+  .tc-ability--inline .tc-ability-body { padding-top: 16px; }
+  .tc-ability-head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin: 0 0 8px;
+  }
+  .tc-ability-head .tc-stamp { flex: none; }
+  .tc-ability-head h2 { margin: 0; }
+
   .tc-style-chip {
     font-family: "IBM Plex Mono", monospace;
     font-size: 10px;
@@ -1730,20 +2098,48 @@ const CARD_STYLES = `
     border-radius: 6px;
   }
 
+  @font-face {
+    font-family: "Nabla";
+    src: url("/fonts/Nabla-Regular.ttf") format("truetype");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
   .tc-ability h2 {
     margin: 0 0 8px;
+    /* Centred over the description (2026-10-16). The paragraph below is
+       centred by the global p rule, so a left-set heading read as misaligned
+       beside the stamp. */
+    text-align: center;
     /* Swap the first family to try alternatives:
        "Lilita One" | "Bowlby One" | "Russo One" | "Anton" | "Concert One" */
-    font-family: "Lilita One", "Bebas Neue", Impact, sans-serif;
-    font-size: 36px;
-    line-height: 1;
-    /* Matched to the EFFECT badge — see EFFECT_TONES. Uses the tone's vivid
-       base rather than the badge's darkened mid stop; the 3.5px white stroke
-       below carries legibility, so the fill can stay bright. */
-    color: var(--effect-ink, #07ddf0);
-    letter-spacing: .01em;
-    -webkit-text-stroke: 3.5px #ffffff;
+    /* Caesar Dressing is a single-weight display face; "Cinzel Decorative"
+       stays as the fallback so the ivory/gold treatment still lands offline. */
+    /* Nabla is a COLRv1 colour font: it paints its own gradient + 3D
+       extrusion, so the color and text-stroke below only reach the fallbacks.
+       Depth/highlight tune via font-variation-settings (EDPT 0–200, EHLT 0–24). */
+    font-family: "Nabla", "Caesar Dressing", "Cinzel Decorative", Georgia, serif;
+    font-size: 38px;
+    line-height: 1.05;
+    font-weight: 400;
+    font-variation-settings: "EDPT" 100, "EHLT" 12;
+    /* Ivory lettering on a gold outline (2026-10-16). The effect tone no
+       longer tints the heading — the EFFECT badge alone carries the lens
+       colour — so the ability name reads as engraved plate text instead of
+       a second colour chip. Stroke sits behind the fill (paint-order), so
+       4px shows ~2px of gold edge. */
+    color: #f7efdc;
+    letter-spacing: .04em;
+    -webkit-text-stroke: 4px #c9972e;
     paint-order: stroke fill;
+    /* Tight dark halo so the gold edge still separates on gold-toned art
+       (Connor's mosaic); the soft drop keeps the lift on busy flame art. */
+    text-shadow:
+      0 1px 0 #7a5a12,
+      0 0 2px rgba(0,0,0,.95),
+      0 0 6px rgba(0,0,0,.85),
+      0 3px 10px rgba(0,0,0,.7);
   }
 
   .tc-ability p {
@@ -1847,8 +2243,13 @@ const CARD_STYLES = `
        out correctly and then buried. Positioned siblings paint after
        non-positioned ones in the same stacking context. */
     position: relative;
-    bottom: 20px;
-    padding: 6px 14px 16px;
+    /* Sits 14px lower than before (2026-10-16): the quote reads as part of
+       the lower text block rather than floating mid-portrait. */
+    bottom: 6px;
+    width: fit-content;
+    max-width: 92%;
+    margin: 0 auto;
+    padding: 8px 20px 10px;
     font-family: "Georgia", "Times New Roman", serif;
     font-style: italic;
     font-weight: 600;
@@ -1856,14 +2257,19 @@ const CARD_STYLES = `
     line-height: 1.35;
     color: #ffe9a8;
     text-align: center;
-    /* Elliptical scrim, not a horizontal band. The old linear-gradient faded
-       only left-to-right, so its flat top and bottom edges showed as a dark
-       line across pale art (Eugene). This fades on every side; the heavier
-       text-shadow carries legibility that the lighter scrim gives up. */
-    background: radial-gradient(ellipse 62% 120% at 50% 50%, rgba(0,0,0,.62), rgba(0,0,0,0) 72%);
+    /* Subtle translucent plate (2026-10-16), replacing the elliptical scrim:
+       a soft rounded card of smoked glass that hugs the text, with a blur so
+       busy art calms behind it and a hairline so its edge reads as intended
+       rather than as a smudge. The lighter text-shadow is now just lift. */
+    background: rgba(8, 5, 2, .38);
+    border: 1px solid rgba(255, 233, 168, .14);
+    border-radius: 14px;
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    box-shadow: 0 4px 14px rgba(0,0,0,.35);
     text-shadow:
-      0 1px 4px rgba(0,0,0,.9),
-      0 0 12px rgba(0,0,0,.75);
+      0 1px 3px rgba(0,0,0,.85),
+      0 0 10px rgba(0,0,0,.5);
   }
 
   /* ───── BATTLE STRIP ───── */
