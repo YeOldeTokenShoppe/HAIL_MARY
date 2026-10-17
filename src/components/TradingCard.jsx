@@ -80,7 +80,7 @@ const TICKET_LABELS = {
 };
 // Stamp word beside the ability, per card type. Never a generic "Effect".
 const STAMP_LABELS = {
-  trader: "Edge",
+  trader: "ABIL80",
   coin: "Listed",
   action: "Filled",
   market: "Printed",
