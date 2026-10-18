@@ -8,10 +8,12 @@
   --paper:#f3e9d2; --paper-ink:#2a2040; --gold:#e8b84b; --rose:#e4567b; --teal:#4fc3a1; --violet:#8d7bd8;
   --bad:#e4567b; --good:#4fc3a1;
   --display:'Alfa Slab One', 'Arial Black', serif; --body:'Spectral', Georgia, serif;
+  --cw: clamp(7rem, 6rem + 3.5vw, 9.5rem);
   color-scheme: dark;
 }
-body{background:var(--felt);color:var(--ink);font-family:var(--body);margin:0;
+body{background:var(--felt);color:var(--ink);font-family:var(--body);margin:0;font-size:clamp(0.95rem, 0.85rem + 0.3vw, 1.1rem);
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px}
+.bar,.tracker,.board,details.history{max-width:82rem;margin-inline:auto}
 h1{font-family:var(--display);font-weight:400;color:var(--gold);font-size:1.35rem;letter-spacing:.02em;margin:0}
 .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
 .bar select,.bar input{background:var(--felt2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-family:var(--body)}
@@ -23,29 +25,29 @@ button:disabled{opacity:.4;cursor:default}
 .tracker span{font-size:.68rem;letter-spacing:.06em;border:1px solid var(--line);border-radius:4px;padding:2px 6px;color:var(--muted)}
 .tracker span.called{opacity:.32;text-decoration:line-through}
 .tracker span.now{background:var(--gold);color:#2a2040;border-color:var(--gold);opacity:1;font-weight:600}
-.board{display:grid;gap:14px}
-.panel{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--felt2)}
+.board{display:grid;gap:1rem}
+.panel{border:1px solid var(--line);border-radius:0.8rem;padding:0.9rem;background:var(--felt2);min-width:0}
 .panel.me{border-color:var(--gold)}
-@media (min-width:980px){ .panel.me{grid-column:1 / -1} }
+
 .phead{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;margin-bottom:10px}
 .phead .who{font-family:var(--display);font-size:1rem;color:var(--ink)}
 .phead .who.active{color:var(--gold)}
 .stat{font-size:.9rem;color:var(--muted)}.stat b{color:var(--ink);font-variant-numeric:tabular-nums;font-size:1.05rem}
 .cred{color:var(--rose);letter-spacing:.12em}
 .rowlabel{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:10px 0 6px}
-.cards{display:flex;flex-wrap:wrap;gap:9px;min-height:30px}
-.card{width:118px;min-height:126px;border-radius:9px;padding:8px;display:flex;flex-direction:column;gap:4px;position:relative;
+.cards{display:flex;flex-wrap:wrap;gap:0.6rem;min-height:2rem;min-width:0}
+.card{width:var(--cw);min-height:calc(var(--cw) * 1.08);border-radius:0.55em;padding:0.6em;font-size:1em;display:flex;flex-direction:column;gap:4px;position:relative;
   background:var(--paper);color:var(--paper-ink);border:1px solid #0006;box-shadow:0 2px 6px #0007}
-.card .num{position:absolute;top:6px;right:8px;font-family:var(--display);font-size:.8rem;opacity:.55}
-.card .nm{font-family:var(--display);font-size:.82rem;line-height:1.15;margin-top:2px;text-wrap:balance}
-.card .en{font-size:.72rem;font-style:italic;opacity:.75}
-.card .fx{font-size:.7rem;line-height:1.25;margin-top:auto;opacity:.9}
-.card .chips{display:flex;gap:5px;font-size:.72rem;font-weight:600}
+.card .num{position:absolute;top:0.4em;right:0.55em;font-family:var(--display);font-size:.8em;opacity:.55}
+.card .nm{font-family:var(--display);font-size:.84em;line-height:1.15;margin-top:2px;padding-right:1.1em;text-wrap:balance;overflow-wrap:anywhere}
+.card .en{font-size:.72em;font-style:italic;opacity:.75}
+.card .fx{font-size:.7em;line-height:1.25;margin-top:auto;opacity:.9}
+.card .chips{display:flex;gap:0.35em;font-size:.72em;font-weight:600;flex-wrap:wrap}
 .card .chips span{background:#2a204014;border-radius:4px;padding:1px 5px}
 .card.event{background:linear-gradient(170deg,#5e4a9e,#473579);color:#f3edff;border-color:#8d7bd8}
 .card.grace{background:linear-gradient(170deg,#e8b84b,#d9a02e);color:#2a2040}
 .card.trader{background:linear-gradient(170deg,#2f6b58,#1f4e3f);color:#eafff5;border-color:#4fc3a1}
-.card.deed{width:76px;min-height:84px;background:#d9a02e;color:#2a2040}
+.card.deed{width:calc(var(--cw) * 0.72);min-height:calc(var(--cw) * 0.62);background:#d9a02e;color:#2a2040}
 .card.buyable,.card.clickable{cursor:pointer;outline:2px solid transparent;transition:outline-color .15s, transform .15s}
 .card.buyable:hover,.card.clickable:hover{outline-color:var(--gold);transform:translateY(-2px)}
 .card.dim{opacity:.55}
@@ -57,14 +59,14 @@ button:disabled{opacity:.4;cursor:default}
 .box .kind{font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .lines{font-size:.85rem;display:grid;gap:3px;max-height:180px;overflow:auto}
 .lines .bad{color:var(--rose)}.lines .good{color:var(--teal)}
-.mecols{display:grid;grid-template-columns:96px 1fr;gap:12px}
-.mecols .deedcol .card.deed{width:84px;min-height:72px}
+.mecols{display:grid;grid-template-columns:calc(var(--cw) * 0.8 + 1rem) minmax(0,1fr);gap:0.9rem}
+
 @media (max-width:700px){ .mecols{grid-template-columns:1fr} .mecols .deedcol .cards{flex-direction:row !important} }
 details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 .log{font-size:.8rem;max-height:220px;overflow:auto;display:grid;gap:2px;margin-top:8px;color:var(--muted)}
 .toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--gold);color:#2a2040;font-weight:600;border-radius:7px;padding:9px 15px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:calc(100vw - 32px)}
 .toast.show{opacity:1}
-@media (min-width:980px){ .board{grid-template-columns:1fr 1fr} .center{grid-column:1 / -1;order:-1} }
+
 </style>
 
 <div class="bar">
@@ -118,6 +120,26 @@ const FX = { elote: 'Slowly appreciates', moneda: 'Pays 1 cash a turn', lingote:
   vela: 'Play: peek at the next two calls', limosna: 'Play: give 2, pocket 3 cash', diezmo: 'Play: bank 2', promesa: 'Play: credibility shielded this round' };
 const NUM = {}; [...TRADERS.map((t) => t.key), ...ASSETS.map((a) => a.key)].forEach((k, i) => NUM[k] = i + 1); EVENTS.forEach((e, i) => NUM[e.key] = NUM[e.key] || 31 + i); GRACES.forEach((g, i) => NUM[g] = 51 + i); NUM.senora = 80;
 const VOLM = ['○', '◑', '●'];
+const CALLFX = { gallo: 'Both players gain 1 cash, and the first card each plays this round costs 1 less.',
+  toro: 'A standing market: every asset is worth +1 while the bull runs.',
+  oso: 'A standing market: sells pay 1 less, and feral (●) assets halve now.',
+  impresora: 'A standing market: +1 cash each turn — and every asset loses 1 value when the printer stops.',
+  luna: 'Feral (●) assets double right now; EL COHETE triples.',
+  sol: 'A standing market: sells pay +1 while the sun shines.',
+  paraguas: 'A standing market: the next disaster cannot touch anyone\'s portfolio.',
+  cadenas: 'A standing market: LA MINA and EL JARDÍN stop paying.',
+  torre: 'Every asset loses half its value. EL LINGOTE and locked cards stand.',
+  mano: 'Each player loses their most volatile asset to the Regulator.',
+  balanza: 'Every trap is revealed and burned; its owner loses 2 credibility. LA DETECTIVE keeps clean books.',
+  muerte: 'Both Traders lose 2 credibility.',
+  arana: 'Every EL PUENTE and EL POZO on the table is burned to nothing.',
+  alacran: 'The Trader with less credibility loses 2 more.',
+  calavera: 'Whoever has sold the most gains 3; the other loses 2 from the Bank.',
+  borracho: 'Each player must buy the top card of the deck if they can afford it.',
+  rueda: 'The two portfolios change hands. LA CORONA refuses the wheel.',
+  ballena: 'The richest portfolio loses its best asset to the poorest. LAS LLAVES block it.',
+  campana: 'The final bell: the game ends at the end of this round, and wealth is counted.',
+  senora: 'The player with the deeper Good Deeds row banks their whole portfolio.' };
 
 for (const [id, label] of [['meT', 'You: '], ['botT', 'Bot: ']]) $(id).innerHTML = '<option value="">' + label + 'random Trader</option>' + TRADERS.map((t) => `<option value="${t.key}">${label}${esc(t.name)}</option>`).join('');
 
@@ -167,7 +189,8 @@ function popMenu(anchor, items) {
 }
 function showCall(c, done) {
   const host = $('overlayHost'); const lines = S.g.lines.slice(S.seen).map((l) => { const t = l.replace(/^\[R\d+\] /, ''); const cls = /FIRE SALE|takes|pops|burns|keeps half|dies|loses/.test(t) ? 'bad' : /ANSWERED|banks|\+|doubles/.test(t) ? 'good' : ''; return `<div class="${cls}">${esc(t)}</div>`; }).join(''); S.seen = S.g.lines.length;
-  host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">el gritón calls · ${esc(c.kind)}</div><div class="call">¡${esc(c.name)}!</div><div class="note">${esc(EN[c.key] || '')}</div><div class="lines">${lines}</div><button class="primary" id="callOk">Continue</button></div></div>`;
+  const first = S.g.called.length <= 1 ? '<div class="note" style="border-top:1px solid var(--line);padding-top:8px">El gritón opens every round with one call from the Events deck. It applies to both players at once; the strip above the table shows every card already called and everything still waiting.</div>' : '';
+  host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">el gritón calls · ${esc(c.kind)}</div><div class="call">¡${esc(c.name)}!</div><div class="note">${esc(EN[c.key] || '')}</div><div style="font-size:.95em">${esc(CALLFX[c.key] || '')}</div><div class="lines">${lines}</div>${first}<button class="primary" id="callOk">Continue</button></div></div>`;
   const close = () => { host.innerHTML = ''; render(); done(); };
   host.querySelector('#callOk').addEventListener('click', close);
 }

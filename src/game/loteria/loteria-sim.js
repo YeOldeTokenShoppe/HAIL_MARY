@@ -72,8 +72,8 @@ export class Game {
       dieUsed: false, given: [], offeredThisTurn: false, buries: cfg.trader.key === 'gato' ? 2 : 0, pumps: cfg.trader.key === 'sirena' ? 2 : 0,
       stats: { buys: 0, sells: 0, payouts: 0, dedicated: 0, offers: 0, refused: 0, gracesPlayed: 0, rolled: 0, answered: 0, fireSales: 0 } }));
     // the caller's deck: 19 shuffled, LA CAMPANA into the last five calls
-    const rest = this.shuffle(EVENTS.filter((e) => e.key !== 'campana'));
-    this.calls = rest.slice(0, 19); this.calls.splice(15 + Math.floor(this.rng() * 5), 0, EVENTS.find((e) => e.key === 'campana'));
+    const rest = this.shuffle(EVENTS.filter((e) => e.key !== 'campana' && e.key !== 'gallo'));
+    this.calls = [EVENTS.find((e) => e.key === 'gallo'), ...rest]; this.calls.splice(15 + Math.floor(this.rng() * 5), 0, EVENTS.find((e) => e.key === 'campana'));
     // the asset bazaar: two copies of each, shuffled; a market row of four
     this.deck = this.shuffle(ASSETS.flatMap((a) => [this.inst(a), this.inst(a)])); this.discard = [];
     for (const p of this.players) for (let i = 0; i < 3; i++) p.hand.push(this.deck.shift());
