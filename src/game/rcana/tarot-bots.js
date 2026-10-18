@@ -42,9 +42,11 @@ export class StrongPolicy {
     if (!this.usePass) return false;
     if (p.bank + p.portfolio >= g.rules.winBank) return false; // bank and win instead
     if (g.rules.passDice) {
-      const odds = g.passOdds(p), m = g.rules.passMult;
-      if (g.opps(p).some((o) => g.wouldWinNext(o)) && p.bank + Math.floor(p.portfolio * m) >= g.rules.winBank) return true; // they win next turn; an answered throw wins NOW: pray at any odds
-      return odds * m > 1 + this.passMargin && p.portfolio >= 8; // otherwise only on positive expectation with a real stake
+      const odds = g.passOdds(p), W = g.wealth(p);
+      const winsNow = W * 2 >= g.rules.winBank && (g.rules.passStake === 'wealth' || p.bank + p.portfolio * 2 >= g.rules.winBank);
+      if (g.opps(p).some((o) => g.wouldWinNext(o)) && winsNow) return true; // they win next turn; an answered throw wins NOW: pray at any odds
+      const ev = odds * 2 + (1 - odds) * 0.5; // double, or keep half
+      return ev > 1 + this.passMargin && (winsNow || odds >= 1); // positive expectation, but only pull the trigger when it wins or cannot fail
     }
     if (g.rules.passLast) { const lead = Math.max(...g.opps(p).map((o) => o.bank + o.portfolio)); return p.bank + p.portfolio * g.rules.passMult > lead; } // the last play: throw if doubling could carry you past them
     const q = this.passSurvival(g, p); const m = g.rules.passMult;
@@ -93,7 +95,7 @@ export class StrongPolicy {
     const c = a.card; const r = c.rank;
     if (c.suit === 'coins') return r + g.modSum(p, 'coinsBonus');
     if (c.suit === 'candles') return (r * g.modProduct(p, 'candlesMult') + g.modSum(p, 'candlesBonus')) + g.yieldOf(p, a.choice.inst) - 0; // includes the Work it triggers
-    if (c.suit === 'cups') { const m = g.modProduct(p, 'cupsMult'); const o = a.choice.opp; const favorV = g.rules.v1b && !c.reversed ? 0.6 : 0; const deedV = g.rules.passDice && !p.hailMaryUsed && g.deeds(p) < g.rules.deedCap ? 0.6 : 0; const lead = o ? g.opps(p).reduce((mx, q) => Math.max(mx, q.bank), 0) - o.bank : 0; return favorV + deedV + r * m + g.modSum(p, 'cupsBonus') - Math.ceil(r / 2) * m * 0.7 + lead * 0.02; }
+    if (c.suit === 'cups') { const m = g.modProduct(p, 'cupsMult'); const o = a.choice.opp; const favorV = g.rules.v1b && !c.reversed ? 0.6 : 0; const lead = o ? g.opps(p).reduce((mx, q) => Math.max(mx, q.bank), 0) - o.bank : 0; return favorV + r * m + g.modSum(p, 'cupsBonus') - Math.ceil(r / 2) * m * 0.7 + lead * 0.02; }
     const t = a.choice.target; const amt = r * g.modProduct(p, 'chainsMult') + g.modSum(p, 'chainsBonus');
     if (t.isPass) return t.owner.inAir * 0.9 + Math.min(amt, t.owner.inAir);
     if (t.card) { const kills = t.drawdown + amt >= t.card.res; return kills ? 2 + g.yieldOf(t.owner, t) * this.horizon(g) * 0.8 + (t.card.kw.exitScam || 0) : amt * 0.35; }
@@ -106,6 +108,12 @@ export class StrongPolicy {
       case 'pip': { let v = this.pipValue(g, p, a) - a.cost * 0.2; if (a.card.suit === 'chains' && this.insurance && p.hand.filter((c) => c.suit === 'chains').length <= 1 && v < 4) v -= 1.5; return v; }
       case 'work': return a.ability ? (a.inst.card.id === 'chains_knight' && g.richestOpp(p) ? Math.min(3, g.richestOpp(p).portfolio) * 1.3 : 0.5) : g.yieldOf(p, a.inst);
       case 'foretell': return a.favor ? (p.favor >= 3 ? 0.6 : -1) : 0.6;
+      case 'deed': { // a card dedicated to Our Lady: worth most early and when the die is the plan
+        if (!g.rules.passDice || p.hailMaryUsed) return -1;
+        const d = g.deeds(p); const gated = g.rules.passLast; const rungs = (gated ? [1.2, 1.2, 1.4, 1.6] : [1.8, 1.8, 2.2, 2.6])[d] ?? -1; // insurance under the gate, a race without it
+        const use = a.card.type === 'court' ? this.courtValue(g, p, a.card, h) * 0.3 : a.card.type === 'trader' ? 1.5 : a.card.rank * 0.25;
+        return (p.hand.length >= 3 ? rungs : rungs - 1.2) - use + (g.isUnderdog(p) ? 0.3 : 0);
+      }
       case 'trader': { const c = a.card, ch = a.choice || {};
         if (c.key === 'margincall') { const t = ch.target; const kills = t.drawdown + 3 >= t.card.res; return (kills ? 3 + g.yieldOf(t.owner, t) * h + (t.card.kw.exitScam || 0) * 0.5 : 1.4) - a.cost * 0.2; }
         if (c.key === 'rebalance') { const n = Math.min(5, p.portfolio); const danger = g.opps(p).some((o) => o.hand.length >= 3); return n * (danger ? 0.4 : 0.2) + (p.bank + n >= g.rules.winBank ? 10 : 0) - a.cost * 0.2; }
