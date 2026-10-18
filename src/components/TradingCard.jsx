@@ -5,6 +5,10 @@ import { fxMaterial } from "../game/terminal-traders/fxMaterials.js";
 
 const REST_TILT = { rx: 0, ry: 0, mx: 50, my: 50, posx: 50, posy: 50, hyp: 0, lift: 0 };
 
+// Which frames may carry the glitter shine. Matched against the frame's src,
+// so it survives the frame registry being reordered or relabelled.
+const GLITTER_FRAMES = /frame_gold/;
+
 const RARITY_ACCENT = {
   Common: "#9cfce9",
   Uncommon: "#53ffd6",
@@ -300,6 +304,8 @@ export default function TradingCard({
   interactive = true,
   cornerBadge = null,
   templateStyle = "terminal",
+  // Shows data.backImage instead of the face. No-op when the card has no back.
+  flipped = false,
 }) {
   const cardRef = useRef(null);
   const interactingRef = useRef(false);
@@ -317,9 +323,19 @@ export default function TradingCard({
     return () => preference.removeEventListener("change", sync);
   }, []);
 
+  // `effects: "off"` is the master switch for every overlay effect — art
+  // foil, background holo, shine/glare, vignette and the FX sheets — so a
+  // flat print (the Lotería cards) renders as ink only. Tilt is interaction,
+  // not an overlay, and stays on.
+  const plain = data.effects === "off";
+  // `layout: "print"` renders data.printImage as the whole face: no frame
+  // grid, no text layers. The frame image, set badge and corner badge still
+  // apply if the caller sets them.
+  const isPrint = data.layout === "print" && Boolean(data.printImage);
+  const hasBack = Boolean(data.backImage);
   // Hard cap at 3: past that the effects stop reading as distinct and just
   // fog the card (MAX_FX in cardFrames.js).
-  const fxLayers = (data.fxOverlays || []).filter(Boolean).slice(0, 3);
+  const fxLayers = plain ? [] : (data.fxOverlays || []).filter(Boolean).slice(0, 3);
 
   const badgeTone = data.badgeTone || BADGE_TONE[data.rarity] || "gold";
   const effectTone = EFFECT_TONES[data.abilityTone] || EFFECT_TONES.cyan;
@@ -346,6 +362,79 @@ export default function TradingCard({
   const foilTier =
     data.foilStyle ||
     (["Mythic", "Legendary"].includes(data.rarity) ? "hero" : "subtle");
+  // Background foil ("none" | "linear" | "motif" | "cosmos") and the
+  // card-level shine/glare pair ("off" | "on" | "soft"). Both default off so
+  // every existing caller renders exactly as it did before.
+  const bgFoil = plain ? "none" : data.bgFoil || "none";
+  // "body" clips the background holo out of the art window, the way a reverse
+  // holo stops at the art box. "full" lets it run over the art as well, which
+  // is what a patterned holo does on a full-art card — and this template's
+  // art is near full-bleed, so "body" alone reads as little more than trim.
+  const bgScope = data.bgScope || "body";
+  // The frame's foil plate: a full-bleed alpha map of which pixels are stamped
+  // metal, generated from the frame asset itself. Masking the shine with it is
+  // what keeps the holo on the border instead of flooding the card. Passed in
+  // rather than imported so this component stays decoupled from the frame
+  // registry; plateForFrame() in cardFrames.js resolves it.
+  const foilPlate = data.foilPlate || null;
+  const shineMode = plain ? "off" : data.shine || "off";
+  // "dodge" brightens every pixel the same way; "mirror" blends with overlay,
+  // which pivots on the underlying luminance and so chromes the light frame
+  // while leaving the dark artwork alone. See the shine CSS block.
+  //
+  // "glitter" is a GOLD-FRAME treatment, reserved the way rainbow is reserved
+  // for the terminal foils: it reads as the 30th-anniversary classic border,
+  // and spending it on silver or grey spends the signal for nothing. Asked for
+  // on any other frame it falls back to mirror, so a caller can set it
+  // unconditionally and still get something sensible. Widen GLITTER_FRAMES to
+  // open it up to more frames.
+  const shineBlendAsked = data.shineBlend || "dodge";
+  const shineBlend =
+    shineBlendAsked === "glitter" && !GLITTER_FRAMES.test(String(data.frameImage || ""))
+      ? "mirror"
+      : shineBlendAsked;
+  // Stable per-card sparkle seed. The glitter field and the motif tiling are
+  // offset by it, so two cards side by side never sparkle in the same places
+  // — and a given card sparkles the same way on every render, which a
+  // Math.random() seed would not.
+  // The art window is NOT a containing block (its position:relative is
+  // commented out below), so .tc-art spans the whole .tc-frame — there is no
+  // exposed card body for a background foil to show through. The background
+  // holo therefore paints ABOVE the art and clips the art window back out,
+  // and the clip needs the window's real geometry, which the frame's grid
+  // decides at layout time. Measure it and publish it as --aw-*.
+  const cardElRef = React.useRef(null);
+  const artWindowRef = React.useRef(null);
+  React.useEffect(() => {
+    const win = artWindowRef.current;
+    const cardEl = cardElRef.current;
+    if (!win || !cardEl) return undefined;
+    const measure = () => {
+      const a = win.getBoundingClientRect();
+      const c = cardEl.getBoundingClientRect();
+      if (!c.width || !c.height) return;
+      // Both rects carry the same scale() so the ratio cancels it out.
+      cardEl.style.setProperty("--aw-x", ((a.left - c.left) / c.width) * 100 + "%");
+      cardEl.style.setProperty("--aw-y", ((a.top - c.top) / c.height) * 100 + "%");
+      cardEl.style.setProperty("--aw-r", ((a.right - c.left) / c.width) * 100 + "%");
+      cardEl.style.setProperty("--aw-b", ((a.bottom - c.top) / c.height) * 100 + "%");
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(win);
+    ro.observe(cardEl);
+    return () => ro.disconnect();
+  });
+
+  const foilSeed = React.useMemo(() => {
+    const key = String(data.id || data.name || "rl80");
+    let h = 2166136261;
+    for (let i = 0; i < key.length; i += 1) {
+      h ^= key.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return { x: ((h >>> 0) % 997) / 997, y: ((h >>> 11) % 991) / 991 };
+  }, [data.id, data.name]);
   const statPair =
     data.statPair ||
     (data.startingCred != null
@@ -455,9 +544,22 @@ export default function TradingCard({
       <style>{CARD_STYLES}</style>
       <style>{CLASSIC_STYLES}</style>
 
+      {/* The flip lives on its own wrapper so it can run slow (700ms) while
+          the tilt on .tc-card stays snappy. It is a plain div unless the
+          card has a back. */}
       <div
-        className={`tc-card tc-card--${templateStyle}${overlayImage ? " is-overlaid" : ""}${data.frameImage ? " is-framed" : ""}${BADGE_STYLE === "ticket" ? " is-ticket" : ""}`}
+        className={`tc-flip${hasBack ? " has-back" : ""}${hasBack && flipped ? " is-flipped" : ""}`}
+        style={hasBack ? { "--flip": flipped ? "180deg" : "0deg" } : undefined}
+      >
+      <div
+        ref={cardElRef}
+        className={`tc-card tc-card--${templateStyle}${overlayImage ? " is-overlaid" : ""}${data.frameImage ? " is-framed" : ""}${BADGE_STYLE === "ticket" ? " is-ticket" : ""}${plain ? " is-plain" : ""}${isPrint ? " is-print" : ""}${hasBack ? " has-back" : ""}`}
         data-foil={foilTier}
+        data-bg-foil={bgFoil}
+        data-bg-scope={bgScope}
+        data-shine={shineMode}
+        data-shine-blend={shineBlend}
+        data-plate={foilPlate ? "on" : "off"}
         data-fx-depth={fxDepth > 0 && fxLayers.length > 0}
         onMouseMove={handleMove}
         onMouseLeave={handleLeave}
@@ -474,10 +576,28 @@ export default function TradingCard({
           "--posy": `${tilt.posy}%`,
           "--hyp": tilt.hyp,
           "--lift": tilt.lift,
+          // Normalised 0..1 pointer position. The background recipes offset
+          // their texture layers by these rather than by --mx/--my, so the
+          // textures drift at a different rate than the gradients do — that
+          // mismatch is what sells the layers as separate depths.
+          "--pointer-from-left": tilt.mx / 100,
+          "--pointer-from-top": tilt.my / 100,
+          "--seedx": foilSeed.x,
+          "--seedy": foilSeed.y,
+          "--shine-strength": data.shineStrength ?? 1,
+          "--foil-plate": foilPlate ? `url("${foilPlate}")` : "none",
         }}
       >
         <div className="tc-card-face">
-          {templateStyle === "classic" ? (
+          {isPrint ? (
+            <img
+              className="tc-print"
+              src={data.printImage}
+              alt={data.name || ""}
+              draggable={false}
+              decoding="async"
+            />
+          ) : templateStyle === "classic" ? (
             <ClassicFrame
               data={data}
               tilt={tilt}
@@ -490,6 +610,12 @@ export default function TradingCard({
           ) : (
           <>
           <div className="tc-body-fill" />
+          {/* Background foil. Deliberately at z 2: the frame content sits at
+              z 5 and the art window paints its own opaque backing, so this
+              shows through only where the card body shows — a reverse holo,
+              without a hand-cut clip-path that would need re-cutting every
+              time the frame grid reflows. */}
+          <div className="tc-bg-holo" />
 
           {overlayImage && (
             <img
@@ -504,7 +630,7 @@ export default function TradingCard({
 
           <div className="tc-frame">
             {/* ───── ART WINDOW (image + foil + floating overlays live here) ───── */}
-            <div className="tc-art-window">
+            <div className="tc-art-window" ref={artWindowRef}>
               <CardArtwork
                 data={data}
                 tilt={tilt}
@@ -736,7 +862,27 @@ export default function TradingCard({
               <span>{cornerBadge}</span>
             </div>
           )}
+
+          {/* Refraction, then specular. Both sit above every printed layer
+              (frame art is z 12, FX z 13) so they read as light landing ON
+              the card rather than as ink IN it. */}
+          <div className="tc-card-shine" />
+          <div className="tc-card-glare" />
         </div>
+
+        {/* Printed back: a second plane rotated 180° behind the face. Both
+            planes hide their backface, so the flip wrapper shows exactly one. */}
+        {hasBack && (
+          <div className="tc-card-back" aria-hidden={!flipped}>
+            <img
+              className="tc-print"
+              src={data.backImage}
+              alt=""
+              draggable={false}
+              decoding="async"
+            />
+          </div>
+        )}
 
         {/* Unclipped siblings of the printed face: each FX sheet has its own
             depth and follows the tilt, opposite to the artwork's small drift. */}
@@ -784,6 +930,7 @@ export default function TradingCard({
             </React.Fragment>
           );
         })}
+      </div>
       </div>
     </div>
   );
@@ -846,6 +993,73 @@ const CARD_STYLES = `
   }
 
   .tc-card[data-fx-depth="true"] { transform-style: preserve-3d; }
+
+  /* ── Flip ── The wrapper carries the slow half-turn; the card inside keeps
+     its fast tilt. Face and back are coplanar with hidden backfaces, so each
+     half of the turn shows exactly one of them. Both need preserve-3d from
+     the wrapper down, or the back would flatten into a mirrored face. */
+  .tc-flip.has-back {
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transform: rotateY(var(--flip, 0deg));
+    transition: transform 700ms cubic-bezier(.4, .1, .2, 1);
+  }
+  .tc-card.has-back { transform-style: preserve-3d; }
+  .tc-card.has-back .tc-card-face,
+  .tc-card-back {
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+  /* WebKit ignores the hidden backface here (it painted the back, mirrored,
+     over the face), so the planes are also separated in depth: the face sits
+     2px proud and wins the depth sort until the wrapper turns it away. */
+  .tc-card.has-back .tc-card-face { transform: translateZ(2px); }
+  /* And a third guard that needs no 3D sorting at all: each plane is only
+     visible on its own half of the turn. The wrapper's ease (.4,.1,.2,1)
+     passes 90° at ~33% of its 700ms, so the swap is delayed 235ms, not 350,
+     to land where both planes are edge-on. Retune if the ease changes. */
+  .tc-card.has-back .tc-card-face,
+  .tc-card.has-back .tc-fx,
+  .tc-card.has-back .tc-fx-reflection,
+  .tc-card-back { transition: visibility 0s 235ms; }
+  .tc-flip.has-back:not(.is-flipped) .tc-card-back { visibility: hidden; }
+  .tc-flip.is-flipped .tc-card-face,
+  .tc-flip.is-flipped .tc-fx,
+  .tc-flip.is-flipped .tc-fx-reflection { visibility: hidden; }
+  .tc-card-back {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    overflow: hidden;
+    background: #0a0805;
+    transform: rotateY(180deg);
+  }
+
+  /* ── Print layout ── the image is the whole face. Same cover crop on the
+     back, which shares the master's aspect. */
+  .tc-print {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  /* ── Plain ── data.effects === "off": every overlay effect gone, ink only.
+     Belt and braces with the JS (fxLayers/bgFoil/shine are also zeroed), so
+     a stray data-* attribute can't bring a layer back. */
+  .tc-card.is-plain .tc-bg-holo,
+  .tc-card.is-plain .tc-foil,
+  .tc-card.is-plain .tc-shine,
+  .tc-card.is-plain .tc-art-inner-vignette,
+  .tc-card.is-plain .tc-card-shine,
+  .tc-card.is-plain .tc-card-glare,
+  .tc-card.is-plain .tc-fx,
+  .tc-card.is-plain .tc-fx-reflection { display: none !important; }
 
   /* Clip and composite the printed card on its own plane. overflow:hidden or
      isolation:isolate on .tc-card would flatten the raised FX back into it. */
@@ -2360,6 +2574,499 @@ const CARD_STYLES = `
   .tc-meta-rarity b {
     color: var(--r) !important;
     text-shadow: 0 0 8px color-mix(in srgb, var(--r) 50%, transparent);
+  }
+
+  /* ======================================================================
+     CARD-LEVEL HOLO SYSTEM
+     .tc-foil (above) foils the ARTWORK. These three foil the CARD:
+
+       .tc-bg-holo     z 11  background foil, above the art, under the border
+       .tc-card-shine  z 30  refraction - diffraction bands + iridescence
+       .tc-card-glare  z 31  the wet specular highlight; nothing blends above
+
+     All three run off the pointer vars the art foil already publishes
+     (--mx/--my, --posx/--posy, --hyp, --lift) plus --pointer-from-left/top
+     and a stable per-card --seedx/--seedy.
+
+     Everything is display:none until data-bg-foil / data-shine turn it on,
+     so cards that don't opt in pay nothing - these are expensive layers and
+     the art foil already pushed iOS Safari's GPU ceiling once.
+
+     Textures in public/TCG/foils/ are generated, not lifted from a published
+     holo library - those are GPL-3.0 or third-party CDN assets, and neither
+     belongs in a commercial brand repo.
+     ====================================================================== */
+
+  .tc-card {
+    --foil-grain: url("/TCG/foils/rl80-grain.webp");
+    --foil-glitter: url("/TCG/foils/rl80-glitter.webp");
+    --foil-iri: url("/TCG/foils/rl80-iri.webp");
+    --foil-noise: url("/TCG/foils/rl80-noise.webp");
+    --foil-flakes: url("/TCG/foils/rl80-flakes.webp");
+    /* The flake texture is 512px and the card is 744px wide, so ~69% renders
+       it 1:1. Go much below that and the flakes are scaled under a pixel and
+       average into flat grey - which looks like no glitter at all, not small
+       glitter. Raise it for coarser flakes, never lower it for finer ones. */
+    --flake-size: 68%;
+    /* Width of the border ring, as a share of the card. Used only as the
+       no-plate fallback for glitter. */
+    --edge-inset: 4.6%;
+    --glitter-warm: #ffd96b;
+    --glitter-deep: #7a5410;
+
+    /* Swap for any high-contrast single-shape SVG to change the background
+       motif - it is used as a mask, so only its alpha matters. */
+    --foil-motif: url("/TCG/frames/money2.svg");
+    --foil-motif-size: 28%;
+    --foil-motif-tile: 260px;
+
+    /* The six angles a diffraction grating throws. */
+    --sun-1: hsl(2, 100%, 73%);
+    --sun-2: hsl(53, 100%, 69%);
+    --sun-3: hsl(93, 100%, 69%);
+    --sun-4: hsl(176, 100%, 76%);
+    --sun-5: hsl(228, 100%, 74%);
+    --sun-6: hsl(283, 100%, 73%);
+
+    /* Band period for the diffraction ramp. Fixed in px, not %, so the bands
+       stay fine at every --scale instead of fanning out on the big preview. */
+    --sun-step: 7px;
+
+    /* Art-window rect, written by the measurement effect. The fallbacks are
+       the terminal frame's resting geometry, used for the first paint and
+       for templates that have no art window at all. */
+    --aw-x: 4.3%;
+    --aw-y: 2.7%;
+    --aw-r: 95.7%;
+    --aw-b: 57%;
+
+    /* Master dial, 0..1 - the card-template slider writes this. */
+    --shine-strength: 1;
+  }
+
+  /* ----- Background foil -------------------------------------------------
+     Clipped with a self-intersecting polygon: it walks the card's outer edge
+     clockwise, then traces the art window counter-clockwise, which punches
+     the window out under the nonzero fill rule. Same trick a reverse holo
+     uses on a real card, where the foil stops at the art box. */
+
+  .tc-bg-holo {
+    position: absolute;
+    inset: 0;
+    z-index: 11;
+    display: none;
+    pointer-events: none;
+    border-radius: inherit;
+    will-change: background-position, filter, opacity;
+    opacity: calc((.26 + .32 * var(--lift, 0)) * var(--shine-strength, 1));
+    transition: opacity 240ms ease;
+  }
+
+  .tc-card[data-bg-scope="body"] .tc-bg-holo {
+    clip-path: polygon(
+      0% 0%, 100% 0%, 100% 100%, 0% 100%,
+      0% var(--aw-y),
+      var(--aw-x) var(--aw-y),
+      var(--aw-x) var(--aw-b),
+      var(--aw-r) var(--aw-b),
+      var(--aw-r) var(--aw-y),
+      var(--aw-x) var(--aw-y),
+      0% var(--aw-y)
+    );
+  }
+
+  .tc-card[data-bg-foil="linear"] .tc-bg-holo,
+  .tc-card[data-bg-foil="motif"] .tc-bg-holo,
+  .tc-card[data-bg-foil="cosmos"] .tc-bg-holo { display: block; }
+
+  /* LINEAR - the plain reverse-holo sheen. */
+  .tc-card[data-bg-foil="linear"] .tc-bg-holo {
+    background-image:
+      repeating-linear-gradient(
+        calc(72deg + var(--ry, 0deg) * 1.4),
+        var(--sun-1) 0, var(--sun-2) calc(var(--sun-step) * 1.6),
+        var(--sun-3) calc(var(--sun-step) * 3.2), var(--sun-4) calc(var(--sun-step) * 4.8),
+        var(--sun-5) calc(var(--sun-step) * 6.4), var(--sun-6) calc(var(--sun-step) * 8),
+        var(--sun-1) calc(var(--sun-step) * 9.6)
+      ),
+      var(--foil-grain);
+    background-size: 100% 100%, 300px 300px;
+    background-position:
+      calc(50% + (50% - var(--posx, 50%)) * 5) calc(50% + (50% - var(--posy, 50%)) * 3),
+      calc(var(--seedx, 0) * 400px) calc(var(--seedy, 0) * 400px);
+    background-blend-mode: overlay;
+    mix-blend-mode: color-dodge;
+    filter: brightness(calc(.20 + .20 * var(--hyp, 0))) contrast(1.5) saturate(1.05);
+  }
+
+  /* MOTIF - the patterned background holo. The sigil is tiled as a MASK over
+     the rainbow rather than drawn as an image: the colour survives only where
+     a sigil sits AND where the cursor is near. That second mask is the whole
+     trick - without it the pattern sits there like printed wallpaper; with
+     it, the sigils light up in a pool that swims across the card as it tilts.
+     mask-composite intersect (source-in on WebKit) is what ANDs the two. */
+  .tc-card[data-bg-foil="motif"] .tc-bg-holo {
+    opacity: calc((.42 + .45 * var(--lift, 0)) * var(--shine-strength, 1));
+    background-image:
+      linear-gradient(
+        calc(45deg + var(--ry, 0deg) * 2),
+        var(--sun-4), var(--sun-5), var(--sun-6),
+        var(--sun-1), var(--sun-2), var(--sun-3), var(--sun-4)
+      ),
+      var(--foil-iri);
+    background-size: 220% 220%, 160% 160%;
+    background-position:
+      var(--mx, 50%) var(--my, 50%),
+      calc(var(--pointer-from-left, .5) * 100%) calc(var(--pointer-from-top, .5) * 100%);
+    background-blend-mode: soft-light;
+    mix-blend-mode: screen;
+    filter: brightness(calc(.34 + .34 * var(--hyp, 0))) contrast(1.35) saturate(1.2);
+
+    -webkit-mask-image:
+      var(--foil-motif),
+      radial-gradient(farthest-corner circle at var(--mx, 50%) var(--my, 50%),
+        #000 6%, rgba(0, 0, 0, .40) 38%, transparent 74%);
+    mask-image:
+      var(--foil-motif),
+      radial-gradient(farthest-corner circle at var(--mx, 50%) var(--my, 50%),
+        #000 6%, rgba(0, 0, 0, .40) 38%, transparent 74%);
+    -webkit-mask-size: var(--foil-motif-size) auto, cover;
+    mask-size: var(--foil-motif-size) auto, cover;
+    -webkit-mask-position:
+      calc(var(--seedx, 0) * var(--foil-motif-tile)) calc(var(--seedy, 0) * var(--foil-motif-tile)), center;
+    mask-position:
+      calc(var(--seedx, 0) * var(--foil-motif-tile)) calc(var(--seedy, 0) * var(--foil-motif-tile)), center;
+    -webkit-mask-repeat: repeat, no-repeat;
+    mask-repeat: repeat, no-repeat;
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+
+  /* COSMOS - glitter field over a slow rainbow, for the terminal rarities. */
+  .tc-card[data-bg-foil="cosmos"] .tc-bg-holo {
+    background-image:
+      var(--foil-glitter),
+      /* repeating, not plain: a plain gradient driven this far past the box
+         clamps to its end colour and lands a hard bar down one edge */
+      repeating-linear-gradient(calc(120deg + var(--ry, 0deg) * 3),
+        var(--sun-1) 0, var(--sun-3) calc(var(--sun-step) * 9),
+        var(--sun-5) calc(var(--sun-step) * 18), var(--sun-1) calc(var(--sun-step) * 27));
+    background-size: 38% 38%, 100% 100%;
+    background-position:
+      calc(var(--seedx, 0) * 500px + (50% - var(--posx, 50%)) * .6)
+        calc(var(--seedy, 0) * 500px + (50% - var(--posy, 50%)) * .6),
+      calc(50% + (50% - var(--posx, 50%)) * 4) calc(50% + (50% - var(--posy, 50%)) * 2);
+    background-blend-mode: color-dodge;
+    mix-blend-mode: screen;
+    filter: brightness(calc(.55 + .45 * var(--hyp, 0))) contrast(1.5) saturate(1.1);
+  }
+
+  /* ----- Shine (refraction) ----------------------------------------------
+     Two blend modes, selected by data-shine-blend:
+
+       dodge  (default) - color-dodge. Brightens every pixel it lands on by
+                the same rule, so the card lifts uniformly.
+       mirror           - overlay, simey's rare-holo pivot. Overlay is a PIVOT
+                blend: against light pixels it drives hard toward white and
+                saturates, against dark ones it barely moves. Nothing in it
+                targets the frame - the frame is simply the lightest pixels on
+                the card, so the same rainbow that stays invisible over the
+                artwork blows out into chrome on the border. contrast(3) then
+                crushes it into hard bright/dark bands, which is what reads as
+                polished rather than merely tinted. It needs no plate and no
+                measuring; it finds the border by luminance alone.
+
+     Mode tunables live as vars on .tc-card so soft/plate/mirror compose by
+     overriding a value rather than re-declaring the whole layer. */
+
+  .tc-card {
+    --shine-blend: color-dodge;
+    --shine-filter: brightness(calc(.20 + .28 * var(--hyp, 0))) contrast(1.7) saturate(.85);
+    --shine-op: calc(.10 + .26 * var(--lift, 0));
+  }
+
+  /* SOFT - dialled back for the commons, where a full sweep over the body
+     makes the card read as a higher rarity than it is. */
+  .tc-card[data-shine="soft"] {
+    --shine-op: calc(.05 + .14 * var(--lift, 0));
+    --shine-filter: brightness(calc(.16 + .18 * var(--hyp, 0))) contrast(1.4) saturate(.65);
+  }
+
+  /* A plated shine lights far less area, so it can run hotter. */
+  .tc-card[data-plate="on"][data-shine="on"] {
+    --shine-op: calc(.30 + .58 * var(--lift, 0));
+    --shine-filter: brightness(calc(.34 + .40 * var(--hyp, 0))) contrast(1.9) saturate(.9);
+  }
+  .tc-card[data-plate="on"][data-shine="soft"] {
+    --shine-op: calc(.14 + .32 * var(--lift, 0));
+  }
+
+  .tc-card-shine {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    display: none;
+    pointer-events: none;
+    border-radius: inherit;
+    overflow: hidden;
+    will-change: background-position, filter, opacity;
+    mix-blend-mode: var(--shine-blend);
+    opacity: calc(var(--shine-op) * var(--shine-strength, 1));
+    transition: opacity 240ms ease;
+
+    background-image:
+      /* fine diffraction bands - the angle swings with the tilt, which is
+         what makes them sweep rather than just slide */
+      repeating-linear-gradient(
+        calc(100deg + var(--ry, 0deg) * 3),
+        var(--sun-1) 0, var(--sun-2) var(--sun-step),
+        var(--sun-3) calc(var(--sun-step) * 2), var(--sun-4) calc(var(--sun-step) * 3),
+        var(--sun-5) calc(var(--sun-step) * 4), var(--sun-6) calc(var(--sun-step) * 5),
+        var(--sun-1) calc(var(--sun-step) * 6)
+      ),
+      /* broad iridescent smear, parallaxed the other way */
+      var(--foil-iri),
+      /* glitter, anchored to the card by its seed */
+      var(--foil-glitter);
+
+    background-size: 100% 100%, 140% 140%, 26% 26%;
+    background-position:
+      calc(50% + (50% - var(--posx, 50%)) * 6) calc(50% + (50% - var(--posy, 50%)) * 3),
+      calc(var(--pointer-from-left, .5) * 140%) calc(var(--pointer-from-top, .5) * 140%),
+      calc(var(--seedx, 0) * 600px + (50% - var(--posx, 50%)) * .8)
+        calc(var(--seedy, 0) * 600px + (50% - var(--posy, 50%)) * .8);
+    background-blend-mode: overlay, soft-light;
+    filter: var(--shine-filter);
+  }
+
+  .tc-card[data-shine="on"] .tc-card-shine,
+  .tc-card[data-shine="soft"] .tc-card-shine { display: block; }
+
+  /* ----- Mirror mode ----------------------------------------------------- */
+
+  /* Unplated, the overlay covers the whole card. Simey's contrast(3) is
+     calibrated for a pale Pokemon card; on RL80's near-black body the same
+     numbers blow the frame out to lurid yellow, so unplated runs far gentler
+     and reads as a sheen rather than chrome. */
+  .tc-card[data-shine-blend="mirror"] {
+    --shine-blend: overlay;
+    --shine-filter: brightness(1.05) contrast(1.9) saturate(.7);
+    --shine-op: calc(.12 + .20 * var(--lift, 0));
+  }
+  .tc-card[data-shine-blend="mirror"][data-shine="soft"] {
+    --shine-op: calc(.06 + .11 * var(--lift, 0));
+  }
+
+  /* Plated, only the frame's stamped metal is lit, so it can take the full
+     recipe. This is the pairing that gives the mirrored border. */
+  .tc-card[data-shine-blend="mirror"][data-plate="on"] {
+    --shine-filter: brightness(1.22) contrast(3) saturate(.75);
+    --shine-op: calc(.42 + .55 * var(--lift, 0));
+  }
+  .tc-card[data-shine-blend="mirror"][data-plate="on"][data-shine="soft"] {
+    --shine-op: calc(.20 + .30 * var(--lift, 0));
+  }
+
+  /* One broad rainbow rather than the dodge stack's fine grating + textures:
+     overlay already supplies the contrast, so layering grain and glitter under
+     it just muddies the pivot. 400% keeps the bands wide enough to sweep. */
+  .tc-card[data-shine-blend="mirror"] .tc-card-shine {
+    background-image:
+      repeating-linear-gradient(
+        calc(10deg + var(--ry, 0deg) * 1.5),
+        var(--sun-1), var(--sun-2), var(--sun-3),
+        var(--sun-4), var(--sun-5), var(--sun-6), var(--sun-1)
+      );
+    background-size: 400% 400%;
+    background-position:
+      calc((50% - var(--posx, 50%)) + 50%) calc((50% - var(--posy, 50%)) + 50%);
+    background-blend-mode: normal;
+  }
+
+  /* The etched bars: two opposing bar gradients screened together, then
+     multiplied over the rainbow inside the shine's own stacking context.
+     This is the step that turns a smooth sheen into banded metal - without it
+     the border reads as tinted glass rather than polished chrome. */
+  .tc-card[data-shine-blend="mirror"] .tc-card-shine::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    /* Simey's bars run a 5% unit with black over most of the period. That
+       works on a pale Pokemon card, where the black runs read as the dark
+       grooves between highlights. On RL80's near-black body the same runs
+       just crush it, and at that period you get one fat stripe rather than
+       banding, so: finer unit, and grey instead of black for the gaps. */
+    --bars: 1.6%;
+    --bar-color: hsla(0, 0%, 78%, 1);
+    --bar-bg: hsla(0, 0%, 12%, 1);
+    opacity: .5;
+    background-image:
+      repeating-linear-gradient(calc(var(--ry, 0deg) * 0.5),
+        var(--bar-bg) calc(var(--bars) * 2.5),
+        var(--bar-color) calc(var(--bars) * 3.25),
+        hsla(0, 0%, 75%, .5) calc(var(--bars) * 3.5),
+        var(--bar-color) calc(var(--bars) * 3.75),
+        var(--bar-bg) calc(var(--bars) * 4.5),
+        var(--bar-bg) calc(var(--bars) * 8)
+      ),
+      repeating-linear-gradient(calc(var(--ry, 0deg) * -0.5),
+        var(--bar-bg) calc(var(--bars) * 2.5),
+        var(--bar-color) calc(var(--bars) * 3.25),
+        hsla(0, 0%, 75%, .5) calc(var(--bars) * 3.5),
+        var(--bar-color) calc(var(--bars) * 3.75),
+        var(--bar-bg) calc(var(--bars) * 4.5),
+        var(--bar-bg) calc(var(--bars) * 8)
+      );
+    background-position:
+      50% calc(var(--posy, 50%) * 1.2),
+      50% calc(var(--posy, 50%) * -1.2);
+    background-size: 200% 200%, 200% 200%;
+    background-blend-mode: screen;
+    filter: brightness(1) contrast(2) saturate(.75);
+    mix-blend-mode: multiply;
+  }
+
+  /* ----- Glitter mode ---------------------------------------------------
+     Embedded foil flakes, the 30th-anniversary gold-border look.
+
+     The whole trick is that the flake field is STATIC - anchored to the card
+     by its seed, never driven by the pointer - while broad sweeps move across
+     it. The sweeps and the flakes are multiplied, then run through a very
+     high contrast(), which behaves as a threshold: a flake lights only while
+     the sweep happens to be bright enough where that flake sits. So flakes
+     pop on and off IN PLACE as the card turns, which is what real glitter
+     does. Drive the flake texture's position with the pointer instead and you
+     get sliding confetti, which reads as cheap plastic.
+
+     Two sweeps at different rates, so the flakes do not all pop in unison. */
+
+  /* color-dodge: dodging by black is the identity, so the gaps between flakes
+     leave the gold exactly as painted, while a lit flake blows straight out of
+     it. hard-light also speckles but multiplies the gaps, which crushes a gold
+     border to near-black; screen is too weak to show against bright gold at
+     all. Dodge is the one that reads as foil embedded IN the metal. */
+  .tc-card[data-shine-blend="glitter"] {
+    --shine-blend: color-dodge;
+    --shine-filter: brightness(1.9) contrast(4.5) saturate(1.05);
+    --shine-op: calc(.55 + .40 * var(--lift, 0));
+  }
+  .tc-card[data-shine-blend="glitter"][data-shine="soft"] {
+    --shine-op: calc(.26 + .28 * var(--lift, 0));
+    --shine-filter: brightness(1.3) contrast(4.5) saturate(1.15);
+  }
+
+  /* The plate rules above are [data-plate][data-shine] = specificity (0,3,1),
+     which outranks a bare [data-shine-blend] at (0,2,1) - so a plated card
+     would otherwise inherit the plate's filter and lose the glitter threshold
+     entirely. Each blend mode needs its own plated pairing to win the cascade. */
+  .tc-card[data-shine-blend="glitter"][data-plate="on"] {
+    --shine-filter: brightness(1.9) contrast(4.5) saturate(1.05);
+    --shine-op: calc(.68 + .30 * var(--lift, 0));
+  }
+  .tc-card[data-shine-blend="glitter"][data-plate="on"][data-shine="soft"] {
+    --shine-filter: brightness(1.3) contrast(4.5) saturate(1.15);
+    --shine-op: calc(.30 + .30 * var(--lift, 0));
+  }
+
+  .tc-card[data-shine-blend="glitter"] .tc-card-shine {
+    background-image:
+      /* sweep A - follows the cursor, supplies the gold */
+      /* never reaches black: the far side of the border must still carry some
+         flakes, just fewer and dimmer than the side facing the light */
+      radial-gradient(farthest-corner circle at var(--mx, 50%) var(--my, 50%),
+        #ffffff 0%, var(--glitter-warm) 22%, var(--glitter-deep) 60%, #6b5a30 100%),
+      /* sweep B - a banded sheet travelling at a different rate and angle */
+      /* floors at #5a5a5a, not #000: these sweeps MULTIPLY the flake field, so
+         a true-black stop annihilates every flake under it instead of just
+         dimming it, and almost nothing survives the threshold. */
+      repeating-linear-gradient(calc(28deg + var(--ry, 0deg) * 7),
+        #5a5a5a 0%, #ffffff 14%, #5a5a5a 30%),
+      /* the flake field - position depends ONLY on the card's seed */
+      var(--foil-flakes);
+    background-size:
+      170% 170%,
+      240% 240%,
+      var(--flake-size) var(--flake-size);
+    background-position:
+      center,
+      calc(50% + (50% - var(--posx, 50%)) * 5) calc(50% + (50% - var(--posy, 50%)) * 5),
+      calc(var(--seedx, 0) * 400px) calc(var(--seedy, 0) * 400px);
+    background-blend-mode: multiply, multiply;
+  }
+
+  /* No etched bars in glitter mode - the flakes are the texture. */
+  .tc-card[data-shine-blend="glitter"] .tc-card-shine::after { display: none; }
+
+  /* Glitter without a plate would flood the whole card, which is never what
+     a glitter BORDER means - and a card can lose its plate quietly, e.g. when
+     the rarity maps to a frame id that no longer exists, so the frame and its
+     plate both resolve to null. Fall back to a plain border ring: the outer
+     edge traced clockwise, an inset rect traced counter-clockwise to punch the
+     middle out. The plate is still better when present, because it follows the
+     frame's real metal rather than a uniform band. */
+  .tc-card[data-shine-blend="glitter"][data-plate="off"] .tc-card-shine {
+    clip-path: polygon(
+      0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
+      var(--edge-inset) var(--edge-inset),
+      var(--edge-inset) calc(100% - var(--edge-inset)),
+      calc(100% - var(--edge-inset)) calc(100% - var(--edge-inset)),
+      calc(100% - var(--edge-inset)) var(--edge-inset),
+      var(--edge-inset) var(--edge-inset),
+      0% 0%
+    );
+  }
+
+  /* PLATE - confine the shine to the frame's stamped metal. The plate is a
+     full-bleed alpha map (white RGB, plate value in alpha) so it masks with
+     the default alpha mode; a greyscale plate would need mask-mode: luminance,
+     which is patchy, and would otherwise mask to fully solid. Mirror mode
+     needs no plate to find the border, but a plate still keeps the shine off
+     the body if you want the edge alone. */
+  .tc-card[data-plate="on"] .tc-card-shine {
+    -webkit-mask-image: var(--foil-plate);
+    mask-image: var(--foil-plate);
+    -webkit-mask-size: cover;
+    mask-size: cover;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+  }
+
+  /* ----- Glare (specular) ------------------------------------------------ */
+
+  .tc-card-glare {
+    position: absolute;
+    inset: 0;
+    z-index: 31;
+    display: none;
+    pointer-events: none;
+    border-radius: inherit;
+    will-change: background-image, opacity;
+    mix-blend-mode: overlay;
+    opacity: calc((.18 + .34 * var(--lift, 0)) * var(--shine-strength, 1));
+    transition: opacity 240ms ease;
+    background-image:
+      radial-gradient(farthest-corner circle at var(--mx, 50%) var(--my, 50%),
+        hsla(0, 0%, 100%, .55) 6%,
+        hsla(0, 0%, 100%, .26) 20%,
+        hsla(0, 0%, 0%, .45) 74%);
+    filter: brightness(.95) contrast(1.25);
+  }
+
+  .tc-card[data-shine="on"] .tc-card-glare,
+  .tc-card[data-shine="soft"] .tc-card-glare { display: block; }
+
+  .tc-card[data-shine="soft"] .tc-card-glare {
+    opacity: calc((.10 + .20 * var(--lift, 0)) * var(--shine-strength, 1));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tc-bg-holo,
+    .tc-card-shine,
+    .tc-card-glare { transition: none; }
   }
 `;
 

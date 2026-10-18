@@ -13,6 +13,7 @@
 // NOTE: the silver-etched file is named frame_mythic_no_badge_transparent —
 // that is the asset pack's name, not this set's tier. Confirmed silver → rare.
 const FRAME_DIR = "/TCG/frames";
+const FOIL_DIR = "/TCG/foils";
 
 // `metaTop` is where the card's EDITION/STYLE/RARITY/SET line is pinned so it
 // lands inside the frame's printed divider slot. Each frame draws that slot at
@@ -20,12 +21,26 @@ const FRAME_DIR = "/TCG/frames";
 // so this is per-frame data, not one constant. Values are the slot centre less
 // half the meta row's height; re-derive by scanning the asset for full-width
 // ink bands between 50% and 95% of height if a frame is ever re-exported.
+// `plate` is the frame's foil plate: a full-bleed alpha map marking which
+// pixels of the card are stamped metal. It is generated FROM the frame asset
+// (its own alpha says where the border is, its luminance carries the brushed
+// grain), so a plate and its frame always line up — re-run the plate script
+// if a frame is re-exported. The holo shine is masked by it, which is what
+// makes the border catch light while the card body stays matte.
 export const FRAMES = [
-  { id: "grey", label: "Grey", src: `${FRAME_DIR}/frame_grey.webp`, metaTop: "86.55%" },
-  { id: "silver", label: "Silver", src: `${FRAME_DIR}/frame_mythic_no_badge_transparent.webp`, metaTop: "86.45%" },
-  { id: "gold", label: "Gold", src: `${FRAME_DIR}/frame_gold.webp`, metaTop: "87.35%" },
-  { id: "rainbow", label: "Rainbow", src: `${FRAME_DIR}/frame_rainbow.webp`, metaTop: "86.6%" },
+  { id: "polished silver", label: "polished silver", src: `${FRAME_DIR}/frame_polished_silver.webp`, metaTop: "86.55%", plate: `${FOIL_DIR}/plate_grey.webp` },
+  { id: "silver", label: "Silver", src: `${FRAME_DIR}/frame_mythic_no_badge_transparent.webp`, metaTop: "86.45%", plate: `${FOIL_DIR}/plate_silver.webp` },
+  { id: "gold", label: "Gold", src: `${FRAME_DIR}/frame_gold.webp`, metaTop: "87.35%", plate: `${FOIL_DIR}/plate_gold.webp` },
+  { id: "rainbow", label: "Rainbow", src: `${FRAME_DIR}/frame_rainbow.webp`, metaTop: "86.6%", plate: `${FOIL_DIR}/plate_rainbow.webp` },
+    { id: "polished grey", label: "polished grey", src: `${FRAME_DIR}/frame_polished_grey.webp`, metaTop: "86.55%", plate: `${FOIL_DIR}/plate_grey.webp` },
+
 ];
+
+// Frame src -> its plate, so a card that only knows its frame image can find
+// the matching plate without the caller having to pass one.
+export function plateForFrame(src) {
+  return FRAMES.find((f) => f.src === src)?.plate || null;
+}
 
 const FRAME_SRC = Object.fromEntries(FRAMES.map((f) => [f.id, f.src]));
 

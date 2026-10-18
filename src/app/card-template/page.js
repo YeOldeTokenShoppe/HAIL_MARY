@@ -5,10 +5,11 @@ import TradingCard from "@/components/TradingCard";
 import { getCardById, GENESIS_SET, CARD_TYPES } from "@/game/terminal-traders/cards";
 import { toTemplateCard, CARD_ART } from "@/game/terminal-traders/templateCard";
 import {
-  FRAMES, FRAME_ID_BY_RARITY, FX_OVERLAYS, FX_BLEND_MODES, MAX_FX,
+  FRAMES, FRAME_ID_BY_RARITY, FX_OVERLAYS, FX_BLEND_MODES, MAX_FX, plateForFrame,
   FX_BLEND_DEFAULT, FX_OPACITY_DEFAULT,
 } from "@/game/terminal-traders/cardFrames";
 import { ROGUES } from "@/game/terminal-traders/rogues";
+import { LOTERIA_CARDS, toLoteriaCard } from "@/game/terminal-traders/loteria";
 
 // Every card renders straight from the engine through the game's own converter,
 // so the preview matches what the table shows (art comes from CARD_ART, keyed
@@ -44,11 +45,21 @@ const CARD_GROUPS = [
     title,
     items: pickerItems(GENESIS_SET.filter((card) => card.type === type).map((card) => card.id)),
   })),
+  // Lotería prints: finished PNG faces with a shared back, rendered in the
+  // template's print layout with every overlay effect off by default.
+  {
+    title: "Lotería",
+    items: LOTERIA_CARDS.map((card, i) => ({ id: card.id, card: toLoteriaCard(card, i), meta: "print" })),
+  },
   {
     title: "Blank",
     items: [{ id: "noart", card: NO_ART, name: "No artwork", meta: "frame only" }],
   },
 ];
+
+// The Rogues navigation group is inserted ahead of this group, i.e. right
+// below the four type groups.
+const ROGUES_BEFORE = "Lotería";
 
 // Every Genesis card is selectable, not just the ones in the picker — the
 // collection grid can open any of the 80. CARD_GROUPS adds only the synthetic
@@ -102,6 +113,19 @@ export default function CardTemplatePage() {
   const [artZoom, setArtZoom] = useState(1.25);
   const [artDepth, setArtDepth] = useState(1);
   const [foilStyle, setFoilStyle] = useState("hero");
+  // Card-level holo: the background foil under the ink, and the shine/glare
+  // pair over everything. Separate from foilStyle, which foils only the art.
+  const [bgFoil, setBgFoil] = useState("motif");
+  const [shineMode, setShineMode] = useState("on");
+  const [bgScope, setBgScope] = useState("full");
+  const [usePlate, setUsePlate] = useState(true);
+  const [shineBlend, setShineBlend] = useState("mirror");
+  const [shineStrength, setShineStrength] = useState(1);
+  // Master switch for every overlay effect (foil, holo, shine, FX). Seeded
+  // from the card: Lotería prints ship with it off.
+  const [effectsOn, setEffectsOn] = useState(true);
+  // Front/back, for cards that carry a printed back.
+  const [flipped, setFlipped] = useState(false);
   const [view, setView] = useState("single");
   // null = follow the card's rarity; a frame id pins an override for preview.
   const [frameOverride, setFrameOverride] = useState(null);
@@ -147,18 +171,35 @@ export default function CardTemplatePage() {
     setFxOpacity(base.fxOpacity ?? FX_OPACITY_DEFAULT);
     setFxDepth(base.fxDepth ?? 1);
     setFxShine(base.fxReflection?.strength ?? 1);
+    setEffectsOn(base.effects !== "off");
+    setFlipped(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
+  // Hoisted so the foil plate can be resolved from the frame that actually
+  // ends up on the card, override included.
+  const resolvedFrame =
+    frameOverride === "none" ? null
+    : frameOverride ? FRAMES.find((f) => f.id === frameOverride)?.src
+    : base.frameImage || autoFrame?.src || null;
+
+  // Glitter is gold-only (TradingCard enforces it); surface that in the UI so
+  // the button does not silently do nothing on another frame.
+  const glitterOk = /frame_gold/.test(String(resolvedFrame || ""));
+
   const card = {
     ...base,
     artFocus: hasArt ? `center ${artFocusY}%` : null,
     artZoom: hasArt ? artZoom : 1,
     artDepth,
     foilStyle,
-    frameImage:
-      frameOverride === "none" ? null
-      : frameOverride ? FRAMES.find((f) => f.id === frameOverride)?.src
-      : base.frameImage || autoFrame?.src || null,
+    bgFoil,
+    bgScope,
+    shine: shineMode,
+    shineBlend,
+    shineStrength,
+    frameImage: resolvedFrame,
+    foilPlate: usePlate ? plateForFrame(resolvedFrame) : null,
+    effects: effectsOn ? "on" : "off",
     // Overriding the frame must carry its divider-slot offset too, or the
     // meta line lands on a bar (the frames don't share a slot height).
     frameMetaTop:
@@ -177,7 +218,7 @@ export default function CardTemplatePage() {
       const w = window.innerWidth;
       if (w < 820) setScale(Math.max(0.36, (w - 60) / 744));
       else if (w < 1200) setScale(0.65);
-      else setScale(0.4);
+      else setScale(0.75);
     };
     adjust();
     window.addEventListener("resize", adjust);
@@ -317,7 +358,7 @@ export default function CardTemplatePage() {
             <React.Fragment key={group.title}>
               {/* Rogues sit below the type groups, above the Blank utility —
                   pure navigation into cards the groups above already list. */}
-              {group.title === "Blank" && (
+              {group.title === ROGUES_BEFORE && (
                 <div className="ct-group">
                   <p className="ct-group-title">Rogues</p>
                   <div className="ct-card-list">
@@ -370,13 +411,56 @@ export default function CardTemplatePage() {
         </aside>
 
         <section className="ct-stage">
-          <TradingCard data={card} scale={scale} templateStyle="terminal" />
+          <TradingCard data={card} scale={scale} templateStyle="terminal" flipped={flipped} />
         </section>
 
         <aside className="ct-column ct-effects">
           <p className="ct-column-title">Effects</p>
 
           <div className="ct-group">
+            <p className="ct-group-title">Overlay effects</p>
+            <div className="ct-seg" role="radiogroup" aria-label="Overlay effects">
+              {[
+                { id: true, label: "On", hint: "Foil, background holo, shine, glare and FX sheets as set below" },
+                { id: false, label: "Off", hint: "Ink only — no foil, holo, shine, glare or FX. Tilt stays on." },
+              ].map((o) => (
+                <button
+                  key={String(o.id)}
+                  role="radio"
+                  aria-checked={effectsOn === o.id}
+                  className={effectsOn === o.id ? "is-active" : ""}
+                  onClick={() => setEffectsOn(o.id)}
+                  title={o.hint}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {base.backImage && (
+            <div className="ct-group">
+              <p className="ct-group-title">Face</p>
+              <div className="ct-seg" role="radiogroup" aria-label="Card face">
+                {[
+                  { id: false, label: "Front" },
+                  { id: true, label: "Back" },
+                ].map((f) => (
+                  <button
+                    key={String(f.id)}
+                    role="radio"
+                    aria-checked={flipped === f.id}
+                    className={flipped === f.id ? "is-active" : ""}
+                    onClick={() => setFlipped(f.id)}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className={`ct-group${effectsOn ? "" : " is-disabled"}`}>
             <p className="ct-group-title">Foil</p>
             <div className="ct-seg" role="radiogroup" aria-label="Foil style">
               {[
@@ -397,6 +481,111 @@ export default function CardTemplatePage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className={`ct-group${effectsOn ? "" : " is-disabled"}`}>
+            <p className="ct-group-title">Background holo</p>
+            <div className="ct-seg" role="radiogroup" aria-label="Background holo">
+              {[
+                { id: "none", label: "None", hint: "No background foil" },
+                { id: "linear", label: "Sheen", hint: "Plain reverse-holo sweep across the card body" },
+                { id: "motif", label: "Sigil", hint: "RL80 sigil tiled as a mask — lights up near the cursor" },
+                { id: "cosmos", label: "Cosmos", hint: "Glitter field over a slow rainbow" },
+              ].map((b) => (
+                <button
+                  key={b.id}
+                  role="radio"
+                  aria-checked={bgFoil === b.id}
+                  className={bgFoil === b.id ? "is-active" : ""}
+                  onClick={() => setBgFoil(b.id)}
+                  title={b.hint}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+            {bgFoil !== "none" && (
+              <div className="ct-seg" role="radiogroup" aria-label="Holo coverage">
+                {[
+                  { id: "body", label: "Body only", hint: "Stops at the art window, the way a reverse holo does" },
+                  { id: "full", label: "Whole card", hint: "Runs over the art too — the full-art holo look" },
+                ].map((sc) => (
+                  <button
+                    key={sc.id}
+                    role="radio"
+                    aria-checked={bgScope === sc.id}
+                    className={bgScope === sc.id ? "is-active" : ""}
+                    onClick={() => setBgScope(sc.id)}
+                    title={sc.hint}
+                  >
+                    {sc.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className={`ct-group${effectsOn ? "" : " is-disabled"}`}>
+            <p className="ct-group-title">Shine</p>
+            <div className="ct-seg" role="radiogroup" aria-label="Shine blend">
+              {[
+                { id: "mirror", label: "Mirror", hint: "Overlay blend — pivots on luminance, so the light frame chromes and the dark art stays put" },
+                { id: "dodge", label: "Dodge", hint: "Color-dodge — brightens every pixel the same way" },
+                { id: "glitter", label: "Glitter", goldOnly: true, hint: "Embedded foil flakes — gold frame only, the way rainbow is reserved for terminal foils" },
+              ].map((m) => (
+                <button
+                  key={m.id}
+                  role="radio"
+                  aria-checked={shineBlend === m.id}
+                  aria-disabled={m.goldOnly && !glitterOk}
+                  className={`${shineBlend === m.id ? "is-active" : ""}${m.goldOnly && !glitterOk ? " is-muted" : ""}`}
+                  onClick={() => setShineBlend(m.id)}
+                  title={m.goldOnly && !glitterOk ? `${m.hint} — pick the Gold frame to use it` : m.hint}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <div className="ct-seg" role="radiogroup" aria-label="Shine">
+              {[
+                { id: "off", label: "Off", hint: "No card-level shine or glare" },
+                { id: "soft", label: "Soft", hint: "Dialled back — for commons, which a full sweep over-rarities" },
+                { id: "on", label: "Full", hint: "Diffraction ramp, iridescence, glitter and specular glare" },
+              ].map((s) => (
+                <button
+                  key={s.id}
+                  role="radio"
+                  aria-checked={shineMode === s.id}
+                  className={shineMode === s.id ? "is-active" : ""}
+                  onClick={() => setShineMode(s.id)}
+                  title={s.hint}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <label>
+              Strength
+              <input
+                type="range"
+                min="0"
+                max="1.6"
+                step="0.05"
+                value={shineStrength}
+                aria-valuetext={`${Math.round(shineStrength * 100)}%`}
+                onChange={(e) => setShineStrength(parseFloat(e.target.value))}
+                title="Scales the background holo, shine and glare together"
+              />
+              <span>{`${Math.round(shineStrength * 100)}%`}</span>
+            </label>
+            <button
+              className={`ct-toggle${usePlate ? " is-active" : ""}`}
+              aria-pressed={usePlate}
+              onClick={() => setUsePlate((v) => !v)}
+              title="Mask the shine with the frame's foil plate, so only the printed metal catches light"
+            >
+              {usePlate ? "Plate: on" : "Plate: off"}
+            </button>
           </div>
 
           <div className="ct-group">
@@ -440,7 +629,7 @@ export default function CardTemplatePage() {
             </div>
           </div>
 
-          <div className="ct-group">
+          <div className={`ct-group${effectsOn ? "" : " is-disabled"}`}>
             <p className="ct-group-title">
               FX overlays <span className="ct-count">{fxPicks.length}/{MAX_FX}</span>
             </p>
@@ -971,6 +1160,13 @@ const PAGE_STYLES = `
     color: #ffd166;
     background: rgba(255,209,102,.1);
     box-shadow: 0 0 18px rgba(255,209,102,.25);
+  }
+
+  /* Still clickable - the mode is simply inert on this frame, and the title
+     says why - but dimmed so it does not look like it should be doing
+     something it is not. */
+  .ct-column button.is-muted {
+    opacity: .42;
   }
 
   .ct-card-btn {
