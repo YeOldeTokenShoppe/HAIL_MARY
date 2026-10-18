@@ -17,7 +17,12 @@ export const DEFAULTS = { winBank: 80, openingHand: 8, minorsPerTurn: 1, firstTu
   actionsPerTurn: 0,
   // prototypes after the One Piece review: Leaders (each Trader sits as a cast character with a suit affinity and an ability),
   // Hedge values on every pip (a Counter: any pip may be thrown from the hand to absorb a Chain), and a draw when a loss of 3+ lands.
-  leaders: false, hedgeAny: false, lossDraw: false, lossDrawMin: 3 };
+  leaders: false, hedgeAny: false, lossDraw: false, lossDrawMin: 3,
+  // the dice Hail Mary: once a game, instead of banking, throw the whole Portfolio and roll Our Lady's die (a d12).
+  // Odds start at 1/12 and double for each good deed done (a Cup played, kept in the Good Deeds row, up to deedCap):
+  // 0 deeds need a 12, then 11+, 9+, 5+, and at deedCap the throw is answered outright. Success banks the stake
+  // multiplied by passMult; failure loses it. Resolves at once: no pass in the air, no interception, no stopped clock.
+  passDice: false, deedCap: 4 };
 export const V1C_PRESET = { v1b: true, majorsSeparate: true, replacePartner: true, hedgeFree: true, copyFavor: false, spareMin: 3, passMax: 20, firstHandPenalty: 0, firstTurnDraw: 1, seatProfit: 8 };
 let UID = 1;
 
@@ -331,9 +336,23 @@ export class TarotGame {
     this.snapshot('turn');
     if (!this.over && lastOfRound && this.bellRound != null && this.round >= this.bellRound) this.endByBell();
   }
-  canPass(p) { return !p.hailMaryUsed && !p.pass && p.bank + p.portfolio < this.rules.winBank && // banking wins outright: no throw offered
+  canPass(p) { if (this.rules.passDice) return !p.hailMaryUsed && p.portfolio >= 1 && p.bank + p.portfolio < this.rules.winBank && !this.closing;
+    return !p.hailMaryUsed && !p.pass && p.bank + p.portfolio < this.rules.winBank && // banking wins outright: no throw offered
     p.portfolio >= (this.rules.passLast ? 1 : this.rules.passMin) && (!this.rules.passUnderdogOnly || this.isUnderdog(p)) && !this.closing && (!this.rules.passLast || this.opps(p).some((o) => this.wouldWinNext(o))); }
+  // ── the dice Hail Mary ──
+  deeds(p) { return Math.min(this.rules.deedCap, p.stats.cups); }
+  passNeed(p) { return [12, 11, 9, 5, 1][this.deeds(p)] ?? 1; } // d12 face required: 1/12, 1/6, 1/3, 2/3, answered
+  passOdds(p) { return (13 - this.passNeed(p)) / 12; }
+  rollPass(p, { extra = false } = {}) {
+    if (!extra) p.hailMaryUsed = true;
+    const stake = p.portfolio; p.portfolio = 0; p.stats.passes++; const d = this.deeds(p); p.stats.deedsAtRoll = (p.stats.deedsAtRoll || 0) + d;
+    const need = this.passNeed(p); const roll = 1 + Math.floor(this.rng() * 12);
+    this.log(`✝ ${p.name} throws a HAIL MARY: ${stake} in the air, ${d} good deed${d === 1 ? '' : 's'} on the table. Our Lady's die needs ${need === 1 ? 'anything' : need + ' or better'}… it shows ${roll}.`);
+    if (roll >= need) { const n = Math.floor(stake * this.rules.passMult); p.stats.completions++; p.stats.passBanked += n; this.passNews(p, { result: 'complete', stake, amount: n, by: `the die: ${roll} against ${need}` }); this.bank(p, n, 'Hail Mary answered'); if (this.winner === p) p.stats.passWins++; }
+    else { this.passNews(p, { result: 'knocked', stake, amount: 0, by: `the die: ${roll} against ${need}` }); this.log(`✝ UNANSWERED: the ${stake} is lost.`); }
+  }
   throwPass(p, { extra = false } = {}) {
+    if (this.rules.passDice) return this.rollPass(p, { extra });
     if (!extra) p.hailMaryUsed = true; const stake = this.rules.passMax && !this.rules.passLast ? Math.min(p.portfolio, this.rules.passMax) : p.portfolio; p.inAir = stake; p.portfolio -= stake; p.pass = { round: this.round }; p.stats.passes++;
     this.log(`✝ ${p.name} throws a HAIL MARY PASS: ${p.inAir} in the air until the start of their next turn${p.portfolio ? ` (${p.portfolio} stays in the Portfolio)` : ''}. Intercept it, or watch it double.`);
   }

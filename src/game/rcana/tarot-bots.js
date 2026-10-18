@@ -41,6 +41,11 @@ export class StrongPolicy {
   hailMaryPass(g, p) {
     if (!this.usePass) return false;
     if (p.bank + p.portfolio >= g.rules.winBank) return false; // bank and win instead
+    if (g.rules.passDice) {
+      const odds = g.passOdds(p), m = g.rules.passMult;
+      if (g.opps(p).some((o) => g.wouldWinNext(o)) && p.bank + Math.floor(p.portfolio * m) >= g.rules.winBank) return true; // they win next turn; an answered throw wins NOW: pray at any odds
+      return odds * m > 1 + this.passMargin && p.portfolio >= 8; // otherwise only on positive expectation with a real stake
+    }
     if (g.rules.passLast) { const lead = Math.max(...g.opps(p).map((o) => o.bank + o.portfolio)); return p.bank + p.portfolio * g.rules.passMult > lead; } // the last play: throw if doubling could carry you past them
     const q = this.passSurvival(g, p); const m = g.rules.passMult;
     const behind = g.isUnderdog(p) ? 0.1 : 0;
@@ -88,7 +93,7 @@ export class StrongPolicy {
     const c = a.card; const r = c.rank;
     if (c.suit === 'coins') return r + g.modSum(p, 'coinsBonus');
     if (c.suit === 'candles') return (r * g.modProduct(p, 'candlesMult') + g.modSum(p, 'candlesBonus')) + g.yieldOf(p, a.choice.inst) - 0; // includes the Work it triggers
-    if (c.suit === 'cups') { const m = g.modProduct(p, 'cupsMult'); const o = a.choice.opp; const favorV = g.rules.v1b && !c.reversed ? 0.6 : 0; const lead = o ? g.opps(p).reduce((mx, q) => Math.max(mx, q.bank), 0) - o.bank : 0; return favorV + r * m + g.modSum(p, 'cupsBonus') - Math.ceil(r / 2) * m * 0.7 + lead * 0.02; }
+    if (c.suit === 'cups') { const m = g.modProduct(p, 'cupsMult'); const o = a.choice.opp; const favorV = g.rules.v1b && !c.reversed ? 0.6 : 0; const deedV = g.rules.passDice && !p.hailMaryUsed && g.deeds(p) < g.rules.deedCap ? 0.6 : 0; const lead = o ? g.opps(p).reduce((mx, q) => Math.max(mx, q.bank), 0) - o.bank : 0; return favorV + deedV + r * m + g.modSum(p, 'cupsBonus') - Math.ceil(r / 2) * m * 0.7 + lead * 0.02; }
     const t = a.choice.target; const amt = r * g.modProduct(p, 'chainsMult') + g.modSum(p, 'chainsBonus');
     if (t.isPass) return t.owner.inAir * 0.9 + Math.min(amt, t.owner.inAir);
     if (t.card) { const kills = t.drawdown + amt >= t.card.res; return kills ? 2 + g.yieldOf(t.owner, t) * this.horizon(g) * 0.8 + (t.card.kw.exitScam || 0) : amt * 0.35; }
