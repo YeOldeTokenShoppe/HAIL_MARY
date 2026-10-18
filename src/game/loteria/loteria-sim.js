@@ -68,15 +68,16 @@ export class Game {
   constructor({ players, seed = 1, verbose = false, paper = false }) {
     this.rng = makeRng(seed); this.verbose = verbose; this.lines = [];
     this.players = players.map((cfg, idx) => ({ idx, name: cfg.name, policy: cfg.policy, t: cfg.trader,
-      cred: cfg.trader.cred, bank: cfg.trader.key === 'hermana' ? 3 : 0, cash: 0, row: [], graces: [...GRACES], deeds: 0,
+      cred: cfg.trader.cred, bank: cfg.trader.key === 'hermana' ? 3 : 0, cash: 0, row: [], hand: [], graces: [...GRACES], deeds: 0,
       dieUsed: false, given: [], offeredThisTurn: false, buries: cfg.trader.key === 'gato' ? 2 : 0, pumps: cfg.trader.key === 'sirena' ? 2 : 0,
       stats: { buys: 0, sells: 0, payouts: 0, dedicated: 0, offers: 0, refused: 0, gracesPlayed: 0, rolled: 0, answered: 0, fireSales: 0 } }));
     // the caller's deck: 19 shuffled, LA CAMPANA into the last five calls
     const rest = this.shuffle(EVENTS.filter((e) => e.key !== 'campana'));
     this.calls = rest.slice(0, 19); this.calls.splice(15 + Math.floor(this.rng() * 5), 0, EVENTS.find((e) => e.key === 'campana'));
     // the asset bazaar: two copies of each, shuffled; a market row of four
-    this.bazaar = this.shuffle(ASSETS.flatMap((a) => [this.inst(a), this.inst(a)])); this.row = [this.bazaar.shift(), this.bazaar.shift(), this.bazaar.shift(), this.bazaar.shift()];
-    this.paper = paper; this.market = null; this.round = 0; this.called = []; this.over = false; this.buyDiscount = 0;
+    this.deck = this.shuffle(ASSETS.flatMap((a) => [this.inst(a), this.inst(a)])); this.discard = [];
+    for (const p of this.players) for (let i = 0; i < 3; i++) p.hand.push(this.deck.shift());
+    this.paper = paper; this.market = null; this.round = 0; this.called = []; this.over = false; this.playDiscount = 0;
   }
   inst(a) { return { ...a, held: 0, bubbleCalls: 0, age: 0, cur: a.pearl ? 1 + Math.floor(this.rng() * 6) : a.val }; }
   shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(this.rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -89,10 +90,11 @@ export class Game {
   need(p) { return [12, 11, 9, 5, 1][this.deeds(p)]; }
   dieGate(p) { return !p.dieUsed && this.round > 10 && this.wealth(p) < this.wealth(this.opp(p)); }
 
+  draw(p) { if (!this.deck.length && this.discard.length) { this.deck = this.shuffle(this.discard.splice(0).map((a) => { a.burned = false; a.examined = false; a.pumped = false; a.bubbleCalls = 0; a.age = 0; a.cur = a.pearl ? 1 + Math.floor(this.rng() * 6) : a.val; return a; })); this.log('The discard is shuffled into a new deck'); } const c = this.deck.shift(); if (c) { p.hand.push(c); this.log(`${p.name} draws ${c.name}`); } return c; }
   sellPrice(a, p) { let v = this.value(a, p); if (a.trap && !a.paper && !a.piramide) v = a.key === 'alfombra' ? 0 : v; if (p.t.ability === 'shill') v += 1; if (this.market && this.market.key === 'oso' && p.t.ability !== 'books') v -= 1; if (this.market && this.market.key === 'sol') v += 1; return Math.max(0, v); }
-  sell(p, a) { if (a.locked && a.age < a.locked) return; if (a.paper) a.examined = true; const v = this.sellPrice(a, p); p.row.splice(p.row.indexOf(a), 1); p.bank += v; p.stats.sells++; if (a.tulip && !this.tulipPopped) { this.tulipPopped = true; for (const q of this.players) for (const x of q.row) if (x.tulip) x.cur = 1; } this.log(`${p.name} sells ${a.name} for ${v}`); }
-  buy(p, i) { const a = this.row[i]; if (!a) return; const cost = Math.max(0, a.cost - this.buyDiscount); if (p.cash < cost) return; p.cash -= cost; this.buyDiscount = 0; p.row.push(a); a.boughtRound = this.round; p.stats.buys++; this.row[i] = this.bazaar.shift() || null; for (const q of this.players) for (const x of q.row) if (x.well && !x.burned) { q.cash += 1; } this.log(`${p.name} buys ${a.name} for ${cost}`); }
-  fireSale(p) { p.stats.fireSales++; this.log(`${p.name}'s credibility is gone: FIRE SALE`); for (const a of [...p.row]) { a.pumped = false; const v = Math.floor(this.sellPrice(a, p) / 2); p.row.splice(p.row.indexOf(a), 1); p.bank += v; } p.cred = 1; }
+  sell(p, a) { if (a.locked && a.age < a.locked) return; if (a.paper) a.examined = true; const v = this.sellPrice(a, p); p.row.splice(p.row.indexOf(a), 1); this.discard.push(a); p.bank += v; p.stats.sells++; if (a.tulip && !this.tulipPopped) { this.tulipPopped = true; for (const q of this.players) for (const x of q.row) if (x.tulip) x.cur = 1; } this.log(`${p.name} sells ${a.name} for ${v}`); }
+  play(p, a) { if (!p.hand.includes(a)) return; const cost = Math.max(0, a.cost - this.playDiscount); if (p.cash < cost) return; p.cash -= cost; this.playDiscount = 0; p.hand.splice(p.hand.indexOf(a), 1); p.row.push(a); a.boughtRound = this.round; a.age = 0; p.stats.buys++; for (const q of this.players) for (const x of q.row) if (x.well && !x.burned) { q.cash += 1; } this.log(`${p.name} plays ${a.name} for ${cost}`); }
+  fireSale(p) { p.stats.fireSales++; this.log(`${p.name}'s credibility is gone: FIRE SALE`); for (const a of [...p.row]) { a.pumped = false; const v = Math.floor(this.sellPrice(a, p) / 2); p.row.splice(p.row.indexOf(a), 1); this.discard.push(a); p.bank += v; } p.cred = 1; }
   hitCred(p, n) { if (p.shield) return; p.cred -= n; if (p.cred <= 0) this.fireSale(p); }
 
   resolveCall(c) {
@@ -101,25 +103,24 @@ export class Game {
     if (c.kind === 'market') { this.prevMarket = this.market; if (this.prevMarket && this.prevMarket.key === 'impresora') for (const q of all) for (const a of q.row) if (!a.immune) a.cur = Math.max(0, a.cur - 1); this.market = c; }
     for (const q of all) for (const a of q.row) { if (a.reprices) a.cur = 1 + Math.floor(this.rng() * a.reprices); if (a.bubble) { a.bubbleCalls++; if (a.bubbleCalls >= a.bubble) { a.cur = 0; this.log(`${q.name}'s LA BURBUJA pops`); } } if (a.memetic) { if (BULL.has(c.key)) a.cur *= 2; if (BEAR.has(c.key)) a.cur = Math.ceil(a.cur / 2); } a.pumped = false; }
     switch (c.key) {
-      case 'gallo': this.buyDiscount = 1; for (const q of all) q.cash += 1; break;
+      case 'gallo': this.playDiscount = 1; for (const q of all) q.cash += 1; break;
       case 'luna': for (const q of all) for (const a of q.row) { if (a.vol === 2 && !a.trap) a.cur *= 2; if (a.rocket) a.cur = a.val * a.rocket; } break;
       case 'impresora': for (const q of all) q.cash += 1; break;
       case 'torre': if (this.market && this.market.key === 'paraguas') break; for (const q of all) for (const a of q.row) if (!a.immune && !(a.locked && a.age < a.locked)) a.cur = Math.floor(a.cur / 2); this.disaster(); break;
-      case 'mano': if (this.market && this.market.key === 'paraguas') break; for (const q of all) { const t = [...q.row].filter((a) => !(a.locked && a.age < a.locked)).sort((x, y) => y.vol - x.vol || this.value(y, q) - this.value(x, q))[0]; if (t) { q.row.splice(q.row.indexOf(t), 1); this.log(`LA MANO takes ${q.name}'s ${t.name}`); } } this.disaster(); break;
+      case 'mano': if (this.market && this.market.key === 'paraguas') break; for (const q of all) { const t = [...q.row].filter((a) => !(a.locked && a.age < a.locked)).sort((x, y) => y.vol - x.vol || this.value(y, q) - this.value(x, q))[0]; if (t) { q.row.splice(q.row.indexOf(t), 1); this.discard.push(t); this.log(`LA MANO takes ${q.name}'s ${t.name}`); } } this.disaster(); break;
       case 'balanza': for (const q of all) { if (q.t.ability === 'clean') continue; let hit = 0; for (const a of q.row) if (a.trap || a.paper) { a.burned = true; a.examined = true; a.cur = 0; hit++; } if (hit) this.hitCred(q, 2); } this.disaster(); break;
       case 'muerte': for (const q of all) this.hitCred(q, 2); this.disaster(); break;
       case 'arana': for (const q of all) for (const a of q.row) if (a.bridge || a.well) { a.burned = true; a.cur = 0; } this.disaster(); break;
       case 'alacran': { const t = [...all].sort((x, y) => x.cred - y.cred)[0]; this.hitCred(t, 2); this.disaster(); break; }
       case 'calavera': { const s = [...all].sort((x, y) => y.stats.sells - x.stats.sells); if (s[0].stats.sells > s[1].stats.sells) { s[0].bank += 3; s[1].bank = Math.max(0, s[1].bank - 2); } this.disaster(); break; }
-      case 'borracho': for (const q of all) { if (q.row.some((a) => a.crown)) continue; const a = this.row[0]; if (a && q.cash >= a.cost) this.buyAs(q, 0); } break;
+      case 'borracho': for (const q of all) { if (q.row.some((a) => a.crown)) continue; const a = this.deck.shift(); if (!a) continue; this.log(`EL BORRACHO flips ${a.name} for ${q.name}`); if (q.cash >= a.cost) { q.hand.push(a); this.play(q, a); } else this.discard.push(a); } break;
       case 'rueda': if (!all.some((q) => q.row.some((a) => a.crown))) { const [x, y] = all; [x.row, y.row] = [y.row, x.row]; this.log('LA RUEDA: the portfolios change hands'); } break;
       case 'ballena': { const rich = [...all].sort((x, y) => this.portfolio(y) - this.portfolio(x)); if (rich[0] !== rich[1] && !rich[0].row.some((a) => a.keys) && !rich[1].row.some((a) => a.crown)) { const best = [...rich[0].row].filter((a) => !(a.locked && a.age < a.locked)).sort((x, y) => this.value(y, rich[0]) - this.value(x, rich[0]))[0]; if (best) { rich[0].row.splice(rich[0].row.indexOf(best), 1); rich[1].row.push(best); this.log(`LA BALLENA moves ${best.name}`); } } break; }
       case 'senora': { const d = [...all].sort((x, y) => this.deeds(y) - this.deeds(x)); if (this.deeds(d[0]) > this.deeds(d[1])) { const v = this.portfolio(d[0]); d[0].bank += v; d[0].row = []; this.log(`NUESTRA SEÑORA banks ${d[0].name}'s everything: ${v}`); } break; }
       case 'campana': this.bell = true; break;
     }
   }
-  disaster() { for (const q of this.players) { for (const a of [...q.row]) if (a.fragile) { q.row.splice(q.row.indexOf(a), 1); this.log(`${q.name}'s EL JARDÍN dies`); } if (q.t.ability === 'feeds') q.cash += 2; } }
-  buyAs(p, i) { this.buy(p, i); }
+  disaster() { for (const q of this.players) { for (const a of [...q.row]) if (a.fragile) { q.row.splice(q.row.indexOf(a), 1); this.discard.push(a); this.log(`${q.name}'s EL JARDÍN dies`); } if (q.t.ability === 'feeds') q.cash += 2; } }
 
   async turn(p) {
     p.shield = false; p.offeredThisTurn = false;
@@ -131,29 +132,30 @@ export class Game {
       let n = a.pays; if (a.upkeep) { if (p.cash >= a.upkeep) p.cash -= a.upkeep; else continue; } if (a.drains) { a.cur = Math.max(0, a.cur - a.drains); if (a.cur <= 0 && a.key === 'piramide' && !a.pays) continue; }
       p.cash += n; p.stats.payouts += n;
     }
+    this.draw(p);
     // the die, at the start of the turn
     if (this.dieGate(p) && await p.policy.rollDie(this, p)) {
       p.dieUsed = true; p.stats.rolled = 1; const W = this.wealth(p); const roll = 1 + Math.floor(this.rng() * 12); const need = this.need(p);
       this.log(`✝ ${p.name} gives Our Lady everything (${W}), ${this.deeds(p)} deeds showing. Needs ${need}+… rolls ${roll}`);
-      p.row = []; if (roll >= need) { p.bank = W * 2; p.stats.answered = 1; this.log('✝ ANSWERED: doubled and banked'); } else { p.bank = Math.floor(W / 2); this.log('✝ UNANSWERED: she keeps half'); }
+      p.row = []; if (roll >= need) { const to = Math.max(W, Math.min(W * 2, this.wealth(this.opp(p)))); p.bank = to; p.stats.answered = 1; this.log(`✝ ANSWERED: Our Lady makes ${p.name} whole — raised to ${to}, banked (to the rival's level, never above)`); } else { p.bank = Math.floor(W / 2); this.log('✝ UNANSWERED: she keeps half'); }
     }
     // three actions
     for (let k = 0; k < 3; k++) { p.actionsLeft = 3 - k; const a = await p.policy.act(this, p); if (!a) break; await this.doAct(p, a); if (this.hooks && this.hooks.render) await this.hooks.render(); if (this.over) return; } p.actionsLeft = 0;
   }
   actions(p) {
     const A = [];
-    this.row.forEach((a, i) => { if (a && p.cash >= Math.max(0, a.cost - this.buyDiscount)) A.push({ t: 'buy', i, a }); });
+    for (const a of p.hand) if (p.cash >= Math.max(0, a.cost - this.playDiscount)) A.push({ t: 'play', a });
     for (const a of p.row) if (!(a.locked && a.age < a.locked)) A.push({ t: 'sell', a });
     const mayOffer = !p.offeredThisTurn && this.deeds(p) < 4;
     for (const g of p.graces) { A.push({ t: 'grace', g }); if (mayOffer) A.push({ t: 'offer', g }); }
-    if (mayOffer) for (const a of p.row) if (!(a.locked && a.age < a.locked) && !a.burned) A.push({ t: 'offer', a });
+    if (mayOffer) for (const a of p.row) if (!(a.locked && a.age < a.locked) && !a.burned) A.push({ t: 'offer', a }); // hand cards cannot be offered: a gift must be something you paid to put in play
     if (p.buries > 0) A.push({ t: 'bury' });
     if (p.pumps > 0) for (const a of p.row) if (this.value(a, p) >= 3) A.push({ t: 'pump', a });
     return A;
   }
   async doAct(p, act) {
     switch (act.t) {
-      case 'buy': this.buy(p, act.i); break;
+      case 'play': this.play(p, act.a); break;
       case 'sell': this.sell(p, act.a); break;
       case 'bury': { p.buries--; const c = this.calls[this.round]; if (c && c.key !== 'campana') { this.calls.splice(this.round, 1); this.calls.push(c); this.log(`${p.name}'s cat knocks ${c.name} off the table`); } break; }
       case 'pump': p.pumps--; act.a.pumped = true; this.log(`${p.name} pumps ${act.a.name}`); break;
@@ -161,8 +163,9 @@ export class Game {
         const o = this.opp(p); const name = act.a ? act.a.name : 'LA ' + act.g.toUpperCase(); p.offeredThisTurn = true; p.stats.offers++;
         const holy = act.a && act.a.holy; // LA ESTAMPITA may not be refused
         const yes = holy || await o.policy.acceptOffer(this, o, p, act.a || act.g);
-        if (!yes) { p.stats.refused++; this.log(`${o.name} REFUSES ${p.name}'s offer of ${name} — refusing charity is a sin (−1 credibility)`); this.hitCred(o, 1); break; }
-        if (act.a) { p.row.splice(p.row.indexOf(act.a), 1); o.row.push(act.a); } else { p.graces.splice(p.graces.indexOf(act.g), 1); o.graces.push(act.g); }
+        if (!yes) { p.stats.refused++; const worthy = act.a ? this.value(act.a, p) >= 3 : true; // trash is refused freely: Our Lady is not fooled
+          if (worthy) { this.log(`${o.name} REFUSES ${p.name}'s worthy offer of ${name} — refusing charity is a sin (−1 credibility)`); this.hitCred(o, 1); } else this.log(`${o.name} waves away ${p.name}'s offer of ${name}`); break; }
+        if (act.a && act.fromHand) { p.hand.splice(p.hand.indexOf(act.a), 1); o.hand.push(act.a); } else if (act.a) { p.row.splice(p.row.indexOf(act.a), 1); o.row.push(act.a); } else { p.graces.splice(p.graces.indexOf(act.g), 1); o.graces.push(act.g); }
         p.deeds++; p.stats.dedicated++; p.given.push(name);
         this.log(`✧ ${o.name} accepts ${name}: a GOOD DEED for ${p.name} (${this.deeds(p)} of 4 — the die answers on ${this.need(p) === 1 ? 'any face' : this.need(p) + '+'})`); break;
       }
@@ -202,10 +205,11 @@ export class Naive {
 export class Strong {
   constructor() {}
   acceptOffer(g, me, giver, card) {
-    const mine = typeof card === 'string' ? 0.8 : this.assetScore(g, me, { ...card, cost: 0 }) * 0.5 + g.value(card, me) * 0.5;
+    const mine = typeof card === 'string' ? 0.8 : (this.assetScore(g, me, { ...card, cost: 0 }) * 0.5 + g.value(card, me) * 0.5) * (g.players.some((q) => q.hand.includes(card)) ? 0.7 : 1);
     const live = !giver.dieUsed && g.deeds(giver) < 4 && g.wealth(me) >= g.wealth(giver); // their die only fires while they trail
     const danger = live ? [1.5, 2, 3, 4.5][g.deeds(giver)] ?? 4.5 : 0;
-    const sin = me.cred <= 2 ? 2.5 : 1.2; // refusing costs 1 credibility, dearer when low
+    const worthy = typeof card === 'string' || g.value(card, giver) >= 3;
+    const sin = worthy ? (me.cred <= 2 ? 2.5 : 1.2) : 0; // only a worthy offer is sinful to refuse
     return mine + sin > danger;
   }
   disastersLeft(g) { return g.calls.slice(g.round + 1).filter((c) => c.kind === 'disaster').length; }
@@ -224,9 +228,9 @@ export class Strong {
     let best = null, bs = 0.4;
     for (const a of A) {
       let s = -1;
-      if (a.t === 'buy') s = this.assetScore(g, p, a.a) * 0.5 + 0.8;
+      if (a.t === 'play') s = this.assetScore(g, p, a.a) * 0.5 + 0.8;
       if (a.t === 'sell') { const v = g.sellPrice(a.a, p); const future = this.assetScore(g, p, { ...a.a, cost: 0 }); s = a.a.pumped ? v * 0.9 : (g.paper && left <= 2 ? v * 0.6 : left <= 2 || a.a.immune ? -0.5 : v >= 5 && a.a.vol === 2 && dis >= 1 ? v * 0.35 : a.a.bubble && a.a.bubbleCalls === a.a.bubble - 1 ? v : a.a.tulip && g.value(a.a, p) >= 6 ? v * 0.8 : -0.5); }
-      if (a.t === 'offer') s = !p.dieUsed && g.deeds(p) < 4 ? (behind > 0 ? 1.6 : 0.5) + (p.t.ability === 'devout' ? 0.6 : 0) - p.stats.refused * 0.5 - (a.a ? this.assetScore(g, p, { ...a.a, cost: 0 }) * 0.35 : a.g === 'promesa' ? 0.3 : 0.5) : -1;
+      if (a.t === 'offer') s = !p.dieUsed && g.deeds(p) < 4 ? (behind > 0 ? 1.6 : 0.5) + (p.t.ability === 'devout' ? 0.6 : 0) - p.stats.refused * 0.5 - (a.a ? this.assetScore(g, p, { ...a.a, cost: a.fromHand ? a.a.cost : 0 }) * 0.35 : a.g === 'promesa' ? 0.3 : 0.5) : -1;
       if (a.t === 'grace') s = a.g === 'diezmo' ? 0.9 : a.g === 'promesa' && dis >= 2 && p.cred <= 3 ? 1.4 : a.g === 'limosna' ? 0.7 : 0.1;
       if (a.t === 'pump') s = g.value(a.a, p) * 0.5;
       if (a.t === 'bury') { const next = g.calls[g.round + 1]; s = next && next.kind === 'disaster' && g.portfolio(p) > g.portfolio(g.opp(p)) ? 2 : -1; }

@@ -26,6 +26,7 @@ button:disabled{opacity:.4;cursor:default}
 .board{display:grid;gap:14px}
 .panel{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--felt2)}
 .panel.me{border-color:var(--gold)}
+@media (min-width:980px){ .panel.me{grid-column:1 / -1} }
 .phead{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;margin-bottom:10px}
 .phead .who{font-family:var(--display);font-size:1rem;color:var(--ink)}
 .phead .who.active{color:var(--gold)}
@@ -56,6 +57,9 @@ button:disabled{opacity:.4;cursor:default}
 .box .kind{font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .lines{font-size:.85rem;display:grid;gap:3px;max-height:180px;overflow:auto}
 .lines .bad{color:var(--rose)}.lines .good{color:var(--teal)}
+.mecols{display:grid;grid-template-columns:96px 1fr;gap:12px}
+.mecols .deedcol .card.deed{width:84px;min-height:72px}
+@media (max-width:700px){ .mecols{grid-template-columns:1fr} .mecols .deedcol .cards{flex-direction:row !important} }
 details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 .log{font-size:.8rem;max-height:220px;overflow:auto;display:grid;gap:2px;margin-top:8px;color:var(--muted)}
 .toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--gold);color:#2a2040;font-weight:600;border-radius:7px;padding:9px 15px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:calc(100vw - 32px)}
@@ -75,19 +79,26 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 <div class="tracker" id="tracker" hidden></div>
 <div class="board" id="board" hidden>
   <section class="panel center">
-    <div class="rowlabel">El mercado · buy with cash</div>
-    <div class="cards" id="market"></div>
-    <div class="phead" style="margin-top:10px"><span class="stat">Standing market: <b id="standing">none</b></span><span class="stat" id="peek"></span></div>
+    <div style="display:flex;gap:22px;flex-wrap:wrap">
+      <div><div class="rowlabel">Deck · draw one each turn</div><div class="cards" id="deckPile"></div></div>
+      <div><div class="rowlabel">Discard</div><div class="cards" id="discardPile"></div></div>
+      <div style="flex:1;min-width:180px"><div class="rowlabel">Standing market</div><div class="stat" style="font-size:1rem"><b id="standing">none</b></div><div class="stat" id="peek"></div></div>
+    </div>
   </section>
   <section class="panel" id="botPanel">
-    <div class="phead"><span class="who" id="botWho">BOT</span><span class="stat">Bank <b id="botBank">0</b></span><span class="stat">Cash <b id="botCash">0</b></span><span class="stat">Cred <b class="cred" id="botCred"></b></span><span class="stat">Deeds <b id="botDeeds">0</b></span><span class="stat">Wealth <b id="botWealth">0</b></span></div>
+    <div class="phead"><span class="who" id="botWho">BOT</span><span class="stat">Bank <b id="botBank">0</b></span><span class="stat">Cash <b id="botCash">0</b></span><span class="stat">Cred <b class="cred" id="botCred"></b></span><span class="stat">Hand <b id="botHand">0</b></span><span class="stat">Deeds <b id="botDeeds">0</b></span><span class="stat">Wealth <b id="botWealth">0</b></span></div>
     <div class="rowlabel">Bot portfolio</div><div class="cards" id="botRow"></div>
   </section>
   <section class="panel me" id="mePanel">
     <div class="phead"><span class="who" id="meWho">YOU</span><span class="stat">Bank <b id="meBank">0</b></span><span class="stat">Cash <b id="meCash">0</b></span><span class="stat">Cred <b class="cred" id="meCred"></b></span><span class="stat">Wealth <b id="meWealth">0</b></span><span class="stat" id="dieInfo"></span></div>
-    <div class="rowlabel">Your portfolio · tap a card to sell, pump or offer</div><div class="cards" id="meRow"></div>
-    <div class="rowlabel">Your graces · tap to play or offer</div><div class="cards" id="meGraces"></div>
-    <div class="rowlabel">Good deeds · what the bot accepted</div><div class="cards" id="meDeeds"></div>
+    <div class="mecols">
+      <div class="deedcol"><div class="rowlabel">Good deeds</div><div class="cards" id="meDeeds" style="flex-direction:column"></div></div>
+      <div style="min-width:0">
+        <div class="rowlabel">Your portfolio · tap a card to sell, pump or offer</div><div class="cards" id="meRow"></div>
+        <div class="rowlabel">Your hand · tap a card to play it</div><div class="cards" id="meHand"></div>
+        <div class="rowlabel">Your graces · tap to play or offer</div><div class="cards" id="meGraces"></div>
+      </div>
+    </div>
     <div class="actionbar"><b id="actionsLeft" class="stat"></b><button id="bury" hidden>Cat: knock the next call off the table</button><button class="primary" id="endTurn" disabled>End turn</button></div>
   </section>
 </div>
@@ -142,7 +153,7 @@ function cardEl(a, { market = false, owner = null } = {}) {
   if (a.type === 'event') { el.classList.add('event'); el.innerHTML = `<span class="num">${num}</span><div class="nm">¡${esc(a.name)}!</div><div class="en">${esc(EN[a.key] || '')}</div><div class="fx">${esc(a.kind)}</div>`; return el; }
   const g = S && S.g; const v = owner && g ? g.value(a, owner) : a.cur ?? a.val;
   el.innerHTML = `<span class="num">${num}</span><div class="nm">${esc(a.name)}</div><div class="en">${esc(EN[a.key] || '')}</div>
-    <div class="chips">${market ? `<span>cost ${Math.max(0, a.cost - (g ? g.buyDiscount : 0))}</span>` : ''}<span>${a.pearl && !market ? 'val ?' : 'val ' + v}</span><span class="vol">${VOLM[a.vol] || ''}</span></div>
+    <div class="chips">${market ? `<span>cost ${Math.max(0, a.cost - (g ? g.playDiscount : 0))}</span>` : ''}<span>${a.pearl && !market ? 'val ?' : 'val ' + v}</span><span class="vol">${VOLM[a.vol] || ''}</span></div>
     <div class="fx">${esc(FX[a.key] || '')}${a.locked && a.age < a.locked && !market ? ` · locked ${a.locked - a.age} more` : ''}${a.pumped ? ' · PUMPED ×2' : ''}${a.burned ? ' · burned' : ''}</div>`;
   return el;
 }
@@ -174,8 +185,8 @@ function showOffer(g, me, giver, card, done) {
   const needAfter = [12, 11, 9, 5, 1][after];
   host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">the bot holds out a card</div><div class="call">AN OFFERING</div>
     <div id="offerCard"></div>
-    <div>Accept, and it is yours — and <b>their good deed</b>: Our Lady's die would answer them on <b>${needAfter === 1 ? 'any face' : needAfter + '+'}</b>. Refuse, and refusing charity is a sin: <b>−1 credibility</b>.</div>
-    <button class="primary" id="offerYes">Accept the gift</button><button id="offerNo">Refuse (−1 ♥)</button></div></div>`;
+    <div>Accept, and it is yours — and <b>their good deed</b>: Our Lady's die would answer them on <b>${needAfter === 1 ? 'any face' : needAfter + '+'}</b>. ${(typeof card === 'string' || g.value(card, giver) >= 3) ? 'Refuse, and refusing a worthy offer is a sin: <b>−1 credibility</b>.' : 'This one is not much of an offering — refusing it costs nothing.'}</div>
+    <button class="primary" id="offerYes">Accept the gift</button><button id="offerNo">${(typeof card === 'string' || g.value(card, giver) >= 3) ? 'Refuse (−1 ♥)' : 'Wave it away'}</button></div></div>`;
   host.querySelector('#offerCard').appendChild(typeof card === 'string' ? graceEl(card) : cardEl(card, { owner: giver }));
   const fin = (v) => { host.innerHTML = ''; done(v); setTimeout(render, 50); };
   host.querySelector('#offerYes').addEventListener('click', () => fin(true));
@@ -201,13 +212,15 @@ function render() {
   $('peek').textContent = me.t.ability === 'peek' && g.calls[g.round + (g.active === me || !g.called.length ? 0 : 0) + (g.called.length > g.round ? 1 : 0)] ? '' : '';
   const nx = me.t.ability === 'peek' ? g.calls[g.called.length] : (me.peeked ? null : null);
   $('peek').textContent = nx ? `Eugene sees the next call: ¡${nx.name}!` : me.peeked ? `La Vela showed: ${me.peeked.map((k) => '¡' + k.toUpperCase() + '!').join(' then ')}` : '';
-  // market row
-  const m = $('market'); m.innerHTML = '';
-  g.row.forEach((a, i) => { if (!a) return; const el = cardEl(a, { market: true }); const act = acts.find((x) => x.t === 'buy' && x.i === i); if (act) { el.classList.add('buyable'); el.addEventListener('click', () => resolveAct(act)); } else el.classList.add('dim'); m.appendChild(el); });
+  // deck and discard
+  const dp = $('deckPile'); dp.innerHTML = '';
+  { const back = document.createElement('div'); back.className = 'card event'; back.innerHTML = `<div class="nm" style="margin:auto;text-align:center">RL80</div><div class="fx" style="text-align:center">${g.deck.length} left</div>`; dp.appendChild(back); }
+  const xp = $('discardPile'); xp.innerHTML = '';
+  if (g.discard.length) { const t = cardEl(g.discard[g.discard.length - 1]); t.classList.add('dim'); xp.appendChild(t); } else xp.innerHTML = '<span class="note">empty</span>';
   // panels
   $('botWho').textContent = 'THE BOT · ' + bot.t.name; $('botWho').classList.toggle('active', g.active === bot && S.running);
   $('meWho').textContent = 'YOU · ' + me.t.name; $('meWho').classList.toggle('active', myTurn && S.running);
-  $('botBank').textContent = bot.bank; $('botCash').textContent = bot.cash; $('botCred').textContent = '♥'.repeat(Math.max(0, bot.cred)); $('botDeeds').textContent = g.deeds(bot); $('botWealth').textContent = g.wealth(bot);
+  $('botHand').textContent = bot.hand.length; $('botBank').textContent = bot.bank; $('botCash').textContent = bot.cash; $('botCred').textContent = '♥'.repeat(Math.max(0, bot.cred)); $('botDeeds').textContent = g.deeds(bot); $('botWealth').textContent = g.wealth(bot);
   $('meBank').textContent = me.bank; $('meCash').textContent = me.cash; $('meCred').textContent = '♥'.repeat(Math.max(0, me.cred)); $('meWealth').textContent = g.wealth(me);
   $('dieInfo').textContent = me.dieUsed ? 'Die: spent' : `Die answers on ${g.need(me) === 1 ? 'any face' : g.need(me) + '+'} · ${g.dieGate(me) ? 'offered when your turn starts' : 'for the trailing, after call 10'}`;
   const br = $('botRow'); br.innerHTML = ''; bot.row.forEach((a) => br.appendChild(cardEl(a, { owner: bot })));
@@ -215,6 +228,9 @@ function render() {
   me.row.forEach((a) => { const el = cardEl(a, { owner: me }); const sell = acts.find((x) => x.t === 'sell' && x.a === a); const off = acts.find((x) => x.t === 'offer' && x.a === a); const pump = acts.find((x) => x.t === 'pump' && x.a === a);
     const items = []; if (sell) items.push([`Sell for ${g.sellPrice(a, me)}`, () => resolveAct(sell)]); if (pump) items.push(['Pump it (×2 until the next call)', () => resolveAct(pump)]); if (off) items.push([a.holy ? 'Offer it (the holy card may not be refused)' : 'Offer it to the bot — a good deed if accepted', () => resolveAct(off)]);
     if (items.length) { el.classList.add('clickable'); el.addEventListener('click', () => popMenu(el, items)); } mr.appendChild(el); });
+  const mh = $('meHand'); mh.innerHTML = '';
+  me.hand.forEach((a) => { const el = cardEl(a, { market: true }); const play = acts.find((x) => x.t === 'play' && x.a === a);
+    if (play) { el.classList.add('buyable'); el.addEventListener('click', () => popMenu(el, [[`Play it for ${Math.max(0, a.cost - g.playDiscount)}`, () => resolveAct(play)]])); } else el.classList.add('dim'); mh.appendChild(el); });
   const mg = $('meGraces'); mg.innerHTML = '';
   me.graces.forEach((k) => { const el = graceEl(k); const play = acts.find((x) => x.t === 'grace' && x.g === k); const off = acts.find((x) => x.t === 'offer' && x.g === k && !x.a);
     const items = []; if (play) items.push([FX[k].replace('Play: ', 'Play it: '), () => resolveAct(play)]); if (off) items.push(['Offer it to the bot — a good deed if accepted', () => resolveAct(off)]);

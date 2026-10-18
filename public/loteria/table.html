@@ -33,6 +33,7 @@ button:disabled{opacity:.4;cursor:default}
 .board{display:grid;gap:14px}
 .panel{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--felt2)}
 .panel.me{border-color:var(--gold)}
+@media (min-width:980px){ .panel.me{grid-column:1 / -1} }
 .phead{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;margin-bottom:10px}
 .phead .who{font-family:var(--display);font-size:1rem;color:var(--ink)}
 .phead .who.active{color:var(--gold)}
@@ -63,6 +64,9 @@ button:disabled{opacity:.4;cursor:default}
 .box .kind{font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .lines{font-size:.85rem;display:grid;gap:3px;max-height:180px;overflow:auto}
 .lines .bad{color:var(--rose)}.lines .good{color:var(--teal)}
+.mecols{display:grid;grid-template-columns:96px 1fr;gap:12px}
+.mecols .deedcol .card.deed{width:84px;min-height:72px}
+@media (max-width:700px){ .mecols{grid-template-columns:1fr} .mecols .deedcol .cards{flex-direction:row !important} }
 details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 .log{font-size:.8rem;max-height:220px;overflow:auto;display:grid;gap:2px;margin-top:8px;color:var(--muted)}
 .toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--gold);color:#2a2040;font-weight:600;border-radius:7px;padding:9px 15px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:calc(100vw - 32px)}
@@ -82,19 +86,26 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 <div class="tracker" id="tracker" hidden></div>
 <div class="board" id="board" hidden>
   <section class="panel center">
-    <div class="rowlabel">El mercado · buy with cash</div>
-    <div class="cards" id="market"></div>
-    <div class="phead" style="margin-top:10px"><span class="stat">Standing market: <b id="standing">none</b></span><span class="stat" id="peek"></span></div>
+    <div style="display:flex;gap:22px;flex-wrap:wrap">
+      <div><div class="rowlabel">Deck · draw one each turn</div><div class="cards" id="deckPile"></div></div>
+      <div><div class="rowlabel">Discard</div><div class="cards" id="discardPile"></div></div>
+      <div style="flex:1;min-width:180px"><div class="rowlabel">Standing market</div><div class="stat" style="font-size:1rem"><b id="standing">none</b></div><div class="stat" id="peek"></div></div>
+    </div>
   </section>
   <section class="panel" id="botPanel">
-    <div class="phead"><span class="who" id="botWho">BOT</span><span class="stat">Bank <b id="botBank">0</b></span><span class="stat">Cash <b id="botCash">0</b></span><span class="stat">Cred <b class="cred" id="botCred"></b></span><span class="stat">Deeds <b id="botDeeds">0</b></span><span class="stat">Wealth <b id="botWealth">0</b></span></div>
+    <div class="phead"><span class="who" id="botWho">BOT</span><span class="stat">Bank <b id="botBank">0</b></span><span class="stat">Cash <b id="botCash">0</b></span><span class="stat">Cred <b class="cred" id="botCred"></b></span><span class="stat">Hand <b id="botHand">0</b></span><span class="stat">Deeds <b id="botDeeds">0</b></span><span class="stat">Wealth <b id="botWealth">0</b></span></div>
     <div class="rowlabel">Bot portfolio</div><div class="cards" id="botRow"></div>
   </section>
   <section class="panel me" id="mePanel">
     <div class="phead"><span class="who" id="meWho">YOU</span><span class="stat">Bank <b id="meBank">0</b></span><span class="stat">Cash <b id="meCash">0</b></span><span class="stat">Cred <b class="cred" id="meCred"></b></span><span class="stat">Wealth <b id="meWealth">0</b></span><span class="stat" id="dieInfo"></span></div>
-    <div class="rowlabel">Your portfolio · tap a card to sell, pump or offer</div><div class="cards" id="meRow"></div>
-    <div class="rowlabel">Your graces · tap to play or offer</div><div class="cards" id="meGraces"></div>
-    <div class="rowlabel">Good deeds · what the bot accepted</div><div class="cards" id="meDeeds"></div>
+    <div class="mecols">
+      <div class="deedcol"><div class="rowlabel">Good deeds</div><div class="cards" id="meDeeds" style="flex-direction:column"></div></div>
+      <div style="min-width:0">
+        <div class="rowlabel">Your portfolio · tap a card to sell, pump or offer</div><div class="cards" id="meRow"></div>
+        <div class="rowlabel">Your hand · tap a card to play it</div><div class="cards" id="meHand"></div>
+        <div class="rowlabel">Your graces · tap to play or offer</div><div class="cards" id="meGraces"></div>
+      </div>
+    </div>
     <div class="actionbar"><b id="actionsLeft" class="stat"></b><button id="bury" hidden>Cat: knock the next call off the table</button><button class="primary" id="endTurn" disabled>End turn</button></div>
   </section>
 </div>
@@ -171,15 +182,16 @@ class Game {
   constructor({ players, seed = 1, verbose = false, paper = false }) {
     this.rng = makeRng(seed); this.verbose = verbose; this.lines = [];
     this.players = players.map((cfg, idx) => ({ idx, name: cfg.name, policy: cfg.policy, t: cfg.trader,
-      cred: cfg.trader.cred, bank: cfg.trader.key === 'hermana' ? 3 : 0, cash: 0, row: [], graces: [...GRACES], deeds: 0,
+      cred: cfg.trader.cred, bank: cfg.trader.key === 'hermana' ? 3 : 0, cash: 0, row: [], hand: [], graces: [...GRACES], deeds: 0,
       dieUsed: false, given: [], offeredThisTurn: false, buries: cfg.trader.key === 'gato' ? 2 : 0, pumps: cfg.trader.key === 'sirena' ? 2 : 0,
       stats: { buys: 0, sells: 0, payouts: 0, dedicated: 0, offers: 0, refused: 0, gracesPlayed: 0, rolled: 0, answered: 0, fireSales: 0 } }));
     // the caller's deck: 19 shuffled, LA CAMPANA into the last five calls
     const rest = this.shuffle(EVENTS.filter((e) => e.key !== 'campana'));
     this.calls = rest.slice(0, 19); this.calls.splice(15 + Math.floor(this.rng() * 5), 0, EVENTS.find((e) => e.key === 'campana'));
     // the asset bazaar: two copies of each, shuffled; a market row of four
-    this.bazaar = this.shuffle(ASSETS.flatMap((a) => [this.inst(a), this.inst(a)])); this.row = [this.bazaar.shift(), this.bazaar.shift(), this.bazaar.shift(), this.bazaar.shift()];
-    this.paper = paper; this.market = null; this.round = 0; this.called = []; this.over = false; this.buyDiscount = 0;
+    this.deck = this.shuffle(ASSETS.flatMap((a) => [this.inst(a), this.inst(a)])); this.discard = [];
+    for (const p of this.players) for (let i = 0; i < 3; i++) p.hand.push(this.deck.shift());
+    this.paper = paper; this.market = null; this.round = 0; this.called = []; this.over = false; this.playDiscount = 0;
   }
   inst(a) { return { ...a, held: 0, bubbleCalls: 0, age: 0, cur: a.pearl ? 1 + Math.floor(this.rng() * 6) : a.val }; }
   shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(this.rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -192,10 +204,11 @@ class Game {
   need(p) { return [12, 11, 9, 5, 1][this.deeds(p)]; }
   dieGate(p) { return !p.dieUsed && this.round > 10 && this.wealth(p) < this.wealth(this.opp(p)); }
 
+  draw(p) { if (!this.deck.length && this.discard.length) { this.deck = this.shuffle(this.discard.splice(0).map((a) => { a.burned = false; a.examined = false; a.pumped = false; a.bubbleCalls = 0; a.age = 0; a.cur = a.pearl ? 1 + Math.floor(this.rng() * 6) : a.val; return a; })); this.log('The discard is shuffled into a new deck'); } const c = this.deck.shift(); if (c) { p.hand.push(c); this.log(`${p.name} draws ${c.name}`); } return c; }
   sellPrice(a, p) { let v = this.value(a, p); if (a.trap && !a.paper && !a.piramide) v = a.key === 'alfombra' ? 0 : v; if (p.t.ability === 'shill') v += 1; if (this.market && this.market.key === 'oso' && p.t.ability !== 'books') v -= 1; if (this.market && this.market.key === 'sol') v += 1; return Math.max(0, v); }
-  sell(p, a) { if (a.locked && a.age < a.locked) return; if (a.paper) a.examined = true; const v = this.sellPrice(a, p); p.row.splice(p.row.indexOf(a), 1); p.bank += v; p.stats.sells++; if (a.tulip && !this.tulipPopped) { this.tulipPopped = true; for (const q of this.players) for (const x of q.row) if (x.tulip) x.cur = 1; } this.log(`${p.name} sells ${a.name} for ${v}`); }
-  buy(p, i) { const a = this.row[i]; if (!a) return; const cost = Math.max(0, a.cost - this.buyDiscount); if (p.cash < cost) return; p.cash -= cost; this.buyDiscount = 0; p.row.push(a); a.boughtRound = this.round; p.stats.buys++; this.row[i] = this.bazaar.shift() || null; for (const q of this.players) for (const x of q.row) if (x.well && !x.burned) { q.cash += 1; } this.log(`${p.name} buys ${a.name} for ${cost}`); }
-  fireSale(p) { p.stats.fireSales++; this.log(`${p.name}'s credibility is gone: FIRE SALE`); for (const a of [...p.row]) { a.pumped = false; const v = Math.floor(this.sellPrice(a, p) / 2); p.row.splice(p.row.indexOf(a), 1); p.bank += v; } p.cred = 1; }
+  sell(p, a) { if (a.locked && a.age < a.locked) return; if (a.paper) a.examined = true; const v = this.sellPrice(a, p); p.row.splice(p.row.indexOf(a), 1); this.discard.push(a); p.bank += v; p.stats.sells++; if (a.tulip && !this.tulipPopped) { this.tulipPopped = true; for (const q of this.players) for (const x of q.row) if (x.tulip) x.cur = 1; } this.log(`${p.name} sells ${a.name} for ${v}`); }
+  play(p, a) { if (!p.hand.includes(a)) return; const cost = Math.max(0, a.cost - this.playDiscount); if (p.cash < cost) return; p.cash -= cost; this.playDiscount = 0; p.hand.splice(p.hand.indexOf(a), 1); p.row.push(a); a.boughtRound = this.round; a.age = 0; p.stats.buys++; for (const q of this.players) for (const x of q.row) if (x.well && !x.burned) { q.cash += 1; } this.log(`${p.name} plays ${a.name} for ${cost}`); }
+  fireSale(p) { p.stats.fireSales++; this.log(`${p.name}'s credibility is gone: FIRE SALE`); for (const a of [...p.row]) { a.pumped = false; const v = Math.floor(this.sellPrice(a, p) / 2); p.row.splice(p.row.indexOf(a), 1); this.discard.push(a); p.bank += v; } p.cred = 1; }
   hitCred(p, n) { if (p.shield) return; p.cred -= n; if (p.cred <= 0) this.fireSale(p); }
 
   resolveCall(c) {
@@ -204,25 +217,24 @@ class Game {
     if (c.kind === 'market') { this.prevMarket = this.market; if (this.prevMarket && this.prevMarket.key === 'impresora') for (const q of all) for (const a of q.row) if (!a.immune) a.cur = Math.max(0, a.cur - 1); this.market = c; }
     for (const q of all) for (const a of q.row) { if (a.reprices) a.cur = 1 + Math.floor(this.rng() * a.reprices); if (a.bubble) { a.bubbleCalls++; if (a.bubbleCalls >= a.bubble) { a.cur = 0; this.log(`${q.name}'s LA BURBUJA pops`); } } if (a.memetic) { if (BULL.has(c.key)) a.cur *= 2; if (BEAR.has(c.key)) a.cur = Math.ceil(a.cur / 2); } a.pumped = false; }
     switch (c.key) {
-      case 'gallo': this.buyDiscount = 1; for (const q of all) q.cash += 1; break;
+      case 'gallo': this.playDiscount = 1; for (const q of all) q.cash += 1; break;
       case 'luna': for (const q of all) for (const a of q.row) { if (a.vol === 2 && !a.trap) a.cur *= 2; if (a.rocket) a.cur = a.val * a.rocket; } break;
       case 'impresora': for (const q of all) q.cash += 1; break;
       case 'torre': if (this.market && this.market.key === 'paraguas') break; for (const q of all) for (const a of q.row) if (!a.immune && !(a.locked && a.age < a.locked)) a.cur = Math.floor(a.cur / 2); this.disaster(); break;
-      case 'mano': if (this.market && this.market.key === 'paraguas') break; for (const q of all) { const t = [...q.row].filter((a) => !(a.locked && a.age < a.locked)).sort((x, y) => y.vol - x.vol || this.value(y, q) - this.value(x, q))[0]; if (t) { q.row.splice(q.row.indexOf(t), 1); this.log(`LA MANO takes ${q.name}'s ${t.name}`); } } this.disaster(); break;
+      case 'mano': if (this.market && this.market.key === 'paraguas') break; for (const q of all) { const t = [...q.row].filter((a) => !(a.locked && a.age < a.locked)).sort((x, y) => y.vol - x.vol || this.value(y, q) - this.value(x, q))[0]; if (t) { q.row.splice(q.row.indexOf(t), 1); this.discard.push(t); this.log(`LA MANO takes ${q.name}'s ${t.name}`); } } this.disaster(); break;
       case 'balanza': for (const q of all) { if (q.t.ability === 'clean') continue; let hit = 0; for (const a of q.row) if (a.trap || a.paper) { a.burned = true; a.examined = true; a.cur = 0; hit++; } if (hit) this.hitCred(q, 2); } this.disaster(); break;
       case 'muerte': for (const q of all) this.hitCred(q, 2); this.disaster(); break;
       case 'arana': for (const q of all) for (const a of q.row) if (a.bridge || a.well) { a.burned = true; a.cur = 0; } this.disaster(); break;
       case 'alacran': { const t = [...all].sort((x, y) => x.cred - y.cred)[0]; this.hitCred(t, 2); this.disaster(); break; }
       case 'calavera': { const s = [...all].sort((x, y) => y.stats.sells - x.stats.sells); if (s[0].stats.sells > s[1].stats.sells) { s[0].bank += 3; s[1].bank = Math.max(0, s[1].bank - 2); } this.disaster(); break; }
-      case 'borracho': for (const q of all) { if (q.row.some((a) => a.crown)) continue; const a = this.row[0]; if (a && q.cash >= a.cost) this.buyAs(q, 0); } break;
+      case 'borracho': for (const q of all) { if (q.row.some((a) => a.crown)) continue; const a = this.deck.shift(); if (!a) continue; this.log(`EL BORRACHO flips ${a.name} for ${q.name}`); if (q.cash >= a.cost) { q.hand.push(a); this.play(q, a); } else this.discard.push(a); } break;
       case 'rueda': if (!all.some((q) => q.row.some((a) => a.crown))) { const [x, y] = all; [x.row, y.row] = [y.row, x.row]; this.log('LA RUEDA: the portfolios change hands'); } break;
       case 'ballena': { const rich = [...all].sort((x, y) => this.portfolio(y) - this.portfolio(x)); if (rich[0] !== rich[1] && !rich[0].row.some((a) => a.keys) && !rich[1].row.some((a) => a.crown)) { const best = [...rich[0].row].filter((a) => !(a.locked && a.age < a.locked)).sort((x, y) => this.value(y, rich[0]) - this.value(x, rich[0]))[0]; if (best) { rich[0].row.splice(rich[0].row.indexOf(best), 1); rich[1].row.push(best); this.log(`LA BALLENA moves ${best.name}`); } } break; }
       case 'senora': { const d = [...all].sort((x, y) => this.deeds(y) - this.deeds(x)); if (this.deeds(d[0]) > this.deeds(d[1])) { const v = this.portfolio(d[0]); d[0].bank += v; d[0].row = []; this.log(`NUESTRA SEÑORA banks ${d[0].name}'s everything: ${v}`); } break; }
       case 'campana': this.bell = true; break;
     }
   }
-  disaster() { for (const q of this.players) { for (const a of [...q.row]) if (a.fragile) { q.row.splice(q.row.indexOf(a), 1); this.log(`${q.name}'s EL JARDÍN dies`); } if (q.t.ability === 'feeds') q.cash += 2; } }
-  buyAs(p, i) { this.buy(p, i); }
+  disaster() { for (const q of this.players) { for (const a of [...q.row]) if (a.fragile) { q.row.splice(q.row.indexOf(a), 1); this.discard.push(a); this.log(`${q.name}'s EL JARDÍN dies`); } if (q.t.ability === 'feeds') q.cash += 2; } }
 
   async turn(p) {
     p.shield = false; p.offeredThisTurn = false;
@@ -234,29 +246,30 @@ class Game {
       let n = a.pays; if (a.upkeep) { if (p.cash >= a.upkeep) p.cash -= a.upkeep; else continue; } if (a.drains) { a.cur = Math.max(0, a.cur - a.drains); if (a.cur <= 0 && a.key === 'piramide' && !a.pays) continue; }
       p.cash += n; p.stats.payouts += n;
     }
+    this.draw(p);
     // the die, at the start of the turn
     if (this.dieGate(p) && await p.policy.rollDie(this, p)) {
       p.dieUsed = true; p.stats.rolled = 1; const W = this.wealth(p); const roll = 1 + Math.floor(this.rng() * 12); const need = this.need(p);
       this.log(`✝ ${p.name} gives Our Lady everything (${W}), ${this.deeds(p)} deeds showing. Needs ${need}+… rolls ${roll}`);
-      p.row = []; if (roll >= need) { p.bank = W * 2; p.stats.answered = 1; this.log('✝ ANSWERED: doubled and banked'); } else { p.bank = Math.floor(W / 2); this.log('✝ UNANSWERED: she keeps half'); }
+      p.row = []; if (roll >= need) { const to = Math.max(W, Math.min(W * 2, this.wealth(this.opp(p)))); p.bank = to; p.stats.answered = 1; this.log(`✝ ANSWERED: Our Lady makes ${p.name} whole — raised to ${to}, banked (to the rival's level, never above)`); } else { p.bank = Math.floor(W / 2); this.log('✝ UNANSWERED: she keeps half'); }
     }
     // three actions
     for (let k = 0; k < 3; k++) { p.actionsLeft = 3 - k; const a = await p.policy.act(this, p); if (!a) break; await this.doAct(p, a); if (this.hooks && this.hooks.render) await this.hooks.render(); if (this.over) return; } p.actionsLeft = 0;
   }
   actions(p) {
     const A = [];
-    this.row.forEach((a, i) => { if (a && p.cash >= Math.max(0, a.cost - this.buyDiscount)) A.push({ t: 'buy', i, a }); });
+    for (const a of p.hand) if (p.cash >= Math.max(0, a.cost - this.playDiscount)) A.push({ t: 'play', a });
     for (const a of p.row) if (!(a.locked && a.age < a.locked)) A.push({ t: 'sell', a });
     const mayOffer = !p.offeredThisTurn && this.deeds(p) < 4;
     for (const g of p.graces) { A.push({ t: 'grace', g }); if (mayOffer) A.push({ t: 'offer', g }); }
-    if (mayOffer) for (const a of p.row) if (!(a.locked && a.age < a.locked) && !a.burned) A.push({ t: 'offer', a });
+    if (mayOffer) for (const a of p.row) if (!(a.locked && a.age < a.locked) && !a.burned) A.push({ t: 'offer', a }); // hand cards cannot be offered: a gift must be something you paid to put in play
     if (p.buries > 0) A.push({ t: 'bury' });
     if (p.pumps > 0) for (const a of p.row) if (this.value(a, p) >= 3) A.push({ t: 'pump', a });
     return A;
   }
   async doAct(p, act) {
     switch (act.t) {
-      case 'buy': this.buy(p, act.i); break;
+      case 'play': this.play(p, act.a); break;
       case 'sell': this.sell(p, act.a); break;
       case 'bury': { p.buries--; const c = this.calls[this.round]; if (c && c.key !== 'campana') { this.calls.splice(this.round, 1); this.calls.push(c); this.log(`${p.name}'s cat knocks ${c.name} off the table`); } break; }
       case 'pump': p.pumps--; act.a.pumped = true; this.log(`${p.name} pumps ${act.a.name}`); break;
@@ -264,8 +277,9 @@ class Game {
         const o = this.opp(p); const name = act.a ? act.a.name : 'LA ' + act.g.toUpperCase(); p.offeredThisTurn = true; p.stats.offers++;
         const holy = act.a && act.a.holy; // LA ESTAMPITA may not be refused
         const yes = holy || await o.policy.acceptOffer(this, o, p, act.a || act.g);
-        if (!yes) { p.stats.refused++; this.log(`${o.name} REFUSES ${p.name}'s offer of ${name} — refusing charity is a sin (−1 credibility)`); this.hitCred(o, 1); break; }
-        if (act.a) { p.row.splice(p.row.indexOf(act.a), 1); o.row.push(act.a); } else { p.graces.splice(p.graces.indexOf(act.g), 1); o.graces.push(act.g); }
+        if (!yes) { p.stats.refused++; const worthy = act.a ? this.value(act.a, p) >= 3 : true; // trash is refused freely: Our Lady is not fooled
+          if (worthy) { this.log(`${o.name} REFUSES ${p.name}'s worthy offer of ${name} — refusing charity is a sin (−1 credibility)`); this.hitCred(o, 1); } else this.log(`${o.name} waves away ${p.name}'s offer of ${name}`); break; }
+        if (act.a && act.fromHand) { p.hand.splice(p.hand.indexOf(act.a), 1); o.hand.push(act.a); } else if (act.a) { p.row.splice(p.row.indexOf(act.a), 1); o.row.push(act.a); } else { p.graces.splice(p.graces.indexOf(act.g), 1); o.graces.push(act.g); }
         p.deeds++; p.stats.dedicated++; p.given.push(name);
         this.log(`✧ ${o.name} accepts ${name}: a GOOD DEED for ${p.name} (${this.deeds(p)} of 4 — the die answers on ${this.need(p) === 1 ? 'any face' : this.need(p) + '+'})`); break;
       }
@@ -305,10 +319,11 @@ class Naive {
 class Strong {
   constructor() {}
   acceptOffer(g, me, giver, card) {
-    const mine = typeof card === 'string' ? 0.8 : this.assetScore(g, me, { ...card, cost: 0 }) * 0.5 + g.value(card, me) * 0.5;
+    const mine = typeof card === 'string' ? 0.8 : (this.assetScore(g, me, { ...card, cost: 0 }) * 0.5 + g.value(card, me) * 0.5) * (g.players.some((q) => q.hand.includes(card)) ? 0.7 : 1);
     const live = !giver.dieUsed && g.deeds(giver) < 4 && g.wealth(me) >= g.wealth(giver); // their die only fires while they trail
     const danger = live ? [1.5, 2, 3, 4.5][g.deeds(giver)] ?? 4.5 : 0;
-    const sin = me.cred <= 2 ? 2.5 : 1.2; // refusing costs 1 credibility, dearer when low
+    const worthy = typeof card === 'string' || g.value(card, giver) >= 3;
+    const sin = worthy ? (me.cred <= 2 ? 2.5 : 1.2) : 0; // only a worthy offer is sinful to refuse
     return mine + sin > danger;
   }
   disastersLeft(g) { return g.calls.slice(g.round + 1).filter((c) => c.kind === 'disaster').length; }
@@ -327,9 +342,9 @@ class Strong {
     let best = null, bs = 0.4;
     for (const a of A) {
       let s = -1;
-      if (a.t === 'buy') s = this.assetScore(g, p, a.a) * 0.5 + 0.8;
+      if (a.t === 'play') s = this.assetScore(g, p, a.a) * 0.5 + 0.8;
       if (a.t === 'sell') { const v = g.sellPrice(a.a, p); const future = this.assetScore(g, p, { ...a.a, cost: 0 }); s = a.a.pumped ? v * 0.9 : (g.paper && left <= 2 ? v * 0.6 : left <= 2 || a.a.immune ? -0.5 : v >= 5 && a.a.vol === 2 && dis >= 1 ? v * 0.35 : a.a.bubble && a.a.bubbleCalls === a.a.bubble - 1 ? v : a.a.tulip && g.value(a.a, p) >= 6 ? v * 0.8 : -0.5); }
-      if (a.t === 'offer') s = !p.dieUsed && g.deeds(p) < 4 ? (behind > 0 ? 1.6 : 0.5) + (p.t.ability === 'devout' ? 0.6 : 0) - p.stats.refused * 0.5 - (a.a ? this.assetScore(g, p, { ...a.a, cost: 0 }) * 0.35 : a.g === 'promesa' ? 0.3 : 0.5) : -1;
+      if (a.t === 'offer') s = !p.dieUsed && g.deeds(p) < 4 ? (behind > 0 ? 1.6 : 0.5) + (p.t.ability === 'devout' ? 0.6 : 0) - p.stats.refused * 0.5 - (a.a ? this.assetScore(g, p, { ...a.a, cost: a.fromHand ? a.a.cost : 0 }) * 0.35 : a.g === 'promesa' ? 0.3 : 0.5) : -1;
       if (a.t === 'grace') s = a.g === 'diezmo' ? 0.9 : a.g === 'promesa' && dis >= 2 && p.cred <= 3 ? 1.4 : a.g === 'limosna' ? 0.7 : 0.1;
       if (a.t === 'pump') s = g.value(a.a, p) * 0.5;
       if (a.t === 'bury') { const next = g.calls[g.round + 1]; s = next && next.kind === 'disaster' && g.portfolio(p) > g.portfolio(g.opp(p)) ? 2 : -1; }
@@ -386,7 +401,7 @@ function cardEl(a, { market = false, owner = null } = {}) {
   if (a.type === 'event') { el.classList.add('event'); el.innerHTML = `<span class="num">${num}</span><div class="nm">¡${esc(a.name)}!</div><div class="en">${esc(EN[a.key] || '')}</div><div class="fx">${esc(a.kind)}</div>`; return el; }
   const g = S && S.g; const v = owner && g ? g.value(a, owner) : a.cur ?? a.val;
   el.innerHTML = `<span class="num">${num}</span><div class="nm">${esc(a.name)}</div><div class="en">${esc(EN[a.key] || '')}</div>
-    <div class="chips">${market ? `<span>cost ${Math.max(0, a.cost - (g ? g.buyDiscount : 0))}</span>` : ''}<span>${a.pearl && !market ? 'val ?' : 'val ' + v}</span><span class="vol">${VOLM[a.vol] || ''}</span></div>
+    <div class="chips">${market ? `<span>cost ${Math.max(0, a.cost - (g ? g.playDiscount : 0))}</span>` : ''}<span>${a.pearl && !market ? 'val ?' : 'val ' + v}</span><span class="vol">${VOLM[a.vol] || ''}</span></div>
     <div class="fx">${esc(FX[a.key] || '')}${a.locked && a.age < a.locked && !market ? ` · locked ${a.locked - a.age} more` : ''}${a.pumped ? ' · PUMPED ×2' : ''}${a.burned ? ' · burned' : ''}</div>`;
   return el;
 }
@@ -418,8 +433,8 @@ function showOffer(g, me, giver, card, done) {
   const needAfter = [12, 11, 9, 5, 1][after];
   host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">the bot holds out a card</div><div class="call">AN OFFERING</div>
     <div id="offerCard"></div>
-    <div>Accept, and it is yours — and <b>their good deed</b>: Our Lady's die would answer them on <b>${needAfter === 1 ? 'any face' : needAfter + '+'}</b>. Refuse, and refusing charity is a sin: <b>−1 credibility</b>.</div>
-    <button class="primary" id="offerYes">Accept the gift</button><button id="offerNo">Refuse (−1 ♥)</button></div></div>`;
+    <div>Accept, and it is yours — and <b>their good deed</b>: Our Lady's die would answer them on <b>${needAfter === 1 ? 'any face' : needAfter + '+'}</b>. ${(typeof card === 'string' || g.value(card, giver) >= 3) ? 'Refuse, and refusing a worthy offer is a sin: <b>−1 credibility</b>.' : 'This one is not much of an offering — refusing it costs nothing.'}</div>
+    <button class="primary" id="offerYes">Accept the gift</button><button id="offerNo">${(typeof card === 'string' || g.value(card, giver) >= 3) ? 'Refuse (−1 ♥)' : 'Wave it away'}</button></div></div>`;
   host.querySelector('#offerCard').appendChild(typeof card === 'string' ? graceEl(card) : cardEl(card, { owner: giver }));
   const fin = (v) => { host.innerHTML = ''; done(v); setTimeout(render, 50); };
   host.querySelector('#offerYes').addEventListener('click', () => fin(true));
@@ -445,13 +460,15 @@ function render() {
   $('peek').textContent = me.t.ability === 'peek' && g.calls[g.round + (g.active === me || !g.called.length ? 0 : 0) + (g.called.length > g.round ? 1 : 0)] ? '' : '';
   const nx = me.t.ability === 'peek' ? g.calls[g.called.length] : (me.peeked ? null : null);
   $('peek').textContent = nx ? `Eugene sees the next call: ¡${nx.name}!` : me.peeked ? `La Vela showed: ${me.peeked.map((k) => '¡' + k.toUpperCase() + '!').join(' then ')}` : '';
-  // market row
-  const m = $('market'); m.innerHTML = '';
-  g.row.forEach((a, i) => { if (!a) return; const el = cardEl(a, { market: true }); const act = acts.find((x) => x.t === 'buy' && x.i === i); if (act) { el.classList.add('buyable'); el.addEventListener('click', () => resolveAct(act)); } else el.classList.add('dim'); m.appendChild(el); });
+  // deck and discard
+  const dp = $('deckPile'); dp.innerHTML = '';
+  { const back = document.createElement('div'); back.className = 'card event'; back.innerHTML = `<div class="nm" style="margin:auto;text-align:center">RL80</div><div class="fx" style="text-align:center">${g.deck.length} left</div>`; dp.appendChild(back); }
+  const xp = $('discardPile'); xp.innerHTML = '';
+  if (g.discard.length) { const t = cardEl(g.discard[g.discard.length - 1]); t.classList.add('dim'); xp.appendChild(t); } else xp.innerHTML = '<span class="note">empty</span>';
   // panels
   $('botWho').textContent = 'THE BOT · ' + bot.t.name; $('botWho').classList.toggle('active', g.active === bot && S.running);
   $('meWho').textContent = 'YOU · ' + me.t.name; $('meWho').classList.toggle('active', myTurn && S.running);
-  $('botBank').textContent = bot.bank; $('botCash').textContent = bot.cash; $('botCred').textContent = '♥'.repeat(Math.max(0, bot.cred)); $('botDeeds').textContent = g.deeds(bot); $('botWealth').textContent = g.wealth(bot);
+  $('botHand').textContent = bot.hand.length; $('botBank').textContent = bot.bank; $('botCash').textContent = bot.cash; $('botCred').textContent = '♥'.repeat(Math.max(0, bot.cred)); $('botDeeds').textContent = g.deeds(bot); $('botWealth').textContent = g.wealth(bot);
   $('meBank').textContent = me.bank; $('meCash').textContent = me.cash; $('meCred').textContent = '♥'.repeat(Math.max(0, me.cred)); $('meWealth').textContent = g.wealth(me);
   $('dieInfo').textContent = me.dieUsed ? 'Die: spent' : `Die answers on ${g.need(me) === 1 ? 'any face' : g.need(me) + '+'} · ${g.dieGate(me) ? 'offered when your turn starts' : 'for the trailing, after call 10'}`;
   const br = $('botRow'); br.innerHTML = ''; bot.row.forEach((a) => br.appendChild(cardEl(a, { owner: bot })));
@@ -459,6 +476,9 @@ function render() {
   me.row.forEach((a) => { const el = cardEl(a, { owner: me }); const sell = acts.find((x) => x.t === 'sell' && x.a === a); const off = acts.find((x) => x.t === 'offer' && x.a === a); const pump = acts.find((x) => x.t === 'pump' && x.a === a);
     const items = []; if (sell) items.push([`Sell for ${g.sellPrice(a, me)}`, () => resolveAct(sell)]); if (pump) items.push(['Pump it (×2 until the next call)', () => resolveAct(pump)]); if (off) items.push([a.holy ? 'Offer it (the holy card may not be refused)' : 'Offer it to the bot — a good deed if accepted', () => resolveAct(off)]);
     if (items.length) { el.classList.add('clickable'); el.addEventListener('click', () => popMenu(el, items)); } mr.appendChild(el); });
+  const mh = $('meHand'); mh.innerHTML = '';
+  me.hand.forEach((a) => { const el = cardEl(a, { market: true }); const play = acts.find((x) => x.t === 'play' && x.a === a);
+    if (play) { el.classList.add('buyable'); el.addEventListener('click', () => popMenu(el, [[`Play it for ${Math.max(0, a.cost - g.playDiscount)}`, () => resolveAct(play)]])); } else el.classList.add('dim'); mh.appendChild(el); });
   const mg = $('meGraces'); mg.innerHTML = '';
   me.graces.forEach((k) => { const el = graceEl(k); const play = acts.find((x) => x.t === 'grace' && x.g === k); const off = acts.find((x) => x.t === 'offer' && x.g === k && !x.a);
     const items = []; if (play) items.push([FX[k].replace('Play: ', 'Play it: '), () => resolveAct(play)]); if (off) items.push(['Offer it to the bot — a good deed if accepted', () => resolveAct(off)]);
