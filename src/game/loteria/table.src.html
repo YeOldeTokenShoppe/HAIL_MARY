@@ -85,9 +85,9 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
   </section>
   <section class="panel me" id="mePanel">
     <div class="phead"><span class="who" id="meWho">YOU</span><span class="stat">Bank <b id="meBank">0</b></span><span class="stat">Cash <b id="meCash">0</b></span><span class="stat">Cred <b class="cred" id="meCred"></b></span><span class="stat">Wealth <b id="meWealth">0</b></span><span class="stat" id="dieInfo"></span></div>
-    <div class="rowlabel">Your portfolio · tap a card to sell or dedicate</div><div class="cards" id="meRow"></div>
-    <div class="rowlabel">Your graces · tap to play or dedicate</div><div class="cards" id="meGraces"></div>
-    <div class="rowlabel">Good deeds · Our Lady's die</div><div class="cards" id="meDeeds"></div>
+    <div class="rowlabel">Your portfolio · tap a card to sell, pump or offer</div><div class="cards" id="meRow"></div>
+    <div class="rowlabel">Your graces · tap to play or offer</div><div class="cards" id="meGraces"></div>
+    <div class="rowlabel">Good deeds · what the bot accepted</div><div class="cards" id="meDeeds"></div>
     <div class="actionbar"><b id="actionsLeft" class="stat"></b><button id="bury" hidden>Cat: knock the next call off the table</button><button class="primary" id="endTurn" disabled>End turn</button></div>
   </section>
 </div>
@@ -103,7 +103,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const EN = { elote: 'the corn', moneda: 'the coin', lingote: 'the ingot', escalera: 'the ladder', jardin: 'the yield farm', mina: 'the mine', pozo: 'the pool', puente: 'the bridge', semilla: 'the seed', llaves: 'the keys', candado: 'the padlock', corona: 'the crown', perla: 'the pearl', arte: 'the NFT', meme: 'the meme', cohete: 'the rocket', burbuja: 'the bubble', estampita: 'the holy card', tulipan: 'the tulip', alfombra: 'the rug', aire: 'vaporware', piramide: 'the pyramid',
   gallo: 'the opening bell', toro: 'bull run', oso: 'bear market', impresora: 'printer goes brrr', luna: 'to the moon', sol: 'golden age', paraguas: 'shelter', cadenas: 'margin call', torre: 'the crash', mano: 'the regulator', balanza: 'the audit', muerte: 'the liquidation', arana: 'the exploit', alacran: 'the social engineer', calavera: 'exit liquidity', borracho: 'the degen', rueda: 'volatility', ballena: 'the whale', campana: 'the final bell', senora: 'mater ex machina',
   vela: 'the candle', limosna: 'the alms', diezmo: 'the tithe', promesa: 'the vow' };
-const FX = { elote: 'Slowly appreciates', moneda: 'Pays 1 cash a turn', lingote: 'Ignores every event', escalera: '+1 value a round held', jardin: 'Pays 2; dies to disasters', mina: 'Pays 2, upkeep 1', pozo: '+1 cash on any purchase', puente: 'Pays 3; the Spider burns it', semilla: 'Blooms to 6 after 5 rounds', llaves: 'Nothing of yours can be stolen', candado: 'Untouchable, unsellable, 3 rounds', corona: 'Caprice calls skip you', perla: 'Appraised 1–6', arte: 'Re-prices on every call', meme: 'Doubles on bulls, halves on bears', cohete: '×3 if the Moon is called', burbuja: '+2 a round; pops on its 3rd call', estampita: 'May be dedicated as a deed', tulipan: '+2 a round until anyone sells one', alfombra: 'Pays 2; worth nothing; audit burns it', aire: 'Worth 5 on paper, 0 examined', piramide: 'Pays 2 out of its own value',
+const FX = { elote: 'Slowly appreciates', moneda: 'Pays 1 cash a turn', lingote: 'Ignores every event', escalera: '+1 value a round held', jardin: 'Pays 2; dies to disasters', mina: 'Pays 2, upkeep 1', pozo: '+1 cash on any purchase', puente: 'Pays 3; the Spider burns it', semilla: 'Blooms to 6 after 5 rounds', llaves: 'Nothing of yours can be stolen', candado: 'Untouchable, unsellable, 3 rounds', corona: 'Caprice calls skip you', perla: 'Appraised 1–6', arte: 'Re-prices on every call', meme: 'Doubles on bulls, halves on bears', cohete: '×3 if the Moon is called', burbuja: '+2 a round; pops on its 3rd call', estampita: 'The holy card may not be refused', tulipan: '+2 a round until anyone sells one', alfombra: 'Pays 2; worth nothing; audit burns it', aire: 'Worth 5 on paper, 0 examined', piramide: 'Pays 2 out of its own value',
   vela: 'Play: peek at the next two calls', limosna: 'Play: give 2, pocket 3 cash', diezmo: 'Play: bank 2', promesa: 'Play: credibility shielded this round' };
 const NUM = {}; [...TRADERS.map((t) => t.key), ...ASSETS.map((a) => a.key)].forEach((k, i) => NUM[k] = i + 1); EVENTS.forEach((e, i) => NUM[e.key] = NUM[e.key] || 31 + i); GRACES.forEach((g, i) => NUM[g] = 51 + i); NUM.senora = 80;
 const VOLM = ['○', '◑', '●'];
@@ -115,6 +115,7 @@ const toast = (t) => { const el = $('toast'); el.textContent = t; el.classList.a
 
 class HumanPolicy {
   rollDie(g, p) { return new Promise((res) => { S.dieResolve = res; showDie(g, p); }); }
+  acceptOffer(g, me, giver, card) { return new Promise((res) => showOffer(g, me, giver, card, res)); }
   act(g, p) { return new Promise((res) => { S.actResolve = res; render(); }); }
 }
 const resolveAct = (a) => { const r = S.actResolve; S.actResolve = null; if (r) r(a); };
@@ -167,6 +168,19 @@ function showDie(g, p) {
   const fin = (v) => { host.innerHTML = ''; const r = S.dieResolve; S.dieResolve = null; r(v); setTimeout(() => { const last = S.g.lines.filter((l) => /ANSWERED|UNANSWERED/.test(l)).pop(); if (v && last) toast(last.replace(/^\[R\d+\] /, '')); render(); }, 50); };
   host.querySelector('#pray').addEventListener('click', () => fin(true)); host.querySelector('#hold').addEventListener('click', () => fin(false));
 }
+function showOffer(g, me, giver, card, done) {
+  const host = $('overlayHost'); const name = typeof card === 'string' ? 'LA ' + card.toUpperCase() : card.name;
+  const after = Math.min(4, (g.deeds(giver) + (giver.t.ability === 'devout' ? 2 : 1)));
+  const needAfter = [12, 11, 9, 5, 1][after];
+  host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">the bot holds out a card</div><div class="call">AN OFFERING</div>
+    <div id="offerCard"></div>
+    <div>Accept, and it is yours — and <b>their good deed</b>: Our Lady's die would answer them on <b>${needAfter === 1 ? 'any face' : needAfter + '+'}</b>. Refuse, and refusing charity is a sin: <b>−1 credibility</b>.</div>
+    <button class="primary" id="offerYes">Accept the gift</button><button id="offerNo">Refuse (−1 ♥)</button></div></div>`;
+  host.querySelector('#offerCard').appendChild(typeof card === 'string' ? graceEl(card) : cardEl(card, { owner: giver }));
+  const fin = (v) => { host.innerHTML = ''; done(v); setTimeout(render, 50); };
+  host.querySelector('#offerYes').addEventListener('click', () => fin(true));
+  host.querySelector('#offerNo').addEventListener('click', () => fin(false));
+}
 function showBell(r) {
   const host = $('overlayHost'); const [a, b] = r.wealth; const win = r.winner === 'YOU' ? 'YOU WIN' : r.winner ? 'THE BOT WINS' : 'A DRAW';
   host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">¡la campana! · round ${r.rounds}</div><div class="call">${win}</div>
@@ -198,14 +212,14 @@ function render() {
   $('dieInfo').textContent = me.dieUsed ? 'Die: spent' : `Die answers on ${g.need(me) === 1 ? 'any face' : g.need(me) + '+'} · ${g.dieGate(me) ? 'offered when your turn starts' : 'for the trailing, after call 10'}`;
   const br = $('botRow'); br.innerHTML = ''; bot.row.forEach((a) => br.appendChild(cardEl(a, { owner: bot })));
   const mr = $('meRow'); mr.innerHTML = '';
-  me.row.forEach((a) => { const el = cardEl(a, { owner: me }); const sell = acts.find((x) => x.t === 'sell' && x.a === a); const ded = acts.find((x) => x.t === 'dedicate' && x.a === a); const pump = acts.find((x) => x.t === 'pump' && x.a === a);
-    const items = []; if (sell) items.push([`Sell for ${g.sellPrice(a, me)}`, () => resolveAct(sell)]); if (pump) items.push(['Pump it (×2 until the next call)', () => resolveAct(pump)]); if (ded) items.push(['Dedicate as a good deed', () => resolveAct(ded)]);
+  me.row.forEach((a) => { const el = cardEl(a, { owner: me }); const sell = acts.find((x) => x.t === 'sell' && x.a === a); const off = acts.find((x) => x.t === 'offer' && x.a === a); const pump = acts.find((x) => x.t === 'pump' && x.a === a);
+    const items = []; if (sell) items.push([`Sell for ${g.sellPrice(a, me)}`, () => resolveAct(sell)]); if (pump) items.push(['Pump it (×2 until the next call)', () => resolveAct(pump)]); if (off) items.push([a.holy ? 'Offer it (the holy card may not be refused)' : 'Offer it to the bot — a good deed if accepted', () => resolveAct(off)]);
     if (items.length) { el.classList.add('clickable'); el.addEventListener('click', () => popMenu(el, items)); } mr.appendChild(el); });
   const mg = $('meGraces'); mg.innerHTML = '';
-  me.graces.forEach((k) => { const el = graceEl(k); const play = acts.find((x) => x.t === 'grace' && x.g === k); const ded = acts.find((x) => x.t === 'dedicate' && x.g === k && !x.a);
-    const items = []; if (play) items.push([FX[k].replace('Play: ', 'Play it: '), () => resolveAct(play)]); if (ded) items.push(['Dedicate as a good deed', () => resolveAct(ded)]);
+  me.graces.forEach((k) => { const el = graceEl(k); const play = acts.find((x) => x.t === 'grace' && x.g === k); const off = acts.find((x) => x.t === 'offer' && x.g === k && !x.a);
+    const items = []; if (play) items.push([FX[k].replace('Play: ', 'Play it: '), () => resolveAct(play)]); if (off) items.push(['Offer it to the bot — a good deed if accepted', () => resolveAct(off)]);
     if (items.length) { el.classList.add('clickable'); el.addEventListener('click', () => popMenu(el, items)); } mg.appendChild(el); });
-  const md = $('meDeeds'); md.innerHTML = ''; for (let i = 0; i < me.deeds; i++) { const el = document.createElement('div'); el.className = 'card deed'; el.innerHTML = '<div class="nm">DEED</div><div class="fx">one rung</div>'; md.appendChild(el); }
+  const md = $('meDeeds'); md.innerHTML = ''; me.given.forEach((n) => { const el = document.createElement('div'); el.className = 'card deed'; el.innerHTML = `<div class="nm">${esc(n)}</div><div class="fx">given · one rung</div>`; md.appendChild(el); });
   if (me.t.ability === 'devout' && me.deeds) { const el = document.createElement('div'); el.className = 'card deed'; el.innerHTML = '<div class="nm">GR80</div><div class="fx">deeds count double</div>'; md.appendChild(el); }
   $('bury').hidden = !acts.some((x) => x.t === 'bury'); $('endTurn').disabled = !S.actResolve;
   $('actionsLeft').textContent = S.actResolve ? `${me.actionsLeft ?? 3} action${(me.actionsLeft ?? 3) === 1 ? '' : 's'} left` : S.running ? (g.active === bot ? 'The bot is playing…' : '') : '';

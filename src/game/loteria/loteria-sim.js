@@ -69,8 +69,8 @@ export class Game {
     this.rng = makeRng(seed); this.verbose = verbose; this.lines = [];
     this.players = players.map((cfg, idx) => ({ idx, name: cfg.name, policy: cfg.policy, t: cfg.trader,
       cred: cfg.trader.cred, bank: cfg.trader.key === 'hermana' ? 3 : 0, cash: 0, row: [], graces: [...GRACES], deeds: 0,
-      dieUsed: false, buries: cfg.trader.key === 'gato' ? 2 : 0, pumps: cfg.trader.key === 'sirena' ? 2 : 0,
-      stats: { buys: 0, sells: 0, payouts: 0, dedicated: 0, gracesPlayed: 0, rolled: 0, answered: 0, fireSales: 0 } }));
+      dieUsed: false, given: [], offeredThisTurn: false, buries: cfg.trader.key === 'gato' ? 2 : 0, pumps: cfg.trader.key === 'sirena' ? 2 : 0,
+      stats: { buys: 0, sells: 0, payouts: 0, dedicated: 0, offers: 0, refused: 0, gracesPlayed: 0, rolled: 0, answered: 0, fireSales: 0 } }));
     // the caller's deck: 19 shuffled, LA CAMPANA into the last five calls
     const rest = this.shuffle(EVENTS.filter((e) => e.key !== 'campana'));
     this.calls = rest.slice(0, 19); this.calls.splice(15 + Math.floor(this.rng() * 5), 0, EVENTS.find((e) => e.key === 'campana'));
@@ -122,7 +122,7 @@ export class Game {
   buyAs(p, i) { this.buy(p, i); }
 
   async turn(p) {
-    p.shield = false;
+    p.shield = false; p.offeredThisTurn = false;
     // income and payouts
     p.cash += p.t.liq + (this.market && this.market.key === 'impresora' ? 1 : 0);
     for (const a of p.row) {
@@ -138,25 +138,34 @@ export class Game {
       p.row = []; if (roll >= need) { p.bank = W * 2; p.stats.answered = 1; this.log('✝ ANSWERED: doubled and banked'); } else { p.bank = Math.floor(W / 2); this.log('✝ UNANSWERED: she keeps half'); }
     }
     // three actions
-    for (let k = 0; k < 3; k++) { p.actionsLeft = 3 - k; const a = await p.policy.act(this, p); if (!a) break; this.doAct(p, a); if (this.hooks && this.hooks.render) await this.hooks.render(); if (this.over) return; } p.actionsLeft = 0;
+    for (let k = 0; k < 3; k++) { p.actionsLeft = 3 - k; const a = await p.policy.act(this, p); if (!a) break; await this.doAct(p, a); if (this.hooks && this.hooks.render) await this.hooks.render(); if (this.over) return; } p.actionsLeft = 0;
   }
   actions(p) {
     const A = [];
     this.row.forEach((a, i) => { if (a && p.cash >= Math.max(0, a.cost - this.buyDiscount)) A.push({ t: 'buy', i, a }); });
     for (const a of p.row) if (!(a.locked && a.age < a.locked)) A.push({ t: 'sell', a });
-    for (const g of p.graces) { A.push({ t: 'grace', g }); A.push({ t: 'dedicate', g }); }
-    for (const a of p.row) if (a.holy) A.push({ t: 'dedicate', g: 'estampita', a });
+    const mayOffer = !p.offeredThisTurn && this.deeds(p) < 4;
+    for (const g of p.graces) { A.push({ t: 'grace', g }); if (mayOffer) A.push({ t: 'offer', g }); }
+    if (mayOffer) for (const a of p.row) if (!(a.locked && a.age < a.locked) && !a.burned) A.push({ t: 'offer', a });
     if (p.buries > 0) A.push({ t: 'bury' });
     if (p.pumps > 0) for (const a of p.row) if (this.value(a, p) >= 3) A.push({ t: 'pump', a });
     return A;
   }
-  doAct(p, act) {
+  async doAct(p, act) {
     switch (act.t) {
       case 'buy': this.buy(p, act.i); break;
       case 'sell': this.sell(p, act.a); break;
       case 'bury': { p.buries--; const c = this.calls[this.round]; if (c && c.key !== 'campana') { this.calls.splice(this.round, 1); this.calls.push(c); this.log(`${p.name}'s cat knocks ${c.name} off the table`); } break; }
       case 'pump': p.pumps--; act.a.pumped = true; this.log(`${p.name} pumps ${act.a.name}`); break;
-      case 'dedicate': if (act.a) { p.row.splice(p.row.indexOf(act.a), 1); } else { p.graces.splice(p.graces.indexOf(act.g), 1); } p.deeds++; p.stats.dedicated++; this.log(`✧ ${p.name} dedicates ${act.g.toUpperCase()} (${this.deeds(p)} deeds)`); break;
+      case 'offer': {
+        const o = this.opp(p); const name = act.a ? act.a.name : 'LA ' + act.g.toUpperCase(); p.offeredThisTurn = true; p.stats.offers++;
+        const holy = act.a && act.a.holy; // LA ESTAMPITA may not be refused
+        const yes = holy || await o.policy.acceptOffer(this, o, p, act.a || act.g);
+        if (!yes) { p.stats.refused++; this.log(`${o.name} REFUSES ${p.name}'s offer of ${name} — refusing charity is a sin (−1 credibility)`); this.hitCred(o, 1); break; }
+        if (act.a) { p.row.splice(p.row.indexOf(act.a), 1); o.row.push(act.a); } else { p.graces.splice(p.graces.indexOf(act.g), 1); o.graces.push(act.g); }
+        p.deeds++; p.stats.dedicated++; p.given.push(name);
+        this.log(`✧ ${o.name} accepts ${name}: a GOOD DEED for ${p.name} (${this.deeds(p)} of 4 — the die answers on ${this.need(p) === 1 ? 'any face' : this.need(p) + '+'})`); break;
+      }
       case 'grace': {
         p.graces.splice(p.graces.indexOf(act.g), 1); p.stats.gracesPlayed++;
         if (act.g === 'limosna') { this.opp(p).bank += 2; p.cash += 3; }
@@ -187,10 +196,18 @@ export class Game {
 export class Naive {
   constructor(rng) { this.rng = rng; }
   rollDie() { return true; }
+  acceptOffer() { return this.rng() < 0.6; }
   act(g, p) { const A = g.actions(p); if (!A.length) return null; const k = Math.floor(this.rng() * (A.length + 1)); return k === A.length ? null : A[k]; }
 }
 export class Strong {
   constructor() {}
+  acceptOffer(g, me, giver, card) {
+    const mine = typeof card === 'string' ? 0.8 : this.assetScore(g, me, { ...card, cost: 0 }) * 0.5 + g.value(card, me) * 0.5;
+    const live = !giver.dieUsed && g.deeds(giver) < 4 && g.wealth(me) >= g.wealth(giver); // their die only fires while they trail
+    const danger = live ? [1.5, 2, 3, 4.5][g.deeds(giver)] ?? 4.5 : 0;
+    const sin = me.cred <= 2 ? 2.5 : 1.2; // refusing costs 1 credibility, dearer when low
+    return mine + sin > danger;
+  }
   disastersLeft(g) { return g.calls.slice(g.round + 1).filter((c) => c.kind === 'disaster').length; }
   rollDie(g, p) { const odds = (13 - g.need(p)) / 12; const behind = g.wealth(g.opp(p)) - g.wealth(p); const left = g.calls.length - g.round;
     if (odds >= 1) return true; if (left <= 3 && g.wealth(p) * 2 > g.wealth(g.opp(p))) return odds >= 1 / 3 || behind > g.wealth(p); return odds >= 2 / 3 && behind >= 5; }
@@ -209,7 +226,7 @@ export class Strong {
       let s = -1;
       if (a.t === 'buy') s = this.assetScore(g, p, a.a) * 0.5 + 0.8;
       if (a.t === 'sell') { const v = g.sellPrice(a.a, p); const future = this.assetScore(g, p, { ...a.a, cost: 0 }); s = a.a.pumped ? v * 0.9 : (g.paper && left <= 2 ? v * 0.6 : left <= 2 || a.a.immune ? -0.5 : v >= 5 && a.a.vol === 2 && dis >= 1 ? v * 0.35 : a.a.bubble && a.a.bubbleCalls === a.a.bubble - 1 ? v : a.a.tulip && g.value(a.a, p) >= 6 ? v * 0.8 : -0.5); }
-      if (a.t === 'dedicate') s = !p.dieUsed && g.deeds(p) < 4 ? (behind > 0 ? 1.2 : 0.4) + (p.t.ability === 'devout' ? 0.6 : 0) - (a.a ? g.value(a.a, p) * 0.3 : a.g === 'diezmo' ? 0.4 : 0.2) : -1;
+      if (a.t === 'offer') s = !p.dieUsed && g.deeds(p) < 4 ? (behind > 0 ? 1.6 : 0.5) + (p.t.ability === 'devout' ? 0.6 : 0) - p.stats.refused * 0.5 - (a.a ? this.assetScore(g, p, { ...a.a, cost: 0 }) * 0.35 : a.g === 'promesa' ? 0.3 : 0.5) : -1;
       if (a.t === 'grace') s = a.g === 'diezmo' ? 0.9 : a.g === 'promesa' && dis >= 2 && p.cred <= 3 ? 1.4 : a.g === 'limosna' ? 0.7 : 0.1;
       if (a.t === 'pump') s = g.value(a.a, p) * 0.5;
       if (a.t === 'bury') { const next = g.calls[g.round + 1]; s = next && next.kind === 'disaster' && g.portfolio(p) > g.portfolio(g.opp(p)) ? 2 : -1; }
