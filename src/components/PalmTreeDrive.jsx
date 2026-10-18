@@ -22,7 +22,8 @@ import RL80SceneIntro, { INTRO_DURATION_MS, REDUCED_INTRO_DURATION_MS } from './
 import BuyModal from './BuyModal';
 import CyberNav from './CyberNav';
 import HorizontalRoadmap from './HorizontalRoadmap';
-import { createLowRider, LOW_RIDER_MODEL_URL } from '@/lib/palmTreeDriveCar.mjs';
+import { createLowRider, LOW_RIDER_MODEL_URL, DEFAULT_TAP_BPM, DEFAULT_TAP_BEAT_OFFSET } from '@/lib/palmTreeDriveCar.mjs';
+import { useMusic } from './MusicContext';
 import { applyIllustratedStyle } from '@/lib/palmTreeDriveIllustrated.mjs';
 import { createCandyEmeraldPaint } from '@/lib/palmTreeDrivePaint.mjs';
 import { createPalmTreeDriveCameraHelper } from '@/lib/palmTreeDriveCameraHelper.mjs';
@@ -41,6 +42,7 @@ gsap.registerPlugin(ScrollTrigger);
 
 const PalmsScene = ({ onLoadingChange, onTitleMomentChange, onIntroComplete, hasEntered = true }) => {
   const { t, locale } = useLanguage();
+  const { audioRef: musicAudioRef } = useMusic();
   const entryStartedRef = useRef(hasEntered);
   const startSequenceRef = useRef(null);
   useEffect(() => {
@@ -1469,7 +1471,24 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange, onIntroComplete, has
     // Keep animation placement separate from the imported rig hierarchy.
     loadModelWithRetry(LOW_RIDER_MODEL_URL, (gltf) => {
       if (disposed) return;
-      lowRider = createLowRider(gltf, { roadSpeed: speed / 2 });
+      // Hand-tap tempo. The tap is scrubbed from the music element's playhead
+      // every frame (no drift); `?tapbpm=NN` / `?tapoffset=S` override the
+      // measured defaults in palmTreeDriveCar for auditioning.
+      const driveParams = new URLSearchParams(window.location.search);
+      const tapBpm = Number(driveParams.get('tapbpm')) || DEFAULT_TAP_BPM;
+      const tapBeatOffset = driveParams.has('tapoffset') ? Number(driveParams.get('tapoffset')) || 0 : DEFAULT_TAP_BEAT_OFFSET;
+      const musicClock = () => {
+        const audio = musicAudioRef?.current;
+        return audio && !audio.paused && !audio.ended && audio.readyState >= 2 ? audio.currentTime : null;
+      };
+      lowRider = createLowRider(gltf, { roadSpeed: speed / 2, tapBpm, tapBeatOffset, tapClock: musicClock });
+      lowRider.syncTapToMusic = () => lowRider?.syncTap(musicClock() ?? 0);
+      // Console tuning: __driveTap.bpm(92) / __driveTap.offset(0.12) apply on the next frame.
+      window.__driveTap = {
+        bpm: (bpm) => { lowRider?.setTapBpm(bpm); return lowRider?.tapBpm; },
+        offset: (seconds) => { lowRider?.setTapBeatOffset(seconds); return lowRider?.tapBeatOffset; },
+        get current() { return { bpm: lowRider?.tapBpm, offset: lowRider?.tapBeatOffset }; },
+      };
       const carScene = lowRider.car;
       carScene.updateMatrixWorld(true);
       const tireEnvelope = new THREE.Box3();
@@ -2096,6 +2115,8 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange, onIntroComplete, has
     startCameraSequence = () => {
       if (disposed || !entryStartedRef.current || !lowRider || resolvedModelNames.size < 4 || cameraSequenceStarted) return;
       cameraSequenceStarted = true;
+      // Free-run fallback phase (the per-frame scrub takes over whenever the song plays).
+      lowRider.syncTapToMusic?.();
       // Enable ScrollTrigger for mobile with better touch handling
       ScrollTrigger.config({
         ignoreMobileResize: true,
@@ -2354,6 +2375,7 @@ const PalmsScene = ({ onLoadingChange, onTitleMomentChange, onIntroComplete, has
       startSequenceRef.current = null;
       lowRider?.dispose();
       lowRider = null;
+      if (window.__driveTap) delete window.__driveTap;
       carModelRef.current = null;
       cameraHelper?.dispose();
       retryTimers.forEach(clearTimeout);
