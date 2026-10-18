@@ -97,8 +97,7 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
       <div class="deedcol"><div class="rowlabel">Good deeds</div><div class="cards" id="meDeeds" style="flex-direction:column"></div></div>
       <div style="min-width:0">
         <div class="rowlabel">Your portfolio · tap a card to sell, pump or offer</div><div class="cards" id="meRow"></div>
-        <div class="rowlabel">Your hand · tap a card to play it</div><div class="cards" id="meHand"></div>
-        <div class="rowlabel">Your graces · tap to play or offer</div><div class="cards" id="meGraces"></div>
+        <div class="rowlabel">Your hand · hidden from the bot · tap a card to play or offer it</div><div class="cards" id="meHand"></div>
       </div>
     </div>
     <div class="actionbar"><b id="actionsLeft" class="stat"></b><button id="bury" hidden>Cat: knock the next call off the table</button><button class="primary" id="endTurn" disabled>End turn</button></div>
@@ -148,7 +147,7 @@ const toast = (t) => { const el = $('toast'); el.textContent = t; el.classList.a
 
 class HumanPolicy {
   rollDie(g, p) { return new Promise((res) => { S.dieResolve = res; showDie(g, p); }); }
-  acceptOffer(g, me, giver, card) { return new Promise((res) => showOffer(g, me, giver, card, res)); }
+  acceptOffer(g, me, giver, card, fromHand) { return new Promise((res) => showOffer(g, me, giver, card, fromHand, res)); }
   act(g, p) { return new Promise((res) => { S.actResolve = res; render(); }); }
 }
 const resolveAct = (a) => { const r = S.actResolve; S.actResolve = null; if (r) r(a); };
@@ -202,15 +201,15 @@ function showDie(g, p) {
   const fin = (v) => { host.innerHTML = ''; const r = S.dieResolve; S.dieResolve = null; r(v); setTimeout(() => { const last = S.g.lines.filter((l) => /ANSWERED|UNANSWERED/.test(l)).pop(); if (v && last) toast(last.replace(/^\[R\d+\] /, '')); render(); }, 50); };
   host.querySelector('#pray').addEventListener('click', () => fin(true)); host.querySelector('#hold').addEventListener('click', () => fin(false));
 }
-function showOffer(g, me, giver, card, done) {
-  const host = $('overlayHost'); const name = typeof card === 'string' ? 'LA ' + card.toUpperCase() : card.name;
+function showOffer(g, me, giver, card, fromHand, done) {
+  const host = $('overlayHost'); const name = card.name;
   const after = Math.min(4, (g.deeds(giver) + (giver.t.ability === 'devout' ? 2 : 1)));
   const needAfter = [12, 11, 9, 5, 1][after];
   host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">the bot holds out a card</div><div class="call">AN OFFERING</div>
     <div id="offerCard"></div>
-    <div>Accept, and it is yours — and <b>their good deed</b>: Our Lady's die would answer them on <b>${needAfter === 1 ? 'any face' : needAfter + '+'}</b>. ${(typeof card === 'string' || g.value(card, giver) >= 3) ? 'Refuse, and refusing a worthy offer is a sin: <b>−1 credibility</b>.' : 'This one is not much of an offering — refusing it costs nothing.'}</div>
-    <button class="primary" id="offerYes">Accept the gift</button><button id="offerNo">${(typeof card === 'string' || g.value(card, giver) >= 3) ? 'Refuse (−1 ♥)' : 'Wave it away'}</button></div></div>`;
-  host.querySelector('#offerCard').appendChild(typeof card === 'string' ? graceEl(card) : cardEl(card, { owner: giver }));
+    <div>Accept, and it is yours — and <b>their good deed</b>: Our Lady's die would answer them on <b>${needAfter === 1 ? 'any face' : needAfter + '+'}</b>. ${(card.type === 'grace' || (!fromHand && g.value(card, giver) >= 3)) ? 'Refuse, and refusing a consecrated offer is a sin: <b>−1 credibility</b>.' : 'An unconsecrated offering — refusing it costs nothing.'}</div>
+    <button class="primary" id="offerYes">Accept the gift</button><button id="offerNo">${(card.type === 'grace' || (!fromHand && g.value(card, giver) >= 3)) ? 'Refuse (−1 ♥)' : 'Wave it away'}</button></div></div>`;
+  host.querySelector('#offerCard').appendChild(card.type === 'grace' ? graceEl(card.key) : cardEl(card, { owner: giver }));
   const fin = (v) => { host.innerHTML = ''; done(v); setTimeout(render, 50); };
   host.querySelector('#offerYes').addEventListener('click', () => fin(true));
   host.querySelector('#offerNo').addEventListener('click', () => fin(false));
@@ -252,12 +251,15 @@ function render() {
     const items = []; if (sell) items.push([`Sell for ${g.sellPrice(a, me)}`, () => resolveAct(sell)]); if (pump) items.push(['Pump it (×2 until the next call)', () => resolveAct(pump)]); if (off) items.push([a.holy ? 'Offer it (the holy card may not be refused)' : 'Offer it to the bot — a good deed if accepted', () => resolveAct(off)]);
     if (items.length) { el.classList.add('clickable'); el.addEventListener('click', () => popMenu(el, items)); } mr.appendChild(el); });
   const mh = $('meHand'); mh.innerHTML = '';
-  me.hand.forEach((a) => { const el = cardEl(a, { market: true }); const play = acts.find((x) => x.t === 'play' && x.a === a);
-    if (play) { el.classList.add('buyable'); el.addEventListener('click', () => popMenu(el, [[`Play it for ${Math.max(0, a.cost - g.playDiscount)}`, () => resolveAct(play)]])); } else el.classList.add('dim'); mh.appendChild(el); });
-  const mg = $('meGraces'); mg.innerHTML = '';
-  me.graces.forEach((k) => { const el = graceEl(k); const play = acts.find((x) => x.t === 'grace' && x.g === k); const off = acts.find((x) => x.t === 'offer' && x.g === k && !x.a);
-    const items = []; if (play) items.push([FX[k].replace('Play: ', 'Play it: '), () => resolveAct(play)]); if (off) items.push(['Offer it to the bot — a good deed if accepted', () => resolveAct(off)]);
-    if (items.length) { el.classList.add('clickable'); el.addEventListener('click', () => popMenu(el, items)); } mg.appendChild(el); });
+  me.hand.forEach((a) => {
+    const el = a.type === 'grace' ? graceEl(a.key) : cardEl(a, { market: true });
+    const play = acts.find((x) => (x.t === 'play' || x.t === 'grace') && x.a === a);
+    const off = acts.find((x) => x.t === 'offer' && x.a === a);
+    const items = [];
+    if (play) items.push([a.type === 'grace' ? FX[a.key].replace('Play: ', 'Play it: ') : `Play it for ${Math.max(0, a.cost - g.playDiscount)}`, () => resolveAct(play)]);
+    if (off) items.push([a.holy ? 'Offer it (the holy card may not be refused)' : 'Offer it to the bot — a good deed if accepted', () => resolveAct(off)]);
+    if (items.length) { el.classList.add(a.type === 'grace' || play ? 'buyable' : 'clickable'); el.addEventListener('click', () => popMenu(el, items)); } else el.classList.add('dim');
+    mh.appendChild(el); });
   const md = $('meDeeds'); md.innerHTML = ''; me.given.forEach((n) => { const el = document.createElement('div'); el.className = 'card deed'; el.innerHTML = `<div class="nm">${esc(n)}</div><div class="fx">given · one rung</div>`; md.appendChild(el); });
   if (me.t.ability === 'devout' && me.deeds) { const el = document.createElement('div'); el.className = 'card deed'; el.innerHTML = '<div class="nm">GR80</div><div class="fx">deeds count double</div>'; md.appendChild(el); }
   $('bury').hidden = !acts.some((x) => x.t === 'bury'); $('endTurn').disabled = !S.actResolve;
