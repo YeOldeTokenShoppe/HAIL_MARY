@@ -1,0 +1,214 @@
+<title>La Lotería RL80</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+/* Night-market table: one committed dark look. Papel-picado accents carry the card types. */
+:root{
+  --felt:#1b1430; --felt2:#241a40; --line:#4a3d6e; --ink:#efe6d0; --muted:#a899c9;
+  --paper:#f3e9d2; --paper-ink:#2a2040; --gold:#e8b84b; --rose:#e4567b; --teal:#4fc3a1; --violet:#8d7bd8;
+  --bad:#e4567b; --good:#4fc3a1;
+  --display:'Alfa Slab One', 'Arial Black', serif; --body:'Spectral', Georgia, serif;
+  color-scheme: dark;
+}
+body{background:var(--felt);color:var(--ink);font-family:var(--body);margin:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px}
+h1{font-family:var(--display);font-weight:400;color:var(--gold);font-size:1.35rem;letter-spacing:.02em;margin:0}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+.bar select,.bar input{background:var(--felt2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-family:var(--body)}
+button{background:var(--felt2);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:7px 14px;font-family:var(--body);font-size:.95rem;cursor:pointer}
+button.primary{background:var(--gold);color:#2a2040;border-color:var(--gold);font-weight:600}
+button:disabled{opacity:.4;cursor:default}
+.note{color:var(--muted);font-size:.85rem}
+.tracker{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 12px}
+.tracker span{font-size:.68rem;letter-spacing:.06em;border:1px solid var(--line);border-radius:4px;padding:2px 6px;color:var(--muted)}
+.tracker span.called{opacity:.32;text-decoration:line-through}
+.tracker span.now{background:var(--gold);color:#2a2040;border-color:var(--gold);opacity:1;font-weight:600}
+.board{display:grid;gap:14px}
+.panel{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--felt2)}
+.panel.me{border-color:var(--gold)}
+.phead{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;margin-bottom:10px}
+.phead .who{font-family:var(--display);font-size:1rem;color:var(--ink)}
+.phead .who.active{color:var(--gold)}
+.stat{font-size:.9rem;color:var(--muted)}.stat b{color:var(--ink);font-variant-numeric:tabular-nums;font-size:1.05rem}
+.cred{color:var(--rose);letter-spacing:.12em}
+.rowlabel{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:10px 0 6px}
+.cards{display:flex;flex-wrap:wrap;gap:9px;min-height:30px}
+.card{width:118px;min-height:126px;border-radius:9px;padding:8px;display:flex;flex-direction:column;gap:4px;position:relative;
+  background:var(--paper);color:var(--paper-ink);border:1px solid #0006;box-shadow:0 2px 6px #0007}
+.card .num{position:absolute;top:6px;right:8px;font-family:var(--display);font-size:.8rem;opacity:.55}
+.card .nm{font-family:var(--display);font-size:.82rem;line-height:1.15;margin-top:2px;text-wrap:balance}
+.card .en{font-size:.72rem;font-style:italic;opacity:.75}
+.card .fx{font-size:.7rem;line-height:1.25;margin-top:auto;opacity:.9}
+.card .chips{display:flex;gap:5px;font-size:.72rem;font-weight:600}
+.card .chips span{background:#2a204014;border-radius:4px;padding:1px 5px}
+.card.event{background:linear-gradient(170deg,#5e4a9e,#473579);color:#f3edff;border-color:#8d7bd8}
+.card.grace{background:linear-gradient(170deg,#e8b84b,#d9a02e);color:#2a2040}
+.card.trader{background:linear-gradient(170deg,#2f6b58,#1f4e3f);color:#eafff5;border-color:#4fc3a1}
+.card.deed{width:76px;min-height:84px;background:#d9a02e;color:#2a2040}
+.card.buyable,.card.clickable{cursor:pointer;outline:2px solid transparent;transition:outline-color .15s, transform .15s}
+.card.buyable:hover,.card.clickable:hover{outline-color:var(--gold);transform:translateY(-2px)}
+.card.dim{opacity:.55}
+.vol{letter-spacing:.1em}
+.actionbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+.overlay{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:#0a0618d9;padding:18px}
+.box{background:var(--felt2);border:1px solid var(--gold);border-radius:14px;padding:22px;max-width:520px;width:100%;display:grid;gap:12px}
+.box .call{font-family:var(--display);font-size:2rem;color:var(--gold);text-wrap:balance}
+.box .kind{font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.lines{font-size:.85rem;display:grid;gap:3px;max-height:180px;overflow:auto}
+.lines .bad{color:var(--rose)}.lines .good{color:var(--teal)}
+details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
+.log{font-size:.8rem;max-height:220px;overflow:auto;display:grid;gap:2px;margin-top:8px;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--gold);color:#2a2040;font-weight:600;border-radius:7px;padding:9px 15px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:calc(100vw - 32px)}
+.toast.show{opacity:1}
+@media (min-width:980px){ .board{grid-template-columns:1fr 1fr} .center{grid-column:1 / -1;order:-1} }
+</style>
+
+<div class="bar">
+  <h1>LA LOTERÍA RL80</h1>
+  <select id="meT"></select><select id="botT"></select>
+  <select id="botKind"><option value="strong">Sharp bot</option><option value="naive">Degen bot</option></select>
+  <label class="note">Seed <input id="seed" type="number" value="7" min="1" style="width:66px"></label>
+  <label class="note" style="display:flex;gap:5px;align-items:center" title="Unsold assets count half at the bell"><input type="checkbox" id="paper"> paper wealth</label>
+  <button class="primary" id="deal">Deal</button>
+  <span class="note" id="status">Pick your Trader and press Deal. First bell counts the wealth.</span>
+</div>
+<div class="tracker" id="tracker" hidden></div>
+<div class="board" id="board" hidden>
+  <section class="panel center">
+    <div class="rowlabel">El mercado · buy with cash</div>
+    <div class="cards" id="market"></div>
+    <div class="phead" style="margin-top:10px"><span class="stat">Standing market: <b id="standing">none</b></span><span class="stat" id="peek"></span></div>
+  </section>
+  <section class="panel" id="botPanel">
+    <div class="phead"><span class="who" id="botWho">BOT</span><span class="stat">Bank <b id="botBank">0</b></span><span class="stat">Cash <b id="botCash">0</b></span><span class="stat">Cred <b class="cred" id="botCred"></b></span><span class="stat">Deeds <b id="botDeeds">0</b></span><span class="stat">Wealth <b id="botWealth">0</b></span></div>
+    <div class="rowlabel">Bot portfolio</div><div class="cards" id="botRow"></div>
+  </section>
+  <section class="panel me" id="mePanel">
+    <div class="phead"><span class="who" id="meWho">YOU</span><span class="stat">Bank <b id="meBank">0</b></span><span class="stat">Cash <b id="meCash">0</b></span><span class="stat">Cred <b class="cred" id="meCred"></b></span><span class="stat">Wealth <b id="meWealth">0</b></span><span class="stat" id="dieInfo"></span></div>
+    <div class="rowlabel">Your portfolio · tap a card to sell or dedicate</div><div class="cards" id="meRow"></div>
+    <div class="rowlabel">Your graces · tap to play or dedicate</div><div class="cards" id="meGraces"></div>
+    <div class="rowlabel">Good deeds · Our Lady's die</div><div class="cards" id="meDeeds"></div>
+    <div class="actionbar"><b id="actionsLeft" class="stat"></b><button id="bury" hidden>Cat: knock the next call off the table</button><button class="primary" id="endTurn" disabled>End turn</button></div>
+  </section>
+</div>
+<details class="history" id="hist" hidden><summary>Table history</summary><div class="log" id="log"></div></details>
+<div id="overlayHost"></div><div class="toast" id="toast"></div>
+
+<script type="module">
+/*__ENGINE__*/
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const EN = { elote: 'the corn', moneda: 'the coin', lingote: 'the ingot', escalera: 'the ladder', jardin: 'the yield farm', mina: 'the mine', pozo: 'the pool', puente: 'the bridge', semilla: 'the seed', llaves: 'the keys', candado: 'the padlock', corona: 'the crown', perla: 'the pearl', arte: 'the NFT', meme: 'the meme', cohete: 'the rocket', burbuja: 'the bubble', estampita: 'the holy card', tulipan: 'the tulip', alfombra: 'the rug', aire: 'vaporware', piramide: 'the pyramid',
+  gallo: 'the opening bell', toro: 'bull run', oso: 'bear market', impresora: 'printer goes brrr', luna: 'to the moon', sol: 'golden age', paraguas: 'shelter', cadenas: 'margin call', torre: 'the crash', mano: 'the regulator', balanza: 'the audit', muerte: 'the liquidation', arana: 'the exploit', alacran: 'the social engineer', calavera: 'exit liquidity', borracho: 'the degen', rueda: 'volatility', ballena: 'the whale', campana: 'the final bell', senora: 'mater ex machina',
+  vela: 'the candle', limosna: 'the alms', diezmo: 'the tithe', promesa: 'the vow' };
+const FX = { elote: 'Slowly appreciates', moneda: 'Pays 1 cash a turn', lingote: 'Ignores every event', escalera: '+1 value a round held', jardin: 'Pays 2; dies to disasters', mina: 'Pays 2, upkeep 1', pozo: '+1 cash on any purchase', puente: 'Pays 3; the Spider burns it', semilla: 'Blooms to 6 after 5 rounds', llaves: 'Nothing of yours can be stolen', candado: 'Untouchable, unsellable, 3 rounds', corona: 'Caprice calls skip you', perla: 'Appraised 1–6', arte: 'Re-prices on every call', meme: 'Doubles on bulls, halves on bears', cohete: '×3 if the Moon is called', burbuja: '+2 a round; pops on its 3rd call', estampita: 'May be dedicated as a deed', tulipan: '+2 a round until anyone sells one', alfombra: 'Pays 2; worth nothing; audit burns it', aire: 'Worth 5 on paper, 0 examined', piramide: 'Pays 2 out of its own value',
+  vela: 'Play: peek at the next two calls', limosna: 'Play: give 2, pocket 3 cash', diezmo: 'Play: bank 2', promesa: 'Play: credibility shielded this round' };
+const NUM = {}; [...TRADERS.map((t) => t.key), ...ASSETS.map((a) => a.key)].forEach((k, i) => NUM[k] = i + 1); EVENTS.forEach((e, i) => NUM[e.key] = NUM[e.key] || 31 + i); GRACES.forEach((g, i) => NUM[g] = 51 + i); NUM.senora = 80;
+const VOLM = ['○', '◑', '●'];
+
+for (const [id, label] of [['meT', 'You: '], ['botT', 'Bot: ']]) $(id).innerHTML = '<option value="">' + label + 'random Trader</option>' + TRADERS.map((t) => `<option value="${t.key}">${label}${esc(t.name)}</option>`).join('');
+
+let S = null; // { g, me, bot, actResolve, dieResolve, result }
+const toast = (t) => { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2600); };
+
+class HumanPolicy {
+  rollDie(g, p) { return new Promise((res) => { S.dieResolve = res; showDie(g, p); }); }
+  act(g, p) { return new Promise((res) => { S.actResolve = res; render(); }); }
+}
+const resolveAct = (a) => { const r = S.actResolve; S.actResolve = null; if (r) r(a); };
+
+$('deal').addEventListener('click', async () => {
+  if (S && S.running) return;
+  const seed = +$('seed').value || 7; const rng = makeRng(seed * 7 + 3); const pool = [...TRADERS].sort(() => rng() - 0.5);
+  const pick = (k) => { const t = k ? TRADERS.find((x) => x.key === k) : pool.pop(); const i = pool.indexOf(t); if (i >= 0) pool.splice(i, 1); return t; };
+  const meT = pick($('meT').value); const botT = pick($('botT').value || null);
+  const bot = $('botKind').value === 'naive' ? new Naive(makeRng(seed * 31 + 9)) : new Strong();
+  const g = new Game({ players: [ { name: 'YOU', policy: new HumanPolicy(), trader: meT }, { name: 'THE BOT', policy: bot, trader: botT } ], seed, verbose: true, paper: $('paper').checked });
+  S = { g, me: g.players[0], bot: g.players[1], running: true, seen: 0 };
+  g.hooks = {
+    onCall: (c) => new Promise((res) => showCall(c, res)),
+    render: async () => { render(); if (g.active === S.bot) await sleep(320); },
+  };
+  $('board').hidden = false; $('tracker').hidden = false; $('hist').hidden = false; render();
+  S.result = await g.run(); S.running = false; render(); showBell(S.result);
+});
+
+function cardEl(a, { market = false, owner = null } = {}) {
+  const el = document.createElement('div'); el.className = 'card';
+  const num = NUM[a.key] || '·';
+  if (a.type === 'event') { el.classList.add('event'); el.innerHTML = `<span class="num">${num}</span><div class="nm">¡${esc(a.name)}!</div><div class="en">${esc(EN[a.key] || '')}</div><div class="fx">${esc(a.kind)}</div>`; return el; }
+  const g = S && S.g; const v = owner && g ? g.value(a, owner) : a.cur ?? a.val;
+  el.innerHTML = `<span class="num">${num}</span><div class="nm">${esc(a.name)}</div><div class="en">${esc(EN[a.key] || '')}</div>
+    <div class="chips">${market ? `<span>cost ${Math.max(0, a.cost - (g ? g.buyDiscount : 0))}</span>` : ''}<span>${a.pearl && !market ? 'val ?' : 'val ' + v}</span><span class="vol">${VOLM[a.vol] || ''}</span></div>
+    <div class="fx">${esc(FX[a.key] || '')}${a.locked && a.age < a.locked && !market ? ` · locked ${a.locked - a.age} more` : ''}${a.pumped ? ' · PUMPED ×2' : ''}${a.burned ? ' · burned' : ''}</div>`;
+  return el;
+}
+function graceEl(k) { const el = document.createElement('div'); el.className = 'card grace'; el.innerHTML = `<span class="num">${NUM[k]}</span><div class="nm">${esc('LA ' + k.toUpperCase()).replace('LA EL', 'EL')}</div><div class="en">${esc(EN[k])}</div><div class="fx">${esc(FX[k])}</div>`; return el; }
+
+function popMenu(anchor, items) {
+  const host = $('overlayHost');
+  host.innerHTML = `<div class="overlay"><div class="box">${items.map((it, i) => `<button ${i === 0 ? 'class="primary"' : ''} data-i="${i}">${esc(it[0])}</button>`).join('')}<button data-i="-1">Never mind</button></div></div>`;
+  host.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { const i = +b.dataset.i; host.innerHTML = ''; if (i >= 0) items[i][1](); }));
+  host.querySelector('.overlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) host.innerHTML = ''; });
+}
+function showCall(c, done) {
+  const host = $('overlayHost'); const lines = S.g.lines.slice(S.seen).map((l) => { const t = l.replace(/^\[R\d+\] /, ''); const cls = /FIRE SALE|takes|pops|burns|keeps half|dies|loses/.test(t) ? 'bad' : /ANSWERED|banks|\+|doubles/.test(t) ? 'good' : ''; return `<div class="${cls}">${esc(t)}</div>`; }).join(''); S.seen = S.g.lines.length;
+  host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">el gritón calls · ${esc(c.kind)}</div><div class="call">¡${esc(c.name)}!</div><div class="note">${esc(EN[c.key] || '')}</div><div class="lines">${lines}</div><button class="primary" id="callOk">Continue</button></div></div>`;
+  const close = () => { host.innerHTML = ''; render(); done(); };
+  host.querySelector('#callOk').addEventListener('click', close);
+}
+function showDie(g, p) {
+  const W = g.wealth(p); const need = g.need(p); const host = $('overlayHost');
+  host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">once a game · you are trailing</div><div class="call">THE HAIL MARY</div>
+    <div>Give Our Lady everything — <b>${W} wealth</b>. With ${g.deeds(p)} good deed${g.deeds(p) === 1 ? '' : 's'} her die answers on <b>${need === 1 ? 'any face' : need + '+'}</b> of 12. Answered: doubled and banked. Unanswered: she keeps half.</div>
+    <button class="primary" id="pray">Pray</button><button id="hold">Hold</button></div></div>`;
+  const fin = (v) => { host.innerHTML = ''; const r = S.dieResolve; S.dieResolve = null; r(v); setTimeout(() => { const last = S.g.lines.filter((l) => /ANSWERED|UNANSWERED/.test(l)).pop(); if (v && last) toast(last.replace(/^\[R\d+\] /, '')); render(); }, 50); };
+  host.querySelector('#pray').addEventListener('click', () => fin(true)); host.querySelector('#hold').addEventListener('click', () => fin(false));
+}
+function showBell(r) {
+  const host = $('overlayHost'); const [a, b] = r.wealth; const win = r.winner === 'YOU' ? 'YOU WIN' : r.winner ? 'THE BOT WINS' : 'A DRAW';
+  host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">¡la campana! · round ${r.rounds}</div><div class="call">${win}</div>
+    <div>You: <b>${a}</b> wealth (bank ${S.me.bank}). The bot: <b>${b}</b> (bank ${S.bot.bank}).${$('paper').checked ? ' Unsold assets counted half.' : ''}</div>
+    <button class="primary" id="again">Deal again</button></div></div>`;
+  host.querySelector('#again').addEventListener('click', () => { host.innerHTML = ''; $('deal').click(); });
+}
+
+$('endTurn').addEventListener('click', () => resolveAct(null));
+$('bury').addEventListener('click', () => { const a = S.g.actions(S.me).find((x) => x.t === 'bury'); if (a) resolveAct(a); });
+
+function render() {
+  if (!S) return; const g = S.g, me = S.me, bot = S.bot; const myTurn = !!S.actResolve || g.active === me;
+  const acts = S.actResolve ? g.actions(me) : [];
+  $('status').textContent = S.running ? `Round ${g.round + 1} · ${g.calls.length - g.round} calls left (la Campana waits in the last five)` : 'The bell has rung.';
+  $('tracker').innerHTML = EVENTS.map((e) => { const i = g.called.indexOf(e.key); const now = g.called.length && g.called[g.called.length - 1] === e.key; return `<span class="${now ? 'now' : i >= 0 ? 'called' : ''}">${esc(e.name)}</span>`; }).join('');
+  $('standing').textContent = g.market ? `¡${g.market.name}!` : 'none';
+  $('peek').textContent = me.t.ability === 'peek' && g.calls[g.round + (g.active === me || !g.called.length ? 0 : 0) + (g.called.length > g.round ? 1 : 0)] ? '' : '';
+  const nx = me.t.ability === 'peek' ? g.calls[g.called.length] : (me.peeked ? null : null);
+  $('peek').textContent = nx ? `Eugene sees the next call: ¡${nx.name}!` : me.peeked ? `La Vela showed: ${me.peeked.map((k) => '¡' + k.toUpperCase() + '!').join(' then ')}` : '';
+  // market row
+  const m = $('market'); m.innerHTML = '';
+  g.row.forEach((a, i) => { if (!a) return; const el = cardEl(a, { market: true }); const act = acts.find((x) => x.t === 'buy' && x.i === i); if (act) { el.classList.add('buyable'); el.addEventListener('click', () => resolveAct(act)); } else el.classList.add('dim'); m.appendChild(el); });
+  // panels
+  $('botWho').textContent = 'THE BOT · ' + bot.t.name; $('botWho').classList.toggle('active', g.active === bot && S.running);
+  $('meWho').textContent = 'YOU · ' + me.t.name; $('meWho').classList.toggle('active', myTurn && S.running);
+  $('botBank').textContent = bot.bank; $('botCash').textContent = bot.cash; $('botCred').textContent = '♥'.repeat(Math.max(0, bot.cred)); $('botDeeds').textContent = g.deeds(bot); $('botWealth').textContent = g.wealth(bot);
+  $('meBank').textContent = me.bank; $('meCash').textContent = me.cash; $('meCred').textContent = '♥'.repeat(Math.max(0, me.cred)); $('meWealth').textContent = g.wealth(me);
+  $('dieInfo').textContent = me.dieUsed ? 'Die: spent' : `Die answers on ${g.need(me) === 1 ? 'any face' : g.need(me) + '+'} · ${g.dieGate(me) ? 'offered when your turn starts' : 'for the trailing, after call 10'}`;
+  const br = $('botRow'); br.innerHTML = ''; bot.row.forEach((a) => br.appendChild(cardEl(a, { owner: bot })));
+  const mr = $('meRow'); mr.innerHTML = '';
+  me.row.forEach((a) => { const el = cardEl(a, { owner: me }); const sell = acts.find((x) => x.t === 'sell' && x.a === a); const ded = acts.find((x) => x.t === 'dedicate' && x.a === a); const pump = acts.find((x) => x.t === 'pump' && x.a === a);
+    const items = []; if (sell) items.push([`Sell for ${g.sellPrice(a, me)}`, () => resolveAct(sell)]); if (pump) items.push(['Pump it (×2 until the next call)', () => resolveAct(pump)]); if (ded) items.push(['Dedicate as a good deed', () => resolveAct(ded)]);
+    if (items.length) { el.classList.add('clickable'); el.addEventListener('click', () => popMenu(el, items)); } mr.appendChild(el); });
+  const mg = $('meGraces'); mg.innerHTML = '';
+  me.graces.forEach((k) => { const el = graceEl(k); const play = acts.find((x) => x.t === 'grace' && x.g === k); const ded = acts.find((x) => x.t === 'dedicate' && x.g === k && !x.a);
+    const items = []; if (play) items.push([FX[k].replace('Play: ', 'Play it: '), () => resolveAct(play)]); if (ded) items.push(['Dedicate as a good deed', () => resolveAct(ded)]);
+    if (items.length) { el.classList.add('clickable'); el.addEventListener('click', () => popMenu(el, items)); } mg.appendChild(el); });
+  const md = $('meDeeds'); md.innerHTML = ''; for (let i = 0; i < me.deeds; i++) { const el = document.createElement('div'); el.className = 'card deed'; el.innerHTML = '<div class="nm">DEED</div><div class="fx">one rung</div>'; md.appendChild(el); }
+  if (me.t.ability === 'devout' && me.deeds) { const el = document.createElement('div'); el.className = 'card deed'; el.innerHTML = '<div class="nm">GR80</div><div class="fx">deeds count double</div>'; md.appendChild(el); }
+  $('bury').hidden = !acts.some((x) => x.t === 'bury'); $('endTurn').disabled = !S.actResolve;
+  $('actionsLeft').textContent = S.actResolve ? `${me.actionsLeft ?? 3} action${(me.actionsLeft ?? 3) === 1 ? '' : 's'} left` : S.running ? (g.active === bot ? 'The bot is playing…' : '') : '';
+  $('log').innerHTML = g.lines.map((l) => `<div>${esc(l)}</div>`).join(''); $('log').scrollTop = $('log').scrollHeight;
+}
+</script>

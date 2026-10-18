@@ -1,0 +1,434 @@
+<title>La Lotería RL80</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+/* Night-market table: one committed dark look. Papel-picado accents carry the card types. */
+:root{
+  --felt:#1b1430; --felt2:#241a40; --line:#4a3d6e; --ink:#efe6d0; --muted:#a899c9;
+  --paper:#f3e9d2; --paper-ink:#2a2040; --gold:#e8b84b; --rose:#e4567b; --teal:#4fc3a1; --violet:#8d7bd8;
+  --bad:#e4567b; --good:#4fc3a1;
+  --display:'Alfa Slab One', 'Arial Black', serif; --body:'Spectral', Georgia, serif;
+  color-scheme: dark;
+}
+body{background:var(--felt);color:var(--ink);font-family:var(--body);margin:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px}
+h1{font-family:var(--display);font-weight:400;color:var(--gold);font-size:1.35rem;letter-spacing:.02em;margin:0}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+.bar select,.bar input{background:var(--felt2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-family:var(--body)}
+button{background:var(--felt2);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:7px 14px;font-family:var(--body);font-size:.95rem;cursor:pointer}
+button.primary{background:var(--gold);color:#2a2040;border-color:var(--gold);font-weight:600}
+button:disabled{opacity:.4;cursor:default}
+.note{color:var(--muted);font-size:.85rem}
+.tracker{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 12px}
+.tracker span{font-size:.68rem;letter-spacing:.06em;border:1px solid var(--line);border-radius:4px;padding:2px 6px;color:var(--muted)}
+.tracker span.called{opacity:.32;text-decoration:line-through}
+.tracker span.now{background:var(--gold);color:#2a2040;border-color:var(--gold);opacity:1;font-weight:600}
+.board{display:grid;gap:14px}
+.panel{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--felt2)}
+.panel.me{border-color:var(--gold)}
+.phead{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;margin-bottom:10px}
+.phead .who{font-family:var(--display);font-size:1rem;color:var(--ink)}
+.phead .who.active{color:var(--gold)}
+.stat{font-size:.9rem;color:var(--muted)}.stat b{color:var(--ink);font-variant-numeric:tabular-nums;font-size:1.05rem}
+.cred{color:var(--rose);letter-spacing:.12em}
+.rowlabel{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:10px 0 6px}
+.cards{display:flex;flex-wrap:wrap;gap:9px;min-height:30px}
+.card{width:118px;min-height:126px;border-radius:9px;padding:8px;display:flex;flex-direction:column;gap:4px;position:relative;
+  background:var(--paper);color:var(--paper-ink);border:1px solid #0006;box-shadow:0 2px 6px #0007}
+.card .num{position:absolute;top:6px;right:8px;font-family:var(--display);font-size:.8rem;opacity:.55}
+.card .nm{font-family:var(--display);font-size:.82rem;line-height:1.15;margin-top:2px;text-wrap:balance}
+.card .en{font-size:.72rem;font-style:italic;opacity:.75}
+.card .fx{font-size:.7rem;line-height:1.25;margin-top:auto;opacity:.9}
+.card .chips{display:flex;gap:5px;font-size:.72rem;font-weight:600}
+.card .chips span{background:#2a204014;border-radius:4px;padding:1px 5px}
+.card.event{background:linear-gradient(170deg,#5e4a9e,#473579);color:#f3edff;border-color:#8d7bd8}
+.card.grace{background:linear-gradient(170deg,#e8b84b,#d9a02e);color:#2a2040}
+.card.trader{background:linear-gradient(170deg,#2f6b58,#1f4e3f);color:#eafff5;border-color:#4fc3a1}
+.card.deed{width:76px;min-height:84px;background:#d9a02e;color:#2a2040}
+.card.buyable,.card.clickable{cursor:pointer;outline:2px solid transparent;transition:outline-color .15s, transform .15s}
+.card.buyable:hover,.card.clickable:hover{outline-color:var(--gold);transform:translateY(-2px)}
+.card.dim{opacity:.55}
+.vol{letter-spacing:.1em}
+.actionbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+.overlay{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:#0a0618d9;padding:18px}
+.box{background:var(--felt2);border:1px solid var(--gold);border-radius:14px;padding:22px;max-width:520px;width:100%;display:grid;gap:12px}
+.box .call{font-family:var(--display);font-size:2rem;color:var(--gold);text-wrap:balance}
+.box .kind{font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.lines{font-size:.85rem;display:grid;gap:3px;max-height:180px;overflow:auto}
+.lines .bad{color:var(--rose)}.lines .good{color:var(--teal)}
+details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
+.log{font-size:.8rem;max-height:220px;overflow:auto;display:grid;gap:2px;margin-top:8px;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--gold);color:#2a2040;font-weight:600;border-radius:7px;padding:9px 15px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:calc(100vw - 32px)}
+.toast.show{opacity:1}
+@media (min-width:980px){ .board{grid-template-columns:1fr 1fr} .center{grid-column:1 / -1;order:-1} }
+</style>
+
+<div class="bar">
+  <h1>LA LOTERÍA RL80</h1>
+  <select id="meT"></select><select id="botT"></select>
+  <select id="botKind"><option value="strong">Sharp bot</option><option value="naive">Degen bot</option></select>
+  <label class="note">Seed <input id="seed" type="number" value="7" min="1" style="width:66px"></label>
+  <label class="note" style="display:flex;gap:5px;align-items:center" title="Unsold assets count half at the bell"><input type="checkbox" id="paper"> paper wealth</label>
+  <button class="primary" id="deal">Deal</button>
+  <span class="note" id="status">Pick your Trader and press Deal. First bell counts the wealth.</span>
+</div>
+<div class="tracker" id="tracker" hidden></div>
+<div class="board" id="board" hidden>
+  <section class="panel center">
+    <div class="rowlabel">El mercado · buy with cash</div>
+    <div class="cards" id="market"></div>
+    <div class="phead" style="margin-top:10px"><span class="stat">Standing market: <b id="standing">none</b></span><span class="stat" id="peek"></span></div>
+  </section>
+  <section class="panel" id="botPanel">
+    <div class="phead"><span class="who" id="botWho">BOT</span><span class="stat">Bank <b id="botBank">0</b></span><span class="stat">Cash <b id="botCash">0</b></span><span class="stat">Cred <b class="cred" id="botCred"></b></span><span class="stat">Deeds <b id="botDeeds">0</b></span><span class="stat">Wealth <b id="botWealth">0</b></span></div>
+    <div class="rowlabel">Bot portfolio</div><div class="cards" id="botRow"></div>
+  </section>
+  <section class="panel me" id="mePanel">
+    <div class="phead"><span class="who" id="meWho">YOU</span><span class="stat">Bank <b id="meBank">0</b></span><span class="stat">Cash <b id="meCash">0</b></span><span class="stat">Cred <b class="cred" id="meCred"></b></span><span class="stat">Wealth <b id="meWealth">0</b></span><span class="stat" id="dieInfo"></span></div>
+    <div class="rowlabel">Your portfolio · tap a card to sell or dedicate</div><div class="cards" id="meRow"></div>
+    <div class="rowlabel">Your graces · tap to play or dedicate</div><div class="cards" id="meGraces"></div>
+    <div class="rowlabel">Good deeds · Our Lady's die</div><div class="cards" id="meDeeds"></div>
+    <div class="actionbar"><b id="actionsLeft" class="stat"></b><button id="bury" hidden>Cat: knock the next call off the table</button><button class="primary" id="endTurn" disabled>End turn</button></div>
+  </section>
+</div>
+<details class="history" id="hist" hidden><summary>Table history</summary><div class="log" id="log"></div></details>
+<div id="overlayHost"></div><div class="toast" id="toast"></div>
+
+<script type="module">
+// La Lotería RL80 — first playable simulation of the post-suit design (see the card-list doc, 2026-10-17).
+// Two players, each AS one Trader (ability / credibility / liquidity). An open market row of Assets
+// (value + volatility), bought with accumulated liquidity, held in the Portfolio row, sold into the Bank.
+// A 20-card caller's deck of Events, one call per round; LA CAMPANA is shuffled into the last five calls.
+// Four dual-use Graces each: play for the mercy, or dedicate to the Good Deeds row for Our Lady's d12.
+// The die (once a game): only while trailing, once the deck is past half. Answered: everything you have
+// goes to Our Lady and comes back doubled, banked. Unanswered: she keeps half. Wealth at the bell =
+// Bank + Portfolio value; unspent liquidity counts for nothing.
+//   node loteria-sim.js --games 3000 --a strong --b naive
+//   node loteria-sim.js --verbose --seed 7 --ta diablito --tb monje
+function makeRng(seed) { let s = seed >>> 0 || 1; return () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+// ── Los Traders (8): the playable cast ──
+const TRADERS = [
+  { key: 'unicornio', name: 'EL UNICORNIO · Eugene', liq: 2, cred: 4, ability: 'peek' },        // sees the next call
+  { key: 'detective', name: 'LA DETECTIVE · Marisol', liq: 2, cred: 5, ability: 'clean' },      // her traps survive LA BALANZA
+  { key: 'monje', name: 'EL MONJE · GR80', liq: 1, cred: 6, ability: 'devout' },                // dedications count double
+  { key: 'diablito', name: 'EL DIABLITO · Connor', liq: 4, cred: 3, ability: 'feeds' },         // +2 Bank per disaster
+  { key: 'gato', name: 'EL GATO · Virgil', liq: 1, cred: 4, ability: 'bury' },                  // twice a game, bury the next call
+  { key: 'hermana', name: 'LA HERMANA · Sister Ledger', liq: 1, cred: 5, ability: 'books' },    // opens with 3 banked; EL OSO never taxes her sells
+  { key: 'sirena', name: 'LA SIRENA · The Influencer', liq: 3, cred: 2, ability: 'pump' },      // twice a game, double one asset until the next call
+  { key: 'pregonero', name: 'EL PREGONERO · The Promoter', liq: 3, cred: 3, ability: 'shill' }, // sells pay +1
+];
+
+// ── Los Activos (22, two copies each): cost, value, volatility ○◑●, special ──
+const A = (key, name, cost, val, vol, o = {}) => ({ type: 'asset', key, name, cost, val, vol, ...o });
+const ASSETS = [
+  A('elote', 'EL ELOTE', 6, 6, 1, { appreciates: 1 }),              // +1 value every other round
+  A('moneda', 'LA MONEDA', 4, 4, 0, { pays: 1 }),
+  A('lingote', 'EL LINGOTE', 5, 5, 0, { immune: true }),
+  A('escalera', 'LA ESCALERA', 3, 3, 0, { ladder: 1 }),             // +1 per round held, cap +5
+  A('jardin', 'EL JARDÍN', 4, 3, 1, { pays: 2, fragile: true }),    // dies to any disaster
+  A('mina', 'LA MINA', 5, 4, 1, { pays: 2, upkeep: 1 }),
+  A('pozo', 'EL POZO', 4, 4, 1, { well: true }),                    // +1 Bank when ANY player buys; LA ARAÑA drains it
+  A('puente', 'EL PUENTE', 5, 4, 2, { pays: 3, bridge: true }),     // LA ARAÑA burns it
+  A('semilla', 'LA SEMILLA', 2, 1, 1, { blooms: 6 }),               // value 6 after five rounds held
+  A('llaves', 'LAS LLAVES', 3, 2, 0, { keys: true }),               // your assets cannot be stolen
+  A('candado', 'EL CANDADO', 3, 5, 0, { locked: 3 }),               // untouchable and unsellable for 3 rounds
+  A('corona', 'LA CORONA', 4, 3, 1, { crown: true }),               // caprice calls skip you
+  A('perla', 'LA PERLA', 3, 0, 1, { pearl: true }),                 // hidden 1–6, revealed at sale or the bell
+  A('arte', 'EL ARTE', 4, 4, 2, { reprices: 8 }),                   // re-rolls 1–8 at every call
+  A('meme', 'EL MEME', 2, 2, 2, { memetic: true }),                 // doubles on bull calls, halves on bear
+  A('cohete', 'EL COHETE', 3, 2, 2, { rocket: 3 }),                 // ×3 if LA LUNA is called while held
+  A('burbuja', 'LA BURBUJA', 2, 2, 2, { bubble: 3 }),               // +2 per round; pops at its 3rd call
+  A('estampita', 'LA ESTAMPITA', 1, 1, 0, { holy: true }),          // may be dedicated as a Grace
+  A('tulipan', 'EL TULIPÁN', 2, 2, 2, { tulip: 2 }),                // +2 per round until anyone sells one, then all → 1
+  A('alfombra', 'LA ALFOMBRA', 2, 0, 2, { pays: 2, trap: true }),   // yield with no floor; burned by the audit
+  A('aire', 'EL AIRE', 2, 5, 2, { trap: true, paper: true }),       // worth 5 on paper, 0 once examined
+  A('piramide', 'LA PIRÁMIDE', 3, 8, 2, { pays: 2, drains: 2, trap: true }), // pays out of its own value
+];
+
+// ── Los Eventos (20): the caller's deck ──
+const E = (key, name, kind, o = {}) => ({ type: 'event', key, name, kind, ...o });
+const EVENTS = [
+  E('gallo', 'EL GALLO', 'grace'), E('toro', 'EL TORO', 'market'), E('oso', 'EL OSO', 'market'),
+  E('impresora', 'LA IMPRESORA', 'market'), E('luna', 'LA LUNA', 'market'), E('sol', 'EL SOL', 'market'),
+  E('paraguas', 'EL PARAGUAS', 'market'), E('cadenas', 'LAS CADENAS', 'market'),
+  E('torre', 'LA TORRE', 'disaster'), E('mano', 'LA MANO', 'disaster'), E('balanza', 'LA BALANZA', 'disaster'),
+  E('muerte', 'LA MUERTE', 'disaster'), E('arana', 'LA ARAÑA', 'disaster'), E('alacran', 'EL ALACRÁN', 'disaster'),
+  E('calavera', 'LA CALAVERA', 'disaster'), E('borracho', 'EL BORRACHO', 'caprice'), E('rueda', 'LA RUEDA', 'caprice'),
+  E('ballena', 'LA BALLENA', 'caprice'), E('campana', 'LA CAMPANA', 'final'), E('senora', 'NUESTRA SEÑORA', 'grace'),
+];
+const BULL = new Set(['toro', 'luna', 'sol']); const BEAR = new Set(['oso', 'torre', 'cadenas']);
+const GRACES = ['vela', 'limosna', 'diezmo', 'promesa']; // dual-use: play, or dedicate for a rung
+
+class Game {
+  constructor({ players, seed = 1, verbose = false, paper = false }) {
+    this.rng = makeRng(seed); this.verbose = verbose; this.lines = [];
+    this.players = players.map((cfg, idx) => ({ idx, name: cfg.name, policy: cfg.policy, t: cfg.trader,
+      cred: cfg.trader.cred, bank: cfg.trader.key === 'hermana' ? 3 : 0, cash: 0, row: [], graces: [...GRACES], deeds: 0,
+      dieUsed: false, buries: cfg.trader.key === 'gato' ? 2 : 0, pumps: cfg.trader.key === 'sirena' ? 2 : 0,
+      stats: { buys: 0, sells: 0, payouts: 0, dedicated: 0, gracesPlayed: 0, rolled: 0, answered: 0, fireSales: 0 } }));
+    // the caller's deck: 19 shuffled, LA CAMPANA into the last five calls
+    const rest = this.shuffle(EVENTS.filter((e) => e.key !== 'campana'));
+    this.calls = rest.slice(0, 19); this.calls.splice(15 + Math.floor(this.rng() * 5), 0, EVENTS.find((e) => e.key === 'campana'));
+    // the asset bazaar: two copies of each, shuffled; a market row of four
+    this.bazaar = this.shuffle(ASSETS.flatMap((a) => [this.inst(a), this.inst(a)])); this.row = [this.bazaar.shift(), this.bazaar.shift(), this.bazaar.shift(), this.bazaar.shift()];
+    this.paper = paper; this.market = null; this.round = 0; this.called = []; this.over = false; this.buyDiscount = 0;
+  }
+  inst(a) { return { ...a, held: 0, bubbleCalls: 0, age: 0, cur: a.pearl ? 1 + Math.floor(this.rng() * 6) : a.val }; }
+  shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(this.rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+  log(t) { if (this.verbose) this.lines.push(`[R${this.round}] ${t}`); }
+  opp(p) { return this.players[1 - p.idx]; }
+  value(a, p) { if (a.paper && a.examined) return 0; if (a.trap && a.burned) return 0; let v = a.cur; if (this.market && this.market.key === 'toro') v += 1; if (a.pumped) v *= 2; return Math.max(0, v); }
+  portfolio(p) { return p.row.reduce((s, a) => s + this.value(a, p), 0); }
+  wealth(p) { return p.bank + this.portfolio(p); }
+  deeds(p) { const d = p.deeds * (p.t.ability === 'devout' ? 2 : 1); return Math.min(4, d); }
+  need(p) { return [12, 11, 9, 5, 1][this.deeds(p)]; }
+  dieGate(p) { return !p.dieUsed && this.round > 10 && this.wealth(p) < this.wealth(this.opp(p)); }
+
+  sellPrice(a, p) { let v = this.value(a, p); if (a.trap && !a.paper && !a.piramide) v = a.key === 'alfombra' ? 0 : v; if (p.t.ability === 'shill') v += 1; if (this.market && this.market.key === 'oso' && p.t.ability !== 'books') v -= 1; if (this.market && this.market.key === 'sol') v += 1; return Math.max(0, v); }
+  sell(p, a) { if (a.locked && a.age < a.locked) return; if (a.paper) a.examined = true; const v = this.sellPrice(a, p); p.row.splice(p.row.indexOf(a), 1); p.bank += v; p.stats.sells++; if (a.tulip && !this.tulipPopped) { this.tulipPopped = true; for (const q of this.players) for (const x of q.row) if (x.tulip) x.cur = 1; } this.log(`${p.name} sells ${a.name} for ${v}`); }
+  buy(p, i) { const a = this.row[i]; if (!a) return; const cost = Math.max(0, a.cost - this.buyDiscount); if (p.cash < cost) return; p.cash -= cost; this.buyDiscount = 0; p.row.push(a); a.boughtRound = this.round; p.stats.buys++; this.row[i] = this.bazaar.shift() || null; for (const q of this.players) for (const x of q.row) if (x.well && !x.burned) { q.cash += 1; } this.log(`${p.name} buys ${a.name} for ${cost}`); }
+  fireSale(p) { p.stats.fireSales++; this.log(`${p.name}'s credibility is gone: FIRE SALE`); for (const a of [...p.row]) { a.pumped = false; const v = Math.floor(this.sellPrice(a, p) / 2); p.row.splice(p.row.indexOf(a), 1); p.bank += v; } p.cred = 1; }
+  hitCred(p, n) { if (p.shield) return; p.cred -= n; if (p.cred <= 0) this.fireSale(p); }
+
+  resolveCall(c) {
+    this.called.push(c.key); this.log(`✦ ¡${c.name}!`);
+    const all = this.players;
+    if (c.kind === 'market') { this.prevMarket = this.market; if (this.prevMarket && this.prevMarket.key === 'impresora') for (const q of all) for (const a of q.row) if (!a.immune) a.cur = Math.max(0, a.cur - 1); this.market = c; }
+    for (const q of all) for (const a of q.row) { if (a.reprices) a.cur = 1 + Math.floor(this.rng() * a.reprices); if (a.bubble) { a.bubbleCalls++; if (a.bubbleCalls >= a.bubble) { a.cur = 0; this.log(`${q.name}'s LA BURBUJA pops`); } } if (a.memetic) { if (BULL.has(c.key)) a.cur *= 2; if (BEAR.has(c.key)) a.cur = Math.ceil(a.cur / 2); } a.pumped = false; }
+    switch (c.key) {
+      case 'gallo': this.buyDiscount = 1; for (const q of all) q.cash += 1; break;
+      case 'luna': for (const q of all) for (const a of q.row) { if (a.vol === 2 && !a.trap) a.cur *= 2; if (a.rocket) a.cur = a.val * a.rocket; } break;
+      case 'impresora': for (const q of all) q.cash += 1; break;
+      case 'torre': if (this.market && this.market.key === 'paraguas') break; for (const q of all) for (const a of q.row) if (!a.immune && !(a.locked && a.age < a.locked)) a.cur = Math.floor(a.cur / 2); this.disaster(); break;
+      case 'mano': if (this.market && this.market.key === 'paraguas') break; for (const q of all) { const t = [...q.row].filter((a) => !(a.locked && a.age < a.locked)).sort((x, y) => y.vol - x.vol || this.value(y, q) - this.value(x, q))[0]; if (t) { q.row.splice(q.row.indexOf(t), 1); this.log(`LA MANO takes ${q.name}'s ${t.name}`); } } this.disaster(); break;
+      case 'balanza': for (const q of all) { if (q.t.ability === 'clean') continue; let hit = 0; for (const a of q.row) if (a.trap || a.paper) { a.burned = true; a.examined = true; a.cur = 0; hit++; } if (hit) this.hitCred(q, 2); } this.disaster(); break;
+      case 'muerte': for (const q of all) this.hitCred(q, 2); this.disaster(); break;
+      case 'arana': for (const q of all) for (const a of q.row) if (a.bridge || a.well) { a.burned = true; a.cur = 0; } this.disaster(); break;
+      case 'alacran': { const t = [...all].sort((x, y) => x.cred - y.cred)[0]; this.hitCred(t, 2); this.disaster(); break; }
+      case 'calavera': { const s = [...all].sort((x, y) => y.stats.sells - x.stats.sells); if (s[0].stats.sells > s[1].stats.sells) { s[0].bank += 3; s[1].bank = Math.max(0, s[1].bank - 2); } this.disaster(); break; }
+      case 'borracho': for (const q of all) { if (q.row.some((a) => a.crown)) continue; const a = this.row[0]; if (a && q.cash >= a.cost) this.buyAs(q, 0); } break;
+      case 'rueda': if (!all.some((q) => q.row.some((a) => a.crown))) { const [x, y] = all; [x.row, y.row] = [y.row, x.row]; this.log('LA RUEDA: the portfolios change hands'); } break;
+      case 'ballena': { const rich = [...all].sort((x, y) => this.portfolio(y) - this.portfolio(x)); if (rich[0] !== rich[1] && !rich[0].row.some((a) => a.keys) && !rich[1].row.some((a) => a.crown)) { const best = [...rich[0].row].filter((a) => !(a.locked && a.age < a.locked)).sort((x, y) => this.value(y, rich[0]) - this.value(x, rich[0]))[0]; if (best) { rich[0].row.splice(rich[0].row.indexOf(best), 1); rich[1].row.push(best); this.log(`LA BALLENA moves ${best.name}`); } } break; }
+      case 'senora': { const d = [...all].sort((x, y) => this.deeds(y) - this.deeds(x)); if (this.deeds(d[0]) > this.deeds(d[1])) { const v = this.portfolio(d[0]); d[0].bank += v; d[0].row = []; this.log(`NUESTRA SEÑORA banks ${d[0].name}'s everything: ${v}`); } break; }
+      case 'campana': this.bell = true; break;
+    }
+  }
+  disaster() { for (const q of this.players) { for (const a of [...q.row]) if (a.fragile) { q.row.splice(q.row.indexOf(a), 1); this.log(`${q.name}'s EL JARDÍN dies`); } if (q.t.ability === 'feeds') q.cash += 2; } }
+  buyAs(p, i) { this.buy(p, i); }
+
+  async turn(p) {
+    p.shield = false;
+    // income and payouts
+    p.cash += p.t.liq + (this.market && this.market.key === 'impresora' ? 1 : 0);
+    for (const a of p.row) {
+      a.age++; if (a.appreciates && this.round % 2 === 0) a.cur += 1; if (a.ladder) a.cur = Math.min(a.val + 5, a.cur + 1); if (a.blooms && a.age === 5) a.cur = a.blooms; if (a.tulip && !this.tulipPopped) a.cur += a.tulip;
+      if (!a.pays || a.burned) continue; if (this.market && this.market.key === 'cadenas' && (a.key === 'mina' || a.key === 'jardin')) continue;
+      let n = a.pays; if (a.upkeep) { if (p.cash >= a.upkeep) p.cash -= a.upkeep; else continue; } if (a.drains) { a.cur = Math.max(0, a.cur - a.drains); if (a.cur <= 0 && a.key === 'piramide' && !a.pays) continue; }
+      p.cash += n; p.stats.payouts += n;
+    }
+    // the die, at the start of the turn
+    if (this.dieGate(p) && await p.policy.rollDie(this, p)) {
+      p.dieUsed = true; p.stats.rolled = 1; const W = this.wealth(p); const roll = 1 + Math.floor(this.rng() * 12); const need = this.need(p);
+      this.log(`✝ ${p.name} gives Our Lady everything (${W}), ${this.deeds(p)} deeds showing. Needs ${need}+… rolls ${roll}`);
+      p.row = []; if (roll >= need) { p.bank = W * 2; p.stats.answered = 1; this.log('✝ ANSWERED: doubled and banked'); } else { p.bank = Math.floor(W / 2); this.log('✝ UNANSWERED: she keeps half'); }
+    }
+    // three actions
+    for (let k = 0; k < 3; k++) { p.actionsLeft = 3 - k; const a = await p.policy.act(this, p); if (!a) break; this.doAct(p, a); if (this.hooks && this.hooks.render) await this.hooks.render(); if (this.over) return; } p.actionsLeft = 0;
+  }
+  actions(p) {
+    const A = [];
+    this.row.forEach((a, i) => { if (a && p.cash >= Math.max(0, a.cost - this.buyDiscount)) A.push({ t: 'buy', i, a }); });
+    for (const a of p.row) if (!(a.locked && a.age < a.locked)) A.push({ t: 'sell', a });
+    for (const g of p.graces) { A.push({ t: 'grace', g }); A.push({ t: 'dedicate', g }); }
+    for (const a of p.row) if (a.holy) A.push({ t: 'dedicate', g: 'estampita', a });
+    if (p.buries > 0) A.push({ t: 'bury' });
+    if (p.pumps > 0) for (const a of p.row) if (this.value(a, p) >= 3) A.push({ t: 'pump', a });
+    return A;
+  }
+  doAct(p, act) {
+    switch (act.t) {
+      case 'buy': this.buy(p, act.i); break;
+      case 'sell': this.sell(p, act.a); break;
+      case 'bury': { p.buries--; const c = this.calls[this.round]; if (c && c.key !== 'campana') { this.calls.splice(this.round, 1); this.calls.push(c); this.log(`${p.name}'s cat knocks ${c.name} off the table`); } break; }
+      case 'pump': p.pumps--; act.a.pumped = true; this.log(`${p.name} pumps ${act.a.name}`); break;
+      case 'dedicate': if (act.a) { p.row.splice(p.row.indexOf(act.a), 1); } else { p.graces.splice(p.graces.indexOf(act.g), 1); } p.deeds++; p.stats.dedicated++; this.log(`✧ ${p.name} dedicates ${act.g.toUpperCase()} (${this.deeds(p)} deeds)`); break;
+      case 'grace': {
+        p.graces.splice(p.graces.indexOf(act.g), 1); p.stats.gracesPlayed++;
+        if (act.g === 'limosna') { this.opp(p).bank += 2; p.cash += 3; }
+        if (act.g === 'diezmo') p.bank += 2;
+        if (act.g === 'promesa') p.shield = true;
+        if (act.g === 'vela') p.peeked = this.calls.slice(this.round, this.round + 2).map((c) => c.key);
+        this.log(`${p.name} plays ${act.g.toUpperCase()}`); break;
+      }
+    }
+  }
+  async run() {
+    const order = this.rng() < 0.5 ? [0, 1] : [0, 1]; // seat order fixed; batches alternate by swapping configs
+    while (this.round < this.calls.length && !this.bell) {
+      const c = this.calls[this.round]; this.resolveCall(c); if (this.hooks && this.hooks.onCall) await this.hooks.onCall(c); if (this.bell === undefined || !this.bell) { }
+      for (const i of order) { if (!this.over) { this.active = this.players[i]; if (this.hooks && this.hooks.render) await this.hooks.render(); await this.turn(this.players[i]); } }
+      this.round++;
+      if (this.bell) break;
+    }
+    const fin = (q) => q.bank + (this.paper ? Math.floor(this.portfolio(q) / 2) : this.portfolio(q));
+    const [x, y] = this.players; const wx = fin(x), wy = fin(y);
+    const winner = wx === wy ? null : wx > wy ? x : y;
+    if (this.verbose) { this.lines.forEach((l) => console.log(l)); console.log(`BELL at round ${this.round}: ${x.name} ${wx} (bank ${x.bank}) vs ${y.name} ${wy} (bank ${y.bank}) → ${winner ? winner.name + ' WINS' : 'DRAW'}`); }
+    return { winner: winner ? winner.name : null, winnerIdx: winner ? winner.idx : -1, rounds: this.round, wealth: [wx, wy], players: this.players.map((q) => ({ name: q.name, trader: q.t.key, wealth: this.wealth(q), ...q.stats, deeds: this.deeds(q), cred: q.cred })) };
+  }
+}
+
+// ── Policies ──
+class Naive {
+  constructor(rng) { this.rng = rng; }
+  rollDie() { return true; }
+  act(g, p) { const A = g.actions(p); if (!A.length) return null; const k = Math.floor(this.rng() * (A.length + 1)); return k === A.length ? null : A[k]; }
+}
+class Strong {
+  constructor() {}
+  disastersLeft(g) { return g.calls.slice(g.round + 1).filter((c) => c.kind === 'disaster').length; }
+  rollDie(g, p) { const odds = (13 - g.need(p)) / 12; const behind = g.wealth(g.opp(p)) - g.wealth(p); const left = g.calls.length - g.round;
+    if (odds >= 1) return true; if (left <= 3 && g.wealth(p) * 2 > g.wealth(g.opp(p))) return odds >= 1 / 3 || behind > g.wealth(p); return odds >= 2 / 3 && behind >= 5; }
+  assetScore(g, p, a) {
+    const left = Math.max(1, g.calls.length - g.round - 1); const dis = this.disastersLeft(g); const horizon = Math.min(left, 8);
+    let v = g.value(a, p) - a.cost; if (a.pays) v += (a.pays - (a.upkeep || 0)) * Math.min(horizon, 6) * (a.fragile ? (dis ? 0.4 : 1) : 1);
+    if (a.ladder) v += Math.min(5, horizon); if (a.blooms && left >= 5) v += a.blooms - a.val; if (a.appreciates) v += horizon / 2;
+    if (a.trap) v -= dis * 1.2; if (a.vol === 2) v -= dis * 0.8; if (a.immune || a.locked) v += dis * 0.5; if (a.keys || a.crown) v += 1;
+    if (a.holy) v += 0.5; if (a.rocket && g.calls.slice(g.round + 1).some((c) => c.key === 'luna')) v += 2;
+    return v;
+  }
+  act(g, p) {
+    const A = g.actions(p); if (!A.length) return null; const left = g.calls.length - g.round; const dis = this.disastersLeft(g); const behind = g.wealth(g.opp(p)) - g.wealth(p);
+    let best = null, bs = 0.4;
+    for (const a of A) {
+      let s = -1;
+      if (a.t === 'buy') s = this.assetScore(g, p, a.a) * 0.5 + 0.8;
+      if (a.t === 'sell') { const v = g.sellPrice(a.a, p); const future = this.assetScore(g, p, { ...a.a, cost: 0 }); s = a.a.pumped ? v * 0.9 : (g.paper && left <= 2 ? v * 0.6 : left <= 2 || a.a.immune ? -0.5 : v >= 5 && a.a.vol === 2 && dis >= 1 ? v * 0.35 : a.a.bubble && a.a.bubbleCalls === a.a.bubble - 1 ? v : a.a.tulip && g.value(a.a, p) >= 6 ? v * 0.8 : -0.5); }
+      if (a.t === 'dedicate') s = !p.dieUsed && g.deeds(p) < 4 ? (behind > 0 ? 1.2 : 0.4) + (p.t.ability === 'devout' ? 0.6 : 0) - (a.a ? g.value(a.a, p) * 0.3 : a.g === 'diezmo' ? 0.4 : 0.2) : -1;
+      if (a.t === 'grace') s = a.g === 'diezmo' ? 0.9 : a.g === 'promesa' && dis >= 2 && p.cred <= 3 ? 1.4 : a.g === 'limosna' ? 0.7 : 0.1;
+      if (a.t === 'pump') s = g.value(a.a, p) * 0.5;
+      if (a.t === 'bury') { const next = g.calls[g.round + 1]; s = next && next.kind === 'disaster' && g.portfolio(p) > g.portfolio(g.opp(p)) ? 2 : -1; }
+      if (s > bs) { bs = s; best = a; }
+    }
+    return best;
+  }
+}
+
+
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const EN = { elote: 'the corn', moneda: 'the coin', lingote: 'the ingot', escalera: 'the ladder', jardin: 'the yield farm', mina: 'the mine', pozo: 'the pool', puente: 'the bridge', semilla: 'the seed', llaves: 'the keys', candado: 'the padlock', corona: 'the crown', perla: 'the pearl', arte: 'the NFT', meme: 'the meme', cohete: 'the rocket', burbuja: 'the bubble', estampita: 'the holy card', tulipan: 'the tulip', alfombra: 'the rug', aire: 'vaporware', piramide: 'the pyramid',
+  gallo: 'the opening bell', toro: 'bull run', oso: 'bear market', impresora: 'printer goes brrr', luna: 'to the moon', sol: 'golden age', paraguas: 'shelter', cadenas: 'margin call', torre: 'the crash', mano: 'the regulator', balanza: 'the audit', muerte: 'the liquidation', arana: 'the exploit', alacran: 'the social engineer', calavera: 'exit liquidity', borracho: 'the degen', rueda: 'volatility', ballena: 'the whale', campana: 'the final bell', senora: 'mater ex machina',
+  vela: 'the candle', limosna: 'the alms', diezmo: 'the tithe', promesa: 'the vow' };
+const FX = { elote: 'Slowly appreciates', moneda: 'Pays 1 cash a turn', lingote: 'Ignores every event', escalera: '+1 value a round held', jardin: 'Pays 2; dies to disasters', mina: 'Pays 2, upkeep 1', pozo: '+1 cash on any purchase', puente: 'Pays 3; the Spider burns it', semilla: 'Blooms to 6 after 5 rounds', llaves: 'Nothing of yours can be stolen', candado: 'Untouchable, unsellable, 3 rounds', corona: 'Caprice calls skip you', perla: 'Appraised 1–6', arte: 'Re-prices on every call', meme: 'Doubles on bulls, halves on bears', cohete: '×3 if the Moon is called', burbuja: '+2 a round; pops on its 3rd call', estampita: 'May be dedicated as a deed', tulipan: '+2 a round until anyone sells one', alfombra: 'Pays 2; worth nothing; audit burns it', aire: 'Worth 5 on paper, 0 examined', piramide: 'Pays 2 out of its own value',
+  vela: 'Play: peek at the next two calls', limosna: 'Play: give 2, pocket 3 cash', diezmo: 'Play: bank 2', promesa: 'Play: credibility shielded this round' };
+const NUM = {}; [...TRADERS.map((t) => t.key), ...ASSETS.map((a) => a.key)].forEach((k, i) => NUM[k] = i + 1); EVENTS.forEach((e, i) => NUM[e.key] = NUM[e.key] || 31 + i); GRACES.forEach((g, i) => NUM[g] = 51 + i); NUM.senora = 80;
+const VOLM = ['○', '◑', '●'];
+
+for (const [id, label] of [['meT', 'You: '], ['botT', 'Bot: ']]) $(id).innerHTML = '<option value="">' + label + 'random Trader</option>' + TRADERS.map((t) => `<option value="${t.key}">${label}${esc(t.name)}</option>`).join('');
+
+let S = null; // { g, me, bot, actResolve, dieResolve, result }
+const toast = (t) => { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2600); };
+
+class HumanPolicy {
+  rollDie(g, p) { return new Promise((res) => { S.dieResolve = res; showDie(g, p); }); }
+  act(g, p) { return new Promise((res) => { S.actResolve = res; render(); }); }
+}
+const resolveAct = (a) => { const r = S.actResolve; S.actResolve = null; if (r) r(a); };
+
+$('deal').addEventListener('click', async () => {
+  if (S && S.running) return;
+  const seed = +$('seed').value || 7; const rng = makeRng(seed * 7 + 3); const pool = [...TRADERS].sort(() => rng() - 0.5);
+  const pick = (k) => { const t = k ? TRADERS.find((x) => x.key === k) : pool.pop(); const i = pool.indexOf(t); if (i >= 0) pool.splice(i, 1); return t; };
+  const meT = pick($('meT').value); const botT = pick($('botT').value || null);
+  const bot = $('botKind').value === 'naive' ? new Naive(makeRng(seed * 31 + 9)) : new Strong();
+  const g = new Game({ players: [ { name: 'YOU', policy: new HumanPolicy(), trader: meT }, { name: 'THE BOT', policy: bot, trader: botT } ], seed, verbose: true, paper: $('paper').checked });
+  S = { g, me: g.players[0], bot: g.players[1], running: true, seen: 0 };
+  g.hooks = {
+    onCall: (c) => new Promise((res) => showCall(c, res)),
+    render: async () => { render(); if (g.active === S.bot) await sleep(320); },
+  };
+  $('board').hidden = false; $('tracker').hidden = false; $('hist').hidden = false; render();
+  S.result = await g.run(); S.running = false; render(); showBell(S.result);
+});
+
+function cardEl(a, { market = false, owner = null } = {}) {
+  const el = document.createElement('div'); el.className = 'card';
+  const num = NUM[a.key] || '·';
+  if (a.type === 'event') { el.classList.add('event'); el.innerHTML = `<span class="num">${num}</span><div class="nm">¡${esc(a.name)}!</div><div class="en">${esc(EN[a.key] || '')}</div><div class="fx">${esc(a.kind)}</div>`; return el; }
+  const g = S && S.g; const v = owner && g ? g.value(a, owner) : a.cur ?? a.val;
+  el.innerHTML = `<span class="num">${num}</span><div class="nm">${esc(a.name)}</div><div class="en">${esc(EN[a.key] || '')}</div>
+    <div class="chips">${market ? `<span>cost ${Math.max(0, a.cost - (g ? g.buyDiscount : 0))}</span>` : ''}<span>${a.pearl && !market ? 'val ?' : 'val ' + v}</span><span class="vol">${VOLM[a.vol] || ''}</span></div>
+    <div class="fx">${esc(FX[a.key] || '')}${a.locked && a.age < a.locked && !market ? ` · locked ${a.locked - a.age} more` : ''}${a.pumped ? ' · PUMPED ×2' : ''}${a.burned ? ' · burned' : ''}</div>`;
+  return el;
+}
+function graceEl(k) { const el = document.createElement('div'); el.className = 'card grace'; el.innerHTML = `<span class="num">${NUM[k]}</span><div class="nm">${esc('LA ' + k.toUpperCase()).replace('LA EL', 'EL')}</div><div class="en">${esc(EN[k])}</div><div class="fx">${esc(FX[k])}</div>`; return el; }
+
+function popMenu(anchor, items) {
+  const host = $('overlayHost');
+  host.innerHTML = `<div class="overlay"><div class="box">${items.map((it, i) => `<button ${i === 0 ? 'class="primary"' : ''} data-i="${i}">${esc(it[0])}</button>`).join('')}<button data-i="-1">Never mind</button></div></div>`;
+  host.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { const i = +b.dataset.i; host.innerHTML = ''; if (i >= 0) items[i][1](); }));
+  host.querySelector('.overlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) host.innerHTML = ''; });
+}
+function showCall(c, done) {
+  const host = $('overlayHost'); const lines = S.g.lines.slice(S.seen).map((l) => { const t = l.replace(/^\[R\d+\] /, ''); const cls = /FIRE SALE|takes|pops|burns|keeps half|dies|loses/.test(t) ? 'bad' : /ANSWERED|banks|\+|doubles/.test(t) ? 'good' : ''; return `<div class="${cls}">${esc(t)}</div>`; }).join(''); S.seen = S.g.lines.length;
+  host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">el gritón calls · ${esc(c.kind)}</div><div class="call">¡${esc(c.name)}!</div><div class="note">${esc(EN[c.key] || '')}</div><div class="lines">${lines}</div><button class="primary" id="callOk">Continue</button></div></div>`;
+  const close = () => { host.innerHTML = ''; render(); done(); };
+  host.querySelector('#callOk').addEventListener('click', close);
+}
+function showDie(g, p) {
+  const W = g.wealth(p); const need = g.need(p); const host = $('overlayHost');
+  host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">once a game · you are trailing</div><div class="call">THE HAIL MARY</div>
+    <div>Give Our Lady everything — <b>${W} wealth</b>. With ${g.deeds(p)} good deed${g.deeds(p) === 1 ? '' : 's'} her die answers on <b>${need === 1 ? 'any face' : need + '+'}</b> of 12. Answered: doubled and banked. Unanswered: she keeps half.</div>
+    <button class="primary" id="pray">Pray</button><button id="hold">Hold</button></div></div>`;
+  const fin = (v) => { host.innerHTML = ''; const r = S.dieResolve; S.dieResolve = null; r(v); setTimeout(() => { const last = S.g.lines.filter((l) => /ANSWERED|UNANSWERED/.test(l)).pop(); if (v && last) toast(last.replace(/^\[R\d+\] /, '')); render(); }, 50); };
+  host.querySelector('#pray').addEventListener('click', () => fin(true)); host.querySelector('#hold').addEventListener('click', () => fin(false));
+}
+function showBell(r) {
+  const host = $('overlayHost'); const [a, b] = r.wealth; const win = r.winner === 'YOU' ? 'YOU WIN' : r.winner ? 'THE BOT WINS' : 'A DRAW';
+  host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">¡la campana! · round ${r.rounds}</div><div class="call">${win}</div>
+    <div>You: <b>${a}</b> wealth (bank ${S.me.bank}). The bot: <b>${b}</b> (bank ${S.bot.bank}).${$('paper').checked ? ' Unsold assets counted half.' : ''}</div>
+    <button class="primary" id="again">Deal again</button></div></div>`;
+  host.querySelector('#again').addEventListener('click', () => { host.innerHTML = ''; $('deal').click(); });
+}
+
+$('endTurn').addEventListener('click', () => resolveAct(null));
+$('bury').addEventListener('click', () => { const a = S.g.actions(S.me).find((x) => x.t === 'bury'); if (a) resolveAct(a); });
+
+function render() {
+  if (!S) return; const g = S.g, me = S.me, bot = S.bot; const myTurn = !!S.actResolve || g.active === me;
+  const acts = S.actResolve ? g.actions(me) : [];
+  $('status').textContent = S.running ? `Round ${g.round + 1} · ${g.calls.length - g.round} calls left (la Campana waits in the last five)` : 'The bell has rung.';
+  $('tracker').innerHTML = EVENTS.map((e) => { const i = g.called.indexOf(e.key); const now = g.called.length && g.called[g.called.length - 1] === e.key; return `<span class="${now ? 'now' : i >= 0 ? 'called' : ''}">${esc(e.name)}</span>`; }).join('');
+  $('standing').textContent = g.market ? `¡${g.market.name}!` : 'none';
+  $('peek').textContent = me.t.ability === 'peek' && g.calls[g.round + (g.active === me || !g.called.length ? 0 : 0) + (g.called.length > g.round ? 1 : 0)] ? '' : '';
+  const nx = me.t.ability === 'peek' ? g.calls[g.called.length] : (me.peeked ? null : null);
+  $('peek').textContent = nx ? `Eugene sees the next call: ¡${nx.name}!` : me.peeked ? `La Vela showed: ${me.peeked.map((k) => '¡' + k.toUpperCase() + '!').join(' then ')}` : '';
+  // market row
+  const m = $('market'); m.innerHTML = '';
+  g.row.forEach((a, i) => { if (!a) return; const el = cardEl(a, { market: true }); const act = acts.find((x) => x.t === 'buy' && x.i === i); if (act) { el.classList.add('buyable'); el.addEventListener('click', () => resolveAct(act)); } else el.classList.add('dim'); m.appendChild(el); });
+  // panels
+  $('botWho').textContent = 'THE BOT · ' + bot.t.name; $('botWho').classList.toggle('active', g.active === bot && S.running);
+  $('meWho').textContent = 'YOU · ' + me.t.name; $('meWho').classList.toggle('active', myTurn && S.running);
+  $('botBank').textContent = bot.bank; $('botCash').textContent = bot.cash; $('botCred').textContent = '♥'.repeat(Math.max(0, bot.cred)); $('botDeeds').textContent = g.deeds(bot); $('botWealth').textContent = g.wealth(bot);
+  $('meBank').textContent = me.bank; $('meCash').textContent = me.cash; $('meCred').textContent = '♥'.repeat(Math.max(0, me.cred)); $('meWealth').textContent = g.wealth(me);
+  $('dieInfo').textContent = me.dieUsed ? 'Die: spent' : `Die answers on ${g.need(me) === 1 ? 'any face' : g.need(me) + '+'} · ${g.dieGate(me) ? 'offered when your turn starts' : 'for the trailing, after call 10'}`;
+  const br = $('botRow'); br.innerHTML = ''; bot.row.forEach((a) => br.appendChild(cardEl(a, { owner: bot })));
+  const mr = $('meRow'); mr.innerHTML = '';
+  me.row.forEach((a) => { const el = cardEl(a, { owner: me }); const sell = acts.find((x) => x.t === 'sell' && x.a === a); const ded = acts.find((x) => x.t === 'dedicate' && x.a === a); const pump = acts.find((x) => x.t === 'pump' && x.a === a);
+    const items = []; if (sell) items.push([`Sell for ${g.sellPrice(a, me)}`, () => resolveAct(sell)]); if (pump) items.push(['Pump it (×2 until the next call)', () => resolveAct(pump)]); if (ded) items.push(['Dedicate as a good deed', () => resolveAct(ded)]);
+    if (items.length) { el.classList.add('clickable'); el.addEventListener('click', () => popMenu(el, items)); } mr.appendChild(el); });
+  const mg = $('meGraces'); mg.innerHTML = '';
+  me.graces.forEach((k) => { const el = graceEl(k); const play = acts.find((x) => x.t === 'grace' && x.g === k); const ded = acts.find((x) => x.t === 'dedicate' && x.g === k && !x.a);
+    const items = []; if (play) items.push([FX[k].replace('Play: ', 'Play it: '), () => resolveAct(play)]); if (ded) items.push(['Dedicate as a good deed', () => resolveAct(ded)]);
+    if (items.length) { el.classList.add('clickable'); el.addEventListener('click', () => popMenu(el, items)); } mg.appendChild(el); });
+  const md = $('meDeeds'); md.innerHTML = ''; for (let i = 0; i < me.deeds; i++) { const el = document.createElement('div'); el.className = 'card deed'; el.innerHTML = '<div class="nm">DEED</div><div class="fx">one rung</div>'; md.appendChild(el); }
+  if (me.t.ability === 'devout' && me.deeds) { const el = document.createElement('div'); el.className = 'card deed'; el.innerHTML = '<div class="nm">GR80</div><div class="fx">deeds count double</div>'; md.appendChild(el); }
+  $('bury').hidden = !acts.some((x) => x.t === 'bury'); $('endTurn').disabled = !S.actResolve;
+  $('actionsLeft').textContent = S.actResolve ? `${me.actionsLeft ?? 3} action${(me.actionsLeft ?? 3) === 1 ? '' : 's'} left` : S.running ? (g.active === bot ? 'The bot is playing…' : '') : '';
+  $('log').innerHTML = g.lines.map((l) => `<div>${esc(l)}</div>`).join(''); $('log').scrollTop = $('log').scrollHeight;
+}
+</script>

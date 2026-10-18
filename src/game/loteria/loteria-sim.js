@@ -121,7 +121,7 @@ export class Game {
   disaster() { for (const q of this.players) { for (const a of [...q.row]) if (a.fragile) { q.row.splice(q.row.indexOf(a), 1); this.log(`${q.name}'s EL JARDÍN dies`); } if (q.t.ability === 'feeds') q.cash += 2; } }
   buyAs(p, i) { this.buy(p, i); }
 
-  turn(p) {
+  async turn(p) {
     p.shield = false;
     // income and payouts
     p.cash += p.t.liq + (this.market && this.market.key === 'impresora' ? 1 : 0);
@@ -132,13 +132,13 @@ export class Game {
       p.cash += n; p.stats.payouts += n;
     }
     // the die, at the start of the turn
-    if (this.dieGate(p) && p.policy.rollDie(this, p)) {
+    if (this.dieGate(p) && await p.policy.rollDie(this, p)) {
       p.dieUsed = true; p.stats.rolled = 1; const W = this.wealth(p); const roll = 1 + Math.floor(this.rng() * 12); const need = this.need(p);
       this.log(`✝ ${p.name} gives Our Lady everything (${W}), ${this.deeds(p)} deeds showing. Needs ${need}+… rolls ${roll}`);
       p.row = []; if (roll >= need) { p.bank = W * 2; p.stats.answered = 1; this.log('✝ ANSWERED: doubled and banked'); } else { p.bank = Math.floor(W / 2); this.log('✝ UNANSWERED: she keeps half'); }
     }
     // three actions
-    for (let k = 0; k < 3; k++) { const a = p.policy.act(this, p); if (!a) break; this.doAct(p, a); if (this.over) return; }
+    for (let k = 0; k < 3; k++) { p.actionsLeft = 3 - k; const a = await p.policy.act(this, p); if (!a) break; this.doAct(p, a); if (this.hooks && this.hooks.render) await this.hooks.render(); if (this.over) return; } p.actionsLeft = 0;
   }
   actions(p) {
     const A = [];
@@ -167,11 +167,11 @@ export class Game {
       }
     }
   }
-  run() {
+  async run() {
     const order = this.rng() < 0.5 ? [0, 1] : [0, 1]; // seat order fixed; batches alternate by swapping configs
     while (this.round < this.calls.length && !this.bell) {
-      const c = this.calls[this.round]; this.resolveCall(c); if (this.bell === undefined || !this.bell) { }
-      for (const i of order) { if (!this.over) this.turn(this.players[i]); }
+      const c = this.calls[this.round]; this.resolveCall(c); if (this.hooks && this.hooks.onCall) await this.hooks.onCall(c); if (this.bell === undefined || !this.bell) { }
+      for (const i of order) { if (!this.over) { this.active = this.players[i]; if (this.hooks && this.hooks.render) await this.hooks.render(); await this.turn(this.players[i]); } }
       this.round++;
       if (this.bell) break;
     }
@@ -232,11 +232,11 @@ export function playOne({ a = 'strong', b = 'naive', ta = null, tb = null, seed 
 }
 if (process.argv[1] && process.argv[1].endsWith('loteria-sim.js')) {
   const games = +(args.games || 1000); const seed = +(args.seed || 1);
-  if (args.verbose) { playOne({ a: args.a || 'strong', b: args.b || 'naive', ta: args.ta, tb: args.tb, seed, verbose: true, paper: +(args.paper||0) === 1 }).run(); process.exit(0); }
+  if (args.verbose) { await playOne({ a: args.a || 'strong', b: args.b || 'naive', ta: args.ta, tb: args.tb, seed, verbose: true, paper: +(args.paper||0) === 1 }).run(); process.exit(0); }
   const res = { wins: {}, firstWins: 0, draws: 0, rounds: [], wealth: [], gap: [], byTrader: {}, dice: { rolled: 0, answered: 0, wonAfter: 0 }, stats: {} };
   for (let i = 0; i < games; i++) {
     const g = playOne({ a: args.a || 'strong', b: args.b || 'naive', ta: args.ta, tb: args.tb, seed: seed + i, swap: i % 2 === 1, paper: +(args.paper||0) === 1 });
-    const r = g.run(); const w = r.winner || 'draw'; res.wins[w] = (res.wins[w] || 0) + 1; if (r.winnerIdx === 0) res.firstWins++; if (!r.winner) res.draws++;
+    const r = await g.run(); const w = r.winner || 'draw'; res.wins[w] = (res.wins[w] || 0) + 1; if (r.winnerIdx === 0) res.firstWins++; if (!r.winner) res.draws++;
     res.rounds.push(r.rounds); res.wealth.push(...r.wealth); res.gap.push(Math.abs(r.wealth[0] - r.wealth[1]));
     for (const p of r.players) { const T = res.byTrader[p.trader] = res.byTrader[p.trader] || { games: 0, wins: 0, wealth: 0 }; T.games++; T.wealth += p.wealth; if (r.winner === p.name) T.wins++;
       if (p.rolled) { res.dice.rolled++; if (p.answered) { res.dice.answered++; if (r.winner === p.name) res.dice.wonAfter++; } }
