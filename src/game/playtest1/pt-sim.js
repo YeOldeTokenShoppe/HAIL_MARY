@@ -25,7 +25,7 @@ export const DESIGNS = [
   D('keys', 'The Keys', 'remedy', 1, { clears: 'rug' }),
   D('tortilla', 'Miracle Tortilla', 'remedy', 2, { clears: 'any' }),
   D('heart', 'Sacred Heart', 'artifact', 2, { text: 'Discard to cancel a hazard just played on you' }),
-  D('halo', 'The Halo', 'artifact', 3, { text: 'Your Trader ignores Quantum Hack' }),
+  D('halo', 'The Halo', 'artifact', 3, { text: 'Your Trader\u2019s ability cannot be disabled' }),
   D('xray', 'X-Ray Glasses', 'artifact', 2, { text: 'Once a turn, peek at one random rival card' }),
   D('rosary', 'The Rosary Beads', 'artifact', 2, { text: 'When you earn a deed, draw a card' }),
   D('rose', 'The Rose', 'coop', 0, { text: 'Give a rival 2 Liquidity: a deed, then draw one' }),

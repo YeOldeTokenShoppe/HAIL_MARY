@@ -79,6 +79,7 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
       <div style="min-width:0"><div class="rowlabel">Hazards on you</div><div class="cards" id="meHazards"></div></div>
     </div>
     <div class="rowlabel">Your hand · one main action a turn</div><div class="cards" id="meHand"></div>
+    <div class="rowlabel" style="margin-top:12px">At the table</div><div id="feed" class="note" style="display:grid;gap:2px;min-height:3.2em"></div>
     <div class="actionbar">
       <b class="stat" id="turnNote"></b>
       <button id="giftBtn">Give 2 Liquidity (deed)</button>
@@ -98,7 +99,7 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const FX = { tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell later: 4 Liquidity or 75 Prosperity', moon: 'Sell later: 7 Liquidity or 150 Prosperity', bull: 'Bank 100 Prosperity', rocket: 'Bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', bell: 'Clears The Bear', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one hazard', heart: 'Discard to cancel a hazard just played on you', halo: 'Your Trader ignores Quantum Hack', xray: 'Once a turn, peek at a random rival card', rosary: 'Draw a card when you earn a deed', rose: 'Give a rival 2 Liquidity: a deed, then draw one', fountain: 'You and a rival each draw one: a deed' };
+const FX = { tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell later: 4 Liquidity or 75 Prosperity', moon: 'Sell later: 7 Liquidity or 150 Prosperity', bull: 'Bank 100 Prosperity', rocket: 'Bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', bell: 'Clears The Bear', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one hazard', heart: 'Discard to cancel a hazard just played on you', halo: 'Your Trader\u2019s ability cannot be disabled', xray: 'Once a turn, peek at a random rival card', rosary: 'Draw a card when you earn a deed', rose: 'Give a rival 2 Liquidity: a deed, then draw one', fountain: 'You and a rival each draw one: a deed' };
 const TFX = { unicornio: 'Peek at your top card before drawing; keep or bottom it', marisol: 'Once a game, cancel a Rug Pull played on you', monje: '+1 Liquidity whenever you earn a deed', gato: 'Once a game, shrug off one hazard for free', diablito: '+1 Liquidity when your hazard lands', abuela: 'Your Remedies cost 1 less', celebridad: 'Pay 1 when banking from a card: +25 Prosperity' };
 $('meT').innerHTML = TRADERS.map((t) => `<option value="${t.key}">You: ${esc(t.name)}</option>`).join('');
 
@@ -106,14 +107,14 @@ let S = null;
 const toast = (t) => { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2800); };
 
 class HumanPolicy {
-  main(g, p) { return new Promise((res) => { S.mainResolve = res; render(); }); }
+  main(g, p) { if (S.turnToasted !== g.turnNo) { S.turnToasted = g.turnNo; toast(`Round ${g.turnNo} · YOUR TURN — +2 Liquidity, one card drawn. Choose one main action.`); } return new Promise((res) => { S.mainResolve = res; render(); }); }
   discardOne(g, p) { return new Promise((res) => pickCard('Discard down to seven — tap a card to let go', p.hand, res)); }
   useHeart(g, p, c, by) { return ask(`${by.name} plays ${c.name} on you`, `Discard your SACRED HEART to cancel it?`, 'Cancel it', 'Take the hazard'); }
   useMarisol(g, p, c, by) { return ask(`${by.name} plays a Rug Pull on you`, 'Use LA DETECTIVE (once a game) to cancel it?', 'Cancel it', 'Take it'); }
   useGato(g, p) { return ask('EL GATO stretches', `Knock ${p.hazards[0].name} off the table for free (once a game)?`, 'Do it', 'Save the cat'); }
   peekBottom(g, p, top) { return ask('EL UNICORNIO peeks', `Top of your deck: ${top.name}. Send it to the bottom?`, 'Bottom it', 'Leave it'); }
 }
-const resolveMain = (a) => { const r = S.mainResolve; S.mainResolve = null; $('overlayHost').innerHTML = ''; if (r) r(a); };
+const resolveMain = (a) => { const r = S.mainResolve; S.mainResolve = null; $('overlayHost').innerHTML = ''; render(); if (r) { toast(a && a.t === 'pass' ? 'You pass — your turn is over.' : 'That was your one main action — your turn is over.'); r(a); } };
 function ask(kind, q, yes, no) { return new Promise((res) => { const host = $('overlayHost');
   host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">${esc(kind)}</div><div>${esc(q)}</div><button class="primary" id="aYes">${esc(yes)}</button><button id="aNo">${esc(no)}</button></div></div>`;
   host.querySelector('#aYes').onclick = () => { host.innerHTML = ''; res(true); setTimeout(render, 30); };
@@ -123,7 +124,7 @@ function pickCard(title, cards, done) { const host = $('overlayHost');
   const row = host.querySelector('#pickRow');
   cards.forEach((c) => { const el = cardEl(c); el.classList.add('playable'); el.onclick = () => { host.innerHTML = ''; done(c); setTimeout(render, 30); }; row.appendChild(el); });
 }
-function popMenu(items) { const host = $('overlayHost');
+function popMenu(items) { if (!S.mainResolve) { toast('Your main action is spent — wait for your next turn.'); return; } const host = $('overlayHost');
   host.innerHTML = `<div class="overlay"><div class="box">${items.map((it, i) => `<button ${i === 0 ? 'class="primary"' : ''} data-i="${i}">${esc(it[0])}</button>`).join('')}<button data-i="-1">Never mind</button></div></div>`;
   host.querySelectorAll('button').forEach((b) => b.onclick = () => { const i = +b.dataset.i; host.innerHTML = ''; if (i >= 0) items[i][1](); });
   host.querySelector('.overlay').onclick = (e) => { if (e.target === e.currentTarget) host.innerHTML = ''; };
@@ -142,7 +143,7 @@ $('deal').onclick = async () => {
     ...Array.from({ length: n }, (_, i) => ({ name: ['EL BOT', 'LA BOT', 'EL OTRO'][i], policy: new GreedyBot(), trader: pool.pop() })) ];
   const g = new Game({ players, seed, verbose: true });
   S = { g, me: g.players[0], running: true, mainResolve: null };
-  g.hooks = { render: async () => { render(); if (g.active !== S.me) await sleep(260); } };
+  g.hooks = { render: async () => { render(); if (g.active !== S.me) await sleep(520); } };
   $('board').hidden = false; $('hist').hidden = false; render();
   const r = await g.run(); S.running = false; render(); bell(r);
 };
@@ -191,7 +192,7 @@ function render() {
     const cyc = A.find((x) => x.t === 'cycle'); if (mine && cyc) items.push(['Discard this, draw one', () => resolveMain({ t: 'cycle', c })]);
     if (items.length && mine) { el.classList.add('playable'); el.onclick = () => popMenu(items); } else el.classList.add('dim');
     mh.appendChild(el); });
-  $('turnNote').textContent = mine ? 'Your main action:' : S.running ? (g.active && g.active !== me ? g.active.name + ' is thinking…' : '') : '';
+  $('turnNote').textContent = mine ? 'YOUR TURN · choose one main action:' : S.running ? (g.active && g.active !== me ? 'Turn over · ' + g.active.name + ' is playing…' : '') : '';
   $('giftBtn').disabled = !mine || me.liq < 2 || me.deeds >= 3 || me.deedThisTurn;
   $('giftBtn').onclick = () => popMenu(g.rivals(me).map((r) => [`Give 2 Liquidity to ${r.name}`, () => resolveMain({ t: 'gift', target: r })]));
   const hailAct = A.find((x) => x.t === 'hail');
@@ -200,6 +201,7 @@ function render() {
   $('cycleBtn').disabled = !mine || !me.hand.length;
   $('cycleBtn').onclick = () => pickCard('Discard one card, draw a replacement', me.hand, (c) => resolveMain({ t: 'cycle', c }));
   $('passBtn').disabled = !mine; $('passBtn').onclick = () => resolveMain({ t: 'pass' });
+  $('feed').innerHTML = g.lines.slice(-3).map((l) => `<div>${esc(l)}</div>`).join('');
   $('log').innerHTML = g.lines.map((l) => `<div>${esc(l)}</div>`).join(''); $('log').scrollTop = $('log').scrollHeight;
 }
 </script>

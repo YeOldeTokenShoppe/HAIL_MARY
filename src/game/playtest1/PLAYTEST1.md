@@ -187,7 +187,7 @@ Each Remedy can help you or a rival. Only qualifying help to a rival earns a dee
 | Card | Copies | Cost | Effect |
 |---|---:|---:|---|
 | **Sacred Heart** | 1 | 2 | Discard this equipped Artifact to cancel a hazard just played on you. |
-| **The Halo** | 1 | 3 | While equipped, your Trader ignores Quantum Hack. The hazard remains until cleared. |
+| **The Halo** | 1 | 3 | While equipped, your Trader’s ability cannot be disabled. A Quantum Hack on you remains until cleared, but does nothing. |
 | **X-Ray Glasses** | 1 | 2 | Once during your turn, inspect one randomly selected card in a rival’s hand. |
 | **The Rosary Beads** | 1 | 2 | When you earn a deed, you may draw one card. |
 
