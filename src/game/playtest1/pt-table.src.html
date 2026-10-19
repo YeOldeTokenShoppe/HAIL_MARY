@@ -64,6 +64,12 @@ button:disabled{opacity:.4;cursor:default}
 .box .kind{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 .log{font-size:.8rem;max-height:220px;overflow:auto;display:grid;gap:2px;margin-top:8px;color:var(--muted)}
+.playbanner{position:fixed;top:calc(4.6rem + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%) translateY(-8px);z-index:55;display:flex;gap:14px;align-items:center;background:var(--felt2);border:1px solid var(--gold);border-radius:12px;padding:10px 16px;box-shadow:0 10px 32px #000b;pointer-events:none;opacity:0;transition:opacity .18s,transform .18s;max-width:min(40rem,calc(100vw - 32px))}
+.playbanner.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.playbanner .card{width:calc(var(--cw)*0.8);min-height:calc(var(--cw)*0.85)}
+.playbanner .what{display:grid;gap:4px;min-width:0}
+.playbanner .who{font-family:var(--display);font-size:.85rem;color:var(--gold)}
+.panel.hot{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
 .toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--gold);color:#2a2040;font-weight:600;border-radius:7px;padding:9px 15px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:calc(100vw - 32px)}
 .toast.show{opacity:1}
 </style>
@@ -154,7 +160,10 @@ $('deal').onclick = async () => {
     ...Array.from({ length: n }, (_, i) => ({ name: ['EL BOT', 'LA BOT', 'EL OTRO'][i], policy: new GreedyBot(), trader: pool.pop() })) ];
   const g = new Game({ players, seed, verbose: true });
   S = { g, me: g.players[0], running: true, mainResolve: null };
-  g.hooks = { render: async () => { render(); if (g.active !== S.me) await sleep(520); } };
+  g.hooks = {
+    render: async () => { render(); if (g.active !== S.me) await sleep(240); },
+    onAction: async (p, a) => { if (p === S.me || !S.running) { render(); return; } render(); await showPlay(g, p, a); },
+  };
   $('board').hidden = false; $('hist').hidden = false; S.dealt = false; S.lastHandLen = g.players[0].hand.length; render();
   await dealFlights(); S.dealt = true;
   const r = await g.run(); S.running = false; render(); bell(r);
@@ -180,6 +189,18 @@ async function dealFlights() {
   }
   await sleep(420);
 }
+async function showPlay(g, p, a) {
+  const line = (g.lines[g.lines.length - 1] || '').replace(/^\[T\d+\] /, '');
+  const card = a.c || a.a || a.h || null;
+  const b = document.createElement('div'); b.className = 'playbanner';
+  const what = document.createElement('div'); what.className = 'what';
+  what.innerHTML = `<div class="who">${esc(p.name)} · ${esc(p.t.name)}</div><div>${esc(line)}</div>`;
+  if (card) b.appendChild(cardEl(card));
+  b.appendChild(what); document.body.appendChild(b);
+  requestAnimationFrame(() => b.classList.add('show'));
+  await sleep(a.t === 'pass' ? 650 : 1250);
+  b.classList.remove('show'); setTimeout(() => b.remove(), 220);
+}
 function bell(r) { const host = $('overlayHost'); const rows = S.g.players.map((q) => `<div>${esc(q.name)} · ${esc(q.t.name)} — <b>${q.pros}</b> Prosperity, ${q.deeds} deed${q.deeds === 1 ? '' : 's'}${q.hailUsed ? ', Hail Mary spent' : ''}</div>`).join('');
   host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">the race is run · round ${r.turns}</div><div class="call">${r.winner === 'YOU' ? 'YOU WIN' : r.winner ? esc(r.winner) + ' WINS' : 'NO WINNER'}</div>${rows}<button class="primary" id="again">Deal again</button></div></div>`;
   host.querySelector('#again').onclick = () => { host.innerHTML = ''; $('deal').click(); };
@@ -192,6 +213,7 @@ function render() {
   const rv = $('rivals'); rv.innerHTML = '';
   for (const q of g.players) { if (q === me) continue;
     const d = document.createElement('section'); d.className = 'panel';
+    if (g.active === q && S.running) d.classList.add('hot');
     d.innerHTML = `<div class="phead"><span class="who ${g.active === q && S.running ? 'active' : ''}">${esc(q.name)} · ${esc(q.t.name)}</span>
       <span class="stat">Liq <b>${q.liq}</b></span><span class="stat">Pros <b>${q.pros}</b></span><span class="stat">Hand <b>${q.hand.length}</b></span><span class="stat candles">${'🕯'.repeat(q.deeds)}</span><span class="stat">${q.hailUsed ? 'HM spent' : 'HM live'}</span></div>
       <div class="prosbar"><i style="width:${Math.min(100, q.pros / 10)}%"></i></div>

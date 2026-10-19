@@ -181,7 +181,7 @@ export class Game {
     if (this.is(p, 'gato') && !p.gatoUsed && p.hazards.length && await p.policy.useGato(this, p)) { p.gatoUsed = true; const h = p.hazards[0]; this.clearHazard(p, h, p, 'EL GATO knocks it off the table'); }
     if (p.policy.beforeDraw) await p.policy.beforeDraw(this, p);
     this.draw(p);
-    let guard = 0; while (guard++ < 4) { const a = await p.policy.main(this, p); const kind = a ? a.t : 'pass'; await this.act(p, a || { t: 'pass' }); if (kind !== 'freecycle' || this.over) break; }
+    let guard = 0; while (guard++ < 4) { const a = await p.policy.main(this, p); const kind = a ? a.t : 'pass'; await this.act(p, a || { t: 'pass' }); if (this.hooks && this.hooks.onAction) await this.hooks.onAction(p, a || { t: 'pass' }); if (kind !== 'freecycle' || this.over) break; }
     while (p.hand.length > 7) { const d = await p.policy.discardOne(this, p); p.hand.splice(p.hand.indexOf(d), 1); p.discard.push(d); p.stats.discards++; }
     if (this.hooks && this.hooks.render) await this.hooks.render();
   }
