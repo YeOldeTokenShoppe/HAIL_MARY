@@ -106,13 +106,14 @@ $('meT').innerHTML = TRADERS.map((t) => `<option value="${t.key}">You: ${esc(t.n
 let S = null;
 const toast = (t) => { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2800); };
 
+function announceTurn(g) { if (S.turnToasted !== g.turnNo) { S.turnToasted = g.turnNo; toast(`Round ${g.turnNo} · YOUR TURN — you collect 2 Liquidity and draw a card. Then one main action.`); } }
 class HumanPolicy {
-  main(g, p) { if (S.turnToasted !== g.turnNo) { S.turnToasted = g.turnNo; toast(`Round ${g.turnNo} · YOUR TURN — +2 Liquidity, one card drawn. Choose one main action.`); } return new Promise((res) => { S.mainResolve = res; render(); }); }
+  main(g, p) { announceTurn(g); return new Promise((res) => { S.mainResolve = res; render(); }); }
   discardOne(g, p) { return new Promise((res) => pickCard('Discard down to seven — tap a card to let go', p.hand, res)); }
   useHeart(g, p, c, by) { return ask(`${by.name} plays ${c.name} on you`, `Discard your SACRED HEART to cancel it?`, 'Cancel it', 'Take the hazard'); }
   useMarisol(g, p, c, by) { return ask(`${by.name} plays a Rug Pull on you`, 'Use LA DETECTIVE (once a game) to cancel it?', 'Cancel it', 'Take it'); }
-  useGato(g, p) { return ask('EL GATO stretches', `Knock ${p.hazards[0].name} off the table for free (once a game)?`, 'Do it', 'Save the cat'); }
-  peekBottom(g, p, top) { return ask('EL UNICORNIO peeks', `Top of your deck: ${top.name}. Send it to the bottom?`, 'Bottom it', 'Leave it'); }
+  useGato(g, p) { announceTurn(g); return ask('Your Trader ability · EL GATO, once a game', `The cat can knock ${p.hazards[0].name} off your table right now, free, without using your action. Use it, or save it for a worse hazard later?`, 'Use it now', 'Save the cat for later'); }
+  async peekBottom(g, p, top) { announceTurn(g); const keep = await ask('Your Trader ability · EL UNICORNIO sees your top card each turn, before you draw', `This turn's draw would be ${top.name} (${FX[top.key] || top.type}). Keep it and draw it now — or send it to the bottom of your deck and draw the next, unseen card instead.`, `Keep it — draw ${top.name}`, 'Send it to the bottom, draw blind'); return !keep; }
 }
 const resolveMain = (a) => { const r = S.mainResolve; S.mainResolve = null; $('overlayHost').innerHTML = ''; render(); if (r) { toast(a && a.t === 'pass' ? 'You pass — your turn is over.' : 'That was your one main action — your turn is over.'); r(a); } };
 function ask(kind, q, yes, no) { return new Promise((res) => { const host = $('overlayHost');
