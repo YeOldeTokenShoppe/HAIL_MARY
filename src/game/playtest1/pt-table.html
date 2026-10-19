@@ -139,7 +139,7 @@ const byKey = Object.fromEntries(DESIGNS.map((d) => [d.key, d]));
 const STARTER = [['tech', 3], ['meme', 3], ['moon', 3], ['bull', 3], ['rocket', 3], ['inherit', 3], ['bear', 2], ['hack', 2], ['rug', 2], ['bell', 2], ['resist', 2], ['keys', 2], ['tortilla', 2], ['heart', 1], ['halo', 1], ['xray', 1], ['rosary', 1], ['rose', 2], ['fountain', 2]];
 
 const TRADERS = [
-  { key: 'unicornio', name: 'El Unicornio' },    // before the draw: peek top of deck, keep or bottom
+  { key: 'unicornio', name: 'El Unicornio' },    // once a turn: a free cycle (discard one, draw one) beside the main action
   { key: 'marisol', name: 'La Detective' },      // once a game: cancel a Rug Pull played on you
   { key: 'monje', name: 'El Monje' },            // +1 Liquidity when you earn a deed
   { key: 'diablito', name: 'El Diablito' },      // +1 Liquidity when your hazard lands
@@ -263,6 +263,7 @@ class Game {
     if (p.liq >= 3) for (const h of p.hazards) A.push({ t: 'payclear', h });
     if (!p.hailUsed) A.push({ t: 'hail' });
     if (p.hand.length) A.push({ t: 'cycle', c: p.hand[0] });
+    if (this.is(p, 'unicornio') && !p.freeCycleUsed && p.hand.length) for (const c of p.hand) A.push({ t: 'freecycle', c });
     A.push({ t: 'pass' });
     return A;
   }
@@ -274,17 +275,17 @@ class Game {
       case 'payclear': return this.payClear(p, a.h);
       case 'hail': return this.hailMary(p);
       case 'cycle': { const c = a.c; p.hand.splice(p.hand.indexOf(c), 1); p.discard.push(c); this.draw(p); this.log(`${p.name} cycles a card`); return true; }
+      case 'freecycle': { const c = a.c; p.freeCycleUsed = true; p.hand.splice(p.hand.indexOf(c), 1); p.discard.push(c); this.draw(p); this.log(`${p.name} cycles freely (El Unicornio) — main action still to come`); return true; }
       case 'pass': this.log(`${p.name} passes`); return true;
     }
   }
   async turn(p) {
-    p.deedThisTurn = false; p.stats.turns++; if (p.hazards.length) p.stats.hazTurns++;
+    p.deedThisTurn = false; p.freeCycleUsed = false; p.stats.turns++; if (p.hazards.length) p.stats.hazTurns++;
     p.liq += 2;
     if (this.is(p, 'gato') && !p.gatoUsed && p.hazards.length && await p.policy.useGato(this, p)) { p.gatoUsed = true; const h = p.hazards[0]; this.clearHazard(p, h, p, 'EL GATO knocks it off the table'); }
     if (p.policy.beforeDraw) await p.policy.beforeDraw(this, p);
-    if (this.is(p, 'unicornio') && p.deck.length) { const top = p.deck[0]; if (await p.policy.peekBottom(this, p, top)) { p.deck.push(p.deck.shift()); this.log(`${p.name} bottoms the top card`); } }
     this.draw(p);
-    const a = await p.policy.main(this, p); await this.act(p, a || { t: 'pass' });
+    let guard = 0; while (guard++ < 4) { const a = await p.policy.main(this, p); const kind = a ? a.t : 'pass'; await this.act(p, a || { t: 'pass' }); if (kind !== 'freecycle' || this.over) break; }
     while (p.hand.length > 7) { const d = await p.policy.discardOne(this, p); p.hand.splice(p.hand.indexOf(d), 1); p.discard.push(d); p.stats.discards++; }
     if (this.hooks && this.hooks.render) await this.hooks.render();
   }
@@ -299,7 +300,7 @@ class Game {
 // ── policies ──
 class RandomBot {
   constructor(rng) { this.rng = rng; }
-  useHeart() { return this.rng() < 0.5; } useMarisol() { return this.rng() < 0.5; } useGato() { return this.rng() < 0.5; } peekBottom() { return this.rng() < 0.5; }
+  useHeart() { return this.rng() < 0.5; } useMarisol() { return this.rng() < 0.5; } useGato() { return this.rng() < 0.5; }
   discardOne(g, p) { return p.hand[Math.floor(this.rng() * p.hand.length)]; }
   main(g, p) { const A = g.legalActions(p); return A[Math.floor(this.rng() * A.length)]; }
 }
@@ -308,7 +309,6 @@ class GreedyBot {
   useHeart(g, p, c) { return c.key !== 'hack' || p.t.key !== 'gato'; }
   useMarisol() { return true; }
   useGato(g, p) { return p.hazards.length > 0; }
-  peekBottom(g, p, top) { return top.type === 'hazard' && p.liq < 5; }
   discardOne(g, p) { const order = { hazard: 0, coop: 1, artifact: 2, remedy: 3, asset: 4, progress: 5 }; return [...p.hand].sort((a, b) => (order[a.type] ?? 9) - (order[b.type] ?? 9))[0]; }
   main(g, p) {
     const A = g.legalActions(p); const lead = [...g.rivals(p)].sort((a, b) => b.pros - a.pros)[0];
@@ -326,6 +326,7 @@ class GreedyBot {
       if (a.t === 'gift') s = p.deeds < 3 && !p.hailUsed && p.liq >= 6 ? 50 : 2;
       if (a.t === 'payclear') s = p.liq >= 5 ? 66 : 20;
       if (a.t === 'hail') s = p.pros + 200 >= g.winAt ? (twelfths >= 4 ? 90 : 30) : twelfths >= 8 ? 72 : lead && lead.pros >= g.winAt - 150 ? 45 : hailEV / 4;
+      if (a.t === 'freecycle') s = p.hand.length >= 4 ? 46 + ({ hazard: 3, coop: 2, remedy: 1 }[a.c.type] || 0) - (a.c.type === 'progress' ? 40 : 0) : 8;
       if (a.t === 'cycle') s = 10; if (a.t === 'pass') s = 1;
       s += (g.rng ? 0 : 0);
       if (s > bs) { bs = s; best = a; }
@@ -340,7 +341,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const FX = { tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell later: 4 Liquidity or 75 Prosperity', moon: 'Sell later: 7 Liquidity or 150 Prosperity', bull: 'Bank 100 Prosperity', rocket: 'Bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', bell: 'Clears The Bear', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one hazard', heart: 'Discard to cancel a hazard just played on you', halo: 'Your Trader\u2019s ability cannot be disabled', xray: 'Once a turn, peek at a random rival card', rosary: 'Draw a card when you earn a deed', rose: 'Give a rival 2 Liquidity: a deed, then draw one', fountain: 'You and a rival each draw one: a deed' };
-const TFX = { unicornio: 'Peek at your top card before drawing; keep or bottom it', marisol: 'Once a game, cancel a Rug Pull played on you', monje: '+1 Liquidity whenever you earn a deed', gato: 'Once a game, shrug off one hazard for free', diablito: '+1 Liquidity when your hazard lands', abuela: 'Your Remedies cost 1 less', celebridad: 'Pay 1 when banking from a card: +25 Prosperity' };
+const TFX = { unicornio: 'Once a turn: discard a card and draw a replacement, without using your action', marisol: 'Once a game, cancel a Rug Pull played on you', monje: '+1 Liquidity whenever you earn a deed', gato: 'Once a game, shrug off one hazard for free', diablito: '+1 Liquidity when your hazard lands', abuela: 'Your Remedies cost 1 less', celebridad: 'Pay 1 when banking from a card: +25 Prosperity' };
 $('meT').innerHTML = TRADERS.map((t) => `<option value="${t.key}">You: ${esc(t.name)}</option>`).join('');
 
 let S = null;
@@ -355,9 +356,8 @@ class HumanPolicy {
   useHeart(g, p, c, by) { return ask(`${by.name} plays ${c.name} on you`, `Discard your SACRED HEART to cancel it?`, 'Cancel it', 'Take the hazard'); }
   useMarisol(g, p, c, by) { return ask(`${by.name} plays a Rug Pull on you`, 'Use LA DETECTIVE (once a game) to cancel it?', 'Cancel it', 'Take it'); }
   useGato(g, p) { announceTurn(g); return ask('Your Trader ability · EL GATO, once a game', `The cat can knock ${p.hazards[0].name} off your table right now, free, without using your action. Use it, or save it for a worse hazard later?`, 'Use it now', 'Save the cat for later'); }
-  peekBottom() { return false; } // the Unicorn's foresight is shown beside the deck, never as a popup
 }
-const resolveMain = (a) => { const r = S.mainResolve; S.mainResolve = null; $('overlayHost').innerHTML = ''; render(); if (r) { toast(a && a.t === 'pass' ? 'You pass — your turn is over.' : 'That was your one main action — your turn is over.'); r(a); } };
+const resolveMain = (a) => { const r = S.mainResolve; S.mainResolve = null; $('overlayHost').innerHTML = ''; render(); if (r) { toast(a && a.t === 'freecycle' ? 'Free cycle (the Unicorn) — you still have your main action.' : a && a.t === 'pass' ? 'You pass — your turn is over.' : 'That was your one main action — your turn is over.'); r(a); } };
 function ask(kind, q, yes, no) { return new Promise((res) => { const host = $('overlayHost');
   host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">${esc(kind)}</div><div>${esc(q)}</div><button class="primary" id="aYes">${esc(yes)}</button><button id="aNo">${esc(no)}</button></div></div>`;
   host.querySelector('#aYes').onclick = () => { host.innerHTML = ''; res(true); setTimeout(render, 30); };
@@ -443,13 +443,6 @@ function render() {
     dk.innerHTML = `<div class="nm" style="margin-top:auto">RL80</div><div class="fx" style="margin-top:auto">${me.deck.length} left${S.drawResolve ? ' · TAP TO DRAW' : ''}</div>`;
     if (S.drawResolve) dk.onclick = () => { const r = S.drawResolve; S.drawResolve = null; r(); };
     piles.appendChild(dk);
-    if (me.t.key === 'unicornio' && g.abilityOn(me) && me.deck.length && S.running) {
-      const top = me.deck[0]; const pv = cardEl(top); pv.title = 'Only the Unicorn can see this';
-      const wrap = document.createElement('div'); wrap.style.display = 'grid'; wrap.style.gap = '4px'; wrap.style.maxWidth = '14rem';
-      const lbl = document.createElement('div'); lbl.className = 'note'; lbl.textContent = 'EL UNICORNIO: this is the top card of your deck, not yet drawn. Tap the deck and this is the card you get.'; wrap.appendChild(lbl); wrap.appendChild(pv);
-      if (S.buriedTurn !== g.turnNo && S.drawResolve) { const b = document.createElement('button'); b.textContent = 'Don\u2019t want it? Slide it under the deck'; b.title = 'Costs nothing — not your action, no Liquidity. Once a turn.'; b.onclick = () => { S.buriedTurn = g.turnNo; me.deck.push(me.deck.shift()); g.log('YOU slide the top card under the deck'); render(); }; wrap.appendChild(b); const n = document.createElement('div'); n.className = 'note'; n.textContent = 'Sliding it under costs nothing and is not your action; you then draw the next, unseen card.'; wrap.appendChild(n); }
-      piles.appendChild(wrap);
-    }
     const dc = document.createElement('div');
     if (me.discard.length) { const top = cardEl(me.discard[me.discard.length - 1]); top.classList.add('dim'); top.title = 'Your discard · ' + me.discard.length; piles.appendChild(top); }
   }
@@ -479,8 +472,10 @@ function render() {
   const hailAct = A.find((x) => x.t === 'hail');
   $('hailBtn').disabled = !mine || !hailAct;
   $('hailBtn').onclick = () => ask('once per game', `Attempt the Hail Mary at ${tw}/12? Answered: your hazards clear and you bank 200.`, 'Pray', 'Hold').then((y) => { if (y) { resolveMain(hailAct); setTimeout(() => { const last = S.g.lines.filter((l) => /HAIL MARY/.test(l)).pop(); if (last) toast(last.replace(/^\[T\d+\] /, '')); }, 60); } });
+  const freeCy = A.some((x) => x.t === 'freecycle');
+  $('cycleBtn').textContent = freeCy ? 'Cycle a card — FREE (the Unicorn)' : 'Cycle a card';
   $('cycleBtn').disabled = !mine || !me.hand.length;
-  $('cycleBtn').onclick = () => pickCard('Discard one card, draw a replacement', me.hand, (c) => resolveMain({ t: 'cycle', c }));
+  $('cycleBtn').onclick = () => pickCard(freeCy ? 'The Unicorn\u2019s free cycle: discard one, draw one — your main action remains' : 'Discard one card, draw a replacement (this is your main action)', me.hand, (c) => resolveMain({ t: freeCy ? 'freecycle' : 'cycle', c }));
   $('passBtn').disabled = !mine; $('passBtn').onclick = () => resolveMain({ t: 'pass' });
   $('feed').innerHTML = g.lines.slice(-3).map((l) => `<div>${esc(l)}</div>`).join('');
   $('log').innerHTML = g.lines.map((l) => `<div>${esc(l)}</div>`).join(''); $('log').scrollTop = $('log').scrollHeight;

@@ -132,7 +132,7 @@ Choose one. These are outside the 40-card deck.
 
 | Trader | Prototype ability |
 |---|---|
-| **El Unicornio** | Before your normal draw, inspect the top card of your deck. Leave it there or move it to the bottom. |
+| **El Unicornio** | Once per turn, you may discard one card and draw a replacement without using your main action. |
 | **La Detective — Marisol** | Once per game, cancel a Rug Pull just played on you. The attacker still spends the card, cost, and action. |
 | **El Monje** | When you earn a deed, collect 1 Liquidity. |
 | **El Diablito — Connor** | When a hazard you play successfully enters a rival’s hazard area, collect 1 Liquidity. |

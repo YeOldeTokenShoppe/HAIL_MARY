@@ -109,7 +109,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const FX = { tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell later: 4 Liquidity or 75 Prosperity', moon: 'Sell later: 7 Liquidity or 150 Prosperity', bull: 'Bank 100 Prosperity', rocket: 'Bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', bell: 'Clears The Bear', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one hazard', heart: 'Discard to cancel a hazard just played on you', halo: 'Your Trader\u2019s ability cannot be disabled', xray: 'Once a turn, peek at a random rival card', rosary: 'Draw a card when you earn a deed', rose: 'Give a rival 2 Liquidity: a deed, then draw one', fountain: 'You and a rival each draw one: a deed' };
-const TFX = { unicornio: 'Peek at your top card before drawing; keep or bottom it', marisol: 'Once a game, cancel a Rug Pull played on you', monje: '+1 Liquidity whenever you earn a deed', gato: 'Once a game, shrug off one hazard for free', diablito: '+1 Liquidity when your hazard lands', abuela: 'Your Remedies cost 1 less', celebridad: 'Pay 1 when banking from a card: +25 Prosperity' };
+const TFX = { unicornio: 'Once a turn: discard a card and draw a replacement, without using your action', marisol: 'Once a game, cancel a Rug Pull played on you', monje: '+1 Liquidity whenever you earn a deed', gato: 'Once a game, shrug off one hazard for free', diablito: '+1 Liquidity when your hazard lands', abuela: 'Your Remedies cost 1 less', celebridad: 'Pay 1 when banking from a card: +25 Prosperity' };
 $('meT').innerHTML = TRADERS.map((t) => `<option value="${t.key}">You: ${esc(t.name)}</option>`).join('');
 
 let S = null;
@@ -124,9 +124,8 @@ class HumanPolicy {
   useHeart(g, p, c, by) { return ask(`${by.name} plays ${c.name} on you`, `Discard your SACRED HEART to cancel it?`, 'Cancel it', 'Take the hazard'); }
   useMarisol(g, p, c, by) { return ask(`${by.name} plays a Rug Pull on you`, 'Use LA DETECTIVE (once a game) to cancel it?', 'Cancel it', 'Take it'); }
   useGato(g, p) { announceTurn(g); return ask('Your Trader ability · EL GATO, once a game', `The cat can knock ${p.hazards[0].name} off your table right now, free, without using your action. Use it, or save it for a worse hazard later?`, 'Use it now', 'Save the cat for later'); }
-  peekBottom() { return false; } // the Unicorn's foresight is shown beside the deck, never as a popup
 }
-const resolveMain = (a) => { const r = S.mainResolve; S.mainResolve = null; $('overlayHost').innerHTML = ''; render(); if (r) { toast(a && a.t === 'pass' ? 'You pass — your turn is over.' : 'That was your one main action — your turn is over.'); r(a); } };
+const resolveMain = (a) => { const r = S.mainResolve; S.mainResolve = null; $('overlayHost').innerHTML = ''; render(); if (r) { toast(a && a.t === 'freecycle' ? 'Free cycle (the Unicorn) — you still have your main action.' : a && a.t === 'pass' ? 'You pass — your turn is over.' : 'That was your one main action — your turn is over.'); r(a); } };
 function ask(kind, q, yes, no) { return new Promise((res) => { const host = $('overlayHost');
   host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">${esc(kind)}</div><div>${esc(q)}</div><button class="primary" id="aYes">${esc(yes)}</button><button id="aNo">${esc(no)}</button></div></div>`;
   host.querySelector('#aYes').onclick = () => { host.innerHTML = ''; res(true); setTimeout(render, 30); };
@@ -212,13 +211,6 @@ function render() {
     dk.innerHTML = `<div class="nm" style="margin-top:auto">RL80</div><div class="fx" style="margin-top:auto">${me.deck.length} left${S.drawResolve ? ' · TAP TO DRAW' : ''}</div>`;
     if (S.drawResolve) dk.onclick = () => { const r = S.drawResolve; S.drawResolve = null; r(); };
     piles.appendChild(dk);
-    if (me.t.key === 'unicornio' && g.abilityOn(me) && me.deck.length && S.running) {
-      const top = me.deck[0]; const pv = cardEl(top); pv.title = 'Only the Unicorn can see this';
-      const wrap = document.createElement('div'); wrap.style.display = 'grid'; wrap.style.gap = '4px'; wrap.style.maxWidth = '14rem';
-      const lbl = document.createElement('div'); lbl.className = 'note'; lbl.textContent = 'EL UNICORNIO: this is the top card of your deck, not yet drawn. Tap the deck and this is the card you get.'; wrap.appendChild(lbl); wrap.appendChild(pv);
-      if (S.buriedTurn !== g.turnNo && S.drawResolve) { const b = document.createElement('button'); b.textContent = 'Don\u2019t want it? Slide it under the deck'; b.title = 'Costs nothing — not your action, no Liquidity. Once a turn.'; b.onclick = () => { S.buriedTurn = g.turnNo; me.deck.push(me.deck.shift()); g.log('YOU slide the top card under the deck'); render(); }; wrap.appendChild(b); const n = document.createElement('div'); n.className = 'note'; n.textContent = 'Sliding it under costs nothing and is not your action; you then draw the next, unseen card.'; wrap.appendChild(n); }
-      piles.appendChild(wrap);
-    }
     const dc = document.createElement('div');
     if (me.discard.length) { const top = cardEl(me.discard[me.discard.length - 1]); top.classList.add('dim'); top.title = 'Your discard · ' + me.discard.length; piles.appendChild(top); }
   }
@@ -248,8 +240,10 @@ function render() {
   const hailAct = A.find((x) => x.t === 'hail');
   $('hailBtn').disabled = !mine || !hailAct;
   $('hailBtn').onclick = () => ask('once per game', `Attempt the Hail Mary at ${tw}/12? Answered: your hazards clear and you bank 200.`, 'Pray', 'Hold').then((y) => { if (y) { resolveMain(hailAct); setTimeout(() => { const last = S.g.lines.filter((l) => /HAIL MARY/.test(l)).pop(); if (last) toast(last.replace(/^\[T\d+\] /, '')); }, 60); } });
+  const freeCy = A.some((x) => x.t === 'freecycle');
+  $('cycleBtn').textContent = freeCy ? 'Cycle a card — FREE (the Unicorn)' : 'Cycle a card';
   $('cycleBtn').disabled = !mine || !me.hand.length;
-  $('cycleBtn').onclick = () => pickCard('Discard one card, draw a replacement', me.hand, (c) => resolveMain({ t: 'cycle', c }));
+  $('cycleBtn').onclick = () => pickCard(freeCy ? 'The Unicorn\u2019s free cycle: discard one, draw one — your main action remains' : 'Discard one card, draw a replacement (this is your main action)', me.hand, (c) => resolveMain({ t: freeCy ? 'freecycle' : 'cycle', c }));
   $('passBtn').disabled = !mine; $('passBtn').onclick = () => resolveMain({ t: 'pass' });
   $('feed').innerHTML = g.lines.slice(-3).map((l) => `<div>${esc(l)}</div>`).join('');
   $('log').innerHTML = g.lines.map((l) => `<div>${esc(l)}</div>`).join(''); $('log').scrollTop = $('log').scrollHeight;

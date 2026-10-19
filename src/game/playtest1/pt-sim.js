@@ -35,7 +35,7 @@ export const byKey = Object.fromEntries(DESIGNS.map((d) => [d.key, d]));
 export const STARTER = [['tech', 3], ['meme', 3], ['moon', 3], ['bull', 3], ['rocket', 3], ['inherit', 3], ['bear', 2], ['hack', 2], ['rug', 2], ['bell', 2], ['resist', 2], ['keys', 2], ['tortilla', 2], ['heart', 1], ['halo', 1], ['xray', 1], ['rosary', 1], ['rose', 2], ['fountain', 2]];
 
 export const TRADERS = [
-  { key: 'unicornio', name: 'El Unicornio' },    // before the draw: peek top of deck, keep or bottom
+  { key: 'unicornio', name: 'El Unicornio' },    // once a turn: a free cycle (discard one, draw one) beside the main action
   { key: 'marisol', name: 'La Detective' },      // once a game: cancel a Rug Pull played on you
   { key: 'monje', name: 'El Monje' },            // +1 Liquidity when you earn a deed
   { key: 'diablito', name: 'El Diablito' },      // +1 Liquidity when your hazard lands
@@ -159,6 +159,7 @@ export class Game {
     if (p.liq >= 3) for (const h of p.hazards) A.push({ t: 'payclear', h });
     if (!p.hailUsed) A.push({ t: 'hail' });
     if (p.hand.length) A.push({ t: 'cycle', c: p.hand[0] });
+    if (this.is(p, 'unicornio') && !p.freeCycleUsed && p.hand.length) for (const c of p.hand) A.push({ t: 'freecycle', c });
     A.push({ t: 'pass' });
     return A;
   }
@@ -170,17 +171,17 @@ export class Game {
       case 'payclear': return this.payClear(p, a.h);
       case 'hail': return this.hailMary(p);
       case 'cycle': { const c = a.c; p.hand.splice(p.hand.indexOf(c), 1); p.discard.push(c); this.draw(p); this.log(`${p.name} cycles a card`); return true; }
+      case 'freecycle': { const c = a.c; p.freeCycleUsed = true; p.hand.splice(p.hand.indexOf(c), 1); p.discard.push(c); this.draw(p); this.log(`${p.name} cycles freely (El Unicornio) — main action still to come`); return true; }
       case 'pass': this.log(`${p.name} passes`); return true;
     }
   }
   async turn(p) {
-    p.deedThisTurn = false; p.stats.turns++; if (p.hazards.length) p.stats.hazTurns++;
+    p.deedThisTurn = false; p.freeCycleUsed = false; p.stats.turns++; if (p.hazards.length) p.stats.hazTurns++;
     p.liq += 2;
     if (this.is(p, 'gato') && !p.gatoUsed && p.hazards.length && await p.policy.useGato(this, p)) { p.gatoUsed = true; const h = p.hazards[0]; this.clearHazard(p, h, p, 'EL GATO knocks it off the table'); }
     if (p.policy.beforeDraw) await p.policy.beforeDraw(this, p);
-    if (this.is(p, 'unicornio') && p.deck.length) { const top = p.deck[0]; if (await p.policy.peekBottom(this, p, top)) { p.deck.push(p.deck.shift()); this.log(`${p.name} bottoms the top card`); } }
     this.draw(p);
-    const a = await p.policy.main(this, p); await this.act(p, a || { t: 'pass' });
+    let guard = 0; while (guard++ < 4) { const a = await p.policy.main(this, p); const kind = a ? a.t : 'pass'; await this.act(p, a || { t: 'pass' }); if (kind !== 'freecycle' || this.over) break; }
     while (p.hand.length > 7) { const d = await p.policy.discardOne(this, p); p.hand.splice(p.hand.indexOf(d), 1); p.discard.push(d); p.stats.discards++; }
     if (this.hooks && this.hooks.render) await this.hooks.render();
   }
@@ -195,7 +196,7 @@ export class Game {
 // ── policies ──
 export class RandomBot {
   constructor(rng) { this.rng = rng; }
-  useHeart() { return this.rng() < 0.5; } useMarisol() { return this.rng() < 0.5; } useGato() { return this.rng() < 0.5; } peekBottom() { return this.rng() < 0.5; }
+  useHeart() { return this.rng() < 0.5; } useMarisol() { return this.rng() < 0.5; } useGato() { return this.rng() < 0.5; }
   discardOne(g, p) { return p.hand[Math.floor(this.rng() * p.hand.length)]; }
   main(g, p) { const A = g.legalActions(p); return A[Math.floor(this.rng() * A.length)]; }
 }
@@ -204,7 +205,6 @@ export class GreedyBot {
   useHeart(g, p, c) { return c.key !== 'hack' || p.t.key !== 'gato'; }
   useMarisol() { return true; }
   useGato(g, p) { return p.hazards.length > 0; }
-  peekBottom(g, p, top) { return top.type === 'hazard' && p.liq < 5; }
   discardOne(g, p) { const order = { hazard: 0, coop: 1, artifact: 2, remedy: 3, asset: 4, progress: 5 }; return [...p.hand].sort((a, b) => (order[a.type] ?? 9) - (order[b.type] ?? 9))[0]; }
   main(g, p) {
     const A = g.legalActions(p); const lead = [...g.rivals(p)].sort((a, b) => b.pros - a.pros)[0];
@@ -222,6 +222,7 @@ export class GreedyBot {
       if (a.t === 'gift') s = p.deeds < 3 && !p.hailUsed && p.liq >= 6 ? 50 : 2;
       if (a.t === 'payclear') s = p.liq >= 5 ? 66 : 20;
       if (a.t === 'hail') s = p.pros + 200 >= g.winAt ? (twelfths >= 4 ? 90 : 30) : twelfths >= 8 ? 72 : lead && lead.pros >= g.winAt - 150 ? 45 : hailEV / 4;
+      if (a.t === 'freecycle') s = p.hand.length >= 4 ? 46 + ({ hazard: 3, coop: 2, remedy: 1 }[a.c.type] || 0) - (a.c.type === 'progress' ? 40 : 0) : 8;
       if (a.t === 'cycle') s = 10; if (a.t === 'pass') s = 1;
       s += (g.rng ? 0 : 0);
       if (s > bs) { bs = s; best = a; }
