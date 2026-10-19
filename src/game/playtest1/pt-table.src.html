@@ -213,10 +213,10 @@ function render() {
     if (S.drawResolve) dk.onclick = () => { const r = S.drawResolve; S.drawResolve = null; r(); };
     piles.appendChild(dk);
     if (me.t.key === 'unicornio' && g.abilityOn(me) && me.deck.length && S.running) {
-      const top = me.deck[0]; const pv = cardEl(top); pv.title = 'El Unicornio sees the top of your deck';
-      const wrap = document.createElement('div'); wrap.style.display = 'grid'; wrap.style.gap = '4px';
-      const lbl = document.createElement('div'); lbl.className = 'note'; lbl.textContent = 'The Unicorn sees your next draw:'; wrap.appendChild(lbl); wrap.appendChild(pv);
-      if (S.buriedTurn !== g.turnNo && S.drawResolve) { const b = document.createElement('button'); b.textContent = 'Bury it (free, once a turn)'; b.onclick = () => { S.buriedTurn = g.turnNo; me.deck.push(me.deck.shift()); g.log('YOU send the top card to the bottom'); render(); }; wrap.appendChild(b); }
+      const top = me.deck[0]; const pv = cardEl(top); pv.title = 'Only the Unicorn can see this';
+      const wrap = document.createElement('div'); wrap.style.display = 'grid'; wrap.style.gap = '4px'; wrap.style.maxWidth = '14rem';
+      const lbl = document.createElement('div'); lbl.className = 'note'; lbl.textContent = 'EL UNICORNIO: this is the top card of your deck, not yet drawn. Tap the deck and this is the card you get.'; wrap.appendChild(lbl); wrap.appendChild(pv);
+      if (S.buriedTurn !== g.turnNo && S.drawResolve) { const b = document.createElement('button'); b.textContent = 'Don\u2019t want it? Slide it under the deck'; b.title = 'Costs nothing — not your action, no Liquidity. Once a turn.'; b.onclick = () => { S.buriedTurn = g.turnNo; me.deck.push(me.deck.shift()); g.log('YOU slide the top card under the deck'); render(); }; wrap.appendChild(b); const n = document.createElement('div'); n.className = 'note'; n.textContent = 'Sliding it under costs nothing and is not your action; you then draw the next, unseen card.'; wrap.appendChild(n); }
       piles.appendChild(wrap);
     }
     const dc = document.createElement('div');
