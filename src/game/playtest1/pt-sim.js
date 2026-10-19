@@ -64,7 +64,7 @@ export class Game {
   hasHaz(p, key) { return p.hazards.some((h) => h.key === key); }
   draw(p, silent = false) {
     if (!p.deck.length && p.discard.length) { p.deck = this.shuffle(p.discard.splice(0)); this.log(`${p.name} reshuffles`); }
-    const c = p.deck.shift(); if (!c) return null; p.hand.push(c); if (!silent) this.log(`${p.name} draws`); return c;
+    const c = p.deck.shift(); if (!c) return null; p.hand.push(c); if (!silent) this.log(`${p.name} draws${p.policy && p.policy.human ? ' ' + c.name : ''}`); return c;
   }
   bank(p, n, src, allowBonus = true) {
     if (this.hasHaz(p, 'bear') && src !== 'hail') { if (n > 75) return false; // larger payouts cannot be chosen
@@ -177,6 +177,7 @@ export class Game {
     p.deedThisTurn = false; p.stats.turns++; if (p.hazards.length) p.stats.hazTurns++;
     p.liq += 2;
     if (this.is(p, 'gato') && !p.gatoUsed && p.hazards.length && await p.policy.useGato(this, p)) { p.gatoUsed = true; const h = p.hazards[0]; this.clearHazard(p, h, p, 'EL GATO knocks it off the table'); }
+    if (p.policy.beforeDraw) await p.policy.beforeDraw(this, p);
     if (this.is(p, 'unicornio') && p.deck.length) { const top = p.deck[0]; if (await p.policy.peekBottom(this, p, top)) { p.deck.push(p.deck.shift()); this.log(`${p.name} bottoms the top card`); } }
     this.draw(p);
     const a = await p.policy.main(this, p); await this.act(p, a || { t: 'pass' });

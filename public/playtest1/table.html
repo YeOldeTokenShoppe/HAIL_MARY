@@ -53,6 +53,8 @@ button:disabled{opacity:.4;cursor:default}
 .card.remedy{background:linear-gradient(170deg,#2f6b58,#1f4e3f);color:#eafff5;border-color:var(--teal)}
 .card.artifact{background:linear-gradient(170deg,#5e4a9e,#473579);color:#f3edff;border-color:var(--violet)}
 .card.coop,.card.lady{background:linear-gradient(170deg,#e8b84b,#d9a02e);color:#2a2040}
+.card.back{background:linear-gradient(170deg,#3d2f73,#2a1f52);color:#cfc3f2;border-color:var(--violet);align-items:center;justify-content:center;text-align:center}
+.card.back.drawable{cursor:pointer;outline:2px solid var(--gold);box-shadow:0 0 18px #e8b84b66;transform:translateY(-2px)}
 .card.playable{cursor:pointer;outline:2px solid transparent;transition:outline-color .15s,transform .15s}
 .card.playable:hover{outline-color:var(--gold);transform:translateY(-2px)}
 .card.dim{opacity:.55}
@@ -82,6 +84,7 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
     <div class="prosbar"><i id="meBar" style="width:0%"></i></div>
     <div class="rowlabel">Your investments · tap to sell (not the turn they arrive)</div><div class="cards" id="meInvest"></div>
     <div style="display:flex;gap:1.2rem;flex-wrap:wrap">
+      <div style="min-width:0"><div class="rowlabel">Your deck · tap to draw on your turn</div><div class="cards" id="mePiles"></div></div>
       <div style="min-width:0"><div class="rowlabel">Artifacts (max 2)</div><div class="cards" id="meArts"></div></div>
       <div style="min-width:0"><div class="rowlabel">Hazards on you</div><div class="cards" id="meHazards"></div></div>
     </div>
@@ -93,7 +96,7 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
       <button id="hailBtn">Hail Mary</button>
       <button id="cycleBtn">Cycle a card</button>
       <button id="passBtn">Pass</button>
-      <span class="stat">Deck <b id="meDeck">0</b> · Discard <b id="meDisc">0</b></span>
+      
     </div>
   </section>
 </div>
@@ -166,7 +169,7 @@ class Game {
   hasHaz(p, key) { return p.hazards.some((h) => h.key === key); }
   draw(p, silent = false) {
     if (!p.deck.length && p.discard.length) { p.deck = this.shuffle(p.discard.splice(0)); this.log(`${p.name} reshuffles`); }
-    const c = p.deck.shift(); if (!c) return null; p.hand.push(c); if (!silent) this.log(`${p.name} draws`); return c;
+    const c = p.deck.shift(); if (!c) return null; p.hand.push(c); if (!silent) this.log(`${p.name} draws${p.policy && p.policy.human ? ' ' + c.name : ''}`); return c;
   }
   bank(p, n, src, allowBonus = true) {
     if (this.hasHaz(p, 'bear') && src !== 'hail') { if (n > 75) return false; // larger payouts cannot be chosen
@@ -279,6 +282,7 @@ class Game {
     p.deedThisTurn = false; p.stats.turns++; if (p.hazards.length) p.stats.hazTurns++;
     p.liq += 2;
     if (this.is(p, 'gato') && !p.gatoUsed && p.hazards.length && await p.policy.useGato(this, p)) { p.gatoUsed = true; const h = p.hazards[0]; this.clearHazard(p, h, p, 'EL GATO knocks it off the table'); }
+    if (p.policy.beforeDraw) await p.policy.beforeDraw(this, p);
     if (this.is(p, 'unicornio') && p.deck.length) { const top = p.deck[0]; if (await p.policy.peekBottom(this, p, top)) { p.deck.push(p.deck.shift()); this.log(`${p.name} bottoms the top card`); } }
     this.draw(p);
     const a = await p.policy.main(this, p); await this.act(p, a || { t: 'pass' });
@@ -345,12 +349,14 @@ const toast = (t) => { const el = $('toast'); el.textContent = t; el.classList.a
 
 function announceTurn(g) { if (S.turnToasted !== g.turnNo) { S.turnToasted = g.turnNo; toast(`Round ${g.turnNo} · YOUR TURN — you collect 2 Liquidity and draw a card. Then one main action.`); } }
 class HumanPolicy {
+  human = true;
+  beforeDraw(g, p) { announceTurn(g); return new Promise((res) => { S.drawResolve = res; render(); }); }
   main(g, p) { announceTurn(g); return new Promise((res) => { S.mainResolve = res; render(); }); }
   discardOne(g, p) { return new Promise((res) => pickCard('Discard down to seven — tap a card to let go', p.hand, res)); }
   useHeart(g, p, c, by) { return ask(`${by.name} plays ${c.name} on you`, `Discard your SACRED HEART to cancel it?`, 'Cancel it', 'Take the hazard'); }
   useMarisol(g, p, c, by) { return ask(`${by.name} plays a Rug Pull on you`, 'Use LA DETECTIVE (once a game) to cancel it?', 'Cancel it', 'Take it'); }
   useGato(g, p) { announceTurn(g); return ask('Your Trader ability · EL GATO, once a game', `The cat can knock ${p.hazards[0].name} off your table right now, free, without using your action. Use it, or save it for a worse hazard later?`, 'Use it now', 'Save the cat for later'); }
-  async peekBottom(g, p, top) { announceTurn(g); const keep = await ask('Your Trader ability · EL UNICORNIO sees your top card each turn, before you draw', `This turn's draw would be ${top.name} (${FX[top.key] || top.type}). Keep it and draw it now — or send it to the bottom of your deck and draw the next, unseen card instead.`, `Keep it — draw ${top.name}`, 'Send it to the bottom, draw blind'); return !keep; }
+  async peekBottom(g, p, top) { announceTurn(g); const keep = await ask('EL UNICORNIO peeks at the card you are about to draw', `It is ${top.name} (${FX[top.key] || top.type}). Keep it and draw it now — or send it to the bottom of your deck and draw the next, unseen card instead.`, `Keep it — draw ${top.name}`, 'Send it to the bottom, draw blind'); return !keep; }
 }
 const resolveMain = (a) => { const r = S.mainResolve; S.mainResolve = null; $('overlayHost').innerHTML = ''; render(); if (r) { toast(a && a.t === 'pass' ? 'You pass — your turn is over.' : 'That was your one main action — your turn is over.'); r(a); } };
 function ask(kind, q, yes, no) { return new Promise((res) => { const host = $('overlayHost');
@@ -410,7 +416,14 @@ function render() {
   $('meDeeds').textContent = '🕯'.repeat(me.deeds) || '—';
   const tw = ODDS[Math.min(3, me.deeds)]; $('meHail').textContent = me.hailUsed ? 'Hail Mary: spent' : `Hail Mary: ${tw}/12 to bank 200`;
   $('meHaz').textContent = g.abilityOn(me) ? '' : 'ABILITY HACKED';
-  $('meDeck').textContent = me.deck.length; $('meDisc').textContent = me.discard.length;
+  const piles = $('mePiles'); piles.innerHTML = '';
+  { const dk = document.createElement('div'); dk.className = 'card back' + (S.drawResolve ? ' drawable' : ' dim');
+    dk.innerHTML = `<div class="nm" style="margin-top:auto">RL80</div><div class="fx" style="margin-top:auto">${me.deck.length} left${S.drawResolve ? ' · TAP TO DRAW' : ''}</div>`;
+    if (S.drawResolve) dk.onclick = () => { const r = S.drawResolve; S.drawResolve = null; r(); };
+    piles.appendChild(dk);
+    const dc = document.createElement('div');
+    if (me.discard.length) { const top = cardEl(me.discard[me.discard.length - 1]); top.classList.add('dim'); top.title = 'Your discard · ' + me.discard.length; piles.appendChild(top); }
+  }
   const inv = $('meInvest'); inv.innerHTML = '';
   me.invest.forEach((a) => { const el = cardEl(a); const sc = A.find((x) => x.t === 'sell' && x.a === a && !x.pros); const sp = A.find((x) => x.t === 'sell' && x.a === a && x.pros);
     const items = []; if (sc) items.push([`Sell for ${a.cash} Liquidity`, () => resolveMain(sc)]); if (sp) items.push([`Sell for ${a.pros} Prosperity`, () => resolveMain(sp)]);
@@ -430,7 +443,7 @@ function render() {
     const cyc = A.find((x) => x.t === 'cycle'); if (mine && cyc) items.push(['Discard this, draw one', () => resolveMain({ t: 'cycle', c })]);
     if (items.length && mine) { el.classList.add('playable'); el.onclick = () => popMenu(items); } else el.classList.add('dim');
     mh.appendChild(el); });
-  $('turnNote').textContent = mine ? 'YOUR TURN · choose one main action:' : S.running ? (g.active && g.active !== me ? 'Turn over · ' + g.active.name + ' is playing…' : '') : '';
+  $('turnNote').textContent = S.drawResolve ? 'YOUR TURN · tap your deck to draw' : mine ? 'YOUR TURN · choose one main action:' : S.running ? (g.active && g.active !== me ? 'Turn over · ' + g.active.name + ' is playing…' : '') : '';
   $('giftBtn').disabled = !mine || me.liq < 2 || me.deeds >= 3 || me.deedThisTurn;
   $('giftBtn').onclick = () => popMenu(g.rivals(me).map((r) => [`Give 2 Liquidity to ${r.name}`, () => resolveMain({ t: 'gift', target: r })]));
   const hailAct = A.find((x) => x.t === 'hail');
