@@ -46,6 +46,12 @@ button:disabled{opacity:.4;cursor:default}
 .card.remedy{background:linear-gradient(170deg,#2f6b58,#1f4e3f);color:#eafff5;border-color:var(--teal)}
 .card.artifact{background:linear-gradient(170deg,#5e4a9e,#473579);color:#f3edff;border-color:var(--violet)}
 .card.coop,.card.lady{background:linear-gradient(170deg,#e8b84b,#d9a02e);color:#2a2040}
+.minihand{display:flex;gap:3px;margin-top:7px;flex-wrap:wrap}
+.miniback{width:1.9rem;height:2.7rem;border-radius:4px;background:linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 1px 3px #0007}
+.flycard{position:fixed;z-index:70;width:var(--cw);height:calc(var(--cw)*1.06);border-radius:.55em;background:linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 6px 18px #0009;pointer-events:none;transition:transform .42s cubic-bezier(.2,.7,.3,1),opacity .42s}
+.card.dealt{animation:dealIn .45s cubic-bezier(.2,.7,.3,1)}
+@keyframes dealIn{from{transform:translate(-18rem,-6rem) rotate(-7deg);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion: reduce){.flycard{transition:none}.card.dealt{animation:none}}
 .card.back{background:linear-gradient(170deg,#3d2f73,#2a1f52);color:#cfc3f2;border-color:var(--violet);align-items:center;justify-content:center;text-align:center}
 .card.back.drawable{cursor:pointer;outline:2px solid var(--gold);box-shadow:0 0 18px #e8b84b66;transform:translateY(-2px)}
 .card.playable{cursor:pointer;outline:2px solid transparent;transition:outline-color .15s,transform .15s}
@@ -118,7 +124,7 @@ class HumanPolicy {
   useHeart(g, p, c, by) { return ask(`${by.name} plays ${c.name} on you`, `Discard your SACRED HEART to cancel it?`, 'Cancel it', 'Take the hazard'); }
   useMarisol(g, p, c, by) { return ask(`${by.name} plays a Rug Pull on you`, 'Use LA DETECTIVE (once a game) to cancel it?', 'Cancel it', 'Take it'); }
   useGato(g, p) { announceTurn(g); return ask('Your Trader ability · EL GATO, once a game', `The cat can knock ${p.hazards[0].name} off your table right now, free, without using your action. Use it, or save it for a worse hazard later?`, 'Use it now', 'Save the cat for later'); }
-  async peekBottom(g, p, top) { announceTurn(g); const keep = await ask('EL UNICORNIO peeks at the card you are about to draw', `It is ${top.name} (${FX[top.key] || top.type}). Keep it and draw it now — or send it to the bottom of your deck and draw the next, unseen card instead.`, `Keep it — draw ${top.name}`, 'Send it to the bottom, draw blind'); return !keep; }
+  peekBottom() { return false; } // the Unicorn's foresight is shown beside the deck, never as a popup
 }
 const resolveMain = (a) => { const r = S.mainResolve; S.mainResolve = null; $('overlayHost').innerHTML = ''; render(); if (r) { toast(a && a.t === 'pass' ? 'You pass — your turn is over.' : 'That was your one main action — your turn is over.'); r(a); } };
 function ask(kind, q, yes, no) { return new Promise((res) => { const host = $('overlayHost');
@@ -150,9 +156,31 @@ $('deal').onclick = async () => {
   const g = new Game({ players, seed, verbose: true });
   S = { g, me: g.players[0], running: true, mainResolve: null };
   g.hooks = { render: async () => { render(); if (g.active !== S.me) await sleep(520); } };
-  $('board').hidden = false; $('hist').hidden = false; render();
+  $('board').hidden = false; $('hist').hidden = false; S.dealt = false; S.lastHandLen = g.players[0].hand.length; render();
+  await dealFlights(); S.dealt = true;
   const r = await g.run(); S.running = false; render(); bell(r);
 };
+async function dealFlights() {
+  const deckEl = document.querySelector('#mePiles .card.back'); if (!deckEl) return;
+  const from = deckEl.getBoundingClientRect();
+  const handEls = [...document.querySelectorAll('#meHand .card')];
+  const riv = [...document.querySelectorAll('.rivals .minihand')].map((m) => [...m.children]);
+  handEls.forEach((el) => { el.style.visibility = 'hidden'; });
+  riv.forEach((backs) => backs.forEach((el) => { el.style.visibility = 'hidden'; }));
+  const flights = [];
+  const maxN = Math.max(handEls.length, ...riv.map((b) => b.length), 0);
+  for (let i = 0; i < maxN; i++) { if (handEls[i]) flights.push(handEls[i]); riv.forEach((b) => { if (b[i]) flights.push(b[i]); }); }
+  for (const target of flights) {
+    const to = target.getBoundingClientRect(); const fly = document.createElement('div'); fly.className = 'flycard';
+    fly.style.left = from.left + 'px'; fly.style.top = from.top + 'px';
+    if (to.width < 60) { fly.style.width = to.width + 'px'; fly.style.height = to.height + 'px'; }
+    document.body.appendChild(fly); const dx = to.left - from.left, dy = to.top - from.top;
+    requestAnimationFrame(() => { fly.style.transform = `translate(${dx}px, ${dy}px) rotate(2deg)`; });
+    setTimeout(() => { fly.remove(); target.style.visibility = ''; }, 440);
+    await sleep(85);
+  }
+  await sleep(420);
+}
 function bell(r) { const host = $('overlayHost'); const rows = S.g.players.map((q) => `<div>${esc(q.name)} · ${esc(q.t.name)} — <b>${q.pros}</b> Prosperity, ${q.deeds} deed${q.deeds === 1 ? '' : 's'}${q.hailUsed ? ', Hail Mary spent' : ''}</div>`).join('');
   host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">the race is run · round ${r.turns}</div><div class="call">${r.winner === 'YOU' ? 'YOU WIN' : r.winner ? esc(r.winner) + ' WINS' : 'NO WINNER'}</div>${rows}<button class="primary" id="again">Deal again</button></div></div>`;
   host.querySelector('#again').onclick = () => { host.innerHTML = ''; $('deal').click(); };
@@ -168,6 +196,7 @@ function render() {
     d.innerHTML = `<div class="phead"><span class="who ${g.active === q && S.running ? 'active' : ''}">${esc(q.name)} · ${esc(q.t.name)}</span>
       <span class="stat">Liq <b>${q.liq}</b></span><span class="stat">Pros <b>${q.pros}</b></span><span class="stat">Hand <b>${q.hand.length}</b></span><span class="stat candles">${'🕯'.repeat(q.deeds)}</span><span class="stat">${q.hailUsed ? 'HM spent' : 'HM live'}</span></div>
       <div class="prosbar"><i style="width:${Math.min(100, q.pros / 10)}%"></i></div>
+      <div class="minihand">${'<span class="miniback"></span>'.repeat(Math.min(9, q.hand.length))}</div>
       <div style="margin-top:6px">${q.invest.map((a) => `<span class="chip">${esc(a.name)}</span>`).join(' ')} ${q.artifacts.map((a) => `<span class="chip">${esc(a.name)}</span>`).join(' ')} ${q.hazards.map((h) => `<span class="chip haz">${esc(h.name)}</span>`).join(' ')}</div>`;
     rv.appendChild(d);
   }
@@ -183,6 +212,13 @@ function render() {
     dk.innerHTML = `<div class="nm" style="margin-top:auto">RL80</div><div class="fx" style="margin-top:auto">${me.deck.length} left${S.drawResolve ? ' · TAP TO DRAW' : ''}</div>`;
     if (S.drawResolve) dk.onclick = () => { const r = S.drawResolve; S.drawResolve = null; r(); };
     piles.appendChild(dk);
+    if (me.t.key === 'unicornio' && g.abilityOn(me) && me.deck.length && S.running) {
+      const top = me.deck[0]; const pv = cardEl(top); pv.title = 'El Unicornio sees the top of your deck';
+      const wrap = document.createElement('div'); wrap.style.display = 'grid'; wrap.style.gap = '4px';
+      const lbl = document.createElement('div'); lbl.className = 'note'; lbl.textContent = 'The Unicorn sees your next draw:'; wrap.appendChild(lbl); wrap.appendChild(pv);
+      if (S.buriedTurn !== g.turnNo && S.drawResolve) { const b = document.createElement('button'); b.textContent = 'Bury it (free, once a turn)'; b.onclick = () => { S.buriedTurn = g.turnNo; me.deck.push(me.deck.shift()); g.log('YOU send the top card to the bottom'); render(); }; wrap.appendChild(b); }
+      piles.appendChild(wrap);
+    }
     const dc = document.createElement('div');
     if (me.discard.length) { const top = cardEl(me.discard[me.discard.length - 1]); top.classList.add('dim'); top.title = 'Your discard · ' + me.discard.length; piles.appendChild(top); }
   }
@@ -195,7 +231,8 @@ function render() {
   me.hazards.forEach((h) => { const el = cardEl(h); const pc = A.find((x) => x.t === 'payclear' && x.h === h);
     if (pc) { el.classList.add('playable'); el.onclick = () => popMenu([[`Pay 3 Liquidity to clear ${h.name}`, () => resolveMain(pc)]]); } hz.appendChild(el); });
   const mh = $('meHand'); mh.innerHTML = '';
-  me.hand.forEach((c) => { const el = cardEl(c); const mineActs = A.filter((x) => x.t === 'play' && x.c === c);
+  const grew = me.hand.length > (S.lastHandLen || 0); S.lastHandLen = me.hand.length;
+  me.hand.forEach((c, ix) => { const el = cardEl(c); if (grew && ix === me.hand.length - 1 && S.dealt) el.classList.add('dealt'); const mineActs = A.filter((x) => x.t === 'play' && x.c === c);
     const items = mineActs.map((x) => { let label = `Play (${g.costOf(me, c)} Liq)`;
       if (c.type === 'hazard') label = `Play on ${x.choice.target.name}`;
       if (c.type === 'remedy') label = `Clear ${x.choice.hazard.name} ${x.choice.target === me ? 'on you' : 'on ' + x.choice.target.name + (x.choice.hazard.by !== me.idx && me.deeds < 3 ? ' (a deed)' : '')}`;
