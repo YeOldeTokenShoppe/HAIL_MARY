@@ -201,6 +201,7 @@ For rules purposes, The Inheritance is a Progress card.
 | **Tax Collector** | 2 | The target pays 1 Liquidity to the bank at the start of each of their turns. |
 | **The Snake** | 3 | The serpent at the shrine: the target's candles count as zero for the Hail Mary. |
 | **El Naranja** | 3 | The Orange One takes his cut: whenever the target banks Prosperity, the hazard's owner collects 2 Liquidity. (Not the Hail Mary.) |
+| **El Alacrán** | 2 | The social engineer's sting: the target's hand is played face-up until cleared. Enigma Machine shields against it. |
 
 These hazards do not prevent a Hail Mary attempt or reduce its payout. Rug Pull still allows direct Progress cards.
 
@@ -244,9 +245,9 @@ Two starters replace the single shared deck, so the first playtests are archetyp
 St. GR80, El Monje, El Gato, La Estrella, The Pope (1 each) · Tech Stock ×1, The Moon ×1, Blue Chip ×1, La Moneda ×2, La Semilla ×1 · The Bull ×2, Rocket ×2, The Inheritance ×1 · La Corrida, The Airdrop, Honeymoon (1 each) · The Bear ×2, Rug Pull ×1 · The Bell ×2, Quantum Resistance ×2, The Keys ×2, Miracle Tortilla ×2 · Sacred Heart, The Halo, The Rosary Beads, X-Ray Glasses, The Grail (1 each) · La Ofrenda ×3, Raphael's Cherub ×1, The Rose ×1.
 
 **Degen** — hazards, gambles, compounding:
-H80Z, El Diablito, Eugene, El Unicornio, El Gato, The Prospector, La Abuela (1 each) · Shitcoin ×2, Tech Stock ×1, The Moon ×1, Blue Chip ×1, El Jardín ×1 · The Bull ×2, Rocket ×2, The Inheritance ×1 · Flash Crash, El Halving, La Ballena, La Rueda, The God Candle, The Skull, The Illuminati (1 each) · The Bear ×1, Quantum Hack ×1, Rug Pull ×1, La Sirena ×1, Tax Collector ×1, The Snake ×1, El Naranja ×1 · Miracle Tortilla ×1, The Keys ×1 · Sacred Heart, X-Ray Glasses, The Halo, Enigma Machine (1 each) · La Ofrenda ×2.
+H80Z, El Diablito, Eugene, El Unicornio, El Gato, The Prospector, La Abuela (1 each) · Shitcoin ×2, Tech Stock ×1, The Moon ×1, Blue Chip ×1, El Jardín ×1 · The Bull ×2, Rocket ×2, The Inheritance ×1 · Flash Crash, El Halving, La Ballena, La Rueda, The God Candle, The Skull, The Illuminati (1 each) · Quantum Hack ×1, Rug Pull ×1, La Sirena ×1, Tax Collector ×1, The Snake ×1, El Naranja ×1, El Alacrán ×1 · Miracle Tortilla ×1, The Keys ×1 · Sacred Heart, X-Ray Glasses, The Halo, Enigma Machine (1 each) · La Ofrenda ×2.
 
-The pool holds **53 distinct designs** (The World rides outside the starters as a collectible) (plus La Detective as a spec-only alternate). Including Our Lady, each player begins with 41 cards in total. The digital table lists every design with its recipe counts under **"All cards in this playtest"** at the bottom of the page.
+The pool holds **54 distinct designs** — the full lotería count (The World rides outside the starters as a collectible) (plus La Detective as a spec-only alternate). Including Our Lady, each player begins with 41 cards in total. The digital table lists every design with its recipe counts under **"All cards in this playtest"** at the bottom of the page.
 
 ## 12. Collectibility and presentation
 
