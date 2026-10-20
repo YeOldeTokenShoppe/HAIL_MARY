@@ -28,7 +28,7 @@ Players themselves are identical — nobody *is* a character. The Traders are ca
 | Resource | Purpose | Presentation |
 |---|---|---|
 | **Liquidity** | Spend on cards, investments, and assistance | Coins or banknotes in denominations of 1, 5, and 10 |
-| **Prosperity** | Progress toward the 1,000-point victory target | Banked cards and a visible total |
+| **Prosperity** | Progress toward the 1,000-point victory target | Banked cards and a visible total (the digital table labels the counter **Banked**) |
 | **Candles** | Offerings to Our Lady that improve your Hail Mary probability | Up to three illuminated candles at the shrine |
 
 Money comes from a shared bank. Bank supply is unlimited in the digital game.
