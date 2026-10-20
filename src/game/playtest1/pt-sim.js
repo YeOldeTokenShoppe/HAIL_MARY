@@ -137,6 +137,12 @@ export class Game {
   }
   gift(p, t) { if (p.liq < 2) return false; p.liq -= 2; t.liq += 2; p.stats.gifts++; this.earnDeed(p, `2 Liquidity to ${t.name}`); this.log(`${p.name} gives ${t.name} 2 Liquidity`); return true; }
   payClear(p, h) { if (!this.spend(p, 3)) return false; this.clearHazard(p, h, p, `${p.name} pays 3`); return true; }
+  peek(p, t) {
+    if (!p.artifacts.some((a) => a.key === 'xray') || p.peekedThisTurn || !t.hand.length) return null;
+    p.peekedThisTurn = true; const c = t.hand[Math.floor(this.rng() * t.hand.length)];
+    this.log(`${p.name} peeks through the X-Ray Glasses at ${t.name}'s hand`);
+    return c;
+  }
   hailMary(p) {
     p.hailUsed = true; p.stats.hail++; const twelfths = ODDS[Math.min(3, p.deeds)];
     const roll = 1 + Math.floor(this.rng() * 12); const ok = roll <= twelfths;
@@ -174,7 +180,7 @@ export class Game {
     }
   }
   async turn(p) {
-    p.deedThisTurn = false; p.stats.turns++; if (p.hazards.length) p.stats.hazTurns++;
+    p.deedThisTurn = false; p.peekedThisTurn = false; p.stats.turns++; if (p.hazards.length) p.stats.hazTurns++;
     p.liq += 2;
     if (this.is(p, 'unicornio')) { p.liq += 1; this.log(`${p.name} collects 1 extra (El Unicornio)`); }
     if (p.policy.beforeDraw) await p.policy.beforeDraw(this, p);

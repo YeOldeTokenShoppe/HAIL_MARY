@@ -116,7 +116,7 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const FX = { unicornio: 'At the start of your turn, collect 1 extra Liquidity', gato: 'When seated: knock one hazard off your table, free', monje: 'When you earn a deed, collect 1 Liquidity', diablito: 'When a hazard you play lands, collect 1 Liquidity', celebridad: 'Pay 1 when banking from a card: +25 Prosperity', tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell later: 4 Liquidity or 75 Prosperity', moon: 'Sell later: 7 Liquidity or 150 Prosperity', bull: 'Bank 100 Prosperity', rocket: 'Bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', bell: 'Clears The Bear', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one hazard', heart: 'Discard to cancel a hazard just played on you', halo: 'Any Trader seated at your desk cannot be disabled', xray: 'Once a turn, peek at a random rival card', rosary: 'Draw a card when you earn a deed', rose: 'Give a rival 2 Liquidity: a deed, then draw one', fountain: 'You and a rival each draw one: a deed' };
+const FX = { unicornio: 'At the start of your turn, collect 1 extra Liquidity', gato: 'When seated: knock one hazard off your table, free', monje: 'When you earn a deed, collect 1 Liquidity', diablito: 'When a hazard you play lands, collect 1 Liquidity', celebridad: 'Pay 1 when banking from a card: +25 Prosperity', tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell later: 4 Liquidity or 75 Prosperity', moon: 'Sell later: 7 Liquidity or 150 Prosperity', bull: 'Bank 100 Prosperity', rocket: 'Bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', bell: 'Clears The Bear', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one hazard', heart: 'Discard to cancel a hazard just played on you', halo: 'Any Trader seated at your desk cannot be disabled', xray: 'Once a turn, tap to peek at a random rival card — free', rosary: 'Draw a card when you earn a deed', rose: 'Give a rival 2 Liquidity: a deed, then draw one', fountain: 'You and a rival each draw one: a deed' };
 
 let S = null;
 const toast = (t) => { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2800); };
@@ -203,6 +203,11 @@ function bell(r) { const host = $('overlayHost'); const rows = S.g.players.map((
   host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">the race is run · round ${r.turns}</div><div class="call">${r.winner === 'YOU' ? 'YOU WIN' : r.winner ? esc(r.winner) + ' WINS' : 'NO WINNER'}</div>${rows}<button class="primary" id="again">Deal again</button></div></div>`;
   host.querySelector('#again').onclick = () => { host.innerHTML = ''; $('deal').click(); };
 }
+function showPeek(r) { const c = S.g.peek(S.me, r); if (!c) return; const host = $('overlayHost');
+  host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">x-ray glasses · a random card from ${esc(r.name)}&#39;s hand</div><div class="cards" id="peekRow"></div><div class="note">It stays in their hand. Your main action is still yours.</div><button class="primary" id="peekOk">Got it</button></div></div>`;
+  host.querySelector('#peekRow').appendChild(cardEl(c));
+  host.querySelector('#peekOk').onclick = () => { host.innerHTML = ''; render(); };
+}
 function acts() { return S.mainResolve ? S.g.legalActions(S.me) : []; }
 function render() {
   if (!S) return; const g = S.g, me = S.me; const mine = !!S.mainResolve; const A = acts();
@@ -241,7 +246,12 @@ function render() {
   me.invest.forEach((a) => { const el = cardEl(a); const sc = A.find((x) => x.t === 'sell' && x.a === a && !x.pros); const sp = A.find((x) => x.t === 'sell' && x.a === a && x.pros);
     const items = []; if (sc) items.push([`Sell for ${a.cash} Liquidity`, () => resolveMain(sc)]); if (sp) items.push([`Sell for ${a.pros} Prosperity`, () => resolveMain(sp)]);
     if (items.length) { el.classList.add('playable'); el.onclick = () => popMenu(items.reverse()); } else el.classList.add('dim'); inv.appendChild(el); });
-  const ar = $('meArts'); ar.innerHTML = ''; me.artifacts.forEach((a) => ar.appendChild(cardEl(a)));
+  const ar = $('meArts'); ar.innerHTML = '';
+  me.artifacts.forEach((a) => { const el = cardEl(a);
+    if (a.key === 'xray' && mine && !me.peekedThisTurn) { const targets = g.rivals(me).filter((r) => r.hand.length);
+      if (targets.length) { el.classList.add('playable'); el.title = 'Tap to peek — free, once a turn';
+        el.onclick = () => popMenu(targets.map((r) => [`Peek at ${r.name}'s hand — free`, () => showPeek(r)])); } }
+    ar.appendChild(el); });
   const hz = $('meHazards'); hz.innerHTML = '';
   me.hazards.forEach((h) => { const el = cardEl(h); const pc = A.find((x) => x.t === 'payclear' && x.h === h);
     if (pc) { el.classList.add('playable'); el.onclick = () => popMenu([[`Pay 3 Liquidity to clear ${h.name}`, () => resolveMain(pc)]]); } hz.appendChild(el); });
