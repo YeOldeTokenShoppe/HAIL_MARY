@@ -14,13 +14,12 @@ Banked Prosperity cannot be spent, stolen, or lost. Liquidity and investments re
 
 ## 2. What each player brings
 
-- A **40-card deck**.
-- **One starting Trader**, placed face-up outside the deck.
-- **Our Lady of Perpetual Profit**, the universal Hail Mary card, also outside the deck.
+- A **40-card deck**, which includes Trader cards.
+- **Our Lady of Perpetual Profit**, the universal Hail Mary card, outside the deck.
 
 Decks may contain **up to three copies of the same card**, regardless of artwork or finish.
 
-Each Trader has one modest ability. For this prototype, Traders have no health, attacks, switching, or supporting roster.
+Players themselves are identical — nobody *is* a character. The Traders are cards in the deck, in the lotería spirit: the cast is something you draw, not something you pick. Each Trader has one modest ability. For this prototype, Traders have no health, attacks, or supporting roster.
 
 **Credibility is reserved for a later test.** The first version uses Liquidity, Prosperity, and Good Deeds.
 
@@ -54,8 +53,9 @@ Your main action can be:
 - Help a rival.
 - Pay to clear one of your hazards.
 - Attempt your Hail Mary.
-- Discard one card to draw one replacement.
 - Pass.
+
+The rhythm of a turn is simple: **every player draws a card, then plays a card.**
 
 Trader abilities and Artifact reactions follow their own timing and do not consume your main action unless stated.
 
@@ -126,37 +126,47 @@ Either result consumes the attempt. Flip Our Lady’s card to show it has been u
 
 The digital interface displays the exact probability before the player commits. All collectible editions have identical odds.
 
-## 9. Starting Trader choices
+## 9. Traders are cards
 
-Choose one. These are outside the 40-card deck.
+Traders are a card type inside the deck — you hire them by drawing and playing them, like everything else.
 
-| Trader | Prototype ability |
-|---|---|
-| **El Unicornio** | Once per turn, you may discard one card and draw a replacement without using your main action. |
-| **La Detective — Marisol** | Once per game, cancel a Rug Pull just played on you. The attacker still spends the card, cost, and action. |
-| **El Monje** | When you earn a deed, collect 1 Liquidity. |
-| **El Diablito — Connor** | When a hazard you play successfully enters a rival’s hazard area, collect 1 Liquidity. |
-| **El Gato** | Once per game, at the start of your main action, discard one hazard affecting you for free. |
-| **La Abuela** | Remedies you play cost 1 less Liquidity, minimum zero. |
-| **La Celebridad** | When you bank Prosperity from an Asset or Progress card, you may pay 1 Liquidity to add 25 Prosperity. |
+- Playing a Trader is your **main action**. Pay its cost and place it in your Trader seat.
+- You can have **one active Trader** at a time. Playing a new one sends the old one to your discard pile.
+- A Trader's ability is passive while it is seated.
+- **Quantum Hack** disables your seated Trader's ability until cleared. The hazard stays in place even if you hire a new Trader. **The Halo** protects your Trader from being disabled.
+- Traders are not Assets: they cannot be sold.
 
-The Celebrity’s bonus does not apply to the Hail Mary.
+| Trader | Cost | Prototype ability |
+|---|---:|---|
+| **El Unicornio** | 3 | At the start of your turn, collect **1 extra Liquidity**. |
+| **El Gato** | 2 | When El Gato is seated, immediately discard **one hazard** affecting you, free. |
+| **El Monje** | 1 | When you earn a deed, collect 1 Liquidity. |
+| **El Diablito — Connor** | 2 | When a hazard you play successfully enters a rival's hazard area, collect 1 Liquidity. |
+| **La Celebridad** | 3 | When you bank Prosperity from an Asset or Progress card, you may pay 1 Liquidity to add 25 Prosperity. |
+
+The Celebrity's bonus does not apply to the Hail Mary.
+
+Two more designs are reserved as collectible alternates outside the starter: **La Abuela** (your Remedies cost 1 less, minimum zero) and **La Detective — Marisol** (Rug Pulls cannot be played on you).
 
 ## 10. Sample 40-card starter deck
 
-This is one shared starter recipe for testing different Traders. The category quantities are not permanent deck-building requirements.
+This is one shared starter recipe. The category quantities are not permanent deck-building requirements.
 
 All costs below are paid in Liquidity when the card is played.
 
-### Assets and progress — 18 cards
+### Traders — 5 cards
+
+One copy each of **El Unicornio**, **El Gato**, **El Monje**, **El Diablito**, and **La Celebridad** (see section 9).
+
+### Assets and progress — 13 cards
 
 | Card | Copies | Cost | Effect |
 |---|---:|---:|---|
-| **Tech Stock** | 3 | 3 | Asset. Later sell for **5 Liquidity** or **100 Prosperity**. |
-| **Meme Coin** | 3 | 2 | Asset. Later sell for **4 Liquidity** or **75 Prosperity**. |
-| **The Moon** | 3 | 4 | Asset. Later sell for **7 Liquidity** or **150 Prosperity**. |
-| **The Bull** | 3 | 2 | Progress. Bank **100 Prosperity**. |
-| **Rocket** | 3 | 4 | Progress. Bank **200 Prosperity**. |
+| **Tech Stock** | 2 | 3 | Asset. Later sell for **5 Liquidity** or **100 Prosperity**. |
+| **Meme Coin** | 2 | 2 | Asset. Later sell for **4 Liquidity** or **75 Prosperity**. |
+| **The Moon** | 2 | 4 | Asset. Later sell for **7 Liquidity** or **150 Prosperity**. |
+| **The Bull** | 2 | 2 | Progress. Bank **100 Prosperity**. |
+| **Rocket** | 2 | 4 | Progress. Bank **200 Prosperity**. |
 | **The Inheritance** | 3 | 0 | Choose **3 Liquidity** or **50 Prosperity**. Discard after taking cash; bank after taking Prosperity. |
 
 For rules purposes, The Inheritance is a Progress card.
@@ -202,9 +212,9 @@ A canceled hazard is discarded. Its player does not recover the cost or action.
 
 Discard these cards after resolving. You must have the required money to play The Rose.
 
-**Deck total: 18 + 6 + 8 + 4 + 4 = 40 cards.**
+**Deck total: 5 + 13 + 6 + 8 + 4 + 4 = 40 cards.**
 
-This starter uses **19 distinct designs**. Including the chosen Trader and Our Lady, each player begins with **42 cards in total**.
+This starter uses **24 distinct designs**. Including Our Lady, each player begins with **41 cards in total**.
 
 ## 11. Collectibility and presentation
 
@@ -230,8 +240,8 @@ Watch for:
 - Whether investing for cash is worth delaying Prosperity.
 - Whether players voluntarily help rivals.
 - Whether hazards create decisions without causing long stalls.
-- Whether Traders change choices without dominating results.
+- Whether hiring a Trader is worth a main action, and whether replacing one ever happens.
 - Whether the Hail Mary feels exciting at both low and high deed counts.
 - Whether the 40-card deck produces enough variety before someone wins.
 
-Start with identical decks and different Traders. Test customized decks after the basic economy and turn structure feel good.
+Start with identical decks. Test customized decks after the basic economy and turn structure feel good.
