@@ -14,19 +14,19 @@
   --felt:#1b1430; --felt2:#241a40; --line:#4a3d6e; --ink:#efe6d0; --muted:#a899c9;
   --paper:#f3e9d2; --paper-ink:#2a2040; --gold:#e8b84b; --rose:#e4567b; --teal:#4fc3a1; --violet:#8d7bd8;
   --display:'Alfa Slab One','Arial Black',serif; --body:'Spectral',Georgia,serif;
-  --cw: clamp(6.6rem, 5.6rem + 3vw, 8.8rem);
+  --cw: clamp(7.8rem, 6.2rem + 3.8vw, 11rem);
   color-scheme: dark;
 }
-body{background:var(--felt);color:var(--ink);font-family:var(--body);margin:0;font-size:clamp(0.95rem,0.85rem + 0.3vw,1.08rem);
+body{background:var(--felt);color:var(--ink);font-family:var(--body);margin:0;font-size:clamp(1.03rem,0.9rem + 0.45vw,1.25rem);
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px}
-.bar,.board,details.history{max-width:80rem;margin-inline:auto}
-h1{font-family:var(--display);font-weight:400;color:var(--gold);font-size:1.3rem;margin:0}
+.bar,.board,details.history{max-width:92rem;margin-inline:auto}
+h1{font-family:var(--display);font-weight:400;color:var(--gold);font-size:1.45rem;margin:0}
 .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
 .bar select,.bar input{background:var(--felt2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-family:var(--body)}
 button{background:var(--felt2);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:7px 14px;font-family:var(--body);font-size:.95rem;cursor:pointer}
 button.primary{background:var(--gold);color:#2a2040;border-color:var(--gold);font-weight:600}
 button:disabled{opacity:.4;cursor:default}
-.note{color:var(--muted);font-size:.85rem}
+.note{color:var(--muted);font-size:.92rem}
 .board{display:grid;gap:1rem}
 .rivals{display:grid;gap:0.8rem;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr))}
 .panel{border:1px solid var(--line);border-radius:0.8rem;padding:0.9rem;background:var(--felt2);min-width:0}
@@ -34,19 +34,19 @@ button:disabled{opacity:.4;cursor:default}
 .phead{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline}
 .phead .who{font-family:var(--display);font-size:.95rem}
 .phead .who.active{color:var(--gold)}
-.stat{font-size:.88rem;color:var(--muted)}.stat b{color:var(--ink);font-variant-numeric:tabular-nums}
+.stat{font-size:.98rem;color:var(--muted)}.stat b{color:var(--ink);font-variant-numeric:tabular-nums}
 .prosbar{height:0.55rem;border-radius:0.3rem;background:#0006;margin-top:6px;overflow:hidden}
 .prosbar i{display:block;height:100%;background:linear-gradient(90deg,var(--teal),var(--gold))}
 .candles{letter-spacing:.15em;color:var(--gold)}
-.rowlabel{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:10px 0 6px}
+.rowlabel{font-size:.76rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:10px 0 6px}
 .cards{display:flex;flex-wrap:wrap;gap:0.6rem;min-height:1.6rem;min-width:0}
 .chip{font-size:.72rem;border:1px solid var(--line);border-radius:4px;padding:2px 7px;color:var(--muted)}
 .chip.haz{border-color:var(--rose);color:var(--rose)}
 .card{width:var(--cw);min-height:calc(var(--cw)*1.06);border-radius:.55em;padding:.6em;display:flex;flex-direction:column;gap:4px;position:relative;
   background:var(--paper);color:var(--paper-ink);border:1px solid #0006;box-shadow:0 2px 6px #0007}
-.card .nm{font-family:var(--display);font-size:.8em;line-height:1.15;padding-right:.2em;text-wrap:balance;overflow-wrap:anywhere}
-.card .ty{font-size:.66em;letter-spacing:.1em;text-transform:uppercase;opacity:.65}
-.card .fx{font-size:.7em;line-height:1.25;margin-top:auto;opacity:.9}
+.card .nm{font-family:var(--display);font-size:.85em;line-height:1.15;padding-right:.2em;text-wrap:balance;overflow-wrap:anywhere}
+.card .ty{font-size:.7em;letter-spacing:.1em;text-transform:uppercase;opacity:.65}
+.card .fx{font-size:.77em;line-height:1.25;margin-top:auto;opacity:.9}
 .card .chips{display:flex;gap:.35em;font-size:.72em;font-weight:600;flex-wrap:wrap}
 .card .chips span{background:#2a204014;border-radius:4px;padding:1px 5px}
 .card.hazard{background:linear-gradient(170deg,#6e3050,#542343);color:#ffe9f0;border-color:var(--rose)}
@@ -57,7 +57,7 @@ button:disabled{opacity:.4;cursor:default}
 .card.slot{background:transparent;border:1.5px dashed var(--line);color:var(--muted);box-shadow:none;align-items:center;justify-content:center;text-align:center}
 .chip.trader{border-color:#e09a5d;color:#e8a96b}
 .card.event{background:linear-gradient(170deg,#2e5f8a,#1d3f61);color:#e8f4ff;border-color:#64a7d8}
-.ticker{max-width:80rem;margin:0 auto 12px;display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:6px;padding:6px 10px;overflow:hidden;white-space:nowrap;background:var(--felt2)}
+.ticker{max-width:92rem;margin:0 auto 12px;display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:6px;padding:6px 10px;overflow:hidden;white-space:nowrap;background:var(--felt2)}
 .ticker .tlabel{font-family:var(--display);font-size:.7rem;color:var(--gold);letter-spacing:.12em;flex-shrink:0}
 #tickText{font-size:.82rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
 #tickText.fresh{animation:tickIn .4s ease}
@@ -78,7 +78,7 @@ button:disabled{opacity:.4;cursor:default}
 .bankchip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-size:.78rem;color:var(--muted);letter-spacing:.08em}
 .flycoin{position:fixed;z-index:68;width:.85rem;height:.85rem;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f7dc8f,#c9941f 70%);border:1px solid #8a6210;pointer-events:none;transition:transform .52s cubic-bezier(.2,.7,.3,1),opacity .2s}
 .minihand{display:flex;gap:3px;margin-top:7px;flex-wrap:wrap}
-.miniback{width:1.9rem;height:2.7rem;border-radius:4px;background:linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 1px 3px #0007}
+.miniback{width:2.1rem;height:3rem;border-radius:4px;background:linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 1px 3px #0007}
 .flycard{position:fixed;z-index:70;width:var(--cw);height:calc(var(--cw)*1.06);border-radius:.55em;background:linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 6px 18px #0009;pointer-events:none;transition:transform .42s cubic-bezier(.2,.7,.3,1),opacity .42s}
 .card.dealt{animation:dealIn .45s cubic-bezier(.2,.7,.3,1)}
 @keyframes dealIn{from{transform:translate(-18rem,-6rem) rotate(-7deg);opacity:0}to{transform:none;opacity:1}}
@@ -94,7 +94,7 @@ button:disabled{opacity:.4;cursor:default}
 .box .call{font-family:var(--display);font-size:1.7rem;color:var(--gold);text-wrap:balance}
 .box .kind{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
-.log{font-size:.8rem;max-height:220px;overflow:auto;display:grid;gap:2px;margin-top:8px;color:var(--muted)}
+.log{font-size:.88rem;max-height:220px;overflow:auto;display:grid;gap:2px;margin-top:8px;color:var(--muted)}
 .playbanner{position:fixed;top:calc(4.6rem + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%) translateY(-8px);z-index:55;display:flex;gap:14px;align-items:center;background:var(--felt2);border:1px solid var(--gold);border-radius:12px;padding:10px 16px;box-shadow:0 10px 32px #000b;pointer-events:none;opacity:0;transition:opacity .18s,transform .18s;max-width:min(40rem,calc(100vw - 32px))}
 .playbanner.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .playbanner .card{width:calc(var(--cw)*0.8);min-height:calc(var(--cw)*0.85)}
