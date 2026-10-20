@@ -71,12 +71,18 @@ button:disabled{opacity:.4;cursor:default}
 #gallery .cards{margin-bottom:12px}
 #gallery .card{cursor:default}
 .copychips{font-size:.68rem;color:var(--muted);margin-top:4px;max-width:var(--cw)}
+.coinrow{display:inline-flex;gap:2px;align-items:center;vertical-align:middle}
+.coin{width:.8rem;height:.8rem;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f7dc8f,#c9941f 70%);border:1px solid #8a6210;display:inline-block;box-shadow:0 1px 2px #0007}
+.coin.five{width:1.05rem;height:1.05rem;background:radial-gradient(circle at 35% 30%,#ffeab0,#d9a02e 70%);position:relative}
+.coin.five::after{content:'5';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.55rem;font-weight:700;color:#6b4a0c}
+.bankchip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-size:.78rem;color:var(--muted);letter-spacing:.08em}
+.flycoin{position:fixed;z-index:68;width:.85rem;height:.85rem;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f7dc8f,#c9941f 70%);border:1px solid #8a6210;pointer-events:none;transition:transform .52s cubic-bezier(.2,.7,.3,1),opacity .2s}
 .minihand{display:flex;gap:3px;margin-top:7px;flex-wrap:wrap}
 .miniback{width:1.9rem;height:2.7rem;border-radius:4px;background:linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 1px 3px #0007}
 .flycard{position:fixed;z-index:70;width:var(--cw);height:calc(var(--cw)*1.06);border-radius:.55em;background:linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 6px 18px #0009;pointer-events:none;transition:transform .42s cubic-bezier(.2,.7,.3,1),opacity .42s}
 .card.dealt{animation:dealIn .45s cubic-bezier(.2,.7,.3,1)}
 @keyframes dealIn{from{transform:translate(-18rem,-6rem) rotate(-7deg);opacity:0}to{transform:none;opacity:1}}
-@media (prefers-reduced-motion: reduce){.flycard{transition:none}.card.dealt{animation:none}}
+@media (prefers-reduced-motion: reduce){.flycard,.flycoin,.flyface{transition:none}.card.dealt{animation:none}}
 .card.back{background:linear-gradient(170deg,#3d2f73,#2a1f52);color:#cfc3f2;border-color:var(--violet);align-items:center;justify-content:center;text-align:center}
 .card.back.drawable{cursor:pointer;outline:2px solid var(--gold);box-shadow:0 0 18px #e8b84b66;transform:translateY(-2px)}
 .card.playable{cursor:pointer;outline:2px solid transparent;transition:outline-color .15s,transform .15s}
@@ -106,13 +112,14 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
   <label class="note">Seed <input id="seed" type="number" value="7" min="1" style="width:66px"></label>
   <label class="note"><input type="checkbox" id="slowMode"> Tap-to-continue</label>
   <button class="primary" id="deal">Deal</button>
+  <span class="bankchip" id="bank"><span class="coin five"></span> LA BANCA</span>
   <span class="note" id="status">Press Deal. First to bank 1,000 Prosperity wins. All cards are listed at the bottom of the page.</span>
 </div>
 <div class="ticker" id="ticker" hidden><span class="tlabel">RL80 NEWS</span><span id="tickText"></span></div>
 <div class="board" id="board" hidden>
   <section class="rivals" id="rivals"></section>
   <section class="panel me">
-    <div class="phead"><span class="who" id="meWho">YOU</span><span class="stat">Liquidity <b id="meLiq">0</b></span><span class="stat">Prosperity <b id="mePros">0</b> / 1000</span><span class="stat">Candles <b class="candles" id="meDeeds"></b></span><span class="stat" id="meHail"></span><span class="stat" id="meHaz"></span></div>
+    <div class="phead"><span class="who" id="meWho">YOU</span><span class="stat">Liquidity <b id="meLiq">0</b> <span class="coinrow" id="meCoins"></span></span><span class="stat">Prosperity <b id="mePros">0</b> / 1000</span><span class="stat">Candles <b class="candles" id="meDeeds"></b></span><span class="stat" id="meHail"></span><span class="stat" id="meHaz"></span></div>
     <div class="prosbar"><i id="meBar" style="width:0%"></i></div>
     <div class="rowlabel">Your investments · tap to sell (not the turn they arrive)</div><div class="cards" id="meInvest"></div>
     <div style="display:flex;gap:1.2rem;flex-wrap:wrap">
@@ -528,6 +535,23 @@ async function dealFlights() {
   }
   await sleep(420);
 }
+function coinHTML(n) {
+  const fives = Math.min(5, Math.floor(n / 5)), ones = Math.min(4, n % 5);
+  return '<span class="coin five"></span>'.repeat(fives) + '<span class="coin"></span>'.repeat(ones) + (n > 29 ? '…' : '');
+}
+function flyCoins(fromEl, toEl, n) {
+  if (!fromEl || !toEl) return;
+  const f = fromEl.getBoundingClientRect(), t = toEl.getBoundingClientRect();
+  const count = Math.min(6, Math.max(1, n));
+  for (let i = 0; i < count; i++) setTimeout(() => {
+    const c = document.createElement('div'); c.className = 'flycoin';
+    c.style.left = (f.left + f.width / 2) + 'px'; c.style.top = (f.top + f.height / 2) + 'px';
+    document.body.appendChild(c);
+    const dx = t.left + t.width / 2 - (f.left + f.width / 2) + (Math.random() * 16 - 8), dy = t.top + t.height / 2 - (f.top + f.height / 2) + (Math.random() * 10 - 5);
+    requestAnimationFrame(() => { c.style.transform = `translate(${dx}px, ${dy}px)`; });
+    setTimeout(() => { c.style.opacity = '0'; setTimeout(() => c.remove(), 220); }, 540);
+  }, i * 70);
+}
 const panelOf = (q) => q === S.me ? document.querySelector('.panel.me') : document.querySelector(`.rivals .panel[data-pidx="${q.idx}"]`);
 async function flyFace(c, fromEl, toEl) {
   if (!fromEl || !toEl) return;
@@ -593,7 +617,7 @@ function render() {
     const d = document.createElement('section'); d.className = 'panel'; d.dataset.pidx = q.idx;
     if (g.active === q && S.running) d.classList.add('hot');
     d.innerHTML = `<div class="phead"><span class="who ${g.active === q && S.running ? 'active' : ''}">${esc(q.name)}</span><span class="stat">${esc(cap(q.recipe))}</span>
-      <span class="stat">Liq <b>${q.liq}</b></span><span class="stat">Pros <b>${q.pros}</b></span><span class="stat">Hand <b>${q.hand.length}</b></span><span class="stat candles">${'🕯'.repeat(q.deeds)}</span><span class="stat">${q.hailUsed ? 'HM spent' : 'HM live'}</span></div>
+      <span class="stat">Liq <b>${q.liq}</b> <span class="coinrow">${coinHTML(q.liq)}</span></span><span class="stat">Pros <b>${q.pros}</b></span><span class="stat">Hand <b>${q.hand.length}</b></span><span class="stat candles">${'🕯'.repeat(q.deeds)}</span><span class="stat">${q.hailUsed ? 'HM spent' : 'HM live'}</span></div>
       <div class="prosbar"><i style="width:${Math.min(100, q.pros / 10)}%"></i></div>
       <div class="minihand">${'<span class="miniback"></span>'.repeat(Math.min(9, q.hand.length))}</div>
       ${q.lastLine ? `<div class="note" style="margin-top:6px">Last turn: ${esc(q.lastLine)}</div>` : ''}
@@ -602,7 +626,7 @@ function render() {
   }
   // me
   $('meWho').textContent = 'YOU · ' + cap(me.recipe); $('meWho').classList.toggle('active', mine && S.running);
-  $('meLiq').textContent = me.liq; $('mePros').textContent = me.pros; $('meBar').style.width = Math.min(100, me.pros / 10) + '%';
+  $('meLiq').textContent = me.liq; $('meCoins').innerHTML = coinHTML(me.liq); $('mePros').textContent = me.pros; $('meBar').style.width = Math.min(100, me.pros / 10) + '%';
   $('meDeeds').textContent = '🕯'.repeat(me.deeds) || '—';
   const tw = g.odds(me); $('meHail').textContent = me.hailUsed ? 'Hail Mary: spent' : `Hail Mary: ${tw}/12 to bank 200`;
   $('meHaz').textContent = me.trader && !g.abilityOn(me) ? 'TRADER HACKED' : '';
@@ -649,6 +673,16 @@ function render() {
   $('passBtn').disabled = !mine; $('passBtn').onclick = () => resolveMain({ t: 'pass' });
   $('feed').innerHTML = g.lines.slice(-3).map((l) => `<div>${esc(l)}</div>`).join('');
   $('log').innerHTML = g.lines.map((l) => `<div>${esc(l)}</div>`).join(''); $('log').scrollTop = $('log').scrollHeight;
+  // money is visible: coins fly between LA BANCA and whoever gained or spent
+  if (!S.coinLiq) S.coinLiq = {};
+  for (const q of g.players) {
+    const prev = S.coinLiq[q.idx];
+    if (S.dealt && S.running && prev != null && prev !== q.liq) {
+      const el = q === me ? $('meCoins') : (panelOf(q) && panelOf(q).querySelector('.coinrow'));
+      if (q.liq > prev) flyCoins($('bank'), el, q.liq - prev); else flyCoins(el, $('bank'), prev - q.liq);
+    }
+    S.coinLiq[q.idx] = q.liq;
+  }
 }
 // ── the card gallery: every design, with its copies per starter recipe ──
 function buildGallery() {
