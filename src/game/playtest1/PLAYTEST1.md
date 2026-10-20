@@ -6,7 +6,7 @@ Players build their decks before the game. During play, they use Liquidity to fu
 
 ## 1. Players and objective
 
-Start with **3–4 players**.
+Start with **2–4 players**. The digital table defaults to a 2-player game for quick testing.
 
 The first player to bank **1,000 Prosperity or more** wins immediately.
 
