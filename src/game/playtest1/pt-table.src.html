@@ -49,6 +49,21 @@ button:disabled{opacity:.4;cursor:default}
 .card.trader{background:linear-gradient(170deg,#b3622f,#8a4520);color:#ffeede;border-color:#e09a5d}
 .card.slot{background:transparent;border:1.5px dashed var(--line);color:var(--muted);box-shadow:none;align-items:center;justify-content:center;text-align:center}
 .chip.trader{border-color:#e09a5d;color:#e8a96b}
+.card.event{background:linear-gradient(170deg,#2e5f8a,#1d3f61);color:#e8f4ff;border-color:#64a7d8}
+.ticker{max-width:80rem;margin:0 auto 12px;display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:6px;padding:6px 10px;overflow:hidden;white-space:nowrap;background:var(--felt2)}
+.ticker .tlabel{font-family:var(--display);font-size:.7rem;color:var(--gold);letter-spacing:.12em;flex-shrink:0}
+#tickText{font-size:.82rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+#tickText.fresh{animation:tickIn .4s ease}
+@keyframes tickIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.titlecard{position:fixed;inset:0;z-index:65;display:flex;align-items:center;justify-content:center;pointer-events:none;background:#0a061866;opacity:0;transition:opacity .2s}
+.titlecard.show{opacity:1}
+.titlecard .tc{font-family:var(--display);font-size:clamp(1.6rem,4vw,2.6rem);color:var(--gold);text-shadow:0 4px 24px #000}
+.playbanner.event{border-color:#64a7d8;box-shadow:0 10px 32px #000b,0 0 24px #64a7d855}
+.playbanner.wait{pointer-events:auto}
+.flyface{position:fixed;z-index:72;pointer-events:none;transition:transform .6s cubic-bezier(.2,.7,.3,1),opacity .2s}
+#gallery .cards{margin-bottom:12px}
+#gallery .card{cursor:default}
+.copychips{font-size:.68rem;color:var(--muted);margin-top:4px;max-width:var(--cw)}
 .minihand{display:flex;gap:3px;margin-top:7px;flex-wrap:wrap}
 .miniback{width:1.9rem;height:2.7rem;border-radius:4px;background:linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 1px 3px #0007}
 .flycard{position:fixed;z-index:70;width:var(--cw);height:calc(var(--cw)*1.06);border-radius:.55em;background:linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 6px 18px #0009;pointer-events:none;transition:transform .42s cubic-bezier(.2,.7,.3,1),opacity .42s}
@@ -79,11 +94,14 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 
 <div class="bar">
   <h1>R-CANA · FIRST PLAYTEST</h1>
+  <select id="meDeck"><option value="devotion" selected>Your deck: Devotion</option><option value="degen">Your deck: Degen</option></select>
   <select id="nBots"><option value="1" selected>1 rival</option><option value="2">2 rivals</option><option value="3">3 rivals</option></select>
   <label class="note">Seed <input id="seed" type="number" value="7" min="1" style="width:66px"></label>
+  <label class="note"><input type="checkbox" id="slowMode"> Tap-to-continue</label>
   <button class="primary" id="deal">Deal</button>
-  <span class="note" id="status">Press Deal. First to bank 1,000 Prosperity wins. Traders are cards — draw one, hire one.</span>
+  <span class="note" id="status">Press Deal. First to bank 1,000 Prosperity wins. All cards are listed at the bottom of the page.</span>
 </div>
+<div class="ticker" id="ticker" hidden><span class="tlabel">RL80 NEWS</span><span id="tickText"></span></div>
 <div class="board" id="board" hidden>
   <section class="rivals" id="rivals"></section>
   <section class="panel me">
@@ -108,6 +126,7 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
   </section>
 </div>
 <details class="history" id="hist" hidden><summary>Table history</summary><div class="log" id="log"></div></details>
+<details class="history" id="galleryD"><summary>All cards in this playtest</summary><div id="gallery"></div></details>
 <div id="overlayHost"></div><div class="toast" id="toast"></div>
 
 <script type="module">
@@ -116,10 +135,15 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const FX = { unicornio: 'At the start of your turn, collect 1 extra Liquidity', gato: 'When seated: knock one hazard off your table, free', monje: 'When you earn a deed, collect 1 Liquidity', diablito: 'When a hazard you play lands, collect 1 Liquidity', celebridad: 'Pay 1 when banking from a card: +25 Prosperity', tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell later: 4 Liquidity or 75 Prosperity', moon: 'Sell later: 7 Liquidity or 150 Prosperity', bull: 'Bank 100 Prosperity', rocket: 'Bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', bell: 'Clears The Bear', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one hazard', heart: 'Discard to cancel a hazard just played on you', halo: 'Any Trader seated at your desk cannot be disabled', xray: 'Once a turn, tap to peek at a random rival card — free', rosary: 'Draw a card when you earn a deed', rose: 'Give a rival 2 Liquidity: a deed, then draw one', fountain: 'You and a rival each draw one: a deed' };
+const FX = { unicornio: 'At the start of your turn, collect 1 extra Liquidity', gato: 'When seated: knock one hazard off your table, free', monje: 'When you earn a deed, collect 1 Liquidity', diablito: 'When a hazard you play lands, collect 1 Liquidity', celebridad: 'Pay 1 when banking from a card: +25 Prosperity', gr80: 'When you earn a deed, bank 25 Prosperity', h80z: 'Hazards you play cost 1 less', eugene: 'Your Hail Mary odds rise one step', abuela: 'Your Remedies cost 1 less', shitcoin: 'Sell for Prosperity: a die decides — 5+ moons for 125, else zero', bluechip: 'Sell later: 10 Liquidity or 250 Prosperity', halving: 'Fires when drawn: until the drawer’s next turn, turn income is 1', corrida: 'Fires when drawn: until the drawer’s next turn, Prosperity sales pay +25', crash: 'Fires when drawn: everyone holding 8+ Liquidity loses half', airdrop: 'Fires when drawn: every player draws a card', honeymoon: 'Fires when drawn: no hazards until the drawer’s next turn', tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell later: 4 Liquidity or 75 Prosperity', moon: 'Sell later: 7 Liquidity or 150 Prosperity', bull: 'Bank 100 Prosperity', rocket: 'Bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', bell: 'Clears The Bear', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one hazard', heart: 'Discard to cancel a hazard just played on you', halo: 'Any Trader seated at your desk cannot be disabled', xray: 'Once a turn, tap to peek at a random rival card — free', rosary: 'Draw a card when you earn a deed', rose: 'Give a rival 2 Liquidity: a deed, then draw one', fountain: 'You and a rival each draw one: a deed' };
 
 let S = null;
 const toast = (t) => { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2800); };
+const tick = (line) => { $('ticker').hidden = false; const el = $('tickText'); el.textContent = line; el.classList.remove('fresh'); void el.offsetWidth; el.classList.add('fresh'); };
+const headline = (raw) => { const l = raw.replace(/^\[T\d+\] /, '');
+  const tag = /EVENT/.test(l) ? 'MARKET WIRE' : /Bear|Hack|Rug/i.test(l) ? 'BREAKING' : /WINS/.test(l) ? 'FINAL BELL' : /deed|Rose|Fountain|gives/i.test(l) ? 'GOOD WORKS' : /HAIL MARY/i.test(l) ? 'MIRACLE DESK' : 'ON CHAIN';
+  return tag + ' · ' + l.toUpperCase(); };
+const cap = (s) => s ? s[0].toUpperCase() + s.slice(1) : '';
 
 function announceTurn(g) { if (S.turnToasted !== g.turnNo) { S.turnToasted = g.turnNo; toast(`Round ${g.turnNo} · YOUR TURN — you collect 2 Liquidity and draw a card. Then one main action.`); } }
 class HumanPolicy {
@@ -145,21 +169,25 @@ function popMenu(items) { if (!S.mainResolve) { toast('Your main action is spent
   host.querySelector('.overlay').onclick = (e) => { if (e.target === e.currentTarget) host.innerHTML = ''; };
 }
 function cardEl(c) {
-  const el = document.createElement('div'); el.className = 'card ' + (c.type === 'hazard' ? 'hazard' : c.type === 'remedy' ? 'remedy' : c.type === 'artifact' ? 'artifact' : c.type === 'coop' ? 'coop' : c.type === 'trader' ? 'trader' : '');
-  el.innerHTML = `<div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips"><span>cost ${c.cost}</span>${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}</div><div class="fx">${esc(FX[c.key] || c.text || '')}</div>`;
+  const el = document.createElement('div'); el.className = 'card ' + (c.type === 'hazard' ? 'hazard' : c.type === 'remedy' ? 'remedy' : c.type === 'artifact' ? 'artifact' : c.type === 'coop' ? 'coop' : c.type === 'trader' ? 'trader' : c.type === 'event' ? 'event' : '');
+  el.innerHTML = `<div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.type === 'event' ? '<span>fires on draw</span>' : `<span>cost ${c.cost}</span>`}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}</div><div class="fx">${esc(FX[c.key] || c.text || '')}</div>`;
   return el;
 }
 $('deal').onclick = async () => {
   if (S && S.running) return;
   const seed = +$('seed').value || 7;
   const n = +$('nBots').value;
-  const players = [ { name: 'YOU', policy: new HumanPolicy() },
-    ...Array.from({ length: n }, (_, i) => ({ name: ['EL BOT', 'LA BOT', 'EL OTRO'][i], policy: new GreedyBot() })) ];
+  const myDeck = $('meDeck').value; const otherDeck = myDeck === 'devotion' ? 'degen' : 'devotion';
+  const players = [ { name: 'YOU', recipe: myDeck, policy: new HumanPolicy() },
+    ...Array.from({ length: n }, (_, i) => ({ name: ['EL BOT', 'LA BOT', 'EL OTRO'][i], recipe: i % 2 ? myDeck : otherDeck, policy: new GreedyBot() })) ];
   const g = new Game({ players, seed, verbose: true });
-  S = { g, me: g.players[0], running: true, mainResolve: null };
+  S = { g, me: g.players[0], running: true, mainResolve: null, lastActive: null };
   g.hooks = {
-    render: async () => { render(); if (g.active !== S.me) await sleep(240); },
-    onAction: async (p, a) => { if (p === S.me || !S.running) { render(); return; } render(); await showPlay(g, p, a); },
+    render: async () => { render();
+      if (S.running && S.dealt && g.active && g.active !== S.lastActive) { S.lastActive = g.active; if (g.active !== S.me) await showTurnCard(g.active); }
+      if (g.active !== S.me) await sleep(240); },
+    onAction: async (p, a) => { if (a.t !== 'pass') tick(headline(g.lines[g.lines.length - 1] || '')); if (p === S.me || !S.running) { render(); return; } render(); await showPlay(g, p, a); },
+    onEvent: (p, c) => { render(); tick('MARKET WIRE · ' + (c.name + ': ' + c.text).toUpperCase()); showEvent(p, c); },
   };
   $('board').hidden = false; $('hist').hidden = false; S.dealt = false; S.lastHandLen = g.players[0].hand.length; render();
   await dealFlights(); S.dealt = true;
@@ -186,9 +214,39 @@ async function dealFlights() {
   }
   await sleep(420);
 }
+const panelOf = (q) => q === S.me ? document.querySelector('.panel.me') : document.querySelector(`.rivals .panel[data-pidx="${q.idx}"]`);
+async function flyFace(c, fromEl, toEl) {
+  if (!fromEl || !toEl) return;
+  const f = fromEl.getBoundingClientRect(), t = toEl.getBoundingClientRect();
+  const d = document.createElement('div'); d.className = 'flyface'; d.appendChild(cardEl(c));
+  d.style.left = (f.left + f.width / 2 - 55) + 'px'; d.style.top = (f.top + f.height / 2 - 60) + 'px';
+  document.body.appendChild(d);
+  const dx = t.left + t.width / 2 - (f.left + f.width / 2), dy = t.top + t.height / 2 - (f.top + f.height / 2);
+  requestAnimationFrame(() => { d.style.transform = `translate(${dx}px, ${dy}px) rotate(3deg)`; });
+  await sleep(620); d.style.opacity = '0'; await sleep(180); d.remove();
+}
+async function showTurnCard(p) {
+  const d = document.createElement('div'); d.className = 'titlecard'; d.innerHTML = `<div class="tc">${esc(p.name)}&#39;S TURN</div>`;
+  document.body.appendChild(d); requestAnimationFrame(() => d.classList.add('show'));
+  await sleep(750); d.classList.remove('show'); setTimeout(() => d.remove(), 220);
+}
+async function showEvent(p, c) {
+  const b = document.createElement('div'); b.className = 'playbanner event';
+  const what = document.createElement('div'); what.className = 'what';
+  what.innerHTML = `<div class="who">THE MARKET SPEAKS · drawn by ${esc(p.name)}</div><div>${esc(c.name)} — ${esc(c.text || '')}</div>`;
+  b.appendChild(cardEl(c)); b.appendChild(what); document.body.appendChild(b);
+  requestAnimationFrame(() => b.classList.add('show'));
+  await sleep(3400); b.classList.remove('show'); setTimeout(() => b.remove(), 220);
+}
 async function showPlay(g, p, a) {
   const line = (g.lines[g.lines.length - 1] || '').replace(/^\[T\d+\] /, '');
   const card = a.c || a.a || a.h || null;
+  if (a.t === 'play' && card) {
+    const src = panelOf(p); const from = (src && src.querySelector('.minihand')) || src;
+    const tgt = a.choice && a.choice.target;
+    const to = card.type === 'hazard' && tgt ? (tgt === S.me ? $('meHazards') : panelOf(tgt)) : (card.type === 'remedy' || card.type === 'coop') && tgt ? (tgt === S.me ? document.querySelector('.panel.me') : panelOf(tgt)) : src;
+    await flyFace(card, from, to);
+  }
   const b = document.createElement('div'); b.className = 'playbanner';
   const what = document.createElement('div'); what.className = 'what';
   what.innerHTML = `<div class="who">${esc(p.name)}</div><div>${esc(line)}</div>`;
@@ -196,7 +254,10 @@ async function showPlay(g, p, a) {
   b.appendChild(what); document.body.appendChild(b);
   requestAnimationFrame(() => b.classList.add('show'));
   p.lastLine = line;
-  await sleep(a.t === 'pass' ? 1100 : 2600);
+  if ($('slowMode').checked && a.t !== 'pass') {
+    b.classList.add('wait'); const btn = document.createElement('button'); btn.className = 'primary'; btn.textContent = 'Continue';
+    b.appendChild(btn); await new Promise((res) => { btn.onclick = res; });
+  } else await sleep(a.t === 'pass' ? 1100 : 2600);
   b.classList.remove('show'); setTimeout(() => b.remove(), 220);
 }
 function bell(r) { const host = $('overlayHost'); const rows = S.g.players.map((q) => `<div>${esc(q.name)}${q.trader ? ' · ' + esc(q.trader.name) : ''} — <b>${q.pros}</b> Prosperity, ${q.deeds} deed${q.deeds === 1 ? '' : 's'}${q.hailUsed ? ', Hail Mary spent' : ''}</div>`).join('');
@@ -215,9 +276,9 @@ function render() {
   // rivals
   const rv = $('rivals'); rv.innerHTML = '';
   for (const q of g.players) { if (q === me) continue;
-    const d = document.createElement('section'); d.className = 'panel';
+    const d = document.createElement('section'); d.className = 'panel'; d.dataset.pidx = q.idx;
     if (g.active === q && S.running) d.classList.add('hot');
-    d.innerHTML = `<div class="phead"><span class="who ${g.active === q && S.running ? 'active' : ''}">${esc(q.name)}</span>
+    d.innerHTML = `<div class="phead"><span class="who ${g.active === q && S.running ? 'active' : ''}">${esc(q.name)}</span><span class="stat">${esc(cap(q.recipe))}</span>
       <span class="stat">Liq <b>${q.liq}</b></span><span class="stat">Pros <b>${q.pros}</b></span><span class="stat">Hand <b>${q.hand.length}</b></span><span class="stat candles">${'🕯'.repeat(q.deeds)}</span><span class="stat">${q.hailUsed ? 'HM spent' : 'HM live'}</span></div>
       <div class="prosbar"><i style="width:${Math.min(100, q.pros / 10)}%"></i></div>
       <div class="minihand">${'<span class="miniback"></span>'.repeat(Math.min(9, q.hand.length))}</div>
@@ -226,10 +287,10 @@ function render() {
     rv.appendChild(d);
   }
   // me
-  $('meWho').textContent = 'YOU'; $('meWho').classList.toggle('active', mine && S.running);
+  $('meWho').textContent = 'YOU · ' + cap(me.recipe); $('meWho').classList.toggle('active', mine && S.running);
   $('meLiq').textContent = me.liq; $('mePros').textContent = me.pros; $('meBar').style.width = Math.min(100, me.pros / 10) + '%';
   $('meDeeds').textContent = '🕯'.repeat(me.deeds) || '—';
-  const tw = ODDS[Math.min(3, me.deeds)]; $('meHail').textContent = me.hailUsed ? 'Hail Mary: spent' : `Hail Mary: ${tw}/12 to bank 200`;
+  const tw = g.odds(me); $('meHail').textContent = me.hailUsed ? 'Hail Mary: spent' : `Hail Mary: ${tw}/12 to bank 200`;
   $('meHaz').textContent = me.trader && !g.abilityOn(me) ? 'TRADER HACKED' : '';
   const ts = $('meTrader'); ts.innerHTML = '';
   if (me.trader) { const tc = cardEl(me.trader); if (!g.abilityOn(me)) { tc.classList.add('dim'); tc.title = 'Disabled by Quantum Hack'; } ts.appendChild(tc); }
@@ -277,4 +338,15 @@ function render() {
   $('feed').innerHTML = g.lines.slice(-3).map((l) => `<div>${esc(l)}</div>`).join('');
   $('log').innerHTML = g.lines.map((l) => `<div>${esc(l)}</div>`).join(''); $('log').scrollTop = $('log').scrollHeight;
 }
+// ── the card gallery: every design, with its copies per starter recipe ──
+function buildGallery() {
+  const host = $('gallery'); const order = ['trader', 'asset', 'progress', 'event', 'hazard', 'remedy', 'artifact', 'coop'];
+  const label = { trader: 'Traders — hire one to your seat (main action); a new hire replaces the old', asset: 'Assets — buy now, sell later for cash or Prosperity', progress: 'Progress — bank Prosperity on the spot', event: 'Events — fire the moment they are drawn and hit the whole table', hazard: 'Hazards — stick to a rival until cleared', remedy: 'Remedies — clear hazards; clearing a rival’s earns a deed', artifact: 'Artifacts — equip up to two', coop: 'Cooperative actions — deeds for the Hail Mary' };
+  const copies = (k) => ['devotion', 'degen'].map((r) => { const e = RECIPES[r].find((x) => x[0] === k); return e ? `${cap(r)} ×${e[1]}` : null; }).filter(Boolean).join(' · ') || 'collectible alternate';
+  for (const ty of order) { const ds = DESIGNS.filter((d) => d.type === ty); if (!ds.length) continue;
+    const rl = document.createElement('div'); rl.className = 'rowlabel'; rl.textContent = label[ty] || ty; host.appendChild(rl);
+    const row = document.createElement('div'); row.className = 'cards'; host.appendChild(row);
+    for (const d of ds) { const wrap = document.createElement('div'); wrap.appendChild(cardEl(d)); const cc = document.createElement('div'); cc.className = 'copychips'; cc.textContent = copies(d.key); wrap.appendChild(cc); row.appendChild(wrap); } }
+}
+buildGallery();
 </script>

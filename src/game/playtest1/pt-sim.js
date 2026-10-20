@@ -18,9 +18,15 @@ export const DESIGNS = [
   D('monje', 'El Monje', 'trader', 1, { text: 'When you earn a deed, collect 1 Liquidity' }),
   D('diablito', 'El Diablito', 'trader', 2, { text: 'When a hazard you play lands, collect 1 Liquidity' }),
   D('celebridad', 'La Celebridad', 'trader', 3, { text: 'Pay 1 when banking from a card: +25 Prosperity' }),
+  D('gr80', 'St. GR80', 'trader', 2, { text: 'When you earn a deed, bank 25 Prosperity' }),
+  D('h80z', 'H80Z', 'trader', 2, { text: 'Hazards you play cost 1 less' }),
+  D('eugene', 'Eugene', 'trader', 2, { text: 'Your Hail Mary odds rise one step' }),
+  D('abuela', 'La Abuela', 'trader', 2, { text: 'Your Remedies cost 1 less' }),
   D('tech', 'Tech Stock', 'asset', 3, { cash: 5, pros: 100 }),
   D('meme', 'Meme Coin', 'asset', 2, { cash: 4, pros: 75 }),
   D('moon', 'The Moon', 'asset', 4, { cash: 7, pros: 150 }),
+  D('shitcoin', 'Shitcoin', 'asset', 1, { cash: 1, pros: 125, gamble: true, text: 'Sell for Prosperity: a die decides — 5+ moons for 125, else zero' }),
+  D('bluechip', 'Blue Chip', 'asset', 6, { cash: 10, pros: 250 }),
   D('bull', 'The Bull', 'progress', 2, { pros: 100 }),
   D('rocket', 'Rocket', 'progress', 4, { pros: 200 }),
   D('inherit', 'The Inheritance', 'progress', 0, { cash: 3, pros: 50, choice: true }),
@@ -37,20 +43,47 @@ export const DESIGNS = [
   D('rosary', 'The Rosary Beads', 'artifact', 2, { text: 'When you earn a deed, draw a card' }),
   D('rose', 'The Rose', 'coop', 0, { text: 'Give a rival 2 Liquidity: a deed, then draw one' }),
   D('fountain', 'The Fountain', 'coop', 1, { text: 'You and a chosen rival each draw one: a deed' }),
+  // Events: the market's own voice. They fire the moment they are drawn, hit the whole
+  // table, then the drawer draws a replacement card. Nobody chooses an Event.
+  D('halving', 'El Halving', 'event', 0, { text: 'Until the drawer’s next turn, turn income is 1' }),
+  D('corrida', 'La Corrida', 'event', 0, { text: 'Until the drawer’s next turn, Assets sold for Prosperity pay +25' }),
+  D('crash', 'Flash Crash', 'event', 0, { text: 'Everyone holding 8+ Liquidity loses half' }),
+  D('airdrop', 'The Airdrop', 'event', 0, { text: 'Every player draws a card' }),
+  D('honeymoon', 'Honeymoon', 'event', 0, { text: 'Until the drawer’s next turn, no hazards can be played' }),
 ];
 export const byKey = Object.fromEntries(DESIGNS.map((d) => [d.key, d]));
-export const STARTER = [['unicornio', 1], ['gato', 1], ['monje', 1], ['diablito', 1], ['celebridad', 1], ['tech', 2], ['meme', 2], ['moon', 2], ['bull', 2], ['rocket', 2], ['inherit', 3], ['bear', 2], ['hack', 2], ['rug', 2], ['bell', 2], ['resist', 2], ['keys', 2], ['tortilla', 2], ['heart', 1], ['halo', 1], ['xray', 1], ['rosary', 1], ['rose', 2], ['fountain', 2]];
+// Two 40-card starter recipes: Devotion (deeds, remedies, slow money) and Degen
+// (hazards, gambles, the Unicorn's compounding). Deck identity is the collectible premise.
+export const RECIPES = {
+  devotion: [['gr80', 1], ['monje', 1], ['gato', 1], ['abuela', 1], ['celebridad', 1],
+    ['tech', 2], ['moon', 2], ['bluechip', 1], ['bull', 2], ['rocket', 2], ['inherit', 2],
+    ['corrida', 1], ['airdrop', 1], ['honeymoon', 1],
+    ['bear', 2], ['rug', 1],
+    ['bell', 2], ['resist', 2], ['keys', 2], ['tortilla', 2],
+    ['heart', 1], ['halo', 1], ['rosary', 1], ['xray', 1],
+    ['rose', 3], ['fountain', 3]],
+  degen: [['h80z', 1], ['diablito', 1], ['eugene', 1], ['unicornio', 1], ['gato', 1],
+    ['meme', 3], ['shitcoin', 3], ['tech', 1], ['moon', 1], ['bluechip', 1], ['bull', 3], ['rocket', 3], ['inherit', 1],
+    ['crash', 1], ['halving', 1], ['corrida', 1],
+    ['bear', 2], ['hack', 2], ['rug', 2],
+    ['tortilla', 2], ['keys', 1], ['bell', 1], ['resist', 1],
+    ['heart', 1], ['xray', 1], ['halo', 1],
+    ['rose', 1], ['fountain', 1]],
+};
+export const STARTER = RECIPES.devotion;
 export const ODDS = [1, 2, 4, 8]; // twelfths, by recorded deeds (cap 3)
 
 export class Game {
   constructor({ players, seed = 1, verbose = false, winAt = 1000, maxTurns = 300 }) {
     this.rng = makeRng(seed); this.verbose = verbose; this.lines = []; this.winAt = winAt; this.maxTurns = maxTurns;
-    this.players = players.map((cfg, idx) => ({ idx, name: cfg.name, policy: cfg.policy, trader: null,
-      deck: this.shuffle(STARTER.flatMap(([k, n]) => Array.from({ length: n }, () => ({ ...byKey[k] })))),
+    this.fx = {}; this.dealing = true;
+    this.players = players.map((cfg, idx) => ({ idx, name: cfg.name, policy: cfg.policy, trader: null, recipe: cfg.recipe || 'devotion',
+      deck: this.shuffle(RECIPES[cfg.recipe || 'devotion'].flatMap(([k, n]) => Array.from({ length: n }, () => ({ ...byKey[k] })))),
       hand: [], discard: [], invest: [], artifacts: [], hazards: [], liq: 5, pros: 0, deeds: 0, hailUsed: false,
       deedThisTurn: false,
       stats: { plays: 0, hires: 0, sells: 0, sellCash: 0, sellPros: 0, hazPlayed: 0, hazCleared: 0, remedyRival: 0, gifts: 0, coop: 0, deeds: 0, hail: 0, hailWon: 0, passes: 0, discards: 0, turns: 0, hazTurns: 0 } }));
     for (const p of this.players) for (let i = 0; i < 5; i++) this.draw(p, true);
+    this.dealing = false;
     this.turnNo = 0; this.over = false; this.winner = null;
   }
   shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(this.rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -61,7 +94,19 @@ export class Game {
   hasHaz(p, key) { return p.hazards.some((h) => h.key === key); }
   draw(p, silent = false) {
     if (!p.deck.length && p.discard.length) { p.deck = this.shuffle(p.discard.splice(0)); this.log(`${p.name} reshuffles`); }
-    const c = p.deck.shift(); if (!c) return null; p.hand.push(c); if (!silent) this.log(`${p.name} draws${p.policy && p.policy.human ? ' ' + c.name : ''}`); return c;
+    const c = p.deck.shift(); if (!c) return null;
+    if (c.type === 'event') {
+      if (this.dealing) { p.deck.push(c); return this.draw(p, silent); } // no weather before the game starts
+      p.discard.push(c); this.event(p, c); return this.draw(p, silent); // the market speaks, then you draw a replacement
+    }
+    p.hand.push(c); if (!silent) this.log(`${p.name} draws${p.policy && p.policy.human ? ' ' + c.name : ''}`); return c;
+  }
+  event(p, c) {
+    this.log(`✦ EVENT — ${c.name} (drawn by ${p.name}): ${c.text}`);
+    if (c.key === 'halving' || c.key === 'corrida' || c.key === 'honeymoon') this.fx[c.key] = { owner: p.idx };
+    if (c.key === 'crash') for (const q of this.players) if (q.liq >= 8) { const lost = Math.floor(q.liq / 2); q.liq -= lost; this.log(`${q.name} loses ${lost} Liquidity in the crash`); }
+    if (this.hooks && this.hooks.onEvent) this.hooks.onEvent(p, c);
+    if (c.key === 'airdrop') for (const q of this.players) this.draw(q);
   }
   bank(p, n, src, allowBonus = true) {
     if (this.hasHaz(p, 'bear') && src !== 'hail') { if (n > 75) return false; // larger payouts cannot be chosen
@@ -77,6 +122,7 @@ export class Game {
     if (p.deedThisTurn || p.deeds >= 3) return false;
     p.deeds += 1; p.deedThisTurn = true; p.stats.deeds++;
     if (this.is(p, 'monje')) p.liq += 1;
+    if (this.is(p, 'gr80')) this.bank(p, 25, 'St. GR80');
     if (p.artifacts.some((a) => a.key === 'rosary')) this.draw(p);
     this.log(`✧ ${p.name} earns a deed (${why}) → ${p.deeds} candle${p.deeds === 1 ? '' : 's'}`);
     return true;
@@ -86,7 +132,8 @@ export class Game {
     this.log(`${why}: ${h.name} off ${victim.name}`);
   }
   spend(p, n) { if (p.liq < n) return false; p.liq -= n; return true; }
-  costOf(p, c) { let n = c.cost; if (c.type === 'remedy' && this.is(p, 'abuela')) n = Math.max(0, n - 1); return n; }
+  costOf(p, c) { let n = c.cost; if (c.type === 'remedy' && this.is(p, 'abuela')) n = Math.max(0, n - 1); if (c.type === 'hazard' && this.is(p, 'h80z')) n = Math.max(0, n - 1); return n; }
+  odds(p) { return ODDS[Math.min(3, p.deeds + (this.is(p, 'eugene') ? 1 : 0))]; }
 
   // ── the main actions ──
   async playCard(p, c, choice = {}) {
@@ -131,7 +178,13 @@ export class Game {
   sell(p, a, wantPros) {
     if (this.hasHaz(p, 'rug')) return false; if (a.bornTurn === this.turnNo) return false;
     p.invest.splice(p.invest.indexOf(a), 1); p.stats.sells++;
-    if (wantPros) { const ok = this.bank(p, a.pros, a.name); if (!ok) { p.invest.push(a); p.stats.sells--; return false; } p.stats.sellPros++; /* banked */ }
+    if (wantPros && a.gamble) {
+      const roll = 1 + Math.floor(this.rng() * 6); p.stats.sellPros++;
+      if (roll >= 5) { const ok = this.bank(p, a.pros + (this.fx.corrida ? 25 : 0), `${a.name} — the die shows ${roll}: IT MOONS`); if (!ok) { p.invest.push(a); p.stats.sells--; p.stats.sellPros--; return false; } }
+      else { p.discard.push(a); this.log(`${p.name} sells ${a.name}… the die shows ${roll}: it goes to zero`); }
+      return true;
+    }
+    if (wantPros) { const bonus = this.fx.corrida && !this.hasHaz(p, 'bear') ? 25 : 0; const ok = this.bank(p, a.pros + bonus, a.name + (bonus ? ' + La Corrida' : '')); if (!ok) { p.invest.push(a); p.stats.sells--; return false; } p.stats.sellPros++; /* banked */ }
     else { p.liq += a.cash; p.discard.push(a); p.stats.sellCash++; this.log(`${p.name} sells ${a.name} for ${a.cash}`); }
     return true;
   }
@@ -144,7 +197,7 @@ export class Game {
     return c;
   }
   hailMary(p) {
-    p.hailUsed = true; p.stats.hail++; const twelfths = ODDS[Math.min(3, p.deeds)];
+    p.hailUsed = true; p.stats.hail++; const twelfths = this.odds(p);
     const roll = 1 + Math.floor(this.rng() * 12); const ok = roll <= twelfths;
     this.log(`✝ ${p.name} attempts the HAIL MARY at ${twelfths}/12 with ${p.deeds} candle${p.deeds === 1 ? '' : 's'}… the die shows ${roll}: ${ok ? 'ANSWERED' : 'unanswered'}`);
     if (ok) { for (const h of [...p.hazards]) this.clearHazard(p, h, p, 'grace'); p.stats.hailWon++; this.bank(p, 200, 'hail'); }
@@ -158,7 +211,7 @@ export class Game {
       if (c.type === 'asset' || c.type === 'artifact') A.push({ t: 'play', c });
       else if (c.type === 'trader') { if (!(p.trader && p.trader.key === c.key)) A.push({ t: 'play', c }); }
       else if (c.type === 'progress') { if (!c.choice) { if (!(this.hasHaz(p, 'bear') && c.pros > 75)) A.push({ t: 'play', c }); } else { A.push({ t: 'play', c, choice: { cash: true } }); if (!(this.hasHaz(p, 'bear') && c.pros > 75)) A.push({ t: 'play', c, choice: {} }); } }
-      else if (c.type === 'hazard') { for (const r of this.rivals(p)) if (!this.hasHaz(r, c.key)) A.push({ t: 'play', c, choice: { target: r } }); }
+      else if (c.type === 'hazard') { if (!this.fx.honeymoon) for (const r of this.rivals(p)) if (!this.hasHaz(r, c.key)) A.push({ t: 'play', c, choice: { target: r } }); }
       else if (c.type === 'remedy') { for (const q of this.players) for (const h of q.hazards) if (c.clears === 'any' || h.key === c.clears) A.push({ t: 'play', c, choice: { target: q, hazard: h } }); }
       else if (c.type === 'coop') { if (c.key === 'rose' && p.liq < cost + 2) continue; for (const r of this.rivals(p)) A.push({ t: 'play', c, choice: { target: r } }); }
     }
@@ -181,7 +234,8 @@ export class Game {
   }
   async turn(p) {
     p.deedThisTurn = false; p.peekedThisTurn = false; p.stats.turns++; if (p.hazards.length) p.stats.hazTurns++;
-    p.liq += 2;
+    for (const k of Object.keys(this.fx)) if (this.fx[k].owner === p.idx) { delete this.fx[k]; this.log(`${byKey[k].name} blows over`); }
+    p.liq += this.fx.halving ? 1 : 2;
     if (this.is(p, 'unicornio')) { p.liq += 1; this.log(`${p.name} collects 1 extra (El Unicornio)`); }
     if (p.policy.beforeDraw) await p.policy.beforeDraw(this, p);
     this.draw(p);
@@ -193,7 +247,7 @@ export class Game {
     while (!this.over && this.turnNo < this.maxTurns) { this.turnNo++; for (const p of this.players) { if (this.over) break; this.active = p; if (this.hooks && this.hooks.render) await this.hooks.render(); await this.turn(p); } }
     if (this.verbose) { this.lines.forEach((l) => console.log(l)); console.log(`END turn ${this.turnNo}: ${this.players.map((q) => `${q.name} ${q.pros}P/${q.liq}L/${q.deeds}d`).join(' · ')}`); }
     return { winner: this.winner ? this.winner.name : null, winnerIdx: this.winner ? this.winner.idx : -1, turns: this.turnNo,
-      players: this.players.map((q) => ({ name: q.name, trader: q.trader ? q.trader.key : null, pros: q.pros, ...q.stats })) };
+      players: this.players.map((q) => ({ name: q.name, recipe: q.recipe, trader: q.trader ? q.trader.key : null, pros: q.pros, ...q.stats })) };
   }
 }
 
@@ -210,12 +264,12 @@ export class GreedyBot {
   discardOne(g, p) { const order = { hazard: 0, coop: 1, trader: 2, artifact: 3, remedy: 4, asset: 5, progress: 6 }; return [...p.hand].sort((a, b) => (order[a.type] ?? 9) - (order[b.type] ?? 9))[0]; }
   main(g, p) {
     const A = g.legalActions(p); const lead = [...g.rivals(p)].sort((a, b) => b.pros - a.pros)[0];
-    const twelfths = ODDS[Math.min(3, p.deeds)]; const hailEV = (twelfths / 12) * 200;
+    const twelfths = g.odds(p); const hailEV = (twelfths / 12) * 200;
     let best = null, bs = -1;
     for (const a of A) {
       let s = 0;
       if (a.t === 'play' && a.c.type === 'progress') s = a.choice && a.choice.cash ? (p.liq < 3 ? 60 : 20) : a.c.pros - a.c.cost * 5 + (p.pros + a.c.pros >= g.winAt ? 9999 : 0);
-      if (a.t === 'sell') s = a.pros ? a.a.pros - 10 + (p.pros + a.a.pros >= g.winAt ? 9999 : 0) : (p.liq <= 2 ? 65 : 25);
+      if (a.t === 'sell') s = a.pros ? (a.a.gamble ? (p.pros + a.a.pros >= g.winAt ? 70 : 34) : a.a.pros - 10 + (p.pros + a.a.pros >= g.winAt ? 9999 : 0) + (g.fx.corrida ? 20 : 0)) : (p.liq <= 2 ? 65 : 25);
       if (a.t === 'play' && a.c.type === 'asset') s = p.liq >= a.c.cost + 2 ? 55 + a.c.pros / 10 : 30;
       if (a.t === 'play' && a.c.type === 'hazard') s = a.choice.target === lead && lead.pros > p.pros ? 70 + lead.pros / 20 : 15;
       if (a.t === 'play' && a.c.type === 'remedy') { const mine = a.choice.target === p; s = mine ? 80 : (p.deeds < 3 && !p.hailUsed && a.choice.hazard.by !== p.idx ? 62 : 8); }
@@ -236,20 +290,23 @@ export class GreedyBot {
 // ── CLI ──
 const ARGV = typeof process !== 'undefined' && process.argv ? process.argv.slice(2) : [];
 const args = Object.fromEntries(ARGV.map((a, i, arr) => (a.startsWith('--') ? [a.slice(2), arr[i + 1] && !arr[i + 1].startsWith('--') ? arr[i + 1] : true] : [])).filter((x) => x.length));
-export function playOne({ seed = 1, nPlayers = 3, bots = null, verbose = false, rotate = 0 }) {
+export function playOne({ seed = 1, nPlayers = 3, bots = null, decks = null, verbose = false, rotate = 0 }) {
   const kinds = (bots || 'greedy,greedy,greedy,greedy'.split(',').slice(0, nPlayers).join(',')).split(',').slice(0, nPlayers);
-  const players = kinds.map((k, i) => ({ name: `${k.toUpperCase()} ${'ABCD'[i]}`, policy: k === 'random' ? new RandomBot(makeRng(seed * 31 + i)) : new GreedyBot() }));
+  const recs = (decks || 'devotion,degen,devotion,degen').split(',');
+  const players = kinds.map((k, i) => ({ name: `${k.toUpperCase()} ${'ABCD'[i]}`, recipe: recs[i % recs.length], policy: k === 'random' ? new RandomBot(makeRng(seed * 31 + i)) : new GreedyBot() }));
   for (let r = 0; r < rotate; r++) players.push(players.shift());
   return new Game({ players, seed, verbose });
 }
 if (typeof process !== 'undefined' && process.argv[1] && process.argv[1].endsWith('pt-sim.js')) {
   const games = +(args.games || 1000); const seed = +(args.seed || 1); const nPlayers = +(args.players || 3);
-  if (args.verbose) { await playOne({ seed, nPlayers, bots: args.bots, verbose: true }).run(); process.exit(0); }
-  const res = { wins: {}, seatWins: [0, 0, 0, 0], turns: [], endTrader: {}, s: {}, noWin: 0 };
+  if (args.verbose) { await playOne({ seed, nPlayers, bots: args.bots, decks: args.decks, verbose: true }).run(); process.exit(0); }
+  const res = { wins: {}, recipeWins: {}, recipeGames: {}, seatWins: [0, 0, 0, 0], turns: [], endTrader: {}, s: {}, noWin: 0 };
   for (let i = 0; i < games; i++) {
-    const r = await playOne({ seed: seed + i, nPlayers, bots: args.bots, rotate: i % nPlayers }).run();
+    const r = await playOne({ seed: seed + i, nPlayers, bots: args.bots, decks: args.decks, rotate: i % nPlayers }).run();
+    for (const p of r.players) res.recipeGames[p.recipe] = (res.recipeGames[p.recipe] || 0) + 1;
     if (!r.winner) { res.noWin++; continue; }
     res.wins[r.winner.replace(/ [A-D]$/, '')] = (res.wins[r.winner.replace(/ [A-D]$/, '')] || 0) + 1;
+    const wp = r.players.find((p) => p.name === r.winner); if (wp) res.recipeWins[wp.recipe] = (res.recipeWins[wp.recipe] || 0) + 1;
     res.seatWins[(r.winnerIdx + nPlayers - (i % nPlayers)) % nPlayers]++; res.turns.push(r.turns);
     for (const p of r.players) { const T = res.endTrader[p.trader || 'none'] = res.endTrader[p.trader || 'none'] || { g: 0, w: 0 }; T.g++; if (r.winner === p.name) T.w++;
       for (const k of ['hires', 'sells', 'sellCash', 'sellPros', 'hazPlayed', 'hazCleared', 'remedyRival', 'gifts', 'coop', 'deeds', 'hail', 'hailWon', 'turns', 'hazTurns']) res.s[k] = (res.s[k] || 0) + p[k]; }
@@ -258,6 +315,7 @@ if (typeof process !== 'undefined' && process.argv[1] && process.argv[1].endsWit
   console.log(`${games} games · ${nPlayers} players · bots ${args.bots || 'greedy all'}`);
   console.log('wins', JSON.stringify(res.wins), '| wins by seat', res.seatWins.slice(0, nPlayers).map((n) => Math.round(n / Math.max(1, games - res.noWin) * 100) + '%').join('/'), '| no winner', res.noWin);
   console.log(`rounds to win avg ${avg(res.turns)} (each player ~that many turns)`);
+  console.log('deck recipes:', Object.entries(res.recipeGames).map(([k, g2]) => `${k} wins ${Math.round((res.recipeWins[k] || 0) / Math.max(1, g2) * 100)}% of its seats (${res.recipeWins[k] || 0}/${g2})`).join(' | '));
   const s = res.s; const pg = (k) => (s[k] / games).toFixed(2);
   console.log(`per game (all players): hires ${pg('hires')} sells ${pg('sells')} (cash ${pg('sellCash')} / pros ${pg('sellPros')}) hazards ${pg('hazPlayed')} cleared ${pg('hazCleared')} remedyRival ${pg('remedyRival')} gifts ${pg('gifts')} coop ${pg('coop')} deeds ${pg('deeds')} hail ${pg('hail')} answered ${pg('hailWon')}`);
   console.log(`hazard-burdened turns: ${Math.round(s.hazTurns / Math.max(1, s.turns) * 100)}% of all turns`);

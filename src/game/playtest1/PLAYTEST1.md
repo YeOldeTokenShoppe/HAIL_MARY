@@ -14,7 +14,7 @@ Banked Prosperity cannot be spent, stolen, or lost. Liquidity and investments re
 
 ## 2. What each player brings
 
-- A **40-card deck**, which includes Trader cards.
+- A **40-card deck**, which includes Trader and Event cards. Two starter recipes are provided (section 11): **Devotion** and **Degen**.
 - **Our Lady of Perpetual Profit**, the universal Hail Mary card, outside the deck.
 
 Decks may contain **up to three copies of the same card**, regardless of artwork or finish.
@@ -56,6 +56,8 @@ Your main action can be:
 - Pass.
 
 The rhythm of a turn is simple: **every player draws a card, then plays a card.**
+
+If your draw turns up an **Event**, it fires immediately for the whole table and you draw a replacement card (section 10).
 
 Trader abilities and Artifact reactions follow their own timing and do not consume your main action unless stated.
 
@@ -143,80 +145,102 @@ Traders are a card type inside the deck — you hire them by drawing and playing
 | **El Monje** | 1 | When you earn a deed, collect 1 Liquidity. |
 | **El Diablito — Connor** | 2 | When a hazard you play successfully enters a rival's hazard area, collect 1 Liquidity. |
 | **La Celebridad** | 3 | When you bank Prosperity from an Asset or Progress card, you may pay 1 Liquidity to add 25 Prosperity. |
+| **St. GR80** | 2 | When you earn a deed, bank **25 Prosperity**. |
+| **H80Z** | 2 | Hazards you play cost 1 less Liquidity, minimum zero. |
+| **Eugene** | 2 | Your Hail Mary odds rise **one step** on the deeds table. |
+| **La Abuela** | 2 | Remedies you play cost 1 less Liquidity, minimum zero. |
 
-The Celebrity's bonus does not apply to the Hail Mary.
+The Celebrity's bonus does not apply to the Hail Mary. Eugene's step respects the 8/12 cap.
 
-Two more designs are reserved as collectible alternates outside the starter: **La Abuela** (your Remedies cost 1 less, minimum zero) and **La Detective — Marisol** (Rug Pulls cannot be played on you).
+One more design is reserved as a collectible alternate outside the starters: **La Detective — Marisol** (Rug Pulls cannot be played on you).
 
-## 10. Sample 40-card starter deck
+## 10. Events
 
-This is one shared starter recipe. The category quantities are not permanent deck-building requirements.
+Events are the market's own voice — the caprice. They are cards in the deck, but nobody chooses to play one: an Event **fires the moment it is drawn**, affects the whole table, goes to the drawer's discard pile, and the drawer draws a replacement card.
 
-All costs below are paid in Liquidity when the card is played.
+| Event | Effect |
+|---|---|
+| **El Halving** | Until the drawer's next turn, turn income is **1** instead of 2. |
+| **La Corrida** | Until the drawer's next turn, Assets sold for Prosperity pay **+25**. |
+| **Flash Crash** | Every player holding **8 or more Liquidity** immediately loses half, rounded down. |
+| **The Airdrop** | Every player draws a card. (With the replacement, the drawer draws two.) |
+| **Honeymoon** | Until the drawer's next turn, **no hazards** can be played. |
 
-### Traders — 5 cards
+Events do not fire during the opening deal.
 
-One copy each of **El Unicornio**, **El Gato**, **El Monje**, **El Diablito**, and **La Celebridad** (see section 9).
+## 11. The card pool and two starter recipes
 
-### Assets and progress — 13 cards
+All costs below are paid in Liquidity when the card is played. Traders are listed in section 9 and Events in section 10.
 
-| Card | Copies | Cost | Effect |
-|---|---:|---:|---|
-| **Tech Stock** | 2 | 3 | Asset. Later sell for **5 Liquidity** or **100 Prosperity**. |
-| **Meme Coin** | 2 | 2 | Asset. Later sell for **4 Liquidity** or **75 Prosperity**. |
-| **The Moon** | 2 | 4 | Asset. Later sell for **7 Liquidity** or **150 Prosperity**. |
-| **The Bull** | 2 | 2 | Progress. Bank **100 Prosperity**. |
-| **Rocket** | 2 | 4 | Progress. Bank **200 Prosperity**. |
-| **The Inheritance** | 3 | 0 | Choose **3 Liquidity** or **50 Prosperity**. Discard after taking cash; bank after taking Prosperity. |
+### Assets and progress
+
+| Card | Cost | Effect |
+|---|---:|---|
+| **Tech Stock** | 3 | Asset. Later sell for **5 Liquidity** or **100 Prosperity**. |
+| **Meme Coin** | 2 | Asset. Later sell for **4 Liquidity** or **75 Prosperity**. |
+| **The Moon** | 4 | Asset. Later sell for **7 Liquidity** or **150 Prosperity**. |
+| **Shitcoin** | 1 | Asset. Later sell for **1 Liquidity** — or gamble it for Prosperity: roll a die, **5+ banks 125**, anything else pays nothing. |
+| **Blue Chip** | 6 | Asset. Later sell for **10 Liquidity** or **250 Prosperity**. |
+| **The Bull** | 2 | Progress. Bank **100 Prosperity**. |
+| **Rocket** | 4 | Progress. Bank **200 Prosperity**. |
+| **The Inheritance** | 0 | Choose **3 Liquidity** or **50 Prosperity**. Discard after taking cash; bank after taking Prosperity. |
 
 For rules purposes, The Inheritance is a Progress card.
 
-### Hazards — 6 cards
+### Hazards
 
-| Card | Copies | Cost | Effect |
-|---|---:|---:|---|
-| **The Bear** | 2 | 2 | Target rival cannot bank more than **75 Prosperity from a single Asset or Progress card**, including bonuses. Larger payouts cannot be chosen. |
-| **Quantum Hack** | 2 | 2 | Disable target rival’s Trader ability until cleared. |
-| **Rug Pull** | 2 | 3 | Target rival cannot sell Assets until cleared. |
+| Card | Cost | Effect |
+|---|---:|---|
+| **The Bear** | 2 | Target rival cannot bank more than **75 Prosperity from a single Asset or Progress card**, including bonuses. Larger payouts cannot be chosen. |
+| **Quantum Hack** | 2 | Disable target rival’s seated Trader until cleared. |
+| **Rug Pull** | 3 | Target rival cannot sell Assets until cleared. |
 
 These hazards do not prevent a Hail Mary attempt or reduce its payout. Rug Pull still allows direct Progress cards.
 
-### Remedies — 8 cards
+### Remedies
 
-| Card | Copies | Cost | Effect |
-|---|---:|---:|---|
-| **The Bell** | 2 | 1 | Clear The Bear. |
-| **Quantum Resistance** | 2 | 1 | Clear Quantum Hack. |
-| **The Keys** | 2 | 1 | Clear Rug Pull. |
-| **Miracle Tortilla** | 2 | 2 | Clear any one hazard. |
+| Card | Cost | Effect |
+|---|---:|---|
+| **The Bell** | 1 | Clear The Bear. |
+| **Quantum Resistance** | 1 | Clear Quantum Hack. |
+| **The Keys** | 1 | Clear Rug Pull. |
+| **Miracle Tortilla** | 2 | Clear any one hazard. |
 
 Each Remedy can help you or a rival. Only qualifying help to a rival earns a deed.
 
-### Artifacts — 4 cards
+### Artifacts
 
-| Card | Copies | Cost | Effect |
-|---|---:|---:|---|
-| **Sacred Heart** | 1 | 2 | Discard this equipped Artifact to cancel a hazard just played on you. |
-| **The Halo** | 1 | 3 | While equipped, any Trader seated at your desk — now or later — cannot be disabled. A Quantum Hack on you remains until cleared, but does nothing. |
-| **X-Ray Glasses** | 1 | 2 | Once during your turn, inspect one randomly selected card in a rival’s hand. This does not use your main action. |
-| **The Rosary Beads** | 1 | 2 | When you earn a deed, you may draw one card. |
+| Card | Cost | Effect |
+|---|---:|---|
+| **Sacred Heart** | 2 | Discard this equipped Artifact to cancel a hazard just played on you. |
+| **The Halo** | 3 | While equipped, any Trader seated at your desk — now or later — cannot be disabled. A Quantum Hack on you remains until cleared, but does nothing. |
+| **X-Ray Glasses** | 2 | Once during your turn, inspect one randomly selected card in a rival’s hand. This does not use your main action. |
+| **The Rosary Beads** | 2 | When you earn a deed, you may draw one card. |
 
 A canceled hazard is discarded. Its player does not recover the cost or action.
 
-### Cooperative actions — 4 cards
+### Cooperative actions
 
-| Card | Copies | Cost | Effect |
-|---|---:|---:|---|
-| **The Rose** | 2 | 0 | Give a rival 2 Liquidity from your funds. Earn one deed, then draw one card. |
-| **The Fountain** | 2 | 1 | You and one chosen rival each draw one card. Earn one deed. |
+| Card | Cost | Effect |
+|---|---:|---|
+| **The Rose** | 0 | Give a rival 2 Liquidity from your funds. Earn one deed, then draw one card. |
+| **The Fountain** | 1 | You and one chosen rival each draw one card. Earn one deed. |
 
 Discard these cards after resolving. You must have the required money to play The Rose.
 
-**Deck total: 5 + 13 + 6 + 8 + 4 + 4 = 40 cards.**
+### The recipes — 40 cards each
 
-This starter uses **24 distinct designs**. Including Our Lady, each player begins with **41 cards in total**.
+Two starters replace the single shared deck, so the first playtests are archetype tests. Deck identity is the collectible premise.
 
-## 11. Collectibility and presentation
+**Devotion** — deeds, remedies, slow money:
+St. GR80, El Monje, El Gato, La Abuela, La Celebridad (1 each) · Tech Stock ×2, The Moon ×2, Blue Chip ×1 · The Bull ×2, Rocket ×2, The Inheritance ×2 · La Corrida, The Airdrop, Honeymoon (1 each) · The Bear ×2, Rug Pull ×1 · The Bell ×2, Quantum Resistance ×2, The Keys ×2, Miracle Tortilla ×2 · Sacred Heart, The Halo, The Rosary Beads, X-Ray Glasses (1 each) · The Rose ×3, The Fountain ×3.
+
+**Degen** — hazards, gambles, compounding:
+H80Z, El Diablito, Eugene, El Unicornio, El Gato (1 each) · Meme Coin ×3, Shitcoin ×3, Tech Stock ×1, The Moon ×1, Blue Chip ×1 · The Bull ×3, Rocket ×3, The Inheritance ×1 · Flash Crash, El Halving, La Corrida (1 each) · The Bear ×2, Quantum Hack ×2, Rug Pull ×2 · Miracle Tortilla ×2, The Keys ×1, The Bell ×1, Quantum Resistance ×1 · Sacred Heart, X-Ray Glasses, The Halo (1 each) · The Rose ×1, The Fountain ×1.
+
+The pool holds **35 distinct designs** (plus La Detective as a spec-only alternate). Including Our Lady, each player begins with 41 cards in total. The digital table lists every design with its recipe counts under **"All cards in this playtest"** at the bottom of the page.
+
+## 12. Collectibility and presentation
 
 Collecting supports both strategy and visual expression:
 
@@ -231,7 +255,7 @@ Keep the Lotería look through numbered cards, strong individual illustrations, 
 
 For the first prototype, there is **no separate caller deck**. Each player draws from their own constructed deck.
 
-## 12. What the first playtest needs to answer
+## 13. What the first playtest needs to answer
 
 These numbers are starting hypotheses, not established balance.
 
@@ -243,5 +267,7 @@ Watch for:
 - Whether hiring a Trader is worth a main action, and whether replacing one ever happens.
 - Whether the Hail Mary feels exciting at both low and high deed counts.
 - Whether the 40-card deck produces enough variety before someone wins.
+- Whether Events feel like weather or like noise.
+- Whether Devotion and Degen feel different to pilot, and whether either dominates.
 
-Start with identical decks. Test customized decks after the basic economy and turn structure feel good.
+Start with the two starter recipes. Build custom decks after the basic economy and turn structure feel good.
