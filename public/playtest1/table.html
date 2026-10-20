@@ -430,7 +430,8 @@ async function showPlay(g, p, a) {
   if (card) b.appendChild(cardEl(card));
   b.appendChild(what); document.body.appendChild(b);
   requestAnimationFrame(() => b.classList.add('show'));
-  await sleep(a.t === 'pass' ? 650 : 1250);
+  p.lastLine = line;
+  await sleep(a.t === 'pass' ? 1100 : 2600);
   b.classList.remove('show'); setTimeout(() => b.remove(), 220);
 }
 function bell(r) { const host = $('overlayHost'); const rows = S.g.players.map((q) => `<div>${esc(q.name)}${q.trader ? ' · ' + esc(q.trader.name) : ''} — <b>${q.pros}</b> Prosperity, ${q.deeds} deed${q.deeds === 1 ? '' : 's'}${q.hailUsed ? ', Hail Mary spent' : ''}</div>`).join('');
@@ -450,6 +451,7 @@ function render() {
       <span class="stat">Liq <b>${q.liq}</b></span><span class="stat">Pros <b>${q.pros}</b></span><span class="stat">Hand <b>${q.hand.length}</b></span><span class="stat candles">${'🕯'.repeat(q.deeds)}</span><span class="stat">${q.hailUsed ? 'HM spent' : 'HM live'}</span></div>
       <div class="prosbar"><i style="width:${Math.min(100, q.pros / 10)}%"></i></div>
       <div class="minihand">${'<span class="miniback"></span>'.repeat(Math.min(9, q.hand.length))}</div>
+      ${q.lastLine ? `<div class="note" style="margin-top:6px">Last turn: ${esc(q.lastLine)}</div>` : ''}
       <div style="margin-top:6px">${q.trader ? `<span class="chip trader" title="${esc(FX[q.trader.key] || '')}">${esc(q.trader.name)}${g.abilityOn(q) ? '' : ' · HACKED'}</span>` : '<span class="chip">no Trader</span>'} ${q.invest.map((a) => `<span class="chip">${esc(a.name)}</span>`).join(' ')} ${q.artifacts.map((a) => `<span class="chip">${esc(a.name)}</span>`).join(' ')} ${q.hazards.map((h) => `<span class="chip haz">${esc(h.name)}</span>`).join(' ')}</div>`;
     rv.appendChild(d);
   }
