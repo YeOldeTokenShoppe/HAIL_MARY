@@ -69,6 +69,7 @@ export const DESIGNS = [
   D('skull', 'The Skull', 'event', 0, { text: 'Exit liquidity: the biggest seller collects 5; everyone else pays 2' }),
   D('world', 'The World', 'event', 0, { text: 'Every standing effect ends, and everyone draws a card' }),
   D('illuminati', 'The Illuminati', 'event', 0, { text: 'Unseen hands: every player passes one random card to the left' }),
+  D('moralhazard', 'Moral Hazard', 'event', 0, { text: 'The bailout: the poorest player collects 5; the richest loses 2' }),
 ];
 export const byKey = Object.fromEntries(DESIGNS.map((d) => [d.key, d]));
 // Two 40-card starter recipes: Devotion (deeds, remedies, slow money) and Degen
@@ -85,7 +86,7 @@ export const RECIPES = {
   degen: [['h80z', 1], ['diablito', 1], ['eugene', 1], ['unicornio', 1], ['gato', 1], ['prospector', 1], ['abuela', 1],
     ['shitcoin', 2], ['tech', 1], ['moon', 1], ['bluechip', 1], ['jardin', 1],
     ['bull', 2], ['rocket', 2], ['inherit', 1],
-    ['crash', 1], ['halving', 1], ['ballena', 1], ['rueda', 1], ['godcandle', 1], ['skull', 1], ['illuminati', 1],
+    ['halving', 1], ['ballena', 1], ['rueda', 1], ['moralhazard', 1], ['godcandle', 1], ['skull', 1], ['illuminati', 1],
     ['hack', 1], ['rug', 1], ['sirena', 1], ['taxman', 1], ['snake', 1], ['naranja', 1], ['alacran', 1],
     ['tortilla', 1], ['keys', 1],
     ['heart', 1], ['xray', 1], ['halo', 1], ['enigma', 1],
@@ -135,6 +136,11 @@ export class Game {
         rich.invest.splice(rich.invest.indexOf(best), 1); poor.invest.push(best);
         this.log(`THE WHALE moves ${best.name} from ${rich.name} to ${poor.name}`);
       }
+    }
+    if (c.key === 'moralhazard') {
+      const byLiq = [...this.players].sort((a2, b2) => a2.liq - b2.liq);
+      const poor = byLiq[0], rich = byLiq[byLiq.length - 1];
+      if (poor !== rich && rich.liq > poor.liq) { poor.liq += 5; rich.liq = Math.max(0, rich.liq - 2); this.log(`TOO BIG TO FAIL: ${poor.name} is bailed out (+5); ${rich.name} pays for prudence (-2)`); }
     }
     if (c.key === 'rueda') {
       const n = this.players.length; const invs = this.players.map((q) => q.invest);
