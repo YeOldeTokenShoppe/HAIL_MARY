@@ -136,15 +136,15 @@ Traders are a card type inside the deck — you hire them by drawing and playing
 | **El Gato** | 2 | When El Gato is seated, immediately discard **one hazard** affecting you, free. |
 | **El Monje** | 1 | When you light a candle, collect 1 Liquidity. |
 | **El Diablito — Connor** | 2 | When a hazard you play successfully enters a rival's hazard area, collect 1 Liquidity. |
-| **La Celebridad** | 3 | When you bank Prosperity from an Asset or Progress card, you may pay 1 Liquidity to add 25 Prosperity. |
+| **La Estrella — The Star** | 3 | The influencer. When you bank Prosperity from an Asset or Progress card, you may pay 1 Liquidity to add 25 Prosperity. |
 | **St. GR80** | 2 | When you light a candle, bank **25 Prosperity**. |
 | **H80Z** | 2 | Hazards you play cost 1 less Liquidity, minimum zero. |
 | **Eugene** | 2 | Your Hail Mary odds rise **one step** on the deeds table. |
-| **La Abuela** | 2 | Remedies you play cost 1 less Liquidity, minimum zero. |
+| **La Abuela** | 2 | The gambling grandmother. Your gambles (Shitcoin) moon on **4+** instead of 5+. |
 | **The Pope** | 3 | Once per game, a failed Hail Mary is absolved — you may attempt it again. |
 | **The Prospector** | 2 | Assets you buy cost 1 less Liquidity, minimum zero. |
 
-The Celebrity's bonus does not apply to the Hail Mary. Eugene's step respects the 8/12 cap.
+The Star's bonus does not apply to the Hail Mary. Eugene's step respects the 8/12 cap.
 
 One more design is reserved as a collectible alternate outside the starters: **La Detective — Marisol** (Rug Pulls cannot be played on you).
 
@@ -200,6 +200,7 @@ For rules purposes, The Inheritance is a Progress card.
 | **La Sirena** | 3 | The target's seated Trader walks into the sea (discarded). They cannot seat a new Trader until cleared. |
 | **Tax Collector** | 2 | The target pays 1 Liquidity to the bank at the start of each of their turns. |
 | **The Snake** | 3 | The serpent at the shrine: the target's candles count as zero for the Hail Mary. |
+| **El Naranja** | 3 | The Orange One takes his cut: whenever the target banks Prosperity, the hazard's owner collects 2 Liquidity. (Not the Hail Mary.) |
 
 These hazards do not prevent a Hail Mary attempt or reduce its payout. Rug Pull still allows direct Progress cards.
 
@@ -233,18 +234,19 @@ A canceled hazard is discarded. Its player does not recover the cost or action.
 |---|---:|---|
 | **La Ofrenda** | 0 | Your main action: place it at Our Lady's shrine (out of the game) and light one candle. |
 | **Raphael's Cherub** | 1 | Your main action: to the shrine — light one candle, then draw a card. |
+| **The Rose** | 0 | Your main action: offer it to a rival. If they **accept**, they keep it in their investments (worth 50 Prosperity) and you light a candle. If they **refuse**, it returns to your hand. |
 
 ### The recipes — 40 cards each
 
 Two starters replace the single shared deck, so the first playtests are archetype tests. Deck identity is the collectible premise.
 
 **Devotion** — deeds, remedies, slow money:
-St. GR80, El Monje, El Gato, La Abuela, La Celebridad, The Pope (1 each) · Tech Stock ×1, The Moon ×1, Blue Chip ×1, La Moneda ×2, La Semilla ×1 · The Bull ×2, Rocket ×2, The Inheritance ×1 · La Corrida, The Airdrop, Honeymoon (1 each) · The Bear ×2, Rug Pull ×1 · The Bell ×2, Quantum Resistance ×2, The Keys ×2, Miracle Tortilla ×2 · Sacred Heart, The Halo, The Rosary Beads, X-Ray Glasses, The Grail (1 each) · La Ofrenda ×3, Raphael's Cherub ×1.
+St. GR80, El Monje, El Gato, La Estrella, The Pope (1 each) · Tech Stock ×1, The Moon ×1, Blue Chip ×1, La Moneda ×2, La Semilla ×1 · The Bull ×2, Rocket ×2, The Inheritance ×1 · La Corrida, The Airdrop, Honeymoon (1 each) · The Bear ×2, Rug Pull ×1 · The Bell ×2, Quantum Resistance ×2, The Keys ×2, Miracle Tortilla ×2 · Sacred Heart, The Halo, The Rosary Beads, X-Ray Glasses, The Grail (1 each) · La Ofrenda ×3, Raphael's Cherub ×1, The Rose ×1.
 
 **Degen** — hazards, gambles, compounding:
-H80Z, El Diablito, Eugene, El Unicornio, El Gato, The Prospector (1 each) · Meme Coin ×1, Shitcoin ×2, Tech Stock ×1, The Moon ×1, Blue Chip ×1, El Jardín ×1 · The Bull ×2, Rocket ×2, The Inheritance ×1 · Flash Crash, El Halving, La Ballena, La Rueda, The God Candle, The Skull, The Illuminati (1 each) · The Bear ×1, Quantum Hack ×1, Rug Pull ×2, La Sirena ×1, Tax Collector ×1, The Snake ×1 · Miracle Tortilla ×1, The Keys ×1 · Sacred Heart, X-Ray Glasses, The Halo, Enigma Machine (1 each) · La Ofrenda ×2.
+H80Z, El Diablito, Eugene, El Unicornio, El Gato, The Prospector, La Abuela (1 each) · Shitcoin ×2, Tech Stock ×1, The Moon ×1, Blue Chip ×1, El Jardín ×1 · The Bull ×2, Rocket ×2, The Inheritance ×1 · Flash Crash, El Halving, La Ballena, La Rueda, The God Candle, The Skull, The Illuminati (1 each) · The Bear ×1, Quantum Hack ×1, Rug Pull ×1, La Sirena ×1, Tax Collector ×1, The Snake ×1, El Naranja ×1 · Miracle Tortilla ×1, The Keys ×1 · Sacred Heart, X-Ray Glasses, The Halo, Enigma Machine (1 each) · La Ofrenda ×2.
 
-The pool holds **51 distinct designs** (The World rides outside the starters as a collectible) (plus La Detective as a spec-only alternate). Including Our Lady, each player begins with 41 cards in total. The digital table lists every design with its recipe counts under **"All cards in this playtest"** at the bottom of the page.
+The pool holds **53 distinct designs** (The World rides outside the starters as a collectible) (plus La Detective as a spec-only alternate). Including Our Lady, each player begins with 41 cards in total. The digital table lists every design with its recipe counts under **"All cards in this playtest"** at the bottom of the page.
 
 ## 12. Collectibility and presentation
 
