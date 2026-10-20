@@ -2,7 +2,7 @@
 
 A digital-first, Lotería-inspired collectible card game about building prosperity, surviving market disasters, and deciding when helping a rival is worth the sacrifice.
 
-Players build their decks before the game. During play, they use Liquidity to fund investments, disrupt competitors, and help one another. Every player has one chance to invoke a Hail Mary, with better chances earned through cooperation.
+Players build their decks before the game. During play, they use Liquidity to fund investments, disrupt competitors, and help one another. Every player has one chance to invoke a Hail Mary, with better chances earned through offerings to Our Lady.
 
 ## 1. Players and objective
 
@@ -29,7 +29,7 @@ Players themselves are identical — nobody *is* a character. The Traders are ca
 |---|---|---|
 | **Liquidity** | Spend on cards, investments, and assistance | Coins or banknotes in denominations of 1, 5, and 10 |
 | **Prosperity** | Progress toward the 1,000-point victory target | Banked cards and a visible total |
-| **Good Deeds** | Improve your Hail Mary probability | Up to three illuminated candles |
+| **Candles** | Offerings to Our Lady that improve your Hail Mary probability | Up to three illuminated candles at the shrine |
 
 Money comes from a shared bank. Bank supply is unlimited in the digital game.
 
@@ -50,7 +50,6 @@ Your main action can be:
 
 - Play one card, paying its cost.
 - Sell one investment you already own.
-- Help a rival.
 - Pay to clear one of your hazards.
 - Attempt your Hail Mary.
 - Pass.
@@ -90,20 +89,13 @@ You may play a Remedy on a rival’s hazard instead of your own. Pay its normal 
 
 Artifacts remain equipped until discarded by an effect. You may equip **at most two**. When playing a third, discard one of your existing Artifacts.
 
-## 7. Cooperation and Good Deeds
+## 7. Offerings and candles
 
-Earn one deed when you:
+**La Ofrenda** is a Grace card in the deck. Playing it is your main action: the card itself is the offering — it goes to Our Lady's shrine, out of the game, and lights **one candle**.
 
-- Use a matching Remedy to clear a rival’s hazard.
-- Spend your main action to give a rival **2 of your own Liquidity**.
-- Resolve a card explicitly marked as a cooperative action.
-
-Limits:
-
-- Maximum **one deed per turn** and **three recorded deeds**.
-- Clearing a hazard you caused earns no deed.
-- Trades, repayments, and gifts conditional on receiving something in return earn no deed.
-- One action earns at most one deed, even if it helps several players.
+- Maximum **three candles**. Each one doubles your Hail Mary chance (section 8).
+- The shrine is the only road to candles. Piety rides the deck: if La Ofrenda never comes, grace never comes.
+- Helping a rival — clearing their hazard with a Remedy, striking deals — is allowed and often wise, but it earns no candle. Charity is its own reward; the Lady counts only what is placed on her shrine.
 
 Players may discuss deals, but informal promises are not enforced by the game.
 
@@ -111,14 +103,14 @@ Players may discuss deals, but informal promises are not enforced by the game.
 
 Every player gets **one attempt per game**. It replaces their main action.
 
-| Recorded deeds | Success chance |
+| Candles lit | Success chance |
 |---:|---:|
 | 0 | 1/12 |
 | 1 | 2/12 |
 | 2 | 4/12 |
 | 3 | 8/12 |
 
-Each deed doubles the success chance, capped at **8/12**.
+Each candle doubles the success chance, capped at **8/12**.
 
 **Success:** clear all hazards affecting you and bank **200 Prosperity**.
 
@@ -142,10 +134,10 @@ Traders are a card type inside the deck — you hire them by drawing and playing
 |---|---:|---|
 | **El Unicornio** | 3 | At the start of your turn, collect **1 extra Liquidity**. |
 | **El Gato** | 2 | When El Gato is seated, immediately discard **one hazard** affecting you, free. |
-| **El Monje** | 1 | When you earn a deed, collect 1 Liquidity. |
+| **El Monje** | 1 | When you light a candle, collect 1 Liquidity. |
 | **El Diablito — Connor** | 2 | When a hazard you play successfully enters a rival's hazard area, collect 1 Liquidity. |
 | **La Celebridad** | 3 | When you bank Prosperity from an Asset or Progress card, you may pay 1 Liquidity to add 25 Prosperity. |
-| **St. GR80** | 2 | When you earn a deed, bank **25 Prosperity**. |
+| **St. GR80** | 2 | When you light a candle, bank **25 Prosperity**. |
 | **H80Z** | 2 | Hazards you play cost 1 less Liquidity, minimum zero. |
 | **Eugene** | 2 | Your Hail Mary odds rise **one step** on the deeds table. |
 | **La Abuela** | 2 | Remedies you play cost 1 less Liquidity, minimum zero. |
@@ -165,6 +157,8 @@ Events are the market's own voice — the caprice. They are cards in the deck, b
 | **Flash Crash** | Every player holding **8 or more Liquidity** immediately loses half, rounded down. |
 | **The Airdrop** | Every player draws a card. (With the replacement, the drawer draws two.) |
 | **Honeymoon** | Until the drawer's next turn, **no hazards** can be played. |
+| **La Ballena** | The whale surfaces: the richest portfolio's best Asset moves to the poorest player. |
+| **La Rueda** | Every portfolio rotates one seat. |
 
 Events do not fire during the opening deal.
 
@@ -181,6 +175,9 @@ All costs below are paid in Liquidity when the card is played. Traders are liste
 | **The Moon** | 4 | Asset. Later sell for **7 Liquidity** or **150 Prosperity**. |
 | **Shitcoin** | 1 | Asset. Later sell for **1 Liquidity** — or gamble it for Prosperity: roll a die, **5+ banks 125**, anything else pays nothing. |
 | **Blue Chip** | 6 | Asset. Later sell for **10 Liquidity** or **250 Prosperity**. |
+| **La Moneda** | 3 | Asset. While held, collect **1 Liquidity** at the start of your turn. Sell for 3 Liquidity or 50 Prosperity. |
+| **El Jardín** | 4 | Asset. While held, collect **2 Liquidity** a turn — but it dies the moment **any Event** fires. Sell for 2 Liquidity or 50 Prosperity. |
+| **La Semilla** | 1 | Asset. Sell for 1 Liquidity or **25 Prosperity** — or hold four rounds and it blooms to **150**. |
 | **The Bull** | 2 | Progress. Bank **100 Prosperity**. |
 | **Rocket** | 4 | Progress. Bank **200 Prosperity**. |
 | **The Inheritance** | 0 | Choose **3 Liquidity** or **50 Prosperity**. Discard after taking cash; bank after taking Prosperity. |
@@ -206,7 +203,7 @@ These hazards do not prevent a Hail Mary attempt or reduce its payout. Rug Pull 
 | **The Keys** | 1 | Clear Rug Pull. |
 | **Miracle Tortilla** | 2 | Clear any one hazard. |
 
-Each Remedy can help you or a rival. Only qualifying help to a rival earns a deed.
+Each Remedy can help you or a rival. Helping earns goodwill, not candles.
 
 ### Artifacts
 
@@ -215,30 +212,27 @@ Each Remedy can help you or a rival. Only qualifying help to a rival earns a dee
 | **Sacred Heart** | 2 | Discard this equipped Artifact to cancel a hazard just played on you. |
 | **The Halo** | 3 | While equipped, any Trader seated at your desk — now or later — cannot be disabled. A Quantum Hack on you remains until cleared, but does nothing. |
 | **X-Ray Glasses** | 2 | Once during your turn, inspect one randomly selected card in a rival’s hand. This does not use your main action. |
-| **The Rosary Beads** | 2 | When you earn a deed, you may draw one card. |
+| **The Rosary Beads** | 2 | When you light a candle, you may draw one card. |
 
 A canceled hazard is discarded. Its player does not recover the cost or action.
 
-### Cooperative actions
+### Graces
 
 | Card | Cost | Effect |
 |---|---:|---|
-| **The Rose** | 0 | Give a rival 2 Liquidity from your funds. Earn one deed, then draw one card. |
-| **The Fountain** | 1 | You and one chosen rival each draw one card. Earn one deed. |
-
-Discard these cards after resolving. You must have the required money to play The Rose.
+| **La Ofrenda** | 0 | Your main action: place it at Our Lady's shrine (out of the game) and light one candle. |
 
 ### The recipes — 40 cards each
 
 Two starters replace the single shared deck, so the first playtests are archetype tests. Deck identity is the collectible premise.
 
 **Devotion** — deeds, remedies, slow money:
-St. GR80, El Monje, El Gato, La Abuela, La Celebridad (1 each) · Tech Stock ×2, The Moon ×2, Blue Chip ×1 · The Bull ×2, Rocket ×2, The Inheritance ×2 · La Corrida, The Airdrop, Honeymoon (1 each) · The Bear ×2, Rug Pull ×1 · The Bell ×2, Quantum Resistance ×2, The Keys ×2, Miracle Tortilla ×2 · Sacred Heart, The Halo, The Rosary Beads, X-Ray Glasses (1 each) · The Rose ×3, The Fountain ×3.
+St. GR80, El Monje, El Gato, La Abuela, La Celebridad (1 each) · Tech Stock ×2, The Moon ×2, Blue Chip ×1, La Moneda ×2, La Semilla ×1 · The Bull ×2, Rocket ×2, The Inheritance ×2 · La Corrida, The Airdrop, Honeymoon (1 each) · The Bear ×2, Rug Pull ×1 · The Bell ×2, Quantum Resistance ×2, The Keys ×2, Miracle Tortilla ×2 · Sacred Heart, The Halo, The Rosary Beads, X-Ray Glasses (1 each) · La Ofrenda ×3.
 
 **Degen** — hazards, gambles, compounding:
-H80Z, El Diablito, Eugene, El Unicornio, El Gato (1 each) · Meme Coin ×3, Shitcoin ×3, Tech Stock ×1, The Moon ×1, Blue Chip ×1 · The Bull ×3, Rocket ×3, The Inheritance ×1 · Flash Crash, El Halving, La Corrida (1 each) · The Bear ×2, Quantum Hack ×2, Rug Pull ×2 · Miracle Tortilla ×2, The Keys ×1, The Bell ×1, Quantum Resistance ×1 · Sacred Heart, X-Ray Glasses, The Halo (1 each) · The Rose ×1, The Fountain ×1.
+H80Z, El Diablito, Eugene, El Unicornio, El Gato (1 each) · Meme Coin ×2, Shitcoin ×3, Tech Stock ×1, The Moon ×1, Blue Chip ×1, El Jardín ×2 · The Bull ×2, Rocket ×3, The Inheritance ×1 · Flash Crash, El Halving, La Corrida, La Ballena, La Rueda (1 each) · The Bear ×2, Quantum Hack ×2, Rug Pull ×2 · Miracle Tortilla ×2, The Keys ×1 · Sacred Heart, X-Ray Glasses, The Halo (1 each) · La Ofrenda ×2.
 
-The pool holds **35 distinct designs** (plus La Detective as a spec-only alternate). Including Our Lady, each player begins with 41 cards in total. The digital table lists every design with its recipe counts under **"All cards in this playtest"** at the bottom of the page.
+The pool holds **39 distinct designs** (plus La Detective as a spec-only alternate). Including Our Lady, each player begins with 41 cards in total. The digital table lists every design with its recipe counts under **"All cards in this playtest"** at the bottom of the page.
 
 ## 12. Collectibility and presentation
 
@@ -262,12 +256,13 @@ These numbers are starting hypotheses, not established balance.
 Watch for:
 
 - Whether investing for cash is worth delaying Prosperity.
-- Whether players voluntarily help rivals.
+- Whether players voluntarily help rivals even without candles for it.
 - Whether hazards create decisions without causing long stalls.
 - Whether hiring a Trader is worth a main action, and whether replacing one ever happens.
 - Whether the Hail Mary feels exciting at both low and high deed counts.
 - Whether the 40-card deck produces enough variety before someone wins.
 - Whether Events feel like weather or like noise.
+- Whether candles riding the deck (La Ofrenda) makes devotion feel like grace or like bad luck.
 - Whether Devotion and Degen feel different to pilot, and whether either dominates.
 
 Start with the two starter recipes. Build custom decks after the basic economy and turn structure feel good.

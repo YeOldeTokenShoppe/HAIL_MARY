@@ -45,7 +45,7 @@ button:disabled{opacity:.4;cursor:default}
 .card.hazard{background:linear-gradient(170deg,#6e3050,#542343);color:#ffe9f0;border-color:var(--rose)}
 .card.remedy{background:linear-gradient(170deg,#2f6b58,#1f4e3f);color:#eafff5;border-color:var(--teal)}
 .card.artifact{background:linear-gradient(170deg,#5e4a9e,#473579);color:#f3edff;border-color:var(--violet)}
-.card.coop,.card.lady{background:linear-gradient(170deg,#e8b84b,#d9a02e);color:#2a2040}
+.card.grace,.card.lady{background:linear-gradient(170deg,#e8b84b,#d9a02e);color:#2a2040}
 .card.trader{background:linear-gradient(170deg,#b3622f,#8a4520);color:#ffeede;border-color:#e09a5d}
 .card.slot{background:transparent;border:1.5px dashed var(--line);color:var(--muted);box-shadow:none;align-items:center;justify-content:center;text-align:center}
 .chip.trader{border-color:#e09a5d;color:#e8a96b}
@@ -105,7 +105,7 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 <div class="board" id="board" hidden>
   <section class="rivals" id="rivals"></section>
   <section class="panel me">
-    <div class="phead"><span class="who" id="meWho">YOU</span><span class="stat">Liquidity <b id="meLiq">0</b></span><span class="stat">Prosperity <b id="mePros">0</b> / 1000</span><span class="stat">Deeds <b class="candles" id="meDeeds"></b></span><span class="stat" id="meHail"></span><span class="stat" id="meHaz"></span></div>
+    <div class="phead"><span class="who" id="meWho">YOU</span><span class="stat">Liquidity <b id="meLiq">0</b></span><span class="stat">Prosperity <b id="mePros">0</b> / 1000</span><span class="stat">Candles <b class="candles" id="meDeeds"></b></span><span class="stat" id="meHail"></span><span class="stat" id="meHaz"></span></div>
     <div class="prosbar"><i id="meBar" style="width:0%"></i></div>
     <div class="rowlabel">Your investments · tap to sell (not the turn they arrive)</div><div class="cards" id="meInvest"></div>
     <div style="display:flex;gap:1.2rem;flex-wrap:wrap">
@@ -118,7 +118,6 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
     <div class="rowlabel" style="margin-top:12px">At the table</div><div id="feed" class="note" style="display:grid;gap:2px;min-height:3.2em"></div>
     <div class="actionbar">
       <b class="stat" id="turnNote"></b>
-      <button id="giftBtn">Give 2 Liquidity (deed)</button>
       <button id="hailBtn">Hail Mary</button>
       <button id="passBtn">Pass</button>
       
@@ -135,13 +134,13 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const FX = { unicornio: 'At the start of your turn, collect 1 extra Liquidity', gato: 'When seated: knock one hazard off your table, free', monje: 'When you earn a deed, collect 1 Liquidity', diablito: 'When a hazard you play lands, collect 1 Liquidity', celebridad: 'Pay 1 when banking from a card: +25 Prosperity', gr80: 'When you earn a deed, bank 25 Prosperity', h80z: 'Hazards you play cost 1 less', eugene: 'Your Hail Mary odds rise one step', abuela: 'Your Remedies cost 1 less', shitcoin: 'Sell for Prosperity: a die decides — 5+ moons for 125, else zero', bluechip: 'Sell later: 10 Liquidity or 250 Prosperity', halving: 'Fires when drawn: until the drawer’s next turn, turn income is 1', corrida: 'Fires when drawn: until the drawer’s next turn, Prosperity sales pay +25', crash: 'Fires when drawn: everyone holding 8+ Liquidity loses half', airdrop: 'Fires when drawn: every player draws a card', honeymoon: 'Fires when drawn: no hazards until the drawer’s next turn', tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell later: 4 Liquidity or 75 Prosperity', moon: 'Sell later: 7 Liquidity or 150 Prosperity', bull: 'Bank 100 Prosperity', rocket: 'Bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', bell: 'Clears The Bear', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one hazard', heart: 'Discard to cancel a hazard just played on you', halo: 'Any Trader seated at your desk cannot be disabled', xray: 'Once a turn, tap to peek at a random rival card — free', rosary: 'Draw a card when you earn a deed', rose: 'Give a rival 2 Liquidity: a deed, then draw one', fountain: 'You and a rival each draw one: a deed' };
+const FX = { unicornio: 'At the start of your turn, collect 1 extra Liquidity', gato: 'When seated: knock one hazard off your table, free', monje: 'When you light a candle, collect 1 Liquidity', diablito: 'When a hazard you play lands, collect 1 Liquidity', celebridad: 'Pay 1 when banking from a card: +25 Prosperity', gr80: 'When you light a candle, bank 25 Prosperity', h80z: 'Hazards you play cost 1 less', eugene: 'Your Hail Mary odds rise one step', abuela: 'Your Remedies cost 1 less', shitcoin: 'Sell for Prosperity: a die decides — 5+ moons for 125, else zero', bluechip: 'Sell later: 10 Liquidity or 250 Prosperity', halving: 'Fires when drawn: until the drawer’s next turn, turn income is 1', corrida: 'Fires when drawn: until the drawer’s next turn, Prosperity sales pay +25', crash: 'Fires when drawn: everyone holding 8+ Liquidity loses half', airdrop: 'Fires when drawn: every player draws a card', honeymoon: 'Fires when drawn: no hazards until the drawer’s next turn', tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell later: 4 Liquidity or 75 Prosperity', moon: 'Sell later: 7 Liquidity or 150 Prosperity', bull: 'Bank 100 Prosperity', rocket: 'Bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', bell: 'Clears The Bear', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one hazard', heart: 'Discard to cancel a hazard just played on you', halo: 'Any Trader seated at your desk cannot be disabled', xray: 'Once a turn, tap to peek at a random rival card — free', rosary: 'Draw a card when you light a candle', ofrenda: 'Offer it to Our Lady: it goes to the shrine and lights a candle (max 3)', moneda: 'While held: collect 1 Liquidity at the start of your turn', jardin: 'While held: collect 2 a turn — but it dies the moment any Event fires', semilla: 'Sell for 25 Prosperity — or hold four rounds and it blooms to 150', ballena: 'Fires when drawn: the richest portfolio’s best Asset moves to the poorest player', rueda: 'Fires when drawn: every portfolio rotates one seat' };
 
 let S = null;
 const toast = (t) => { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2800); };
 const tick = (line) => { $('ticker').hidden = false; const el = $('tickText'); el.textContent = line; el.classList.remove('fresh'); void el.offsetWidth; el.classList.add('fresh'); };
 const headline = (raw) => { const l = raw.replace(/^\[T\d+\] /, '');
-  const tag = /EVENT/.test(l) ? 'MARKET WIRE' : /Bear|Hack|Rug/i.test(l) ? 'BREAKING' : /WINS/.test(l) ? 'FINAL BELL' : /deed|Rose|Fountain|gives/i.test(l) ? 'GOOD WORKS' : /HAIL MARY/i.test(l) ? 'MIRACLE DESK' : 'ON CHAIN';
+  const tag = /EVENT/.test(l) ? 'MARKET WIRE' : /Bear|Hack|Rug/i.test(l) ? 'BREAKING' : /WINS/.test(l) ? 'FINAL BELL' : /candle|shrine/i.test(l) ? 'GOOD WORKS' : /HAIL MARY/i.test(l) ? 'MIRACLE DESK' : 'ON CHAIN';
   return tag + ' · ' + l.toUpperCase(); };
 const cap = (s) => s ? s[0].toUpperCase() + s.slice(1) : '';
 
@@ -169,8 +168,8 @@ function popMenu(items) { if (!S.mainResolve) { toast('Your main action is spent
   host.querySelector('.overlay').onclick = (e) => { if (e.target === e.currentTarget) host.innerHTML = ''; };
 }
 function cardEl(c) {
-  const el = document.createElement('div'); el.className = 'card ' + (c.type === 'hazard' ? 'hazard' : c.type === 'remedy' ? 'remedy' : c.type === 'artifact' ? 'artifact' : c.type === 'coop' ? 'coop' : c.type === 'trader' ? 'trader' : c.type === 'event' ? 'event' : '');
-  el.innerHTML = `<div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.type === 'event' ? '<span>fires on draw</span>' : `<span>cost ${c.cost}</span>`}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}</div><div class="fx">${esc(FX[c.key] || c.text || '')}</div>`;
+  const el = document.createElement('div'); el.className = 'card ' + (c.type === 'hazard' ? 'hazard' : c.type === 'remedy' ? 'remedy' : c.type === 'artifact' ? 'artifact' : c.type === 'grace' ? 'grace' : c.type === 'trader' ? 'trader' : c.type === 'event' ? 'event' : '');
+  el.innerHTML = `<div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.type === 'event' ? '<span>fires on draw</span>' : c.type === 'grace' ? '<span>to the shrine</span>' : `<span>cost ${c.cost}</span>`}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}</div><div class="fx">${esc(FX[c.key] || c.text || '')}</div>`;
   return el;
 }
 $('deal').onclick = async () => {
@@ -244,7 +243,7 @@ async function showPlay(g, p, a) {
   if (a.t === 'play' && card) {
     const src = panelOf(p); const from = (src && src.querySelector('.minihand')) || src;
     const tgt = a.choice && a.choice.target;
-    const to = card.type === 'hazard' && tgt ? (tgt === S.me ? $('meHazards') : panelOf(tgt)) : (card.type === 'remedy' || card.type === 'coop') && tgt ? (tgt === S.me ? document.querySelector('.panel.me') : panelOf(tgt)) : src;
+    const to = card.type === 'hazard' && tgt ? (tgt === S.me ? $('meHazards') : panelOf(tgt)) : card.type === 'remedy' && tgt ? (tgt === S.me ? document.querySelector('.panel.me') : panelOf(tgt)) : src;
     await flyFace(card, from, to);
   }
   const b = document.createElement('div'); b.className = 'playbanner';
@@ -260,7 +259,7 @@ async function showPlay(g, p, a) {
   } else await sleep(a.t === 'pass' ? 1100 : 2600);
   b.classList.remove('show'); setTimeout(() => b.remove(), 220);
 }
-function bell(r) { const host = $('overlayHost'); const rows = S.g.players.map((q) => `<div>${esc(q.name)}${q.trader ? ' · ' + esc(q.trader.name) : ''} — <b>${q.pros}</b> Prosperity, ${q.deeds} deed${q.deeds === 1 ? '' : 's'}${q.hailUsed ? ', Hail Mary spent' : ''}</div>`).join('');
+function bell(r) { const host = $('overlayHost'); const rows = S.g.players.map((q) => `<div>${esc(q.name)}${q.trader ? ' · ' + esc(q.trader.name) : ''} — <b>${q.pros}</b> Prosperity, ${q.deeds} candle${q.deeds === 1 ? '' : 's'}${q.hailUsed ? ', Hail Mary spent' : ''}</div>`).join('');
   host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">the race is run · round ${r.turns}</div><div class="call">${r.winner === 'YOU' ? 'YOU WIN' : r.winner ? esc(r.winner) + ' WINS' : 'NO WINNER'}</div>${rows}<button class="primary" id="again">Deal again</button></div></div>`;
   host.querySelector('#again').onclick = () => { host.innerHTML = ''; $('deal').click(); };
 }
@@ -305,7 +304,7 @@ function render() {
   }
   const inv = $('meInvest'); inv.innerHTML = '';
   me.invest.forEach((a) => { const el = cardEl(a); const sc = A.find((x) => x.t === 'sell' && x.a === a && !x.pros); const sp = A.find((x) => x.t === 'sell' && x.a === a && x.pros);
-    const items = []; if (sc) items.push([`Sell for ${a.cash} Liquidity`, () => resolveMain(sc)]); if (sp) items.push([`Sell for ${a.pros} Prosperity`, () => resolveMain(sp)]);
+    const items = []; if (sc) items.push([`Sell for ${a.cash} Liquidity`, () => resolveMain(sc)]); if (sp) items.push([a.gamble ? 'Sell for Prosperity — roll the die' : `Sell for ${g.prosOf(a)} Prosperity${a.bloom && g.prosOf(a) === a.bloom ? ' — IN BLOOM' : ''}`, () => resolveMain(sp)]);
     if (items.length) { el.classList.add('playable'); el.onclick = () => popMenu(items.reverse()); } else el.classList.add('dim'); inv.appendChild(el); });
   const ar = $('meArts'); ar.innerHTML = '';
   me.artifacts.forEach((a) => { const el = cardEl(a);
@@ -321,16 +320,14 @@ function render() {
   me.hand.forEach((c, ix) => { const el = cardEl(c); if (grew && ix === me.hand.length - 1 && S.dealt) el.classList.add('dealt'); const mineActs = A.filter((x) => x.t === 'play' && x.c === c);
     const items = mineActs.map((x) => { let label = `Play (${g.costOf(me, c)} Liq)`;
       if (c.type === 'hazard') label = `Play on ${x.choice.target.name}`;
-      if (c.type === 'remedy') label = `Clear ${x.choice.hazard.name} ${x.choice.target === me ? 'on you' : 'on ' + x.choice.target.name + (x.choice.hazard.by !== me.idx && me.deeds < 3 ? ' (a deed)' : '')}`;
-      if (c.type === 'coop') label = `${c.name} with ${x.choice.target.name}`;
+      if (c.type === 'remedy') label = `Clear ${x.choice.hazard.name} ${x.choice.target === me ? 'on you' : 'on ' + x.choice.target.name}`;
+      if (c.type === 'grace') label = 'Offer to Our Lady — light a candle';
       if (c.type === 'progress' && c.choice) label = x.choice.cash ? `Take ${c.cash} Liquidity` : `Bank ${c.pros} Prosperity`;
       if (c.type === 'trader') label = me.trader ? `Hire — replaces ${me.trader.name} (${g.costOf(me, c)} Liq)` : `Hire (${g.costOf(me, c)} Liq)`;
       return [label, () => resolveMain(x)]; });
     if (items.length && mine) { el.classList.add('playable'); el.onclick = () => popMenu(items); } else el.classList.add('dim');
     mh.appendChild(el); });
   $('turnNote').textContent = S.drawResolve ? 'YOUR TURN · tap your deck to draw' : mine ? 'YOUR TURN · choose one main action:' : S.running ? (g.active && g.active !== me ? 'Turn over · ' + g.active.name + ' is playing…' : '') : '';
-  $('giftBtn').disabled = !mine || me.liq < 2 || me.deeds >= 3 || me.deedThisTurn;
-  $('giftBtn').onclick = () => popMenu(g.rivals(me).map((r) => [`Give 2 Liquidity to ${r.name}`, () => resolveMain({ t: 'gift', target: r })]));
   const hailAct = A.find((x) => x.t === 'hail');
   $('hailBtn').disabled = !mine || !hailAct;
   $('hailBtn').onclick = () => ask('once per game', `Attempt the Hail Mary at ${tw}/12? Answered: your hazards clear and you bank 200.`, 'Pray', 'Hold').then((y) => { if (y) { resolveMain(hailAct); setTimeout(() => { const last = S.g.lines.filter((l) => /HAIL MARY/.test(l)).pop(); if (last) toast(last.replace(/^\[T\d+\] /, '')); }, 60); } });
@@ -340,8 +337,8 @@ function render() {
 }
 // ── the card gallery: every design, with its copies per starter recipe ──
 function buildGallery() {
-  const host = $('gallery'); const order = ['trader', 'asset', 'progress', 'event', 'hazard', 'remedy', 'artifact', 'coop'];
-  const label = { trader: 'Traders — hire one to your seat (main action); a new hire replaces the old', asset: 'Assets — buy now, sell later for cash or Prosperity', progress: 'Progress — bank Prosperity on the spot', event: 'Events — fire the moment they are drawn and hit the whole table', hazard: 'Hazards — stick to a rival until cleared', remedy: 'Remedies — clear hazards; clearing a rival’s earns a deed', artifact: 'Artifacts — equip up to two', coop: 'Cooperative actions — deeds for the Hail Mary' };
+  const host = $('gallery'); const order = ['trader', 'asset', 'progress', 'event', 'hazard', 'remedy', 'artifact', 'grace'];
+  const label = { trader: 'Traders — hire one to your seat (main action); a new hire replaces the old', asset: 'Assets — buy now, sell later for cash or Prosperity', progress: 'Progress — bank Prosperity on the spot', event: 'Events — fire the moment they are drawn and hit the whole table', hazard: 'Hazards — stick to a rival until cleared', remedy: 'Remedies — clear hazards, yours or a rival’s', artifact: 'Artifacts — equip up to two', grace: 'Graces — offerings to Our Lady; candles raise the Hail Mary' };
   const copies = (k) => ['devotion', 'degen'].map((r) => { const e = RECIPES[r].find((x) => x[0] === k); return e ? `${cap(r)} ×${e[1]}` : null; }).filter(Boolean).join(' · ') || 'collectible alternate';
   for (const ty of order) { const ds = DESIGNS.filter((d) => d.type === ty); if (!ds.length) continue;
     const rl = document.createElement('div'); rl.className = 'rowlabel'; rl.textContent = label[ty] || ty; host.appendChild(rl);

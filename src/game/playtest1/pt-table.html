@@ -45,7 +45,7 @@ button:disabled{opacity:.4;cursor:default}
 .card.hazard{background:linear-gradient(170deg,#6e3050,#542343);color:#ffe9f0;border-color:var(--rose)}
 .card.remedy{background:linear-gradient(170deg,#2f6b58,#1f4e3f);color:#eafff5;border-color:var(--teal)}
 .card.artifact{background:linear-gradient(170deg,#5e4a9e,#473579);color:#f3edff;border-color:var(--violet)}
-.card.coop,.card.lady{background:linear-gradient(170deg,#e8b84b,#d9a02e);color:#2a2040}
+.card.grace,.card.lady{background:linear-gradient(170deg,#e8b84b,#d9a02e);color:#2a2040}
 .card.trader{background:linear-gradient(170deg,#b3622f,#8a4520);color:#ffeede;border-color:#e09a5d}
 .card.slot{background:transparent;border:1.5px dashed var(--line);color:var(--muted);box-shadow:none;align-items:center;justify-content:center;text-align:center}
 .chip.trader{border-color:#e09a5d;color:#e8a96b}
@@ -105,7 +105,7 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 <div class="board" id="board" hidden>
   <section class="rivals" id="rivals"></section>
   <section class="panel me">
-    <div class="phead"><span class="who" id="meWho">YOU</span><span class="stat">Liquidity <b id="meLiq">0</b></span><span class="stat">Prosperity <b id="mePros">0</b> / 1000</span><span class="stat">Deeds <b class="candles" id="meDeeds"></b></span><span class="stat" id="meHail"></span><span class="stat" id="meHaz"></span></div>
+    <div class="phead"><span class="who" id="meWho">YOU</span><span class="stat">Liquidity <b id="meLiq">0</b></span><span class="stat">Prosperity <b id="mePros">0</b> / 1000</span><span class="stat">Candles <b class="candles" id="meDeeds"></b></span><span class="stat" id="meHail"></span><span class="stat" id="meHaz"></span></div>
     <div class="prosbar"><i id="meBar" style="width:0%"></i></div>
     <div class="rowlabel">Your investments · tap to sell (not the turn they arrive)</div><div class="cards" id="meInvest"></div>
     <div style="display:flex;gap:1.2rem;flex-wrap:wrap">
@@ -118,7 +118,6 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
     <div class="rowlabel" style="margin-top:12px">At the table</div><div id="feed" class="note" style="display:grid;gap:2px;min-height:3.2em"></div>
     <div class="actionbar">
       <b class="stat" id="turnNote"></b>
-      <button id="giftBtn">Give 2 Liquidity (deed)</button>
       <button id="hailBtn">Hail Mary</button>
       <button id="passBtn">Pass</button>
       
@@ -133,8 +132,8 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 // RL80 R-cana — First Playtest (PLAYTEST1.md as a running game).
 // 3–4 players, constructed 40-card decks, one main action a turn, race to bank 1,000 Prosperity.
 // Liquidity funds plays; Assets sell later for cash or Prosperity; Hazards stick until cleared;
-// Remedies, Artifacts (max two equipped), cooperative actions; Good Deeds (max three candles) raise
-// the one-per-game Hail Mary from 1/12 up to 8/12 — success clears your hazards and banks 200.
+// Remedies, Artifacts (max two equipped); La Ofrenda lights candles at Our Lady's shrine (max three),
+// each doubling the one-per-game Hail Mary from 1/12 up to 8/12 — success clears your hazards and banks 200.
 //   node pt-sim.js --games 2000 --players 3 --bots greedy,greedy,random
 //   node pt-sim.js --verbose --seed 7 --players 3
 function makeRng(seed) { let s = seed >>> 0 || 1; return () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -172,8 +171,10 @@ const DESIGNS = [
   D('halo', 'The Halo', 'artifact', 3, { text: 'Any Trader seated at your desk cannot be disabled' }),
   D('xray', 'X-Ray Glasses', 'artifact', 2, { text: 'Once a turn, peek at one random rival card' }),
   D('rosary', 'The Rosary Beads', 'artifact', 2, { text: 'When you earn a deed, draw a card' }),
-  D('rose', 'The Rose', 'coop', 0, { text: 'Give a rival 2 Liquidity: a deed, then draw one' }),
-  D('fountain', 'The Fountain', 'coop', 1, { text: 'You and a chosen rival each draw one: a deed' }),
+  D('ofrenda', 'La Ofrenda', 'grace', 0, { text: 'Offer this card to Our Lady: it goes to the shrine and lights a candle' }),
+  D('moneda', 'La Moneda', 'asset', 3, { cash: 3, pros: 50, income: 1, text: 'While held: collect 1 Liquidity at the start of your turn' }),
+  D('jardin', 'El Jardín', 'asset', 4, { cash: 2, pros: 50, income: 2, text: 'While held: collect 2 a turn — but it dies the moment any Event fires' }),
+  D('semilla', 'La Semilla', 'asset', 1, { cash: 1, pros: 25, bloom: 150, text: 'Sell for 25 Prosperity — or hold four rounds and it blooms to 150' }),
   // Events: the market's own voice. They fire the moment they are drawn, hit the whole
   // table, then the drawer draws a replacement card. Nobody chooses an Event.
   D('halving', 'El Halving', 'event', 0, { text: 'Until the drawer’s next turn, turn income is 1' }),
@@ -181,25 +182,29 @@ const DESIGNS = [
   D('crash', 'Flash Crash', 'event', 0, { text: 'Everyone holding 8+ Liquidity loses half' }),
   D('airdrop', 'The Airdrop', 'event', 0, { text: 'Every player draws a card' }),
   D('honeymoon', 'Honeymoon', 'event', 0, { text: 'Until the drawer’s next turn, no hazards can be played' }),
+  D('ballena', 'La Ballena', 'event', 0, { text: 'The whale surfaces: the richest portfolio’s best Asset moves to the poorest player' }),
+  D('rueda', 'La Rueda', 'event', 0, { text: 'Every portfolio rotates one seat' }),
 ];
 const byKey = Object.fromEntries(DESIGNS.map((d) => [d.key, d]));
 // Two 40-card starter recipes: Devotion (deeds, remedies, slow money) and Degen
 // (hazards, gambles, the Unicorn's compounding). Deck identity is the collectible premise.
 const RECIPES = {
   devotion: [['gr80', 1], ['monje', 1], ['gato', 1], ['abuela', 1], ['celebridad', 1],
-    ['tech', 2], ['moon', 2], ['bluechip', 1], ['bull', 2], ['rocket', 2], ['inherit', 2],
+    ['tech', 2], ['moon', 2], ['bluechip', 1], ['moneda', 2], ['semilla', 1],
+    ['bull', 2], ['rocket', 2], ['inherit', 2],
     ['corrida', 1], ['airdrop', 1], ['honeymoon', 1],
     ['bear', 2], ['rug', 1],
     ['bell', 2], ['resist', 2], ['keys', 2], ['tortilla', 2],
     ['heart', 1], ['halo', 1], ['rosary', 1], ['xray', 1],
-    ['rose', 3], ['fountain', 3]],
+    ['ofrenda', 3]],
   degen: [['h80z', 1], ['diablito', 1], ['eugene', 1], ['unicornio', 1], ['gato', 1],
-    ['meme', 3], ['shitcoin', 3], ['tech', 1], ['moon', 1], ['bluechip', 1], ['bull', 3], ['rocket', 3], ['inherit', 1],
-    ['crash', 1], ['halving', 1], ['corrida', 1],
+    ['meme', 2], ['shitcoin', 3], ['tech', 1], ['moon', 1], ['bluechip', 1], ['jardin', 2],
+    ['bull', 2], ['rocket', 3], ['inherit', 1],
+    ['crash', 1], ['halving', 1], ['corrida', 1], ['ballena', 1], ['rueda', 1],
     ['bear', 2], ['hack', 2], ['rug', 2],
-    ['tortilla', 2], ['keys', 1], ['bell', 1], ['resist', 1],
+    ['tortilla', 2], ['keys', 1],
     ['heart', 1], ['xray', 1], ['halo', 1],
-    ['rose', 1], ['fountain', 1]],
+    ['ofrenda', 2]],
 };
 const STARTER = RECIPES.devotion;
 const ODDS = [1, 2, 4, 8]; // twelfths, by recorded deeds (cap 3)
@@ -211,8 +216,7 @@ class Game {
     this.players = players.map((cfg, idx) => ({ idx, name: cfg.name, policy: cfg.policy, trader: null, recipe: cfg.recipe || 'devotion',
       deck: this.shuffle(RECIPES[cfg.recipe || 'devotion'].flatMap(([k, n]) => Array.from({ length: n }, () => ({ ...byKey[k] })))),
       hand: [], discard: [], invest: [], artifacts: [], hazards: [], liq: 5, pros: 0, deeds: 0, hailUsed: false,
-      deedThisTurn: false,
-      stats: { plays: 0, hires: 0, sells: 0, sellCash: 0, sellPros: 0, hazPlayed: 0, hazCleared: 0, remedyRival: 0, gifts: 0, coop: 0, deeds: 0, hail: 0, hailWon: 0, passes: 0, discards: 0, turns: 0, hazTurns: 0 } }));
+      stats: { plays: 0, hires: 0, sells: 0, sellCash: 0, sellPros: 0, hazPlayed: 0, hazCleared: 0, remedyRival: 0, candles: 0, hail: 0, hailWon: 0, passes: 0, discards: 0, turns: 0, hazTurns: 0 } }));
     for (const p of this.players) for (let i = 0; i < 5; i++) this.draw(p, true);
     this.dealing = false;
     this.turnNo = 0; this.over = false; this.winner = null;
@@ -234,8 +238,24 @@ class Game {
   }
   event(p, c) {
     this.log(`✦ EVENT — ${c.name} (drawn by ${p.name}): ${c.text}`);
+    for (const q of this.players) for (const a of [...q.invest]) if (a.key === 'jardin') { q.invest.splice(q.invest.indexOf(a), 1); q.discard.push(a); this.log(`${q.name}'s EL JARDÍN withers in the weather`); }
     if (c.key === 'halving' || c.key === 'corrida' || c.key === 'honeymoon') this.fx[c.key] = { owner: p.idx };
     if (c.key === 'crash') for (const q of this.players) if (q.liq >= 8) { const lost = Math.floor(q.liq / 2); q.liq -= lost; this.log(`${q.name} loses ${lost} Liquidity in the crash`); }
+    if (c.key === 'ballena') {
+      const worth = (q) => q.invest.reduce((s2, a2) => s2 + this.prosOf(a2), 0);
+      const sorted = [...this.players].sort((a2, b2) => worth(b2) - worth(a2));
+      const rich = sorted[0], poor = sorted[sorted.length - 1];
+      if (rich !== poor && rich.invest.length && worth(rich) > worth(poor)) {
+        const best = [...rich.invest].sort((a2, b2) => this.prosOf(b2) - this.prosOf(a2))[0];
+        rich.invest.splice(rich.invest.indexOf(best), 1); poor.invest.push(best);
+        this.log(`THE WHALE moves ${best.name} from ${rich.name} to ${poor.name}`);
+      }
+    }
+    if (c.key === 'rueda') {
+      const n = this.players.length; const invs = this.players.map((q) => q.invest);
+      for (let i = 0; i < n; i++) this.players[i].invest = invs[(i + n - 1) % n];
+      this.log('LA RUEDA turns — every portfolio rotates one seat');
+    }
     if (this.hooks && this.hooks.onEvent) this.hooks.onEvent(p, c);
     if (c.key === 'airdrop') for (const q of this.players) this.draw(q);
   }
@@ -249,15 +269,16 @@ class Game {
     if (p.pros >= this.winAt && !this.over) { this.over = true; this.winner = p; this.log(`*** ${p.name} WINS with ${p.pros} ***`); }
     return true;
   }
-  earnDeed(p, why) {
-    if (p.deedThisTurn || p.deeds >= 3) return false;
-    p.deeds += 1; p.deedThisTurn = true; p.stats.deeds++;
+  lightCandle(p, why) {
+    if (p.deeds >= 3) return false;
+    p.deeds += 1; p.stats.candles++;
     if (this.is(p, 'monje')) p.liq += 1;
     if (this.is(p, 'gr80')) this.bank(p, 25, 'St. GR80');
     if (p.artifacts.some((a) => a.key === 'rosary')) this.draw(p);
-    this.log(`✧ ${p.name} earns a deed (${why}) → ${p.deeds} candle${p.deeds === 1 ? '' : 's'}`);
+    this.log(`🕯 ${p.name} lights a candle (${why}) → ${p.deeds} of 3`);
     return true;
   }
+  prosOf(a) { return a.bloom && this.turnNo - a.bornTurn >= 4 ? a.bloom : a.pros; }
   clearHazard(victim, h, by, why) {
     victim.hazards.splice(victim.hazards.indexOf(h), 1); h.owner.discard.push(h); victim.stats.hazCleared++;
     this.log(`${why}: ${h.name} off ${victim.name}`);
@@ -288,7 +309,7 @@ class Game {
         const t = choice.target || p; const h = choice.hazard || t.hazards.find((x) => c.clears === 'any' || x.key === c.clears);
         if (!h) { p.liq += cost; p.hand.push(c); p.stats.plays--; return false; }
         this.clearHazard(t, h, p, `${p.name} plays ${c.name}`); p.discard.push(c);
-        if (t !== p) { p.stats.remedyRival++; if (h.by !== p.idx) this.earnDeed(p, `cleared ${t.name}'s ${h.name}`); }
+        if (t !== p) p.stats.remedyRival++;
         break; }
       case 'artifact': {
         if (p.artifacts.length >= 2) { const drop = choice.drop || p.artifacts[0]; p.artifacts.splice(p.artifacts.indexOf(drop), 1); p.discard.push(drop); this.log(`${p.name} unequips ${drop.name}`); }
@@ -298,11 +319,11 @@ class Game {
         p.trader = c; p.stats.hires++; this.log(`${p.name} seats ${c.name} at the desk`);
         if (c.key === 'gato' && p.hazards.length && this.abilityOn(p)) { const h = choice.hazard || p.hazards[0]; this.clearHazard(p, h, p, 'EL GATO knocks it off the table'); }
         break; }
-      case 'coop': {
-        const t = choice.target || this.rivals(p)[0];
-        if (c.key === 'rose') { if (p.liq < 2) { p.liq += cost; p.hand.push(c); p.stats.plays--; return false; } p.liq -= 2; t.liq += 2; this.earnDeed(p, 'the Rose'); this.draw(p); }
-        if (c.key === 'fountain') { this.draw(p); this.draw(t); this.earnDeed(p, 'the Fountain'); }
-        p.stats.coop++; p.discard.push(c); this.log(`${p.name} plays ${c.name} with ${t.name}`); break; }
+      case 'grace': {
+        // the card itself is the offering: it leaves the game for the shrine
+        this.log(`${p.name} places ${c.name} at Our Lady’s shrine`);
+        this.lightCandle(p, 'La Ofrenda');
+        break; }
     }
     return true;
   }
@@ -315,11 +336,10 @@ class Game {
       else { p.discard.push(a); this.log(`${p.name} sells ${a.name}… the die shows ${roll}: it goes to zero`); }
       return true;
     }
-    if (wantPros) { const bonus = this.fx.corrida && !this.hasHaz(p, 'bear') ? 25 : 0; const ok = this.bank(p, a.pros + bonus, a.name + (bonus ? ' + La Corrida' : '')); if (!ok) { p.invest.push(a); p.stats.sells--; return false; } p.stats.sellPros++; /* banked */ }
+    if (wantPros) { const bonus = this.fx.corrida && !this.hasHaz(p, 'bear') ? 25 : 0; const base = this.prosOf(a); const ok = this.bank(p, base + bonus, a.name + (a.bloom && base === a.bloom ? ' IN BLOOM' : '') + (bonus ? ' + La Corrida' : '')); if (!ok) { p.invest.push(a); p.stats.sells--; return false; } p.stats.sellPros++; /* banked */ }
     else { p.liq += a.cash; p.discard.push(a); p.stats.sellCash++; this.log(`${p.name} sells ${a.name} for ${a.cash}`); }
     return true;
   }
-  gift(p, t) { if (p.liq < 2) return false; p.liq -= 2; t.liq += 2; p.stats.gifts++; this.earnDeed(p, `2 Liquidity to ${t.name}`); this.log(`${p.name} gives ${t.name} 2 Liquidity`); return true; }
   payClear(p, h) { if (!this.spend(p, 3)) return false; this.clearHazard(p, h, p, `${p.name} pays 3`); return true; }
   peek(p, t) {
     if (!p.artifacts.some((a) => a.key === 'xray') || p.peekedThisTurn || !t.hand.length) return null;
@@ -344,10 +364,9 @@ class Game {
       else if (c.type === 'progress') { if (!c.choice) { if (!(this.hasHaz(p, 'bear') && c.pros > 75)) A.push({ t: 'play', c }); } else { A.push({ t: 'play', c, choice: { cash: true } }); if (!(this.hasHaz(p, 'bear') && c.pros > 75)) A.push({ t: 'play', c, choice: {} }); } }
       else if (c.type === 'hazard') { if (!this.fx.honeymoon) for (const r of this.rivals(p)) if (!this.hasHaz(r, c.key)) A.push({ t: 'play', c, choice: { target: r } }); }
       else if (c.type === 'remedy') { for (const q of this.players) for (const h of q.hazards) if (c.clears === 'any' || h.key === c.clears) A.push({ t: 'play', c, choice: { target: q, hazard: h } }); }
-      else if (c.type === 'coop') { if (c.key === 'rose' && p.liq < cost + 2) continue; for (const r of this.rivals(p)) A.push({ t: 'play', c, choice: { target: r } }); }
+      else if (c.type === 'grace') { if (p.deeds < 3) A.push({ t: 'play', c }); }
     }
-    for (const a of p.invest) { if (this.hasHaz(p, 'rug') || a.bornTurn === this.turnNo) continue; A.push({ t: 'sell', a, pros: false }); if (!(this.hasHaz(p, 'bear') && a.pros > 75)) A.push({ t: 'sell', a, pros: true }); }
-    if (p.liq >= 2) for (const r of this.rivals(p)) A.push({ t: 'gift', target: r });
+    for (const a of p.invest) { if (this.hasHaz(p, 'rug') || a.bornTurn === this.turnNo) continue; A.push({ t: 'sell', a, pros: false }); if (!(this.hasHaz(p, 'bear') && this.prosOf(a) > 75)) A.push({ t: 'sell', a, pros: true }); }
     if (p.liq >= 3) for (const h of p.hazards) A.push({ t: 'payclear', h });
     if (!p.hailUsed) A.push({ t: 'hail' });
     A.push({ t: 'pass' });
@@ -357,17 +376,18 @@ class Game {
     switch (a.t) {
       case 'play': return this.playCard(p, a.c, a.choice || {});
       case 'sell': return this.sell(p, a.a, a.pros);
-      case 'gift': return this.gift(p, a.target);
       case 'payclear': return this.payClear(p, a.h);
       case 'hail': return this.hailMary(p);
       case 'pass': this.log(`${p.name} passes`); return true;
     }
   }
   async turn(p) {
-    p.deedThisTurn = false; p.peekedThisTurn = false; p.stats.turns++; if (p.hazards.length) p.stats.hazTurns++;
+    p.peekedThisTurn = false; p.stats.turns++; if (p.hazards.length) p.stats.hazTurns++;
     for (const k of Object.keys(this.fx)) if (this.fx[k].owner === p.idx) { delete this.fx[k]; this.log(`${byKey[k].name} blows over`); }
     p.liq += this.fx.halving ? 1 : 2;
     if (this.is(p, 'unicornio')) { p.liq += 1; this.log(`${p.name} collects 1 extra (El Unicornio)`); }
+    const yield2 = p.invest.reduce((s2, a2) => s2 + (a2.income || 0), 0);
+    if (yield2) { p.liq += yield2; this.log(`${p.name} collects ${yield2} from investments`); }
     if (p.policy.beforeDraw) await p.policy.beforeDraw(this, p);
     this.draw(p);
     { const a = await p.policy.main(this, p); await this.act(p, a || { t: 'pass' }); if (this.hooks && this.hooks.onAction) await this.hooks.onAction(p, a || { t: 'pass' }); }
@@ -392,7 +412,7 @@ class RandomBot {
 class GreedyBot {
   constructor() {}
   useHeart() { return true; }
-  discardOne(g, p) { const order = { hazard: 0, coop: 1, trader: 2, artifact: 3, remedy: 4, asset: 5, progress: 6 }; return [...p.hand].sort((a, b) => (order[a.type] ?? 9) - (order[b.type] ?? 9))[0]; }
+  discardOne(g, p) { const order = { hazard: 0, remedy: 1, artifact: 2, trader: 3, grace: 4, asset: 5, progress: 6 }; return [...p.hand].sort((a, b) => (order[a.type] ?? 9) - (order[b.type] ?? 9))[0]; }
   main(g, p) {
     const A = g.legalActions(p); const lead = [...g.rivals(p)].sort((a, b) => b.pros - a.pros)[0];
     const twelfths = g.odds(p); const hailEV = (twelfths / 12) * 200;
@@ -400,14 +420,13 @@ class GreedyBot {
     for (const a of A) {
       let s = 0;
       if (a.t === 'play' && a.c.type === 'progress') s = a.choice && a.choice.cash ? (p.liq < 3 ? 60 : 20) : a.c.pros - a.c.cost * 5 + (p.pros + a.c.pros >= g.winAt ? 9999 : 0);
-      if (a.t === 'sell') s = a.pros ? (a.a.gamble ? (p.pros + a.a.pros >= g.winAt ? 70 : 34) : a.a.pros - 10 + (p.pros + a.a.pros >= g.winAt ? 9999 : 0) + (g.fx.corrida ? 20 : 0)) : (p.liq <= 2 ? 65 : 25);
-      if (a.t === 'play' && a.c.type === 'asset') s = p.liq >= a.c.cost + 2 ? 55 + a.c.pros / 10 : 30;
+      if (a.t === 'sell') { const pv = g.prosOf(a.a); s = a.pros ? (a.a.gamble ? (p.pros + pv >= g.winAt ? 70 : 34) : pv - 10 + (p.pros + pv >= g.winAt ? 9999 : 0) + (g.fx.corrida ? 20 : 0) - (a.a.bloom && pv < a.a.bloom ? 30 : 0)) : (p.liq <= 2 ? 65 : 25); }
+      if (a.t === 'play' && a.c.type === 'asset') s = (p.liq >= a.c.cost + 2 ? 55 + a.c.pros / 10 : 30) + (a.c.income ? 16 : 0) + (a.c.bloom ? 8 : 0);
       if (a.t === 'play' && a.c.type === 'hazard') s = a.choice.target === lead && lead.pros > p.pros ? 70 + lead.pros / 20 : 15;
-      if (a.t === 'play' && a.c.type === 'remedy') { const mine = a.choice.target === p; s = mine ? 80 : (p.deeds < 3 && !p.hailUsed && a.choice.hazard.by !== p.idx ? 62 : 8); }
+      if (a.t === 'play' && a.c.type === 'remedy') { const mine = a.choice.target === p; s = mine ? 80 : 8; }
       if (a.t === 'play' && a.c.type === 'artifact') s = 35;
-      if (a.t === 'play' && a.c.type === 'coop') s = p.deeds < 3 && !p.hailUsed ? 58 : 5;
+      if (a.t === 'play' && a.c.type === 'grace') s = !p.hailUsed ? 57 - p.deeds * 4 : 2;
       if (a.t === 'play' && a.c.type === 'trader') s = p.trader ? 4 : 40 + (a.c.key === 'gato' && p.hazards.length ? 30 : 0) + (a.c.key === 'unicornio' ? 8 : 0);
-      if (a.t === 'gift') s = p.deeds < 3 && !p.hailUsed && p.liq >= 6 ? 50 : 2;
       if (a.t === 'payclear') s = p.liq >= 5 ? 66 : 20;
       if (a.t === 'hail') s = p.pros + 200 >= g.winAt ? (twelfths >= 4 ? 90 : 30) : twelfths >= 8 ? 72 : lead && lead.pros >= g.winAt - 150 ? 45 : hailEV / 4;
       if (a.t === 'pass') s = 1;
@@ -423,13 +442,13 @@ class GreedyBot {
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const FX = { unicornio: 'At the start of your turn, collect 1 extra Liquidity', gato: 'When seated: knock one hazard off your table, free', monje: 'When you earn a deed, collect 1 Liquidity', diablito: 'When a hazard you play lands, collect 1 Liquidity', celebridad: 'Pay 1 when banking from a card: +25 Prosperity', gr80: 'When you earn a deed, bank 25 Prosperity', h80z: 'Hazards you play cost 1 less', eugene: 'Your Hail Mary odds rise one step', abuela: 'Your Remedies cost 1 less', shitcoin: 'Sell for Prosperity: a die decides — 5+ moons for 125, else zero', bluechip: 'Sell later: 10 Liquidity or 250 Prosperity', halving: 'Fires when drawn: until the drawer’s next turn, turn income is 1', corrida: 'Fires when drawn: until the drawer’s next turn, Prosperity sales pay +25', crash: 'Fires when drawn: everyone holding 8+ Liquidity loses half', airdrop: 'Fires when drawn: every player draws a card', honeymoon: 'Fires when drawn: no hazards until the drawer’s next turn', tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell later: 4 Liquidity or 75 Prosperity', moon: 'Sell later: 7 Liquidity or 150 Prosperity', bull: 'Bank 100 Prosperity', rocket: 'Bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', bell: 'Clears The Bear', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one hazard', heart: 'Discard to cancel a hazard just played on you', halo: 'Any Trader seated at your desk cannot be disabled', xray: 'Once a turn, tap to peek at a random rival card — free', rosary: 'Draw a card when you earn a deed', rose: 'Give a rival 2 Liquidity: a deed, then draw one', fountain: 'You and a rival each draw one: a deed' };
+const FX = { unicornio: 'At the start of your turn, collect 1 extra Liquidity', gato: 'When seated: knock one hazard off your table, free', monje: 'When you light a candle, collect 1 Liquidity', diablito: 'When a hazard you play lands, collect 1 Liquidity', celebridad: 'Pay 1 when banking from a card: +25 Prosperity', gr80: 'When you light a candle, bank 25 Prosperity', h80z: 'Hazards you play cost 1 less', eugene: 'Your Hail Mary odds rise one step', abuela: 'Your Remedies cost 1 less', shitcoin: 'Sell for Prosperity: a die decides — 5+ moons for 125, else zero', bluechip: 'Sell later: 10 Liquidity or 250 Prosperity', halving: 'Fires when drawn: until the drawer’s next turn, turn income is 1', corrida: 'Fires when drawn: until the drawer’s next turn, Prosperity sales pay +25', crash: 'Fires when drawn: everyone holding 8+ Liquidity loses half', airdrop: 'Fires when drawn: every player draws a card', honeymoon: 'Fires when drawn: no hazards until the drawer’s next turn', tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell later: 4 Liquidity or 75 Prosperity', moon: 'Sell later: 7 Liquidity or 150 Prosperity', bull: 'Bank 100 Prosperity', rocket: 'Bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', bell: 'Clears The Bear', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one hazard', heart: 'Discard to cancel a hazard just played on you', halo: 'Any Trader seated at your desk cannot be disabled', xray: 'Once a turn, tap to peek at a random rival card — free', rosary: 'Draw a card when you light a candle', ofrenda: 'Offer it to Our Lady: it goes to the shrine and lights a candle (max 3)', moneda: 'While held: collect 1 Liquidity at the start of your turn', jardin: 'While held: collect 2 a turn — but it dies the moment any Event fires', semilla: 'Sell for 25 Prosperity — or hold four rounds and it blooms to 150', ballena: 'Fires when drawn: the richest portfolio’s best Asset moves to the poorest player', rueda: 'Fires when drawn: every portfolio rotates one seat' };
 
 let S = null;
 const toast = (t) => { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2800); };
 const tick = (line) => { $('ticker').hidden = false; const el = $('tickText'); el.textContent = line; el.classList.remove('fresh'); void el.offsetWidth; el.classList.add('fresh'); };
 const headline = (raw) => { const l = raw.replace(/^\[T\d+\] /, '');
-  const tag = /EVENT/.test(l) ? 'MARKET WIRE' : /Bear|Hack|Rug/i.test(l) ? 'BREAKING' : /WINS/.test(l) ? 'FINAL BELL' : /deed|Rose|Fountain|gives/i.test(l) ? 'GOOD WORKS' : /HAIL MARY/i.test(l) ? 'MIRACLE DESK' : 'ON CHAIN';
+  const tag = /EVENT/.test(l) ? 'MARKET WIRE' : /Bear|Hack|Rug/i.test(l) ? 'BREAKING' : /WINS/.test(l) ? 'FINAL BELL' : /candle|shrine/i.test(l) ? 'GOOD WORKS' : /HAIL MARY/i.test(l) ? 'MIRACLE DESK' : 'ON CHAIN';
   return tag + ' · ' + l.toUpperCase(); };
 const cap = (s) => s ? s[0].toUpperCase() + s.slice(1) : '';
 
@@ -457,8 +476,8 @@ function popMenu(items) { if (!S.mainResolve) { toast('Your main action is spent
   host.querySelector('.overlay').onclick = (e) => { if (e.target === e.currentTarget) host.innerHTML = ''; };
 }
 function cardEl(c) {
-  const el = document.createElement('div'); el.className = 'card ' + (c.type === 'hazard' ? 'hazard' : c.type === 'remedy' ? 'remedy' : c.type === 'artifact' ? 'artifact' : c.type === 'coop' ? 'coop' : c.type === 'trader' ? 'trader' : c.type === 'event' ? 'event' : '');
-  el.innerHTML = `<div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.type === 'event' ? '<span>fires on draw</span>' : `<span>cost ${c.cost}</span>`}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}</div><div class="fx">${esc(FX[c.key] || c.text || '')}</div>`;
+  const el = document.createElement('div'); el.className = 'card ' + (c.type === 'hazard' ? 'hazard' : c.type === 'remedy' ? 'remedy' : c.type === 'artifact' ? 'artifact' : c.type === 'grace' ? 'grace' : c.type === 'trader' ? 'trader' : c.type === 'event' ? 'event' : '');
+  el.innerHTML = `<div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.type === 'event' ? '<span>fires on draw</span>' : c.type === 'grace' ? '<span>to the shrine</span>' : `<span>cost ${c.cost}</span>`}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}</div><div class="fx">${esc(FX[c.key] || c.text || '')}</div>`;
   return el;
 }
 $('deal').onclick = async () => {
@@ -532,7 +551,7 @@ async function showPlay(g, p, a) {
   if (a.t === 'play' && card) {
     const src = panelOf(p); const from = (src && src.querySelector('.minihand')) || src;
     const tgt = a.choice && a.choice.target;
-    const to = card.type === 'hazard' && tgt ? (tgt === S.me ? $('meHazards') : panelOf(tgt)) : (card.type === 'remedy' || card.type === 'coop') && tgt ? (tgt === S.me ? document.querySelector('.panel.me') : panelOf(tgt)) : src;
+    const to = card.type === 'hazard' && tgt ? (tgt === S.me ? $('meHazards') : panelOf(tgt)) : card.type === 'remedy' && tgt ? (tgt === S.me ? document.querySelector('.panel.me') : panelOf(tgt)) : src;
     await flyFace(card, from, to);
   }
   const b = document.createElement('div'); b.className = 'playbanner';
@@ -548,7 +567,7 @@ async function showPlay(g, p, a) {
   } else await sleep(a.t === 'pass' ? 1100 : 2600);
   b.classList.remove('show'); setTimeout(() => b.remove(), 220);
 }
-function bell(r) { const host = $('overlayHost'); const rows = S.g.players.map((q) => `<div>${esc(q.name)}${q.trader ? ' · ' + esc(q.trader.name) : ''} — <b>${q.pros}</b> Prosperity, ${q.deeds} deed${q.deeds === 1 ? '' : 's'}${q.hailUsed ? ', Hail Mary spent' : ''}</div>`).join('');
+function bell(r) { const host = $('overlayHost'); const rows = S.g.players.map((q) => `<div>${esc(q.name)}${q.trader ? ' · ' + esc(q.trader.name) : ''} — <b>${q.pros}</b> Prosperity, ${q.deeds} candle${q.deeds === 1 ? '' : 's'}${q.hailUsed ? ', Hail Mary spent' : ''}</div>`).join('');
   host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">the race is run · round ${r.turns}</div><div class="call">${r.winner === 'YOU' ? 'YOU WIN' : r.winner ? esc(r.winner) + ' WINS' : 'NO WINNER'}</div>${rows}<button class="primary" id="again">Deal again</button></div></div>`;
   host.querySelector('#again').onclick = () => { host.innerHTML = ''; $('deal').click(); };
 }
@@ -593,7 +612,7 @@ function render() {
   }
   const inv = $('meInvest'); inv.innerHTML = '';
   me.invest.forEach((a) => { const el = cardEl(a); const sc = A.find((x) => x.t === 'sell' && x.a === a && !x.pros); const sp = A.find((x) => x.t === 'sell' && x.a === a && x.pros);
-    const items = []; if (sc) items.push([`Sell for ${a.cash} Liquidity`, () => resolveMain(sc)]); if (sp) items.push([`Sell for ${a.pros} Prosperity`, () => resolveMain(sp)]);
+    const items = []; if (sc) items.push([`Sell for ${a.cash} Liquidity`, () => resolveMain(sc)]); if (sp) items.push([a.gamble ? 'Sell for Prosperity — roll the die' : `Sell for ${g.prosOf(a)} Prosperity${a.bloom && g.prosOf(a) === a.bloom ? ' — IN BLOOM' : ''}`, () => resolveMain(sp)]);
     if (items.length) { el.classList.add('playable'); el.onclick = () => popMenu(items.reverse()); } else el.classList.add('dim'); inv.appendChild(el); });
   const ar = $('meArts'); ar.innerHTML = '';
   me.artifacts.forEach((a) => { const el = cardEl(a);
@@ -609,16 +628,14 @@ function render() {
   me.hand.forEach((c, ix) => { const el = cardEl(c); if (grew && ix === me.hand.length - 1 && S.dealt) el.classList.add('dealt'); const mineActs = A.filter((x) => x.t === 'play' && x.c === c);
     const items = mineActs.map((x) => { let label = `Play (${g.costOf(me, c)} Liq)`;
       if (c.type === 'hazard') label = `Play on ${x.choice.target.name}`;
-      if (c.type === 'remedy') label = `Clear ${x.choice.hazard.name} ${x.choice.target === me ? 'on you' : 'on ' + x.choice.target.name + (x.choice.hazard.by !== me.idx && me.deeds < 3 ? ' (a deed)' : '')}`;
-      if (c.type === 'coop') label = `${c.name} with ${x.choice.target.name}`;
+      if (c.type === 'remedy') label = `Clear ${x.choice.hazard.name} ${x.choice.target === me ? 'on you' : 'on ' + x.choice.target.name}`;
+      if (c.type === 'grace') label = 'Offer to Our Lady — light a candle';
       if (c.type === 'progress' && c.choice) label = x.choice.cash ? `Take ${c.cash} Liquidity` : `Bank ${c.pros} Prosperity`;
       if (c.type === 'trader') label = me.trader ? `Hire — replaces ${me.trader.name} (${g.costOf(me, c)} Liq)` : `Hire (${g.costOf(me, c)} Liq)`;
       return [label, () => resolveMain(x)]; });
     if (items.length && mine) { el.classList.add('playable'); el.onclick = () => popMenu(items); } else el.classList.add('dim');
     mh.appendChild(el); });
   $('turnNote').textContent = S.drawResolve ? 'YOUR TURN · tap your deck to draw' : mine ? 'YOUR TURN · choose one main action:' : S.running ? (g.active && g.active !== me ? 'Turn over · ' + g.active.name + ' is playing…' : '') : '';
-  $('giftBtn').disabled = !mine || me.liq < 2 || me.deeds >= 3 || me.deedThisTurn;
-  $('giftBtn').onclick = () => popMenu(g.rivals(me).map((r) => [`Give 2 Liquidity to ${r.name}`, () => resolveMain({ t: 'gift', target: r })]));
   const hailAct = A.find((x) => x.t === 'hail');
   $('hailBtn').disabled = !mine || !hailAct;
   $('hailBtn').onclick = () => ask('once per game', `Attempt the Hail Mary at ${tw}/12? Answered: your hazards clear and you bank 200.`, 'Pray', 'Hold').then((y) => { if (y) { resolveMain(hailAct); setTimeout(() => { const last = S.g.lines.filter((l) => /HAIL MARY/.test(l)).pop(); if (last) toast(last.replace(/^\[T\d+\] /, '')); }, 60); } });
@@ -628,8 +645,8 @@ function render() {
 }
 // ── the card gallery: every design, with its copies per starter recipe ──
 function buildGallery() {
-  const host = $('gallery'); const order = ['trader', 'asset', 'progress', 'event', 'hazard', 'remedy', 'artifact', 'coop'];
-  const label = { trader: 'Traders — hire one to your seat (main action); a new hire replaces the old', asset: 'Assets — buy now, sell later for cash or Prosperity', progress: 'Progress — bank Prosperity on the spot', event: 'Events — fire the moment they are drawn and hit the whole table', hazard: 'Hazards — stick to a rival until cleared', remedy: 'Remedies — clear hazards; clearing a rival’s earns a deed', artifact: 'Artifacts — equip up to two', coop: 'Cooperative actions — deeds for the Hail Mary' };
+  const host = $('gallery'); const order = ['trader', 'asset', 'progress', 'event', 'hazard', 'remedy', 'artifact', 'grace'];
+  const label = { trader: 'Traders — hire one to your seat (main action); a new hire replaces the old', asset: 'Assets — buy now, sell later for cash or Prosperity', progress: 'Progress — bank Prosperity on the spot', event: 'Events — fire the moment they are drawn and hit the whole table', hazard: 'Hazards — stick to a rival until cleared', remedy: 'Remedies — clear hazards, yours or a rival’s', artifact: 'Artifacts — equip up to two', grace: 'Graces — offerings to Our Lady; candles raise the Hail Mary' };
   const copies = (k) => ['devotion', 'degen'].map((r) => { const e = RECIPES[r].find((x) => x[0] === k); return e ? `${cap(r)} ×${e[1]}` : null; }).filter(Boolean).join(' · ') || 'collectible alternate';
   for (const ty of order) { const ds = DESIGNS.filter((d) => d.type === ty); if (!ds.length) continue;
     const rl = document.createElement('div'); rl.className = 'rowlabel'; rl.textContent = label[ty] || ty; host.appendChild(rl);
