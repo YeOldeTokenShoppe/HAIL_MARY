@@ -133,7 +133,7 @@ Traders are a card type inside the deck — you hire them by drawing and playing
 - Playing a Trader is your **main action**. Pay its cost and place it in your Trader seat.
 - You can have **one active Trader** at a time. Playing a new one sends the old one to your discard pile.
 - A Trader's ability is passive while it is seated.
-- **Quantum Hack** disables your seated Trader's ability until cleared. The hazard stays in place even if you hire a new Trader. **The Halo** protects your Trader from being disabled.
+- **Quantum Hack** disables your seated Trader's ability until cleared. The hazard stays in place even if you hire a new Trader. **The Halo** protects whoever sits in your Trader seat, current or future.
 - Traders are not Assets: they cannot be sold.
 
 | Trader | Cost | Prototype ability |
@@ -197,7 +197,7 @@ Each Remedy can help you or a rival. Only qualifying help to a rival earns a dee
 | Card | Copies | Cost | Effect |
 |---|---:|---:|---|
 | **Sacred Heart** | 1 | 2 | Discard this equipped Artifact to cancel a hazard just played on you. |
-| **The Halo** | 1 | 3 | While equipped, your Trader’s ability cannot be disabled. A Quantum Hack on you remains until cleared, but does nothing. |
+| **The Halo** | 1 | 3 | While equipped, any Trader seated at your desk — now or later — cannot be disabled. A Quantum Hack on you remains until cleared, but does nothing. |
 | **X-Ray Glasses** | 1 | 2 | Once during your turn, inspect one randomly selected card in a rival’s hand. |
 | **The Rosary Beads** | 1 | 2 | When you earn a deed, you may draw one card. |
 
