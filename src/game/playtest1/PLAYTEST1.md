@@ -185,8 +185,8 @@ All costs below are paid in Liquidity when the card is played. Traders are liste
 | **La Moneda** | 3 | Asset. While held, collect **1 Liquidity** at the start of your turn. Sell for 3 Liquidity or 50 Prosperity. |
 | **El Jardín** | 4 | Asset. While held, collect **2 Liquidity** a turn — but it dies the moment **any Event** fires. Sell for 2 Liquidity or 50 Prosperity. |
 | **La Semilla** | 1 | Asset. Sell for 1 Liquidity or **25 Prosperity** — or hold four rounds and it blooms to **150**. |
-| **The Bull** | 2 | Progress. Bank **100 Prosperity**. |
-| **Rocket** | 4 | Progress. Bank **200 Prosperity**. |
+| **The Bull** | 2 | Progress. Invest 2 → bank **100 Prosperity**. |
+| **Rocket** | 4 | Progress. Invest 4 → bank **200 Prosperity**. |
 | **The Inheritance** | 0 | Choose **3 Liquidity** or **50 Prosperity**. Discard after taking cash; bank after taking Prosperity. |
 
 For rules purposes, The Inheritance is a Progress card.
