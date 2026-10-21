@@ -329,26 +329,27 @@ export class GreedyBot {
   useHeart() { return true; }
   acceptRose() { return true; }
   discardOne(g, p) { const order = { hazard: 0, remedy: 1, artifact: 2, trader: 3, grace: 4, asset: 5, progress: 6 }; return [...p.hand].sort((a, b) => (order[a.type] ?? 9) - (order[b.type] ?? 9))[0]; }
-  main(g, p) {
-    const A = g.legalActions(p); const lead = [...g.rivals(p)].sort((a, b) => b.pros - a.pros)[0];
+  score(g, p, a) {
+    const lead = [...g.rivals(p)].sort((x, y) => y.pros - x.pros)[0];
     const twelfths = g.odds(p); const hailEV = (twelfths / 12) * 200;
+    let s = 0;
+    if (a.t === 'play' && a.c.type === 'progress') s = a.choice && a.choice.cash ? (p.liq < 3 ? 60 : 20) : a.c.pros - a.c.cost * 5 + (p.pros + a.c.pros >= g.winAt ? 9999 : 0);
+    if (a.t === 'sell') { const pv = g.prosOf(a.a); s = a.pros ? (a.a.gamble ? (p.pros + pv >= g.winAt ? 70 : 34) : pv - 10 + (p.pros + pv >= g.winAt ? 9999 : 0) + (g.fx.corrida ? 20 : 0) - (a.a.bloom && pv < a.a.bloom ? 30 : 0)) : (p.liq <= 2 ? 65 : 25); }
+    if (a.t === 'play' && a.c.type === 'asset') s = (p.liq >= a.c.cost + 2 ? 55 + a.c.pros / 10 : 30) + (a.c.income ? 16 : 0) + (a.c.bloom ? 8 : 0);
+    if (a.t === 'play' && a.c.type === 'hazard') s = a.choice.target === lead && lead.pros > p.pros ? 70 + lead.pros / 20 : 15;
+    if (a.t === 'play' && a.c.type === 'remedy') { const mine = a.choice.target === p; s = mine ? 80 : 8; }
+    if (a.t === 'play' && a.c.type === 'artifact') s = 35;
+    if (a.t === 'play' && a.c.type === 'grace') s = !p.hailUsed ? 57 - p.deeds * 4 : 2;
+    if (a.t === 'play' && a.c.type === 'trader') s = p.trader ? 4 : 40 + (a.c.key === 'gato' && p.hazards.length ? 30 : 0) + (a.c.key === 'unicornio' ? 8 : 0);
+    if (a.t === 'payclear') s = p.liq >= 5 ? 66 : 20;
+    if (a.t === 'hail') s = p.pros + 200 >= g.winAt ? (twelfths >= 4 ? 90 : 30) : twelfths >= 8 ? 72 : lead && lead.pros >= g.winAt - 150 ? 45 : hailEV / 4;
+    if (a.t === 'pass') s = 1;
+    return s;
+  }
+  main(g, p) {
+    const A = g.legalActions(p);
     let best = null, bs = -1;
-    for (const a of A) {
-      let s = 0;
-      if (a.t === 'play' && a.c.type === 'progress') s = a.choice && a.choice.cash ? (p.liq < 3 ? 60 : 20) : a.c.pros - a.c.cost * 5 + (p.pros + a.c.pros >= g.winAt ? 9999 : 0);
-      if (a.t === 'sell') { const pv = g.prosOf(a.a); s = a.pros ? (a.a.gamble ? (p.pros + pv >= g.winAt ? 70 : 34) : pv - 10 + (p.pros + pv >= g.winAt ? 9999 : 0) + (g.fx.corrida ? 20 : 0) - (a.a.bloom && pv < a.a.bloom ? 30 : 0)) : (p.liq <= 2 ? 65 : 25); }
-      if (a.t === 'play' && a.c.type === 'asset') s = (p.liq >= a.c.cost + 2 ? 55 + a.c.pros / 10 : 30) + (a.c.income ? 16 : 0) + (a.c.bloom ? 8 : 0);
-      if (a.t === 'play' && a.c.type === 'hazard') s = a.choice.target === lead && lead.pros > p.pros ? 70 + lead.pros / 20 : 15;
-      if (a.t === 'play' && a.c.type === 'remedy') { const mine = a.choice.target === p; s = mine ? 80 : 8; }
-      if (a.t === 'play' && a.c.type === 'artifact') s = 35;
-      if (a.t === 'play' && a.c.type === 'grace') s = !p.hailUsed ? 57 - p.deeds * 4 : 2;
-      if (a.t === 'play' && a.c.type === 'trader') s = p.trader ? 4 : 40 + (a.c.key === 'gato' && p.hazards.length ? 30 : 0) + (a.c.key === 'unicornio' ? 8 : 0);
-      if (a.t === 'payclear') s = p.liq >= 5 ? 66 : 20;
-      if (a.t === 'hail') s = p.pros + 200 >= g.winAt ? (twelfths >= 4 ? 90 : 30) : twelfths >= 8 ? 72 : lead && lead.pros >= g.winAt - 150 ? 45 : hailEV / 4;
-      if (a.t === 'pass') s = 1;
-      s += (g.rng ? 0 : 0);
-      if (s > bs) { bs = s; best = a; }
-    }
+    for (const a of A) { const s = this.score(g, p, a); if (s > bs) { bs = s; best = a; } }
     return best;
   }
 }
