@@ -186,7 +186,7 @@ function popMenu(items) { if (!S.mainResolve) { toast('Your main action is spent
   host.querySelector('.overlay').onclick = (e) => { if (e.target === e.currentTarget) host.innerHTML = ''; };
 }
 const typeClass = (c) => c.type === 'hazard' ? 'hazard' : c.type === 'remedy' ? 'remedy' : c.type === 'artifact' ? 'artifact' : c.type === 'grace' ? 'grace' : c.type === 'trader' ? 'trader' : c.type === 'event' ? 'event' : '';
-const miniHTML = (c) => `<div class="card mini ${typeClass(c)}" title="${esc(FX[c.key] || c.text || '')}"><div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}</div></div>`;
+const miniHTML = (c) => `<div class="card mini ${typeClass(c)}" title="${esc(FX[c.key] || c.text || '')}"><div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}${c.bloom && c.bornTurn != null && S && S.g ? (S.g.turnNo - c.bornTurn >= 4 ? '<span>\uD83C\uDF38</span>' : `<span>blooms in ${Math.max(0, 4 - (S.g.turnNo - c.bornTurn))}</span>`) : ''}</div></div>`;
 function cardEl(c) {
   const el = document.createElement('div'); el.className = 'card ' + typeClass(c);
   el.innerHTML = `<div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.type === 'event' ? '<span>fires on draw</span>' : c.type === 'grace' ? '<span>to the shrine</span>' : `<span>cost ${c.cost}</span>`}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}</div><div class="fx">${esc(FX[c.key] || c.text || '')}</div>`;
@@ -332,8 +332,8 @@ function coachTips() {
   const scored = acts().filter((a) => a.t !== 'pass').map((a) => ({ a, s: COACH.score(g, me, a) })).sort((x, y) => y.s - x.s);
   if (!scored.length) { $('coachTxt').textContent = 'Nothing playable — pass and bank up next turn.'; return; }
   const seen = new Set(); const tips = [];
-  for (const x of scored) { const l = coachLabel(g, me, x.a); if (!seen.has(l)) { seen.add(l); tips.push(l); } if (tips.length === 3) break; }
-  $('coachTxt').innerHTML = tips.map((l, i) => i === 0 ? `<b>${esc(l)}</b>` : esc(l)).join(' · ');
+  for (const x of scored) { if (tips.length && x.s <= 8) break; const l = coachLabel(g, me, x.a); if (!seen.has(l)) { seen.add(l); tips.push(l); } if (tips.length === 3) break; }
+  $('coachTxt').innerHTML = `<b>${esc(tips[0])}</b>` + (tips.length > 1 ? ` <span class="note">\u00b7 other options: ${tips.slice(1).map(esc).join(' \u00b7 ')}</span>` : '');
 }
 function render() {
   if (!S) return; const g = S.g, me = S.me; const mine = !!S.mainResolve; const A = acts();
@@ -372,7 +372,9 @@ function render() {
     if (me.discard.length) { const top = cardEl(me.discard[me.discard.length - 1]); top.classList.add('dim'); top.title = 'Your discard · ' + me.discard.length; piles.appendChild(top); }
   }
   const inv = $('meInvest'); inv.innerHTML = '';
-  me.invest.forEach((a) => { const el = cardEl(a); const sc = A.find((x) => x.t === 'sell' && x.a === a && !x.pros); const sp = A.find((x) => x.t === 'sell' && x.a === a && x.pros);
+  me.invest.forEach((a) => { const el = cardEl(a);
+    if (a.bloom && a.bornTurn != null) { const held = g.turnNo - a.bornTurn; const ch = el.querySelector('.chips');
+      if (ch) ch.insertAdjacentHTML('beforeend', held >= 4 ? '<span>\uD83C\uDF38 IN BLOOM \u2014 150P</span>' : `<span>blooms in ${4 - held} round${4 - held === 1 ? '' : 's'}</span>`); } const sc = A.find((x) => x.t === 'sell' && x.a === a && !x.pros); const sp = A.find((x) => x.t === 'sell' && x.a === a && x.pros);
     const items = []; if (sc) items.push([`Sell for ${a.cash} Liquidity`, () => resolveMain(sc)]); if (sp) items.push([a.gamble ? 'Sell for Prosperity — roll the die' : `Sell for ${g.prosOf(a)} Prosperity${a.bloom && g.prosOf(a) === a.bloom ? ' — IN BLOOM' : ''}`, () => resolveMain(sp)]);
     if (items.length) { el.classList.add('playable'); el.onclick = () => popMenu(items.reverse()); } else el.classList.add('dim'); inv.appendChild(el); });
   const ar = $('meArts'); ar.innerHTML = '';

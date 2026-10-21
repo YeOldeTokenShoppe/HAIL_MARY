@@ -334,7 +334,7 @@ export class GreedyBot {
     const twelfths = g.odds(p); const hailEV = (twelfths / 12) * 200;
     let s = 0;
     if (a.t === 'play' && a.c.type === 'progress') s = a.choice && a.choice.cash ? (p.liq < 3 ? 60 : 20) : a.c.pros - a.c.cost * 5 + (p.pros + a.c.pros >= g.winAt ? 9999 : 0);
-    if (a.t === 'sell') { const pv = g.prosOf(a.a); s = a.pros ? (a.a.gamble ? (p.pros + pv >= g.winAt ? 70 : 34) : pv - 10 + (p.pros + pv >= g.winAt ? 9999 : 0) + (g.fx.corrida ? 20 : 0) - (a.a.bloom && pv < a.a.bloom ? 30 : 0)) : (p.liq <= 2 ? 65 : 25); }
+    if (a.t === 'sell') { const pv = g.prosOf(a.a); s = a.pros ? (a.a.gamble ? (p.pros + pv >= g.winAt ? 70 : 34) : pv - 10 + (p.pros + pv >= g.winAt ? 9999 : 0) + (g.fx.corrida ? 20 : 0) - (a.a.bloom && pv < a.a.bloom ? 30 : 0)) : (p.liq <= 2 ? 65 : 25) - (a.a.bloom && pv < a.a.bloom ? 40 : 0); }
     if (a.t === 'play' && a.c.type === 'asset') s = (p.liq >= a.c.cost + 2 ? 55 + a.c.pros / 10 : 30) + (a.c.income ? 16 : 0) + (a.c.bloom ? 8 : 0);
     if (a.t === 'play' && a.c.type === 'hazard') s = a.choice.target === lead && lead.pros > p.pros ? 70 + lead.pros / 20 : 15;
     if (a.t === 'play' && a.c.type === 'remedy') { const mine = a.choice.target === p; s = mine ? 80 : 8; }
