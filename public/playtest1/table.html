@@ -57,6 +57,10 @@ button:disabled{opacity:.4;cursor:default}
 .card.trader{background:linear-gradient(170deg,#b3622f,#8a4520);color:#ffeede;border-color:#e09a5d}
 .card.slot{background:transparent;border:1.5px dashed var(--line);color:var(--muted);box-shadow:none;align-items:center;justify-content:center;text-align:center}
 .chip.trader{border-color:#e09a5d;color:#e8a96b}
+.chip.eye{border-color:var(--teal);color:var(--teal);margin-top:6px;display:inline-block}
+.card.mini{width:calc(var(--cw)*.58);min-height:calc(var(--cw)*.62);padding:.45em;gap:2px}
+.card.mini .nm{font-size:.72em}
+.card.mini .fx{display:none}
 .card.event{background:linear-gradient(170deg,#2e5f8a,#1d3f61);color:#e8f4ff;border-color:#64a7d8}
 .ticker{max-width:92rem;margin:0 auto 12px;display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:6px;padding:6px 10px;overflow:hidden;white-space:nowrap;background:var(--felt2)}
 .ticker .tlabel{font-family:var(--display);font-size:.7rem;color:var(--gold);letter-spacing:.12em;flex-shrink:0}
@@ -537,8 +541,10 @@ function popMenu(items) { if (!S.mainResolve) { toast('Your main action is spent
   host.querySelectorAll('button').forEach((b) => b.onclick = () => { const i = +b.dataset.i; host.innerHTML = ''; if (i >= 0) items[i][1](); });
   host.querySelector('.overlay').onclick = (e) => { if (e.target === e.currentTarget) host.innerHTML = ''; };
 }
+const typeClass = (c) => c.type === 'hazard' ? 'hazard' : c.type === 'remedy' ? 'remedy' : c.type === 'artifact' ? 'artifact' : c.type === 'grace' ? 'grace' : c.type === 'trader' ? 'trader' : c.type === 'event' ? 'event' : '';
+const miniHTML = (c) => `<div class="card mini ${typeClass(c)}" title="${esc(FX[c.key] || c.text || '')}"><div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}</div></div>`;
 function cardEl(c) {
-  const el = document.createElement('div'); el.className = 'card ' + (c.type === 'hazard' ? 'hazard' : c.type === 'remedy' ? 'remedy' : c.type === 'artifact' ? 'artifact' : c.type === 'grace' ? 'grace' : c.type === 'trader' ? 'trader' : c.type === 'event' ? 'event' : '');
+  const el = document.createElement('div'); el.className = 'card ' + typeClass(c);
   el.innerHTML = `<div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.type === 'event' ? '<span>fires on draw</span>' : c.type === 'grace' ? '<span>to the shrine</span>' : `<span>cost ${c.cost}</span>`}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}</div><div class="fx">${esc(FX[c.key] || c.text || '')}</div>`;
   return el;
 }
@@ -650,10 +656,14 @@ function bell(r) { const host = $('overlayHost'); const rows = S.g.players.map((
   host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">the race is run · round ${r.turns}</div><div class="call">${r.winner === 'YOU' ? 'YOU WIN' : r.winner ? esc(r.winner) + ' WINS' : 'NO WINNER'}</div>${rows}<button class="primary" id="again">Deal again</button></div></div>`;
   host.querySelector('#again').onclick = () => { host.innerHTML = ''; $('deal').click(); };
 }
-function showPeek(r) { const c = S.g.peek(S.me, r); if (!c) return; const host = $('overlayHost');
+function showPeek(r) { const c = S.g.peek(S.me, r); if (!c) return;
+  S.known = S.known || []; if (!S.known.some((k) => k.c === c)) S.known.push({ idx: r.idx, c });
+  const host = $('overlayHost');
   host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">x-ray glasses · a random card from ${esc(r.name)}&#39;s hand</div><div class="cards" id="peekRow"></div><div class="note">It stays in their hand. Your main action is still yours.</div><button class="primary" id="peekOk">Got it</button></div></div>`;
   host.querySelector('#peekRow').appendChild(cardEl(c));
   host.querySelector('#peekOk').onclick = () => { host.innerHTML = ''; render(); };
+  render(); const again = host.querySelector('#peekRow'); // re-render refreshes panels; keep the modal content
+  if (!again || !again.childElementCount) { /* no-op */ }
 }
 function acts() { return S.mainResolve ? S.g.legalActions(S.me) : []; }
 function render() {
@@ -668,8 +678,11 @@ function render() {
       <span class="stat">Liq <b>${q.liq}</b> <span class="coinrow">${coinHTML(q.liq)}</span></span><span class="stat">Banked <b>${q.pros}</b></span><span class="stat">Hand <b>${q.hand.length}</b></span><span class="stat candles">${'🕯'.repeat(q.deeds)}</span><span class="stat">${q.hailUsed ? 'HM spent' : 'HM live'}</span></div>
       <div class="prosbar"><i style="width:${Math.min(100, q.pros / 10)}%"></i></div>
       ${q.hazards.some((h) => h.key === 'alacran') && !q.artifacts.some((a) => a.key === 'enigma') ? `<div class="minihand" title="EL ALACRÁN: hand face-up">${q.hand.map((c) => `<span class="chip">${esc(c.name)}</span>`).join('')}</div>` : `<div class="minihand">${'<span class="miniback"></span>'.repeat(Math.min(9, q.hand.length))}</div>`}
+      ${(S.known || []).filter((k) => k.idx === q.idx && q.hand.includes(k.c)).map((k) => `<span class="chip eye" title="seen through the X-Ray Glasses">\uD83D\uDC41 ${esc(k.c.name)} in hand</span>`).join(' ')}
       ${q.lastLine ? `<div class="note" style="margin-top:6px">Last turn: ${esc(q.lastLine)}</div>` : ''}
-      <div style="margin-top:6px">${q.trader ? `<span class="chip trader" title="${esc(FX[q.trader.key] || '')}">${esc(q.trader.name)}${g.abilityOn(q) ? '' : ' · HACKED'}</span>` : '<span class="chip">no Trader</span>'} ${q.invest.map((a) => `<span class="chip">${esc(a.name)}</span>`).join(' ')} ${q.artifacts.map((a) => `<span class="chip">${esc(a.name)}</span>`).join(' ')} ${q.hazards.map((h) => `<span class="chip haz">${esc(h.name)}</span>`).join(' ')}</div>`;
+      <div style="margin-top:6px">${q.trader ? `<span class="chip trader" title="${esc(FX[q.trader.key] || '')}">Trader: ${esc(q.trader.name)}${g.abilityOn(q) ? '' : ' · HACKED'}</span>` : '<span class="chip">no Trader</span>'} ${q.artifacts.map((a) => `<span class="chip" title="${esc(FX[a.key] || '')}">${esc(a.name)}</span>`).join(' ')} ${q.hazards.map((h) => `<span class="chip haz" title="${esc(FX[h.key] || '')}">${esc(h.name)}</span>`).join(' ')}</div>
+      <div class="rowlabel" style="margin:9px 0 5px">Their investments</div>
+      <div class="cards">${q.invest.length ? q.invest.map((a) => miniHTML(a)).join('') : '<span class="note">none yet</span>'}</div>`;
     rv.appendChild(d);
   }
   // me
