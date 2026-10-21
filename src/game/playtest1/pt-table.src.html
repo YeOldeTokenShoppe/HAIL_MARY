@@ -314,7 +314,7 @@ function render() {
     const d = document.createElement('section'); d.className = 'panel'; d.dataset.pidx = q.idx;
     if (g.active === q && S.running) d.classList.add('hot');
     d.innerHTML = `<div class="phead"><span class="who ${g.active === q && S.running ? 'active' : ''}">${esc(q.name)}</span><span class="stat">${esc(cap(q.recipe))}</span>
-      <span class="stat">Liq <b>${q.liq}</b> <span class="coinrow">${coinHTML(q.liq)}</span></span><span class="stat">Banked <b>${q.pros}</b></span><span class="stat">Hand <b>${q.hand.length}</b></span><span class="stat candles">${'🕯'.repeat(q.deeds)}</span><span class="stat">${q.hailUsed ? 'HM spent' : 'HM live'}</span></div>
+      <span class="stat">Liq <b>${q.liq}</b> <span class="coinrow">${coinHTML(q.liq)}</span></span><span class="stat">Banked <b>${q.pros}</b></span><span class="stat">Hand <b>${q.hand.length}</b></span><span class="stat candles">${'🕯'.repeat(q.deeds)}</span><span class="stat">${q.hailUsed ? 'Hail Mary: spent' : `Hail Mary: ${g.odds(q)}/12`}</span></div>
       <div class="prosbar"><i style="width:${Math.min(100, q.pros / 10)}%"></i></div>
       ${q.hazards.some((h) => h.key === 'alacran') && !q.artifacts.some((a) => a.key === 'enigma') ? `<div class="minihand" title="EL ALACRÁN: hand face-up">${q.hand.map((c) => `<span class="chip">${esc(c.name)}</span>`).join('')}</div>` : `<div class="minihand">${'<span class="miniback"></span>'.repeat(Math.min(9, q.hand.length))}</div>`}
       ${(S.known || []).filter((k) => k.idx === q.idx && q.hand.includes(k.c)).map((k) => `<span class="chip eye" title="seen through the X-Ray Glasses">\uD83D\uDC41 ${esc(k.c.name)} in hand</span>`).join(' ')}
