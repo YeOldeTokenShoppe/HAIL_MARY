@@ -1,0 +1,439 @@
+<title>R-cana Playtest 2</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+/* The first playtest: night-market table, papel-picado card types. One committed dark look. */
+html{font-size:clamp(16px, 0.6vw + 8.6px, 23px)}
+:root{
+  --felt:#1b1430; --felt2:#241a40; --line:#4a3d6e; --ink:#efe6d0; --muted:#a899c9;
+  --paper:#f3e9d2; --paper-ink:#2a2040; --gold:#e8b84b; --rose:#e4567b; --teal:#4fc3a1; --violet:#8d7bd8;
+  --display:'Alfa Slab One','Arial Black',serif; --body:'Spectral',Georgia,serif;
+  --cw: clamp(7.8rem, 6.2rem + 3.8vw, 11rem);
+  color-scheme: dark;
+}
+body{background:var(--felt);color:var(--ink);font-family:var(--body);margin:0;font-size:clamp(1.03rem,0.9rem + 0.45vw,1.25rem);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px}
+.bar,.board,details.history{max-width:92rem;margin-inline:auto}
+h1{font-family:var(--display);font-weight:400;color:var(--gold);font-size:1.45rem;margin:0}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+.bar select,.bar input{background:var(--felt2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-family:var(--body)}
+button{background:var(--felt2);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:7px 14px;font-family:var(--body);font-size:.95rem;cursor:pointer}
+button.primary{background:var(--gold);color:#2a2040;border-color:var(--gold);font-weight:600}
+button:disabled{opacity:.4;cursor:default}
+.note{color:var(--muted);font-size:.92rem}
+.board{display:grid;gap:1rem}
+.rivals{display:grid;gap:0.8rem;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr))}
+.panel{border:1px solid var(--line);border-radius:0.8rem;padding:0.9rem;background:var(--felt2);min-width:0}
+.panel.me{border-color:var(--gold)}
+.phead{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline}
+.phead .who{font-family:var(--display);font-size:.95rem}
+.phead .who.active{color:var(--gold)}
+.stat{font-size:.98rem;color:var(--muted)}.stat b{color:var(--ink);font-variant-numeric:tabular-nums}
+.prosbar{height:0.55rem;border-radius:0.3rem;background:#0006;margin-top:6px;overflow:hidden}
+.prosbar i{display:block;height:100%;background:linear-gradient(90deg,var(--teal),var(--gold))}
+.candles{letter-spacing:.15em;color:var(--gold)}
+.rowlabel{font-size:.76rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:10px 0 6px}
+.cards{display:flex;flex-wrap:wrap;gap:0.6rem;min-height:1.6rem;min-width:0}
+.chip{font-size:.72rem;border:1px solid var(--line);border-radius:4px;padding:2px 7px;color:var(--muted)}
+.chip.haz{border-color:var(--rose);color:var(--rose)}
+.card{width:var(--cw);min-height:calc(var(--cw)*1.06);border-radius:.55em;padding:.6em;display:flex;flex-direction:column;gap:4px;position:relative;
+  background:var(--paper);color:var(--paper-ink);border:1px solid #0006;box-shadow:0 2px 6px #0007}
+.card .nm{font-family:var(--display);font-size:.85em;line-height:1.15;padding-right:.2em;text-wrap:balance;overflow-wrap:anywhere}
+.card .ty{font-size:.7em;letter-spacing:.1em;text-transform:uppercase;opacity:.65}
+.card .fx{font-size:.77em;line-height:1.25;margin-top:auto;opacity:.9}
+.card .chips{display:flex;gap:.35em;font-size:.72em;font-weight:600;flex-wrap:wrap}
+.card .chips span{background:#2a204014;border-radius:4px;padding:1px 5px}
+.card.hazard{background:linear-gradient(170deg,#6e3050,#542343);color:#ffe9f0;border-color:var(--rose)}
+.card.remedy{background:linear-gradient(170deg,#2f6b58,#1f4e3f);color:#eafff5;border-color:var(--teal)}
+.card.artifact{background:linear-gradient(170deg,#5e4a9e,#473579);color:#f3edff;border-color:var(--violet)}
+.card.grace,.card.lady{background:linear-gradient(170deg,#e8b84b,#d9a02e);color:#2a2040}
+.card.trader{background:linear-gradient(170deg,#b3622f,#8a4520);color:#ffeede;border-color:#e09a5d}
+.card.slot{background:transparent;border:1.5px dashed var(--line);color:var(--muted);box-shadow:none;align-items:center;justify-content:center;text-align:center}
+.chip.trader{border-color:#e09a5d;color:#e8a96b}
+.chip.eye{border-color:var(--teal);color:var(--teal);margin-top:6px;display:inline-block}
+.coachbar{border:1px solid var(--teal);border-radius:8px;padding:8px 12px;margin-top:10px;font-size:.93rem;line-height:1.5}
+.coachbar .clabel{color:var(--teal);font-family:var(--display);font-size:.7rem;letter-spacing:.14em;margin-right:8px}
+.coachbar b{color:var(--teal)}
+.card.mini{width:calc(var(--cw)*.58);min-height:calc(var(--cw)*.62);padding:.45em;gap:2px}
+.card.mini .nm{font-size:.72em}
+.card.mini .fx{display:none}
+.card.event{background:linear-gradient(170deg,#2e5f8a,#1d3f61);color:#e8f4ff;border-color:#64a7d8}
+.ticker{max-width:92rem;margin:0 auto 12px;display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:6px;padding:6px 10px;overflow:hidden;white-space:nowrap;background:var(--felt2)}
+.ticker .tlabel{font-family:var(--display);font-size:.7rem;color:var(--gold);letter-spacing:.12em;flex-shrink:0}
+#tickText{font-size:.82rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+#tickText.fresh{animation:tickIn .4s ease}
+@keyframes tickIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.titlecard{position:fixed;inset:0;z-index:65;display:flex;align-items:center;justify-content:center;pointer-events:none;background:#0a061866;opacity:0;transition:opacity .2s}
+.titlecard.show{opacity:1}
+.titlecard .tc{font-family:var(--display);font-size:clamp(1.6rem,4vw,2.6rem);color:var(--gold);text-shadow:0 4px 24px #000}
+.playbanner.event{border-color:#64a7d8;box-shadow:0 10px 32px #000b,0 0 24px #64a7d855}
+.playbanner.wait{pointer-events:auto}
+.flyface{position:fixed;z-index:72;pointer-events:none;transition:transform .6s cubic-bezier(.2,.7,.3,1),opacity .2s}
+#gallery .cards{margin-bottom:12px}
+#gallery .card{cursor:default}
+.copychips{font-size:.68rem;color:var(--muted);margin-top:4px;max-width:var(--cw)}
+.coinrow{display:inline-flex;gap:2px;align-items:center;vertical-align:middle}
+.coin{width:.8rem;height:.8rem;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f7dc8f,#c9941f 70%);border:1px solid #8a6210;display:inline-block;box-shadow:0 1px 2px #0007}
+.coin.five{width:1.05rem;height:1.05rem;background:radial-gradient(circle at 35% 30%,#ffeab0,#d9a02e 70%);position:relative}
+.coin.five::after{content:'5';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.55rem;font-weight:700;color:#6b4a0c}
+.bankchip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-size:.78rem;color:var(--muted);letter-spacing:.08em}
+.flycoin{position:fixed;z-index:68;width:.85rem;height:.85rem;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f7dc8f,#c9941f 70%);border:1px solid #8a6210;pointer-events:none;transition:transform .52s cubic-bezier(.2,.7,.3,1),opacity .2s}
+.minihand{display:flex;gap:3px;margin-top:7px;flex-wrap:wrap}
+.miniback{width:2.1rem;height:3rem;border-radius:4px;background:linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 1px 3px #0007}
+.flycard{position:fixed;z-index:70;width:var(--cw);height:calc(var(--cw)*1.06);border-radius:.55em;background:linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 6px 18px #0009;pointer-events:none;transition:transform .42s cubic-bezier(.2,.7,.3,1),opacity .42s}
+.card.dealt{animation:dealIn .45s cubic-bezier(.2,.7,.3,1)}
+@keyframes dealIn{from{transform:translate(-18rem,-6rem) rotate(-7deg);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion: reduce){.flycard,.flycoin,.flyface{transition:none}.card.dealt{animation:none}}
+.card.back{background:linear-gradient(170deg,#3d2f73,#2a1f52);color:#cfc3f2;border-color:var(--violet);align-items:center;justify-content:center;text-align:center}
+.card.back.drawable{cursor:pointer;outline:2px solid var(--gold);box-shadow:0 0 18px #e8b84b66;transform:translateY(-2px)}
+.card.playable{cursor:pointer;outline:2px solid transparent;transition:outline-color .15s,transform .15s}
+.card.playable:hover{outline-color:var(--gold);transform:translateY(-2px)}
+.card.dim{opacity:.55}
+.actionbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+.overlay{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:#0a0618d9;padding:18px}
+.box{background:var(--felt2);border:1px solid var(--gold);border-radius:14px;padding:22px;max-width:540px;width:100%;display:grid;gap:12px;max-height:85dvh;overflow:auto}
+.box .call{font-family:var(--display);font-size:1.7rem;color:var(--gold);text-wrap:balance}
+.box .kind{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
+.log{font-size:.88rem;max-height:220px;overflow:auto;display:grid;gap:2px;margin-top:8px;color:var(--muted)}
+.playbanner{position:fixed;top:calc(4.6rem + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%) translateY(-8px);z-index:55;display:flex;gap:14px;align-items:center;background:var(--felt2);border:1px solid var(--gold);border-radius:12px;padding:10px 16px;box-shadow:0 10px 32px #000b;pointer-events:none;opacity:0;transition:opacity .18s,transform .18s;max-width:min(40rem,calc(100vw - 32px))}
+.playbanner.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.playbanner .card{width:calc(var(--cw)*0.8);min-height:calc(var(--cw)*0.85)}
+.playbanner .what{display:grid;gap:4px;min-width:0}
+.playbanner .who{font-family:var(--display);font-size:.85rem;color:var(--gold)}
+.panel.hot{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--gold);color:#2a2040;font-weight:600;border-radius:7px;padding:9px 15px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:calc(100vw - 32px)}
+.toast.show{opacity:1}
+</style>
+
+<div class="bar">
+  <h1>R-CANA · PLAYTEST 2 · THE TRADING DESK</h1>
+  <select id="meDeck"><option value="devotion" selected>Your deck: Devotion</option><option value="degen">Your deck: Degen</option></select>
+  <select id="nBots"><option value="1" selected>1 rival</option><option value="2">2 rivals</option><option value="3">3 rivals</option></select>
+  <label class="note">Seed <input id="seed" type="number" value="7" min="1" style="width:66px"></label>
+  <label class="note"><input type="checkbox" id="slowMode"> Tap-to-continue</label>
+  <label class="note"><input type="checkbox" id="coachMode" checked> Coach</label>
+  <button class="primary" id="deal">Deal</button>
+  <span class="bankchip" id="bank"><span class="coin five"></span> LA BANCA</span>
+  <span class="note" id="status">Press Deal. Your Trader’s LIQ is your income; scandals drain their CRED. First to bank 1,000.</span>
+</div>
+<div class="ticker" id="ticker" hidden><span class="tlabel">RL80 NEWS</span><span id="tickText"></span></div>
+<div class="board" id="board" hidden>
+  <section class="rivals" id="rivals"></section>
+  <section class="panel me">
+    <div class="phead"><span class="who" id="meWho">YOU</span><span class="stat">Liquidity <b id="meLiq">0</b> <span class="coinrow" id="meCoins"></span></span><span class="stat">Banked <b id="mePros">0</b> / 1,000</span><span class="stat">Candles <b class="candles" id="meDeeds"></b></span><span class="stat" id="meHail"></span><span class="stat" id="meHaz"></span></div>
+    <div class="prosbar"><i id="meBar" style="width:0%"></i></div>
+    <div class="rowlabel">Your investments · tap to sell (not the turn they arrive)</div><div class="cards" id="meInvest"></div>
+    <div style="display:flex;gap:1.2rem;flex-wrap:wrap">
+      <div style="min-width:0"><div class="rowlabel">Your deck · tap to draw on your turn</div><div class="cards" id="mePiles"></div></div>
+      <div style="min-width:0"><div class="rowlabel">Your Trader · seat</div><div class="cards" id="meTrader"></div></div>
+      <div style="min-width:0"><div class="rowlabel">Bench · tap to swap (free, once a turn)</div><div class="cards" id="meBench"></div></div>
+      <div style="min-width:0"><div class="rowlabel">Artifacts (max 2)</div><div class="cards" id="meArts"></div></div>
+      <div style="min-width:0"><div class="rowlabel">Hazards on you</div><div class="cards" id="meHazards"></div></div>
+    </div>
+    <div class="rowlabel">Your hand · one main action a turn</div><div class="cards" id="meHand"></div>
+    <div class="rowlabel" style="margin-top:12px">At the table</div><div id="feed" class="note" style="display:grid;gap:2px;min-height:3.2em"></div>
+    <div class="actionbar">
+      <b class="stat" id="turnNote"></b>
+      <button id="hailBtn">Hail Mary</button>
+      <button id="passBtn">Pass</button>
+      
+    </div>
+    <div id="coach" hidden class="coachbar"><span class="clabel">COACH</span> <span id="coachTxt"></span></div>
+  </section>
+</div>
+<details class="history" id="hist" hidden><summary>Table history</summary><div class="log" id="log"></div></details>
+<details class="history" id="galleryD"><summary>All cards in this playtest</summary><div id="gallery"></div></details>
+<div id="overlayHost"></div><div class="toast" id="toast"></div>
+
+<script type="module">
+/*__ENGINE__*/
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const FX = { unicornio: 'Pure compounding — the best paycheck at the desk', gato: 'When seated: knock one hazard off your table, free', monje: 'When you light a candle, collect 2 Liquidity', diablito: 'When a hazard you play lands, collect 1 Liquidity', celebridad: 'The influencer: pay 1 when banking from a card, +25 Prosperity', gr80: 'When you light a candle, bank 25 Prosperity', h80z: 'Hazards you play cost 1 less', eugene: 'Your Hail Mary odds rise one step', abuela: 'The gambling grandmother: your gambles moon on 4+ instead of 5+', pope: 'Once a game, a failed Hail Mary is absolved — try again', prospector: 'Assets you buy cost 1 less', shitcoin: 'Sell for Prosperity: a die decides — 5+ moons for 125, else zero', bluechip: 'Sell later: 10 Liquidity or 250 Prosperity', halving: 'Fires when drawn: until the drawer’s next turn, turn income is 1', corrida: 'Fires when drawn: until the drawer’s next turn, Prosperity sales pay +25', crash: 'Fires when drawn: everyone holding 8+ Liquidity loses half', airdrop: 'Fires when drawn: every player draws a card', honeymoon: 'Fires when drawn: no hazards until the drawer’s next turn', tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell later: 4 Liquidity or 75 Prosperity', moon: 'Sell later: 7 Liquidity or 150 Prosperity', bull: 'Invest 2 → bank 100 Prosperity', rocket: 'Invest 4 → bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', sirena: 'Their seated Trader walks into the sea; no new hires until cleared', taxman: 'They pay 1 to the bank at the start of each turn', snake: 'The serpent at the shrine: their candles count as zero', naranja: 'The Orange One takes his cut: when they bank, the hazard’s owner collects 2', escandalo: 'Scandal: their seated Trader loses 5 Cred when it breaks, 2 more each turn', alacran: 'The social engineer’s sting: their hand is played face-up until cleared', bell: 'Clears The Bear', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one hazard', publicista: 'Clear a Scandal — or polish: your seated Trader regains 5 Cred', heart: 'Discard to cancel a hazard just played on you', halo: 'Any Trader seated at your desk cannot be disabled', xray: 'Once a turn, tap to peek at a random rival card — free', rosary: 'Draw a card when you light a candle', grail: 'An answered Hail Mary banks 300 instead of 200', enigma: 'Your hand cannot be peeked', ofrenda: 'Offer it to Our Lady: it goes to the shrine and lights a candle (max 3)', moneda: 'While held: collect 1 Liquidity at the start of your turn', jardin: 'While held: collect 2 a turn — but it dies the moment any Event fires', semilla: 'Sell for 25 Prosperity — or hold four rounds and it blooms to 150', ballena: 'Fires when drawn: the richest portfolio’s best Asset moves to the poorest player', rueda: 'Fires when drawn: every portfolio rotates one seat', godcandle: 'Fires when drawn: Prosperity sales pay double until the drawer’s next turn', skull: 'Fires when drawn: the biggest seller collects 5; everyone else pays 2', world: 'Fires when drawn: every standing effect ends; everyone draws', illuminati: 'Fires when drawn: every player passes one random card to the left', moralhazard: 'Fires when drawn: the bailout — the poorest player collects 5; the richest loses 2', rose: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise' };
+
+let S = null;
+const toast = (t) => { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2800); };
+const tick = (line) => { $('ticker').hidden = false; const el = $('tickText'); el.textContent = line; el.classList.remove('fresh'); void el.offsetWidth; el.classList.add('fresh'); };
+const headline = (raw) => { const l = raw.replace(/^\[T\d+\] /, '');
+  const tag = /EVENT/.test(l) ? 'MARKET WIRE' : /Bear|Hack|Rug/i.test(l) ? 'BREAKING' : /WINS/.test(l) ? 'FINAL BELL' : /candle|shrine/i.test(l) ? 'GOOD WORKS' : /HAIL MARY/i.test(l) ? 'MIRACLE DESK' : 'ON CHAIN';
+  return tag + ' · ' + l.toUpperCase(); };
+const cap = (s) => s ? s[0].toUpperCase() + s.slice(1) : '';
+
+function announceTurn(g) { if (S.turnToasted !== g.turnNo) { S.turnToasted = g.turnNo; toast(`Round ${g.turnNo} · YOUR TURN — you collect your Trader’s LIQ (1 if the seat is empty) and draw. Then one main action.`); } }
+class HumanPolicy {
+  human = true;
+  beforeDraw(g, p) { announceTurn(g); return new Promise((res) => { S.drawResolve = res; render(); }); }
+  main(g, p) { announceTurn(g); return new Promise((res) => { S.mainResolve = res; render(); }); }
+  discardOne(g, p) { return new Promise((res) => pickCard('Discard down to seven — tap a card to let go', p.hand, res)); }
+  useHeart(g, p, c, by) { return ask(`${by.name} plays ${c.name} on you`, `Discard your SACRED HEART to cancel it?`, 'Cancel it', 'Take the hazard'); }
+  acceptRose(g, p, by) { return ask(`${by.name} offers you THE ROSE`, 'Accept it and it joins your investments, worth 50 Prosperity — and their candle lights. Refuse, and they keep it.', 'Accept the Rose', 'Refuse it'); }
+}
+const resolveMain = (a) => { const r = S.mainResolve; S.mainResolve = null; $('overlayHost').innerHTML = ''; render(); if (r) { toast(a && a.t === 'swap' ? 'Swapped — you still have your main action.' : a && a.t === 'pass' ? 'You pass — your turn is over.' : 'That was your one main action — your turn is over.'); r(a); } };
+function ask(kind, q, yes, no) { return new Promise((res) => { const host = $('overlayHost');
+  host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">${esc(kind)}</div><div>${esc(q)}</div><button class="primary" id="aYes">${esc(yes)}</button><button id="aNo">${esc(no)}</button></div></div>`;
+  host.querySelector('#aYes').onclick = () => { host.innerHTML = ''; res(true); setTimeout(render, 30); };
+  host.querySelector('#aNo').onclick = () => { host.innerHTML = ''; res(false); setTimeout(render, 30); }; }); }
+function pickCard(title, cards, done) { const host = $('overlayHost');
+  host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">${esc(title)}</div><div class="cards" id="pickRow"></div></div></div>`;
+  const row = host.querySelector('#pickRow');
+  cards.forEach((c) => { const el = cardEl(c); el.classList.add('playable'); el.onclick = () => { host.innerHTML = ''; done(c); setTimeout(render, 30); }; row.appendChild(el); });
+}
+function popMenu(items) { if (!S.mainResolve) { toast('Your main action is spent — wait for your next turn.'); return; } const host = $('overlayHost');
+  host.innerHTML = `<div class="overlay"><div class="box">${items.map((it, i) => `<button ${i === 0 ? 'class="primary"' : ''} data-i="${i}">${esc(it[0])}</button>`).join('')}<button data-i="-1">Never mind</button></div></div>`;
+  host.querySelectorAll('button').forEach((b) => b.onclick = () => { const i = +b.dataset.i; host.innerHTML = ''; if (i >= 0) items[i][1](); });
+  host.querySelector('.overlay').onclick = (e) => { if (e.target === e.currentTarget) host.innerHTML = ''; };
+}
+const typeClass = (c) => c.type === 'hazard' ? 'hazard' : c.type === 'remedy' ? 'remedy' : c.type === 'artifact' ? 'artifact' : c.type === 'grace' ? 'grace' : c.type === 'trader' ? 'trader' : c.type === 'event' ? 'event' : '';
+const miniHTML = (c) => `<div class="card mini ${typeClass(c)}" title="${esc(FX[c.key] || c.text || '')}"><div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.liq ? `<span>LIQ ${c.liq}</span>` : ''}${c.cred ? `<span>CRED ${c.credNow != null ? c.credNow + '/' + c.cred : c.cred}</span>` : ''}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}${c.bloom && c.bornTurn != null && S && S.g ? (S.g.turnNo - c.bornTurn >= 4 ? '<span>\uD83C\uDF38</span>' : `<span>blooms in ${Math.max(0, 4 - (S.g.turnNo - c.bornTurn))}</span>`) : ''}</div></div>`;
+function cardEl(c) {
+  const el = document.createElement('div'); el.className = 'card ' + typeClass(c);
+  el.innerHTML = `<div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.type === 'event' ? '<span>fires on draw</span>' : c.type === 'grace' ? '<span>to the shrine</span>' : `<span>cost ${c.cost}</span>`}${c.liq ? `<span>LIQ ${c.liq}</span>` : ''}${c.cred ? `<span>CRED ${c.credNow != null ? c.credNow + '/' + c.cred : c.cred}</span>` : ''}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}</div><div class="fx">${esc(FX[c.key] || c.text || '')}</div>`;
+  return el;
+}
+$('deal').onclick = async () => {
+  if (S && S.running) return;
+  const seed = +$('seed').value || 7;
+  const n = +$('nBots').value;
+  const myDeck = $('meDeck').value; const otherDeck = myDeck === 'devotion' ? 'degen' : 'devotion';
+  const players = [ { name: 'YOU', recipe: myDeck, policy: new HumanPolicy() },
+    ...Array.from({ length: n }, (_, i) => ({ name: ['EL BOT', 'LA BOT', 'EL OTRO'][i], recipe: i % 2 ? myDeck : otherDeck, policy: new GreedyBot() })) ];
+  const g = new Game({ players, seed, verbose: true });
+  S = { g, me: g.players[0], running: true, mainResolve: null, lastActive: null };
+  g.hooks = {
+    render: async () => { render();
+      if (S.running && S.dealt && g.active && g.active !== S.lastActive) { S.lastActive = g.active; if (g.active !== S.me) await showTurnCard(g.active); }
+      if (g.active !== S.me) await sleep(240); },
+    onAction: async (p, a) => { if (a.t !== 'pass') tick(headline(g.lines[g.lines.length - 1] || '')); if (p === S.me || !S.running) { render(); return; } render(); await showPlay(g, p, a); },
+    onEvent: (p, c) => { render(); tick('MARKET WIRE · ' + (c.name + ': ' + c.text).toUpperCase()); showEvent(p, c); },
+  };
+  $('board').hidden = false; $('hist').hidden = false; S.dealt = false; S.lastHandLen = g.players[0].hand.length; render();
+  await dealFlights(); S.dealt = true;
+  const r = await g.run(); S.running = false; render(); bell(r);
+};
+async function dealFlights() {
+  const deckEl = document.querySelector('#mePiles .card.back'); if (!deckEl) return;
+  const from = deckEl.getBoundingClientRect();
+  const handEls = [...document.querySelectorAll('#meHand .card')];
+  const riv = [...document.querySelectorAll('.rivals .minihand')].map((m) => [...m.children]);
+  handEls.forEach((el) => { el.style.visibility = 'hidden'; });
+  riv.forEach((backs) => backs.forEach((el) => { el.style.visibility = 'hidden'; }));
+  const flights = [];
+  const maxN = Math.max(handEls.length, ...riv.map((b) => b.length), 0);
+  for (let i = 0; i < maxN; i++) { if (handEls[i]) flights.push(handEls[i]); riv.forEach((b) => { if (b[i]) flights.push(b[i]); }); }
+  for (const target of flights) {
+    const to = target.getBoundingClientRect(); const fly = document.createElement('div'); fly.className = 'flycard';
+    fly.style.left = from.left + 'px'; fly.style.top = from.top + 'px';
+    if (to.width < 60) { fly.style.width = to.width + 'px'; fly.style.height = to.height + 'px'; }
+    document.body.appendChild(fly); const dx = to.left - from.left, dy = to.top - from.top;
+    requestAnimationFrame(() => { fly.style.transform = `translate(${dx}px, ${dy}px) rotate(2deg)`; });
+    setTimeout(() => { fly.remove(); target.style.visibility = ''; }, 440);
+    await sleep(85);
+  }
+  await sleep(420);
+}
+function coinHTML(n) {
+  const fives = Math.min(5, Math.floor(n / 5)), ones = Math.min(4, n % 5);
+  return '<span class="coin five"></span>'.repeat(fives) + '<span class="coin"></span>'.repeat(ones) + (n > 29 ? '…' : '');
+}
+function flyCoins(fromEl, toEl, n) {
+  if (!fromEl || !toEl) return;
+  const f = fromEl.getBoundingClientRect(), t = toEl.getBoundingClientRect();
+  const count = Math.min(6, Math.max(1, n));
+  for (let i = 0; i < count; i++) setTimeout(() => {
+    const c = document.createElement('div'); c.className = 'flycoin';
+    c.style.left = (f.left + f.width / 2) + 'px'; c.style.top = (f.top + f.height / 2) + 'px';
+    document.body.appendChild(c);
+    const dx = t.left + t.width / 2 - (f.left + f.width / 2) + (Math.random() * 16 - 8), dy = t.top + t.height / 2 - (f.top + f.height / 2) + (Math.random() * 10 - 5);
+    requestAnimationFrame(() => { c.style.transform = `translate(${dx}px, ${dy}px)`; });
+    setTimeout(() => { c.style.opacity = '0'; setTimeout(() => c.remove(), 220); }, 540);
+  }, i * 70);
+}
+const panelOf = (q) => q === S.me ? document.querySelector('.panel.me') : document.querySelector(`.rivals .panel[data-pidx="${q.idx}"]`);
+async function flyFace(c, fromEl, toEl) {
+  if (!fromEl || !toEl) return;
+  const f = fromEl.getBoundingClientRect(), t = toEl.getBoundingClientRect();
+  const d = document.createElement('div'); d.className = 'flyface'; d.appendChild(cardEl(c));
+  d.style.left = (f.left + f.width / 2 - 55) + 'px'; d.style.top = (f.top + f.height / 2 - 60) + 'px';
+  document.body.appendChild(d);
+  const dx = t.left + t.width / 2 - (f.left + f.width / 2), dy = t.top + t.height / 2 - (f.top + f.height / 2);
+  requestAnimationFrame(() => { d.style.transform = `translate(${dx}px, ${dy}px) rotate(3deg)`; });
+  await sleep(620); d.style.opacity = '0'; await sleep(180); d.remove();
+}
+async function showTurnCard(p) {
+  const d = document.createElement('div'); d.className = 'titlecard'; d.innerHTML = `<div class="tc">${esc(p.name)}&#39;S TURN</div>`;
+  document.body.appendChild(d); requestAnimationFrame(() => d.classList.add('show'));
+  await sleep(750); d.classList.remove('show'); setTimeout(() => d.remove(), 220);
+}
+async function showEvent(p, c) {
+  const b = document.createElement('div'); b.className = 'playbanner event';
+  const what = document.createElement('div'); what.className = 'what';
+  what.innerHTML = `<div class="who">THE MARKET SPEAKS · drawn by ${esc(p.name)}</div><div>${esc(c.name)} — ${esc(c.text || '')}</div>`;
+  b.appendChild(cardEl(c)); b.appendChild(what); document.body.appendChild(b);
+  requestAnimationFrame(() => b.classList.add('show'));
+  await sleep(3400); b.classList.remove('show'); setTimeout(() => b.remove(), 220);
+}
+async function showPlay(g, p, a) {
+  const line = (g.lines[g.lines.length - 1] || '').replace(/^\[T\d+\] /, '');
+  const card = a.c || a.a || a.h || null;
+  if (a.t === 'play' && card) {
+    const src = panelOf(p); const from = (src && src.querySelector('.minihand')) || src;
+    const tgt = a.choice && a.choice.target;
+    const to = card.type === 'hazard' && tgt ? (tgt === S.me ? $('meHazards') : panelOf(tgt)) : (card.type === 'remedy' || card.type === 'grace') && tgt ? (tgt === S.me ? document.querySelector('.panel.me') : panelOf(tgt)) : src;
+    await flyFace(card, from, to);
+  }
+  const b = document.createElement('div'); b.className = 'playbanner';
+  const what = document.createElement('div'); what.className = 'what';
+  what.innerHTML = `<div class="who">${esc(p.name)}</div><div>${esc(line)}</div>`;
+  if (card) b.appendChild(cardEl(card));
+  b.appendChild(what); document.body.appendChild(b);
+  requestAnimationFrame(() => b.classList.add('show'));
+  p.lastLine = line;
+  if ($('slowMode').checked && a.t !== 'pass') {
+    b.classList.add('wait'); const btn = document.createElement('button'); btn.className = 'primary'; btn.textContent = 'Continue';
+    b.appendChild(btn); await new Promise((res) => { btn.onclick = res; });
+  } else await sleep(a.t === 'pass' ? 1100 : 2600);
+  b.classList.remove('show'); setTimeout(() => b.remove(), 220);
+}
+function bell(r) { const host = $('overlayHost'); const rows = S.g.players.map((q) => `<div>${esc(q.name)}${q.trader ? ' · ' + esc(q.trader.name) : ''} — <b>${q.pros}</b> banked, ${q.deeds} candle${q.deeds === 1 ? '' : 's'}${q.hailUsed ? ', Hail Mary spent' : ''}</div>`).join('');
+  host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">the race is run · round ${r.turns}</div><div class="call">${r.winner === 'YOU' ? 'YOU WIN' : r.winner ? esc(r.winner) + ' WINS' : 'NO WINNER'}</div>${rows}<button class="primary" id="again">Deal again</button></div></div>`;
+  host.querySelector('#again').onclick = () => { host.innerHTML = ''; $('deal').click(); };
+}
+function showPeek(r) { const c = S.g.peek(S.me, r); if (!c) return;
+  S.known = S.known || []; if (!S.known.some((k) => k.c === c)) S.known.push({ idx: r.idx, c });
+  const host = $('overlayHost');
+  host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">x-ray glasses · a random card from ${esc(r.name)}&#39;s hand</div><div class="cards" id="peekRow"></div><div class="note">It stays in their hand. Your main action is still yours.</div><button class="primary" id="peekOk">Got it</button></div></div>`;
+  host.querySelector('#peekRow').appendChild(cardEl(c));
+  host.querySelector('#peekOk').onclick = () => { host.innerHTML = ''; render(); };
+  render(); const again = host.querySelector('#peekRow'); // re-render refreshes panels; keep the modal content
+  if (!again || !again.childElementCount) { /* no-op */ }
+}
+function acts() { return S.mainResolve ? S.g.legalActions(S.me) : []; }
+const COACH = new GreedyBot();
+function coachLabel(g, p, a) {
+  if (a.t === 'swap') return `swap ${p.bench[a.i].name} into the seat (free)`;
+  if (a.t === 'hail') return `attempt the Hail Mary at ${g.odds(p)}/12`;
+  if (a.t === 'payclear') return `pay 3 to clear ${a.h.name}`;
+  if (a.t === 'sell') return a.pros ? (a.a.gamble ? `sell ${a.a.name} — roll the die for ${a.a.pros}` : `sell ${a.a.name} to bank ${g.prosOf(a.a) * (g.fx.godcandle ? 2 : 1)}`) : `sell ${a.a.name} for ${a.a.cash} Liquidity (refuel)`;
+  const c = a.c, t = a.choice && a.choice.target;
+  if (c.type === 'progress') return a.choice && a.choice.cash ? `cash ${c.name} for ${c.cash} Liquidity` : `bank ${c.name} for ${c.pros}`;
+  if (c.type === 'asset') return `invest in ${c.name}${c.income ? ' (pays ' + c.income + '/turn)' : ''}`;
+  if (c.type === 'hazard') return `hit ${t.name} with ${c.name}`;
+  if (c.type === 'remedy') { if (a.choice && a.choice.polish) return `polish your Trader: +5 Cred`; return t === p ? `clear your ${a.choice.hazard.name}` : `clear ${t.name}'s ${a.choice.hazard.name} (goodwill)`; }
+  if (c.type === 'artifact') return `equip ${c.name}`;
+  if (c.type === 'trader') return p.trader ? `bench ${c.name} (LIQ ${c.liq})` : `hire ${c.name} — income becomes ${c.liq}`;
+  if (c.type === 'grace') return c.key === 'rose' ? `offer the Rose to ${t.name} — a candle if accepted` : `offer ${c.name} — light a candle, odds rise`;
+  return c.name;
+}
+function coachTips() {
+  const el = $('coach'); const on = $('coachMode').checked && !!S.mainResolve && S.running;
+  el.hidden = !on; if (!on) return;
+  const g = S.g, me = S.me;
+  const scored = acts().filter((a) => a.t !== 'pass').map((a) => ({ a, s: COACH.score(g, me, a) })).sort((x, y) => y.s - x.s);
+  if (!scored.length) { $('coachTxt').textContent = 'Nothing playable — pass and bank up next turn.'; return; }
+  const seen = new Set(); const tips = [];
+  for (const x of scored) { if (tips.length && x.s <= 8) break; const l = coachLabel(g, me, x.a); if (!seen.has(l)) { seen.add(l); tips.push(l); } if (tips.length === 3) break; }
+  $('coachTxt').innerHTML = `<b>${esc(tips[0])}</b>` + (tips.length > 1 ? ` <span class="note">\u00b7 other options: ${tips.slice(1).map(esc).join(' \u00b7 ')}</span>` : '');
+}
+function render() {
+  if (!S) return; const g = S.g, me = S.me; const mine = !!S.mainResolve; const A = acts();
+  $('status').textContent = S.running ? `Round ${g.turnNo} · first to 1,000` : 'Game over.';
+  // rivals
+  const rv = $('rivals'); rv.innerHTML = '';
+  for (const q of g.players) { if (q === me) continue;
+    const d = document.createElement('section'); d.className = 'panel'; d.dataset.pidx = q.idx;
+    if (g.active === q && S.running) d.classList.add('hot');
+    d.innerHTML = `<div class="phead"><span class="who ${g.active === q && S.running ? 'active' : ''}">${esc(q.name)}</span><span class="stat">${esc(cap(q.recipe))}</span>
+      <span class="stat">Liq <b>${q.liq}</b> <span class="coinrow">${coinHTML(q.liq)}</span></span><span class="stat">Banked <b>${q.pros}</b></span><span class="stat">Hand <b>${q.hand.length}</b></span><span class="stat candles">${'🕯'.repeat(q.deeds)}</span><span class="stat">${q.hailUsed ? 'Hail Mary: spent' : `Hail Mary: ${g.odds(q)}/12`}</span></div>
+      <div class="prosbar"><i style="width:${Math.min(100, q.pros / 10)}%"></i></div>
+      ${q.hazards.some((h) => h.key === 'alacran') && !q.artifacts.some((a) => a.key === 'enigma') ? `<div class="minihand" title="EL ALACRÁN: hand face-up">${q.hand.map((c) => `<span class="chip">${esc(c.name)}</span>`).join('')}</div>` : `<div class="minihand">${'<span class="miniback"></span>'.repeat(Math.min(9, q.hand.length))}</div>`}
+      ${(S.known || []).filter((k) => k.idx === q.idx && q.hand.includes(k.c)).map((k) => `<span class="chip eye" title="seen through the X-Ray Glasses">\uD83D\uDC41 ${esc(k.c.name)} in hand</span>`).join(' ')}
+      ${q.lastLine ? `<div class="note" style="margin-top:6px">Last turn: ${esc(q.lastLine)}</div>` : ''}
+      <div style="margin-top:6px">${q.trader ? `<span class="chip trader" title="${esc(FX[q.trader.key] || '')}">Trader: ${esc(q.trader.name)} · LIQ ${q.trader.liq} · CRED ${q.trader.credNow}/${q.trader.cred}${g.abilityOn(q) ? '' : ' · HACKED'}</span>` : '<span class="chip">no Trader — income 1</span>'} ${q.bench.map((b) => `<span class="chip trader" title="${esc(FX[b.key] || '')}">bench: ${esc(b.name)} · ${b.credNow}/${b.cred}</span>`).join(' ')} ${q.artifacts.map((a) => `<span class="chip" title="${esc(FX[a.key] || '')}">${esc(a.name)}</span>`).join(' ')} ${q.hazards.map((h) => `<span class="chip haz" title="${esc(FX[h.key] || '')}">${esc(h.name)}</span>`).join(' ')}</div>
+      <div class="rowlabel" style="margin:9px 0 5px">Their investments</div>
+      <div class="cards">${q.invest.length ? q.invest.map((a) => miniHTML(a)).join('') : '<span class="note">none yet</span>'}</div>`;
+    rv.appendChild(d);
+  }
+  // me
+  $('meWho').textContent = 'YOU · ' + cap(me.recipe); $('meWho').classList.toggle('active', mine && S.running);
+  $('meLiq').textContent = me.liq; $('meCoins').innerHTML = coinHTML(me.liq); $('mePros').textContent = me.pros; $('meBar').style.width = Math.min(100, me.pros / 10) + '%';
+  $('meDeeds').textContent = '🕯'.repeat(me.deeds) || '—';
+  const tw = g.odds(me); $('meHail').textContent = me.hailUsed ? 'Hail Mary: spent' : `Hail Mary: ${tw}/12 to bank 200`;
+  $('meHaz').textContent = (me.trader && !g.abilityOn(me) ? 'TRADER HACKED ' : '') + (me.hazards.some((h) => h.key === 'alacran') && !me.artifacts.some((a) => a.key === 'enigma') ? 'HAND FACE-UP (EL ALACRÁN)' : '');
+  const ts = $('meTrader'); ts.innerHTML = '';
+  if (me.trader) { const tc = cardEl(me.trader); if (!g.abilityOn(me)) { tc.classList.add('dim'); tc.title = 'Disabled by Quantum Hack'; } ts.appendChild(tc); }
+  else { const slot = document.createElement('div'); slot.className = 'card slot'; slot.innerHTML = '<div class="fx">empty seat — income is 1 until a Trader sits here</div>'; ts.appendChild(slot); }
+  const bn = $('meBench'); bn.innerHTML = '';
+  if (me.bench.length) me.bench.forEach((b, i) => { const el = cardEl(b); const sw = A.find((x) => x.t === 'swap' && x.i === i);
+    if (sw && mine) { el.classList.add('playable'); el.onclick = () => popMenu([[`Swap ${b.name} into the seat (free)`, () => resolveMain(sw)]]); } else el.classList.add('dim');
+    bn.appendChild(el); });
+  else { const slot = document.createElement('div'); slot.className = 'card slot'; slot.innerHTML = '<div class="fx">empty bench — hire spare Traders (max 2)</div>'; bn.appendChild(slot); }
+  const piles = $('mePiles'); piles.innerHTML = '';
+  { const dk = document.createElement('div'); dk.className = 'card back' + (S.drawResolve ? ' drawable' : ' dim');
+    dk.innerHTML = `<div class="nm" style="margin-top:auto">RL80</div><div class="fx" style="margin-top:auto">${me.deck.length} left${S.drawResolve ? ' · TAP TO DRAW' : ''}</div>`;
+    if (S.drawResolve) dk.onclick = () => { const r = S.drawResolve; S.drawResolve = null; r(); };
+    piles.appendChild(dk);
+    const dc = document.createElement('div');
+    if (me.discard.length) { const top = cardEl(me.discard[me.discard.length - 1]); top.classList.add('dim'); top.title = 'Your discard · ' + me.discard.length; piles.appendChild(top); }
+  }
+  const inv = $('meInvest'); inv.innerHTML = '';
+  me.invest.forEach((a) => { const el = cardEl(a);
+    if (a.bloom && a.bornTurn != null) { const held = g.turnNo - a.bornTurn; const ch = el.querySelector('.chips');
+      if (ch) ch.insertAdjacentHTML('beforeend', held >= 4 ? '<span>\uD83C\uDF38 IN BLOOM \u2014 150P</span>' : `<span>blooms in ${4 - held} round${4 - held === 1 ? '' : 's'}</span>`); } const sc = A.find((x) => x.t === 'sell' && x.a === a && !x.pros); const sp = A.find((x) => x.t === 'sell' && x.a === a && x.pros);
+    const items = []; if (sc) items.push([`Sell for ${a.cash} Liquidity`, () => resolveMain(sc)]); if (sp) items.push([a.gamble ? 'Sell for Prosperity — roll the die' : `Sell for ${g.prosOf(a)} Prosperity${a.bloom && g.prosOf(a) === a.bloom ? ' — IN BLOOM' : ''}`, () => resolveMain(sp)]);
+    if (items.length) { el.classList.add('playable'); el.onclick = () => popMenu(items.reverse()); } else el.classList.add('dim'); inv.appendChild(el); });
+  const ar = $('meArts'); ar.innerHTML = '';
+  me.artifacts.forEach((a) => { const el = cardEl(a);
+    if (a.key === 'xray' && mine && !me.peekedThisTurn) { const targets = g.rivals(me).filter((r) => r.hand.length && !r.artifacts.some((a2) => a2.key === 'enigma'));
+      if (targets.length) { el.classList.add('playable'); el.title = 'Tap to peek — free, once a turn';
+        el.onclick = () => popMenu(targets.map((r) => [`Peek at ${r.name}'s hand — free`, () => showPeek(r)])); } }
+    ar.appendChild(el); });
+  const hz = $('meHazards'); hz.innerHTML = '';
+  me.hazards.forEach((h) => { const el = cardEl(h); const pc = A.find((x) => x.t === 'payclear' && x.h === h);
+    if (pc) { el.classList.add('playable'); el.onclick = () => popMenu([[`Pay 3 Liquidity to clear ${h.name}`, () => resolveMain(pc)]]); } hz.appendChild(el); });
+  const mh = $('meHand'); mh.innerHTML = '';
+  const grew = me.hand.length > (S.lastHandLen || 0); S.lastHandLen = me.hand.length;
+  me.hand.forEach((c, ix) => { const el = cardEl(c); if (grew && ix === me.hand.length - 1 && S.dealt) el.classList.add('dealt'); const mineActs = A.filter((x) => x.t === 'play' && x.c === c);
+    const items = mineActs.map((x) => { let label = `Play (${g.costOf(me, c)} Liq)`;
+      if (c.type === 'hazard') label = `Play on ${x.choice.target.name}`;
+      if (c.type === 'remedy') label = `Clear ${x.choice.hazard.name} ${x.choice.target === me ? 'on you' : 'on ' + x.choice.target.name}`;
+      if (c.type === 'grace') label = c.key === 'rose' ? `Offer THE ROSE to ${x.choice.target.name}` : 'Offer to Our Lady — light a candle';
+      if (c.type === 'progress') label = c.choice ? (x.choice.cash ? `Take ${c.cash} Liquidity` : `Bank ${c.pros} Prosperity`) : `Invest ${g.costOf(me, c)} → bank ${c.pros} Prosperity`;
+      if (c.type === 'trader') label = me.trader ? `Hire to the bench (${g.costOf(me, c)} Liq)` : `Hire to the seat (${g.costOf(me, c)} Liq)`;
+      if (x.choice && x.choice.polish) label = `Polish ${me.trader ? me.trader.name : 'your Trader'}: +5 Cred (${g.costOf(me, c)} Liq)`;
+      return [label, () => resolveMain(x)]; });
+    if (items.length && mine) { el.classList.add('playable'); el.onclick = () => popMenu(items); } else el.classList.add('dim');
+    mh.appendChild(el); });
+  $('turnNote').textContent = S.drawResolve ? 'YOUR TURN · tap your deck to draw' : mine ? 'YOUR TURN · choose one main action:' : S.running ? (g.active && g.active !== me ? 'Turn over · ' + g.active.name + ' is playing…' : '') : '';
+  const hailAct = A.find((x) => x.t === 'hail');
+  $('hailBtn').disabled = !mine || !hailAct;
+  $('hailBtn').onclick = () => ask('once per game', `Attempt the Hail Mary at ${tw}/12? Answered: your hazards clear and you bank 200.`, 'Pray', 'Hold').then((y) => { if (y) { resolveMain(hailAct); setTimeout(() => { const last = S.g.lines.filter((l) => /HAIL MARY/.test(l)).pop(); if (last) toast(last.replace(/^\[T\d+\] /, '')); }, 60); } });
+  $('passBtn').disabled = !mine; $('passBtn').onclick = () => resolveMain({ t: 'pass' });
+  $('feed').innerHTML = g.lines.slice(-3).map((l) => `<div>${esc(l)}</div>`).join('');
+  $('log').innerHTML = g.lines.map((l) => `<div>${esc(l)}</div>`).join(''); $('log').scrollTop = $('log').scrollHeight;
+  coachTips();
+  // money is visible: coins fly between LA BANCA and whoever gained or spent
+  if (!S.coinLiq) S.coinLiq = {};
+  for (const q of g.players) {
+    const prev = S.coinLiq[q.idx];
+    if (S.dealt && S.running && prev != null && prev !== q.liq) {
+      const el = q === me ? $('meCoins') : (panelOf(q) && panelOf(q).querySelector('.coinrow'));
+      if (q.liq > prev) flyCoins($('bank'), el, q.liq - prev); else flyCoins(el, $('bank'), prev - q.liq);
+    }
+    S.coinLiq[q.idx] = q.liq;
+  }
+}
+// ── the card gallery: every design, with its copies per starter recipe ──
+function buildGallery() {
+  const host = $('gallery'); const order = ['trader', 'asset', 'progress', 'event', 'hazard', 'remedy', 'artifact', 'grace'];
+  const label = { trader: 'Traders — LIQ is your income while seated, CRED is their reputation; one seat, two bench spots', asset: 'Assets — buy now, sell later for cash or Prosperity', progress: 'Progress — bank Prosperity on the spot', event: 'Events — fire the moment they are drawn and hit the whole table', hazard: 'Hazards — stick to a rival until cleared', remedy: 'Remedies — clear hazards, yours or a rival’s', artifact: 'Artifacts — equip up to two', grace: 'Graces — offerings to Our Lady; candles raise the Hail Mary' };
+  const copies = (k) => ['devotion', 'degen'].map((r) => { const e = RECIPES[r].find((x) => x[0] === k); return e ? `${cap(r)} ×${e[1]}` : null; }).filter(Boolean).join(' · ') || 'collectible alternate';
+  for (const ty of order) { const ds = DESIGNS.filter((d) => d.type === ty); if (!ds.length) continue;
+    const rl = document.createElement('div'); rl.className = 'rowlabel'; rl.textContent = label[ty] || ty; host.appendChild(rl);
+    const row = document.createElement('div'); row.className = 'cards'; host.appendChild(row);
+    for (const d of ds) { const wrap = document.createElement('div'); wrap.appendChild(cardEl(d)); const cc = document.createElement('div'); cc.className = 'copychips'; cc.textContent = copies(d.key); wrap.appendChild(cc); row.appendChild(wrap); } }
+}
+buildGallery();
+</script>
