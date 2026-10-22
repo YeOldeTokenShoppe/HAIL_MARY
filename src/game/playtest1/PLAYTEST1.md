@@ -221,7 +221,7 @@ Each Remedy can help you or a rival. Helping earns goodwill, not candles.
 
 | Card | Cost | Effect |
 |---|---:|---|
-| **Sacred Heart** | 2 | Discard this equipped Artifact to cancel a hazard just played on you. |
+| **Sacred Heart** | 2 | A shield, not a cure: discard this equipped Artifact to cancel a hazard **at the moment it is played on you**. It cannot remove a hazard already in place. |
 | **The Halo** | 3 | While equipped, any Trader seated at your desk — now or later — cannot be disabled. A Quantum Hack on you remains until cleared, but does nothing. |
 | **X-Ray Glasses** | 2 | Once during your turn, inspect one randomly selected card in a rival’s hand. This does not use your main action. |
 | **The Rosary Beads** | 2 | When you light a candle, you may draw one card. |

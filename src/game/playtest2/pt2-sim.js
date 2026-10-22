@@ -48,7 +48,7 @@ export const DESIGNS = [
   D('keys', 'The Keys', 'remedy', 1, { clears: 'rug' }),
   D('tortilla', 'Miracle Tortilla', 'remedy', 2, { clears: 'any' }),
   D('publicista', 'El Publicista', 'remedy', 1, { clears: 'escandalo', text: 'Clear a Scandal — or polish: your seated Trader regains 5 Cred' }),
-  D('heart', 'Sacred Heart', 'artifact', 2, { text: 'Discard to cancel a hazard just played on you' }),
+  D('heart', 'Sacred Heart', 'artifact', 2, { text: 'A shield, not a cure: discard to cancel a hazard as it lands' }),
   D('halo', 'The Halo', 'artifact', 3, { text: 'Any Trader seated at your desk cannot be disabled' }),
   D('xray', 'X-Ray Glasses', 'artifact', 2, { text: 'Once a turn, peek at one random rival card' }),
   D('rosary', 'The Rosary Beads', 'artifact', 2, { text: 'When you light a candle, draw a card' }),
