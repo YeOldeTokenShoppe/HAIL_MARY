@@ -112,7 +112,7 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
   <h1>R-CANA · PLAYTEST 2 · THE TRADING DESK</h1>
   <select id="meDeck"><option value="devotion" selected>Your deck: Devotion</option><option value="degen">Your deck: Degen</option></select>
   <select id="nBots"><option value="1" selected>1 rival</option><option value="2">2 rivals</option><option value="3">3 rivals</option></select>
-  <label class="note">Seed <input id="seed" type="number" value="7" min="1" style="width:66px"></label>
+  <label class="note">Seed <input id="seed" type="number" placeholder="random" min="1" style="width:76px"></label>
   <label class="note"><input type="checkbox" id="slowMode"> Tap-to-continue</label>
   <label class="note"><input type="checkbox" id="coachMode" checked> Coach</label>
   <button class="primary" id="deal">Deal</button>
@@ -576,7 +576,8 @@ function cardEl(c) {
 }
 $('deal').onclick = async () => {
   if (S && S.running) return;
-  const seed = +$('seed').value || 7;
+  const seed = +$('seed').value > 0 ? +$('seed').value : 1 + Math.floor(Math.random() * 999983);
+  $('seed').placeholder = 'last: ' + seed;
   const n = +$('nBots').value;
   const myDeck = $('meDeck').value; const otherDeck = myDeck === 'devotion' ? 'degen' : 'devotion';
   const players = [ { name: 'YOU', recipe: myDeck, policy: new HumanPolicy() },
