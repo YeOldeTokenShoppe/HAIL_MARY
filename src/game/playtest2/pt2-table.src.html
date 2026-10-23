@@ -56,6 +56,7 @@ button:disabled{opacity:.4;cursor:default}
 .coachbar b{color:var(--teal)}
 .credbar{height:.42rem;border-radius:.21rem;background:#0006;margin-top:5px;overflow:hidden}
 .credbar i{display:block;height:100%}
+.pilelabel{position:absolute;top:4px;right:5px;font-size:.58rem;letter-spacing:.1em;background:#0008;color:#fff;padding:2px 6px;border-radius:4px;z-index:2}
 .card.mini{width:calc(var(--cw)*.58);min-height:calc(var(--cw)*.62);padding:.45em;gap:2px}
 .card.mini .nm{font-size:.72em}
 .card.mini .fx{display:none}
@@ -129,7 +130,7 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
     <div class="prosbar"><i id="meBar" style="width:0%"></i></div>
     <div class="rowlabel">Your investments · tap to sell (not the turn they arrive)</div><div class="cards" id="meInvest"></div>
     <div style="display:flex;gap:1.2rem;flex-wrap:wrap">
-      <div style="min-width:0"><div class="rowlabel">Your deck · tap to draw on your turn</div><div class="cards" id="mePiles"></div></div>
+      <div style="min-width:0"><div class="rowlabel">Deck &amp; discard · tap the deck to draw</div><div class="cards" id="mePiles"></div></div>
       <div style="min-width:0;max-width:16rem"><div class="rowlabel">Your Trader · seat</div><div class="cards" id="meTrader"></div><div class="note" style="margin-top:5px">Grace is reputation: when all is lost the Trader is <b>disgraced</b> (discarded; income back to 1). Lost Grace persists — candles restore 3, El Publicista 5. At <b>full Grace: +1 LIQ</b>.</div></div>
       <div style="min-width:0"><div class="rowlabel">Bench · tap to swap (free, once a turn)</div><div class="cards" id="meBench"></div></div>
       <div style="min-width:0"><div class="rowlabel">Artifacts (max 2)</div><div class="cards" id="meArts"></div></div>
@@ -385,7 +386,7 @@ function render() {
     if (S.drawResolve) dk.onclick = () => { const r = S.drawResolve; S.drawResolve = null; r(); };
     piles.appendChild(dk);
     const dc = document.createElement('div');
-    if (me.discard.length) { const top = cardEl(me.discard[me.discard.length - 1]); top.classList.add('dim'); top.title = 'Your discard · ' + me.discard.length; piles.appendChild(top); }
+    if (me.discard.length) { const top = cardEl(me.discard[me.discard.length - 1]); top.classList.add('dim'); top.title = 'Your discard pile · ' + me.discard.length + ' cards'; top.insertAdjacentHTML('afterbegin', `<div class="pilelabel">DISCARD · ${me.discard.length}</div>`); piles.appendChild(top); }
   }
   const inv = $('meInvest'); inv.innerHTML = '';
   me.invest.forEach((a) => { const el = cardEl(a);

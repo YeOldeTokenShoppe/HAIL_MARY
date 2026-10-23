@@ -72,6 +72,7 @@ button:disabled{opacity:.4;cursor:default}
 #gallery .cards{margin-bottom:12px}
 #gallery .card{cursor:default}
 .copychips{font-size:.68rem;color:var(--muted);margin-top:4px;max-width:var(--cw)}
+.pilelabel{position:absolute;top:4px;right:5px;font-size:.58rem;letter-spacing:.1em;background:#0008;color:#fff;padding:2px 6px;border-radius:4px;z-index:2}
 .coinrow{display:inline-flex;gap:2px;align-items:center;vertical-align:middle}
 .coin{width:.8rem;height:.8rem;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f7dc8f,#c9941f 70%);border:1px solid #8a6210;display:inline-block;box-shadow:0 1px 2px #0007}
 .coin.five{width:1.05rem;height:1.05rem;background:radial-gradient(circle at 35% 30%,#ffeab0,#d9a02e 70%);position:relative}
@@ -127,7 +128,7 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
     <div class="prosbar"><i id="meBar" style="width:0%"></i></div>
     <div class="rowlabel">Your investments · tap to sell (not the turn they arrive)</div><div class="cards" id="meInvest"></div>
     <div style="display:flex;gap:1.2rem;flex-wrap:wrap">
-      <div style="min-width:0"><div class="rowlabel">Your deck · tap to draw on your turn</div><div class="cards" id="mePiles"></div></div>
+      <div style="min-width:0"><div class="rowlabel">Deck &amp; discard · tap the deck to draw</div><div class="cards" id="mePiles"></div></div>
       <div style="min-width:0"><div class="rowlabel">Your Trader</div><div class="cards" id="meTrader"></div></div>
       <div style="min-width:0"><div class="rowlabel">Artifacts (max 2)</div><div class="cards" id="meArts"></div></div>
       <div style="min-width:0"><div class="rowlabel">Hazards on you</div><div class="cards" id="meHazards"></div></div>
@@ -372,7 +373,7 @@ function render() {
     if (S.drawResolve) dk.onclick = () => { const r = S.drawResolve; S.drawResolve = null; r(); };
     piles.appendChild(dk);
     const dc = document.createElement('div');
-    if (me.discard.length) { const top = cardEl(me.discard[me.discard.length - 1]); top.classList.add('dim'); top.title = 'Your discard · ' + me.discard.length; piles.appendChild(top); }
+    if (me.discard.length) { const top = cardEl(me.discard[me.discard.length - 1]); top.classList.add('dim'); top.title = 'Your discard pile · ' + me.discard.length + ' cards'; top.insertAdjacentHTML('afterbegin', `<div class="pilelabel">DISCARD · ${me.discard.length}</div>`); piles.appendChild(top); }
   }
   const inv = $('meInvest'); inv.innerHTML = '';
   me.invest.forEach((a) => { const el = cardEl(a);
