@@ -45,7 +45,7 @@ export const DESIGNS = [
   D('tortilla', 'Miracle Tortilla', 'remedy', 2, { clears: 'any' }),
   D('heart', 'Sacred Heart', 'artifact', 2, { text: 'A shield, not a cure: discard to cancel a hazard as it lands' }),
   D('halo', 'The Halo', 'artifact', 3, { text: 'Any Trader seated at your desk cannot be disabled' }),
-  D('xray', 'X-Ray Glasses', 'artifact', 2, { text: 'Once a turn, peek at one random rival card' }),
+  D('xray', 'X-Ray Glasses', 'artifact', 2, { text: 'Once a turn, study a rival’s entire hand' }),
   D('rosary', 'The Rosary Beads', 'artifact', 2, { text: 'When you light a candle, draw a card' }),
   D('grail', 'The Grail', 'artifact', 3, { text: 'An answered Hail Mary banks 300 instead of 200' }),
   D('enigma', 'Enigma Machine', 'artifact', 2, { text: 'Your hand cannot be peeked' }),
@@ -254,9 +254,9 @@ export class Game {
   payClear(p, h) { if (!this.spend(p, 3)) return false; this.clearHazard(p, h, p, `${p.name} pays 3`); return true; }
   peek(p, t) {
     if (!p.artifacts.some((a) => a.key === 'xray') || p.peekedThisTurn || !t.hand.length || t.artifacts.some((a) => a.key === 'enigma')) return null;
-    p.peekedThisTurn = true; const c = t.hand[Math.floor(this.rng() * t.hand.length)];
-    this.log(`${p.name} peeks through the X-Ray Glasses at ${t.name}'s hand`);
-    return c;
+    p.peekedThisTurn = true;
+    this.log(`${p.name} studies ${t.name}'s entire hand through the X-Ray Glasses`);
+    return [...t.hand];
   }
   hailMary(p) {
     p.hailUsed = true; p.stats.hail++; const twelfths = this.odds(p);
