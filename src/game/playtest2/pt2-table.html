@@ -54,6 +54,8 @@ button:disabled{opacity:.4;cursor:default}
 .coachbar{border:1px solid var(--teal);border-radius:8px;padding:8px 12px;margin-top:10px;font-size:.93rem;line-height:1.5}
 .coachbar .clabel{color:var(--teal);font-family:var(--display);font-size:.7rem;letter-spacing:.14em;margin-right:8px}
 .coachbar b{color:var(--teal)}
+.credbar{height:.42rem;border-radius:.21rem;background:#0006;margin-top:5px;overflow:hidden}
+.credbar i{display:block;height:100%}
 .card.mini{width:calc(var(--cw)*.58);min-height:calc(var(--cw)*.62);padding:.45em;gap:2px}
 .card.mini .nm{font-size:.72em}
 .card.mini .fx{display:none}
@@ -117,7 +119,7 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
   <label class="note"><input type="checkbox" id="coachMode" checked> Coach</label>
   <button class="primary" id="deal">Deal</button>
   <span class="bankchip" id="bank"><span class="coin five"></span> LA BANCA</span>
-  <span class="note" id="status">Press Deal. Your Trader’s LIQ is your income; scandals drain their CRED. First to bank 1,000.</span>
+  <span class="note" id="status">Press Deal. Your Trader’s LIQ is your income; scandals drain their GRACE. First to bank 1,000.</span>
 </div>
 <div class="ticker" id="ticker" hidden><span class="tlabel">RL80 NEWS</span><span id="tickText"></span></div>
 <div class="board" id="board" hidden>
@@ -128,7 +130,7 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
     <div class="rowlabel">Your investments · tap to sell (not the turn they arrive)</div><div class="cards" id="meInvest"></div>
     <div style="display:flex;gap:1.2rem;flex-wrap:wrap">
       <div style="min-width:0"><div class="rowlabel">Your deck · tap to draw on your turn</div><div class="cards" id="mePiles"></div></div>
-      <div style="min-width:0"><div class="rowlabel">Your Trader · seat</div><div class="cards" id="meTrader"></div></div>
+      <div style="min-width:0;max-width:16rem"><div class="rowlabel">Your Trader · seat</div><div class="cards" id="meTrader"></div><div class="note" style="margin-top:5px">Grace is reputation: when all is lost the Trader is <b>disgraced</b> (discarded; income back to 1). Lost Grace persists — candles restore 3, El Publicista 5. At <b>full Grace: +1 LIQ</b>.</div></div>
       <div style="min-width:0"><div class="rowlabel">Bench · tap to swap (free, once a turn)</div><div class="cards" id="meBench"></div></div>
       <div style="min-width:0"><div class="rowlabel">Artifacts (max 2)</div><div class="cards" id="meArts"></div></div>
       <div style="min-width:0"><div class="rowlabel">Hazards on you</div><div class="cards" id="meHazards"></div></div>
@@ -151,7 +153,7 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 <script type="module">
 // RL80 R-cana — Playtest 2: THE TRADING DESK (PLAYTEST2.md).
 // Traders carry CRED (durability) and LIQ (your income); one seat + a bench of two,
-// one free swap a turn. Scandals drain Cred — disgrace at zero. Candles restore it.
+// one free swap a turn. Scandals drain Grace — disgrace when all is lost. Candles restore it.
 // 3–4 players, constructed 40-card decks, one main action a turn, race to bank 1,000 Prosperity.
 // Liquidity funds plays; Assets sell later for cash or Prosperity; Hazards stick until cleared;
 // Remedies, Artifacts (max two equipped); La Ofrenda lights candles at Our Lady's shrine (max three),
@@ -190,13 +192,13 @@ const DESIGNS = [
   D('sirena', 'La Sirena', 'hazard', 3, { text: 'The seated Trader walks into the sea; no new hires until cleared' }),
   D('taxman', 'Tax Collector', 'hazard', 2, { text: 'Pay 1 to the bank at the start of each turn' }),
   D('snake', 'The Snake', 'hazard', 3, { text: 'The serpent at the shrine: your candles count as zero' }),
-  D('escandalo', 'El Escándalo', 'hazard', 2, { text: 'Scandal: the seated Trader loses 5 Cred when it breaks, 2 more each turn' }),
+  D('escandalo', 'El Escándalo', 'hazard', 2, { text: 'Scandal: the seated Trader loses 5 Grace when it breaks, 2 more each turn' }),
   D('naranja', 'El Naranja', 'hazard', 3, { text: 'The Orange One takes his cut: whenever the target banks, the hazard’s owner collects 2' }),
   D('bell', 'The Bell', 'remedy', 1, { clears: 'bear' }),
   D('resist', 'Quantum Resistance', 'remedy', 1, { clears: 'hack' }),
   D('keys', 'The Keys', 'remedy', 1, { clears: 'rug' }),
   D('tortilla', 'Miracle Tortilla', 'remedy', 2, { clears: 'any' }),
-  D('publicista', 'El Publicista', 'remedy', 1, { clears: 'escandalo', text: 'Clear a Scandal — or polish: your seated Trader regains 5 Cred' }),
+  D('publicista', 'El Publicista', 'remedy', 1, { clears: 'escandalo', text: 'Clear a Scandal — or polish: your seated Trader regains 5 Grace' }),
   D('heart', 'Sacred Heart', 'artifact', 2, { text: 'A shield, not a cure: discard to cancel a hazard as it lands' }),
   D('halo', 'The Halo', 'artifact', 3, { text: 'Any Trader seated at your desk cannot be disabled' }),
   D('xray', 'X-Ray Glasses', 'artifact', 2, { text: 'Once a turn, peek at one random rival card' }),
@@ -329,7 +331,7 @@ class Game {
     if (p.deeds >= 3) return false;
     p.deeds += 1; p.stats.candles++;
     if (this.is(p, 'monje')) p.liq += 2;
-    if (p.trader && p.trader.credNow != null && p.trader.credNow < p.trader.cred) { p.trader.credNow = Math.min(p.trader.cred, p.trader.credNow + 3); this.log(`the candlelight restores ${p.trader.name} → ${p.trader.credNow}/${p.trader.cred} Cred`); }
+    if (p.trader && p.trader.credNow != null && p.trader.credNow < p.trader.cred) { p.trader.credNow = Math.min(p.trader.cred, p.trader.credNow + 3); this.log(`the candlelight restores ${p.trader.name} → ${p.trader.credNow}/${p.trader.cred} Grace`); }
     if (this.is(p, 'gr80')) this.bank(p, 25, 'St. GR80');
     if (p.artifacts.some((a) => a.key === 'rosary')) this.draw(p);
     this.log(`🕯 ${p.name} lights a candle (${why}) → ${p.deeds} of 3`);
@@ -338,7 +340,7 @@ class Game {
   credDamage(p, n, why) {
     if (!p.trader) return;
     p.trader.credNow = (p.trader.credNow == null ? p.trader.cred : p.trader.credNow) - n;
-    this.log(`${p.trader.name} loses ${n} Cred (${why}) → ${Math.max(0, p.trader.credNow)}/${p.trader.cred}`);
+    this.log(`${p.trader.name} loses ${n} Grace (${why}) → ${Math.max(0, p.trader.credNow)}/${p.trader.cred}`);
     if (p.trader.credNow <= 0) { this.log(`☠ ${p.trader.name} is DISGRACED and leaves ${p.name}'s desk`); p.discard.push(p.trader); p.trader = null; p.stats.disgraces++; }
   }
   prosOf(a) { return a.bloom && this.turnNo - a.bornTurn >= 4 ? a.bloom : a.pros; }
@@ -372,7 +374,7 @@ class Game {
         if (c.key === 'escandalo') this.credDamage(t, 5, 'EL ESCÁNDALO breaks');
         break; }
       case 'remedy': {
-        if (choice.polish) { if (p.trader) { p.trader.credNow = Math.min(p.trader.cred, (p.trader.credNow == null ? p.trader.cred : p.trader.credNow) + 5); this.log(`EL PUBLICISTA polishes ${p.trader.name} → ${p.trader.credNow}/${p.trader.cred} Cred`); } p.discard.push(c); break; }
+        if (choice.polish) { if (p.trader) { p.trader.credNow = Math.min(p.trader.cred, (p.trader.credNow == null ? p.trader.cred : p.trader.credNow) + 5); this.log(`EL PUBLICISTA polishes ${p.trader.name} → ${p.trader.credNow}/${p.trader.cred} Grace`); } p.discard.push(c); break; }
         const t = choice.target || p; const h = choice.hazard || t.hazards.find((x) => c.clears === 'any' || x.key === c.clears);
         if (!h) { p.liq += cost; p.hand.push(c); p.stats.plays--; return false; }
         this.clearHazard(t, h, p, `${p.name} plays ${c.name}`); p.discard.push(c);
@@ -383,7 +385,7 @@ class Game {
         p.artifacts.push(c); this.log(`${p.name} equips ${c.name}`); break; }
       case 'trader': {
         c.credNow = c.cred; p.stats.hires++;
-        if (!p.trader) { p.trader = c; this.log(`${p.name} seats ${c.name} at the desk (LIQ ${c.liq} · CRED ${c.cred})`);
+        if (!p.trader) { p.trader = c; this.log(`${p.name} seats ${c.name} at the desk (LIQ ${c.liq} · GRACE ${c.cred})`);
           if (c.key === 'gato' && p.hazards.length && this.abilityOn(p)) { const h = choice.hazard || p.hazards[0]; this.clearHazard(p, h, p, 'EL GATO knocks it off the table'); } }
         else { p.bench.push(c); this.log(`${c.name} joins ${p.name}'s bench`); }
         break; }
@@ -467,7 +469,9 @@ class Game {
     for (const k of Object.keys(this.fx)) if (this.fx[k].owner === p.idx) { delete this.fx[k]; this.log(`${byKey[k].name} blows over`); }
     p.swapUsed = false;
     const employed = p.trader && this.abilityOn(p);
-    p.liq += this.fx.halving ? 1 : (employed ? p.trader.liq : 1);
+    const spotless = employed && (p.trader.credNow == null || p.trader.credNow === p.trader.cred);
+    p.liq += this.fx.halving ? 1 : (employed ? p.trader.liq + (spotless ? 1 : 0) : 1);
+    if (!this.fx.halving && spotless) this.log(`${p.trader.name}'s spotless reputation pays ${p.name} +1`);
     if (!this.fx.halving && !employed) this.log(`${p.name} is between Traders — collects only 1`);
     if (this.hasHaz(p, 'escandalo')) this.credDamage(p, 2, 'the Scandal grinds on');
     if (this.hasHaz(p, 'taxman') && p.liq > 0) { p.liq -= 1; this.log(`${p.name} pays 1 to the TAX COLLECTOR`); }
@@ -533,7 +537,7 @@ class GreedyBot {
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const FX = { unicornio: 'Pure compounding — the best paycheck at the desk', gato: 'When seated: knock one hazard off your table, free', monje: 'When you light a candle, collect 2 Liquidity', diablito: 'When a hazard you play lands, collect 1 Liquidity', celebridad: 'The influencer: pay 1 when banking from a card, +25 Prosperity', gr80: 'When you light a candle, bank 25 Prosperity', h80z: 'Hazards you play cost 1 less', eugene: 'Your Hail Mary odds rise one step', abuela: 'The gambling grandmother: your gambles moon on 4+ instead of 5+', pope: 'Once a game, a failed Hail Mary is absolved — try again', prospector: 'Assets you buy cost 1 less', shitcoin: 'Sell for Prosperity: a die decides — 5+ moons for 125, else zero', bluechip: 'Sell later: 10 Liquidity or 250 Prosperity', halving: 'Fires when drawn: until the drawer’s next turn, turn income is 1', corrida: 'Fires when drawn: until the drawer’s next turn, Prosperity sales pay +25', crash: 'Fires when drawn: everyone holding 8+ Liquidity loses half', airdrop: 'Fires when drawn: every player draws a card', honeymoon: 'Fires when drawn: no hazards until the drawer’s next turn', tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell later: 4 Liquidity or 75 Prosperity', moon: 'Sell later: 7 Liquidity or 150 Prosperity', bull: 'Invest 2 → bank 100 Prosperity', rocket: 'Invest 4 → bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', sirena: 'Their seated Trader walks into the sea; no new hires until cleared', taxman: 'They pay 1 to the bank at the start of each turn', snake: 'The serpent at the shrine: their candles count as zero', naranja: 'The Orange One takes his cut: when they bank, the hazard’s owner collects 2', escandalo: 'Scandal: their seated Trader loses 5 Cred when it breaks, 2 more each turn', bell: 'Clears The Bear', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one hazard', publicista: 'Clear a Scandal — or polish: your seated Trader regains 5 Cred', heart: 'A shield, not a cure: while equipped, discard it to cancel a hazard AS it lands — it cannot clear one already on you', halo: 'Any Trader seated at your desk cannot be disabled', xray: 'Once a turn, tap to peek at a random rival card — free', rosary: 'Draw a card when you light a candle', grail: 'An answered Hail Mary banks 300 instead of 200', enigma: 'Your hand cannot be peeked', ofrenda: 'Offer it to Our Lady: it goes to the shrine and lights a candle (max 3)', moneda: 'While held: collect 1 Liquidity at the start of your turn', jardin: 'While held: collect 2 a turn — but it dies the moment any Event fires', semilla: 'Sell for 25 Prosperity — or hold four rounds and it blooms to 150', ballena: 'Fires when drawn: the richest portfolio’s best Asset moves to the poorest player', rueda: 'Fires when drawn: every portfolio rotates one seat', godcandle: 'Fires when drawn: Prosperity sales pay double until the drawer’s next turn', skull: 'Fires when drawn: the biggest seller collects 5; everyone else pays 2', world: 'Fires when drawn: every standing effect ends; everyone draws', illuminati: 'Fires when drawn: every player passes one random card to the left', moralhazard: 'Fires when drawn: the bailout — the poorest player collects 5; the richest loses 2', rose: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise' };
+const FX = { unicornio: 'Pure compounding — the best paycheck at the desk', gato: 'When seated: knock one hazard off your table, free', monje: 'When you light a candle, collect 2 Liquidity', diablito: 'When a hazard you play lands, collect 1 Liquidity', celebridad: 'The influencer: pay 1 when banking from a card, +25 Prosperity', gr80: 'When you light a candle, bank 25 Prosperity', h80z: 'Hazards you play cost 1 less', eugene: 'Your Hail Mary odds rise one step', abuela: 'The gambling grandmother: your gambles moon on 4+ instead of 5+', pope: 'Once a game, a failed Hail Mary is absolved — try again', prospector: 'Assets you buy cost 1 less', shitcoin: 'Sell for Prosperity: a die decides — 5+ moons for 125, else zero', bluechip: 'Sell later: 10 Liquidity or 250 Prosperity', halving: 'Fires when drawn: until the drawer’s next turn, turn income is 1', corrida: 'Fires when drawn: until the drawer’s next turn, Prosperity sales pay +25', crash: 'Fires when drawn: everyone holding 8+ Liquidity loses half', airdrop: 'Fires when drawn: every player draws a card', honeymoon: 'Fires when drawn: no hazards until the drawer’s next turn', tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell later: 4 Liquidity or 75 Prosperity', moon: 'Sell later: 7 Liquidity or 150 Prosperity', bull: 'Invest 2 → bank 100 Prosperity', rocket: 'Invest 4 → bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', sirena: 'Their seated Trader walks into the sea; no new hires until cleared', taxman: 'They pay 1 to the bank at the start of each turn', snake: 'The serpent at the shrine: their candles count as zero', naranja: 'The Orange One takes his cut: when they bank, the hazard’s owner collects 2', escandalo: 'Scandal: their seated Trader loses 5 Grace when it breaks, 2 more each turn', bell: 'Clears The Bear', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one hazard', publicista: 'Clear a Scandal — or polish: your seated Trader regains 5 Grace', heart: 'A shield, not a cure: while equipped, discard it to cancel a hazard AS it lands — it cannot clear one already on you', halo: 'Any Trader seated at your desk cannot be disabled', xray: 'Once a turn, tap to peek at a random rival card — free', rosary: 'Draw a card when you light a candle', grail: 'An answered Hail Mary banks 300 instead of 200', enigma: 'Your hand cannot be peeked', ofrenda: 'Offer it to Our Lady: it goes to the shrine and lights a candle (max 3)', moneda: 'While held: collect 1 Liquidity at the start of your turn', jardin: 'While held: collect 2 a turn — but it dies the moment any Event fires', semilla: 'Sell for 25 Prosperity — or hold four rounds and it blooms to 150', ballena: 'Fires when drawn: the richest portfolio’s best Asset moves to the poorest player', rueda: 'Fires when drawn: every portfolio rotates one seat', godcandle: 'Fires when drawn: Prosperity sales pay double until the drawer’s next turn', skull: 'Fires when drawn: the biggest seller collects 5; everyone else pays 2', world: 'Fires when drawn: every standing effect ends; everyone draws', illuminati: 'Fires when drawn: every player passes one random card to the left', moralhazard: 'Fires when drawn: the bailout — the poorest player collects 5; the richest loses 2', rose: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise' };
 
 let S = null;
 const toast = (t) => { const el = $('toast'); el.innerHTML = `<span>${esc(t)}</span><button class="tx" aria-label="dismiss">\u00d7</button>`; el.querySelector('.tx').onclick = () => el.classList.remove('show'); el.classList.add('show'); };
@@ -568,10 +572,10 @@ function popMenu(items) { if (!S.mainResolve) { toast('Your main action is spent
   host.querySelector('.overlay').onclick = (e) => { if (e.target === e.currentTarget) host.innerHTML = ''; };
 }
 const typeClass = (c) => c.type === 'hazard' ? 'hazard' : c.type === 'remedy' ? 'remedy' : c.type === 'artifact' ? 'artifact' : c.type === 'grace' ? 'grace' : c.type === 'trader' ? 'trader' : c.type === 'event' ? 'event' : '';
-const miniHTML = (c) => `<div class="card mini ${typeClass(c)}" title="${esc(FX[c.key] || c.text || '')}"><div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.liq ? `<span>LIQ ${c.liq}</span>` : ''}${c.cred ? `<span>CRED ${c.credNow != null ? c.credNow + '/' + c.cred : c.cred}</span>` : ''}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}${c.bloom && c.bornTurn != null && S && S.g ? (S.g.turnNo - c.bornTurn >= 4 ? '<span>\uD83C\uDF38</span>' : `<span>blooms in ${Math.max(0, 4 - (S.g.turnNo - c.bornTurn))}</span>`) : ''}</div></div>`;
+const miniHTML = (c) => `<div class="card mini ${typeClass(c)}" title="${esc(FX[c.key] || c.text || '')}"><div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.liq ? `<span>LIQ ${c.liq}</span>` : ''}${c.cred ? `<span>GRACE ${c.credNow != null ? c.credNow + '/' + c.cred : c.cred}</span>` : ''}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}${c.bloom && c.bornTurn != null && S && S.g ? (S.g.turnNo - c.bornTurn >= 4 ? '<span>\uD83C\uDF38</span>' : `<span>blooms in ${Math.max(0, 4 - (S.g.turnNo - c.bornTurn))}</span>`) : ''}</div></div>`;
 function cardEl(c) {
   const el = document.createElement('div'); el.className = 'card ' + typeClass(c);
-  el.innerHTML = `<div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.type === 'event' ? '<span>fires on draw</span>' : c.type === 'grace' ? '<span>to the shrine</span>' : `<span>cost ${c.cost}</span>`}${c.liq ? `<span>LIQ ${c.liq}</span>` : ''}${c.cred ? `<span>CRED ${c.credNow != null ? c.credNow + '/' + c.cred : c.cred}</span>` : ''}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}</div><div class="fx">${esc(FX[c.key] || c.text || '')}</div>`;
+  el.innerHTML = `<div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.type === 'event' ? '<span>fires on draw</span>' : c.type === 'grace' ? '<span>to the shrine</span>' : `<span>cost ${c.cost}</span>`}${c.liq ? `<span>LIQ ${c.liq}</span>` : ''}${c.cred ? `<span>GRACE ${c.credNow != null ? c.credNow + '/' + c.cred : c.cred}</span>` : ''}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}</div><div class="fx">${esc(FX[c.key] || c.text || '')}</div>`;
   return el;
 }
 $('deal').onclick = async () => {
@@ -703,7 +707,7 @@ function coachLabel(g, p, a) {
   if (c.type === 'progress') return a.choice && a.choice.cash ? `cash ${c.name} for ${c.cash} Liquidity` : `bank ${c.name} for ${c.pros}`;
   if (c.type === 'asset') return `invest in ${c.name}${c.income ? ' (pays ' + c.income + '/turn)' : ''}`;
   if (c.type === 'hazard') return `hit ${t.name} with ${c.name}`;
-  if (c.type === 'remedy') { if (a.choice && a.choice.polish) return `polish your Trader: +5 Cred`; return t === p ? `clear your ${a.choice.hazard.name}` : `clear ${t.name}'s ${a.choice.hazard.name} (goodwill)`; }
+  if (c.type === 'remedy') { if (a.choice && a.choice.polish) return `polish your Trader: +5 Grace`; return t === p ? `clear your ${a.choice.hazard.name}` : `clear ${t.name}'s ${a.choice.hazard.name} (goodwill)`; }
   if (c.type === 'artifact') return c.key === 'heart' ? 'equip Sacred Heart — shields the NEXT hazard (not ones already stuck)' : `equip ${c.name}`;
   if (c.type === 'trader') return p.trader ? `bench ${c.name} (LIQ ${c.liq})` : `hire ${c.name} — income becomes ${c.liq}`;
   if (c.type === 'grace') return c.key === 'rose' ? `offer the Rose to ${t.name} — a candle if accepted` : `offer ${c.name} — light a candle, odds rise`;
@@ -733,7 +737,7 @@ function render() {
       <div class="minihand">${'<span class="miniback"></span>'.repeat(Math.min(9, q.hand.length))}</div>
       ${(S.known || []).filter((k) => k.idx === q.idx && q.hand.includes(k.c)).map((k) => `<span class="chip eye" title="seen through the X-Ray Glasses">\uD83D\uDC41 ${esc(k.c.name)} in hand</span>`).join(' ')}
       ${q.lastLine ? `<div class="note" style="margin-top:6px">Last turn: ${esc(q.lastLine)}</div>` : ''}
-      <div style="margin-top:6px">${q.trader ? `<span class="chip trader" title="${esc(FX[q.trader.key] || '')}">Trader: ${esc(q.trader.name)} · LIQ ${q.trader.liq} · CRED ${q.trader.credNow}/${q.trader.cred}${g.abilityOn(q) ? '' : ' · HACKED'}</span>` : '<span class="chip">no Trader — income 1</span>'} ${q.bench.map((b) => `<span class="chip trader" title="${esc(FX[b.key] || '')}">bench: ${esc(b.name)} · ${b.credNow}/${b.cred}</span>`).join(' ')} ${q.artifacts.map((a) => `<span class="chip" title="${esc(FX[a.key] || '')}">${esc(a.name)}</span>`).join(' ')} ${q.hazards.map((h) => `<span class="chip haz" title="${esc(FX[h.key] || '')}">${esc(h.name)}</span>`).join(' ')}</div>
+      <div style="margin-top:6px">${q.trader ? `<span class="chip trader" title="${esc(FX[q.trader.key] || '')}">Trader: ${esc(q.trader.name)} · LIQ ${q.trader.liq} · GRACE ${q.trader.credNow}/${q.trader.cred}${g.abilityOn(q) ? '' : ' · HACKED'}</span>` : '<span class="chip">no Trader — income 1</span>'} ${q.bench.map((b) => `<span class="chip trader" title="${esc(FX[b.key] || '')}">bench: ${esc(b.name)} · ${b.credNow}/${b.cred}</span>`).join(' ')} ${q.artifacts.map((a) => `<span class="chip" title="${esc(FX[a.key] || '')}">${esc(a.name)}</span>`).join(' ')} ${q.hazards.map((h) => `<span class="chip haz" title="${esc(FX[h.key] || '')}">${esc(h.name)}</span>`).join(' ')}</div>
       <div class="rowlabel" style="margin:9px 0 5px">Their investments</div>
       <div class="cards">${q.invest.length ? q.invest.map((a) => miniHTML(a)).join('') : '<span class="note">none yet</span>'}</div>`;
     rv.appendChild(d);
@@ -745,7 +749,11 @@ function render() {
   const tw = g.odds(me); $('meHail').textContent = me.hailUsed ? 'Hail Mary: spent' : `Hail Mary: ${tw}/12 to bank 200`;
   $('meHaz').textContent = me.trader && !g.abilityOn(me) ? 'TRADER HACKED' : '';
   const ts = $('meTrader'); ts.innerHTML = '';
-  if (me.trader) { const tc = cardEl(me.trader); if (!g.abilityOn(me)) { tc.classList.add('dim'); tc.title = 'Disabled by Quantum Hack'; } ts.appendChild(tc); }
+  if (me.trader) { const tc = cardEl(me.trader); if (!g.abilityOn(me)) { tc.classList.add('dim'); tc.title = 'Disabled by Quantum Hack'; }
+    const cn = me.trader.credNow == null ? me.trader.cred : me.trader.credNow; const ratio = cn / me.trader.cred;
+    const ch = tc.querySelector('.chips'); if (ch && ratio === 1 && g.abilityOn(me)) ch.insertAdjacentHTML('beforeend', '<span>IN A STATE OF GRACE: +1 LIQ</span>');
+    tc.insertAdjacentHTML('beforeend', `<div class="credbar" title="Grace ${cn}/${me.trader.cred}"><i style="width:${Math.round(ratio * 100)}%;background:${ratio === 1 ? 'var(--teal)' : ratio > 0.4 ? 'var(--gold)' : 'var(--rose)'}"></i></div>`);
+    ts.appendChild(tc); }
   else { const slot = document.createElement('div'); slot.className = 'card slot'; slot.innerHTML = '<div class="fx">empty seat — income is 1 until a Trader sits here</div>'; ts.appendChild(slot); }
   const bn = $('meBench'); bn.innerHTML = '';
   if (me.bench.length) me.bench.forEach((b, i) => { const el = cardEl(b); const sw = A.find((x) => x.t === 'swap' && x.i === i);
@@ -780,12 +788,12 @@ function render() {
   me.hand.forEach((c, ix) => { const el = cardEl(c); if (grew && ix === me.hand.length - 1 && S.dealt) el.classList.add('dealt'); const mineActs = A.filter((x) => x.t === 'play' && x.c === c);
     const items = mineActs.map((x) => { let label = `Play (${g.costOf(me, c)} Liq)`;
       if (c.type === 'hazard') label = `Play on ${x.choice.target.name}`;
-      if (c.type === 'remedy') label = `Clear ${x.choice.hazard.name} ${x.choice.target === me ? 'on you' : 'on ' + x.choice.target.name}`;
+      if (c.type === 'remedy' && x.choice.hazard) label = `Clear ${x.choice.hazard.name} ${x.choice.target === me ? 'on you' : 'on ' + x.choice.target.name}`;
       if (c.type === 'grace') label = c.key === 'rose' ? `Offer THE ROSE to ${x.choice.target.name}` : 'Offer to Our Lady — light a candle';
       if (c.type === 'progress') label = c.choice ? (x.choice.cash ? `Take ${c.cash} Liquidity` : `Bank ${c.pros} Prosperity`) : `Invest ${g.costOf(me, c)} → bank ${c.pros} Prosperity`;
       if (c.key === 'heart') label = `Equip — shields you against the NEXT hazard (${g.costOf(me, c)} Liq)`;
       if (c.type === 'trader') label = me.trader ? `Hire to the bench (${g.costOf(me, c)} Liq)` : `Hire to the seat (${g.costOf(me, c)} Liq)`;
-      if (x.choice && x.choice.polish) label = `Polish ${me.trader ? me.trader.name : 'your Trader'}: +5 Cred (${g.costOf(me, c)} Liq)`;
+      if (x.choice && x.choice.polish) label = `Polish ${me.trader ? me.trader.name : 'your Trader'}: +5 Grace (${g.costOf(me, c)} Liq)`;
       return [label, () => resolveMain(x)]; });
     if (items.length && mine) { el.classList.add('playable'); el.onclick = () => popMenu(items); } else el.classList.add('dim');
     mh.appendChild(el); });

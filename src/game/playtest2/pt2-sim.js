@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // RL80 R-cana — Playtest 2: THE TRADING DESK (PLAYTEST2.md).
 // Traders carry CRED (durability) and LIQ (your income); one seat + a bench of two,
-// one free swap a turn. Scandals drain Cred — disgrace at zero. Candles restore it.
+// one free swap a turn. Scandals drain Grace — disgrace when all is lost. Candles restore it.
 // 3–4 players, constructed 40-card decks, one main action a turn, race to bank 1,000 Prosperity.
 // Liquidity funds plays; Assets sell later for cash or Prosperity; Hazards stick until cleared;
 // Remedies, Artifacts (max two equipped); La Ofrenda lights candles at Our Lady's shrine (max three),
@@ -40,13 +40,13 @@ export const DESIGNS = [
   D('sirena', 'La Sirena', 'hazard', 3, { text: 'The seated Trader walks into the sea; no new hires until cleared' }),
   D('taxman', 'Tax Collector', 'hazard', 2, { text: 'Pay 1 to the bank at the start of each turn' }),
   D('snake', 'The Snake', 'hazard', 3, { text: 'The serpent at the shrine: your candles count as zero' }),
-  D('escandalo', 'El Escándalo', 'hazard', 2, { text: 'Scandal: the seated Trader loses 5 Cred when it breaks, 2 more each turn' }),
+  D('escandalo', 'El Escándalo', 'hazard', 2, { text: 'Scandal: the seated Trader loses 5 Grace when it breaks, 2 more each turn' }),
   D('naranja', 'El Naranja', 'hazard', 3, { text: 'The Orange One takes his cut: whenever the target banks, the hazard’s owner collects 2' }),
   D('bell', 'The Bell', 'remedy', 1, { clears: 'bear' }),
   D('resist', 'Quantum Resistance', 'remedy', 1, { clears: 'hack' }),
   D('keys', 'The Keys', 'remedy', 1, { clears: 'rug' }),
   D('tortilla', 'Miracle Tortilla', 'remedy', 2, { clears: 'any' }),
-  D('publicista', 'El Publicista', 'remedy', 1, { clears: 'escandalo', text: 'Clear a Scandal — or polish: your seated Trader regains 5 Cred' }),
+  D('publicista', 'El Publicista', 'remedy', 1, { clears: 'escandalo', text: 'Clear a Scandal — or polish: your seated Trader regains 5 Grace' }),
   D('heart', 'Sacred Heart', 'artifact', 2, { text: 'A shield, not a cure: discard to cancel a hazard as it lands' }),
   D('halo', 'The Halo', 'artifact', 3, { text: 'Any Trader seated at your desk cannot be disabled' }),
   D('xray', 'X-Ray Glasses', 'artifact', 2, { text: 'Once a turn, peek at one random rival card' }),
@@ -179,7 +179,7 @@ export class Game {
     if (p.deeds >= 3) return false;
     p.deeds += 1; p.stats.candles++;
     if (this.is(p, 'monje')) p.liq += 2;
-    if (p.trader && p.trader.credNow != null && p.trader.credNow < p.trader.cred) { p.trader.credNow = Math.min(p.trader.cred, p.trader.credNow + 3); this.log(`the candlelight restores ${p.trader.name} → ${p.trader.credNow}/${p.trader.cred} Cred`); }
+    if (p.trader && p.trader.credNow != null && p.trader.credNow < p.trader.cred) { p.trader.credNow = Math.min(p.trader.cred, p.trader.credNow + 3); this.log(`the candlelight restores ${p.trader.name} → ${p.trader.credNow}/${p.trader.cred} Grace`); }
     if (this.is(p, 'gr80')) this.bank(p, 25, 'St. GR80');
     if (p.artifacts.some((a) => a.key === 'rosary')) this.draw(p);
     this.log(`🕯 ${p.name} lights a candle (${why}) → ${p.deeds} of 3`);
@@ -188,7 +188,7 @@ export class Game {
   credDamage(p, n, why) {
     if (!p.trader) return;
     p.trader.credNow = (p.trader.credNow == null ? p.trader.cred : p.trader.credNow) - n;
-    this.log(`${p.trader.name} loses ${n} Cred (${why}) → ${Math.max(0, p.trader.credNow)}/${p.trader.cred}`);
+    this.log(`${p.trader.name} loses ${n} Grace (${why}) → ${Math.max(0, p.trader.credNow)}/${p.trader.cred}`);
     if (p.trader.credNow <= 0) { this.log(`☠ ${p.trader.name} is DISGRACED and leaves ${p.name}'s desk`); p.discard.push(p.trader); p.trader = null; p.stats.disgraces++; }
   }
   prosOf(a) { return a.bloom && this.turnNo - a.bornTurn >= 4 ? a.bloom : a.pros; }
@@ -222,7 +222,7 @@ export class Game {
         if (c.key === 'escandalo') this.credDamage(t, 5, 'EL ESCÁNDALO breaks');
         break; }
       case 'remedy': {
-        if (choice.polish) { if (p.trader) { p.trader.credNow = Math.min(p.trader.cred, (p.trader.credNow == null ? p.trader.cred : p.trader.credNow) + 5); this.log(`EL PUBLICISTA polishes ${p.trader.name} → ${p.trader.credNow}/${p.trader.cred} Cred`); } p.discard.push(c); break; }
+        if (choice.polish) { if (p.trader) { p.trader.credNow = Math.min(p.trader.cred, (p.trader.credNow == null ? p.trader.cred : p.trader.credNow) + 5); this.log(`EL PUBLICISTA polishes ${p.trader.name} → ${p.trader.credNow}/${p.trader.cred} Grace`); } p.discard.push(c); break; }
         const t = choice.target || p; const h = choice.hazard || t.hazards.find((x) => c.clears === 'any' || x.key === c.clears);
         if (!h) { p.liq += cost; p.hand.push(c); p.stats.plays--; return false; }
         this.clearHazard(t, h, p, `${p.name} plays ${c.name}`); p.discard.push(c);
@@ -233,7 +233,7 @@ export class Game {
         p.artifacts.push(c); this.log(`${p.name} equips ${c.name}`); break; }
       case 'trader': {
         c.credNow = c.cred; p.stats.hires++;
-        if (!p.trader) { p.trader = c; this.log(`${p.name} seats ${c.name} at the desk (LIQ ${c.liq} · CRED ${c.cred})`);
+        if (!p.trader) { p.trader = c; this.log(`${p.name} seats ${c.name} at the desk (LIQ ${c.liq} · GRACE ${c.cred})`);
           if (c.key === 'gato' && p.hazards.length && this.abilityOn(p)) { const h = choice.hazard || p.hazards[0]; this.clearHazard(p, h, p, 'EL GATO knocks it off the table'); } }
         else { p.bench.push(c); this.log(`${c.name} joins ${p.name}'s bench`); }
         break; }
@@ -317,7 +317,9 @@ export class Game {
     for (const k of Object.keys(this.fx)) if (this.fx[k].owner === p.idx) { delete this.fx[k]; this.log(`${byKey[k].name} blows over`); }
     p.swapUsed = false;
     const employed = p.trader && this.abilityOn(p);
-    p.liq += this.fx.halving ? 1 : (employed ? p.trader.liq : 1);
+    const spotless = employed && (p.trader.credNow == null || p.trader.credNow === p.trader.cred);
+    p.liq += this.fx.halving ? 1 : (employed ? p.trader.liq + (spotless ? 1 : 0) : 1);
+    if (!this.fx.halving && spotless) this.log(`${p.trader.name}'s spotless reputation pays ${p.name} +1`);
     if (!this.fx.halving && !employed) this.log(`${p.name} is between Traders — collects only 1`);
     if (this.hasHaz(p, 'escandalo')) this.credDamage(p, 2, 'the Scandal grinds on');
     if (this.hasHaz(p, 'taxman') && p.liq > 0) { p.liq -= 1; this.log(`${p.name} pays 1 to the TAX COLLECTOR`); }
