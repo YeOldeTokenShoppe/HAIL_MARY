@@ -25,11 +25,51 @@
   font-style: normal;
   font-display: swap;
 }
+/* IBM Plex Serif — the card body face. Only the weights the cards use are
+   registered (each is its own download); the full family is in
+   /fonts/IBM_Plex_Serif. The italics are REAL italics — without them the
+   browser shears the roman into a faux oblique, which is what the flavour
+   quotes were showing. */
 @font-face {
- font-family: "IBM Plex Serif";
-  src: url('/fonts/IBMPlexSerif-Regular.ttf') format('truetype');
+  font-family: "IBM Plex Serif";
+  src: url('/fonts/IBM_Plex_Serif/IBMPlexSerif-Regular.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Serif";
+  src: url('/fonts/IBM_Plex_Serif/IBMPlexSerif-Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Serif";
+  src: url('/fonts/IBM_Plex_Serif/IBMPlexSerif-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Serif";
+  src: url('/fonts/IBM_Plex_Serif/IBMPlexSerif-MediumItalic.ttf') format('truetype');
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Serif";
+  src: url('/fonts/IBM_Plex_Serif/IBMPlexSerif-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Serif";
+  src: url('/fonts/IBM_Plex_Serif/IBMPlexSerif-SemiBoldItalic.ttf') format('truetype');
+  font-weight: 600;
+  font-style: italic;
   font-display: swap;
 }
 

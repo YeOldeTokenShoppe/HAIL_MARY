@@ -10,6 +10,7 @@ import {
 } from "@/game/terminal-traders/cardFrames";
 import { ROGUES } from "@/game/terminal-traders/rogues";
 import { LOTERIA_CARDS, toLoteriaCard } from "@/game/terminal-traders/loteria";
+import RcanaBench from "@/components/RcanaBench";
 
 // Every card renders straight from the engine through the game's own converter,
 // so the preview matches what the table shows (art comes from CARD_ART, keyed
@@ -254,6 +255,7 @@ export default function CardTemplatePage() {
           {[
             { id: "single", label: "Single" },
             { id: "collection", label: `Collection ${TOTAL_WIRED}/${GENESIS_SET.length}` },
+            { id: "rcana", label: "R-cana" },
           ].map((v) => (
             <button
               key={v.id}
@@ -350,6 +352,8 @@ export default function CardTemplatePage() {
           </div>
         </section>
       )}
+
+      {view === "rcana" && <RcanaBench />}
 
       <div className="ct-workspace" hidden={view !== "single"}>
         <aside className="ct-column ct-picker">
