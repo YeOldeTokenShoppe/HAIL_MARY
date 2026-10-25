@@ -103,7 +103,8 @@ for (const card of RCANA_SET) {
     "src/game/rcana/set/designs.js",
     "src/game/rcana/set/faces.js",
     "src/game/playtest2/pt2-table.src.html",
-    "src/game/playtest2/pt2-build.mjs",
+    "src/game/playtest2/pt2-build.js",
+    "src/game/playtest2/pt2-sim.js",
   ].map((p) => path.join(root, p));
   if (fs.existsSync(table)) {
     const built = fs.statSync(table).mtimeMs;

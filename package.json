@@ -14,7 +14,7 @@
     "rcana:lint": "node scripts/rcana-lint.mjs",
     "rcana:trace": "node scripts/rcana-trace-fx.mjs",
     "rcana:faces": "node scripts/rcana-render-faces.mjs",
-    "pt2:build": "node src/game/playtest2/pt2-build.mjs",
+    "pt2:build": "node src/game/playtest2/pt2-build.js",
     "lt": "node scripts/lt-tv-status.mjs",
     "lt:studio": "bash scripts/lt-tv-studio.sh",
     "lt:check": "node scripts/lt-tv-check.mjs",

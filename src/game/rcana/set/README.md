@@ -14,7 +14,7 @@ the art files into `RCANA_ART`; `cardFace.js` re-exports both, so nothing
 upstream changes its imports.
 
 `designs.js` was lifted from the Playtest 2 table, whose build source had
-never been committed. The build is restored: `src/game/playtest2/pt2-build.mjs`
+never been committed. The build is restored: `src/game/playtest2/pt2-build.js`
 injects `designs.js` and the faces into `pt2-table.src.html` and writes
 `public/playtest2/table.html`. **Never edit `table.html` by hand.**
 
