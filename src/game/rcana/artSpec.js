@@ -136,11 +136,41 @@ export const FLAME3_REFLECTION = {
 // a class its own art by replacing just that entry.
 export const DEFAULT_FRAME = "/TCG/frames/LOTERIA_FRAME2.webp";
 
+// Three plates. The stat boxes and their glyphs are painted INTO the plate:
+//   "boxed"   halo box left, drop box right — Trader
+//   "valued"  the halo swapped for the INGOT (Prosperity) — Asset, called Event
+//   "sealed"  the halo box healed over and the TYPE SEAL drawn there instead,
+//             drop box kept — Hazard, Remedy, Artifact, Grace, fired Event
+// The drop box always holds "the Liquidity on this card": what you pay for
+// it on every type but Traders, where it is what they pay YOU (their income —
+// the one type that generates water). A Trader's hire cost prints as a coin
+// in the tab instead, the one place that coin appears.
+export const PLATES = {
+  // halo + drop: a Trader's Grace and income
+  boxed: "/TCG/frames/LOTERIA_FRAME2.webp",
+  // ingot + drop: an Asset's or a called Event's value (Prosperity) and cost
+  valued: "/TCG/frames/LOTERIA_FRAME2_value.webp",
+  // type seal + drop: everything else, and its cost
+  sealed: "/TCG/frames/LOTERIA_FRAME2_sealed.webp",
+};
+
+// The type seal on a sealed plate: a full-canvas overlay (1024x1422, seal in
+// place at the left of the signature strip, centre ≈ 18% across, 90% down),
+// one per type. "event" is the seal for FIRED Events; a called Event is on
+// the boxed plate and prints its value instead.
+export const TYPE_BADGE = {
+  event: "/TCG/badges/event.webp",
+  hazard: "/TCG/badges/hazard.webp",
+  remedy: "/TCG/badges/remedy.webp",
+  artifact: "/TCG/badges/artifact.webp",
+  grace: "/TCG/badges/grace.webp",
+};
+
 export const CLASS_FRAME = {
   Trader: DEFAULT_FRAME,
   Asset: DEFAULT_FRAME,
   Event: DEFAULT_FRAME,
-  Grace: DEFAULT_FRAME,
+  Artifact: DEFAULT_FRAME,
 };
 
 // Each card names its art planes far to near. `z` defaults to the ART_PLANES

@@ -23,6 +23,7 @@ export default function RcanaBench() {
   const [depth, setDepth] = useState(1);
   const [showSlots, setShowSlots] = useState(false);
   const [showFacets, setShowFacets] = useState(false);
+  const [classFont, setClassFont] = useState("blackletter");
 
   // Device tilt. iOS hands out the orientation sensor only from inside a tap
   // (DeviceOrientationEvent.requestPermission), Android just fires events,
@@ -65,6 +66,15 @@ export default function RcanaBench() {
   const [hydro, setHydro] = useState(source.hydro);
   const [ability, setAbility] = useState(source.ability);
   const [flavor, setFlavor] = useState(source.flavor);
+  // The edit fields belong to ONE card: switching cards reloads them from the
+  // new card's face, or the bear would print the devil's lines.
+  useEffect(() => {
+    setRarity(source.rarity);
+    setHalo(source.halo);
+    setHydro(source.hydro);
+    setAbility(source.ability);
+    setFlavor(source.flavor);
+  }, [source]);
 
   const card = useMemo(() => {
     const c = toRcanaCard(source, { rarity, halo, hydro, ability, flavor });
@@ -151,6 +161,7 @@ export default function RcanaBench() {
           depth={depth}
           showSlots={showSlots}
           showFacets={showFacets}
+          classFont={classFont}
           gyro={gyro}
           hideFrame={hideFrame}
           showFx={showFx}
@@ -198,6 +209,17 @@ export default function RcanaBench() {
               onChange={(e) => setShowSlots(e.target.checked)}
             />
             Slot outlines
+          </label>
+          <label title="Typeface for the class label in the tab">
+            Class type
+            <select value={classFont} onChange={(e) => setClassFont(e.target.value)}>
+              <option value="blackletter">Blackletter (default)</option>
+              <option value="bebas">Bebas (caps)</option>
+              <option value="grenze">Grenze Gotisch</option>
+              <option value="unifraktur">UnifrakturCook</option>
+              <option value="maguntia">UnifrakturMaguntia</option>
+              <option value="pirata">Pirata One</option>
+            </select>
           </label>
           <label title="Where each FX sheet's light facets sit. Every ring should be on flame.">
             <input

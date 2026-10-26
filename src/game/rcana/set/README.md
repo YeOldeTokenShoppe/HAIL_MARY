@@ -22,6 +22,10 @@ injects `designs.js` and the faces into `pt2-table.src.html` and writes
 
 1. **Design** — if the card isn't in `designs.js`, add a `D(...)` line. If it
    is, skip this. (`npm run rcana:lint` lists every design with no face yet.)
+   The printed name, when it differs from the engine's, is the design's
+   `printName`. Rule: lotería names for figures, devotional objects and
+   classic lotería images (El Monje, El Exvoto, La Luna); market names for
+   market forces, hazards and instruments (Bull Run, Rug Pull, Blue Chip).
 
 2. **Art files** — author on the frame's own **1024 × 1422** canvas so layers
    land where drawn with no offsets. Export WebP into
@@ -42,15 +46,19 @@ injects `designs.js` and the faces into `pt2-table.src.html` and writes
    - ~10 facets max — cost tracks lit gradient area, not count, but keep it
    - a `tune` block overrides the shared `fire` material for this card only
 
-4. **Art file** — copy `art/el-diablito.js`, rename, set `backdrop`, the
-   `layers` (far → near; `z` defaults from `ART_PLANES` by layer id), and
-   `fx` (sheet, `blend`, `clip`, `clear: ["numberTab"]` if it crosses the tab,
-   `reflection`). Register it in `art/index.js` — one import, one key.
+4. **Art file** — copy `art/el-toro.js`, rename, set `backdrop` and the
+   `layers` (far → near; `z` defaults from `ART_PLANES` by layer id). **No
+   paths**: a layer `{ id: "scene" }` is `public/TCG/rcana/<id>/scene.webp`,
+   an fx `{ id: "flame" }` is `fx-flame.webp`, by convention (`artPath`). Give
+   a `src` only to point at a shared file (El Diablito's flame sheet). FX take
+   `blend`, `clip`, `clear: ["numberTab"]` if the sheet crosses the tab, and
+   `reflection`. Register the file in `art/index.js` — one import, one key.
 
-5. **Face** — add an entry to `faces.js`: `id`, `design`, `number` (unique),
-   `rarity`, `halo`, `hydro`, `ability` (printed line — shorter than the
-   simulator's), `flavor`. Traders' flavor prints as a quote and leads the
-   panel; everything else narrates after the rule.
+5. **Face** — add an entry to `faces.js`: `id`, `design` (the engine key,
+   e.g. `"bull"` — never the name), `number` (unique), `rarity`, `ability`
+   (printed line — shorter than the simulator's), `flavor`. Halo/hydro print
+   the design's `cred`/`liq` unless overridden. Traders' flavor prints as a
+   quote and leads the panel; everything else narrates after the rule.
 
 6. **Check**
    ```
@@ -88,15 +96,35 @@ at build.
 no motion, transparent page. Open it in a browser to see exactly what the
 renderer captures.
 
+## Plates and seals
+
+The stat boxes are painted into the plate, so the plate follows the card's
+type (`PLATES` in `artSpec.js`, chosen by `plate` from `buildFace()`):
+
+| plate | left box | right (drop) box | types |
+|---|---|---|---|
+| `boxed` (`LOTERIA_FRAME2`) | halo: Grace | cost = income | Trader |
+| `valued` (`LOTERIA_FRAME2_value`) | **ingot: Prosperity** | **cost** | Asset, called Event |
+| `sealed` (`LOTERIA_FRAME2_sealed`) | **type seal** | **cost** | Hazard, Remedy, Artifact, Grace, fired Event |
+
+The drop box is always "the Liquidity on this card": what you pay to play
+it — and on a Trader, also what they pay you a turn (hire cost = income, by
+rule). The class label is set in Blackletter, the wordmark's face. Type seals are full-canvas
+overlays in `public/TCG/badges/<type>.webp` (`TYPE_BADGE`), drawn in place
+at the left of the strip; fired Events have none yet. The rarity heart sits
+under the wordmark on every plate. An art file may still pin a `frame:`.
+
 ## Open design calls (placeholders in code, flagged where they live)
 
-- **Type → class.** The game has 8 types, the face 4 classes. `TYPE_CLASS`
-  in `set/index.js` currently prints hazards as Events and remedies /
-  artifacts as Graces. Change it there and every card follows.
-- **Stats → boxes.** Halo is printed Grace, Hydro printed Liquidity
-  (`POINT_TYPES`). Designs carry `liq` and `cred`; faces set `halo`/`hydro`
-  explicitly for now, with `hydro` defaulting to `liq`. Decide whether `cred`
-  is Halo, and `buildFace()` is the one place to encode it.
+- ~~**Type → class.**~~ Settled in `TYPE_CLASS` (`set/index.js`): Trader,
+  Asset (assets), Event (events, hazards, progress), Artifact (artifacts,
+  remedies, graces). Remedies and Graces print their type as a sub-class
+  line under ARTIFACT. The engine's eight types are untouched.
+- ~~**Stats → boxes.**~~ Settled (`buildFace()`): the drop box is always
+  Liquidity; the halo box is standing — Grace on a Trader, **Prosperity (the
+  card's value)** on an Asset or a called Event. Other types print blank
+  boxes. Cost prints as a coin in the tab on every type. Rarity stays the
+  heart; by convention an Asset's rarity tracks its Prosperity tier.
 - **Numbering.** Lotería numbers are assigned per face by hand. If the set
   should number by type (Traders 1–11, …), do it in `faces.js` deliberately
   rather than by insertion order.

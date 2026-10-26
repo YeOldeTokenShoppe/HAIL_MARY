@@ -18,6 +18,16 @@ export const FX_MATERIALS = {
     bloomLightness: 60, bloomRadius: [8, 38], bloomBrightness: 1.75,
     baseHueShift: [0, 0],
   },
+  gold: {
+    // Metal, not flame: a narrow warm hue that barely travels, a core that
+    // goes white at the peak (the glint of a nugget catching the light), and
+    // a tight, pale-gold bloom rather than a fire's wide orange one.
+    hueTravel: 8, hueRange: [40, 54], rimHueOffset: -4, edgeHueOffset: -8,
+    coreLightness: [58, 100], rimLightness: 70, edgeLightness: 50,
+    emissionGain: 1.15, bloomGain: 1.0, bloomColor: "255 228 150",
+    bloomLightness: 68, bloomRadius: [5, 18], bloomBrightness: 1.6,
+    baseHueShift: [0, 0],
+  },
 };
 
 export function fxMaterial(name) {

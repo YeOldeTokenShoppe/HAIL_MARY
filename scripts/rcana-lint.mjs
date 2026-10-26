@@ -23,7 +23,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pub = (p) => path.join(root, "public", p.replace(/^\//, ""));
 const strict = process.argv.includes("--strict");
 
-const { RCANA_SET, UNPRINTED, RARITY_ORDER, RCANA_ART } = await import(
+const { RCANA_SET, UNPRINTED, RARITY_ORDER, RCANA_ART, toRcanaCard } = await import(
   path.join(root, "src/game/rcana/cardFace.js")
 );
 
@@ -55,16 +55,20 @@ for (const card of RCANA_SET) {
   const art = RCANA_ART[id];
   if (!art) { err(id, "no art file (src/game/rcana/art/<id>.js, registered in art/index.js)"); continue; }
 
+  // Resolve through the converter, so convention-derived paths (a layer with
+  // no `src` → /TCG/rcana/<id>/<layer>.webp) are checked as the card sees them.
+  const resolved = toRcanaCard(card);
   const srcs = [
-    art.frame,
-    ...(art.layers || []).map((l) => l.src),
-    ...(art.fx || []).map((l) => l.src),
+    resolved.frameImage,
+    resolved.badgeImage,
+    ...resolved.artLayers.map((l) => l.src),
+    ...resolved.fxLayers.map((l) => l.src),
     ...(typeof art.backdrop === "string" && art.backdrop.startsWith("/") ? [art.backdrop] : []),
   ].filter(Boolean);
   for (const s of srcs) if (!fs.existsSync(pub(s))) err(id, `missing file ${s}`);
 
   // Facets on bright pixels.
-  for (const fx of art.fx || []) {
+  for (const fx of resolved.fxLayers) {
     const facets = fx.reflection?.facets;
     if (!facets?.length) continue;
     if (!sharp) { warn(id, `facet check skipped for ${path.basename(fx.src)} — sharp did not load here`); continue; }

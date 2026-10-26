@@ -30,7 +30,7 @@ if (!importLine.test(engine)) throw new Error('pt2-sim.js no longer imports DESI
 engine = engine.replace(importLine, () => designs + '\n');
 
 // Faces: resolved through the real modules so the mapping cannot drift.
-const { RCANA_SET, RCANA_ART } = await import(join(root, 'src/game/rcana/cardFace.js'));
+const { RCANA_SET, RCANA_ART, TYPE_CLASS } = await import(join(root, 'src/game/rcana/cardFace.js'));
 const faces = {};
 for (const c of RCANA_SET) {
   const art = RCANA_ART[c.id] || {};
@@ -38,13 +38,16 @@ for (const c of RCANA_SET) {
   const subject = (art.layers || []).find((l) => l.id === 'subject')?.src || null;
   faces[c.designKey] = {
     id: c.id,
+    name: c.name,
     number: c.number,
     rarity: c.rarity,
     face: existsSync(join(root, 'public', facePath)) ? facePath : null,
     art: subject,
   };
 }
-const facesSrc = `const FACES = ${JSON.stringify(faces, null, 2)};`;
+// The printed class per engine type, so the table groups and labels cards the
+// way the cards themselves do; the engine keeps playing by type.
+const facesSrc = `const FACES = ${JSON.stringify(faces, null, 2)};\nconst TYPE_CLASS = ${JSON.stringify(TYPE_CLASS)};`;
 
 let page = readFileSync(join(here, 'pt2-table.src.html'), 'utf8');
 for (const [slot, src] of [['/*__ENGINE__*/', engine], ['/*__FACES__*/', facesSrc]]) {

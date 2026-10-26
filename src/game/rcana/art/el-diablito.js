@@ -3,7 +3,7 @@
 import { ART_PLANES, FLAME3_REFLECTION } from "../artSpec.js";
 
 export default {
-  frame: "/TCG/frames/LOTERIA_FRAME2.webp",
+  // No `frame`: the plate follows the card's type (FRAME_BY_BOXES).
 
   // ---- THE BACKGROUND BEHIND EVERYTHING ----
   // Swap this line to change the sky. It takes either a CSS value (a

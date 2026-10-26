@@ -74,10 +74,35 @@ button:disabled{opacity:.4;cursor:default}
 .flyface{position:fixed;z-index:72;pointer-events:none;transition:transform .6s cubic-bezier(.2,.7,.3,1),opacity .2s}
 #gallery .cards{margin-bottom:12px}
 #gallery .card{cursor:default}
+#gallery .classhead{font-family:var(--display);color:var(--gold);font-size:1.05rem;margin:14px 0 2px;padding-top:10px;border-top:1px solid var(--line)}
+#gallery .classhead:first-child{border-top:0;padding-top:0;margin-top:0}
 /* A design with a printed face: the rendered card fills the top, chips sit under it. */
 .card.printed{padding:.35em;gap:3px}
 .card.printed .face{display:block;width:100%;aspect-ratio:1027/1424;object-fit:cover;border-radius:.4em}
 .card .num{position:absolute;top:.35em;right:.5em;font-family:var(--display);font-size:.8rem;color:var(--gold);opacity:.8}
+/* Enlarge: a corner button on every printed card (so a tap on the card itself
+   still plays it), and the whole card in the gallery where nothing else is
+   listening. The lightbox is its own layer above the game's modals. */
+.card.printed{position:relative}
+.card .zoom{position:absolute;top:.55em;right:.55em;width:1.7em;height:1.7em;border-radius:50%;border:1px solid #fff5;background:#0a0618b8;color:var(--ink);
+  font:700 .95em/1 var(--body);display:grid;place-items:center;padding:0;cursor:zoom-in;opacity:.75;z-index:2}
+.card .zoom:hover{opacity:1;border-color:var(--gold);color:var(--gold)}
+#gallery .card.printed{cursor:zoom-in}
+.lightbox{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#05030ce8;padding:16px;cursor:zoom-out;
+  animation:lbIn .16s ease-out}
+/* The card box is sized by the viewport at the card's aspect; the picture and
+   the live iframe both fill it, the iframe fading in over the picture when
+   its route has loaded. The iframe renders the card at 744 CSS px and is
+   scaled to the box, so the live card is pixel-matched to the picture. */
+.lightbox .lbcard{position:relative;height:min(88dvh, calc(92vw * 1424 / 1027));aspect-ratio:1027/1424;border-radius:1.2em;cursor:default;
+  box-shadow:0 30px 80px #000c, 0 0 0 1px #fff2;overflow:visible}
+.lightbox img{display:block;width:100%;height:100%;border-radius:1.2em}
+.lightbox iframe{position:absolute;inset:-12%;width:124%;height:124%;border:0;background:transparent;opacity:0;transition:opacity .25s;pointer-events:none}
+.lightbox iframe.ready{opacity:1;pointer-events:auto}
+.lightbox .lbx{position:fixed;top:14px;right:16px;width:40px;height:40px;border-radius:50%;border:1px solid #fff4;background:#0a0618c0;color:var(--ink);font:400 24px/1 var(--body);cursor:pointer}
+.lightbox .cap{font-family:var(--display);color:var(--gold);font-size:1.05rem;text-align:center}
+.lightbox .cap small{display:block;font-family:var(--body);color:var(--muted);font-size:.85rem;margin-top:2px}
+@keyframes lbIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
 .copychips{font-size:.68rem;color:var(--muted);margin-top:4px;max-width:var(--cw)}
 .coinrow{display:inline-flex;gap:2px;align-items:center;vertical-align:middle}
 .coin{width:.8rem;height:.8rem;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f7dc8f,#c9941f 70%);border:1px solid #8a6210;display:inline-block;box-shadow:0 1px 2px #0007}
@@ -164,7 +189,7 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const FX = { unicornio: 'Pure compounding — the best paycheck at the desk', gato: 'When seated: knock one hazard off your table, free', monje: 'When you light a candle, collect 2 Liquidity', diablito: 'When a hazard you play lands, collect 1 Liquidity', celebridad: 'The influencer: pay 1 when banking from a card, +25 Prosperity', gr80: 'When you light a candle, bank 25 Prosperity', h80z: 'Hazards you play cost 1 less', eugene: 'Your Hail Mary odds rise one step', abuela: 'The gambling grandmother: your gambles moon on 4+ instead of 5+', pope: 'Once a game, a failed Hail Mary is absolved — try again', prospector: 'Assets you buy cost 1 less', shitcoin: 'Sell for Prosperity: a die decides — 5+ moons for 125, else zero', bluechip: 'Sell later: 10 Liquidity or 250 Prosperity', halving: 'Fires when drawn: until the drawer’s next turn, turn income is 1', corrida: 'Fires when drawn: until the drawer’s next turn, Prosperity sales pay +25', crash: 'Fires when drawn: everyone holding 8+ Liquidity loses half', airdrop: 'Fires when drawn: every player draws a card', honeymoon: 'Fires when drawn: no hazards until the drawer’s next turn', tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell later: 4 Liquidity or 75 Prosperity', moon: 'Sell later: 7 Liquidity or 150 Prosperity', bull: 'Invest 2 → bank 100 Prosperity', rocket: 'Invest 4 → bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', sirena: 'Their seated Trader walks into the sea; no new hires until cleared', taxman: 'They pay 1 to the bank at the start of each turn', snake: 'The serpent at the shrine: their candles count as zero', naranja: 'The Orange One takes his cut: when they bank, the hazard’s owner collects 2', escandalo: 'Scandal: their seated Trader loses 5 Grace when it breaks, 2 more each turn', bell: 'Clears The Bear', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one hazard', publicista: 'Clear a Scandal — or polish: your seated Trader regains 5 Grace', heart: 'A shield, not a cure: while equipped, discard it to cancel a hazard AS it lands — it cannot clear one already on you', halo: 'Any Trader seated at your desk cannot be disabled', xray: 'Once a turn, tap to study a rival’s entire hand — free', rosary: 'Draw a card when you light a candle', grail: 'An answered Hail Mary banks 300 instead of 200', enigma: 'Your hand cannot be peeked', ofrenda: 'Offer it to Our Lady: it goes to the shrine and lights a candle (max 3)', moneda: 'While held: collect 1 Liquidity at the start of your turn', jardin: 'While held: collect 2 a turn — but it dies the moment any Event fires', semilla: 'Sell for 25 Prosperity — or hold four rounds and it blooms to 150', ballena: 'Fires when drawn: the richest portfolio’s best Asset moves to the poorest player', rueda: 'Fires when drawn: every portfolio rotates one seat', godcandle: 'Fires when drawn: Prosperity sales pay double until the drawer’s next turn', skull: 'Fires when drawn: the biggest seller collects 5; everyone else pays 2', world: 'Fires when drawn: every standing effect ends; everyone draws', illuminati: 'Fires when drawn: every player passes one random card to the left', moralhazard: 'Fires when drawn: the bailout — the poorest player collects 5; the richest loses 2', rose: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise' };
+const FX = { unicornio: 'Pure compounding — the best paycheck at the desk', gato: 'When seated: knock one hazard off your table, free', monje: 'When you light a candle, bank 25 Prosperity', diablito: 'When a hazard you play lands, collect 1 Liquidity', celebridad: 'The influencer: pay 1 when banking from a card, +25 Prosperity', abuela: 'The gambling grandmother: your gambles moon on 4+ instead of 5+', pope: 'Once a game, a failed Hail Mary is absolved — try again', prospector: 'Assets you buy cost 1 less', bluechip: 'Sell later: 10 Liquidity or 250 Prosperity', halving: 'Fires when drawn: until the drawer’s next turn, turn income is 1', crash: 'Fires when drawn: everyone holding 8+ Liquidity loses half', airdrop: 'Fires when drawn: every player draws a card', tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell for 4 Liquidity — or roll the die for Prosperity: 5+ moons for 125, else zero', moon: 'Invest 4 → bank 150 Prosperity', bull: 'Invest 2 → bank 100 Prosperity', rocket: 'Invest 4 → bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', taxman: 'They pay 1 to the bank at the start of each turn', naranja: 'The Orange One takes his cut: when they bank, the hazard’s owner collects 2', escandalo: 'Scandal: their seated Trader loses 5 Grace when it breaks, 2 more each turn', bell: 'Clears Bear Market', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one hazard', publicista: 'Clear a Scandal — or polish: your seated Trader regains 5 Grace', heart: 'A shield, not a cure: while equipped, discard it to cancel a hazard AS it lands — it cannot clear one already on you', halo: 'Any Trader seated at your desk cannot be disabled', rosary: 'Draw a card when you light a candle', grail: 'An answered Hail Mary banks 300 instead of 200', enigma: 'Once a turn, tap: discard up to 3 cards and draw that many — free', fountain: 'Toss in 2 Liquidity: your Hail Mary odds rise one step, even past the shrine’s three', shroud: 'When your seated Trader would be disgraced, the Shroud is spent instead: they stay, with 5 Grace', collectibles: 'Sell later: 5 Liquidity or 125 Prosperity', gold: 'Sell later: 6 Liquidity or 75 Prosperity — the safe haven', realestate: 'Sell later: 8 Liquidity or 150 Prosperity — Bear Market cannot cap it', stablecoin: 'While held: collect 1 Liquidity at the start of your turn', scam: 'They cannot play the Events they call (Bull Run, Rocket, Full Moon, Inheritance) until cleared', confession: 'To the shrine: light a candle, and your seated Trader’s Grace is restored in full', ofrenda: 'Offer it to Our Lady: it goes to the shrine and lights a candle (max 3)', moneda: 'Fires when drawn: every player collects 2 Liquidity', jardin: 'Yield farming: collect 2 a turn while held — but it dies the moment any Event fires', map: 'Sell later: 2 Liquidity or 75 Prosperity — and draw 2 cards', mine: 'Sell later: 4 Liquidity, or Prosperity that grows 25 each round held (from 75)', oil: 'Sell for Prosperity: a die decides — 3+ gushes for 175, else it runs dry for 25', semilla: 'Sell for 25 Prosperity — or hold four rounds and it blooms to 150', ballena: 'Fires when drawn: the richest portfolio’s best Asset moves to the poorest player', rueda: 'Fires when drawn: every portfolio rotates one seat', godcandle: 'Fires when drawn: Prosperity sales pay double until the drawer’s next turn', skull: 'Exit liquidity: whenever a rival sells an Asset, collect 1 Liquidity', world: 'Fires when drawn: every standing effect ends; everyone draws', illuminati: 'Fires when drawn: every player passes one random card to the left', moralhazard: 'Fires when drawn: the bailout — the poorest player collects 5; the richest loses 2', rose: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise' };
 
 let S = null;
 const toast = (t) => { const el = $('toast'); el.innerHTML = `<span>${esc(t)}</span><button class="tx" aria-label="dismiss">\u00d7</button>`; el.querySelector('.tx').onclick = () => el.classList.remove('show'); el.classList.add('show'); };
@@ -199,7 +224,37 @@ function popMenu(items) { if (!S.mainResolve) { toast('Your main action is spent
   host.querySelector('.overlay').onclick = (e) => { if (e.target === e.currentTarget) host.innerHTML = ''; };
 }
 const typeClass = (c) => c.type === 'hazard' ? 'hazard' : c.type === 'remedy' ? 'remedy' : c.type === 'artifact' ? 'artifact' : c.type === 'grace' ? 'grace' : c.type === 'trader' ? 'trader' : c.type === 'event' ? 'event' : '';
-const miniHTML = (c) => `<div class="card mini ${typeClass(c)}" title="${esc(FX[c.key] || c.text || '')}"><div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.liq ? `<span>LIQ ${c.liq}</span>` : ''}${c.cred ? `<span>GRACE ${c.credNow != null ? c.credNow + '/' + c.cred : c.cred}</span>` : ''}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}${c.bloom && c.bornTurn != null && S && S.g ? (S.g.turnNo - c.bornTurn >= 4 ? '<span>\uD83C\uDF38</span>' : `<span>blooms in ${Math.max(0, 4 - (S.g.turnNo - c.bornTurn))}</span>`) : ''}</div></div>`;
+const miniHTML = (c) => `<div class="card mini ${typeClass(c)}" title="${esc(FX[c.key] || c.text || '')}"><div class="nm">${esc(c.name)}</div><div class="ty">${esc(classLabel(c))}</div><div class="chips">${c.liq ? `<span>LIQ ${c.liq}</span>` : ''}${c.cred ? `<span>GRACE ${c.credNow != null ? c.credNow + '/' + c.cred : c.cred}</span>` : ''}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}${c.bloom && c.bornTurn != null && S && S.g ? (S.g.turnNo - c.bornTurn >= 4 ? '<span>\uD83C\uDF38</span>' : `<span>blooms in ${Math.max(0, 4 - (S.g.turnNo - c.bornTurn))}</span>`) : ''}</div></div>`;
+// The enlarged view of a printed card. Its own layer (not overlayHost), so
+// it can open over a play prompt without replacing it; any click or Escape
+// closes it.
+function showFace(face, c) {
+  let lb = document.getElementById('lightbox');
+  if (!lb) { lb = document.createElement('div'); lb.id = 'lightbox'; document.body.appendChild(lb); }
+  const title = face.name || c.name;
+  const sub = [face.number != null ? `No. ${face.number}` : null, face.rarity, cap(c.type), face.name && face.name !== c.name ? `"${c.name}" in play` : null].filter(Boolean).join(' · ');
+  // The picture first (instant), then the live layered card over it once the
+  // app route has loaded — same size, so the swap is invisible. The live card
+  // is the real component on /rcana-print, in an iframe, so it tilts, sways
+  // and catches touch exactly as it does on the bench.
+  const liveSrc = `/rcana-print?id=${encodeURIComponent(face.id)}&live=1&scale=1`;
+  lb.innerHTML = `<div class="lightbox" role="dialog" aria-label="${esc(c.name)}">
+    <div class="lbcard"><img src="${face.face}" alt="${esc(c.name)}"><iframe src="${liveSrc}" title="${esc(c.name)}" loading="eager" scrolling="no"></iframe></div>
+    <div class="cap">${esc(title)}<small>${esc(sub)} · tilt it</small></div>
+    <button class="lbx" type="button" aria-label="Close">×</button></div>`;
+  const close = () => { lb.innerHTML = ''; document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  const box = lb.querySelector('.lightbox');
+  const fr = lb.querySelector('iframe');
+  fr.onload = () => fr.classList.add('ready');
+  // Clicks on the backdrop or the × close; the card itself is for tilting.
+  box.onclick = (e) => { if (e.target === box || e.target.classList.contains('cap') || e.target.closest('.lbx')) close(); };
+  document.addEventListener('keydown', onKey);
+}
+// What the card SAYS it is (its printed class), with the engine type after it
+// where the two differ — "event · hazard", "artifact · remedy" — so a player
+// reads the same word on the table as on the card, and still sees how it plays.
+const classLabel = (c) => { const cls = (typeof TYPE_CLASS !== 'undefined' && TYPE_CLASS[c.type]) || c.type; return cls.toLowerCase() === c.type ? c.type : `${cls.toLowerCase()} \u00b7 ${c.type}`; };
 function cardEl(c) {
   const el = document.createElement('div'); el.className = 'card ' + typeClass(c);
   // A printed face, when the set has one for this design: the rendered card
@@ -207,10 +262,11 @@ function cardEl(c) {
   const face = typeof FACES !== 'undefined' ? FACES[c.key] : null;
   if (face && face.face) {
     el.classList.add('printed');
-    el.innerHTML = `<img class="face" src="${face.face}" alt="${esc(c.name)}" loading="lazy" decoding="async"><div class="chips">${c.type === 'event' ? '<span>fires on draw</span>' : c.type === 'grace' ? '<span>to the shrine</span>' : `<span>cost ${c.cost}</span>`}${c.liq ? `<span>LIQ ${c.liq}</span>` : ''}${c.cred ? `<span>GRACE ${c.credNow != null ? c.credNow + '/' + c.cred : c.cred}</span>` : ''}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}</div>`;
+    el.innerHTML = `<button class="zoom" type="button" aria-label="Enlarge ${esc(c.name)}" title="Enlarge">⤢</button><img class="face" src="${face.face}" alt="${esc(c.name)}" loading="lazy" decoding="async"><div class="chips">${c.type === 'event' && !c.played ? '<span>fires on draw</span>' : c.type === 'grace' ? '<span>to the shrine</span>' : `<span>cost ${c.cost}</span>`}${c.liq ? `<span>LIQ ${c.liq}</span>` : ''}${c.cred ? `<span>GRACE ${c.credNow != null ? c.credNow + '/' + c.cred : c.cred}</span>` : ''}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}</div>`;
+    el.querySelector('.zoom').onclick = (e) => { e.stopPropagation(); showFace(face, c); };
     return el;
   }
-  el.innerHTML = `${face && face.number != null ? `<div class="num">${face.number}</div>` : ''}<div class="nm">${esc(c.name)}</div><div class="ty">${esc(c.type)}</div><div class="chips">${c.type === 'event' ? '<span>fires on draw</span>' : c.type === 'grace' ? '<span>to the shrine</span>' : `<span>cost ${c.cost}</span>`}${c.liq ? `<span>LIQ ${c.liq}</span>` : ''}${c.cred ? `<span>GRACE ${c.credNow != null ? c.credNow + '/' + c.cred : c.cred}</span>` : ''}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}</div><div class="fx">${esc(FX[c.key] || c.text || '')}</div>`;
+  el.innerHTML = `${face && face.number != null ? `<div class="num">${face.number}</div>` : ''}<div class="nm">${esc(c.name)}</div><div class="ty">${esc(classLabel(c))}</div><div class="chips">${c.type === 'event' && !c.played ? '<span>fires on draw</span>' : c.type === 'grace' ? '<span>to the shrine</span>' : `<span>cost ${c.cost}</span>`}${c.liq ? `<span>LIQ ${c.liq}</span>` : ''}${c.cred ? `<span>GRACE ${c.credNow != null ? c.credNow + '/' + c.cred : c.cred}</span>` : ''}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}</div><div class="fx">${esc(FX[c.key] || c.text || '')}</div>`;
   return el;
 }
 $('deal').onclick = async () => {
@@ -324,6 +380,15 @@ function bell(r) { const host = $('overlayHost'); const rows = S.g.players.map((
   host.querySelector('#review').onclick = () => { host.innerHTML = ''; const h = $('hist'); h.open = true; render(); h.scrollIntoView({ behavior: 'smooth' }); };
   host.querySelector('.overlay').onclick = (e) => { if (e.target === e.currentTarget) host.querySelector('#review').click(); };
 }
+// The Enigma Machine: pick up to three cards from your hand to replace.
+function enigmaUI() { const host = $('overlayHost'); const me = S.me; const chosen = new Set();
+  host.innerHTML = `<div class="overlay"><div class="box" style="max-width:min(64rem,94vw)"><div class="kind">enigma machine · choose up to 3 cards to replace</div><div class="cards" id="enRow"></div><div><button class="primary" id="enGo">Replace 0</button> <button id="enNo">Never mind</button></div></div></div>`;
+  const row = host.querySelector('#enRow'); const go = host.querySelector('#enGo');
+  me.hand.forEach((c) => { const el = cardEl(c); el.classList.add('playable'); el.onclick = () => { if (chosen.has(c)) chosen.delete(c); else if (chosen.size < 3) chosen.add(c); el.style.outline = chosen.has(c) ? '3px solid var(--gold)' : ''; go.textContent = `Replace ${chosen.size}`; go.disabled = !chosen.size; }; row.appendChild(el); });
+  go.disabled = true;
+  go.onclick = () => { host.innerHTML = ''; S.g.enigma(me, [...chosen]); render(); };
+  host.querySelector('#enNo').onclick = () => { host.innerHTML = ''; };
+}
 function showPeek(r) { const cards = S.g.peek(S.me, r); if (!cards || !cards.length) return;
   S.known = S.known || []; for (const c of cards) if (!S.known.some((k) => k.c === c)) S.known.push({ idx: r.idx, c });
   const host = $('overlayHost');
@@ -341,13 +406,13 @@ function coachLabel(g, p, a) {
   if (a.t === 'payclear') return `pay 3 to clear ${a.h.name}`;
   if (a.t === 'sell') return a.pros ? (a.a.gamble ? `sell ${a.a.name} — roll the die for ${a.a.pros}` : `sell ${a.a.name} to bank ${g.prosOf(a.a) * (g.fx.godcandle ? 2 : 1)}`) : `sell ${a.a.name} for ${a.a.cash} Liquidity (refuel)`;
   const c = a.c, t = a.choice && a.choice.target;
-  if (c.type === 'progress') return a.choice && a.choice.cash ? `cash ${c.name} for ${c.cash} Liquidity` : `bank ${c.name} for ${c.pros}`;
+  if (c.type === 'event' && c.played) return a.choice && a.choice.cash ? `cash ${c.name} for ${c.cash} Liquidity` : `bank ${c.name} for ${c.pros}`;
   if (c.type === 'asset') return `invest in ${c.name}${c.income ? ' (pays ' + c.income + '/turn)' : ''}`;
   if (c.type === 'hazard') return `hit ${t.name} with ${c.name}`;
   if (c.type === 'remedy') { if (a.choice && a.choice.polish) return `polish your Trader: +5 Grace`; return t === p ? `clear your ${a.choice.hazard.name}` : `clear ${t.name}'s ${a.choice.hazard.name} (goodwill)`; }
   if (c.type === 'artifact') return c.key === 'heart' ? 'equip Sacred Heart — shields the NEXT hazard (not ones already stuck)' : `equip ${c.name}`;
   if (c.type === 'trader') return p.trader ? `bench ${c.name} (LIQ ${c.liq})` : `hire ${c.name} — income becomes ${c.liq}`;
-  if (c.type === 'grace') return c.key === 'rose' ? `offer the Rose to ${t.name} — a candle if accepted` : `offer ${c.name} — light a candle, odds rise`;
+  if (c.type === 'grace') return c.key === 'rose' ? `offer the Rose to ${t.name} — a candle if accepted` : c.key === 'fountain' ? `toss 2 Liquidity in the Fountain — Hail Mary odds rise a step` : `offer ${c.name} — light a candle, odds rise`;
   return c.name;
 }
 function coachTips() {
@@ -413,9 +478,7 @@ function render() {
     if (items.length) { el.classList.add('playable'); el.onclick = () => popMenu(items.reverse()); } else el.classList.add('dim'); inv.appendChild(el); });
   const ar = $('meArts'); ar.innerHTML = '';
   me.artifacts.forEach((a) => { const el = cardEl(a);
-    if (a.key === 'xray' && mine && !me.peekedThisTurn) { const targets = g.rivals(me).filter((r) => r.hand.length && !r.artifacts.some((a2) => a2.key === 'enigma'));
-      if (targets.length) { el.classList.add('playable'); el.title = 'Tap to peek — free, once a turn';
-        el.onclick = () => popMenu(targets.map((r) => [`Study ${r.name}'s entire hand — free`, () => showPeek(r)])); } }
+    if (a.key === 'enigma' && mine && !me.enigmaUsed && me.hand.length) { el.classList.add('playable'); el.title = 'Tap to replace up to 3 cards — free, once a turn'; el.onclick = () => enigmaUI(); }
     ar.appendChild(el); });
   const hz = $('meHazards'); hz.innerHTML = '';
   me.hazards.forEach((h) => { const el = cardEl(h); const pc = A.find((x) => x.t === 'payclear' && x.h === h);
@@ -427,7 +490,7 @@ function render() {
       if (c.type === 'hazard') label = `Play on ${x.choice.target.name}`;
       if (c.type === 'remedy' && x.choice.hazard) label = `Clear ${x.choice.hazard.name} ${x.choice.target === me ? 'on you' : 'on ' + x.choice.target.name}`;
       if (c.type === 'grace') label = c.key === 'rose' ? `Offer THE ROSE to ${x.choice.target.name}` : 'Offer to Our Lady — light a candle';
-      if (c.type === 'progress') label = c.choice ? (x.choice.cash ? `Take ${c.cash} Liquidity` : `Bank ${c.pros} Prosperity`) : `Invest ${g.costOf(me, c)} → bank ${c.pros} Prosperity`;
+      if (c.type === 'event' && c.played) label = c.choice ? (x.choice.cash ? `Take ${c.cash} Liquidity` : `Bank ${c.pros} Prosperity`) : `Invest ${g.costOf(me, c)} → bank ${c.pros} Prosperity`;
       if (c.key === 'heart') label = `Equip — shields you against the NEXT hazard (${g.costOf(me, c)} Liq)`;
       if (c.type === 'trader') label = me.trader ? `Hire to the bench (${g.costOf(me, c)} Liq)` : `Hire to the seat (${g.costOf(me, c)} Liq)`;
       if (x.choice && x.choice.polish) label = `Polish ${me.trader ? me.trader.name : 'your Trader'}: +5 Grace (${g.costOf(me, c)} Liq)`;
@@ -455,13 +518,21 @@ function render() {
 }
 // ── the card gallery: every design, with its copies per starter recipe ──
 function buildGallery() {
-  const host = $('gallery'); const order = ['trader', 'asset', 'progress', 'event', 'hazard', 'remedy', 'artifact', 'grace'];
-  const label = { trader: 'Traders — LIQ is your income while seated, CRED is their reputation; one seat, two bench spots', asset: 'Assets — buy now, sell later for cash or Prosperity', progress: 'Progress — bank Prosperity on the spot', event: 'Events — fire the moment they are drawn and hit the whole table', hazard: 'Hazards — stick to a rival until cleared', remedy: 'Remedies — clear hazards, yours or a rival’s', artifact: 'Artifacts — equip up to two', grace: 'Graces — offerings to Our Lady; candles raise the Hail Mary' };
+  const host = $('gallery'); const order = ['trader', 'asset', 'event', 'hazard', 'remedy', 'artifact', 'grace'];
+  const label = { trader: 'Traders — LIQ is your income while seated, CRED is their reputation; one seat, two bench spots', asset: 'Assets — buy now, sell later for cash or Prosperity', event: 'Events — most fire the moment they are drawn and hit the whole table; Bull Run, Rocket and The Inheritance are Events you call, played for their cost', hazard: 'Hazards — stick to a rival until cleared', remedy: 'Remedies — clear hazards, yours or a rival’s', artifact: 'Artifacts — equip up to two', grace: 'Graces — offerings to Our Lady; candles raise the Hail Mary' };
   const copies = (k) => ['devotion', 'degen'].map((r) => { const e = RECIPES[r].find((x) => x[0] === k); return e ? `${cap(r)} ×${e[1]}` : null; }).filter(Boolean).join(' · ') || 'collectible alternate';
-  for (const ty of order) { const ds = DESIGNS.filter((d) => d.type === ty); if (!ds.length) continue;
+  // Grouped by printed CLASS (Trader, Asset, Event, Artifact), each class
+  // holding its engine types in the order above, so Bull Run sits with the
+  // Events and The Bell with the Artifacts — as they print — while the row
+  // label still says how each type plays.
+  const classes = ['Trader', 'Asset', 'Event', 'Artifact'];
+  const typesOf = (cls) => order.filter((t) => ((typeof TYPE_CLASS !== 'undefined' && TYPE_CLASS[t]) || t) === cls);
+  const groups = classes.flatMap((cls) => { const ts = typesOf(cls); return ts.length ? ts.map((t, i) => ({ t, cls, first: i === 0, n: ts.length })) : []; });
+  for (const grp of groups) { const ty = grp.t; const ds = DESIGNS.filter((d) => d.type === ty); if (!ds.length) continue;
+    if (grp.first) { const ch = document.createElement('div'); ch.className = 'classhead'; ch.textContent = grp.cls + (grp.n > 1 ? 's' : 's'); host.appendChild(ch); }
     const rl = document.createElement('div'); rl.className = 'rowlabel'; rl.textContent = label[ty] || ty; host.appendChild(rl);
     const row = document.createElement('div'); row.className = 'cards'; host.appendChild(row);
-    for (const d of ds) { const wrap = document.createElement('div'); wrap.appendChild(cardEl(d)); const cc = document.createElement('div'); cc.className = 'copychips'; cc.textContent = copies(d.key); wrap.appendChild(cc); row.appendChild(wrap); } }
+    for (const d of ds) { const wrap = document.createElement('div'); const ce = cardEl(d); const f = typeof FACES !== 'undefined' ? FACES[d.key] : null; if (f && f.face) ce.onclick = () => showFace(f, d); wrap.appendChild(ce); const cc = document.createElement('div'); cc.className = 'copychips'; cc.textContent = copies(d.key); wrap.appendChild(cc); row.appendChild(wrap); } }
 }
 buildGallery();
 </script>

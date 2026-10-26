@@ -102,6 +102,11 @@ export default function RcanaCard({
   // where a card-sized dead zone in the scroll is a trap. Defaults to
   // following `sway`, which marks the same distinction.
   captureTouch = sway,
+  // Typeface for the class label in the tab. "blackletter" — the wordmark's
+  // own face, set in title case (caps blackletter is unreadable) — is the
+  // default; "bebas" is the condensed caps it replaced, and the other
+  // blackletters remain for the bench's comparison switch.
+  classFont = "blackletter",
   // Tilt from the device's own orientation, phones and tablets. Off by
   // default: iOS only grants the sensor behind a user gesture, so the page
   // asks (see RcanaBench's "Tilt with device") and turns this on when
@@ -420,6 +425,10 @@ export default function RcanaCard({
               // percent offset means the same thing on either kind of layer.
               ...(clip ? cardSpan(clip) : null),
               transform: `translate(${layer.offset.x}%, ${layer.offset.y}%) scale(${layer.scale})`,
+              // Per-layer treatment from the art file — a soft far plane is
+              // depth of field, and sells the parallax harder than the
+              // parallax does. Written against --u so it scales with the card.
+              ...(layer.filter ? { filter: layer.filter } : null),
             }}
           />
         ) : (
@@ -442,6 +451,7 @@ export default function RcanaCard({
       <div
         ref={cardRef}
         className="rc-card"
+        data-plate={data.plate}
         onMouseMove={onMove}
         onMouseLeave={onLeave}
         onTouchStart={onTouch}
@@ -496,6 +506,11 @@ export default function RcanaCard({
               decoding="async"
             />
           )}
+          {/* The type seal rides on the plate at the frame's own depth — it
+              is printed on the card, not floating in front of it. */}
+          {data.badgeImage && !hideFrame && (
+            <img className="rc-frame rc-badge" src={data.badgeImage} alt="" draggable={false} decoding="async" />
+          )}
 
           {showSlots && (
             <div className="rc-slots" aria-hidden>
@@ -537,8 +552,15 @@ export default function RcanaCard({
               <div className="rc-slot rc-number" style={box(L.numberCell)}>
                 <span>{data.number ?? ""}</span>
               </div>
-              <div className="rc-slot rc-class" style={box(L.classCell)}>
-                <span>{(data.cardClass || "").toUpperCase()}</span>
+              <div className="rc-slot rc-class" style={box(L.classCell)} data-sub={data.subClass ? "1" : undefined} data-font={classFont}>
+                <span>
+                  {classFont === "bebas" ? (data.cardClass || "").toUpperCase() : data.cardClass || ""}
+                  {/* A coin after the class, only when a face sets tabCost —
+                      no card does by default, since a Trader's hire cost is
+                      their income and the drop box carries it. */}
+                  {data.tabCost > 0 && <i className="rc-cost" aria-label={`cost ${data.tabCost}`}>{data.tabCost}</i>}
+                </span>
+                {data.subClass && <small>{data.subClass.toUpperCase()}</small>}
               </div>
             </>
           )}
@@ -569,25 +591,39 @@ export default function RcanaCard({
             </AutoFit>
           </div>
 
-          <div className="rc-slot rc-stat" style={box(L.haloValue)}>
-            <span>{data.halo ?? ""}</span>
-          </div>
-          <div className="rc-slot rc-stat" style={box(L.hydroValue)}>
+          {/* data-len steps the size down for three-digit values (100, 125,
+              250) so they sit inside the box instead of running out of it. */}
+          {/* No left box on a sealed plate — the type seal stands there. */}
+          {data.plate !== "sealed" && (
+            <div className="rc-slot rc-stat rc-stat--left" style={box(data.plate === "valued" ? L.haloValueValued : L.haloValue)} data-len={String(data.halo ?? "").length}>
+              <span>{data.halo ?? ""}</span>
+            </div>
+          )}
+          <div className="rc-slot rc-stat" style={box(L.hydroValue)} data-len={String(data.hydro ?? "").length}>
             <span>{data.hydro ?? ""}</span>
           </div>
 
-          <div className="rc-slot rc-rarity" style={box(L.rarity)}>
-            <RarityHeart
-              rarity={rarity}
-              height={u * 0.048}
-              rx={lrx}
-              ry={HEART_HOLO.style === "sigil" ? tilt.ry : lry}
-              mx={tilt.mx}
-              my={tilt.my}
-              hyp={tilt.hyp}
-              slot={L.rarity}
-            />
-          </div>
+          {/* The heart sits under the wordmark on every plate — a rarity mark
+              should be where the eye learned to find it. */}
+          {(() => {
+            const heartSlot = L.rarity;
+            const hf = heartSlot.heightFactor || 0.048;
+            return (
+              <div className="rc-slot rc-rarity" style={box(heartSlot)}>
+                <RarityHeart
+                  rarity={rarity}
+                  height={u * hf}
+                  heightFactor={hf}
+                  rx={lrx}
+                  ry={HEART_HOLO.style === "sigil" ? tilt.ry : lry}
+                  mx={tilt.mx}
+                  my={tilt.my}
+                  hyp={tilt.hyp}
+                  slot={heartSlot}
+                />
+              </div>
+            );
+          })()}
         </div>
 
         {/* ---------------- fx: in front of everything ----------------
@@ -674,7 +710,7 @@ export default function RcanaCard({
 // the dark copy behind each shape is the icon's own drop shadow, which is what
 // keeps it legible on parchment. The arrow stays brand green at every tier;
 // only the heart carries the rarity.
-const RarityHeart = React.memo(function RarityHeart({ rarity, height, rx, ry, mx, my, hyp, slot }) {
+const RarityHeart = React.memo(function RarityHeart({ rarity, height, heightFactor = 0.048, rx, ry, mx, my, hyp, slot }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const metal = HEART_METALS[rarity.heart];
   if (!metal) return null;
@@ -683,8 +719,8 @@ const RarityHeart = React.memo(function RarityHeart({ rarity, height, rx, ry, mx
     // The mark is centred in its slot, 0.048 card-widths tall and 1.2× as
     // wide, so its box in card percent is known without measuring. Map the
     // pointer into the mark's own viewBox (72×60) for the pool.
-    const wPct = 0.048 * 1.2 * 100;
-    const hPct = 0.048 * RCANA_ASPECT * 100;
+    const wPct = heightFactor * 1.2 * 100;
+    const hPct = heightFactor * RCANA_ASPECT * 100;
     const cx = slot ? slot.x + slot.w / 2 : 50;
     const cy = slot ? slot.y + slot.h / 2 : 50;
     const px = 36 + (((mx ?? 50) - cx) / wPct) * 72;
@@ -1320,6 +1356,24 @@ const RCANA_STYLES = `
 }
 .rc-number { font-size: calc(var(--u) * .070); }
 .rc-class  { font-size: calc(var(--u) * .050); letter-spacing: .04em; }
+/* Blackletter trials for the class label (bench control). Title case, no
+   tracking, sized up a little since blackletter x-heights run small. */
+.rc-class[data-font="blackletter"] span { font-family: "Blackletter", "UnifrakturCook", serif; font-weight: 400; letter-spacing: .01em; font-size: calc(var(--u) * .058); }
+.rc-class[data-font="grenze"] span { font-family: "Grenze Gotisch", serif; font-weight: 700; letter-spacing: 0; font-size: calc(var(--u) * .058); }
+.rc-class[data-font="unifraktur"] span { font-family: "UnifrakturCook", serif; font-weight: 700; letter-spacing: 0; font-size: calc(var(--u) * .056); }
+.rc-class[data-font="pirata"] span { font-family: "Pirata One", serif; font-weight: 400; letter-spacing: .01em; font-size: calc(var(--u) * .058); }
+.rc-class[data-font="maguntia"] span { font-family: "UnifrakturMaguntia", serif; font-weight: 400; letter-spacing: 0; font-size: calc(var(--u) * .058); }
+/* The cost coin: a small dark disc with the number knocked out, after the
+   class word, so TRADER 2 reads as one unit. */
+.rc-class .rc-cost {
+  display: inline-grid; place-items: center; vertical-align: .12em;
+  margin-left: .32em; width: 1.05em; height: 1.05em; border-radius: 50%;
+  background: #120d04; color: #f2d26a; font-style: normal; font-size: .78em; letter-spacing: 0;
+}
+/* A sub-class (ARTIFACT · REMEDY) stacks a smaller line under the class and
+   tightens the class so both fit the tab cell. */
+.rc-class[data-sub] { display: grid; place-items: center; align-content: center; line-height: .92; font-size: calc(var(--u) * .042); }
+.rc-class[data-sub] small { display: block; font-size: calc(var(--u) * .024); letter-spacing: .14em; opacity: .78; }
 
 /* Nabla is a COLRv1 chrome font: it carries its own bevel and palette, so
    the extruded gold comes from the typeface rather than from a text-shadow
@@ -1374,7 +1428,18 @@ const RCANA_STYLES = `
   font-size: calc(var(--u) * .064);
   color: #140f05;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
+/* Bebas is condensed enough that three digits (100 / 125 / 250) fit the
+   numeral area at the same size as a single digit, so every value prints at
+   one size and the two boxes match. Four digits would step down; the set
+   has none. */
+/* The value box on the ingot plate is sage green. Its numeral stays the same
+   dark ink as the drop box's, so the two boxes read as a pair; --value-ink is
+   the one switch if 100 ever goes muddy at thumbnail size (try #f4e3b0). */
+.rc-card[data-plate="valued"] .rc-stat--left { color: var(--value-ink, #140f05); }
+.rc-stat[data-len="3"] { letter-spacing: -.02em; }
+.rc-stat[data-len="4"] { font-size: calc(var(--u) * .05); letter-spacing: -.04em; }
 /* The rarity mark is artwork now, not type. */
 .rc-heart { display: block; }
 

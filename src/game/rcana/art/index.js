@@ -3,7 +3,13 @@
 // (An explicit list rather than a glob, so the bundler can tree-shake and the
 // lint can read it.)
 import elDiablito from "./el-diablito.js";
+import elToro from "./el-toro.js";
+import elMonje from "./el-monje.js";
+import elOso from "./el-oso.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
+  "el-toro": elToro,
+  "el-monje": elMonje,
+  "el-oso": elOso,
 };

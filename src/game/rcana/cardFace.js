@@ -24,6 +24,14 @@
 
 export const RCANA_DIR = "/TCG/rcana";
 
+// Where a card's images live, by convention: public/TCG/rcana/<id>/<name>.webp.
+// An art file that names no `src` for a layer gets this — the scene layer is
+// scene.webp, the subject is subject.webp, an fx layer "flame" is
+// fx-flame.webp — so the images are only ever touched in public/ and the art
+// file never repeats a path. A `src` on the layer still wins (shared sheets
+// such as /TCG/fx-overlays/flame3.webp).
+export const artPath = (id, name, ext = "webp") => `${RCANA_DIR}/${id}/${name}.${ext}`;
+
 // The frame defines the card's edge, so its aspect is the card's aspect.
 // As of the 2026-10-23 re-export every layer — frame, hell2 and Diablito2 —
 // is 1024x1422, so the whole stack shares one canvas and object-fit: cover
@@ -38,7 +46,7 @@ export const RCANA_CLASSES = {
   TRADER: "Trader",
   ASSET: "Asset",
   EVENT: "Event",
-  GRACE: "Grace",
+  ARTIFACT: "Artifact",
 };
 
 // Classes that are a person. Their flavour line is something the character
@@ -51,7 +59,7 @@ export const CLASS_TONE = {
   Trader: { ink: "#1b1206", accent: "#f2c230" },
   Asset: { ink: "#1b1206", accent: "#8fd4a8" },
   Event: { ink: "#1b1206", accent: "#ff8a5c" },
-  Grace: { ink: "#1b1206", accent: "#cdb4ff" },
+  Artifact: { ink: "#1b1206", accent: "#cdb4ff" },
 };
 
 // ---------------------------------------------------------------------------
@@ -62,7 +70,10 @@ export const CLASS_TONE = {
 // on the frame are the glyphs for those stats, so the card face and the rules
 // stay one vocabulary — a disgraced Trader is one printed at zero halo.
 export const POINT_TYPES = {
-  halo: { label: "Halo", rule: "Grace", glyph: "halo", box: "left" },
+  // On a Trader the halo is Grace; on an Asset or a called Event it is the
+  // card's VALUE — Prosperity on sale or when banked. Same glyph: standing,
+  // in a game where profit is piety. The drop is Liquidity on every type.
+  halo: { label: "Halo", rule: "Grace", assetRule: "Prosperity", glyph: "halo", box: "left" },
   hydro: { label: "Hydro", rule: "Liquidity", glyph: "drop", box: "right" },
 };
 
@@ -327,8 +338,15 @@ export const RCANA_LAYOUT = {
   // against 56.2% of the hydro — so each cell is measured, not reflected.
   haloBox: { x: 10.61, y: 87.6, w: 18.21, h: 7.3 },
   hydroBox: { x: 71.86, y: 87.6, w: 18.11, h: 7.3 },
-  haloValue: { x: 22.3, y: 87.6, w: 6.52, h: 7.3 },
-  hydroValue: { x: 82.04, y: 87.6, w: 7.94, h: 7.3 },
+  // The numeral areas, measured off each plate's divider and box edge at the
+  // strip's centre line (y 90.5%), so a value sits dead centre of its half.
+  //   halo plate   left box: divider 22.3% → edge 29.0% (the divider sits
+  //                further right than the value plate's; the halo is wider)
+  //   value plate  left box: divider 20.8% → edge 29.3%
+  //   both         drop box: divider 82.4% → edge 90.3%
+  haloValue: { x: 22.3, y: 87.6, w: 6.7, h: 7.3 },
+  haloValueValued: { x: 20.8, y: 87.6, w: 8.5, h: 7.3 },
+  hydroValue: { x: 82.4, y: 87.6, w: 7.9, h: 7.3 },
 
   // Rarity mark, in the one clear band the footer leaves: under the RL80
   // wordmark, between the flourish tips, above the bottom border. Measured
@@ -417,7 +435,7 @@ export const FX_CEILING = 130;
 export * from "./artSpec.js";
 export { RCANA_ART } from "./art/index.js";
 import {
-  ART_PLANES, FX_PLANES, DEFAULT_FRAME, CLASS_FRAME,
+  ART_PLANES, FX_PLANES, DEFAULT_FRAME, CLASS_FRAME, PLATES, TYPE_BADGE,
   FX_BLEND_DEFAULT, FX_CLIP_DEFAULT, FX_CLEAR_PAD, FX_CLEAR_FEATHER,
 } from "./artSpec.js";
 import { RCANA_ART } from "./art/index.js";
@@ -443,6 +461,10 @@ export function toRcanaCard(card, overrides = {}) {
     id: card.id,
     number: card.number ?? null,
     cardClass: cls,
+    subClass: card.subClass ?? null,
+    cost: card.cost ?? null,
+    // The coin in the tab: a Trader's hire cost (its boxes hold Grace and income).
+    tabCost: card.tabCost ?? null,
     name: card.name,
     rarity: card.rarity || "Common",
 
@@ -458,7 +480,11 @@ export function toRcanaCard(card, overrides = {}) {
     // the page shows through wherever the art does not paint.
     backdrop: art.backdrop ?? null,
 
-    frameImage: art.frame || CLASS_FRAME[cls] || DEFAULT_FRAME,
+    // An art file may pin a frame; otherwise the plate follows the type.
+    plate: card.plate || "boxed",
+    frameImage: art.frame || PLATES[card.plate || "boxed"] || CLASS_FRAME[cls] || DEFAULT_FRAME,
+    // The type seal, on sealed plates only (it stands where the halo box was).
+    badgeImage: card.plate === "sealed" ? TYPE_BADGE[card.type] || null : null,
     // "combined" means the figure is inside the frame image, not that the
     // card has no depth: such a card still takes the planes behind it.
     combinedPlate: !!art.combinedPlate,
@@ -467,9 +493,13 @@ export function toRcanaCard(card, overrides = {}) {
     // stacking order, so a card reads top-down the way its art was built.
     artLayers: layers.map((l, i) => ({
       id: l.id || `layer-${i}`,
-      src: l.src,
+      src: l.src || artPath(card.id, l.id || `layer-${i}`),
       scale: l.scale ?? 1.06,
       offset: { x: 0, y: 0, ...l.offset },
+      // Optional CSS filter for the layer. `blur` is a shorthand: a number in
+      // thousandths of the card width, so blur: 4 is 3px on a 744px card and
+      // stays the same softness on a thumbnail or a 4K print.
+      filter: l.filter || (l.blur ? `blur(calc(var(--u) * ${l.blur / 1000}))` : null),
       // Clamped at both ends: too far back and the layer's edge drifts out
       // from under the border, too far forward and it unsticks from the card.
       z: Math.min(
@@ -481,7 +511,7 @@ export function toRcanaCard(card, overrides = {}) {
     // Nearest to the viewer, drawn over the frame and the ink alike.
     fxLayers: (art.fx || []).map((l, i) => ({
       id: l.id || `fx-${i}`,
-      src: l.src,
+      src: l.src || artPath(card.id, `fx-${l.id || i}`),
       blend: l.blend || FX_BLEND_DEFAULT,
       clip: l.clip || FX_CLIP_DEFAULT,
       reflection: l.reflection || null,
