@@ -106,6 +106,8 @@ for (const card of RCANA_SET) {
   const inputs = [
     "src/game/rcana/set/designs.js",
     "src/game/rcana/set/faces.js",
+    "src/game/rcana/set/index.js",
+    "src/game/rcana/eventTemplate.js",
     "src/game/playtest2/pt2-table.src.html",
     "src/game/playtest2/pt2-build.js",
     "src/game/playtest2/pt2-sim.js",

@@ -16,6 +16,12 @@ import {
   behindClip,
 } from "../game/rcana/cardFace.js";
 import { CurrencyHeart, SigilHeart, HEART, HEART_SHADOW, ARROW, ARROW_SHADOW } from "./CurrencyHeart.jsx";
+import { ArtifactHeader, ArtifactUsageBadge } from "./RcanaArtifactTemplate.jsx";
+import { EventHeader, EventUsageBadge } from "./RcanaEventTemplate.jsx";
+import { SUBTYPE_FURNITURE_STYLES } from "./RcanaSubtypeFurniture.jsx";
+
+import { RcanaLiquidityBox, LIQUIDITY_BOX_STYLES } from "./RcanaLiquidityBox.jsx";
+import { RcanaTypeHeader, TYPE_HEADER_STYLES } from "./RcanaTypeHeader.jsx";
 
 const REST = { rx: 0, ry: 0, mx: 50, my: 50, hyp: 0 };
 
@@ -381,7 +387,7 @@ export default function RcanaCard({
   const rarity = RCANA_RARITIES[data.rarity] || RCANA_RARITIES.Common;
   const tone = CLASS_TONE[data.cardClass] || CLASS_TONE.Trader;
   const printed = data.printed || {};
-  const L = RCANA_LAYOUT;
+  const L = data.layout || RCANA_LAYOUT;
 
   const box = (slot) => ({
     left: `${slot.x}%`,
@@ -452,6 +458,7 @@ export default function RcanaCard({
         ref={cardRef}
         className="rc-card"
         data-plate={data.plate}
+        data-template={data.artifactTemplate ? "artifact" : undefined}
         onMouseMove={onMove}
         onMouseLeave={onLeave}
         onTouchStart={onTouch}
@@ -524,7 +531,7 @@ export default function RcanaCard({
 
           {/* Sheen rides the plate so it reads as light on the card's own
               surface, not on the art behind the window. */}
-          <div className="rc-gloss" style={{ "--foil": rarity.foil }} aria-hidden />
+          {!data.templateOnly && <div className="rc-gloss" style={{ "--foil": rarity.foil }} aria-hidden />}
         </div>
 
 
@@ -547,7 +554,13 @@ export default function RcanaCard({
             "--accent": tone.accent,
           }}
         >
-          {!printed.numberTab && (
+          {!printed.numberTab && (data.artifactTemplate ? (
+            <ArtifactHeader data={data} hideFrame={hideFrame} />
+          ) : data.eventTemplate ? (
+            <EventHeader data={data} hideFrame={hideFrame} />
+          ) : data.compactTypeHeader ? (
+            <RcanaTypeHeader data={data} slot={L.numberTab} hideFrame={hideFrame} classFont={classFont} />
+          ) : (
             <>
               <div className="rc-slot rc-number" style={box(L.numberCell)}>
                 <span>{data.number ?? ""}</span>
@@ -563,7 +576,7 @@ export default function RcanaCard({
                 {data.subClass && <small>{data.subClass.toUpperCase()}</small>}
               </div>
             </>
-          )}
+          ))}
 
           {!printed.name && (
             <div className="rc-slot rc-name" style={box(L.nameBanner)}>
@@ -593,19 +606,25 @@ export default function RcanaCard({
 
           {/* data-len steps the size down for three-digit values (100, 125,
               250) so they sit inside the box instead of running out of it. */}
-          {/* No left box on a sealed plate — the type seal stands there. */}
+          {data.artifactTemplate && !hideFrame && <ArtifactUsageBadge template={data.artifactTemplate} />}
+          {data.eventTemplate && !hideFrame && <EventUsageBadge template={data.eventTemplate} />}
+          {/* No left stat on a sealed plate — its seal stands there. */}
           {data.plate !== "sealed" && (
             <div className="rc-slot rc-stat rc-stat--left" style={box(data.plate === "valued" ? L.haloValueValued : L.haloValue)} data-len={String(data.halo ?? "").length}>
               <span>{data.halo ?? ""}</span>
             </div>
           )}
-          <div className="rc-slot rc-stat" style={box(L.hydroValue)} data-len={String(data.hydro ?? "").length}>
-            <span>{data.hydro ?? ""}</span>
-          </div>
+          {data.liquidityBox ? (
+            <RcanaLiquidityBox value={data.hydro} slot={data.liquidityBox} hideFrame={hideFrame} />
+          ) : (
+            <div className="rc-slot rc-stat" style={box(L.hydroValue)} data-len={String(data.hydro ?? "").length}>
+              <span>{data.hydro ?? ""}</span>
+            </div>
+          )}
 
           {/* The heart sits under the wordmark on every plate — a rarity mark
               should be where the eye learned to find it. */}
-          {(() => {
+          {!printed.rarity && (() => {
             const heartSlot = L.rarity;
             const hf = heartSlot.heightFactor || 0.048;
             return (
@@ -700,7 +719,7 @@ export default function RcanaCard({
         })}
       </div>
 
-      <style>{RCANA_STYLES}</style>
+      <style>{RCANA_STYLES}{SUBTYPE_FURNITURE_STYLES}{LIQUIDITY_BOX_STYLES}{TYPE_HEADER_STYLES}</style>
     </div>
   );
 }

@@ -31,6 +31,9 @@ engine = engine.replace(importLine, () => designs + '\n');
 
 // Faces: resolved through the real modules so the mapping cannot drift.
 const { RCANA_SET, RCANA_ART, TYPE_CLASS } = await import(join(root, 'src/game/rcana/cardFace.js'));
+const { DESIGNS: cardDesigns } = await import(join(root, 'src/game/rcana/set/designs.js'));
+const { getEventSubtype } = await import(join(root, 'src/game/rcana/eventTemplate.js'));
+const eventSubtypes = Object.fromEntries(cardDesigns.map((c) => [c.key, getEventSubtype(c)]).filter(([, subtype]) => subtype));
 const faces = {};
 for (const c of RCANA_SET) {
   const art = RCANA_ART[c.id] || {};
@@ -47,7 +50,7 @@ for (const c of RCANA_SET) {
 }
 // The printed class per engine type, so the table groups and labels cards the
 // way the cards themselves do; the engine keeps playing by type.
-const facesSrc = `const FACES = ${JSON.stringify(faces, null, 2)};\nconst TYPE_CLASS = ${JSON.stringify(TYPE_CLASS)};`;
+const facesSrc = `const FACES = ${JSON.stringify(faces, null, 2)};\nconst TYPE_CLASS = ${JSON.stringify(TYPE_CLASS)};\nconst EVENT_SUBTYPES = ${JSON.stringify(eventSubtypes)};`;
 
 let page = readFileSync(join(here, 'pt2-table.src.html'), 'utf8');
 for (const [slot, src] of [['/*__ENGINE__*/', engine], ['/*__FACES__*/', facesSrc]]) {

@@ -4,15 +4,15 @@
 // and an art file; see README.md.
 import { DESIGNS, designByKey } from "./designs.js";
 import { FACES } from "./faces.js";
+import { ARTIFACT_SUBTYPES } from "../artifactTemplate.js";
+import { getEventSubtype } from "../eventTemplate.js";
 
 // Design type -> printed class. The face has four classes and the game has
-// eight types, so this is where they meet. The printed class is what the
-// card SAYS it is; the type is how it PLAYS (an Event fires on draw, a
-// Hazard sticks to a rival, Progress banks on play) and never changes here.
-// Hazards print as Events — things that happen to the market (The Bull,
-// Rocket and The Inheritance ARE Events now, ones you call; see designs.js).
-// Remedies and Graces are Artifacts — things you hold — with the
-// type carried as a printed sub-class (ARTIFACT · REMEDY) where it differs.
+// seven types, so this is where they meet. The printed class is what the
+// card SAYS it is; the type and `played` flag determine how it PLAYS.
+// Events print a Hazard, Opportunity or Market subtype without changing
+// their engine type or timing.
+// Artifacts print as Remedy, Grace or Relic while retaining their engine type.
 // (Literal strings rather than RCANA_CLASSES, so this module never imports
 // cardFace.js and cardFace.js can import it without a cycle.)
 export const TYPE_CLASS = {
@@ -34,14 +34,9 @@ export function buildFace(face) {
     number: face.number ?? null,
     cardClass: face.cardClass || TYPE_CLASS[design.type] || "Trader",
     type: design.type,
-    // Printed under the class when the type is a sub-kind of it: a Remedy
-    // or a Grace is an Artifact of a particular sort. Capitalised type name;
-    // null when the type simply IS the class (Trader, Asset, Artifact).
-    subClass:
-      face.subClass ??
-      (["remedy", "grace"].includes(design.type)
-        ? design.type[0].toUpperCase() + design.type.slice(1)
-        : null),
+    played: !!design.played,
+    // Subtypes appear beside the class in the swept header.
+    subClass: face.subClass ?? getEventSubtype(design) ?? ARTIFACT_SUBTYPES[design.type] ?? null,
     cost: design.cost,
     name: face.name || design.printName || design.name,
     rarity: face.rarity || "Common",

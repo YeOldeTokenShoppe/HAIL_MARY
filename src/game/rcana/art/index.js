@@ -6,10 +6,18 @@ import elDiablito from "./el-diablito.js";
 import elToro from "./el-toro.js";
 import elMonje from "./el-monje.js";
 import elOso from "./el-oso.js";
+import techStock from "./tech-stock.js";
+import abuela from "./abuela.js";
+import tortilla from "./tortilla.js";
+import laCampana from "./la-campana.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
   "el-toro": elToro,
   "el-monje": elMonje,
   "el-oso": elOso,
+  "tech-stock": techStock,
+  abuela,
+  tortilla,
+  "la-campana": laCampana,
 };

@@ -273,10 +273,9 @@ export const RCANA_RARITIES = {
   Uncommon: { label: "UNCOMMON", ink: "#3f7a58", foil: 0.15, heart: "red" },
   Rare: { label: "RARE", ink: "#2f6391", foil: 0.4, heart: "gold" },
   Mythic: { label: "MYTHIC", ink: "#8a4ea8", foil: 0.7, heart: "gold" },
-  Relic: { label: "RELIC", ink: "#a8741b", foil: 1, heart: "gold" },
 };
 
-export const RARITY_ORDER = ["Common", "Uncommon", "Rare", "Mythic", "Relic"];
+export const RARITY_ORDER = ["Common", "Uncommon", "Rare", "Mythic"];
 
 // ---------------------------------------------------------------------------
 // Slot geometry
@@ -284,6 +283,8 @@ export const RARITY_ORDER = ["Common", "Uncommon", "Rare", "Mythic", "Relic"];
 // Measured off LOTERIA_FRAME2 (1024x1422), as percentages of the card box, so
 // they survive a re-export at any resolution. The bench's "Slot outlines"
 // toggle paints these as labelled rectangles over the frame.
+export const COMPACT_TYPE_HEADER = { x: 3.6, y: 2.55, w: 40.5, h: 7.45 };
+
 export const RCANA_LAYOUT = {
   // Number and class, in the gold tab. The frame prints the tab and its
   // divider rule; both cells are empty, so both are drawn.
@@ -294,7 +295,11 @@ export const RCANA_LAYOUT = {
   // The opening's BOUNDING BOX. Layers behind the frame are clipped to this:
   // they are only ever seen through the hole, so clipping there costs nothing
   // and guarantees their edges can never swing outside the card on tilt.
-  window: { x: 4.48, y: 3.16, w: 90.85, h: 65.1 },
+  // The box is taller than the window looks: the hole is not a rectangle —
+  // under the ribbon's curled tails it reaches 73.3% of the card at both
+  // corners (measured on the plate), well below the ribbon's sill at ~63%.
+  // Clip short of that and the page shows in the two corners.
+  window: { x: 4.48, y: 3.16, w: 90.85, h: 70.3 },
 
   // The opening as it actually reads across the middle of the card. The bbox
   // above only reaches 68.57% beside the banner's pointed tails; through the
@@ -439,6 +444,10 @@ import {
   FX_BLEND_DEFAULT, FX_CLIP_DEFAULT, FX_CLEAR_PAD, FX_CLEAR_FEATHER,
 } from "./artSpec.js";
 import { RCANA_ART } from "./art/index.js";
+import { getArtifactTemplate } from "./artifactTemplate.js";
+import { getEventTemplate } from "./eventTemplate.js";
+import { SUBTYPE_HEADER, SUBTYPE_USAGE_SLOT } from "./subtypeTemplate.js";
+import { LIQUIDITY_BOXES } from "./liquidityBox.js";
 
 
 // The set itself lives in set/ (designs + faces, merged by set/index.js).
@@ -456,12 +465,46 @@ export function toRcanaCard(card, overrides = {}) {
   const art = RCANA_ART[card.id] || {};
   const cls = card.cardClass || card.class || RCANA_CLASSES.TRADER;
   const layers = art.layers || [];
+  const artifactTemplate = getArtifactTemplate({ ...card, cardClass: cls });
+  const eventTemplate = getEventTemplate({ ...card, cardClass: cls });
+  const subtypeTemplate = artifactTemplate || eventTemplate;
+  const compactTypeHeader = ["Trader", "Asset"].includes(cls);
+  const liquidityBox = ["Artifact", "Trader", "Asset", "Event"].includes(cls)
+    ? LIQUIDITY_BOXES[card.plate || "boxed"] || null
+    : null;
+  const layout = subtypeTemplate ? {
+    ...RCANA_LAYOUT,
+    numberTab: SUBTYPE_HEADER,
+    numberCell: { x: 4.3, y: 3.1, w: 9.1, h: 6.4 },
+    classCell: { x: cls === "Event" ? 72 : 67, y: 3.1, w: cls === "Event" ? 23.4 : 28.4, h: 6.4 },
+    subtypeCell: { x: 13.4, y: 3.1, w: cls === "Event" ? 58.6 : 53.6, h: 6.4 },
+    usageSeal: SUBTYPE_USAGE_SLOT,
+  } : { ...RCANA_LAYOUT };
+  if (compactTypeHeader) {
+    layout.numberTab = COMPACT_TYPE_HEADER;
+    layout.numberCell = { x: 4.25, y: 3.2, w: 9.5, h: 6.15 };
+    layout.classCell = { x: 13.75, y: 3.2, w: 29.7, h: 6.15 };
+  }
+  if (liquidityBox) {
+    layout.hydroBox = liquidityBox;
+    layout.hydroValue = {
+      x: liquidityBox.x + liquidityBox.w * .54,
+      y: liquidityBox.y + .5,
+      w: liquidityBox.w * .46,
+      h: liquidityBox.h - 1,
+    };
+  }
 
   return {
     id: card.id,
     number: card.number ?? null,
     cardClass: cls,
-    subClass: card.subClass ?? null,
+    subClass: subtypeTemplate?.subtype ?? card.subClass ?? null,
+    artifactTemplate,
+    eventTemplate,
+    compactTypeHeader,
+    liquidityBox,
+    layout,
     cost: card.cost ?? null,
     // The coin in the tab: a Trader's hire cost (its boxes hold Grace and income).
     tabCost: card.tabCost ?? null,
@@ -484,7 +527,7 @@ export function toRcanaCard(card, overrides = {}) {
     plate: card.plate || "boxed",
     frameImage: art.frame || PLATES[card.plate || "boxed"] || CLASS_FRAME[cls] || DEFAULT_FRAME,
     // The type seal, on sealed plates only (it stands where the halo box was).
-    badgeImage: card.plate === "sealed" ? TYPE_BADGE[card.type] || null : null,
+    badgeImage: !subtypeTemplate && card.plate === "sealed" ? TYPE_BADGE[card.type] || null : null,
     // "combined" means the figure is inside the frame image, not that the
     // card has no depth: such a card still takes the planes behind it.
     combinedPlate: !!art.combinedPlate,
@@ -517,10 +560,13 @@ export function toRcanaCard(card, overrides = {}) {
       reflection: l.reflection || null,
       // Resolved to boxes here so the renderer never looks up slots. Each
       // entry is a slot name, or { slot, pad, feather } to tune one hole.
-      clear: (l.clear || [])
+      clear: [
+        ...(l.clear || []),
+        ...((subtypeTemplate || compactTypeHeader) && !(l.clear || []).some((c) => (typeof c === "string" ? c : c.slot) === "numberTab") ? ["numberTab"] : []),
+      ]
         .map((c) => {
           const spec = typeof c === "string" ? { slot: c } : c;
-          const box = RCANA_LAYOUT[spec.slot];
+          const box = layout[spec.slot];
           if (!box) return null;
           const pad = spec.pad ?? FX_CLEAR_PAD;
           return {

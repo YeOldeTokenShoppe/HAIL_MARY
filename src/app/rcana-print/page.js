@@ -1,6 +1,10 @@
 "use client";
 
 // /rcana-print?id=<face id>[&scale=1][&live=1]
+// /rcana-print?template=artifact[&subtype=remedy|grace|relic]
+// The template has an empty art window, number, name, rules and cost, ready
+// for export; its Artifact header and usage seal are the real components.
+// ?template=event&subtype=hazard|opportunity|market uses the same system.
 //
 // One card, flat, on a transparent page: the print target for
 // scripts/rcana-render-faces.mjs, which screenshots `.rc-stage` here into
@@ -40,17 +44,34 @@ function useFitScale(on) {
 
 function PrintCard() {
   const params = useSearchParams();
+  const artifactTemplate = params.get("template") === "artifact";
+  const eventTemplate = params.get("template") === "event";
+  const templateOnly = artifactTemplate || eventTemplate;
+  // Keep the original generic Artifact template URL working as a Relic.
+  const requestedSubtype = params.get("subtype") === "artifact" ? "relic" : params.get("subtype");
+  const subtypes = eventTemplate ? ["hazard", "opportunity", "market"] : ["remedy", "grace", "relic"];
+  const subtype = subtypes.includes(requestedSubtype) ? requestedSubtype : subtypes[0];
   const id = params.get("id") || RCANA_SET[0]?.id;
   const scale = Number(params.get("scale") || 1);
   // ?live=1: the card as it is on the bench — depth, tilt, sway, touch — for
   // embedding (the Playtest 2 lightbox) rather than screenshotting.
   const live = params.get("live") === "1";
   const fitScale = useFitScale(live);
-  const source = RCANA_SET.find((c) => c.id === id);
+  const source = templateOnly ? {
+    id: `${eventTemplate ? "event" : "artifact"}-template-${subtype}`,
+    type: eventTemplate ? (subtype === "hazard" ? "hazard" : "event") : subtype === "relic" ? "artifact" : subtype,
+    played: subtype === "opportunity",
+    cardClass: eventTemplate ? "Event" : "Artifact",
+    subClass: subtype[0].toUpperCase() + subtype.slice(1),
+    plate: subtype === "opportunity" ? "valued" : "sealed",
+    number: null,
+    name: "",
+    printed: { rarity: true },
+  } : RCANA_SET.find((c) => c.id === id);
   if (!source) {
     return <pre style={{ color: "#f66", padding: 16 }}>no face "{id}" — ids: {RCANA_SET.map((c) => c.id).join(", ")}</pre>;
   }
-  const card = toRcanaCard(source);
+  const card = toRcanaCard(source, { templateOnly });
   if (live) {
     return (
       <main

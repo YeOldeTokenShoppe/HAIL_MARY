@@ -104,22 +104,96 @@ type (`PLATES` in `artSpec.js`, chosen by `plate` from `buildFace()`):
 | plate | left box | right (drop) box | types |
 |---|---|---|---|
 | `boxed` (`LOTERIA_FRAME2`) | halo: Grace | cost = income | Trader |
-| `valued` (`LOTERIA_FRAME2_value`) | **ingot: Prosperity** | **cost** | Asset, called Event |
-| `sealed` (`LOTERIA_FRAME2_sealed`) | **type seal** | **cost** | Hazard, Remedy, Artifact, Grace, fired Event |
+| `valued` (`LOTERIA_FRAME2_value`) | **ingot: Prosperity** | **cost** | Asset, Opportunity Event |
+| `sealed` (`LOTERIA_FRAME2_sealed`) | **usage seal** | **cost** (Market: **—**) | Hazard, Market, Remedy, Relic, Grace |
 
 The drop box is always "the Liquidity on this card": what you pay to play
 it — and on a Trader, also what they pay you a turn (hire cost = income, by
-rule). The class label is set in Blackletter, the wordmark's face. Type seals are full-canvas
-overlays in `public/TCG/badges/<type>.webp` (`TYPE_BADGE`), drawn in place
-at the left of the strip; fired Events have none yet. The rarity heart sits
+rule). The class label is set in Blackletter, the wordmark's face. Events
+and Artifacts use live usage medallions instead of the legacy full-canvas
+type overlays in `public/TCG/badges/<type>.webp` (`TYPE_BADGE`). The rarity heart sits
 under the wordmark on every plate. An art file may still pin a `frame:`.
+
+### Artifact template
+
+Cards whose printed class is `Artifact` use the swept teal-and-gold header
+in `RcanaArtifactTemplate.jsx`. The larger subtype symbol sits to the left
+of `Remedy`, `Grace` or `Relic`; `Artifact` remains on the right. The engine's
+`artifact` type prints as `Relic` and uses the **Equip** seal.
+Traders and Assets use the compact swept header in `RcanaTypeHeader.jsx`:
+a gold number cell and a colored field with the type name in pale-gold
+Blackletter. `COMPACT_TYPE_HEADER` defines its footprint and FX clearance.
+`headerColors.js` assigns plum to Traders, forest green to Assets, teal to
+Artifacts, and indigo to Events. All Artifact subtypes share teal; all Event
+subtypes share indigo. Hazard usage seals retain their red warning color.
+
+Rarity is **Common → Uncommon → Rare → Mythic**. Relic is exclusively an
+Artifact subtype; it is not a rarity.
+
+The lower-left seal describes use: **Single use**, **Equip**, or **To shrine**.
+`artifactTemplate.js` maps these from the engine type and handles the Grace
+exceptions: the Rose is **Offer**, and the Fountain is **Spend**. This is
+display information only. The old subtype badge is omitted for Artifacts.
+FX clearance follows the full header, including on La Tortilla's steam.
+
+All four card classes share `RcanaLiquidityBox.jsx`: deep teal, a gold inset
+and divider, a blue droplet with a pale-gold outline, and a pale-gold value.
+They cover each plate's painted cyan box at the positions in `liquidityBox.js`,
+so new frame artwork is not required. Liquidity stays teal across types,
+independent of header color. Trader and Asset Grace/Prosperity boxes retain
+their current designs.
+
+Blank templates are available from the same print renderer:
+
+- `/rcana-print?template=artifact&subtype=remedy`
+- `/rcana-print?template=artifact&subtype=grace`
+- `/rcana-print?template=artifact&subtype=relic`
+
+The earlier `subtype=artifact` URL and `artifact-template-artifact.png`
+download remain aliases for the Relic template.
+
+These leave the illustration, number, name, rules, rarity and cost empty.
+Transparent PNG exports live in `public/TCG/frames/artifact-template-*.png`;
+the component remains the editable source. Regenerate them with
+`npm run rcana:artifact-templates` while the dev server is running.
+After a visible template change,
+render the affected Artifact faces again and run `npm run pt2:build`.
+
+### Event subtypes and usage seals
+
+Events share the full-width swept header and medallion components with
+Artifacts (`RcanaSubtypeFurniture.jsx`). `eventTemplate.js` derives the
+printed subtype from the existing game type and `played` flag:
+
+| Engine behavior | Printed subtype | Lower-left information |
+|---|---|---|
+| `type: "hazard"` | Hazard | Red **Until cleared** seal; pinned-card symbol |
+| `type: "event", played: true` | Opportunity | Existing numeric **Prosperity** value |
+| `type: "event"`, no `played` | Market | Indigo **On draw** seal; draw-card symbol |
+
+The header uses a skull, sparkles, or globe to the left of the subtype and
+`Event` in Blackletter on the gold right panel. Future cards inherit their
+header and stamp automatically; they do not need new frame artwork.
+Market Events print **—** for Liquidity because they resolve automatically.
+The God Candle can leave an ongoing Market effect after resolving.
+
+The playtest gallery groups all Event designs under these three subtypes,
+including designs without art. The build injects the same subtype mapping
+used by the live cards, without changing engine rules. Exit Scam's text
+names Opportunities, Yield Farm's text names Market Events, and The World
+ends ongoing Market effects; it does not clear attached Hazards.
+
+Blank templates are also available at
+`/rcana-print?template=event&subtype=hazard`, `subtype=opportunity`, and
+`subtype=market`. They leave card-specific text and numbers empty. For visible
+changes, render affected Event faces and rebuild the playtest table.
 
 ## Open design calls (placeholders in code, flagged where they live)
 
 - ~~**Type → class.**~~ Settled in `TYPE_CLASS` (`set/index.js`): Trader,
-  Asset (assets), Event (events, hazards, progress), Artifact (artifacts,
-  remedies, graces). Remedies and Graces print their type as a sub-class
-  line under ARTIFACT. The engine's eight types are untouched.
+  Asset (assets), Event (events and hazards), Artifact (artifacts,
+  remedies, graces). Event and Artifact subtypes print beside their class
+  in the swept header. The engine's seven types are untouched.
 - ~~**Stats → boxes.**~~ Settled (`buildFace()`): the drop box is always
   Liquidity; the halo box is standing — Grace on a Trader, **Prosperity (the
   card's value)** on an Asset or a called Event. Other types print blank

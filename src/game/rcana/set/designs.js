@@ -60,7 +60,7 @@ export const DESIGNS = [
   D('taxman', 'Tax Collector', 'hazard', 2, { text: 'Pay 1 to the bank at the start of each turn' }),
   D('escandalo', 'Scandal', 'hazard', 2, { text: 'Scandal: the seated Trader loses 5 Grace when it breaks, 2 more each turn' }),
   D('naranja', 'El Naranja', 'hazard', 3, { text: 'The Orange One takes his cut: whenever the target banks, the hazard’s owner collects 2' }),
-  D('scam', 'Exit Scam', 'hazard', 3, { text: 'The target cannot play the Events they call (The Bull, Rocket, Full Moon, The Inheritance) until cleared' }),
+  D('scam', 'Exit Scam', 'hazard', 3, { text: 'The target cannot play Opportunity Events until cleared' }),
   D('bell', 'The Bell', 'remedy', 1, { clears: 'bear', printName: 'La Campana' }),
   D('resist', 'Quantum Resistance', 'remedy', 1, { clears: 'hack', printName: 'La Resistencia' }),
   D('keys', 'The Keys', 'remedy', 1, { clears: 'rug', printName: 'Las Llaves' }),
@@ -85,7 +85,7 @@ export const DESIGNS = [
   D('rose', 'The Rose', 'grace', 0, { pros: 50, cash: 2, text: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise', printName: 'La Rosa' }),
   D('moneda', 'Pay Day', 'event', 0, { text: 'Every player collects 2 Liquidity' }),
   // Yield farming: fat income until the market moves and wipes it.
-  D('jardin', 'Yield Farm', 'asset', 4, { cash: 2, pros: 50, income: 2, text: 'While held: collect 2 a turn — but it dies the moment any Event fires' }),
+  D('jardin', 'Yield Farm', 'asset', 4, { cash: 2, pros: 50, income: 2, text: 'While held: collect 2 a turn. Discard this Asset when any Market Event triggers' }),
   // Hail Mary Prospecting Co. — three claims:
   // the map leads somewhere (cards), the mine pays the longer you dig, the well is a wildcat.
   D('map', 'Treasure Map', 'asset', 2, { cash: 2, pros: 75, text: 'When sold, draw 2 cards' }),
@@ -99,7 +99,7 @@ export const DESIGNS = [
   D('rueda', 'The Wheel', 'event', 0, { text: 'Every portfolio rotates one seat' }),
   D('godcandle', 'The God Candle', 'event', 0, { text: 'Until the drawer’s next turn, Prosperity sales pay double' }),
 
-  D('world', 'The World', 'event', 0, { text: 'Every standing effect ends, and everyone draws a card' }),
+  D('world', 'The World', 'event', 0, { text: 'End all ongoing Market effects. Every player draws a card' }),
 
   D('moralhazard', 'Moral Hazard', 'event', 0, { text: 'The bailout: the poorest player collects 5; the richest loses 2' }),
 ];

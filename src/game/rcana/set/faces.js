@@ -8,7 +8,7 @@
 //            cost and rules text come from there unless overridden here.
 //            The printed name comes from the design too (`printName`).
 //   number   the card's lotería number, unique across the set.
-//   rarity   Common | Uncommon | Rare | Mythic | Relic (RARITY_ORDER).
+//   rarity   Common | Uncommon | Rare | Mythic (RARITY_ORDER).
 //   halo / hydro   the two boxes, filled from the design by type: a Trader's
 //            Grace and LIQ; an Asset's Prosperity and Liquidity on sale; a
 //            called Event's Prosperity. Others print blank. Set them only to
@@ -68,6 +68,50 @@ export const FACES = [
     // A Hazard narrates (the line follows the rule).
     ability: "Until cleared, the target banks at most 75 from a single card.",
     flavor: "The market only ever remembers one direction.",
+    printed: {},
+  },
+  {
+    id: "tech-stock",
+    design: "tech",
+    // PROVISIONAL number and rarity.
+    number: 14,
+    rarity: "Common",
+    // An Asset's line says what it sells for; the boxes print value (100)
+    // and cost (3), so the text carries the cash option.
+    ability: "Sell for 5 Hydro, or bank 100 Prosperity.",
+    flavor: "It only goes up, until the day it does not.",
+    printed: {},
+  },
+  {
+    id: "abuela",
+    design: "abuela",
+    // PROVISIONAL number and rarity.
+    number: 15,
+    rarity: "Rare",
+    ability: "Your gambles moon on 4+ instead of 5+.",
+    // A Trader speaks; prints as a quotation and leads the panel.
+    flavor: "I have buried two husbands and a bear market, mijo.",
+    printed: {},
+  },
+  {
+    id: "tortilla",
+    design: "tortilla",
+    // PROVISIONAL number and rarity.
+    number: 16,
+    rarity: "Rare",
+    ability: "Clear any one hazard.",
+    // A Remedy narrates; the line follows the rule.
+    flavor: "She appeared at breakfast. The spread closed by noon.",
+    printed: {},
+  },
+  {
+    id: "la-campana",
+    design: "bell",
+    // PROVISIONAL number and rarity.
+    number: 17,
+    rarity: "Uncommon",
+    ability: "Clear Bear Market.",
+    flavor: "When it rings, the bear goes back to the hills.",
     printed: {},
   },
 ];
