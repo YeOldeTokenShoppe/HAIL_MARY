@@ -298,7 +298,7 @@ check("and no model URL is typed into it either", modelLiterals, []);
 
 // ── The served URL ────────────────────────────────────────────────────────
 console.log("\nThe repo path and the served path are the same file:");
-check("the set", modelUrl(SET_MODEL.file), `/models/LTTV_Set.glb?v=${MODEL_VERSION}`);
+check("the set", modelUrl(SET_MODEL.file), `/models/LTTV_Set2.glb?v=${MODEL_VERSION}`);
 for (const [actor, character] of Object.entries(CHARACTERS)) {
   ok(`${actor}'s URL drops "public" and keeps the filename`,
     modelUrl(character.file).startsWith(character.file.replace(/^public/, "").split("?")[0]));

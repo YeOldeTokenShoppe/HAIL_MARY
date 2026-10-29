@@ -20,7 +20,10 @@ function SubtypeSymbol({ kind }) {
         <path d="m13 5 3 8 8 3-8 3-3 8-3-8-8-3 8-3ZM25 2v6M22 5h6M25 24v6M22 27h6" />
       </> : kind === "market" ? <>
         <circle cx="16" cy="16" r="13" /><ellipse cx="16" cy="16" rx="6" ry="13" /><path d="M3 16h26" />
-      </> : <path d="M7 10h18v17H7zM5 6h22v5H5zM16 6v21" />}
+      </> : <>
+        <path d="M9 5h14l6 8-13 16L3 13Z" />
+        <path d="M3 13h26M9 5l3 8 4 16 4-16 3-8" />
+      </>}
     </svg>
   );
 }

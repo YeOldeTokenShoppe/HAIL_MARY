@@ -48,6 +48,7 @@ import {
 } from "@/lib/ltTv/shotFraming.mjs";
 import {
   CHARACTERS,
+  CREW,
   SET_MODEL,
   clipShape,
   matchesAuthoredName,
@@ -56,6 +57,11 @@ import {
   reactionDurations,
 } from "@/lib/ltTv/modelContract.mjs";
 import { shapeClip } from "@/lib/ltTv/clipShaping.mjs";
+import {
+  CAMERA_OPERATOR_LIMITS,
+  cameraOperatorMount,
+} from "@/lib/ltTv/cameraOperator.mjs";
+import { createCrewAnimation } from "@/lib/ltTv/crewAnimation.mjs";
 import { FACES, isFaceBeat } from "@/lib/ltTv/faces.mjs";
 import { findEpisode } from "@/content/lt-tv";
 
@@ -82,6 +88,7 @@ const SET_URL = modelUrl(SET_MODEL.file);
 // argument, so a list rebuilt per render would re-suspend the whole set.
 const CHARACTER_EMPTIES = Object.values(CHARACTERS).map((c) => c.empty);
 const CHARACTER_URLS = Object.values(CHARACTERS).map((c) => modelUrl(c.file));
+const CREW_URLS = Object.values(CREW).map((c) => modelUrl(c.file));
 // World up, for the camera prop's pan.
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const SITEPAL_ACCOUNT = "9308752";
@@ -473,6 +480,7 @@ const PORTAL_HOST_WIDTH = PORTAL_WIDTH * Object.keys(TALKSHOW_PROJECTION_CONFIG)
 export function preloadTalkShow() {
   useGLTF.preload(SET_URL, DRACO_PATH);
   CHARACTER_URLS.forEach((url) => useGLTF.preload(url, DRACO_PATH));
+  CREW_URLS.forEach((url) => useGLTF.preload(url, DRACO_PATH));
 }
 
 // Build (once) the crop canvas + CanvasTexture + MeshBasicMaterial for a
@@ -555,11 +563,30 @@ function paintCrop(st, cfg, source, dim = 0) {
 //     across the panel, v up it, matching the render target's bottom-left
 //     texel origin.
 const MONITOR_SCREEN_MESH = "Camera_Screen";
-// `Camera` is the swivel head (its origin sits at the top of the tripod) and
-// parents `Camera_Screen`; `Tripod` is the legs and stays put. Both are hidden
-// for the offscreen pass, so the feed is a clean lens POV with no feedback.
-const MONITOR_PIVOT_NODE = "Camera";
-const MONITOR_HIDDEN_NODES = ["Camera", "Tripod"];
+// `Tripod_Head` is the swivel head (its origin sits at the top of the legs) and
+// carries the whole apparatus — camera body, `Camera_Screen`, RedLight — as a
+// unit. The legs are its parent and stay put. The stand is found as the head's
+// parent rather than by name, since the legs still carry the asset pack's
+// `SM_Prop_Tripod_01 (2)`. The whole stand is hidden for the offscreen pass, so
+// the feed is a clean lens POV with no feedback.
+const MONITOR_PIVOT_NODE = "Tripod_Head";
+// Node names may carry GLTFLoader's collision suffix, hence the pattern.
+const MONITOR_PIVOT_RE = new RegExp(`^${MONITOR_PIVOT_NODE}(_\\d+)?$`);
+
+function findMonitorPivot(root) {
+  let found = null;
+  root.traverse((o) => { if (!found && MONITOR_PIVOT_RE.test(o.name)) found = o; });
+  return found;
+}
+
+// The legs with the head under them: what the feed hides, the drag grabs and
+// the mobile mount strikes. Falls back to the head alone if it ever sits at the
+// top of the file, so a re-parent can never hide the whole set.
+function findMonitorStand(root) {
+  const head = findMonitorPivot(root);
+  if (!head) return null;
+  return head.parent && head.parent !== root ? head.parent : head;
+}
 
 export const MONITOR_FEED = {
   enabled: true,
@@ -594,7 +621,8 @@ export const MONITOR_FEED = {
   // convention). Flip `dragInvert` for the opposite feel.
   dragSensitivity: 0.005,
   dragInvert: false,
-  maxPitch: 0.4,
+  maxYaw: CAMERA_OPERATOR_LIMITS.yaw,
+  maxPitch: CAMERA_OPERATOR_LIMITS.pitch,
   wheelSensitivity: 0.03,
   minFov: 16,
   maxFov: 70,
@@ -636,16 +664,18 @@ function applyRigOrientation(feed) {
     .multiply(feed.baseQuaternion);
 }
 
-// Build the feed once the viewer camera exists (its position picks the side of
-// the panel that faces front). Returns null if the prop is missing.
-function buildMonitorFeed(root, viewerCamera) {
-  const screen = root.getObjectByName(MONITOR_SCREEN_MESH);
-  if (!screen?.geometry?.attributes?.position) return null;
-  const hidden = MONITOR_HIDDEN_NODES.map((n) => root.getObjectByName(n)).filter(
-    Boolean,
-  );
-  const pivot = root.getObjectByName(MONITOR_PIVOT_NODE) || null;
+// Every mesh whose name starts `Camera_Screen` shows the feed: the flip-out
+// monitor on the camera (`Camera_Screen`, which is also where the lens sits)
+// and the monitor on the light stand (`Camera_Screen.001`, which GLTFLoader
+// loads as `Camera_Screen001`).
+const isFeedScreen = (o) =>
+  o.isMesh && o.name.startsWith(MONITOR_SCREEN_MESH) && o.geometry?.attributes?.position;
 
+// A cloned copy of the panel's geometry with its own planar UV set, `cover`
+// fitted to a feed of `aspect` (width / height), so a panel of a different
+// shape crops the picture rather than stretching it. Without an aspect the fit
+// is exact, which is what the lens's own panel wants.
+function planarScreenGeometry(screen, viewerCamera, aspect = null) {
   screen.updateWorldMatrix(true, false);
 
   const geometry = screen.geometry.clone();
@@ -696,8 +726,12 @@ function buildMonitorFeed(root, viewerCamera) {
   const rightLocal = upLocal.clone().cross(normalLocal);
 
   const rightAxis = rightLocal.x !== 0 ? 0 : rightLocal.y !== 0 ? 1 : 2;
-  const uSpan = dims[rightAxis] || 1;
-  const vSpan = dims[upAxis] || 1;
+  const width = dims[rightAxis] || 1;
+  const height = dims[upAxis] || 1;
+  // The span of panel one full texture covers: the panel itself, widened on
+  // whichever axis the feed's shape overhangs.
+  const uSpan = aspect ? Math.max(width, height * aspect) : width;
+  const vSpan = aspect ? uSpan / aspect : height;
 
   // (0,0) = bottom-left of the panel seen from the front, which is also the
   // render target's first texel, so the feed lands upright and unmirrored.
@@ -710,9 +744,29 @@ function buildMonitorFeed(root, viewerCamera) {
     uv[i * 2 + 1] = THREE.MathUtils.clamp(vertex.dot(upLocal) / vSpan + 0.5, 0, 1);
   }
   geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
-  screen.geometry = geometry;
+  return { geometry, center, aspect: width / height };
+}
 
-  const aspect = uSpan / vSpan;
+// Build the feed once the viewer camera exists (its position picks the side of
+// the panel that faces front). Returns null if the prop is missing.
+function buildMonitorFeed(root, viewerCamera) {
+  const screens = [];
+  root.traverse((o) => { if (isFeedScreen(o)) screens.push(o); });
+  // The lens rides the camera's own monitor; without it there is no feed.
+  const screen = screens.find((o) => o.name === MONITOR_SCREEN_MESH);
+  if (!screen) return null;
+  const stand = findMonitorStand(root);
+  const hidden = stand ? [stand] : [];
+  const pivot = findMonitorPivot(root);
+
+  // The lens's panel sets the picture's shape; the others crop to it.
+  const lensPanel = planarScreenGeometry(screen, viewerCamera);
+  const { center, aspect } = lensPanel;
+  const geometries = screens.map((o) =>
+    o === screen ? lensPanel.geometry : planarScreenGeometry(o, viewerCamera, aspect).geometry,
+  );
+  screens.forEach((o, i) => { o.geometry = geometries[i]; });
+
   const width = Math.round(MONITOR_FEED.resolution);
   const target = new THREE.WebGLRenderTarget(
     width,
@@ -737,14 +791,15 @@ function buildMonitorFeed(root, viewerCamera) {
     polygonOffsetFactor: -2,
     polygonOffsetUnits: -2,
   });
-  screen.material = material;
+  screens.forEach((o) => { o.material = material; });
 
   return {
     root,
     screen,
+    screens,
     hidden,
     pivot,
-    geometry,
+    geometries,
     material,
     target,
     center,
@@ -886,8 +941,10 @@ function updateCameraRig(feed, headBones, timeline, elapsed, running, delta) {
   }
   // Shortest way round, so a bearing that crosses ±π never unwinds the long way.
   const offset = bearing - feed.restYaw;
-  const target =
-    Math.atan2(Math.sin(offset), Math.cos(offset)) * MONITOR_FEED.panScale;
+  const target = THREE.MathUtils.clamp(
+    Math.atan2(Math.sin(offset), Math.cos(offset)) * MONITOR_FEED.panScale,
+    -MONITOR_FEED.maxYaw, MONITOR_FEED.maxYaw,
+  );
   feed.yaw += (target - feed.yaw) * panEase;
   feed.pitch += (0 - feed.pitch) * panEase;
   applyRigOrientation(feed);
@@ -1064,7 +1121,7 @@ function directViewerCamera({ state, controls, camera, headBones, timeline, elap
 // One offscreen pass from the prop's point of view. Every renderer flag it
 // touches is restored before the EffectComposer's pass runs.
 function renderMonitorFeed(feed, gl, scene) {
-  const { screen, camera, target } = feed;
+  const { camera, target } = feed;
 
   // Orientation overrides ride on the texture transform, so flipping one is
   // live and never touches the rebuilt UVs.
@@ -1091,7 +1148,11 @@ function renderMonitorFeed(feed, gl, scene) {
   gl.getClearColor(feed.prevClear);
   const wasVisible = feed.hidden.map((o) => o.visible);
   feed.hidden.forEach((o) => { o.visible = false; });
-  screen.visible = false;
+  // Every panel showing the feed is struck too, not just the lens's own: the
+  // light-stand monitor is in shot, and drawing the target into itself is a
+  // feedback loop.
+  const screenWasVisible = feed.screens.map((o) => o.visible);
+  feed.screens.forEach((o) => { o.visible = false; });
   try {
     gl.xr.enabled = false;
     // The canvas is alpha:true — clearing the feed opaque keeps the monitor
@@ -1105,7 +1166,7 @@ function renderMonitorFeed(feed, gl, scene) {
     gl.setClearColor(feed.prevClear, prevAlpha);
     gl.xr.enabled = prevXr;
     feed.hidden.forEach((o, i) => { o.visible = wasVisible[i]; });
-    screen.visible = true;
+    feed.screens.forEach((o, i) => { o.visible = screenWasVisible[i]; });
   }
 }
 
@@ -1850,6 +1911,9 @@ function TalkShowModel({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- characterKey identifies characterGltfs
   }, [scene, characterKey]);
 
+  const operatorMount = useMemo(() => cameraOperatorMount(cloned), [cloned]);
+  const crewUpdateRef = useRef(null);
+
   /* WHICH CLIPS EACH CHARACTER BROUGHT WITH THEM.
    *
    * This used to be one `animations` array off the single GLB, and the split
@@ -1898,15 +1962,9 @@ function TalkShowModel({
   // frame — so the mobile mount strikes it, and so does LT TV's lineup, where
   // the frame is carrying the channel. Toggled (not culled at clone time) so
   // flipping the prop back on doesn't need a re-clone.
-  // Node names may carry GLTFLoader's collision suffix, hence the pattern.
   useEffect(() => {
-    const rig = MONITOR_HIDDEN_NODES.map(
-      (n) => new RegExp(`^${n}(_\\d+)?$`),
-    );
-    const hidden = [];
-    cloned.traverse((o) => {
-      if (rig.some((re) => re.test(o.name))) hidden.push(o);
-    });
+    const stand = findMonitorStand(cloned);
+    const hidden = stand ? [stand] : [];
     hidden.forEach((o) => { o.visible = !hideCameraRig; });
     return () => { hidden.forEach((o) => { o.visible = true; }); };
   }, [cloned, hideCameraRig]);
@@ -2101,7 +2159,7 @@ function TalkShowModel({
       if (!feed) return;
       feed.target.dispose();
       feed.material.dispose();
-      feed.geometry.dispose();
+      feed.geometries.forEach((g) => g.dispose());
     };
   }, [cloned]);
 
@@ -2156,7 +2214,10 @@ function TalkShowModel({
         event.stopPropagation();
         const sign = MONITOR_FEED.dragInvert ? -1 : 1;
         const step = MONITOR_FEED.dragSensitivity * sign;
-        feed.yaw += (event.clientX - feed.lastX) * step;
+        feed.yaw = THREE.MathUtils.clamp(
+          feed.yaw + (event.clientX - feed.lastX) * step,
+          -MONITOR_FEED.maxYaw, MONITOR_FEED.maxYaw,
+        );
         feed.pitch = THREE.MathUtils.clamp(
           feed.pitch + (event.clientY - feed.lastY) * step,
           -MONITOR_FEED.maxPitch,
@@ -4033,7 +4094,7 @@ function TalkShowModel({
       const isListener = soloKey && soloKey !== key;
       const repaint = show && (!isListener || solotickRef.current === 0);
       if (repaint && st.cropCtx) paintCrop(st, cfg, source, houseDim);
-a    });
+    });
 
     // The viewer camera follows the shot list — the "camera operator". Runs
     // before the monitor feed so the tripod's second render sees this frame's
@@ -4073,10 +4134,18 @@ a    });
         // The swivel updates every frame even when the feed renders at half
         // rate, or the prop pans in visible steps.
         updateCameraRig(feed, headBones, timeline, elapsed, playback.running, delta);
-        const every = Math.max(1, Math.round(MONITOR_FEED.everyNthFrame));
-        feed.tick = (feed.tick + 1) % every;
-        if (feed.tick === 0) renderMonitorFeed(feed, gl, scene);
       }
+    }
+    // One ordered update: move the camera, play the crew's base clips, solve
+    // contact, then render either view. A separate crew useFrame can lag the
+    // swivel by a frame and can let AnimationMixer erase the hand correction.
+    const feed = monitorRef.current;
+    crewUpdateRef.current?.(delta, playback.running || live, playback.pausedAt !== null,
+      feed?.yaw ?? 0, feed?.pitch ?? 0);
+    if (feed && MONITOR_FEED.enabled && enableMonitorFeed) {
+      const every = Math.max(1, Math.round(MONITOR_FEED.everyNthFrame));
+      feed.tick = (feed.tick + 1) % every;
+      if (feed.tick === 0) renderMonitorFeed(feed, gl, scene);
     }
   });
 
@@ -4090,8 +4159,64 @@ a    });
       {lightFixtures.length > 0 && (
         <StudioLights fixtures={lightFixtures} onAir={onAir} />
       )}
+      {/* Its own boundary, so the crew's download never holds up the set. */}
+      <Suspense fallback={null}>
+        <StudioCrew set={cloned} hidden={hideCameraRig || castHidden}
+          operatorMount={operatorMount} updateRef={crewUpdateRef} />
+      </Suspense>
     </group>
   );
+}
+
+// THE CREW (see CREW in modelContract.mjs): attached into the set exactly as the
+// cast is, so they stand where the export put them. Their original clips cycle
+// off air; playback blends the operator into on_air and enables camera tracking.
+// Added after the set is built rather than inside its clone, so
+// nothing keyed off the cast ever sees them. Off with the camera rig (mobile),
+// and off with the cast on the lineup, which shows the studio but no people.
+function StudioCrew({ set, hidden, operatorMount, updateRef }) {
+  const gltfs = useGLTF(CREW_URLS, DRACO_PATH);
+  const crewKey = gltfs.map((g) => g.scene.uuid).join("|");
+
+  const crew = useMemo(
+    () =>
+      Object.values(CREW).map((member, i) => {
+        const object = skeletonClone(gltfs[i].scene);
+        const rig = findRig(object, member.empty, member.rig) || object;
+        return { object, rig, clips: gltfs[i].animations, config: member, animation: null };
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- crewKey identifies gltfs
+    [crewKey],
+  );
+
+  useEffect(() => {
+    crew.forEach((member) => {
+      set.add(member.object);
+      member.animation = createCrewAnimation(member.object, member.rig, member.clips, member.config, operatorMount);
+    });
+    return () => {
+      crew.forEach((member) => {
+        member.animation?.dispose();
+        member.animation = null;
+        set.remove(member.object);
+      });
+    };
+  }, [set, crew, operatorMount]);
+
+  useEffect(() => {
+    crew.forEach(({ object }) => { object.visible = !hidden; });
+  }, [crew, hidden]);
+
+  useEffect(() => {
+    const update = (delta, onAir, paused, yaw, pitch) => {
+      if (hidden) return;
+      crew.forEach(({ animation }) => animation?.update(delta, onAir, paused, yaw, pitch));
+    };
+    updateRef.current = update;
+    return () => { if (updateRef.current === update) updateRef.current = null; };
+  }, [crew, hidden, updateRef]);
+
+  return null;
 }
 
 // Mounts inside a host Canvas (no Canvas of its own). Takes the same

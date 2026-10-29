@@ -35,7 +35,7 @@
  * before being renamed to LTTV_Set.glb — so listing it would imply the props
  * file might be the set. It would fail the content check anyway.
  */
-const SET_FILE = "public/models/LTTV_Set.glb";
+const SET_FILE = "public/models/LTTV_Set2.glb";
 const PRE_SPLIT_SET_FILE = "public/models/talk_show3-textures.glb";
 
 export const SET_MODEL = {
@@ -55,7 +55,7 @@ export const SET_MODEL = {
     "DeskChair",
     "Camera",
     "Camera_Screen",
-    "Tripod",
+    "Tripod_Head",
     "Content_Screen",
   ],
   // Once the characters ship as their own files they must not ALSO be in the
@@ -446,6 +446,35 @@ export const CHARACTERS = {
   },
 };
 
+/*
+ * THE CREW, added 2026-10-28. People in the studio who are not on the show:
+ * no seat, no lines, no SitePal face, no reactions. So they are deliberately
+ * NOT in CHARACTERS — everything keyed off that registry (the portals, the
+ * cast filter, the seat poses, the shot solver's heads) would either hide them
+ * for having no lines or go looking for a face they do not have.
+ *
+ * A crew member stands wherever the export put them: the position lives in
+ * the file, not here, so moving one is a re-export (Michelle placed the camera
+ * operator in Blender). They are struck with the camera rig — on the lineup
+ * and on mobile — because the operator without the camera is a man staring at
+ * the desk. Names read off `npm run lt:models -- public/models/LTTV_CameraMan.glb`.
+ */
+export const CREW = {
+  CameraMan: {
+    file: "public/models/LTTV_CameraMan.glb",
+    empty: "CameraMan_Empty",
+    // "Root.002" in the export; GLTFLoader strips the dot.
+    rig: "Root002",
+    idle: "cameraMan_idle",
+    idleClips: ["cameraMan_idle", "cameraMan_talking", "cameraMan_clapping"],
+    idleLoopsBetweenGestures: [3, 4],
+    // Only while the show is running, with live arm/gaze tracking.
+    onAir: "on_air",
+    followCamera: true,
+    plantedFeet: true,
+  },
+};
+
 /**
  * Does a node name in a loaded or exported file stand for the name authored
  * here? Exactly, or with the numeric suffix Blender adds when two objects in
@@ -520,7 +549,7 @@ export function optionalClips(character) {
  * invisible — the character just goes on doing what the old file said, which
  * reads as the fix not working.
  */
-export const MODEL_VERSION = "split-7";
+export const MODEL_VERSION = "split-8-on-air";
 export function modelUrl(file) {
   return `${String(file).replace(/^public/, "")}?v=${MODEL_VERSION}`;
 }

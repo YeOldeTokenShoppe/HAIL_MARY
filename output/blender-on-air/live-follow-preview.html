@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8"><title>Camera operator follow check</title>
+<style>body{margin:0;background:#20252c;color:#eee;font:15px system-ui}canvas{display:block}#label{position:fixed;left:24px;top:20px;background:#20252cbb;padding:10px 14px;border-radius:7px}</style>
+<div id="label">Loading camera operator…</div>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {DRACOLoader} from 'three/addons/loaders/DRACOLoader.js';
+import {cameraOperatorMount,createCameraOperator} from '/src/lib/ltTv/cameraOperator.mjs';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(1);renderer.setClearColor('#30353c');document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.add(new THREE.HemisphereLight(0xffffff,0x626574,2));
+const light=new THREE.DirectionalLight(0xffffff,2.3);light.position.set(3,5,4);scene.add(light);
+const viewer=new THREE.OrthographicCamera(-1.05,1.05,1.05,-1.05,.01,100);viewer.position.set(2.6,1.95,4.4);viewer.lookAt(-.05,1.02,2.80);
+const loader=new GLTFLoader();const draco=new DRACOLoader().setDecoderPath('/public/draco/gltf/');loader.setDRACOLoader(draco);
+const [studio,model]=await Promise.all([loader.loadAsync('/public/models/LTTV_Set2.glb'),loader.loadAsync('/public/models/LTTV_CameraMan.glb')]);
+scene.add(studio.scene);studio.scene.add(model.scene);
+const rig=model.scene.getObjectByName('Root002');const mixer=new THREE.AnimationMixer(rig);mixer.clipAction(THREE.AnimationClip.findByName(model.animations,'on_air')).play();mixer.update(0);
+const mount=cameraOperatorMount(studio.scene);const op=createCameraOperator(model.scene,mount);
+const up=new THREE.Vector3(0,1,0);const right=new THREE.Vector3(0,0,1).applyQuaternion(rig.getObjectByName('head').getWorldQuaternion(new THREE.Quaternion())).cross(up).normalize();
+window.pose=(yawDegrees,pitchDegrees,time=0)=>{
+ op.restore();mixer.setTime(time);
+ const yaw=THREE.MathUtils.degToRad(yawDegrees),pitch=THREE.MathUtils.degToRad(pitchDegrees);
+ mount.pivot.quaternion.setFromAxisAngle(up,yaw).multiply(new THREE.Quaternion().setFromAxisAngle(right,pitch)).multiply(mount.restQuaternion);
+ op.update(yaw,pitch);scene.updateMatrixWorld(true);renderer.render(scene,viewer);
+ document.querySelector('#label').textContent=`on_air · pan ${yawDegrees.toFixed(0)}° · tilt ${pitchDegrees.toFixed(0)}°`;
+ return {...op.status};
+};
+window.pose(0,0);window.ready=true;
+</script>

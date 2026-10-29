@@ -1,0 +1,27 @@
+{
+  "status": "ok",
+  "result": {
+    "file": "/Users/michellepaulson/HAIL_MARY/output/blender-on-air/news_cameraman_on_air.blend",
+    "backup": "/Users/michellepaulson/HAIL_MARY/output/blender-on-air/before_on_air.blend",
+    "validation": {
+      "action": "on_air",
+      "track": "on_air",
+      "strip": "on_air",
+      "frames": [
+        1,
+        193
+      ],
+      "duration_seconds": 8.0,
+      "fps": 24.0,
+      "max_wrist_drift_m": 5.4322857062692e-07,
+      "max_foot_drift_m": 0.0,
+      "retained_clips": [
+        "cameraMan_idle",
+        "cameraMan_clapping",
+        "cameraMan_talking"
+      ]
+    },
+    "frames_rendered": 96
+  },
+  "stdout": "Info: Saved as \"news_cameraman_on_air.blend\"\n"
+}

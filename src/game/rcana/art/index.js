@@ -10,6 +10,8 @@ import techStock from "./tech-stock.js";
 import abuela from "./abuela.js";
 import tortilla from "./tortilla.js";
 import laCampana from "./la-campana.js";
+import rosario from "./rosario.js";
+import laCalavera from "./la-calavera.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -20,4 +22,6 @@ export const RCANA_ART = {
   abuela,
   tortilla,
   "la-campana": laCampana,
+  rosario,
+  "la-calavera": laCalavera,
 };

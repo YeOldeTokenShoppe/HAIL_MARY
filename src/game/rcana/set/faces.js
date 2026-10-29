@@ -114,4 +114,24 @@ export const FACES = [
     flavor: "When it rings, the bear goes back to the hills.",
     printed: {},
   },
+  {
+    id: "rosario",
+    design: "rosary",
+    // PROVISIONAL number and rarity.
+    number: 18,
+    rarity: "Uncommon",
+    ability: "When you light a candle, draw a card.",
+    flavor: "A prayer for every bead. An answer in every hand.",
+    printed: {},
+  },
+  {
+    id: "la-calavera",
+    design: "skull",
+    // PROVISIONAL number and rarity.
+    number: 19,
+    rarity: "Uncommon",
+    ability: "Whenever a rival sells an Asset, collect 1 Hydro.",
+    flavor: "Even the dead take their cut.",
+    printed: {},
+  },
 ];

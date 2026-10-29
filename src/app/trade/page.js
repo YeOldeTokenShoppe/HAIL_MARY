@@ -4275,9 +4275,9 @@ export default function CyborgTemple() {
                 The tripod camera stands on BOTH shows — it is the prop that
                 says "studio" — and it only earns the middle of the frame when
                 its flip-out monitor is live, so `enableMonitorFeed` follows it
-                on rather than being switched per show. The lineup is the one
-                place it comes down: off air the neon frame is carrying the
-                channel and the prop would stand in front of it. */}
+                on rather than being switched per show. It stays up on the
+                lineup too (Michelle, 2026-10-28: the whole studio, minus the
+                people, before you enter it) — only the feed waits for the set. */}
             {talkShowMode && (
               <TalkShowScene
                 episode={ltTvEpisode}
@@ -4288,7 +4288,6 @@ export default function CyborgTemple() {
                 castHidden={ltTvView === 'lineup'}
                 newsMode={ltTvView === 'set' && ltTvSelection.showId === 'news'}
                 onAir={talkShowPlaying}
-                hideCameraRig={ltTvView === 'lineup'}
                 enableMonitorFeed={ltTvView === 'set'}
                 channelCards={ltTvView === 'lineup' || ltTvSelection.showId === 'news' ? ltTvChannelCards : null}
                 onPlaybackReady={handleTalkShowPlaybackReady}
