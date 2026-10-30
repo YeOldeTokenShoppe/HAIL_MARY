@@ -96,8 +96,7 @@ const MOBILE_SCENE = 'laptop';
 // redundant. Flip to true to bring it back (e.g. when multi-case switching ships).
 const SHOW_CASE_HUD_STRIP = false;
 
-// How far the viewer may dolly out on LT TV — the set shot sits at ~3.7, so
-// this leaves room to look around without zooming the stage into the void.
+// Default orbit envelope; the wider news studio entry has its own limit.
 const LT_TV_MAX_DISTANCE = 6;
 
 const HOST_SITEPAL_CONFIG = {
@@ -692,10 +691,11 @@ function GpuMemoryProbe() {
 // three.js compiles a material's shader program the first time that mesh is
 // actually rendered. With an orbiting camera that means new programs compile
 // mid-flight as meshes enter the frustum — each one a 20-50ms stall on a
-// tablet, which is exactly the "not smooth as it rotates" hitch. compileAsync
-// uses KHR_parallel_shader_compile where available, so this doesn't block the
-// frame; it just pays the cost during the load screen instead of during the
-// user's first look around.
+// tablet, which is exactly the "not smooth as it rotates" hitch. Start the
+// programs during the load screen instead of during the first look around.
+// We don't await readiness here, so use compile (also compileAsync's first
+// step). Its async readiness poll can outlive a material replaced by a screen
+// painter and throw from a timer after the material's program is disposed.
 //
 // Re-runs on templeEpoch so a model swap (the LT TV round trip) recompiles for
 // the new meshes rather than re-hitching on the way back.
@@ -708,10 +708,7 @@ function PrecompileScene({ ready, epoch }) {
     const t = setTimeout(() => {
       if (cancelled) return;
       try {
-        const done = gl.compileAsync
-          ? gl.compileAsync(scene, camera)
-          : Promise.resolve(gl.compile(scene, camera));
-        Promise.resolve(done).catch(() => {});
+        gl.compile(scene, camera);
       } catch (e) {
         /* non-fatal: worst case we compile lazily as before */
       }
@@ -852,6 +849,14 @@ function CameraControlsRig({
     c.maxDistance = focusPose?.maxDistance ?? 20;
     if (!focusPose) return;
     introCompleteRef.current = true;
+    // During the news broadcast, the scene owns the camera, including its
+    // slow opening move. A Play-triggered render must not reset that move.
+    if (focusPose.directed) return;
+    // Re-entering the studio must not keep a broadcast close-up's lens.
+    if (focusPose.fov != null && c.camera.isPerspectiveCamera) {
+      c.camera.fov = focusPose.fov;
+      c.camera.updateProjectionMatrix();
+    }
     const p = focusPose.position;
     const t = focusPose.target;
     c.setLookAt(p[0], p[1], p[2], t[0], t[1], t[2], true);
@@ -1447,6 +1452,16 @@ export default function CyborgTemple() {
   const [ltTvChapter, setLtTvChapter] = useState(null);
   const handleTalkShowChapter = useCallback((chapter) => {
     setLtTvChapter(chapter);
+  }, []);
+  // A direct LT TV link never mounts CyborgTempleScene. The studio must
+  // release the initial loader itself, without waiting for SitePal voices
+  // or enabling the temple's ticker and screen painters.
+  const handleTalkShowLoad = useCallback(() => {
+    setModelLoaded(true);
+    setLoadingProgress(100);
+    setLoadingMessage("Ready!");
+    setSceneReady(true);
+    setIsSceneLoading(false);
   }, []);
   const handleTalkShowPlaybackReady = useCallback((ready, status) => {
     setTalkShowAudioReady(ready);
@@ -2904,17 +2919,22 @@ export default function CyborgTemple() {
     [isMobileView],
   );
   const cameraInitialTarget = useMemo(() => [0, -0.5, 0], []);
-  // TALK SHOW composed shot — a fixed front-facing framing of the two seated
-  // characters (Demon left, Monk right) with the neon frame behind them.
-  // Derived from the model's world layout (see TalkShowScene). Null unless the
-  // tab is active, so the rig only snaps when talk show is on.
-  // The landing uses an elevated three-quarter establishing shot of the
-  // news desk, program screen, and diagonal studio lights, right of the console. Either way the viewer can
-  // orbit and dolly, but not pull back past LT_TV_MAX_DISTANCE into the void.
+  // Composed entry views; viewers can still orbit and dolly around the set.
+  // News opens wide from the side so the cameraman doesn't obscure the desk.
+  // Play lets the scene director move from that view toward the anchors.
   const talkShowPose = useMemo(() => {
     if (!talkShowMode) return null;
     if (ltTvView === 'set' && ltTvSelection.showId === 'news') {
-      return { position: [-0.8, 0.6, 4.8], target: [-0.8, -0.1, -0.2], maxDistance: LT_TV_MAX_DISTANCE };
+      // Keep the closer framing on a narrow mobile screen.
+      if (isMobileView) {
+        return { position: [-0.8, 0.6, 4.8], target: [-0.8, -0.1, -0.2], maxDistance: LT_TV_MAX_DISTANCE };
+      }
+      return {
+        position: [-4, 2.3, 6.7], target: [-0.3, -0.4, 0.4], fov: 50,
+        // Leave room for the ~7.8-unit entry distance throughout the opening.
+        maxDistance: 8.5,
+        directed: talkShowPlaying,
+      };
     }
     if (ltTvView === 'set') {
       // Playback collapses the console: center the guests and dolly in ~15%.
@@ -2925,7 +2945,7 @@ export default function CyborgTemple() {
       return { position: [-0.65, 0.4, 5.8], target: [-0.65, -0.5, 0.1], maxDistance: LT_TV_MAX_DISTANCE };
     }
     return { position: [-4.7744, 2.004, 1.9736], target: [-0.8, -0.65, -0.4], maxDistance: LT_TV_MAX_DISTANCE };
-  }, [talkShowMode, ltTvView, ltTvSelection.showId, talkShowPlaying]);
+  }, [talkShowMode, ltTvView, ltTvSelection.showId, talkShowPlaying, isMobileView]);
   // Tightened framing: dolly the resting shot ~15% closer so the workstation
   // fills more of the frame and the empty sky band above the monitors crops
   // down. Angle/target unchanged — same approved composition, just nearer.
@@ -3192,6 +3212,9 @@ export default function CyborgTemple() {
 
   // Comprehensive loading coordination
   useEffect(() => {
+    // The studio reveals itself when its models commit. Its direct links
+    // must not inherit the temple's ticker/font delays and reveal timers.
+    if (talkShowMode) return;
     // console.log('🔄 Loading state check:', {
     //   fontLoaded,
     //   mounted,
@@ -3236,7 +3259,7 @@ export default function CyborgTemple() {
       
       return () => clearTimeout(timer);
     }
-  }, [fontLoaded, mounted, modelLoaded, tickerLoaded, tickerReady, isMobileView, modelLoadStartTime]);
+  }, [fontLoaded, mounted, modelLoaded, tickerLoaded, tickerReady, isMobileView, talkShowMode, modelLoadStartTime]);
 
   // Fallback timeout to prevent infinite loading
   useEffect(() => {
@@ -4068,13 +4091,13 @@ export default function CyborgTemple() {
         >
           <fog attach="fog" args={context80sMode ? ['#1a0033', 50, 300] : ['#000000', 20, 200]} />
           <Suspense fallback={null}>
-            {/* The page's flat ambient, which is most of the light on the
-                canvas. It eases down between LT TV episodes so the studio
-                going dark at the end of a show is something you can see;
-                everywhere else it is the 1.5 it has always been. */}
-            <HouseAmbient dimmed={talkShowMode && !talkShowPlaying} />
+            {/* LT TV has its own ambient levels; the regular trade scene
+                retains its original brightness. */}
+            <HouseAmbient studio={talkShowMode} dimmed={talkShowMode && !talkShowPlaying} />
             <GpuMemoryProbe />
-            <PrecompileScene ready={modelLoaded} epoch={templeEpoch} />
+            {/* The studio's load signal clears the page loader, but the
+                temple's warm-up pass still waits for the temple itself. */}
+            <PrecompileScene ready={!talkShowMode && templeLoadCountRef.current > 0} epoch={templeEpoch} />
             <TempleWatch onChange={setTempleShowing} />
             <PostProcessingEffects is80sMode={context80sMode} isMobile={isMobileView} />
             
@@ -4290,6 +4313,7 @@ export default function CyborgTemple() {
                 onAir={talkShowPlaying}
                 enableMonitorFeed={ltTvView === 'set'}
                 channelCards={ltTvView === 'lineup' || ltTvSelection.showId === 'news' ? ltTvChannelCards : null}
+                onLoad={handleTalkShowLoad}
                 onPlaybackReady={handleTalkShowPlaybackReady}
                 onPlaybackStateChange={handleTalkShowPlaybackState}
                 onChapterChange={handleTalkShowChapter}

@@ -113,6 +113,8 @@ export function toSlateRecord(episode) {
       Object.entries(episode.cast || {}).map(([actor, c]) => [actor, c.sitepalAudio]),
     );
     record.lineStarts = timing.lineStarts;
+    // Head turns end with the spoken line, before the gap or the reply.
+    if (Array.isArray(timing.lineEnds)) record.lineEnds = timing.lineEnds;
     record.dialogueEnd = timing.durationSeconds;
     // SitePal will not play a clip over 90 seconds, so an episode of any real
     // length went up as several and the set plays them in order. Carried only

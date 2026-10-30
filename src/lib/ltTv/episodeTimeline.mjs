@@ -371,15 +371,32 @@ export function episodeChapters(record) {
     .sort((a, b) => a.at - b.at);
 }
 
-/** Shows whose hosts read every line played to the room down the lens. */
+/** Shows whose cast faces the viewer except during direct exchanges. */
 export const READS_TO_CAMERA = new Set(["news"]);
+const NEWS_GLANCE_SECONDS = 2;
+const NEWS_GLANCE_ANGLES = [45, 75];
+
+/** The active, brief co-anchor glance, including its authored turn limit. */
+export function conversationGlanceAt(timeline, actor, elapsed) {
+  for (const gaze of timeline?.gazes || []) {
+    if (!gaze.speakerLook || elapsed < gaze.startAt || elapsed >= gaze.endAt) continue;
+    if (gaze.speaker === actor) return gaze;
+  }
+  return null;
+}
+
+/** The co-anchor this actor is currently glancing toward, otherwise null. */
+export function conversationPartnerAt(timeline, actor, elapsed) {
+  return conversationGlanceAt(timeline, actor, elapsed)?.listener ?? null;
+}
 
 /**
  * How much `actor` is looking down the lens at `elapsed`, 0 to 1. A look
- * lets go over the last 0.6s of its line, so the head is already on its way
- * back when the next line starts.
+ * tied to a line lets go over its last 0.6s. News anchors default to the
+ * viewer, briefly turning away at the start of their own addressed line.
  */
 export function cameraLookAt(timeline, actor, elapsed) {
+  if (conversationPartnerAt(timeline, actor, elapsed)) return 0;
   let weight = 0;
   for (const look of timeline?.toCamera || []) {
     if (look.actor !== actor || elapsed < look.startAt || elapsed >= look.endAt) continue;
@@ -407,6 +424,7 @@ export function buildEpisodeTimeline(record, { reactionDurations = {} } = {}) {
   const speakers = record.speakers || [];
   const audienceLines = new Set(record.audienceLines || []);
   const cast = episodeCast(record);
+  const readsToCamera = READS_TO_CAMERA.has(record.showId);
   // With two in the room the listener is simply the other chair, so a record
   // need not say. WITH THREE IT HAS TO: `opposite` would pick whichever of the
   // other two comes first in the cast, and everyone would turn the same way all
@@ -417,44 +435,53 @@ export function buildEpisodeTimeline(record, { reactionDurations = {} } = {}) {
     opposite[actor] = cast.find((other) => other !== actor) || null;
   });
 
-  // Who turns to face whom. A line played to the room turns nobody.
+  // A news anchor glances over for at most two seconds of their addressed line,
+  // or until the speech ends if sooner. Each anchor alternates 45° and 75°
+  // limits; choosing here keeps the turn stable during playback, seeks/replays.
+  // Older records without line ends fall back to the next line's start.
+  // Other shows retain their listener-only cues.
   const gazes = [];
+  const glanceCounts = new Map();
   speakers.forEach((speaker, line) => {
     if (!speaker || audienceLines.has(line)) return;
     const listener = record.listeners?.[line] ?? opposite[speaker];
     if (!listener) return;
+    const nextLine = lineStarts[line + 1] ?? dialogueEnd;
+    const recordedEnd = record.lineEnds?.[line];
+    const spokenEnd = Number.isFinite(recordedEnd) && recordedEnd >= lineStarts[line]
+      ? Math.min(recordedEnd, nextLine) : nextLine;
+    const glanceIndex = glanceCounts.get(speaker) || 0;
+    if (readsToCamera) glanceCounts.set(speaker, glanceIndex + 1);
     gazes.push({
       line,
+      speaker,
       listener,
-      startAt: lineStarts[line] + GAZE_LEAD_IN,
-      endAt: (lineStarts[line + 1] ?? dialogueEnd) - GAZE_RELEASE,
+      speakerLook: readsToCamera,
+      ...(readsToCamera ? { yawDegrees: NEWS_GLANCE_ANGLES[glanceIndex % NEWS_GLANCE_ANGLES.length] } : {}),
+      startAt: lineStarts[line] + (readsToCamera ? 0 : GAZE_LEAD_IN),
+      endAt: readsToCamera ? Math.min(spokenEnd, lineStarts[line] + NEWS_GLANCE_SECONDS) : nextLine - GAZE_RELEASE,
     });
   });
 
-  // Who looks down the lens, and when. Every show's opener is played to the
-  // viewer, so whoever speaks first holds the camera until the second line
-  // lands (from the very start, lead-in included). On the news the anchors
-  // READ to camera: every line played to the room is also delivered to the
-  // lens, the way a newsreader does it. Markets & Morality keeps it to the
-  // opener — two people arguing across a table do not keep checking the lens.
+  // Both news anchors default to the viewer, including the lead-in and closing
+  // tail; cameraLookAt yields to direct exchanges. The scene gates these looks
+  // on playback.running, so stopping still releases them to intermission.
+  // Other shows retain the first speaker's look during the opener only.
   const toCamera = [];
-  if (speakers[0]) {
+  if (readsToCamera) {
+    cast.forEach((actor) => {
+      toCamera.push({
+        actor,
+        startAt: Number.NEGATIVE_INFINITY,
+        endAt: Number.POSITIVE_INFINITY,
+      });
+    });
+  } else if (speakers[0]) {
     toCamera.push({
       line: 0,
       actor: speakers[0],
       startAt: Number.NEGATIVE_INFINITY,
       endAt: lineStarts[1] ?? dialogueEnd,
-    });
-  }
-  if (READS_TO_CAMERA.has(record.showId)) {
-    speakers.forEach((speaker, line) => {
-      if (line === 0 || !speaker || !audienceLines.has(line)) return;
-      toCamera.push({
-        line,
-        actor: speaker,
-        startAt: lineStarts[line],
-        endAt: lineStarts[line + 1] ?? dialogueEnd,
-      });
     });
   }
 
@@ -477,6 +504,9 @@ export function buildEpisodeTimeline(record, { reactionDurations = {} } = {}) {
   // name a LINE, which is exactly what the shot list is walking.
   const chapterLines = new Set(chapters.map((chapter) => chapter.line));
   const shots = buildShots(lineStarts, speakers, audienceLines, chapterLines, dialogueEnd);
+  // The news opening moves from the viewer's current pose into the pair.
+  // Hold that composition until the next scheduled shot after the move lands.
+  if (readsToCamera) shots[0].framing = "two";
 
   return {
     id: record.id,

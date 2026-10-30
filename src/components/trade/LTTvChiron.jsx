@@ -3,16 +3,15 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import css from "styled-jsx/css";
 
-// LT TV on-air graphics: the cable-news lower third (spinning logo cube,
+// LT TV on-air graphics: the cable-news lower third (spinning globe mark,
 // headline bar, scrolling ticker with a quote box) laid over the talk-show
 // set. Structure after Jon Kantner's "Fox News TV Display" pen (MIT,
 // codepen.io/jkantner/pen/mPzpEa), rebranded — no network marks ship here.
 //
 // The headline bar and the ticker read the episode's own graphics when the
 // record carries them (`graphics.headline`, `graphics.ticker` — the news
-// pipeline writes both), the quote box is the live RL80 price (hidden rather
-// than faked when it fails to load), and the cube's clock face is the viewer's
-// local time.
+// pipeline writes both) and the quote box is the live RL80 price (hidden
+// rather than faked when it fails to load).
 //
 // `chapter` is the part of the show that is on air now, passed down from the
 // set (which owns the clock). A newscast's lower third changes with the
@@ -21,8 +20,8 @@ import css from "styled-jsx/css";
 // anything staged before they existed — sits on `graphics.headline` for the
 // whole episode, which is what the bar did before.
 //
-// `mode`: "news" is the full package; "logo" keeps only the spinning cube, like
-// a channel's corner logo, for non-news shows and the lineup. The cube holds
+// `mode`: "news" is the full package; "logo" keeps only the spinning globe, like
+// a channel's corner logo, for non-news shows and the lineup. The globe holds
 // its place in both, so news slides its bar and ticker in beside it.
 
 const TICKER_PX_PER_SEC = 80;
@@ -55,24 +54,6 @@ function Price({ value }) {
   return "$" + value.toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: value < 1 ? 4 : 2 });
 }
 
-function useClock() {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    // Tick on the minute boundary — the face only shows h:mm.
-    let interval;
-    const timeout = setTimeout(() => {
-      setNow(new Date());
-      interval = setInterval(() => setNow(new Date()), 60_000);
-    }, 60_000 - (Date.now() % 60_000) + 50);
-    return () => {
-      clearTimeout(timeout);
-      clearInterval(interval);
-    };
-  }, []);
-  const h = now.getHours();
-  return { hm: `${h % 12 || 12}:${String(now.getMinutes()).padStart(2, "0")}`, ampm: h < 12 ? "AM" : "PM" };
-}
-
 function useRl80Price(enabled) {
   const [data, setData] = useState(null);
   useEffect(() => {
@@ -98,22 +79,21 @@ function useRl80Price(enabled) {
   return data;
 }
 
-// The network mark, printed on all four faces of the glass cube like the
-// source's logo.
-const LOGO_FACE = (
-  <div className="ltc-net">
-    <span>LT</span>
-    <span>TV</span>
-  </div>
-);
+// The network mark: a globe wrapped in a ribbon, the news-channel cliché. The
+// ribbon is a ring of flat segments, one letter each, stood up around the
+// globe in CSS 3D; the globe itself is a still disc at the ring's centre
+// with the land cut out of it (an equirectangular Natural Earth land layer
+// used as a mask) and the night-side city lights laid over the holes. A disc at z=0 hides exactly the half of the ring that a sphere of
+// the same silhouette would, so no front/back split is needed. Blank
+// segments space the words; the count must match --ltc-ring-n in the CSS.
+const RIBBON = ["L", "T", "T", "V", "", "", "L", "T", "T", "V", "", "", "L", "T", "T", "V", "", ""];
 
-export default function LTTvChiron({ episode, mode = "news", status = "Replay", chapter = null }) {
+export default function LTTvChiron({ episode, mode = "news", chapter = null }) {
   const news = mode === "news";
   const trackRef = useRef(null);
   const headlineRef = useRef(null);
   const [navHeight, setNavHeight] = useState(64);
   const [tickerSeconds, setTickerSeconds] = useState(60);
-  const clock = useClock();
   const rl80 = useRl80Price(news);
   const rl80Price = Number.isFinite(rl80?.price) ? rl80.price : null;
   const headline = chapter?.headline || episode?.graphics?.headline || episode.title;
@@ -206,26 +186,17 @@ export default function LTTvChiron({ episode, mode = "news", status = "Replay", 
       <div className="ltc-main">
         <div className="ltc-logo" aria-hidden="true">
           <div className="ltc-box-top">
-            <div className="ltc-cube">
-              <div className="ltc-face ltc-f-front">{LOGO_FACE}</div>
-              <div className="ltc-face ltc-f-right">{LOGO_FACE}</div>
-              <div className="ltc-face ltc-f-back">{LOGO_FACE}</div>
-              <div className="ltc-face ltc-f-left">{LOGO_FACE}</div>
-            </div>
-          </div>
-          {/* Same face pattern as the source's channel / LIVE / channel / clock.
-              Text sits in a span so the face itself keeps the cube's font-size —
-              the translateZ is in em. */}
-          <div className="ltc-box-bttm">
-            <div className="ltc-cube">
-              <div className="ltc-face ltc-f-front"><span>EP {episode.number}</span></div>
-              <div className="ltc-face ltc-f-right"><span>{status}</span></div>
-              <div className="ltc-face ltc-f-back"><span>EP {episode.number}</span></div>
-              <div className="ltc-face ltc-f-left">
-                <span>
-                  {clock.hm}
-                  <small>{clock.ampm}</small>
-                </span>
+            <div className="ltc-globe-rig">
+              <div className="ltc-globe-glow" />
+              <div className="ltc-globe-land" />
+              <div className="ltc-globe" />
+              <div className="ltc-globe-lights" />
+              <div className="ltc-ring">
+                <div className="ltc-ring-spin">
+                  {RIBBON.map((ch, i) => (
+                    <span key={i} className="ltc-seg" style={{ "--i": i }}><b>{ch}</b></span>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -272,21 +243,45 @@ export default function LTTvChiron({ episode, mode = "news", status = "Replay", 
 const styles = css.global`
   .ltc {
     /* The source's broadcast roles in the set's inks: its red bar is fuchsia,
-       its blue glass is cyan, its green quote is the console's phosphor.
-       Kept dark enough for white type — cube glass composites to ~#0d6d86
-       (~6:1 behind the mark), the bar is ~11:1 under the headline, and the
-       phosphor is ~3.4:1 under the price (the source's #0a0 is ~3.1:1). */
-    --ltc-cube: rgba(16, 130, 160, 0.6);
-    --ltc-cube-edge: #8feeff;
+       its blue glass is the globe's cyan sea, its green quote is the
+       console's phosphor. Kept dark enough for white type — the bar is ~11:1
+       under the headline, and the phosphor is ~3.4:1 under the price (the
+       source's #0a0 is ~3.1:1). */
+    --ltc-sea: #0e6f8e;
+    --ltc-sea-lit: #3fbde0;
+    --ltc-sea-deep: #052a3a;
+    /* Land colour, seen through the cut-out continents. */
+    --ltc-land-lit: #3b2366;
+    --ltc-land: #170b2c;
     --ltc-bar: #6e0f5a;
     --ltc-bar-deep: #2a0626;
     --ltc-bar-hot: #b8168f;
     --ltc-bar-rule: #ffa8ec;
     --ltc-up: #12a05c;
     --ltc-down: #b3123a;
-    /* A var keeps "7.6em" as text and resolves it on the element that uses
-       it — only use it where font-size is still the .ltc base. */
-    --ltc-cube-w: 7.6em;
+    /* A var keeps its em as text and resolves it on the element that uses
+       it — only use these where font-size is still the .ltc base. */
+    --ltc-logo-w: 9em;
+    --ltc-globe-d: 7.6em;
+    /* Lifted off the box's centre so the mark rides up over the bar's top
+       edge like a corner logo. */
+    --ltc-globe-y: -1em;
+    /* The globe's axis leans like a desk globe's. */
+    --ltc-globe-lean: -18deg;
+    /* A touch taller than wide, stretched in screen space (after the
+       lean) so the long axis stands upright. Shared by the globe, its
+       lights and its glow. */
+    --ltc-globe-sy: 1.07;
+    --ltc-ring-r: 4.45em;
+    --ltc-ring-n: 18;
+    --ltc-ring-t: 24s;
+    /* One turn of the globe. The land mask and the lights scroll together,
+       leftward — against the ring, whose near side runs right. */
+    --ltc-globe-t: 120s;
+    /* Segment pitch around the ring: 2·r·tan(180°/n). The letters have no
+       band behind them, so they need not tile edge to edge. */
+    --ltc-seg-w: 1.57em;
+    --ltc-seg-h: 2.6em;
 
     position: fixed;
     left: 0;
@@ -308,97 +303,181 @@ const styles = css.global`
     width: 100%;
   }
 
-  /* ── Logo cube ─────────────────────────────────────────────────────
-     Proportions are the source's scaled from its 110px cube to 7.6em:
-     80px top box → 5.5em, 30px bottom → 2.1em, 1200px perspective → 83em,
-     perspective origin 100px down → 6.9em. */
+  /* ── Logo globe ─────────────────────────────────────────────────────
+     The column the source gave its logo cube (7.6em tall) now holds the
+     globe mark alone, which fills it and rides up past its top edge. */
   .ltc-logo {
     flex: 0 0 auto;
     width: max(15%, 11em);
     height: 7.6em;
   }
 
-  .ltc-box-top,
-  .ltc-box-bttm {
-    width: var(--ltc-cube-w);
-    margin-left: auto;
-    margin-right: 1.8em;
-    perspective: 83em;
-    perspective-origin: 50% 6.9em;
-  }
-
   .ltc-box-top {
-    height: 5.5em;
+    width: var(--ltc-logo-w);
+    height: 100%;
+    margin-left: auto;
+    margin-right: 1.4em;
+    /* A fairly close eye centred on the globe, so the ribbon's near side
+       reads a touch larger than its far side. */
+    perspective: 40em;
+    perspective-origin: 50% 50%;
   }
 
-  .ltc-box-bttm {
-    height: 2.1em;
-    transform: scale(1, 0.85);
-    transform-origin: top;
-  }
-
-  .ltc-cube {
+  .ltc-globe-rig {
     position: relative;
-    width: var(--ltc-cube-w);
+    width: 100%;
     height: 100%;
     transform-style: preserve-3d;
   }
 
-  .ltc-face {
+  /* An outer glow behind the globe. Its own layer, since the globe's mask
+     clips anything outside the disc; hollow inside the rim so the cut-out
+     land still opens onto the set and not onto the glow. Sized 2.4× the
+     disc and the gradient ray is closest-side (half the width — the default
+     farthest-corner ray is 1.41× longer and put the glow's inner edge well
+     inside the globe, a dark orb across the continents), so the rim falls
+     at 50/2.4 ≈ 41.7%; the light starts just outside it and falls off over
+     the rest. */
+  .ltc-globe-glow {
     position: absolute;
-    inset: 0;
+    left: 50%;
+    top: 50%;
+    width: calc(var(--ltc-globe-d) * 2.4);
+    height: calc(var(--ltc-globe-d) * 2.4);
+    margin: calc(var(--ltc-globe-d) * -1.2 + var(--ltc-globe-y)) 0 0 calc(var(--ltc-globe-d) * -1.2);
+    border-radius: 50%;
+    transform: scaleY(var(--ltc-globe-sy));
+    background: radial-gradient(
+      circle closest-side,
+      rgba(63, 189, 224, 0) 41%,
+      rgba(90, 205, 235, 0.45) 42.5%,
+      rgba(63, 189, 224, 0.26) 50%,
+      rgba(63, 189, 224, 0.12) 62%,
+      rgba(63, 189, 224, 0.04) 76%,
+      rgba(63, 189, 224, 0) 92%
+    );
+  }
+
+  /* A coloured disc under the globe: the land is cut out of the globe, so
+     this is what shows through the continents. Same geometry as the globe
+     (size, lift, lean, stretch); lit from the same corner. */
+  .ltc-globe-land {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--ltc-globe-d);
+    height: var(--ltc-globe-d);
+    margin: calc(var(--ltc-globe-d) / -2 + var(--ltc-globe-y)) 0 0 calc(var(--ltc-globe-d) / -2);
+    border-radius: 50%;
+    transform: scaleY(var(--ltc-globe-sy)) rotate(var(--ltc-globe-lean));
+    background: radial-gradient(circle at 32% 30%, var(--ltc-land-lit), var(--ltc-land) 70%);
+  }
+
+  /* The globe: ocean in the set's cyan, lit from the upper left, with a
+     specular highlight and a shadowed limb. The land is cut out of it — the
+     land PNG is a mask subtracted from the full disc, so the continents are
+     holes onto the set behind. The 2:1 map is sized 240% × 120% of the disc
+     (aspect kept) and pinned to the top, so the disc shows roughly 90°N
+     down to 60°S and Antarctica, the band along the map's foot, stays below
+     the rim. The x offset centres the mid-Atlantic (~45°W), so the Americas
+     sit on the near side with Europe and Africa at the right limb. The
+     mask clips to the box, so no outer drop shadow here. */
+  .ltc-globe {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--ltc-globe-d);
+    height: var(--ltc-globe-d);
+    margin: calc(var(--ltc-globe-d) / -2 + var(--ltc-globe-y)) 0 0 calc(var(--ltc-globe-d) / -2);
+    border-radius: 50%;
+    transform: scaleY(var(--ltc-globe-sy)) rotate(var(--ltc-globe-lean));
+    background-image:
+      radial-gradient(circle at 30% 26%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 38%),
+      radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0) 58%, rgba(2, 20, 30, 0.75) 100%),
+      radial-gradient(circle at 32% 30%, var(--ltc-sea-lit), var(--ltc-sea) 48%, var(--ltc-sea-deep) 100%);
+    box-shadow: inset -0.5em -0.45em 0.9em rgba(0, 10, 20, 0.55);
+    -webkit-mask-image: linear-gradient(#000, #000), url("/images/lttv-globe-land-px.png");
+    -webkit-mask-size: 100% 100%, 240% 120%;
+    -webkit-mask-repeat: no-repeat, repeat-x;
+    -webkit-mask-position: 0 0, calc(var(--ltc-globe-d) * -0.42) 0;
+    -webkit-mask-composite: xor;
+    mask-image: linear-gradient(#000, #000), url("/images/lttv-globe-land-px.png");
+    mask-size: 100% 100%, 240% 120%;
+    mask-repeat: no-repeat, repeat-x;
+    mask-position: 0 0, calc(var(--ltc-globe-d) * -0.42) 0;
+    mask-composite: exclude;
+    animation: ltc-globe-turn var(--ltc-globe-t) linear infinite;
+  }
+
+  /* City lights over the cut-out land: NASA's night-side lights lifted out
+     of their map and resampled into the land mask's frame (see
+     public/images/lttv-globe-lights-px.png's provenance in memory), drawn on a
+     disc that sits exactly on the globe with the same map sizing, offset
+     and lean, so each light lands on its continent. */
+  .ltc-globe-lights {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--ltc-globe-d);
+    height: var(--ltc-globe-d);
+    margin: calc(var(--ltc-globe-d) / -2 + var(--ltc-globe-y)) 0 0 calc(var(--ltc-globe-d) / -2);
+    border-radius: 50%;
+    transform: scaleY(var(--ltc-globe-sy)) rotate(var(--ltc-globe-lean));
+    background-image: url("/images/lttv-globe-lights-px.png");
+    background-size: 240% 120%;
+    background-repeat: repeat-x;
+    background-position: calc(var(--ltc-globe-d) * -0.42) 0;
+    filter: drop-shadow(0 0 1px rgba(255, 220, 140, 0.9));
+    animation: ltc-lights-turn var(--ltc-globe-t) linear infinite;
+  }
+
+  /* The ribbon: letters only, circling the globe's middle on a ring that is
+     nearly level with a slight dip toward the viewer, then spun. Each
+     segment stands at its angle, face out, at the ring's radius. */
+  .ltc-ring {
+    position: absolute;
+    left: 50%;
+    top: calc(50% + var(--ltc-globe-y));
+    width: 0;
+    height: 0;
+    transform-style: preserve-3d;
+    transform: rotateZ(-5deg) rotateX(-9deg);
+  }
+
+  .ltc-ring-spin {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    transform-style: preserve-3d;
+    animation: ltc-ring-turn var(--ltc-ring-t) linear infinite;
+  }
+
+  .ltc-seg {
+    position: absolute;
+    left: calc(var(--ltc-seg-w) / -2);
+    top: calc(var(--ltc-seg-h) / -2);
+    width: var(--ltc-seg-w);
+    height: var(--ltc-seg-h);
     display: grid;
     place-items: center;
+    transform: rotateY(calc(var(--i) * (360deg / var(--ltc-ring-n)))) translateZ(var(--ltc-ring-r));
+    /* A letter is drawn only from its front: once it swings past side-on it
+       is culled, so nothing shows through the cut-out land from behind. */
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
 
-  .ltc-f-front { transform: translateZ(calc(var(--ltc-cube-w) / 2)); }
-  .ltc-f-right { transform: rotateY(90deg) translateZ(calc(var(--ltc-cube-w) / 2)); }
-  .ltc-f-back  { transform: rotateY(180deg) translateZ(calc(var(--ltc-cube-w) / 2)); }
-  .ltc-f-left  { transform: rotateY(-90deg) translateZ(calc(var(--ltc-cube-w) / 2)); }
-
-  .ltc-box-top .ltc-cube {
-    animation: ltc-spin 60s linear infinite;
-  }
-
-  .ltc-box-top .ltc-face {
-    background: var(--ltc-cube);
-    border: max(1px, 0.15em) solid var(--ltc-cube-edge);
-    box-sizing: border-box;
-    overflow: hidden;
-  }
-
-  /* Heavy white mark filling the face, stretched wide like the source's
-     logo (the pen scales its type the same way). */
-  .ltc-net {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    font-family: "Arial Black", "Helvetica Neue", Arial, sans-serif;
-    font-size: 2.55em;
-    font-weight: 900;
-    line-height: 0.8;
-    letter-spacing: -0.01em;
-    transform: scaleX(1.3);
-  }
-
-  .ltc-box-bttm .ltc-cube {
-    animation: ltc-spin 15s cubic-bezier(0.25, 1, 0.45, 1) infinite;
-    text-shadow: 0 0 4px #000;
-  }
-
-  .ltc-box-bttm .ltc-face {
-    background: radial-gradient(var(--ltc-bar), var(--ltc-bar-deep));
-  }
-
-  .ltc-box-bttm .ltc-face > span {
-    font-size: 1.6em;
-    font-weight: 700;
-    white-space: nowrap;
-  }
-
-  .ltc-box-bttm small {
-    margin-left: 0.15em;
-    font-size: 0.67em;
+  /* The letter is sized on a child: the segment's own em must stay the
+     .ltc base, or the em-valued ring radius and pitch scale with it. */
+  .ltc-seg b {
+    color: #fff;
+    font-family: "Bebas Neue", "Helvetica Neue", Arial, sans-serif;
+    font-size: 2.7em;
+    font-weight: 400;
+    line-height: 1;
+    text-shadow: 0 0.06em 0.1em rgba(0, 0, 0, 0.7), 0 0 0.3em rgba(0, 0, 0, 0.5);
   }
 
   /* ── Headline bar ──────────────────────────────────────────────────── */
@@ -578,12 +657,28 @@ const styles = css.global`
     animation-play-state: paused;
   }
 
-  @keyframes ltc-spin {
-    0% { transform: rotateY(0deg); }
-    25% { transform: rotateY(90deg); }
-    50% { transform: rotateY(180deg); }
-    75% { transform: rotateY(270deg); }
-    100% { transform: rotateY(360deg); }
+  @keyframes ltc-ring-turn {
+    from { transform: rotateY(0deg); }
+    to { transform: rotateY(360deg); }
+  }
+
+  /* A full turn is one map width (240% of the disc = 2.4d) of scroll,
+     leftward from the resting offset. Only the land layer (second) moves;
+     the full-disc layer holds at 0. */
+  @keyframes ltc-globe-turn {
+    from {
+      -webkit-mask-position: 0 0, calc(var(--ltc-globe-d) * -0.42) 0;
+      mask-position: 0 0, calc(var(--ltc-globe-d) * -0.42) 0;
+    }
+    to {
+      -webkit-mask-position: 0 0, calc(var(--ltc-globe-d) * -2.82) 0;
+      mask-position: 0 0, calc(var(--ltc-globe-d) * -2.82) 0;
+    }
+  }
+
+  @keyframes ltc-lights-turn {
+    from { background-position: calc(var(--ltc-globe-d) * -0.42) 0; }
+    to { background-position: calc(var(--ltc-globe-d) * -2.82) 0; }
   }
 
   @keyframes ltc-crawl {
@@ -611,7 +706,9 @@ const styles = css.global`
 
   @media (prefers-reduced-motion: reduce) {
     .ltc,
-    .ltc-cube,
+    .ltc-ring-spin,
+    .ltc-globe,
+    .ltc-globe-lights,
     .ltc-event p,
     .ltc-track {
       animation: none !important;

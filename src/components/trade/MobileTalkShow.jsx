@@ -316,7 +316,7 @@ export default function MobileTalkShow({ onExit }) {
           <StageCamera newsMode={newsMode} />
           {/* Same house-lights cue as the desktop set: the room goes down
               between episodes and comes up when one starts. */}
-          <HouseAmbient dimmed={!playing} />
+          <HouseAmbient studio dimmed={!playing} />
           <TalkShowScene
             episode={selectedEpisode}
             newsMode={newsMode}

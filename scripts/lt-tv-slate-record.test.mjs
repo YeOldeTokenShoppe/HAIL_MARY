@@ -115,10 +115,12 @@ const timeline = buildEpisodeTimeline(recorded, { reactionDurations: {} });
 ok("a timeline builds", Boolean(timeline));
 check("every cue survived", timeline.cues.length, record.cues.length);
 check(
-  "one listener turn per line aimed at the other host",
+  "news anchors turn to each other for every direct-address line",
   timeline.gazes.length,
   directAddress,
 );
+ok("news turns identify the speaking anchor and their colleague", timeline.gazes.every(g => g.speakerLook && g.speaker && g.listener));
+check("both recorded anchors receive camera tracking", timeline.toCamera.map(look => look.actor), Object.keys(recorded.audio));
 ok("no cue lands after its line is over", timeline.cues.every((c) => {
   const next = lineStarts[c.line + 1] ?? recorded.dialogueEnd;
   return c.at < next;
@@ -193,6 +195,7 @@ console.log("\nThe command line, which is the refresh after a recording:");
   );
   ok("the slate record it wrote is playable", episodeIsPlayable(written));
   ok("and it carries the recorded timing", written.lineStarts.length === lines.length);
+  check("spoken line ends survive for gaze timing", written.lineEnds, staged.timing.lineEnds);
   ok("the leadIn tuned by ear survives", written.leadIn === 3);
   check("the production record is left exactly as it was", await readFile(recordPath, "utf8"), before);
 

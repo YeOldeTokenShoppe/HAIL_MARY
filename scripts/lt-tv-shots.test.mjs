@@ -24,6 +24,8 @@ import { resolve, join } from "node:path";
 import {
   buildEpisodeTimeline,
   cameraLookAt,
+  conversationGlanceAt,
+  conversationPartnerAt,
   shotAt,
   shotSubjectAt,
 } from "../src/lib/ltTv/episodeTimeline.mjs";
@@ -168,14 +170,14 @@ for (const file of files) {
 }
 
 // ── Looking down the lens ────────────────────────────────────────────────
-// Whoever opens holds the camera until the second line; on the news, every
-// line played to the room is read to camera too. Markets & Morality keeps it
-// to the opener.
+// A news anchor turns to the colleague for their own addressed line, then
+// returns to the viewer. Markets & Morality keeps its listener-only turns.
 {
   const record = (showId) => ({
-    id: `${showId}-t`, showId, audio: { mode: "sections" },
+    id: `${showId}-t`, showId, audio: { Kip: "kip", Holly: "holly" },
     sections: [{ clips: {}, start: 0, end: 20 }],
     lineStarts: [0.5, 4, 8, 12], dialogueEnd: 16,
+    lineEnds: [3.2, 7.2, 11.2, 15.2],
     speakers: ["Kip", "Holly", "Kip", "Holly"],
     audienceLines: [0, 2],
   });
@@ -184,15 +186,52 @@ for (const file of files) {
   if (!news || !talk) {
     ok("the look-to-camera fixture is playable", false);
   } else {
-    check("news: who reads to camera, by line", news.toCamera.map((l) => [l.line, l.actor]), [[0, "Kip"], [2, "Kip"]]);
+    check("news: both anchors follow the viewer", news.toCamera.map((l) => l.actor), ["Kip", "Holly"]);
+    check("news: direct lines cue speaker gaze", news.gazes.map(g => [g.line, g.speaker, g.listener, g.speakerLook]),
+      [[1, "Holly", "Kip", true], [3, "Holly", "Kip", true]]);
     check("morality: only the opener", talk.toCamera.map((l) => [l.line, l.actor]), [[0, "Kip"]]);
-    check("the opener holds the lens through the lead-in", cameraLookAt(news, "Kip", 0), 1);
-    check("…and mid-line", cameraLookAt(news, "Kip", 2), 1);
-    ok("…letting go over the end of the line", cameraLookAt(news, "Kip", 3.7) < 0.5);
-    check("a line to the other host is not to camera", cameraLookAt(news, "Kip", 5), 0);
-    check("news: a later line to the room is", cameraLookAt(news, "Kip", 9), 1);
+    for (const actor of ["Kip", "Holly"]) {
+      ok(`news: ${actor} follows the viewer on audience lines, lead-in and closing tail`,
+        [-2.5, 0, 2, 3.7, 8, 9, 16, 18].every(time => cameraLookAt(news, actor, time) === 1));
+      ok(`news: ${actor} faces the camera as soon as speech ends, including the gap`,
+        [7.2, 7.99, 15.2, 15.99].every(time => conversationPartnerAt(news, actor, time) === null
+          && cameraLookAt(news, actor, time) === 1));
+    }
+    ok("news: Holly briefly turns to Kip at the start of her addressed line",
+      [4, 5, 5.99, 12, 13.99].every(time => conversationPartnerAt(news, "Holly", time) === "Kip"
+        && cameraLookAt(news, "Holly", time) === 0));
+    ok("news: Holly returns to camera after two seconds while still speaking",
+      [6, 6.5, 7.19, 14, 15.19].every(time => conversationPartnerAt(news, "Holly", time) === null
+        && cameraLookAt(news, "Holly", time) === 1));
+    check("news: Holly alternates the two turn limits", news.gazes.map(g => g.yawDegrees), [45, 75]);
+    check("news: the selected angle stays fixed throughout a glance",
+      [12, 13, 12.5, 13.99, 12].map(time => conversationGlanceAt(news, "Holly", time)?.yawDegrees),
+      [75, 75, 75, 75, 75]);
+    ok("news: Kip remains on camera while Holly speaks",
+      [4, 5, 7.19, 12, 15.19].every(time => conversationPartnerAt(news, "Kip", time) === null
+        && cameraLookAt(news, "Kip", time) === 1));
+    check("news: people outside the cast have no camera look", cameraLookAt(news, "Monk", 5), 0);
+    check("morality: the opener holds the lens through the lead-in", cameraLookAt(talk, "Kip", 0), 1);
+    ok("morality: the opener lets go over the end of the line", cameraLookAt(talk, "Kip", 3.7) < 0.5);
     check("morality: a later line to the room is not", cameraLookAt(talk, "Kip", 9), 0);
-    check("the listener never looks", cameraLookAt(news, "Holly", 9), 0);
+    check("morality: the listener does not follow the camera", cameraLookAt(talk, "Holly", 9), 0);
+    ok("morality: listeners still turn toward the speaker", talk.gazes.length > 0);
+    check("morality: direct lines retain listener-only gaze", conversationPartnerAt(talk, "Kip", 5), null);
+
+    const exchange = buildEpisodeTimeline({ ...record("news"), audienceLines: [0], lineEnds: undefined });
+    for (const [time, targets] of [[7.99, [null, null]], [8, ["Holly", null]],
+      [8.01, ["Holly", null]], [10, [null, null]], [11.99, [null, null]], [12, [null, "Kip"]], [12.01, [null, "Kip"]]]) {
+      check(`news: the finished speaker faces camera during the reply at ${time}s`,
+        [conversationPartnerAt(exchange, "Kip", time), conversationPartnerAt(exchange, "Holly", time)],
+        targets);
+    }
+    const shortLine = buildEpisodeTimeline({ ...record("news"), lineEnds: [3.2, 5.25, 11.2, 15.2] });
+    check("news: a short spoken line releases the glance before two seconds",
+      [conversationPartnerAt(shortLine, "Holly", 5.24), conversationPartnerAt(shortLine, "Holly", 5.25)], ["Kip", null]);
+    const alternating = buildEpisodeTimeline({ ...record("news"), audienceLines: [] });
+    check("news: each anchor gets both angles independently",
+      alternating.gazes.map(g => [g.speaker, g.yawDegrees]),
+      [["Kip", 45], ["Holly", 45], ["Kip", 75], ["Holly", 75]]);
   }
 }
 

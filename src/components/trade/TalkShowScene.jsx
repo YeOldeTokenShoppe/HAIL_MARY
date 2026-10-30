@@ -30,6 +30,7 @@ import { useChannelScreen } from "@/components/trade/ltTvChannelScreen";
 import {
   buildEpisodeTimeline,
   cameraLookAt,
+  conversationGlanceAt,
   chapterIndexAt,
   cueIndexAt,
   episodeCast,
@@ -955,6 +956,7 @@ function updateCameraRig(feed, headBones, timeline, elapsed, running, delta) {
 // out, so a viewer who orbits after the show can't drop under the floor.
 const ORBIT_MIN_POLAR = Math.PI * 0.18;
 const ORBIT_MAX_POLAR = Math.PI * 0.52;
+const NEWS_OPENING_SECONDS = 5;
 
 // Swing the VIEWER's camera to the shot that is live now. Runs every frame
 // while the director is active; returns false when it has nothing to do, so
@@ -964,7 +966,7 @@ const ORBIT_MAX_POLAR = Math.PI * 0.52;
 // but reading their real world positions means the framing survives the set
 // being nudged or rescaled — the same reason the tripod feed reads bones and
 // not constants.
-function directViewerCamera({ state, controls, camera, headBones, timeline, elapsed, running, live = false, delta, aspect, viewportHeightPx }) {
+function directViewerCamera({ state, controls, camera, headBones, timeline, elapsed, running, live = false, paused = false, delta, aspect, viewportHeightPx }) {
   const cfg = SHOT_FRAMING;
   if (!controls) return false;
 
@@ -981,6 +983,8 @@ function directViewerCamera({ state, controls, camera, headBones, timeline, elap
     state.primed = false;
     state.handingBack = false;
     state.lastKey = null;
+    state.openingPending = false;
+    state.opening = null;
     cfg.current = null;
     return false;
   }
@@ -991,7 +995,11 @@ function directViewerCamera({ state, controls, camera, headBones, timeline, elap
   // the tripod prop already uses (MONITOR_FEED.handBackAfter): while a hand is
   // on it, and for a few seconds after letting go, the director touches nothing.
   if (!state.detach) {
-    const onStart = () => { state.dragging = true; };
+    const onStart = () => {
+      state.dragging = true;
+      state.openingPending = false;
+      state.opening = null;
+    };
     const onEnd = () => { state.dragging = false; state.releasedAt = performance.now(); };
     controls.addEventListener("controlstart", onStart);
     controls.addEventListener("controlend", onEnd);
@@ -1027,15 +1035,43 @@ function directViewerCamera({ state, controls, camera, headBones, timeline, elap
   // The two heads in world space. Missing (a still-loading clone) means the
   // director can't frame anything, so it hands back rather than guessing.
   const heads = {};
+  const cast = (live && TALKSHOW_LIVE.cast) || episodeCast(timeline);
   for (const [actor, bone] of Object.entries(headBones)) {
+    // All character models are loaded, including the hidden lounge hosts.
+    // Only the current cast should contribute to the center of a pair shot.
+    if (cast.length && !cast.includes(actor)) continue;
     heads[actor] = bone.getWorldPosition(new THREE.Vector3());
   }
   if (Object.keys(heads).length < 1) return false;
 
+  if (holding || live) {
+    state.openingPending = false;
+    state.opening = null;
+  }
+  if (state.openingPending) {
+    const pair = solveShot({ framing: "two", subject: null, heads, front: state.front, aspect });
+    if (pair) {
+      state.opening = {
+        elapsed: 0,
+        eye: camera.getWorldPosition(new THREE.Vector3()),
+        aim: controls.getTarget(new THREE.Vector3(), false),
+        fov: camera.fov,
+        targetEye: new THREE.Vector3(pair.eye.x, pair.eye.y, pair.eye.z),
+        targetAim: new THREE.Vector3(pair.aim.x, pair.aim.y, pair.aim.z),
+        targetFov: pair.fov,
+      };
+      state.openingPending = false;
+      state.primed = true;
+    }
+  }
+
   // Which shot, and on whom.
   let framing;
   let subject;
-  if (holding) {
+  if (state.opening) {
+    framing = "two";
+    subject = null;
+  } else if (holding) {
     framing = cfg.hold;
     subject = isSingleShot(framing)
       ? (speakerAt(timeline, elapsed, running) ?? Object.keys(heads)[0])
@@ -1074,12 +1110,26 @@ function directViewerCamera({ state, controls, camera, headBones, timeline, elap
   state.targetEye.set(solved.eye.x, solved.eye.y, solved.eye.z);
   state.targetAim.set(solved.aim.x, solved.aim.y, solved.aim.z);
   const driftFrac = Math.min(cfg.driftMax, cfg.drift * state.sinceCut);
-  if (driftFrac > 0) {
+  if (driftFrac > 0 && !state.opening) {
     state.targetEye.lerp(state.targetAim, driftFrac);
   }
   state.targetFov = solved.fov;
 
-  if (!state.primed || (isCut && cfg.cut && !state.handingBack)) {
+  if (state.opening) {
+    const opening = state.opening;
+    if (!paused) opening.elapsed = Math.min(NEWS_OPENING_SECONDS, opening.elapsed + delta);
+    const t = opening.elapsed / NEWS_OPENING_SECONDS;
+    const eased = t * t * (3 - 2 * t);
+    state.eye.lerpVectors(opening.eye, opening.targetEye, eased);
+    state.aim.lerpVectors(opening.aim, opening.targetAim, eased);
+    state.fov = THREE.MathUtils.lerp(opening.fov, opening.targetFov, eased);
+    if (t === 1) {
+      state.opening = null;
+      // Ease into the scheduled shot after the opening instead of cutting
+      // away the instant the push-in finishes.
+      state.handingBack = true;
+    }
+  } else if (!state.primed || (isCut && cfg.cut && !state.handingBack)) {
     // First frame, or a hard cut: land on the shot instantly.
     state.eye.copy(state.targetEye);
     state.aim.copy(state.targetAim);
@@ -1287,11 +1337,12 @@ export const STUDIO_LIGHTS = {
 // it is, because none of it is lit by this light. That is the studio going
 // dark around the sign, which is the cue asked for.
 //
-// It is mounted for the WHOLE page, so `dimmed` must only ever be true while
-// the talk show tab is on. Outside it, the value is the 1.5 the page has
-// always had. Live-tunable from `window.__tsAmbient`.
+// The regular trade scene keeps its 1.35 ambient. In the studio, use a modest
+// reduction from the previous broadcast level; the off-air level stays 0.5.
+// Live-tunable from `window.__tsAmbient`.
+const TRADE_AMBIENT_INTENSITY = 1.35;
 export const HOUSE_AMBIENT = {
-  onAir: 1.35,
+  onAir: 1,
   offAir: 0.5,
   // Matches STUDIO_LIGHTS.fadeLambda so the room and the rig move together;
   // two different rates read as two separate faults.
@@ -1418,9 +1469,11 @@ const showIsOn = (onAir) =>
   : HOUSE_PREVIEW.force === "off" ? false
   : onAir;
 
-export function HouseAmbient({ dimmed = false }) {
+export function HouseAmbient({ dimmed = false, studio = false }) {
   const lightRef = useRef(null);
-  const levelRef = useRef(dimmed ? HOUSE_AMBIENT.offAir : HOUSE_AMBIENT.onAir);
+  const levelRef = useRef(studio
+    ? (dimmed ? HOUSE_AMBIENT.offAir : HOUSE_AMBIENT.onAir)
+    : TRADE_AMBIENT_INTENSITY);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1445,7 +1498,9 @@ export function HouseAmbient({ dimmed = false }) {
   }, []);
 
   useFrame((state, delta) => {
-    const target = showIsOn(!dimmed) ? HOUSE_AMBIENT.onAir : HOUSE_AMBIENT.offAir;
+    const target = studio
+      ? (showIsOn(!dimmed) ? HOUSE_AMBIENT.onAir : HOUSE_AMBIENT.offAir)
+      : TRADE_AMBIENT_INTENSITY;
     levelRef.current = THREE.MathUtils.damp(
       levelRef.current,
       target,
@@ -1784,6 +1839,7 @@ function TalkShowModel({
   newsMode,
   onAir,
   channelCards,
+  onLoad,
   onPlaybackReady,
   onPlaybackStateChange,
   onChapterChange,
@@ -2432,6 +2488,8 @@ function TalkShowModel({
     lastKey: null,
     sinceCut: 0,
     primed: false,
+    openingPending: false,
+    opening: null,
     // Hand-back state: whether a hand is on the camera now, when it last came
     // off, and whether the director is easing out of the viewer's own pose.
     dragging: false,
@@ -2817,6 +2875,8 @@ function TalkShowModel({
 
     const resetPerformance = () => {
       playbackRef.current = idlePlayback();
+      shotDirectorRef.current.openingPending = false;
+      shotDirectorRef.current.opening = null;
       resetReactions();
       clearFaces();
     };
@@ -3376,6 +3436,8 @@ function TalkShowModel({
       const ok = startSection(0) === castSize();
       if (ok) {
         resetPerformance();
+        shotDirectorRef.current.openingPending = newsModeRef.current;
+        shotDirectorRef.current.releasedAt = 0;
         playbackRef.current = {
           ...idlePlayback(),
           running: true,
@@ -3607,6 +3669,8 @@ function TalkShowModel({
       const section = sections[index];
       const playback = playbackRef.current;
       if (!section || !playback.running) return false;
+      shotDirectorRef.current.openingPending = false;
+      shotDirectorRef.current.opening = null;
       clearTimeout(pausePendingTimer);
       pausePending = false;
       // Same trick as the pause: off "playing" first, so the talk-ended that
@@ -3886,22 +3950,30 @@ function TalkShowModel({
       animatedHeadQuaternions[actor].copy(head.quaternion);
     });
 
-    // LOOKING DOWN THE LENS. The opener is played to the viewer, so whoever
-    // speaks first holds the camera until the second line lands; on the news
-    // the anchors also read every line played to the room to camera
-    // (`toCamera` in episodeTimeline.mjs says who and when). The aim is the
-    // actual viewer camera, so it follows the shot and the viewer's drag.
+    // News anchors briefly glance toward their colleague at the start of their
+    // own addressed line, then return to the viewer. One smoothed aim handles
+    // both targets so the handoff begins without snapping the head.
     Object.entries(headBones).forEach(([actor, head]) => {
       const aim = cameraAimRef.current;
-      const weight = playback.running ? cameraLookAt(timeline, actor, elapsed) : 0;
+      const glance = playback.running ? conversationGlanceAt(timeline, actor, elapsed) : null;
+      const partnerHead = glance ? headBones[glance.listener] : null;
+      const weight = playback.running ? (partnerHead ? 1 : cameraLookAt(timeline, actor, elapsed)) : 0;
       const baseLocal = neutralHeadQuaternions[actor];
       if (weight > 0.001 && head.parent && baseLocal) {
         // Mirror CyborgTempleScene's proven Demon look-at math. A dummy
-        // Object3D aims at the actual viewer camera, then its world rotation is
+        // Object3D aims at the viewer or co-anchor, then its world rotation is
         // converted into the head bone's local space and clamped without roll.
         cloned.updateWorldMatrix(true, true);
-        camera.getWorldPosition(aim.cameraPosition);
+        (partnerHead || camera).getWorldPosition(aim.cameraPosition);
         head.getWorldPosition(aim.headPosition);
+        if (actor === "Kip" && partnerHead && glance.listener === "Holly") {
+          // Lift his glance slightly; a distance-based offset scales with the set.
+          const distance = Math.hypot(
+            aim.cameraPosition.x - aim.headPosition.x,
+            aim.cameraPosition.z - aim.headPosition.z,
+          );
+          aim.cameraPosition.y += distance * Math.tan(THREE.MathUtils.degToRad(5));
+        }
         aim.dummy.position.copy(aim.headPosition);
         aim.dummy.lookAt(aim.cameraPosition);
         head.parent.getWorldQuaternion(aim.parentWorldQuaternion).invert();
@@ -3914,7 +3986,9 @@ function TalkShowModel({
           .invert()
           .multiply(aim.desiredLocalQuaternion);
         aim.euler.setFromQuaternion(aim.deltaQuaternion, "YXZ");
-        aim.euler.y = THREE.MathUtils.clamp(aim.euler.y, -1.15, 1.15);
+        // Alternate two turn limits, chosen once per glance by the timeline.
+        const yawLimit = partnerHead ? THREE.MathUtils.degToRad(glance.yawDegrees) : 1.15;
+        aim.euler.y = THREE.MathUtils.clamp(aim.euler.y, -yawLimit, yawLimit);
         aim.euler.x = THREE.MathUtils.clamp(aim.euler.x, -0.5, 0.5);
         aim.euler.z = 0;
         aim.clampedDeltaQuaternion.setFromEuler(aim.euler);
@@ -4002,6 +4076,9 @@ function TalkShowModel({
     let addressedListener = live ? TALKSHOW_LIVE.listener : null;
     if (playback.running) {
       for (const cue of timeline?.gazes || []) {
+        // The news speaker's look is handled above; the listener stays on
+        // camera, including immediately after finishing their own line.
+        if (cue.speakerLook) continue;
         if (elapsed >= cue.startAt && elapsed < cue.endAt) {
           addressedListener = cue.listener;
           break;
@@ -4111,6 +4188,7 @@ function TalkShowModel({
         elapsed,
         running: playback.running || live,
         live,
+        paused: playback.pausedAt !== null,
         delta,
         aspect: size.width / size.height,
         viewportHeightPx: gl.domElement.height,
@@ -4149,6 +4227,11 @@ function TalkShowModel({
     }
   });
 
+  // This effect only commits after the set and cast GLBs resolve Suspense
+  // and their setup effects run. Geometry readiness is separate from voice
+  // readiness: a cold episode link can reveal the studio while audio loads.
+  useEffect(() => { onLoad?.(); }, [cloned, onLoad]);
+
   // Mirror CyborgTempleScene's internal anchor offset so the set lands at the
   // same height the temple model does.
   return (
@@ -4174,6 +4257,29 @@ function TalkShowModel({
 // Added after the set is built rather than inside its clone, so
 // nothing keyed off the cast ever sees them. Off with the camera rig (mobile),
 // and off with the cast on the lineup, which shows the studio but no people.
+const CREW_FILL_INTENSITY = 15;
+const CREW_FILL_OFF_AIR = 0.38;
+
+// The desk spots miss the operator. A soft rear/side fill reveals the
+// clothing's existing facets, which disappear under ambient light alone.
+// Keep it with the crew so hiding the camera rig also removes this light.
+function createCrewFillLight(object, emptyName) {
+  const light = new THREE.SpotLight(
+    "#dce7ff", CREW_FILL_INTENSITY * CREW_FILL_OFF_AIR, 7.2, 0.72, 1, 1.2,
+  );
+  light.name = "Crew_Soft_Fill";
+  light.castShadow = false;
+  const anchor = object.getObjectByName(emptyName) || object;
+  anchor.getWorldPosition(light.target.position);
+  object.worldToLocal(light.target.position);
+  // Aim at the torso relative to the planted character's origin. Accessories
+  // in this export extend well beyond the body, so do not use its full bounds.
+  light.target.position.add(new THREE.Vector3(0, 0.75, -0.07));
+  light.position.copy(light.target.position).add(new THREE.Vector3(-1.8, 2.2, 1.6));
+  object.add(light, light.target);
+  return light;
+}
+
 function StudioCrew({ set, hidden, operatorMount, updateRef }) {
   const gltfs = useGLTF(CREW_URLS, DRACO_PATH);
   const crewKey = gltfs.map((g) => g.scene.uuid).join("|");
@@ -4183,7 +4289,7 @@ function StudioCrew({ set, hidden, operatorMount, updateRef }) {
       Object.values(CREW).map((member, i) => {
         const object = skeletonClone(gltfs[i].scene);
         const rig = findRig(object, member.empty, member.rig) || object;
-        return { object, rig, clips: gltfs[i].animations, config: member, animation: null };
+        return { object, rig, clips: gltfs[i].animations, config: member, animation: null, fill: null };
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- crewKey identifies gltfs
     [crewKey],
@@ -4193,11 +4299,17 @@ function StudioCrew({ set, hidden, operatorMount, updateRef }) {
     crew.forEach((member) => {
       set.add(member.object);
       member.animation = createCrewAnimation(member.object, member.rig, member.clips, member.config, operatorMount);
+      member.fill = createCrewFillLight(member.object, member.config.empty);
     });
     return () => {
       crew.forEach((member) => {
         member.animation?.dispose();
         member.animation = null;
+        if (member.fill) {
+          member.object.remove(member.fill, member.fill.target);
+          member.fill.dispose();
+          member.fill = null;
+        }
         set.remove(member.object);
       });
     };
@@ -4210,7 +4322,13 @@ function StudioCrew({ set, hidden, operatorMount, updateRef }) {
   useEffect(() => {
     const update = (delta, onAir, paused, yaw, pitch) => {
       if (hidden) return;
-      crew.forEach(({ animation }) => animation?.update(delta, onAir, paused, yaw, pitch));
+      const fillIntensity = CREW_FILL_INTENSITY * (showIsOn(onAir) ? 1 : CREW_FILL_OFF_AIR);
+      crew.forEach(({ animation, fill }) => {
+        animation?.update(delta, onAir, paused, yaw, pitch);
+        if (fill) fill.intensity = THREE.MathUtils.damp(
+          fill.intensity, fillIntensity, HOUSE_AMBIENT.fadeLambda, delta,
+        );
+      });
     };
     updateRef.current = update;
     return () => { if (updateRef.current === update) updateRef.current = null; };
@@ -4258,6 +4376,7 @@ export default function TalkShowScene({
   newsMode = false,
   onAir = false,
   channelCards = null,
+  onLoad,
   onPlaybackReady,
   onPlaybackStateChange,
   onChapterChange,
@@ -4279,6 +4398,7 @@ export default function TalkShowScene({
           newsMode={newsMode}
           onAir={onAir}
           channelCards={channelCards}
+          onLoad={onLoad}
           onPlaybackReady={onPlaybackReady}
           onPlaybackStateChange={onPlaybackStateChange}
           onChapterChange={onChapterChange}
