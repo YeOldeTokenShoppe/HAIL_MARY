@@ -99,7 +99,15 @@ export const SHOT_FRAMING = {
   // `close` she left alone; `two` she came back to the next day, to get the
   // tripod prop out of the picture — see the note on it below.
   shots: {
-    establish: { coverage: 5.9, fov: 45, azimuth: 8, height: 0.85, lookLift: -0.55 },
+    // The establishing wide. Its coverage puts the lens ~4.2m out on a wide
+    // screen, and the CAMERA OPERATOR (CREW, added 2026-10-28) stands ~3m
+    // out at x≈-0.25 — so at the fitted azimuth of 8° the viewer's camera sat
+    // directly behind him, with the guests hidden behind his back. Swung to
+    // 36° (toward screen right, the same side the pre-show entry pose in
+    // page.js uses) and raised to a high crane wide, the line to the chairs
+    // passes ~2m to his side and ~1m over his head and the monitor tripod
+    // beside him. Coverage and lens are hers, unchanged.
+    establish: { coverage: 5.9, fov: 45, azimuth: 36, height: 1.8, lookLift: -0.55 },
     // The pair at the desk. Her azimuth is NEGATIVE on purpose: the tripod
     // camera prop stands at x=0.006, z=1.922, and a two-shot swung to screen
     // right put the lens 0.13m off the prop's axis with the prop between it and

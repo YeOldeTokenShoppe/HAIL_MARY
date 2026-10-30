@@ -504,9 +504,13 @@ export function buildEpisodeTimeline(record, { reactionDurations = {} } = {}) {
   // name a LINE, which is exactly what the shot list is walking.
   const chapterLines = new Set(chapters.map((chapter) => chapter.line));
   const shots = buildShots(lineStarts, speakers, audienceLines, chapterLines, dialogueEnd);
-  // The news opening moves from the viewer's current pose into the pair.
-  // Hold that composition until the next scheduled shot after the move lands.
-  if (readsToCamera) shots[0].framing = "two";
+  // Every show opens on the pair, square to the hosts. The news opening moves
+  // from the viewer's current pose into it and holds that composition until
+  // the next scheduled shot after the move lands; the roundtable shows cut
+  // straight to it. (They used to open on the establishing wide, which since
+  // the camera operator joined the crew is a high shot from the side — fine
+  // for a chapter break, wrong as a cold open. Asked for 2026-10-29.)
+  shots[0].framing = "two";
 
   return {
     id: record.id,

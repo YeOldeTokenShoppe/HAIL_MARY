@@ -98,6 +98,11 @@ const SHOW_CASE_HUD_STRIP = false;
 
 // Default orbit envelope; the wider news studio entry has its own limit.
 const LT_TV_MAX_DISTANCE = 6;
+// Bloom in the studio, as a multiple of the page's base (1). The set's
+// emissives — the Monk's halo, the neon frame — spilled across close-ups at
+// the page setting, and the rest of /trade was fitted at 1, so only this
+// look comes down. Edit and save to try values; it hot-reloads.
+const LT_TV_BLOOM = 0.1;
 
 const HOST_SITEPAL_CONFIG = {
   containerId: DEMON_SITEPAL_CONTAINER_ID, // shared host container
@@ -2939,10 +2944,18 @@ export default function CyborgTemple() {
     if (ltTvView === 'set') {
       // Playback collapses the console: center the guests and dolly in ~15%.
       // The wider, offset framing returns when playback stops or finishes.
+      // On desktop the scene's shot director owns the camera from Play — it
+      // cuts to this same over-the-shoulder pose itself (ROUNDTABLE_OPENING_FROM
+      // in TalkShowScene) and pushes in to the pair — so the rig must not fly
+      // there in parallel. Mobile has no director and still takes the pose.
       if (talkShowPlaying) {
-        return { position: [0.1, 0.25, 4.95], target: [0.1, -0.5, 0.1], maxDistance: LT_TV_MAX_DISTANCE };
+        return { position: [0.1, 0.25, 4.95], target: [0.1, -0.5, 0.1], maxDistance: LT_TV_MAX_DISTANCE, directed: !isMobileView };
       }
-      return { position: [-0.65, 0.4, 5.8], target: [-0.65, -0.5, 0.1], maxDistance: LT_TV_MAX_DISTANCE };
+      // Off to the left and a little high, like the news entry: the camera
+      // operator (CREW, 2026-10-28) stands at about (-0.25, 0.2, 3.1), dead
+      // on the old straight-on line from (-0.65, 0.4, 5.8), with the guests
+      // behind him. From here the line to the chairs passes ~1.9 to his left.
+      return { position: [-2.9, 1.45, 4.5], target: [-0.1, -0.35, 0], fov: 50, maxDistance: LT_TV_MAX_DISTANCE };
     }
     return { position: [-4.7744, 2.004, 1.9736], target: [-0.8, -0.65, -0.4], maxDistance: LT_TV_MAX_DISTANCE };
   }, [talkShowMode, ltTvView, ltTvSelection.showId, talkShowPlaying, isMobileView]);
@@ -4099,7 +4112,7 @@ export default function CyborgTemple() {
                 temple's warm-up pass still waits for the temple itself. */}
             <PrecompileScene ready={!talkShowMode && templeLoadCountRef.current > 0} epoch={templeEpoch} />
             <TempleWatch onChange={setTempleShowing} />
-            <PostProcessingEffects is80sMode={context80sMode} isMobile={isMobileView} />
+            <PostProcessingEffects is80sMode={context80sMode} isMobile={isMobileView} bloomScale={talkShowMode ? LT_TV_BLOOM : 1} />
             
             {/* Synthwave sunset for 80s mode — RETIRED ON /trade 2026-07-26.
                 This page's sky is the ConstellationModel starfield, full stop

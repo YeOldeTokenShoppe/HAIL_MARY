@@ -336,7 +336,9 @@ of the script.
 The five cameras:
 
 - **Establish** — the whole set. Top of the show, and every new story (a
-  chapter start).
+  chapter start). A high wide from screen right (36°) since 2026-10-29: the camera
+  operator (crew, added 2026-10-28) stands about 3 m out on the set's axis,
+  and the original 8° wide sat the viewer's camera directly behind him.
 - **Two-shot** — the pair at the desk. The breather between runs of singles,
   and the only shot that shows one host *reacting* to the other, which is why
   the grammar keeps coming back to it (see "Reaction coverage" below).

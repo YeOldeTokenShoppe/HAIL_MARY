@@ -357,7 +357,10 @@ const SOLO_LISTENER_EVERY_NTH = 6;
 // per-frame compositor reads these fields every tick, so edits go live.
 export const TALKSHOW_MONK_CROP = { cropX: 249, cropY: 150, cropW: 160, cropH: 205, rotateZ: 0, rotateX: 0 };
 export const TALKSHOW_MONK_FILTER = { saturate: 99, contrast: 99, brightness: 93, hueRotate: -27, sepia: 0 };
-export const TALKSHOW_CONNOR_CROP = { cropX: 180, cropY: 118, cropW: 145, cropH: 195, rotateZ: 0, rotateX: 0 };
+// CONNOR REFITTED BY MICHELLE 2026-10-29 for his adjusted face mesh: the box
+// moved right and widened (180,118 145x195 → 184,118 155x195) and picked up a
+// 1° roll. Filter unchanged.
+export const TALKSHOW_CONNOR_CROP = { cropX: 184, cropY: 118, cropW: 155, cropH: 195, rotateZ: 1, rotateX: 0 };
 export const TALKSHOW_CONNOR_FILTER = { saturate: 106, contrast: 102, brightness: 73, hueRotate: 0, sepia: 20 };
 // HOLLY'S ARE MICHELLE'S OWN, fitted on the set 2026-09-22 and pasted back.
 // They started as a copy of PROMOS_SITEPAL_CROP in src/lib/vendorSitePal.js —
@@ -957,6 +960,16 @@ function updateCameraRig(feed, headBones, timeline, elapsed, running, delta) {
 const ORBIT_MIN_POLAR = Math.PI * 0.18;
 const ORBIT_MAX_POLAR = Math.PI * 0.52;
 const NEWS_OPENING_SECONDS = 5;
+// THE ROUNDTABLE'S COLD OPEN (2026-10-29). Play cuts to a locked-off wide
+// over the camera operator's shoulder — the hosts beyond him, his camera and
+// the monitors in the foreground — and pushes in to the two-shot from there
+// over ROUNDTABLE_OPENING_SECONDS. The news opening keeps its own habit of
+// easing in from wherever the viewer left the camera; this one starts from a
+// fixed pose because the point of it is that picture. World units, the same
+// frame the page's entry poses use; it is the old straight-on "playing" pose
+// from page.js, which the operator happened to walk into.
+const ROUNDTABLE_OPENING_SECONDS = 4;
+const ROUNDTABLE_OPENING_FROM = { eye: [0.1, 0.25, 4.95], aim: [0.1, -0.5, 0.1], fov: 50 };
 
 // Swing the VIEWER's camera to the shot that is live now. Runs every frame
 // while the director is active; returns false when it has nothing to do, so
@@ -1051,11 +1064,13 @@ function directViewerCamera({ state, controls, camera, headBones, timeline, elap
   if (state.openingPending) {
     const pair = solveShot({ framing: "two", subject: null, heads, front: state.front, aspect });
     if (pair) {
+      const from = state.openingFrom;
       state.opening = {
         elapsed: 0,
-        eye: camera.getWorldPosition(new THREE.Vector3()),
-        aim: controls.getTarget(new THREE.Vector3(), false),
-        fov: camera.fov,
+        seconds: from ? ROUNDTABLE_OPENING_SECONDS : NEWS_OPENING_SECONDS,
+        eye: from ? new THREE.Vector3(...from.eye) : camera.getWorldPosition(new THREE.Vector3()),
+        aim: from ? new THREE.Vector3(...from.aim) : controls.getTarget(new THREE.Vector3(), false),
+        fov: from ? from.fov : camera.fov,
         targetEye: new THREE.Vector3(pair.eye.x, pair.eye.y, pair.eye.z),
         targetAim: new THREE.Vector3(pair.aim.x, pair.aim.y, pair.aim.z),
         targetFov: pair.fov,
@@ -1117,8 +1132,8 @@ function directViewerCamera({ state, controls, camera, headBones, timeline, elap
 
   if (state.opening) {
     const opening = state.opening;
-    if (!paused) opening.elapsed = Math.min(NEWS_OPENING_SECONDS, opening.elapsed + delta);
-    const t = opening.elapsed / NEWS_OPENING_SECONDS;
+    if (!paused) opening.elapsed = Math.min(opening.seconds, opening.elapsed + delta);
+    const t = opening.elapsed / opening.seconds;
     const eased = t * t * (3 - 2 * t);
     state.eye.lerpVectors(opening.eye, opening.targetEye, eased);
     state.aim.lerpVectors(opening.aim, opening.targetAim, eased);
@@ -1253,6 +1268,31 @@ const LAMP_HEAD_NODES = [
 // stated in model units and the other two in world units. Keep
 // `coneLength * <the page's scale>` a little longer than `beamLength` so the
 // shaft fades out on its own rather than ending in a cut-off disc.
+// THE SHAFT GOES AWAY WHEN THE CAMERA IS IN IT. The cone is a double-sided
+// additive mesh: from outside it reads as a beam, but once the lens is inside
+// the volume its far wall covers the whole frame and the picture takes on a
+// flat warm veil — the two-shot (lens ~2m from the guests, inside the overlap
+// of the inner pair) had it, the singles (long lens, swung out to the side)
+// did not. Bloom was the first suspect; it was this. So each shaft's opacity
+// is scaled by how far the lens is from the cone's axis, in cone radii at the
+// lens's depth: fully off inside the cone, back to full a little outside it.
+// Measured in the mesh's own space, so the page's set scale is irrelevant.
+const SHAFT_FADE_FROM = 1;   // cone radii: inside this, the shaft is off
+const SHAFT_FADE_TO = 1.7;   // cone radii: beyond this, the shaft is full
+function shaftFadeForCamera(cone, camera, scratch) {
+  // The mesh's +z runs from the apex down the beam (drei lookAt's the target).
+  const p = cone.worldToLocal(camera.getWorldPosition(scratch));
+  const length = STUDIO_LIGHTS.coneLength;
+  if (p.z <= 0 || p.z >= length) return 1;
+  const top = STUDIO_LIGHTS.radiusTop;
+  const bottom = length * Math.tan(STUDIO_LIGHTS.angle);
+  const radius = top + (bottom - top) * (p.z / length);
+  if (!(radius > 1e-6)) return 1;
+  const t = (Math.hypot(p.x, p.y) / radius - SHAFT_FADE_FROM) / (SHAFT_FADE_TO - SHAFT_FADE_FROM);
+  const k = THREE.MathUtils.clamp(t, 0, 1);
+  return k * k * (3 - 2 * k);
+}
+
 export const STUDIO_LIGHTS = {
   enabled: true,
   // Beams off leaves the illumination but hides the visible shafts.
@@ -1312,15 +1352,21 @@ export const STUDIO_LIGHTS = {
   // DIALLED IN BY MICHELLE on the lighting board (?tune=lights), 2026-09-21.
   // Every yaw and pitch here was set by eye against the news desk, so a
   // re-export that moves the fixtures invalidates the aim, not the plot.
+  //
+  // SHAFT OPACITIES HALVED 2026-10-29 (0.125/0.1/0.06/0.11 → half). The
+  // shows now cold-open on the two-shot, ~2m from the guests, which puts the
+  // lens inside the overlap of the inner cones — and at the fitted figures
+  // that read as a milky wash over the whole frame. Intensity (the light on
+  // the faces) is untouched; only the visible haze came down.
   plot: [
     // key — lands on GR80
-    { intensity: 9.5, color: "#ffe6c4", opacity: 0.125, yaw: 22, pitch: -8 },
+    { intensity: 9.5, color: "#ffe6c4", opacity: 0.062, yaw: 22, pitch: -8 },
     // fill — centre right
-    { intensity: 8, color: "#ffd9b0", opacity: 0.1, yaw: 19, pitch: -17 },
+    { intensity: 8, color: "#ffd9b0", opacity: 0.05, yaw: 19, pitch: -17 },
     // fill — neon frame
-    { intensity: 8, color: "#ffd9b0", opacity: 0.06, yaw: -14, pitch: -18 },
+    { intensity: 8, color: "#ffd9b0", opacity: 0.03, yaw: -14, pitch: -18 },
     // key — lands on Connor
-    { intensity: 12, color: "#ffe6c4", opacity: 0.11, yaw: -10, pitch: -9 },
+    { intensity: 12, color: "#ffe6c4", opacity: 0.055, yaw: -10, pitch: -9 },
   ],
 };
 
@@ -1715,6 +1761,7 @@ function StudioLights({ fixtures, onAir }) {
 
   // Push the live config every tick. Cheap (four lights), and it means the
   // console knobs work without re-rendering a component that owns the whole set.
+  const insideScratch = useMemo(() => new THREE.Vector3(), []);
   useFrame((state, delta) => {
     const on = STUDIO_LIGHTS.enabled;
     // Ease toward the house level for whichever way the show is. Damping on
@@ -1767,7 +1814,7 @@ function StudioLights({ fixtures, onAir }) {
       const u = cone.material.uniforms;
       u.attenuation.value = STUDIO_LIGHTS.beamLength;
       u.anglePower.value = STUDIO_LIGHTS.anglePower;
-      u.opacity.value = plot.opacity * level;
+      u.opacity.value = plot.opacity * level * shaftFadeForCamera(cone, state.camera, insideScratch);
       u.lightColor.value.set(plot.color);
     });
   });
@@ -2075,8 +2122,14 @@ function TalkShowModel({
   // Desk chairs and sign supports follow the same rule. Lounge chairs
   // (seats and legs) appear only in the regular roundtable set.
   // Match Blender duplicates (.001) and GLTFLoader's sanitized names (001).
+  // The desk's top and its two neon strips are NOT under NewsDesk: LTTV_Set2
+  // (2026-10-29) exports `Countertop - even width`, `NeonTop` and
+  // `NeonBottom` as scene roots, so they are named here, or the countertop
+  // and its glow float over the talk-show set once the desk is gone. The
+  // countertop's name carries spaces and a dash, which GLTFLoader turns into
+  // underscores, hence the loose tail on that one.
   useEffect(() => {
-    const deskPropName = /^(?:NewsDesk|CoffeeCup|Microphone|Laptop|DeskChair|Cylinder|SM_Prop_(?:Cup_Coffee_Disposable_Open_01|Microphone_03|Laptop_01))(?:[._]?\d+)?$/;
+    const deskPropName = /^(?:NewsDesk|Countertop(?:[\s_-].*)?|NeonTop|NeonBottom|CoffeeCup|Microphone|Laptop|DeskChair|Cylinder|SM_Prop_(?:Cup_Coffee_Disposable_Open_01|Microphone_03|Laptop_01))(?:[._]?\d+)?$/;
     const loungeChairName = /^Chair1?_Color_[12]_0(?:_\d+)?$/;
     const props = [];
     cloned.traverse((object) => {
@@ -2489,6 +2542,9 @@ function TalkShowModel({
     sinceCut: 0,
     primed: false,
     openingPending: false,
+    // A fixed pose to open from (the roundtable), or null to open from where
+    // the camera is (the news).
+    openingFrom: null,
     opening: null,
     // Hand-back state: whether a hand is on the camera now, when it last came
     // off, and whether the director is easing out of the viewer's own pose.
@@ -3436,7 +3492,9 @@ function TalkShowModel({
       const ok = startSection(0) === castSize();
       if (ok) {
         resetPerformance();
-        shotDirectorRef.current.openingPending = newsModeRef.current;
+        // Every show opens with a move into the pair; see ROUNDTABLE_OPENING_FROM.
+        shotDirectorRef.current.openingPending = true;
+        shotDirectorRef.current.openingFrom = newsModeRef.current ? null : ROUNDTABLE_OPENING_FROM;
         shotDirectorRef.current.releasedAt = 0;
         playbackRef.current = {
           ...idlePlayback(),

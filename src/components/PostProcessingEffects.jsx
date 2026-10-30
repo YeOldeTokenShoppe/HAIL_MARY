@@ -16,12 +16,19 @@ import { BlendFunction, GlitchMode } from "postprocessing";
 // `isMobile` skips Bloom on mobile — Bloom's mipmap-blur shader compilation
 // silently fails on some Android Chrome / Mali / Adreno drivers, leaving
 // the entire framebuffer black. Other effects (Vignette, etc.) stay on.
-const PostProcessingEffects = ({ is80sMode = false, isMobile = false }) => {
+// `bloomScale` multiplies the bloom intensity for one look without touching
+// the page-wide default — /trade passes a lower scale while the LT TV studio
+// is open, because its emissives (the Monk's halo, the neon frame) spilled at
+// the full setting on close-ups, and the rest of the page was fitted at 1.
+const PostProcessingEffects = ({ is80sMode = false, isMobile = false, bloomScale = 1 }) => {
   const { scene, gl, camera } = useThree();
   const composerRef = useRef();
   const timeRef = useRef(0);
   const [isReady, setIsReady] = useState(false);
+  // The page-wide base, live-settable from window.postProcessingEffects;
+  // `bloomScale` (a prop) rides on top of it.
   const [bloomIntensity, setBloomIntensity] = useState(1);
+  const effectiveBloom = bloomIntensity * bloomScale;
 
   // Increase time for animated effects
   useFrame((_, delta) => {
@@ -143,7 +150,7 @@ const PostProcessingEffects = ({ is80sMode = false, isMobile = false }) => {
       )} */}
       {!isMobile && (
         <Bloom
-          intensity={bloomIntensity}           // Dynamically controlled intensity
+          intensity={effectiveBloom}           // base × the caller's scale
           luminanceThreshold={0.3}  // Lowered to 0.3 to catch emissive cylinder rings
           luminanceSmoothing={0.7}  // Adjusted from 0.9 for sharper bloom edges
           height={400}              // Increased from 300 for more detail
@@ -181,7 +188,7 @@ const PostProcessingEffects = ({ is80sMode = false, isMobile = false }) => {
       )} */}
       {!isMobile && (
         <Bloom
-          intensity={bloomIntensity * 0.1}  // Subtle bloom enhancement for 80s mode
+          intensity={effectiveBloom * 0.1}  // Subtle bloom enhancement for 80s mode
           luminanceThreshold={0.6} // Higher threshold - only catch bright emissives
           luminanceSmoothing={0.6}  // Softer bloom edges
           height={400}              // Standard resolution

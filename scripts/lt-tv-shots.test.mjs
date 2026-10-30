@@ -69,7 +69,9 @@ const RECORD = {
 console.log("\nThe shot list an episode is cut into:");
 const t = buildEpisodeTimeline(RECORD);
 
-check("opens on the establishing wide", t.shots[0], { at: 0, subject: null, framing: "establish" });
+// Every show opens square on the pair (2026-10-29); the establishing wide is
+// a chapter break's shot, not the cold open's.
+check("opens on the pair", t.shots[0], { at: 0, subject: null, framing: "two" });
 
 const framings = new Set(t.shots.map((s) => s.framing));
 ok("uses the pair between runs of singles", framings.has("two"));
