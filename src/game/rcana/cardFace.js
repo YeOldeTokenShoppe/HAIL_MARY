@@ -454,6 +454,12 @@ import { LIQUIDITY_BOXES } from "./liquidityBox.js";
 // RCANA_DEMO is the old name for it, kept for the bench and anything else
 // that still imports it.
 export { RCANA_SET, RCANA_SET as RCANA_DEMO, UNPRINTED, TYPE_CLASS } from "./set/index.js";
+import { RCANA_SET_SIZE } from "./set/index.js";
+import { HEADER_COLORS } from "./headerColors.js";
+
+// The collector line sits in the gold margin under the inner border — the
+// one strip of plate the ink never used — right-aligned to the drop box.
+export const COLLECTOR_SLOT = { x: 52, y: 97.15, w: 38.9, h: 2.3 };
 
 // ---------------------------------------------------------------------------
 // Converter
@@ -485,6 +491,7 @@ export function toRcanaCard(card, overrides = {}) {
     layout.numberCell = { x: 4.25, y: 3.2, w: 9.5, h: 6.15 };
     layout.classCell = { x: 13.75, y: 3.2, w: 29.7, h: 6.15 };
   }
+  layout.collector = COLLECTOR_SLOT;
   if (liquidityBox) {
     layout.hydroBox = liquidityBox;
     layout.hydroValue = {
@@ -513,6 +520,14 @@ export function toRcanaCard(card, overrides = {}) {
 
     // Ink
     ability: card.ability ?? null,
+    // The rules line leads with its timing keyword — Equip, Single use,
+    // Until cleared, On draw — as a badge, the way Palworld prints CONT /
+    // AUTO. It is the usage medallion's label, so the two always agree.
+    keyword: card.keyword ?? subtypeTemplate?.label ?? null,
+    keywordColor: subtypeTemplate?.color || HEADER_COLORS[cls] || HEADER_COLORS.Artifact,
+    traits: card.traits ?? [],
+    // "19 / 80": the lotería number over the set size.
+    collector: card.number != null ? { number: card.number, of: card.setSize ?? RCANA_SET_SIZE } : null,
     flavor: card.flavor ?? null,
     // A person's line is quoted and leads; narration follows the rules.
     flavorQuoted: card.flavorQuoted ?? SPEAKING_CLASSES.includes(cls),

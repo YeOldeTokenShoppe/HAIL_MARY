@@ -61,6 +61,17 @@ export const TYPE_HEADER_STYLES = `
   white-space: nowrap;
 }
 .rc-type-class[data-font="bebas"] { font-family: "Bebas Neue", Impact, sans-serif; }
+/* "gilt": the ExtraBold struck in gold — hairline light on top, a dark bevel
+   under, a soft drop — so the class reads as a stamped gilt letter, the same
+   metal as the Nabla name on the banner. The shadow font was tried and
+   rejected here: at tab size its hairline interior fills in. */
+.rc-type-class[data-font="gilt"] {
+  color: #f4cd61;
+  text-shadow:
+    0 calc(var(--u) * -.0012) 0 #fff6d0,
+    0 calc(var(--u) * .002) 0 #6a4a08,
+    0 calc(var(--u) * .004) calc(var(--u) * .005) rgba(0, 0, 0, .45);
+}
 .rc-type-header[data-hide-frame] { background: none; border-color: transparent; }
 .rc-type-header[data-hide-frame] .rc-type-number { border-color: transparent; }
 .rc-type-header[data-hide-frame] .rc-type-class { background: none; box-shadow: none; }

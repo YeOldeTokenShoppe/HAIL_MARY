@@ -112,7 +112,20 @@ export default function RcanaCard({
   // own face, set in title case (caps blackletter is unreadable) — is the
   // default; "bebas" is the condensed caps it replaced, and the other
   // blackletters remain for the bench's comparison switch.
-  classFont = "blackletter",
+  classFont = "gilt",
+  // Typeface for the name on the ribbon. "gilt" — the tab's own blackletter
+  // struck in gold — is the default, so the name and the tab are one metal.
+  // "nabla" is the chromatic 3D sans it replaced; it stays for foils and
+  // alt-arts, where loud is the job. (Nabla is a COLRv1 font: engines
+  // without COLRv1 paint its flat fallback colour.)
+  nameFont = "gilt",
+  // The rules line's furniture: a leading timing badge (Equip, On draw…),
+  // trait pills, bold game terms with the drop glyph on Hydro, and a
+  // hairline before the flavor. One switch, so the bench can compare the
+  // plain line against the dressed one.
+  keywordBadges = true,
+  // The "19 / 80" in the bottom margin.
+  collectorLine = true,
   // Tilt from the device's own orientation, phones and tablets. Off by
   // default: iOS only grants the sensor behind a user gesture, so the page
   // asks (see RcanaBench's "Tilt with device") and turns this on when
@@ -555,9 +568,9 @@ export default function RcanaCard({
           }}
         >
           {!printed.numberTab && (data.artifactTemplate ? (
-            <ArtifactHeader data={data} hideFrame={hideFrame} />
+            <ArtifactHeader data={data} hideFrame={hideFrame} classFont={classFont} />
           ) : data.eventTemplate ? (
-            <EventHeader data={data} hideFrame={hideFrame} />
+            <EventHeader data={data} hideFrame={hideFrame} classFont={classFont} />
           ) : data.compactTypeHeader ? (
             <RcanaTypeHeader data={data} slot={L.numberTab} hideFrame={hideFrame} classFont={classFont} />
           ) : (
@@ -579,7 +592,7 @@ export default function RcanaCard({
           ))}
 
           {!printed.name && (
-            <div className="rc-slot rc-name" style={box(L.nameBanner)}>
+            <div className="rc-slot rc-name" style={box(L.nameBanner)} data-font={nameFont}>
               {/* Sized off the ribbon rather than by eye: at this cap the
                   title fills the band height with a little headroom and its
                   width still clears the flourishes. AutoFit only steps in for
@@ -590,16 +603,28 @@ export default function RcanaCard({
             </div>
           )}
 
-          <div className="rc-slot rc-body" style={box(L.bodyPanel)}>
+          {/* With the furniture on, the panel gives up a little of its bottom
+              edge: it ends 0.3% above the boxes, so a line that fills it sits
+              on their lids. */}
+          <div className="rc-slot rc-body" style={box(keywordBadges ? { ...L.bodyPanel, h: L.bodyPanel.h - 0.9 } : L.bodyPanel)}>
             <AutoFit max={u * 0.0375} min={u * 0.015} block>
               {/* A person's line leads the panel as a quotation; narration
                   keeps its usual place beneath the rules. */}
               {data.flavor && data.flavorQuoted ? (
                 <p className="rc-flavor rc-flavor--quote">{"\u201C" + data.flavor + "\u201D"}</p>
               ) : null}
-              {data.ability ? <p className="rc-ability">{data.ability}</p> : null}
+              {data.ability ? (
+                <p className="rc-ability" style={{ "--kw": data.keywordColor }}>
+                  {keywordBadges && data.keyword && <b className="rc-kw">{data.keyword}</b>}
+                  {keywordBadges && (data.traits || []).map((t) => <b key={t} className="rc-kw rc-kw--trait">{t}</b>)}
+                  {keywordBadges ? <RulesText text={stripKeyword(data.ability, data.keyword)} /> : data.ability}
+                </p>
+              ) : null}
               {data.flavor && !data.flavorQuoted ? (
-                <p className="rc-flavor">{data.flavor}</p>
+                <>
+                  {keywordBadges && data.ability ? <hr className="rc-sep" aria-hidden /> : null}
+                  <p className="rc-flavor">{data.flavor}</p>
+                </>
               ) : null}
             </AutoFit>
           </div>
@@ -624,6 +649,12 @@ export default function RcanaCard({
 
           {/* The heart sits under the wordmark on every plate — a rarity mark
               should be where the eye learned to find it. */}
+          {collectorLine && data.collector && !printed.collector && !hideFrame && (
+            <div className="rc-slot rc-collector" style={box(L.collector)} aria-label={`Card ${data.collector.number} of ${data.collector.of}`}>
+              <span>{data.collector.number}<i>/</i>{data.collector.of}</span>
+            </div>
+          )}
+
           {!printed.rarity && (() => {
             const heartSlot = L.rarity;
             const hf = heartSlot.heightFactor || 0.048;
@@ -1160,6 +1191,55 @@ const FxLight = React.memo(function FxLight({ reflection, src, rx, ry, unit, cle
   );
 });
 
+// The drop from the liquidity box, inline, sized to the text it sits in.
+function DropGlyph() {
+  return (
+    <svg className="rc-drop" viewBox="0 0 40 56" aria-hidden="true" focusable="false">
+      <path d="M20 4C16 14 5 25 5 35a15 15 0 0 0 30 0C35 25 24 14 20 4Z" fill="#245fa4" stroke="#1d190f" strokeWidth="3" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// Game nouns the rules text may name. Bold where they appear, so the eye
+// can pick the mechanic out of the sentence at table distance; a Hydro or
+// Liquidity count also gets the drop in front of it, the same glyph as the
+// box in the corner, so "1 Hydro" and the box read as the same currency.
+const RULE_TERMS =
+  /(\d+\s+)?(Hydro|Liquidity|Prosperity|Grace|Assets?|Hazards?|Events?|Traders?|Artifacts?|Remedy|Remedies|Hail Mary|Good Deeds?)\b/g;
+
+// A rules line that opens with its own keyword ("Until cleared, the target
+// banks…") would print it twice once the badge carries it, so the badge
+// takes the words and the sentence restarts on a capital.
+function stripKeyword(text, keyword) {
+  if (!text || !keyword) return text;
+  const re = new RegExp(`^${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*[,:—–-]\\s*`, "i");
+  if (!re.test(text)) return text;
+  const rest = text.replace(re, "");
+  return rest.charAt(0).toUpperCase() + rest.slice(1);
+}
+
+function RulesText({ text }) {
+  const out = [];
+  let last = 0;
+  let m;
+  RULE_TERMS.lastIndex = 0;
+  while ((m = RULE_TERMS.exec(text))) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    const count = m[1] || "";
+    const term = m[2];
+    const hydro = /^(Hydro|Liquidity)$/.test(term) && count;
+    out.push(
+      <b key={m.index} className={hydro ? "rc-term rc-term--hydro" : "rc-term"}>
+        {hydro ? <DropGlyph /> : null}
+        {count}{term}
+      </b>
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return <>{out}</>;
+}
+
 // Steps the font size down until the content stops overflowing its slot.
 // Cheaper and more predictable than measuring text metrics, and it reruns on
 // content change, which is what a programmatic ability line needs.
@@ -1378,6 +1458,18 @@ const RCANA_STYLES = `
 /* Blackletter trials for the class label (bench control). Title case, no
    tracking, sized up a little since blackletter x-heights run small. */
 .rc-class[data-font="blackletter"] span { font-family: "Blackletter", "UnifrakturCook", serif; font-weight: 400; letter-spacing: .01em; font-size: calc(var(--u) * .058); }
+.rc-class[data-font="gilt"] span { font-family: "Blackletter", "UnifrakturCook", serif; font-weight: 400; letter-spacing: .01em; font-size: calc(var(--u) * .058); }
+/* "gilt": the ExtraBold struck in gold — hairline light on top, a dark bevel
+   under, a soft drop — so the class reads as a stamped gilt letter, the same
+   metal as the Nabla name on the banner. The shadow font was tried and
+   rejected here: at tab size its hairline interior fills in. */
+.rc-class[data-font="gilt"] span {
+  color: #f4cd61;
+  text-shadow:
+    0 calc(var(--u) * -.0012) 0 #fff6d0,
+    0 calc(var(--u) * .002) 0 #6a4a08,
+    0 calc(var(--u) * .004) calc(var(--u) * .005) rgba(0, 0, 0, .45);
+}
 .rc-class[data-font="grenze"] span { font-family: "Grenze Gotisch", serif; font-weight: 700; letter-spacing: 0; font-size: calc(var(--u) * .058); }
 .rc-class[data-font="unifraktur"] span { font-family: "UnifrakturCook", serif; font-weight: 700; letter-spacing: 0; font-size: calc(var(--u) * .056); }
 .rc-class[data-font="pirata"] span { font-family: "Pirata One", serif; font-weight: 400; letter-spacing: .01em; font-size: calc(var(--u) * .058); }
@@ -1404,15 +1496,26 @@ const RCANA_STYLES = `
   src: url("/fonts/Nabla-Regular.ttf") format("truetype");
   font-display: swap;
 }
-.rc-name {
+.rc-name { padding: 0 2%; color: #f4cf62; }
+.rc-name[data-font="nabla"] {
   font-family: "Nabla", "Blackletter", "UnifrakturCook", serif;
-
   font-variation-settings: "EDPT" var(--name-depth, 120), "EHLT" var(--name-hilite, 12);
-  color: #f4cf62;
-  padding: 0 2%;
   /* Nabla's bevel extrudes downward, so the glyphs sit optically low in the
      ribbon; this lifts them back onto its centre line. */
   transform: translateY(-2%);
+}
+/* The name in the tab's metal: gold ExtraBold with a hairline light on top,
+   a bevel under and a soft drop, scaled up from the tab's stack because the
+   letter is twice the size. One foil across the card, not two golds. */
+.rc-name[data-font="gilt"] {
+  font-family: "Blackletter", "UnifrakturCook", serif;
+  font-weight: 400;
+  letter-spacing: .01em;
+  color: #f4cd61;
+  text-shadow:
+    0 calc(var(--u) * -.0015) 0 #fff6d0,
+    0 calc(var(--u) * .0035) 0 #6a4a08,
+    0 calc(var(--u) * .007) calc(var(--u) * .007) rgba(0, 0, 0, .55);
 }
 .rc-body { padding: 1.6% 2.4%; align-items: start; }
 /* The rule is what gets played, so it is the louder line: Medium weight,
@@ -1441,6 +1544,73 @@ const RCANA_STYLES = `
 /* Leading the panel, so its spacing sits below rather than above, and a
    shade darker — it is the character speaking, not a footnote. */
 .rc-flavor--quote { margin: 0 0 .35em; color: #4f3b1c; }
+
+/* ---------------- rules furniture ----------------
+   Everything here is in em, so AutoFit scales the badges with the line.
+   The timing badge is enamel in the type's header colour with the gold
+   keyline the tab wears — the same vocabulary as the frame, not a sticker
+   on it. A trait is the outlined form of the same pill. */
+.rc-kw {
+  display: inline-block;
+  vertical-align: .1em;
+  margin: 0 .42em .08em 0;
+  padding: .1em .42em .02em;
+  border-radius: .3em;
+  background: var(--kw, #155b60);
+  color: #fff0bc;
+  font-family: "Bebas Neue", Impact, sans-serif;
+  font-weight: 400;
+  font-style: normal;
+  font-size: .76em;
+  letter-spacing: .07em;
+  line-height: 1.05;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 .07em #f4cd61, 0 0 0 .06em #1d190f;
+}
+.rc-kw--trait {
+  background: #fff6d6;
+  color: var(--kw, #155b60);
+  box-shadow: inset 0 0 0 .08em var(--kw, #155b60);
+}
+.rc-term { font-weight: 600; color: #140f05; white-space: nowrap; }
+.rc-drop {
+  display: inline-block;
+  width: .62em;
+  height: .88em;
+  margin: 0 .12em 0 .02em;
+  vertical-align: -.1em;
+  overflow: visible;
+}
+/* The rule is played, the flavor is read: a hairline between them says so
+   without spending a line. Short and centred, like the flourishes either
+   side of the wordmark. */
+.rc-sep {
+  width: 26%;
+  height: 0;
+  margin: .24em auto .2em;
+  border: 0;
+  border-top: .07em solid rgba(29, 25, 15, .38);
+}
+.rc-sep + .rc-flavor { margin-top: 0; }
+
+/* "19 / 80" in the gold margin, right-aligned to the drop box. Bebas at
+   this size is still a readable numeral on a printed card; the slash is
+   lighter so the two numbers read as a pair. */
+.rc-collector {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  font-family: "Bebas Neue", Impact, sans-serif;
+  font-weight: 400;
+  font-size: calc(var(--u) * .019);
+  letter-spacing: .05em;
+  line-height: 1;
+  color: #1d190f;
+  opacity: .82;
+  font-variant-numeric: tabular-nums;
+}
+.rc-collector i { font-style: normal; opacity: .55; margin: 0 .14em; }
 .rc-stat {
   font-family: "Bebas Neue", "Anton", ui-sans-serif, system-ui;
   font-weight: 400;

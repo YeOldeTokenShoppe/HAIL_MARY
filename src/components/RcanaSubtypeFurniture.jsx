@@ -28,18 +28,18 @@ function SubtypeSymbol({ kind }) {
   );
 }
 
-export function RcanaSubtypeHeader({ data, template, hideFrame = false }) {
+export function RcanaSubtypeHeader({ data, template, hideFrame = false, classFont = "blackletter" }) {
   if (!template) return null;
   return (
     <div className={`rc-subtype-header rc-${data.cardClass.toLowerCase()}-header`} style={{ ...box(SUBTYPE_HEADER), "--subtype-enamel": HEADER_COLORS[data.cardClass] }} data-class={data.cardClass} data-hide-frame={hideFrame || undefined} data-subtype={template.subtype || undefined} aria-label={[data.number != null ? `No. ${data.number}` : null, template.subtype, data.cardClass].filter(Boolean).join(", ")}>
       <span className="rc-subtype-number">{data.number ?? ""}</span>
       {template.subtype && (
-        <span className="rc-subtype-field">
+        <span className="rc-subtype-field" data-font={classFont}>
           <span className="rc-subtype-icon"><SubtypeSymbol kind={template.symbol} /></span>
           <span className="rc-subtype-label" data-long={template.subtype.length > 9 || undefined}>{template.subtype}</span>
         </span>
       )}
-      <span className="rc-subtype-class">{data.cardClass}</span>
+      <span className="rc-subtype-class" data-font={classFont}>{classFont === "bebas" || classFont === "gilt" ? data.cardClass?.toUpperCase() : data.cardClass}</span>
     </div>
   );
 }
@@ -146,6 +146,33 @@ export const SUBTYPE_FURNITURE_STYLES = `
   font-weight: 400;
   font-size: calc(var(--u) * .055);
   white-space: nowrap;
+}
+.rc-subtype-class[data-font="bebas"] { font-family: "Bebas Neue", Impact, sans-serif; }
+/* "gilt" puts the stamped gold letter where the enamel is — the subtype
+   field — so the whole bar is one blackletter, and the icon takes the gold. */
+.rc-subtype-field[data-font="gilt"] .rc-subtype-label {
+  font-family: "Blackletter", "UnifrakturCook", serif;
+  font-weight: 400;
+  letter-spacing: .01em;
+  font-size: calc(var(--u) * .062);
+  color: #f4cd61;
+  text-shadow:
+    0 calc(var(--u) * -.0012) 0 #fff6d0,
+    0 calc(var(--u) * .002) 0 #6a4a08,
+    0 calc(var(--u) * .004) calc(var(--u) * .005) rgba(0, 0, 0, .45);
+}
+.rc-subtype-field[data-font="gilt"] .rc-subtype-label[data-long] { font-size: calc(var(--u) * .054); }
+.rc-subtype-field[data-font="gilt"] .rc-subtype-icon { color: #f4cd61; }
+/* With the subtype struck in gilt, the class beside it steps down to a
+   label: the number cell's own Bebas, tracked caps, plain ink. Two
+   blackletters on one bar compete; number → gilt subtype → category reads
+   left to right. (Gold on this paper field vanishes — tried.) */
+.rc-subtype-class[data-font="gilt"] {
+  font-family: "Bebas Neue", Impact, sans-serif;
+  font-size: calc(var(--u) * .05);
+  letter-spacing: .1em;
+  padding-top: calc(var(--u) * .004);
+  color: #1d190f;
 }
 .rc-subtype-header[data-hide-frame] { background: none; border-color: transparent; }
 .rc-subtype-header[data-class="Event"] .rc-subtype-class { flex-basis: 25%; }

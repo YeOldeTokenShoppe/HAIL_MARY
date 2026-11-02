@@ -23,7 +23,9 @@ export default function RcanaBench() {
   const [depth, setDepth] = useState(1);
   const [showSlots, setShowSlots] = useState(false);
   const [showFacets, setShowFacets] = useState(false);
-  const [classFont, setClassFont] = useState("blackletter");
+  const [classFont, setClassFont] = useState("gilt");
+  // The name on the ribbon: gilt blackletter (default) or the Nabla it replaced.
+  const [nameFont, setNameFont] = useState("gilt");
 
   // Device tilt. iOS hands out the orientation sensor only from inside a tap
   // (DeviceOrientationEvent.requestPermission), Android just fires events,
@@ -59,6 +61,10 @@ export default function RcanaBench() {
   // back, so the two never silently fight.
   const [nudge, setNudge] = useState(null);
   const [inkOnTop, setInkOnTop] = useState(false);
+  // Rules furniture (keyword badge, trait pills, bold terms, hairline) and
+  // the collector line, each switchable to compare against the plain face.
+  const [keywordBadges, setKeywordBadges] = useState(true);
+  const [collectorLine, setCollectorLine] = useState(true);
 
   const source = RCANA_DEMO.find((c) => c.id === cardId) || RCANA_DEMO[0];
   const [rarity, setRarity] = useState(source.rarity);
@@ -162,10 +168,13 @@ export default function RcanaBench() {
           showSlots={showSlots}
           showFacets={showFacets}
           classFont={classFont}
+          nameFont={nameFont}
           gyro={gyro}
           hideFrame={hideFrame}
           showFx={showFx}
           inkOnTop={inkOnTop}
+          keywordBadges={keywordBadges}
+          collectorLine={collectorLine}
           sway
         />
       </section>
@@ -213,12 +222,20 @@ export default function RcanaBench() {
           <label title="Typeface for the class label in the tab">
             Class type
             <select value={classFont} onChange={(e) => setClassFont(e.target.value)}>
-              <option value="blackletter">Blackletter (default)</option>
+              <option value="gilt">Gilt (default) — gold blackletter subtype, Bebas class</option>
+              <option value="blackletter">Blackletter, plain</option>
               <option value="bebas">Bebas (caps)</option>
               <option value="grenze">Grenze Gotisch</option>
               <option value="unifraktur">UnifrakturCook</option>
               <option value="maguntia">UnifrakturMaguntia</option>
               <option value="pirata">Pirata One</option>
+            </select>
+          </label>
+          <label title="Typeface for the name on the ribbon">
+            Name type
+            <select value={nameFont} onChange={(e) => setNameFont(e.target.value)}>
+              <option value="gilt">Gilt blackletter (default)</option>
+              <option value="nabla">Nabla (chromatic 3D)</option>
             </select>
           </label>
           <label title="Where each FX sheet's light facets sit. Every ring should be on flame.">
@@ -258,6 +275,22 @@ export default function RcanaBench() {
               onChange={(e) => setInkOnTop(e.target.checked)}
             />
             Ink above FX
+          </label>
+          <label title="Timing badge, trait pills, bold game terms and the hairline in the rules panel">
+            <input
+              type="checkbox"
+              checked={keywordBadges}
+              onChange={(e) => setKeywordBadges(e.target.checked)}
+            />
+            Rules furniture
+          </label>
+          <label title="The card number over the set size, in the bottom margin">
+            <input
+              type="checkbox"
+              checked={collectorLine}
+              onChange={(e) => setCollectorLine(e.target.checked)}
+            />
+            Collector line
           </label>
         </div>
 

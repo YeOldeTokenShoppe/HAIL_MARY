@@ -25,6 +25,22 @@ export const TYPE_CLASS = {
   grace: "Artifact",
 };
 
+// The printed size of the set, for the collector line ("19 / 80"). Eighty,
+// not the lotería's fifty-four: the RL80 number.
+export const RCANA_SET_SIZE = 80;
+
+// Trait pills — the Palworld "Lucky Pal / Transporting" row, read off the
+// design's own flags so the face never restates a rule. A face may pass
+// `traits: []` to print none, or its own list.
+export function deriveTraits(design) {
+  const t = [];
+  if (design.gamble) t.push("Gamble");
+  if (design.bearProof) t.push("Bear-proof");
+  if (design.income) t.push("Yield");
+  if (design.choice) t.push("Choice");
+  return t;
+}
+
 export function buildFace(face) {
   const design = designByKey[face.design];
   if (!design) throw new Error(`faces.js: "${face.id}" names unknown design "${face.design}"`);
@@ -60,6 +76,7 @@ export function buildFace(face) {
     // drop box's one number is both. Kept as an override hook only.
     tabCost: face.tabCost ?? null,
     ability: face.ability ?? design.text ?? null,
+    traits: face.traits ?? deriveTraits(design),
     flavor: face.flavor ?? null,
     flavorQuoted: face.flavorQuoted,
     printed: face.printed || {},

@@ -59,6 +59,14 @@ injects `designs.js` and the faces into `pt2-table.src.html` and writes
    (printed line — shorter than the simulator's), `flavor`. Halo/hydro print
    the design's `cred`/`liq` unless overridden. Traders' flavor prints as a
    quote and leads the panel; everything else narrates after the rule.
+   The rules line dresses itself: a leading **keyword badge** (the usage
+   label — Equip, Single use, Until cleared, On draw — so don't open the
+   ability with those words; the badge strips a duplicate), **trait pills**
+   read off the design's flags (`gamble`, `bearProof`, `income`, `choice`;
+   override with `traits: [...]`), bold game terms with the drop on
+   "N Hydro", a hairline before the flavor, and the collector line
+   (`number / RCANA_SET_SIZE`) in the bottom margin. The bench's **Rules
+   furniture** and **Collector line** toggles show the plain face.
 
 6. **Check**
    ```
