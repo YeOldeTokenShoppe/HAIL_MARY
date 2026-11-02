@@ -1,7 +1,7 @@
-// La Campana — the mission bell. Three planes, all behind the frame: El Sol
-// over the mission far back, the bell in its stone arch, and bougainvillea
-// hanging in front of the arch — still behind the plate, so the window crops
-// all three together.
+// La Campana — the mission bell. Three planes: El Sol over the mission far
+// back, the bell in its arch with the bougainvillea (one sheet now) inside
+// the window, and the ring of the bell — gold sound arcs either side of it —
+// loose in the air in front of the frame.
 //
 // The scene's sky is only part-opaque at its margins, so the backdrop is the
 // same blue: wherever the scene thins, it thins into itself.
@@ -14,9 +14,10 @@ export default {
   layers: [
     { id: "scene", scale: 1.04 },
     { id: "subject", z: ART_PLANES.subject, scale: 1 },
-    // In front of the arch, behind the frame: no named rung, so the depth
-    // is given outright, a little short of the plate. (+20 was tried and
-    // tore the vine off the arch; 14px ahead keeps it hanging ON it.)
-    { id: "prop", z: -8, scale: 1 },
+    // The sound arcs are not attached to anything, so they take the full
+    // prop rung: ahead of the plate, swinging against the bell on tilt the
+    // way a ring in the air should. (The vine used to be the prop and sat at
+    // -8 to stay ON the arch; it is painted into the subject sheet now.)
+    { id: "prop", z: ART_PLANES.prop, scale: 1 },
   ],
 };

@@ -440,7 +440,7 @@ export const FX_CEILING = 130;
 export * from "./artSpec.js";
 export { RCANA_ART } from "./art/index.js";
 import {
-  ART_PLANES, FX_PLANES, DEFAULT_FRAME, CLASS_FRAME, PLATES, TYPE_BADGE,
+  ART_PLANES, FX_PLANES, DEFAULT_FRAME, CLASS_FRAME, PLATES, PLATES_BY_CLASS, TYPE_BADGE,
   FX_BLEND_DEFAULT, FX_CLIP_DEFAULT, FX_CLEAR_PAD, FX_CLEAR_FEATHER,
 } from "./artSpec.js";
 import { RCANA_ART } from "./art/index.js";
@@ -525,7 +525,11 @@ export function toRcanaCard(card, overrides = {}) {
 
     // An art file may pin a frame; otherwise the plate follows the type.
     plate: card.plate || "boxed",
-    frameImage: art.frame || PLATES[card.plate || "boxed"] || CLASS_FRAME[cls] || DEFAULT_FRAME,
+    frameImage: art.frame
+      || PLATES_BY_CLASS[card.plate || "boxed"]?.[cls]
+      || PLATES[card.plate || "boxed"]
+      || CLASS_FRAME[cls]
+      || DEFAULT_FRAME,
     // The type seal, on sealed plates only (it stands where the halo box was).
     badgeImage: !subtypeTemplate && card.plate === "sealed" ? TYPE_BADGE[card.type] || null : null,
     // "combined" means the figure is inside the frame image, not that the

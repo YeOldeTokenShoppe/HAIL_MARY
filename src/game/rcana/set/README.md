@@ -107,6 +107,13 @@ type (`PLATES` in `artSpec.js`, chosen by `plate` from `buildFace()`):
 | `valued` (`LOTERIA_FRAME2_value`) | **ingot: Prosperity** | **cost** | Asset, Opportunity Event |
 | `sealed` (`LOTERIA_FRAME2_sealed`) | **usage seal** | **cost** (Market: **—**) | Hazard, Market, Remedy, Relic, Grace |
 
+The name banner's border matches the type tab's colour (`HEADER_COLORS`).
+The plates above carry the Trader red; the other classes use a copy with the
+border recoloured (`PLATES_BY_CLASS`, keyed plate → class): `_value_asset`,
+`_value_event`, `_sealed_artifact`, `_sealed_event`. They are generated, not
+painted — after re-exporting a plate, re-run
+`node scripts/recolor-plate-banner.mjs <plate> <out> <#hex>` for each.
+
 The drop box is always "the Liquidity on this card": what you pay to play
 it — and on a Trader, also what they pay you a turn (hire cost = income, by
 rule). The class label is set in Blackletter, the wordmark's face. Events

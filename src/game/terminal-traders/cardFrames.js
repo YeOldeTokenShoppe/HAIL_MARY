@@ -14,6 +14,8 @@
 // that is the asset pack's name, not this set's tier. Confirmed silver → rare.
 const FRAME_DIR = "/TCG/frames";
 const FOIL_DIR = "/TCG/foils";
+export const HOLO_FRAME_SRC = "holo:foil";
+export const HOLO_GOLD_FRAME_SRC = "holo:gold";
 
 // `metaTop` is where the card's EDITION/STYLE/RARITY/SET line is pinned so it
 // lands inside the frame's printed divider slot. Each frame draws that slot at
@@ -33,8 +35,22 @@ export const FRAMES = [
   { id: "gold", label: "Gold", src: `${FRAME_DIR}/frame_gold.webp`, metaTop: "87.35%", plate: `${FOIL_DIR}/plate_gold.webp` },
   { id: "rainbow", label: "Rainbow", src: `${FRAME_DIR}/frame_rainbow.webp`, metaTop: "86.6%", plate: `${FOIL_DIR}/plate_rainbow.webp` },
     { id: "polished grey", label: "polished grey", src: `${FRAME_DIR}/frame_polished_grey.webp`, metaTop: "86.55%", plate: `${FOIL_DIR}/plate_grey.webp` },
-
+  // Live holographic foil (2026-11-01): not an image. `src` is a sentinel —
+  // TradingCard sees the `holo:` prefix and draws the border with WebGL
+  // (src/components/HoloFoilFrame.jsx) in place of the frame <img>, cut out
+  // over the same three slots the printed frames leave open. No plate: the
+  // foil IS the metal, so the CSS shine has nothing to mask. `holo` carries
+  // per-frame overrides for HOLO_DEFAULTS (outerBand, tiltGain, exposure…).
+  { id: "holo", label: "Holo (live)", src: HOLO_FRAME_SRC, metaTop: "86.6%", plate: null, holo: { outerBand: false } },
+  // Gold leaf with a light holographic emboss: mostly mirror, a quarter of
+  // the rainbow. tint is the metal's linear reflectance; mirror makes up the
+  // light the weakened gratings no longer return.
+  { id: "holo gold", label: "Holo Gold (live)", src: HOLO_GOLD_FRAME_SRC, metaTop: "86.6%", plate: null, holo: { outerBand: false, tint: [1.0, 0.72, 0.30], spectral: 0.25, mirror: 1.6, roughness: 6, base: 0.16, exposure: 1.1 } },
 ];
+
+export function holoForFrame(src) {
+  return FRAMES.find((f) => f.src === src)?.holo || null;
+}
 
 // Frame src -> its plate, so a card that only knows its frame image can find
 // the matching plate without the caller having to pass one.

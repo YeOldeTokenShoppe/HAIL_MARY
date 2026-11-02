@@ -154,6 +154,24 @@ export const PLATES = {
   sealed: "/TCG/frames/LOTERIA_FRAME2_sealed.webp",
 };
 
+// The name banner's border is painted red into every plate above, which is
+// the Trader tab's colour (HEADER_COLORS). The other classes get the same
+// plate with the border recoloured to THEIR tab colour — generated from the
+// plate by scripts/recolor-plate-banner.mjs, never hand-edited — looked up
+// by plate then class. A plate with no entry for a class falls back to the
+// red one in PLATES. Re-run the script after any plate re-export:
+//   node scripts/recolor-plate-banner.mjs <plate.webp> <out.webp> <#hex>
+export const PLATES_BY_CLASS = {
+  valued: {
+    Asset: "/TCG/frames/LOTERIA_FRAME2_value_asset.webp",
+    Event: "/TCG/frames/LOTERIA_FRAME2_value_event.webp",
+  },
+  sealed: {
+    Artifact: "/TCG/frames/LOTERIA_FRAME2_sealed_artifact.webp",
+    Event: "/TCG/frames/LOTERIA_FRAME2_sealed_event.webp",
+  },
+};
+
 // The type seal on a sealed plate: a full-canvas overlay (1024x1422, seal in
 // place at the left of the signature strip, centre ≈ 18% across, 90% down),
 // one per type. "event" is the seal for FIRED Events; a called Event is on

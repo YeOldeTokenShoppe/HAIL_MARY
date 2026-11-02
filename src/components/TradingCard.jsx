@@ -2,6 +2,11 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { fxMaterial } from "../game/terminal-traders/fxMaterials.js";
+import HoloFoilFrame from "./HoloFoilFrame.jsx";
+
+// A frame src with this prefix is not an image: the border is computed live
+// by HoloFoilFrame. See cardFrames.js HOLO_FRAME_SRC.
+const HOLO_FRAME = /^holo:/;
 
 const REST_TILT = { rx: 0, ry: 0, mx: 50, my: 50, posx: 50, posy: 50, hyp: 0, lift: 0 };
 
@@ -852,10 +857,12 @@ export default function TradingCard({
               not fire reliably there — at collection-grid scale the frames
               simply never loaded. Only 4 frame files exist set-wide, so they
               cache after the first card and cost nothing to load eagerly. */}
-          {data.frameImage && (
+          {data.frameImage && HOLO_FRAME.test(data.frameImage) ? (
+            <HoloFoilFrame tilt={tilt} scale={scale} options={data.frameHolo} />
+          ) : data.frameImage ? (
             <img className="tc-cardframe" src={data.frameImage} alt="" draggable={false}
                  decoding="async" />
-          )}
+          ) : null}
 
           {cornerBadge && (
             <div className="tc-corner-badge" aria-hidden="true">

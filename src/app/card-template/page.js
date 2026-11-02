@@ -5,7 +5,7 @@ import TradingCard from "@/components/TradingCard";
 import { getCardById, GENESIS_SET, CARD_TYPES } from "@/game/terminal-traders/cards";
 import { toTemplateCard, CARD_ART } from "@/game/terminal-traders/templateCard";
 import {
-  FRAMES, FRAME_ID_BY_RARITY, FX_OVERLAYS, FX_BLEND_MODES, MAX_FX, plateForFrame,
+  FRAMES, FRAME_ID_BY_RARITY, FX_OVERLAYS, FX_BLEND_MODES, MAX_FX, plateForFrame, holoForFrame,
   FX_BLEND_DEFAULT, FX_OPACITY_DEFAULT,
 } from "@/game/terminal-traders/cardFrames";
 import { ROGUES } from "@/game/terminal-traders/rogues";
@@ -200,6 +200,7 @@ export default function CardTemplatePage() {
     shineStrength,
     frameImage: resolvedFrame,
     foilPlate: usePlate ? plateForFrame(resolvedFrame) : null,
+    frameHolo: holoForFrame(resolvedFrame),
     effects: effectsOn ? "on" : "off",
     // Overriding the frame must carry its divider-slot offset too, or the
     // meta line lands on a bar (the frames don't share a slot height).
