@@ -1,6 +1,7 @@
 import React from "react";
 import { SUBTYPE_HEADER, SUBTYPE_USAGE_SLOT } from "../game/rcana/subtypeTemplate.js";
 import { HEADER_COLORS } from "../game/rcana/headerColors.js";
+import { SUBTYPE_WORDMARKS } from "../game/rcana/subtypeWordmarks.js";
 
 const box = ({ x, y, w, h }) => ({ left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%` });
 
@@ -12,7 +13,7 @@ function SubtypeSymbol({ kind }) {
         <circle cx="13" cy="18" r="1" fill="currentColor" stroke="none" />
       </> : kind === "grace" ? <>
         <path d="M11 17h10v12H11zM8 29h16M16 3c-1 4-5 5-5 8a5 5 0 0 0 10 0c0-3-4-4-5-8Z" />
-      </> : kind === "hazard" ? <>
+      </> : kind === "calamity" ? <>
         <path d="M10 27v-5a11 11 0 1 1 12 0v5H10ZM14 24v3M18 24v3" />
         <circle cx="11.5" cy="15" r="2" /><circle cx="20.5" cy="15" r="2" />
         <path d="m16 19-1 2h2Z" fill="currentColor" stroke="none" />
@@ -28,18 +29,28 @@ function SubtypeSymbol({ kind }) {
   );
 }
 
-export function RcanaSubtypeHeader({ data, template, hideFrame = false, classFont = "bebas" }) {
+export function RcanaSubtypeHeader({ data, template, hideFrame = false, classFont = "mosaic" }) {
   if (!template) return null;
+  const wordmark = classFont === "mosaic" ? SUBTYPE_WORDMARKS[template.subtype] : null;
+  const categoryFont = classFont === "mosaic" ? "bebas" : classFont;
   return (
     <div className={`rc-subtype-header rc-${data.cardClass.toLowerCase()}-header`} style={{ ...box(SUBTYPE_HEADER), "--subtype-enamel": HEADER_COLORS[data.cardClass] }} data-class={data.cardClass} data-hide-frame={hideFrame || undefined} data-subtype={template.subtype || undefined} aria-label={[data.number != null ? `No. ${data.number}` : null, template.subtype, data.cardClass].filter(Boolean).join(", ")}>
       <span className="rc-subtype-number">{data.number ?? ""}</span>
       {template.subtype && (
         <span className="rc-subtype-field" data-font={classFont}>
           <span className="rc-subtype-icon"><SubtypeSymbol kind={template.symbol} /></span>
-          <span className="rc-subtype-label" data-long={template.subtype.length > 9 || undefined}>{template.subtype}</span>
+          <span className="rc-subtype-label" data-long={template.subtype.length > 9 || undefined} data-wordmark={wordmark ? true : undefined}>
+            {wordmark ? (
+              <svg className="rc-subtype-wordmark" viewBox={wordmark.viewBox.join(" ")}
+                width={wordmark.viewBox[2]} height={wordmark.viewBox[3]}
+                preserveAspectRatio="xMinYMid meet" role="img" aria-label={template.subtype} focusable="false">
+                <image href={wordmark.src} width={wordmark.width} height={wordmark.height} aria-hidden="true" />
+              </svg>
+            ) : template.subtype}
+          </span>
         </span>
       )}
-      <span className="rc-subtype-class" data-font={classFont}>{classFont === "bebas" || classFont === "gilt" ? data.cardClass?.toUpperCase() : data.cardClass}</span>
+      <span className="rc-subtype-class" data-font={categoryFont}>{categoryFont === "bebas" || categoryFont === "gilt" ? data.cardClass?.toUpperCase() : data.cardClass}</span>
     </div>
   );
 }
@@ -130,12 +141,37 @@ export const SUBTYPE_FURNITURE_STYLES = `
 }
 .rc-subtype-label { white-space: nowrap; }
 .rc-subtype-label[data-long] { font-size: calc(var(--u) * .049); }
-.rc-subtype-field[data-font="bebas"] {
+.rc-subtype-field[data-font="bebas"],
+.rc-subtype-field[data-font="mosaic"] {
   font-family: "Bebas Neue", Impact, sans-serif;
   font-size: calc(var(--u) * .055);
   font-weight: 400;
   letter-spacing: .08em;
   text-transform: uppercase;
+}
+.rc-subtype-field[data-font="mosaic"] {
+  gap: calc(var(--u) * .014);
+  padding-left: calc(var(--u) * .026);
+  padding-right: calc(var(--u) * .035);
+}
+.rc-subtype-label[data-wordmark] {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+.rc-subtype-wordmark {
+  display: block;
+  flex-shrink: 1;
+  width: auto;
+  max-width: 100%;
+  height: calc(var(--u) * .06);
+}
+.rc-subtype-field[data-font="mosaic"] .rc-subtype-icon {
+  flex-basis: calc(var(--u) * .055);
+  width: calc(var(--u) * .055);
+  height: calc(var(--u) * .055);
+  color: #f4cd61;
 }
 .rc-subtype-icon {
   display: flex;

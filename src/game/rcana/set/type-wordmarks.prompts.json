@@ -1,0 +1,22 @@
+{
+  "mode": "built-in imagegen",
+  "transparent_background": true,
+  "assets": [
+    {
+      "word": "TRADER",
+      "source": "/Users/michellepaulson/HAIL_MARY/src/game/rcana/set/labels/subtype-relic.png",
+      "prompt": "Use case: text-localization. Asset type: transparent gold mosaic wordmark for the top-left type label of an illustrated Lotería card. Input image: the existing RELIC wordmark is the lettering style reference. Create ONLY the new word \"TRADER\", correctly spelled T R A D E R, in all uppercase, matching the reference's classical serif letterforms, carved gold bevels, warm amber-gold highlights, small mosaic tile texture, and restrained decorative terminals. Keep it in the exact same family as RELIC. A small flourish on the first capital is welcome, but preserve bold clear letter silhouettes and moderate spacing; no extreme swoops. One straight horizontal line, naturally proportioned letters. Thin dark bronze contours may hug individual letter edges. Genuine transparent background with all letter counters and spaces fully transparent: no haze, pale glow, checkerboard, shadow field, plaque, ribbon, frame or backing shape. No other text, logos, icons or ornaments. Keep the whole word and every serif inside the canvas. This will display approximately 35 pixels tall on a colored header. Prefer a wide 3:1 canvas with enough transparent padding above and below the centered word to retain its natural proportions; do not stretch the word to fill canvas height.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a1ac-7563-7452-925f-c66c731e1bdf/exec-dca093ab-45e1-4410-a60d-81c74c51aba8.png",
+      "png": "src/game/rcana/set/labels/type-trader.png",
+      "webp": "public/TCG/labels/type-trader.webp"
+    },
+    {
+      "word": "ASSET",
+      "source": "/Users/michellepaulson/HAIL_MARY/src/game/rcana/set/labels/subtype-relic.png",
+      "prompt": "Use case: text-localization. Asset type: transparent gold mosaic wordmark for the top-left type label of an illustrated Lotería card. Input image: the existing RELIC wordmark is the lettering style reference. Create ONLY the new word \"ASSET\", correctly spelled A S S E T, in all uppercase, matching the reference's classical serif letterforms, carved gold bevels, warm amber-gold highlights, small mosaic tile texture, and restrained decorative terminals. Keep it in the exact same family as RELIC. A small flourish on the first capital is welcome, but preserve bold clear letter silhouettes and moderate spacing; no extreme swoops. One straight horizontal line, naturally proportioned letters. Thin dark bronze contours may hug individual letter edges. Genuine transparent background with all letter counters and spaces fully transparent: no haze, pale glow, checkerboard, shadow field, plaque, ribbon, frame or backing shape. No other text, logos, icons or ornaments. Keep the whole word and every serif inside the canvas. This will display approximately 35 pixels tall on a colored header. Prefer a wide 3:1 canvas with enough transparent padding above and below the centered word to retain its natural proportions; do not stretch the word to fill canvas height.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a1ac-7563-7452-925f-c66c731e1bdf/exec-a0b5a24e-1429-4d9d-a15e-0ff0214691a4.png",
+      "png": "src/game/rcana/set/labels/type-asset.png",
+      "webp": "public/TCG/labels/type-asset.webp"
+    }
+  ]
+}

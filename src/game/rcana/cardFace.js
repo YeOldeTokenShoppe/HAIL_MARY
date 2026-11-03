@@ -10,7 +10,7 @@
 //                          z) when its own art is drawn to overhang the
 //                          border — see ART_PLANES.figureFront
 //   frame       near       border, banner, parchment panel, stat boxes, mark
-//   ink         near       number, class, name, ability, halo, hydro, rarity
+//   ink         near       number, class, name, ability, halo, hydro, emblem
 //   fx[0..n]    nearest    overlays in FRONT of the card: flame, thunder, holo
 //
 // The ink rides at the SAME depth as the frame, because every ink slot is
@@ -77,10 +77,8 @@ export const POINT_TYPES = {
 // ---------------------------------------------------------------------------
 // Rarity
 // ---------------------------------------------------------------------------
-// The faceted heart and arrow sit beside the printed rarity tier in a small
-// gold-edged seal. Red enamel covers Common/Uncommon; gold covers Rare/Mythic.
-// The written tier distinguishes rarities without relying on colour alone.
-// Set false to omit the arrow while preserving the heart and tier label.
+// Rarity still drives gameplay and foil; the card footer uses the mosaic
+// medallion. These legacy palettes remain available to standalone heart effects.
 export const RARITY_HEART_ARROW = true;
 
 // These palettes and `holo` flags support the optional earlier foil finishes.
@@ -308,14 +306,16 @@ export const RCANA_LAYOUT = {
 
   // Gameplay first: the text starts inside the ribbon tails and ends above
   // the compact live footer. No padding is added outside these bounds.
-  bodyPanel: { x: 9.5, y: 77.0, w: 81.0, h: 13.0 },
+  bodyPanel: { x: 9.5, y: 77.0, w: 81.0, h: 12.1 },
+  footerPanel: { x: 4.3, y: 89.6, w: 91.4, h: 7.5 },
   standingBox: { x: 9, y: 91.2, w: 27, h: 5.2 },
   haloBox: { x: 9, y: 91.2, w: 27, h: 5.2 },
   hydroBox: { x: 68, y: 91.2, w: 23, h: 5.2 },
   haloValue: { x: 28, y: 91.2, w: 7, h: 5.2 },
   haloValueValued: { x: 28, y: 91.2, w: 7, h: 5.2 },
   hydroValue: { x: 83, y: 91.2, w: 7, h: 5.2 },
-  rarity: { x: 37.5, y: 91.2, w: 25, h: 5.2, heightFactor: 0.038 },
+  // The mosaic medallion overlaps the bottom border between the stats.
+  rarity: { x: 37.5, y: 89, w: 25, h: 10.8 },
 };
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,30 @@
+{
+  "mode": "built-in imagegen",
+  "transparent_background": true,
+  "assets": [
+    {
+      "name": "PROSPERITY",
+      "filename": "RL80_PROSPERITY_ribbon_clean",
+      "source": "/Users/michellepaulson/.codex/generated_images/01a1a1ac-7563-7452-925f-c66c731e1bdf/exec-2bf6c102-ff60-4a2b-9599-a7cc31c3737a.png",
+      "prompt": "Use case: precise-object-edit. Asset type: transparent game-card stat badge. Input image is the sole edit target. Remove ONLY the two small angular gold Greek-key/scroll-like ornaments that flank the lettering INSIDE the red ribbon, filling their former locations with seamlessly matching red ribbon texture. Preserve the complete outside gold ribbon border, its notched ends, every coin/medal frame, blank number wells, tails if present, all original lighting, colors and textures. Preserve the original canvas aspect ratio, silhouette, scale, object placement and transparent margins EXACTLY so this remains a drop-in replacement for the same card layout. Keep the label exactly \"PROSPERITY\" with identical typography, sizing and location. Do not enlarge the text; the removed ornaments should leave clean breathing room to either side. Do not add any decoration or numbers. No extra border or marks. Genuine transparent background, preserve existing alpha. Change only those two interior ornamental glyphs."
+    },
+    {
+      "name": "COST",
+      "filename": "RL80_COST_ribbon_clean",
+      "source": "/Users/michellepaulson/.codex/generated_images/01a1a1ac-7563-7452-925f-c66c731e1bdf/exec-d9a1d022-2764-4572-81bc-e56bc6448e13.png",
+      "prompt": "Use case: precise-object-edit. Asset type: transparent game-card stat badge. Input image is the sole edit target. Remove ONLY the two small angular gold Greek-key/scroll-like ornaments that flank the lettering INSIDE the red ribbon, filling their former locations with seamlessly matching red ribbon texture. Preserve the complete outside gold ribbon border, its notched ends, every coin/medal frame, blank number wells, tails if present, all original lighting, colors and textures. Preserve the original canvas aspect ratio, silhouette, scale, object placement and transparent margins EXACTLY so this remains a drop-in replacement for the same card layout. Keep the label exactly \"COST\" with identical typography, sizing and location. Do not enlarge the text; the removed ornaments should leave clean breathing room to either side. Do not add any decoration or numbers. No extra border or marks. Genuine transparent background, preserve existing alpha. Change only those two interior ornamental glyphs."
+    },
+    {
+      "name": "CRED",
+      "filename": "RL80_CRED_medal_clean",
+      "source": "/Users/michellepaulson/.codex/generated_images/01a1a1ac-7563-7452-925f-c66c731e1bdf/exec-00335505-0a78-4a74-8f9c-91612a429b82.png",
+      "prompt": "Use case: precise-object-edit. Asset type: transparent game-card stat badge. Input image is the sole edit target. Remove ONLY the two small angular gold Greek-key/scroll-like ornaments that flank the lettering INSIDE the red ribbon, filling their former locations with seamlessly matching red ribbon texture. Preserve the complete outside gold ribbon border, its notched ends, every coin/medal frame, blank number wells, tails if present, all original lighting, colors and textures. Preserve the original canvas aspect ratio, silhouette, scale, object placement and transparent margins EXACTLY so this remains a drop-in replacement for the same card layout. Keep the label exactly \"CRED\" with identical typography, sizing and location. Do not enlarge the text; the removed ornaments should leave clean breathing room to either side. Do not add any decoration or numbers. No extra border or marks. Genuine transparent background, preserve existing alpha. Change only those two interior ornamental glyphs."
+    },
+    {
+      "name": "COST_INCOME",
+      "filename": "RL80_COST_INCOME_coin_bar_clean",
+      "source": "/Users/michellepaulson/.codex/generated_images/01a1a1ac-7563-7452-925f-c66c731e1bdf/exec-37d64213-ec35-4b8d-b4ea-ff58ffd6254f.png",
+      "prompt": "Use case: precise-object-edit. Asset type: transparent game-card stat badge. Input image is the sole edit target. Remove ONLY the two small angular gold Greek-key/scroll-like ornaments that flank the lettering INSIDE the red ribbon, filling their former locations with seamlessly matching red ribbon texture. Preserve the complete outside gold ribbon border, its notched ends, every coin/medal frame, blank number wells, tails if present, all original lighting, colors and textures. Preserve the original canvas aspect ratio, silhouette, scale, object placement and transparent margins EXACTLY so this remains a drop-in replacement for the same card layout. Keep the label exactly \"COST above INCOME\" with identical typography, sizing and location, and keep the horizontal divider between COST and INCOME. Do not enlarge the text; the removed ornaments should leave clean breathing room to either side. Do not add any decoration or numbers. No extra border or marks. Genuine transparent background, preserve existing alpha. Change only those two interior ornamental glyphs."
+    }
+  ]
+}

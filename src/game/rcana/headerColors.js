@@ -1,5 +1,5 @@
 // Main card types share gold trim and pale-gold lettering, with one
-// restrained field color per type. Liquidity always retains its own teal.
+// restrained field color per type. Footer badge ribbons use matching variants.
 export const HEADER_COLORS = {
   // The red of the name banner's border on the Lotería plate, picked off
   // LOTERIA_FRAME2.webp, so the Trader tab reads as part of the frame.

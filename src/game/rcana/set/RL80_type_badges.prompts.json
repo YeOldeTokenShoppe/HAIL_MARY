@@ -1,0 +1,66 @@
+{
+  "mode": "built-in imagegen",
+  "transparent_background": true,
+  "assets": [
+    {
+      "cardClass": "Asset",
+      "kind": "cost",
+      "color": "#315c3c",
+      "colorName": "muted forest green",
+      "file": "RL80_COST_ribbon_asset",
+      "source": "/Users/michellepaulson/HAIL_MARY/src/game/rcana/set/RL80_COST_ribbon_wide.png",
+      "prompt": "Use case: precise-object-edit. Change ONLY the red interior background of this game badge's ribbon to muted forest green, matching the card type accent color #315c3c. Keep the same fine painted texture, highlights and shadows, with the main ribbon field centered on #315c3c, so it pairs with a flat header in that color. Preserve ALL other artwork exactly: gold lettering, gold bevel borders, single blank gold coin on the right, their shapes, size, location, light, shadows and colors. Exact existing text \"COST\" stays unchanged in its existing pale gold color, font, size and position. Preserve the original 2172x724 canvas, transparent margins and complete silhouette exactly. No moving, stretching, cropping, enlarging or redrawing the lettering or gold elements. Do not tint the gold coins, borders or lettering. No added ornaments, numbers, words or symbols. Only the ribbon's red material becomes muted forest green. Keep genuine transparent alpha outside the badge.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a1ac-7563-7452-925f-c66c731e1bdf/exec-f6e0d6a7-412c-4765-b3ab-b9f99b4a3008.png",
+      "png": "src/game/rcana/set/RL80_COST_ribbon_asset.png",
+      "webp": "public/RL80_COST_ribbon_asset.webp"
+    },
+    {
+      "cardClass": "Artifact",
+      "kind": "cost",
+      "color": "#155b60",
+      "colorName": "deep muted teal",
+      "file": "RL80_COST_ribbon_artifact",
+      "source": "/Users/michellepaulson/HAIL_MARY/src/game/rcana/set/RL80_COST_ribbon_wide.png",
+      "prompt": "Use case: precise-object-edit. Change ONLY the red interior background of this game badge's ribbon to deep muted teal, matching the card type accent color #155b60. Keep the same fine painted texture, highlights and shadows, with the main ribbon field centered on #155b60, so it pairs with a flat header in that color. Preserve ALL other artwork exactly: gold lettering, gold bevel borders, single blank gold coin on the right, their shapes, size, location, light, shadows and colors. Exact existing text \"COST\" stays unchanged in its existing pale gold color, font, size and position. Preserve the original 2172x724 canvas, transparent margins and complete silhouette exactly. No moving, stretching, cropping, enlarging or redrawing the lettering or gold elements. Do not tint the gold coins, borders or lettering. No added ornaments, numbers, words or symbols. Only the ribbon's red material becomes deep muted teal. Keep genuine transparent alpha outside the badge.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a1ac-7563-7452-925f-c66c731e1bdf/exec-1e21356b-4108-4f8e-a514-71e467c983eb.png",
+      "png": "src/game/rcana/set/RL80_COST_ribbon_artifact.png",
+      "webp": "public/RL80_COST_ribbon_artifact.webp"
+    },
+    {
+      "cardClass": "Event",
+      "kind": "cost",
+      "color": "#38477e",
+      "colorName": "muted indigo blue",
+      "file": "RL80_COST_ribbon_event",
+      "source": "/Users/michellepaulson/HAIL_MARY/src/game/rcana/set/RL80_COST_ribbon_wide.png",
+      "prompt": "Use case: precise-object-edit. Change ONLY the red interior background of this game badge's ribbon to muted indigo blue, matching the card type accent color #38477e. Keep the same fine painted texture, highlights and shadows, with the main ribbon field centered on #38477e, so it pairs with a flat header in that color. Preserve ALL other artwork exactly: gold lettering, gold bevel borders, single blank gold coin on the right, their shapes, size, location, light, shadows and colors. Exact existing text \"COST\" stays unchanged in its existing pale gold color, font, size and position. Preserve the original 2172x724 canvas, transparent margins and complete silhouette exactly. No moving, stretching, cropping, enlarging or redrawing the lettering or gold elements. Do not tint the gold coins, borders or lettering. No added ornaments, numbers, words or symbols. Only the ribbon's red material becomes muted indigo blue. Keep genuine transparent alpha outside the badge.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a1ac-7563-7452-925f-c66c731e1bdf/exec-8b2bd9f6-7bf0-497b-8fa8-00ff659e0b31.png",
+      "png": "src/game/rcana/set/RL80_COST_ribbon_event.png",
+      "webp": "public/RL80_COST_ribbon_event.webp"
+    },
+    {
+      "cardClass": "Asset",
+      "kind": "prosperity",
+      "color": "#315c3c",
+      "colorName": "muted forest green",
+      "file": "RL80_PROSPERITY_stack_ribbon_asset",
+      "source": "/Users/michellepaulson/HAIL_MARY/src/game/rcana/set/RL80_PROSPERITY_stack_ribbon.png",
+      "prompt": "Use case: precise-object-edit. Change ONLY the red interior background of this game badge's ribbon to muted forest green, matching the card type accent color #315c3c. Keep the same fine painted texture, highlights and shadows, with the main ribbon field centered on #315c3c, so it pairs with a flat header in that color. Preserve ALL other artwork exactly: gold lettering, gold bevel borders, three stacked gold coins on the left with a blank top face, their shapes, size, location, light, shadows and colors. Exact existing text \"PROSPERITY\" stays unchanged in its existing pale gold color, font, size and position. Preserve the original 2172x724 canvas, transparent margins and complete silhouette exactly. No moving, stretching, cropping, enlarging or redrawing the lettering or gold elements. Do not tint the gold coins, borders or lettering. No added ornaments, numbers, words or symbols. Only the ribbon's red material becomes muted forest green. Keep genuine transparent alpha outside the badge.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a1ac-7563-7452-925f-c66c731e1bdf/exec-7e4c5a05-1e87-4da8-8464-ffe1ba6d8817.png",
+      "png": "src/game/rcana/set/RL80_PROSPERITY_stack_ribbon_asset.png",
+      "webp": "public/RL80_PROSPERITY_stack_ribbon_asset.webp"
+    },
+    {
+      "cardClass": "Event",
+      "kind": "prosperity",
+      "color": "#38477e",
+      "colorName": "muted indigo blue",
+      "file": "RL80_PROSPERITY_stack_ribbon_event",
+      "source": "/Users/michellepaulson/HAIL_MARY/src/game/rcana/set/RL80_PROSPERITY_stack_ribbon.png",
+      "prompt": "Use case: precise-object-edit. Change ONLY the red interior background of this game badge's ribbon to muted indigo blue, matching the card type accent color #38477e. Keep the same fine painted texture, highlights and shadows, with the main ribbon field centered on #38477e, so it pairs with a flat header in that color. Preserve ALL other artwork exactly: gold lettering, gold bevel borders, three stacked gold coins on the left with a blank top face, their shapes, size, location, light, shadows and colors. Exact existing text \"PROSPERITY\" stays unchanged in its existing pale gold color, font, size and position. Preserve the original 2172x724 canvas, transparent margins and complete silhouette exactly. No moving, stretching, cropping, enlarging or redrawing the lettering or gold elements. Do not tint the gold coins, borders or lettering. No added ornaments, numbers, words or symbols. Only the ribbon's red material becomes muted indigo blue. Keep genuine transparent alpha outside the badge.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a1ac-7563-7452-925f-c66c731e1bdf/exec-49fe5adb-5a1c-4568-bbda-3c370b8a8cf7.png",
+      "png": "src/game/rcana/set/RL80_PROSPERITY_stack_ribbon_event.png",
+      "webp": "public/RL80_PROSPERITY_stack_ribbon_event.webp"
+    }
+  ]
+}

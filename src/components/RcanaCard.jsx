@@ -1,21 +1,17 @@
 "use client";
 
-import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fxMaterial } from "../game/terminal-traders/fxMaterials.js";
 import {
   RCANA_ASPECT,
   RCANA_LAYOUT,
   RCANA_DEPTHS,
   RCANA_RARITIES,
-  HEART_METALS,
-  HEART_HOLO,
-  RARITY_HEART_ARROW,
   CLASS_TONE,
   DEPTH_FLOOR,
   MAX_TILT,
   behindClip,
 } from "../game/rcana/cardFace.js";
-import { CurrencyHeart, SigilHeart, HEART, HEART_SHADOW, ARROW, ARROW_SHADOW } from "./CurrencyHeart.jsx";
 import { ArtifactHeader } from "./RcanaArtifactTemplate.jsx";
 import { EventHeader } from "./RcanaEventTemplate.jsx";
 import { SUBTYPE_FURNITURE_STYLES, UsageSymbol } from "./RcanaSubtypeFurniture.jsx";
@@ -108,9 +104,10 @@ export default function RcanaCard({
   // where a card-sized dead zone in the scroll is a trap. Defaults to
   // following `sway`, which marks the same distinction.
   captureTouch = sway,
-  // Condensed caps make the type easy to scan and distinguish it from the
-  // ornate card name. Earlier blackletter options remain on the bench.
-  classFont = "bebas",
+  // Mosaic wordmarks identify compact types and subtypes; the secondary
+  // Artifact/Event class labels remain condensed capitals.
+  // Earlier text-only treatments remain available on the bench.
+  classFont = "mosaic",
   // Typeface for the name on the ribbon. "gilt" is blackletter struck in gold.
   // "nabla" is the chromatic 3D sans it replaced; it stays for foils and
   // alt-arts, where loud is the job. (Nabla is a COLRv1 font: engines
@@ -402,6 +399,7 @@ export default function RcanaCard({
   const printed = data.printed || {};
   const L = data.layout || RCANA_LAYOUT;
   const usage = data.artifactTemplate || data.eventTemplate;
+  const categoryFont = classFont === "mosaic" ? "bebas" : classFont;
 
   const box = (slot) => ({
     left: `${slot.x}%`,
@@ -537,6 +535,9 @@ export default function RcanaCard({
           {/* The editable paper covers the old painted logo, seal and stat
               boxes while keeping the illustration, ribbon and outer frame. */}
           {!hideFrame && <div className="rc-footer-paper" aria-hidden />}
+          {!hideFrame && !data.templateOnly && (
+            <div className="rc-footer-panel" style={box(L.footerPanel)} aria-hidden="true" />
+          )}
 
           {showSlots && (
             <div className="rc-slots" aria-hidden>
@@ -584,9 +585,9 @@ export default function RcanaCard({
               <div className="rc-slot rc-number" style={box(L.numberCell)}>
                 <span>{data.number ?? ""}</span>
               </div>
-              <div className="rc-slot rc-class" style={box(L.classCell)} data-sub={data.subClass ? "1" : undefined} data-font={classFont}>
+              <div className="rc-slot rc-class" style={box(L.classCell)} data-sub={data.subClass ? "1" : undefined} data-font={categoryFont}>
                 <span>
-                  {classFont === "bebas" ? (data.cardClass || "").toUpperCase() : data.cardClass || ""}
+                  {categoryFont === "bebas" ? (data.cardClass || "").toUpperCase() : data.cardClass || ""}
                   {/* A coin after the class, only when a face sets tabCost —
                       no card does by default, since a Trader's hire cost is
                       their income and the drop box carries it. */}
@@ -634,14 +635,16 @@ export default function RcanaCard({
 
           {/* Sealed cards put usage beside its label above the rule. */}
           {data.plate !== "sealed" && (
-            <RcanaValueBox value={data.halo} slot={L.standingBox} hideFrame={hideFrame}
+            <RcanaValueBox value={data.halo} slot={L.standingBox} hideFrame={hideFrame} cardClass={data.cardClass}
               kind={data.plate === "valued" ? "prosperity" : "grace"}
               label={data.plate === "valued" ? "Prosperity" : "Credibility"} />
           )}
           {data.liquidityBox ? (
             <RcanaLiquidityBox
+              cardClass={data.cardClass}
               value={data.cardClass === "Trader" ? data.cost ?? data.hydro : data.hydro}
               income={data.cardClass === "Trader" ? data.hydro : undefined}
+              ribbon={data.cardClass === "Asset" || data.cardClass === "Event" || data.cardClass === "Artifact"}
               slot={data.liquidityBox} hideFrame={hideFrame} />
           ) : (
             <div className="rc-slot rc-stat" style={box(L.hydroValue)} data-len={String(data.hydro ?? "").length}>
@@ -656,28 +659,17 @@ export default function RcanaCard({
             </div>
           )}
 
-          {!printed.rarity && (() => {
-            const heartSlot = L.rarity;
-            const hf = heartSlot.heightFactor || 0.048;
-            return (
-              <div className="rc-slot rc-rarity" style={box(heartSlot)} role="img" aria-label={`Rarity: ${data.rarity}`}>
-                <div className="rc-rarity-seal" aria-hidden="true">
-                  <RarityHeart
-                    rarity={rarity}
-                    height={u * hf}
-                    heightFactor={hf}
-                    rx={lrx}
-                    ry={HEART_HOLO.style === "sigil" ? tilt.ry : lry}
-                    mx={tilt.mx}
-                    my={tilt.my}
-                    hyp={tilt.hyp}
-                    slot={heartSlot}
-                  />
-                  <span>{data.rarity}</span>
-                </div>
-              </div>
-            );
-          })()}
+          {!printed.rarity && (
+            <div className="rc-slot rc-emblem" style={box(L.rarity)}>
+              <img
+                src="/RL80_Mosaic_Medallion.webp"
+                alt="RL80 heart-and-arrow medallion"
+                width={1254}
+                height={1254}
+                draggable={false}
+              />
+            </div>
+          )}
         </div>
 
         {/* ---------------- fx: in front of everything ----------------
@@ -759,344 +751,6 @@ export default function RcanaCard({
   );
 }
 
-// The rarity mark: the site's own favicon heart, with its flat red swapped
-// for a metal. The paths live in CurrencyHeart.jsx alongside the currency OVD;
-// The default faceted finish shares the footer's warm metal palette. Earlier
-// foil treatments remain available through HEART_HOLO.style.
-const RarityHeart = React.memo(function RarityHeart({ rarity, height, heightFactor = 0.048, rx, ry, mx, my, hyp, slot }) {
-  const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
-  const metal = HEART_METALS[rarity.heart];
-  if (!metal) return null;
-
-  if (HEART_HOLO.style === "faceted") {
-    const gold = rarity.heart === "gold";
-    const colors = gold
-      ? { light: "#fff3aa", mid: "#e5b13c", dark: "#a3671e", edge: "#80511e" }
-      : { light: "#f3a17d", mid: "#bd442e", dark: "#832b20", edge: "#713020" };
-    return (
-      <svg className="rc-heart rc-heart--faceted" viewBox="0 0 72 60" width={height * 1.2} height={height} aria-hidden focusable="false">
-        <defs>
-          <clipPath id={`${uid}-facets`}><path d={HEART} /></clipPath>
-          <linearGradient id={`${uid}-arrow`} x1="0" y1="0" x2="0.7" y2="1">
-            <stop offset="0" stopColor="#fff5bf" />
-            <stop offset=".48" stopColor="#e4af3d" />
-            <stop offset="1" stopColor="#a87322" />
-          </linearGradient>
-        </defs>
-        <g transform="translate(-262.671875,-68.484385) scale(1.333333)">
-          <path d={HEART} fill={colors.mid} stroke={colors.edge} strokeWidth="1.8" strokeLinejoin="round" />
-          <g clipPath={`url(#${uid}-facets)`}>
-            <path d="M196 51H211L221 68 197 73Z" fill={colors.light} />
-            <path d="M211 51 221 58 221 68Z" fill={colors.mid} />
-            <path d="M221 58 233 51 246 60 221 68Z" fill={colors.light} />
-            <path d="M197 73 221 68 221 96Z" fill={colors.mid} />
-            <path d="M221 68 246 60 242 80 221 96Z" fill={colors.dark} />
-            <path d="M197 73 209 83 221 96 211 76Z" fill={colors.dark} />
-          </g>
-          <path d={HEART} fill="none" stroke={colors.light} strokeWidth=".65" strokeLinejoin="round" />
-          {RARITY_HEART_ARROW && <path d={ARROW} fill={`url(#${uid}-arrow)`} stroke="#68461e" strokeWidth="1.25" strokeLinejoin="round" />}
-        </g>
-      </svg>
-    );
-  }
-
-  if (metal.holo && HEART_HOLO.style === "sigil") {
-    // The mark is centred in its slot, 0.048 card-widths tall and 1.2× as
-    // wide, so its box in card percent is known without measuring. Map the
-    // pointer into the mark's own viewBox (72×60) for the pool.
-    const wPct = heightFactor * 1.2 * 100;
-    const hPct = heightFactor * RCANA_ASPECT * 100;
-    const cx = slot ? slot.x + slot.w / 2 : 50;
-    const cy = slot ? slot.y + slot.h / 2 : 50;
-    const px = 36 + (((mx ?? 50) - cx) / wPct) * 72;
-    const py = 30 + (((my ?? 50) - cy) / hPct) * 60;
-    return (
-      <SigilHeart
-        uid={uid}
-        height={height}
-        metal={metal}
-        mx={mx}
-        my={my}
-        px={px}
-        py={py}
-        hyp={hyp}
-        ry={ry}
-        arrow={RARITY_HEART_ARROW}
-      />
-    );
-  }
-
-  // -1..1 across the card's travel, so the foil reads the tilt the same way
-  // the flame light does.
-  const dx = Math.max(-1, Math.min(1, (ry || 0) / MAX_TILT.ry));
-  const dy = Math.max(-1, Math.min(1, (rx || 0) / MAX_TILT.rx));
-
-  if (!metal.holo) {
-    // Flat ink. A basic card's mark is printed, not struck in foil.
-    return (
-      <svg className="rc-heart" viewBox="0 0 72 60" width={height * 1.2} height={height} aria-hidden focusable="false">
-        <defs>
-          <linearGradient id={uid} x1="0" y1="0" x2="0.4" y2="1">
-            <stop offset="0%" stopColor={metal.lit} />
-            <stop offset="34%" stopColor={metal.mid} />
-            <stop offset="100%" stopColor={metal.deep} />
-          </linearGradient>
-          <linearGradient id={`${uid}s`} x1="0" y1="0" x2="0.7" y2="1">
-            <stop offset="18%" stopColor="#ffffff" stopOpacity="0" />
-            <stop offset="34%" stopColor="#ffffff" stopOpacity={metal.sheen} />
-            <stop offset="48%" stopColor="#ffffff" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <g transform="translate(-262.671875,-68.484385) scale(1.333333)">
-          <path d={HEART_SHADOW} fill="#1b1724" />
-          <path d={HEART} fill={`url(#${uid})`} />
-          <path d={HEART} fill={`url(#${uid}s)`} />
-          {RARITY_HEART_ARROW && (
-            <>
-              <path d={ARROW_SHADOW} fill="#1b1724" />
-              <path d={ARROW} fill="#64ef07" />
-            </>
-          )}
-        </g>
-      </svg>
-    );
-  }
-
-  // Banknote-style OVD — see CurrencyHeart.jsx. The foil patch below is the
-  // older full-colour treatment, kept behind HEART_HOLO.style = "foil".
-  if (HEART_HOLO.style === "currency") {
-    return <CurrencyHeart uid={uid} height={height} dx={dx} dy={dy} arrow={RARITY_HEART_ARROW} />;
-  }
-
-  // --- the foil patch -------------------------------------------------
-  // A hologram is not a tinted sheen over whatever is behind it: it is an
-  // opaque patch of metallised stock that happens to diffract. So the heart
-  // is filled solid first and every colour above it is opaque too — nothing
-  // here blends with the parchment, which is what bleached the old gold.
-  //
-  // The spectrum is struck in HARD bands rather than blended. Each colour
-  // gets two stops at the same offset, so the eye sees four or five crisp
-  // zones instead of a smudge, and the whole ramp both rotates and slides
-  // with the tilt. Sliding is what sells it — a rainbow that only rotates
-  // reads as a pinwheel, one that travels reads as diffraction.
-  const bands = HEART_HOLO.bands;
-  const spin = 64 + dx * 40 + dy * 12;
-  const slide = dx * 0.42 + dy * 0.1;
-
-  // Hard stops for the fringes: two per colour at the same offset, so the
-  // texture is ruled rather than blended.
-  const span = 1 / bands.length;
-  const stops = [];
-  bands.forEach((c, i) => {
-    stops.push(<stop key={`${i}a`} offset={`${i * span * 100}%`} stopColor={c} />);
-    stops.push(<stop key={`${i}b`} offset={`${(i + 1) * span * 100}%`} stopColor={c} />);
-  });
-
-  // The field is a BAND of colour inside transparency, not a wash over the
-  // whole patch. That is the part the reference gets right and a full-bleed
-  // ramp cannot: colour lands on one side of the mark and the dark stock
-  // shows on the other, and the tilt sweeps the band across. A patch that
-  // is coloured everywhere reads as painted; one that is half metal reads
-  // as foil. One pass through the spectrum, not out and back — doubling it
-  // back halves how far the hue actually travels, which is the effect.
-  // The spectrum runs from the field's centre out to `tail`, then fades to
-  // nothing by its rim. Opaque at the centre, so a card at rest shows the
-  // mark fully coloured; transparent past the tail, so once the field is
-  // swung off to one side the far half of the patch falls outside it and
-  // goes back to bare stock. An inner transparent edge instead would put a
-  // dark hole in the middle of the mark at rest.
-  const { reach, radius, tail } = HEART_HOLO.field;
-  const fieldStops = [
-    ...bands.map((c, i) => (
-      <stop key={i} offset={`${((i / (bands.length - 1)) * tail).toFixed(1)}%`} stopColor={c} />
-    )),
-    <stop key="z" offset="100%" stopColor={bands[bands.length - 1]} stopOpacity="0" />,
-  ];
-
-  // The facet grid's two halves, lit against shaded. At dx -1 the upper
-  // triangles take the light; at +1 they take the shade; through the middle
-  // they cross over, which is the moment the whole patch appears to flip.
-  const facet = HEART_HOLO.facet;
-  const bias = (dx * 0.72 + dy * 0.28);
-  const lo = Math.max(0.03, facet.depth * (0.5 - bias * 0.5) * 2);
-  const hi = Math.max(0.03, facet.depth * (0.5 + bias * 0.5) * 2);
-
-  // The glint: a narrow hard-edged bar, the one place the foil goes white.
-  // It crosses the patch rather than sitting on it, so it only shows for
-  // part of the travel — the rest of the time the patch is pure colour.
-  const glint = 50 + dx * 46 - dy * 12;
-
-  return (
-    <svg
-      className="rc-heart"
-      viewBox="0 0 72 60"
-      width={height * 1.2}
-      height={height}
-      aria-hidden
-      focusable="false"
-    >
-      <defs>
-        {/* Repeated so the ramp still covers the patch once it is slid. */}
-        <linearGradient
-          id={`${uid}h`}
-          x1="0"
-          y1="0"
-          x2={HEART_HOLO.period}
-          y2="0"
-          gradientTransform={`rotate(${spin} 0.5 0.5) translate(${slide} 0)`}
-          spreadMethod="repeat"
-        >
-          {stops}
-        </linearGradient>
-
-        {/* A second ramp at a crossing angle, kept faint. One set of fringes
-            is a rainbow; two that interfere are a hologram. */}
-        <linearGradient
-          id={`${uid}x`}
-          x1="0"
-          y1="0"
-          x2={HEART_HOLO.period * 1.7}
-          y2="0"
-          gradientTransform={`rotate(${spin + 68} 0.5 0.5) translate(${-slide * 0.6} 0)`}
-          spreadMethod="repeat"
-        >
-          {stops}
-        </linearGradient>
-
-        {/* The spectral field. Far bigger than the patch and swung well off
-            it, so the patch samples a slice and the tilt drags a different
-            slice across — the mark changes hue instead of showing bands
-            that travel. This is where the colour comes from. */}
-        <radialGradient
-          id={`${uid}f`}
-          cx={0.5 - dx * reach}
-          cy={0.44 - dy * reach * 0.7}
-          r={radius}
-        >
-          {fieldStops}
-        </radialGradient>
-
-        {/* The embossed facet grid. Two triangles per tile: one takes the
-            light, one takes the shade, and the tilt swaps which is which —
-            that swap is what a kinegram does and what no amount of moving
-            colour can imitate. Rotating the whole grid a little as well
-            keeps it from reading as a static screen door. */}
-        <pattern
-          id={`${uid}p`}
-          width={facet.size}
-          height={facet.size}
-          patternUnits="userSpaceOnUse"
-          patternTransform={`rotate(${-18 + dx * 7})`}
-        >
-          <polygon
-            points={`0,0 ${facet.size},0 0,${facet.size}`}
-            fill="#ffffff"
-            fillOpacity={lo}
-          />
-          <polygon
-            points={`${facet.size},0 ${facet.size},${facet.size} 0,${facet.size}`}
-            fill="#000000"
-            fillOpacity={hi}
-          />
-        </pattern>
-
-        {/* Metallised curvature: the patch is not flat stock, it has a dome,
-            and without this the bands look like printed stripes. */}
-        <radialGradient id={`${uid}d`} cx={0.38 - dx * 0.16} cy={0.3 - dy * 0.14} r="0.78">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.34" />
-          <stop offset="38%" stopColor="#ffffff" stopOpacity="0.02" />
-          <stop offset="72%" stopColor="#000000" stopOpacity="0.22" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.62" />
-        </radialGradient>
-
-        {/* The arrow's own fringes, crossing the heart's by 52 degrees and
-            running finer, so one patch still reads as two struck shapes. */}
-        <linearGradient
-          id={`${uid}a`}
-          x1="0"
-          y1="0"
-          x2={HEART_HOLO.period * 0.72}
-          y2="0"
-          gradientTransform={`rotate(${spin + 52} 0.5 0.5) translate(${slide * 1.3} 0)`}
-          spreadMethod="repeat"
-        >
-          {stops}
-        </linearGradient>
-
-        <linearGradient id={`${uid}g`} x1="0" y1="0" x2="0.65" y2="1">
-          <stop offset={`${glint - 8}%`} stopColor="#ffffff" stopOpacity="0" />
-          <stop offset={`${glint - 2}%`} stopColor="#ffffff" stopOpacity="0.72" />
-          <stop offset={`${glint + 2}%`} stopColor="#ffffff" stopOpacity="0.72" />
-          <stop offset={`${glint + 8}%`} stopColor="#ffffff" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-
-      <g transform="translate(-262.671875,-68.484385) scale(1.333333)">
-        <path d={HEART_SHADOW} fill="#1b1724" />
-        {/* Opaque stock, then the diffraction on top of it. */}
-        {/* Isolated, so the blend modes inside mix with each other and not
-            with the parchment — and saturated afterwards, because two
-            semi-transparent ramps of different hues average toward grey,
-            which is exactly how the first attempt went pastel. */}
-        <g style={{ isolation: "isolate", filter: "saturate(1.6) contrast(1.06)" }}>
-          <path d={HEART} fill={HEART_HOLO.substrate} />
-          <path d={HEART} fill={`url(#${uid}f)`} />
-          {/* Soft-light, so the facets emboss the colour rather than
-              bleaching it the way straight white and black would. */}
-          <path d={HEART} fill={`url(#${uid}p)`} style={{ mixBlendMode: "soft-light" }} />
-          <path d={HEART} fill={`url(#${uid}p)`} opacity="0.55" />
-          {/* Overlay keeps the field's hue and adds the ruling on top of it;
-              plain alpha would wash both toward the average of the two. */}
-          <path
-            d={HEART}
-            fill={`url(#${uid}h)`}
-            opacity={HEART_HOLO.fringe}
-            style={{ mixBlendMode: "overlay" }}
-          />
-          <path
-            d={HEART}
-            fill={`url(#${uid}x)`}
-            opacity={HEART_HOLO.crossing}
-            style={{ mixBlendMode: "color-dodge" }}
-          />
-        </g>
-        <path d={HEART} fill={`url(#${uid}d)`} />
-        <path d={HEART} fill={`url(#${uid}g)`} />
-        {/* A bright rim, so the patch keeps its edge against parchment even
-            when the bands facing the viewer happen to be dark. */}
-        <path d={HEART} fill="none" stroke={HEART_HOLO.rim} strokeOpacity="0.55" strokeWidth="1.1" />
-        {RARITY_HEART_ARROW && (
-          <>
-            {/* Either way the arrow is keylined against the foil — printed
-                green it would otherwise land on a band its own colour, and
-                struck in foil it would dissolve into the heart entirely. */}
-            <path d={ARROW_SHADOW} fill="#121020" />
-            <path d={ARROW} fill="none" stroke="#121020" strokeWidth="2.6" strokeLinejoin="round" />
-            {HEART_HOLO.arrow === "foil" ? (
-              <>
-                <g style={{ isolation: "isolate", filter: "saturate(1.6) contrast(1.06)" }}>
-                  <path d={ARROW} fill={HEART_HOLO.substrate} />
-                  <path d={ARROW} fill={`url(#${uid}f)`} />
-                  <path d={ARROW} fill={`url(#${uid}p)`} style={{ mixBlendMode: "soft-light" }} />
-                  <path d={ARROW} fill={`url(#${uid}p)`} opacity="0.55" />
-                  <path
-                    d={ARROW}
-                    fill={`url(#${uid}a)`}
-                    opacity={HEART_HOLO.fringe + 0.18}
-                    style={{ mixBlendMode: "overlay" }}
-                  />
-                </g>
-                <path d={ARROW} fill={`url(#${uid}g)`} />
-              </>
-            ) : (
-              <path d={ARROW} fill="#7dff14" />
-            )}
-          </>
-        )}
-      </g>
-    </svg>
-  );
-});
 
 // Light anchored to an FX texture. Each facet faces its own direction, so a
 // tilt sweeps past them one at a time and individual curls flare instead of
@@ -1237,7 +891,7 @@ function CoinGlyph() {
 // footer badge read as the same currency. Explicit signs on printed payouts
 // stay with the count after the coin; costs and sale prices stay unsigned.
 const RULE_TERMS =
-  /([+-]?\d+\s+)?(Hydro|Liquidity|Prosperity|Grace|Assets?|Hazards?|Events?|Traders?|Artifacts?|Remedy|Remedies|Hail Mary|Good Deeds?)\b/g;
+  /([+-]?\d+\s+)?(Hydro|Liquidity|Prosperity|Grace|Assets?|Calamit(?:y|ies)|Events?|Traders?|Artifacts?|Remedy|Remedies|Hail Mary|Good Deeds?)\b/g;
 
 // A rules line that opens with its own keyword ("Until cleared, the target
 // banks…") would print it twice once the badge carries it, so the badge
@@ -1666,36 +1320,21 @@ const RCANA_STYLES = `
   font-variant-numeric: tabular-nums;
 }
 .rc-collector i { font-style: normal; opacity: .55; margin: 0 .14em; }
-.rc-rarity { display: flex; align-items: center; justify-content: center; overflow: visible; }
-.rc-rarity-seal {
-  position: relative;
-  isolation: isolate;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: calc(var(--u) * .012);
-  min-width: calc(var(--u) * .18);
-  max-width: 100%;
-  height: calc(var(--u) * .058);
-  padding: 0 calc(var(--u) * .016);
-  background: linear-gradient(135deg, #fff0b1, #b9822c 55%, #f7d675);
-  clip-path: polygon(6% 0, 94% 0, 100% 50%, 94% 100%, 6% 100%, 0 50%);
-}
-.rc-rarity-seal::before {
-  content: "";
+.rc-footer-panel {
   position: absolute;
-  inset: calc(var(--u) * .0018);
-  z-index: -1;
-  background: linear-gradient(135deg, #ffeab1, #f4ce70);
-  clip-path: polygon(6% 0, 94% 0, 100% 50%, 94% 100%, 6% 100%, 0 50%);
+  box-sizing: border-box;
+  /* The card frame supplies the sides and bottom; only the divider is new. */
+  border-top: calc(var(--u) * .004) solid #211c10;
+  border-radius: 0 0 calc(var(--u) * .025) calc(var(--u) * .025);
+  background: linear-gradient(180deg, #fff0bd, #edc66b);
+  pointer-events: none;
 }
-.rc-rarity-seal > span {
-  font-family: "Bebas Neue", Impact, sans-serif;
-  font-size: calc(var(--u) * .027);
-  letter-spacing: .035em;
-  line-height: 1;
-  color: #4f3b1c;
+.rc-emblem { display: flex; align-items: center; justify-content: center; }
+.rc-emblem > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 .rc-stat {
   font-family: "Bebas Neue", "Anton", ui-sans-serif, system-ui;
@@ -1715,8 +1354,6 @@ const RCANA_STYLES = `
 .rc-card[data-plate="valued"] .rc-stat--left { color: var(--value-ink, #140f05); }
 .rc-stat[data-len="3"] { letter-spacing: -.02em; }
 .rc-stat[data-len="4"] { font-size: calc(var(--u) * .05); letter-spacing: -.04em; }
-/* The rarity mark is artwork now, not type. */
-.rc-heart { display: block; }
 
 /* ---------------- sheen ---------------- */
 /* The laminate's specular. A sheen, not a spotlight: a broad low-contrast

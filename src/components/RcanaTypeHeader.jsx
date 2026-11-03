@@ -1,7 +1,9 @@
 import React from "react";
 import { HEADER_COLORS } from "../game/rcana/headerColors.js";
+import { TYPE_WORDMARKS } from "../game/rcana/typeWordmarks.js";
 
-export function RcanaTypeHeader({ data, slot, hideFrame = false, classFont = "bebas" }) {
+export function RcanaTypeHeader({ data, slot, hideFrame = false, classFont = "mosaic" }) {
+  const wordmark = classFont === "mosaic" ? TYPE_WORDMARKS[data.cardClass] : null;
   return (
     <div
       className="rc-type-header"
@@ -10,9 +12,15 @@ export function RcanaTypeHeader({ data, slot, hideFrame = false, classFont = "be
       aria-label={[data.number != null ? `No. ${data.number}` : null, data.cardClass].filter(Boolean).join(", ")}
     >
       <span className="rc-type-number">{data.number ?? ""}</span>
-      <span className="rc-type-class" data-font={classFont}>
-        <span>
-          {classFont === "bebas" ? data.cardClass?.toUpperCase() : data.cardClass}
+      <span className="rc-type-class" data-font={classFont} data-wordmark={wordmark ? true : undefined}>
+        <span className="rc-type-label">
+          {wordmark ? (
+            <svg className="rc-type-wordmark" viewBox={wordmark.viewBox.join(" ")}
+              width={wordmark.viewBox[2]} height={wordmark.viewBox[3]}
+              preserveAspectRatio="xMidYMid meet" role="img" aria-label={data.cardClass} focusable="false">
+              <image href={wordmark.src} width={wordmark.width} height={wordmark.height} aria-hidden="true" />
+            </svg>
+          ) : classFont === "bebas" || classFont === "mosaic" ? data.cardClass?.toUpperCase() : data.cardClass}
           {data.tabCost > 0 && <i className="rc-cost" aria-label={`cost ${data.tabCost}`}>{data.tabCost}</i>}
         </span>
       </span>
@@ -60,11 +68,30 @@ export const TYPE_HEADER_STYLES = `
   line-height: 1;
   white-space: nowrap;
 }
-.rc-type-class[data-font="bebas"] {
+.rc-type-class[data-font="bebas"],
+.rc-type-class[data-font="mosaic"] {
   font-family: "Bebas Neue", Impact, sans-serif;
   font-size: calc(var(--u) * .055);
   letter-spacing: .1em;
   padding-top: calc(var(--u) * .004);
+}
+.rc-type-class[data-wordmark] {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0 calc(var(--u) * .026) 0 calc(var(--u) * .018);
+}
+.rc-type-class[data-wordmark] .rc-type-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  width: 100%;
+}
+.rc-type-wordmark {
+  display: block;
+  flex-shrink: 1;
+  width: auto;
+  max-width: 100%;
+  height: calc(var(--u) * .055);
 }
 /* "gilt": the ExtraBold struck in gold — hairline light on top, a dark bevel
    under, a soft drop — so the class reads as a stamped gilt letter, the same

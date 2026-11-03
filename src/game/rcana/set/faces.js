@@ -65,7 +65,7 @@ export const FACES = [
     // PROVISIONAL number and rarity.
     number: 13,
     rarity: "Uncommon",
-    // A Hazard narrates (the line follows the rule).
+    // A Calamity narrates (the line follows the rule).
     ability: "Until cleared, the target banks at most 75 from a single card.",
     flavor: "The market only ever remembers one direction.",
     printed: {},
@@ -99,7 +99,7 @@ export const FACES = [
     // PROVISIONAL number and rarity.
     number: 16,
     rarity: "Rare",
-    ability: "Clear any one hazard.",
+    ability: "Clear any one Calamity.",
     // A Remedy narrates; the line follows the rule.
     flavor: "She appeared at breakfast. The spread closed by noon.",
     printed: {},

@@ -16,7 +16,7 @@
 // The rule: lotería names for FIGURES, devotional objects and classic lotería
 // The rule is by ROW: things you hold are lotería — Traders, Artifacts,
 // Remedies, Graces (El Monje, La Máquina, La Campana, El Exvoto); the market
-// is English — Assets, Events, Hazards (Blue Chip, Bull Run, Rug Pull). Two
+// is English — Assets, Events, Calamities (Blue Chip, Bull Run, Rug Pull). Two
 // deliberate exception keeps its lotería name: El Naranja (he is a figure).
 // Faces never carry a name.
 
@@ -26,9 +26,9 @@
 const D = (key, name, type, cost, o = {}) => ({ key, name, type, cost, ...o });
 export const DESIGNS = [
   D('unicornio', 'El Unicornio', 'trader', 3, { liq: 3, cred: 20, text: 'Pure compounding — the best paycheck at the desk' }),
-  D('gato', 'El Gato', 'trader', 2, { liq: 2, cred: 16, text: 'When seated, immediately knock one hazard off your table, free' }),
+  D('gato', 'El Gato', 'trader', 2, { liq: 2, cred: 16, text: 'When seated, immediately knock one Calamity off your table, free' }),
   D('monje', 'El Monje', 'trader', 1, { liq: 1, cred: 22, text: 'When you light a candle, bank 25 Prosperity' }),
-  D('diablito', 'El Diablito', 'trader', 2, { liq: 2, cred: 10, text: 'When a hazard you play lands, collect 1 Liquidity' }),
+  D('diablito', 'El Diablito', 'trader', 2, { liq: 2, cred: 10, text: 'When a Calamity you play lands, collect 1 Liquidity' }),
   D('celebridad', 'La Estrella', 'trader', 3, { liq: 3, cred: 8, text: 'The influencer: pay 1 when banking from a card, +25 Prosperity' }),
   D('abuela', 'La Abuela', 'trader', 2, { liq: 2, cred: 18, text: 'The gambling grandmother: your gambles moon on 4+ instead of 5+' }),
   D('pope', 'El Papa', 'trader', 3, { liq: 3, cred: 25, text: 'Once a game, a failed Hail Mary is absolved — you may attempt it again' }),
@@ -59,14 +59,14 @@ export const DESIGNS = [
   D('rug', 'Rug Pull', 'hazard', 3, { text: 'Cannot sell Assets' }),
   D('taxman', 'Tax Collector', 'hazard', 2, { text: 'Pay 1 to the bank at the start of each turn' }),
   D('escandalo', 'Scandal', 'hazard', 2, { text: 'Scandal: the seated Trader loses 5 Grace when it breaks, 2 more each turn' }),
-  D('naranja', 'El Naranja', 'hazard', 3, { text: 'The Orange One takes his cut: whenever the target banks, the hazard’s owner collects 2' }),
+  D('naranja', 'El Naranja', 'hazard', 3, { text: 'The Orange One takes his cut: whenever the target banks, the Calamity’s owner collects 2' }),
   D('scam', 'Exit Scam', 'hazard', 3, { text: 'The target cannot play Opportunity Events until cleared' }),
   D('bell', 'The Bell', 'remedy', 1, { clears: 'bear', printName: 'La Campana' }),
   D('resist', 'Quantum Resistance', 'remedy', 1, { clears: 'hack', printName: 'La Resistencia' }),
   D('keys', 'The Keys', 'remedy', 1, { clears: 'rug', printName: 'Las Llaves' }),
   D('tortilla', 'Miracle Tortilla', 'remedy', 2, { clears: 'any', printName: 'La Tortilla' }),
   D('publicista', 'El Publicista', 'remedy', 1, { clears: 'escandalo', text: 'Clear a Scandal — or polish: your seated Trader regains 5 Grace' }),
-  D('heart', 'Sacred Heart', 'artifact', 2, { text: 'A shield, not a cure: discard to cancel a hazard as it lands', printName: 'El Corazón' }),
+  D('heart', 'Sacred Heart', 'artifact', 2, { text: 'A shield, not a cure: discard to cancel a Calamity as it lands', printName: 'El Corazón' }),
   D('halo', 'The Halo', 'artifact', 3, { text: 'Any Trader seated at your desk cannot be disabled', printName: 'La Aureola' }),
   D('rosary', 'The Rosary Beads', 'artifact', 2, { text: 'When you light a candle, draw a card', printName: 'El Rosario' }),
   D('grail', 'The Grail', 'artifact', 3, { text: 'An answered Hail Mary banks 300 instead of 200', printName: 'El Cáliz' }),
