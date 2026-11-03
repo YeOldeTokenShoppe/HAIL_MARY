@@ -16,11 +16,11 @@ import {
   behindClip,
 } from "../game/rcana/cardFace.js";
 import { CurrencyHeart, SigilHeart, HEART, HEART_SHADOW, ARROW, ARROW_SHADOW } from "./CurrencyHeart.jsx";
-import { ArtifactHeader, ArtifactUsageBadge } from "./RcanaArtifactTemplate.jsx";
-import { EventHeader, EventUsageBadge } from "./RcanaEventTemplate.jsx";
-import { SUBTYPE_FURNITURE_STYLES } from "./RcanaSubtypeFurniture.jsx";
+import { ArtifactHeader } from "./RcanaArtifactTemplate.jsx";
+import { EventHeader } from "./RcanaEventTemplate.jsx";
+import { SUBTYPE_FURNITURE_STYLES, UsageSymbol } from "./RcanaSubtypeFurniture.jsx";
 
-import { RcanaLiquidityBox, LIQUIDITY_BOX_STYLES } from "./RcanaLiquidityBox.jsx";
+import { RcanaLiquidityBox, RcanaValueBox, LIQUIDITY_BOX_STYLES } from "./RcanaLiquidityBox.jsx";
 import { RcanaTypeHeader, TYPE_HEADER_STYLES } from "./RcanaTypeHeader.jsx";
 
 const REST = { rx: 0, ry: 0, mx: 50, my: 50, hyp: 0 };
@@ -108,13 +108,10 @@ export default function RcanaCard({
   // where a card-sized dead zone in the scroll is a trap. Defaults to
   // following `sway`, which marks the same distinction.
   captureTouch = sway,
-  // Typeface for the class label in the tab. "blackletter" — the wordmark's
-  // own face, set in title case (caps blackletter is unreadable) — is the
-  // default; "bebas" is the condensed caps it replaced, and the other
-  // blackletters remain for the bench's comparison switch.
-  classFont = "gilt",
-  // Typeface for the name on the ribbon. "gilt" — the tab's own blackletter
-  // struck in gold — is the default, so the name and the tab are one metal.
+  // Condensed caps make the type easy to scan and distinguish it from the
+  // ornate card name. Earlier blackletter options remain on the bench.
+  classFont = "bebas",
+  // Typeface for the name on the ribbon. "gilt" is blackletter struck in gold.
   // "nabla" is the chromatic 3D sans it replaced; it stays for foils and
   // alt-arts, where loud is the job. (Nabla is a COLRv1 font: engines
   // without COLRv1 paint its flat fallback colour.)
@@ -310,7 +307,10 @@ export default function RcanaCard({
         ...artLayers.map((l) => l.z * d * scale)
       ) +
       6 * (d || 1) * scale
-    : zPlate;
+    // Keep ink just above the paper even in flat/reduced-motion mode.
+    // Coplanar transparent marks can lose glyphs to the plate in Chromium.
+    // counterScale keeps this subpixel separation invisible at rest.
+    : zPlate + 0.1 * scale;
   const W = RCANA_LAYOUT.window;
   const FW = RCANA_LAYOUT.fxWindow;
 
@@ -401,6 +401,7 @@ export default function RcanaCard({
   const tone = CLASS_TONE[data.cardClass] || CLASS_TONE.Trader;
   const printed = data.printed || {};
   const L = data.layout || RCANA_LAYOUT;
+  const usage = data.artifactTemplate || data.eventTemplate;
 
   const box = (slot) => ({
     left: `${slot.x}%`,
@@ -470,6 +471,7 @@ export default function RcanaCard({
       <div
         ref={cardRef}
         className="rc-card"
+        data-flat={d === 0 || undefined}
         data-plate={data.plate}
         data-template={data.artifactTemplate ? "artifact" : undefined}
         onMouseMove={onMove}
@@ -531,6 +533,10 @@ export default function RcanaCard({
           {data.badgeImage && !hideFrame && (
             <img className="rc-frame rc-badge" src={data.badgeImage} alt="" draggable={false} decoding="async" />
           )}
+
+          {/* The editable paper covers the old painted logo, seal and stat
+              boxes while keeping the illustration, ribbon and outer frame. */}
+          {!hideFrame && <div className="rc-footer-paper" aria-hidden />}
 
           {showSlots && (
             <div className="rc-slots" aria-hidden>
@@ -603,52 +609,47 @@ export default function RcanaCard({
             </div>
           )}
 
-          {/* With the furniture on, the panel gives up a little of its bottom
-              edge: it ends 0.3% above the boxes, so a line that fills it sits
-              on their lids. */}
-          <div className="rc-slot rc-body" style={box(keywordBadges ? { ...L.bodyPanel, h: L.bodyPanel.h - 0.9 } : L.bodyPanel)}>
-            <AutoFit max={u * 0.0375} min={u * 0.015} block>
-              {/* A person's line leads the panel as a quotation; narration
-                  keeps its usual place beneath the rules. */}
-              {data.flavor && data.flavorQuoted ? (
-                <p className="rc-flavor rc-flavor--quote">{"\u201C" + data.flavor + "\u201D"}</p>
-              ) : null}
+          <div className="rc-slot rc-body" style={box(L.bodyPanel)}>
+            <AutoFit max={u * 0.043} min={u * 0.036} block>
+              {keywordBadges && (data.keyword || data.traits?.length > 0) && (
+                <div className="rc-rules-labels" style={{ "--kw": data.keywordColor }}>
+                  {data.keyword && <b className="rc-kw">
+                    {usage?.usage && <UsageSymbol kind={usage.usage} />}
+                    {data.keyword}
+                  </b>}
+                  {(data.traits || []).map((t) => <b key={t} className="rc-kw rc-kw--trait">{t}</b>)}
+                </div>
+              )}
+              {data.abilityName && <p className="rc-ability-name">{data.abilityName}</p>}
               {data.ability ? (
-                <p className="rc-ability" style={{ "--kw": data.keywordColor }}>
-                  {keywordBadges && data.keyword && <b className="rc-kw">{data.keyword}</b>}
-                  {keywordBadges && (data.traits || []).map((t) => <b key={t} className="rc-kw rc-kw--trait">{t}</b>)}
+                <p className="rc-ability">
                   {keywordBadges ? <RulesText text={stripKeyword(data.ability, data.keyword)} /> : data.ability}
                 </p>
               ) : null}
-              {data.flavor && !data.flavorQuoted ? (
-                <>
-                  {keywordBadges && data.ability ? <hr className="rc-sep" aria-hidden /> : null}
-                  <p className="rc-flavor">{data.flavor}</p>
-                </>
+              {data.flavor ? (
+                <p className="rc-flavor">{data.flavorQuoted ? `“${data.flavor}”` : data.flavor}</p>
               ) : null}
             </AutoFit>
           </div>
 
-          {/* data-len steps the size down for three-digit values (100, 125,
-              250) so they sit inside the box instead of running out of it. */}
-          {data.artifactTemplate && !hideFrame && <ArtifactUsageBadge template={data.artifactTemplate} />}
-          {data.eventTemplate && !hideFrame && <EventUsageBadge template={data.eventTemplate} />}
-          {/* No left stat on a sealed plate — its seal stands there. */}
+          {/* Sealed cards put usage beside its label above the rule. */}
           {data.plate !== "sealed" && (
-            <div className="rc-slot rc-stat rc-stat--left" style={box(data.plate === "valued" ? L.haloValueValued : L.haloValue)} data-len={String(data.halo ?? "").length}>
-              <span>{data.halo ?? ""}</span>
-            </div>
+            <RcanaValueBox value={data.halo} slot={L.standingBox} hideFrame={hideFrame}
+              kind={data.plate === "valued" ? "prosperity" : "grace"}
+              label={data.plate === "valued" ? "Prosperity" : "Credibility"} />
           )}
           {data.liquidityBox ? (
-            <RcanaLiquidityBox value={data.hydro} slot={data.liquidityBox} hideFrame={hideFrame} />
+            <RcanaLiquidityBox
+              value={data.cardClass === "Trader" ? data.cost ?? data.hydro : data.hydro}
+              income={data.cardClass === "Trader" ? data.hydro : undefined}
+              slot={data.liquidityBox} hideFrame={hideFrame} />
           ) : (
             <div className="rc-slot rc-stat" style={box(L.hydroValue)} data-len={String(data.hydro ?? "").length}>
               <span>{data.hydro ?? ""}</span>
             </div>
           )}
 
-          {/* The heart sits under the wordmark on every plate — a rarity mark
-              should be where the eye learned to find it. */}
+          {/* The collection number stays in the bottom-right gold margin. */}
           {collectorLine && data.collector && !printed.collector && !hideFrame && (
             <div className="rc-slot rc-collector" style={box(L.collector)} aria-label={`Card ${data.collector.number} of ${data.collector.of}`}>
               <span>{data.collector.number}<i>/</i>{data.collector.of}</span>
@@ -659,18 +660,21 @@ export default function RcanaCard({
             const heartSlot = L.rarity;
             const hf = heartSlot.heightFactor || 0.048;
             return (
-              <div className="rc-slot rc-rarity" style={box(heartSlot)}>
-                <RarityHeart
-                  rarity={rarity}
-                  height={u * hf}
-                  heightFactor={hf}
-                  rx={lrx}
-                  ry={HEART_HOLO.style === "sigil" ? tilt.ry : lry}
-                  mx={tilt.mx}
-                  my={tilt.my}
-                  hyp={tilt.hyp}
-                  slot={heartSlot}
-                />
+              <div className="rc-slot rc-rarity" style={box(heartSlot)} role="img" aria-label={`Rarity: ${data.rarity}`}>
+                <div className="rc-rarity-seal" aria-hidden="true">
+                  <RarityHeart
+                    rarity={rarity}
+                    height={u * hf}
+                    heightFactor={hf}
+                    rx={lrx}
+                    ry={HEART_HOLO.style === "sigil" ? tilt.ry : lry}
+                    mx={tilt.mx}
+                    my={tilt.my}
+                    hyp={tilt.hyp}
+                    slot={heartSlot}
+                  />
+                  <span>{data.rarity}</span>
+                </div>
               </div>
             );
           })()}
@@ -757,13 +761,44 @@ export default function RcanaCard({
 
 // The rarity mark: the site's own favicon heart, with its flat red swapped
 // for a metal. The paths live in CurrencyHeart.jsx alongside the currency OVD;
-// the dark copy behind each shape is the icon's own drop shadow, which is what
-// keeps it legible on parchment. The arrow stays brand green at every tier;
-// only the heart carries the rarity.
+// The default faceted finish shares the footer's warm metal palette. Earlier
+// foil treatments remain available through HEART_HOLO.style.
 const RarityHeart = React.memo(function RarityHeart({ rarity, height, heightFactor = 0.048, rx, ry, mx, my, hyp, slot }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const metal = HEART_METALS[rarity.heart];
   if (!metal) return null;
+
+  if (HEART_HOLO.style === "faceted") {
+    const gold = rarity.heart === "gold";
+    const colors = gold
+      ? { light: "#fff3aa", mid: "#e5b13c", dark: "#a3671e", edge: "#80511e" }
+      : { light: "#f3a17d", mid: "#bd442e", dark: "#832b20", edge: "#713020" };
+    return (
+      <svg className="rc-heart rc-heart--faceted" viewBox="0 0 72 60" width={height * 1.2} height={height} aria-hidden focusable="false">
+        <defs>
+          <clipPath id={`${uid}-facets`}><path d={HEART} /></clipPath>
+          <linearGradient id={`${uid}-arrow`} x1="0" y1="0" x2="0.7" y2="1">
+            <stop offset="0" stopColor="#fff5bf" />
+            <stop offset=".48" stopColor="#e4af3d" />
+            <stop offset="1" stopColor="#a87322" />
+          </linearGradient>
+        </defs>
+        <g transform="translate(-262.671875,-68.484385) scale(1.333333)">
+          <path d={HEART} fill={colors.mid} stroke={colors.edge} strokeWidth="1.8" strokeLinejoin="round" />
+          <g clipPath={`url(#${uid}-facets)`}>
+            <path d="M196 51H211L221 68 197 73Z" fill={colors.light} />
+            <path d="M211 51 221 58 221 68Z" fill={colors.mid} />
+            <path d="M221 58 233 51 246 60 221 68Z" fill={colors.light} />
+            <path d="M197 73 221 68 221 96Z" fill={colors.mid} />
+            <path d="M221 68 246 60 242 80 221 96Z" fill={colors.dark} />
+            <path d="M197 73 209 83 221 96 211 76Z" fill={colors.dark} />
+          </g>
+          <path d={HEART} fill="none" stroke={colors.light} strokeWidth=".65" strokeLinejoin="round" />
+          {RARITY_HEART_ARROW && <path d={ARROW} fill={`url(#${uid}-arrow)`} stroke="#68461e" strokeWidth="1.25" strokeLinejoin="round" />}
+        </g>
+      </svg>
+    );
+  }
 
   if (metal.holo && HEART_HOLO.style === "sigil") {
     // The mark is centred in its slot, 0.048 card-widths tall and 1.2× as
@@ -1191,21 +1226,18 @@ const FxLight = React.memo(function FxLight({ reflection, src, rx, ry, unit, cle
   );
 });
 
-// The drop from the liquidity box, inline, sized to the text it sits in.
-function DropGlyph() {
-  return (
-    <svg className="rc-drop" viewBox="0 0 40 56" aria-hidden="true" focusable="false">
-      <path d="M20 4C16 14 5 25 5 35a15 15 0 0 0 30 0C35 25 24 14 20 4Z" fill="#245fa4" stroke="#1d190f" strokeWidth="3" strokeLinejoin="round" />
-    </svg>
-  );
+// The same coin as the cost badge, scaled to the rules text.
+function CoinGlyph() {
+  return <img className="rc-coin" src="/GoldCoin.png" alt="" aria-hidden="true" draggable={false} />;
 }
 
 // Game nouns the rules text may name. Bold where they appear, so the eye
 // can pick the mechanic out of the sentence at table distance; a Hydro or
-// Liquidity count also gets the drop in front of it, the same glyph as the
-// box in the corner, so "1 Hydro" and the box read as the same currency.
+// Liquidity count also gets the coin in front of it, so "1 Hydro" and the
+// footer badge read as the same currency. Explicit signs on printed payouts
+// stay with the count after the coin; costs and sale prices stay unsigned.
 const RULE_TERMS =
-  /(\d+\s+)?(Hydro|Liquidity|Prosperity|Grace|Assets?|Hazards?|Events?|Traders?|Artifacts?|Remedy|Remedies|Hail Mary|Good Deeds?)\b/g;
+  /([+-]?\d+\s+)?(Hydro|Liquidity|Prosperity|Grace|Assets?|Hazards?|Events?|Traders?|Artifacts?|Remedy|Remedies|Hail Mary|Good Deeds?)\b/g;
 
 // A rules line that opens with its own keyword ("Until cleared, the target
 // banks…") would print it twice once the badge carries it, so the badge
@@ -1230,7 +1262,7 @@ function RulesText({ text }) {
     const hydro = /^(Hydro|Liquidity)$/.test(term) && count;
     out.push(
       <b key={m.index} className={hydro ? "rc-term rc-term--hydro" : "rc-term"}>
-        {hydro ? <DropGlyph /> : null}
+        {hydro ? <CoinGlyph /> : null}
         {count}{term}
       </b>
     );
@@ -1250,6 +1282,7 @@ function AutoFit({ children, max, min, block = false }) {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    let active = true;
     // Measure against the SLOT, not against this element. A line-height
     // below 1 makes the glyphs overflow their own line box at every size, so
     // comparing the element with itself is permanently true and the text
@@ -1261,16 +1294,25 @@ function AutoFit({ children, max, min, block = false }) {
     // there. The slot, clipping at overflow: hidden, reports the truth.
     const fits = () =>
       slot.scrollHeight <= slot.clientHeight + 1 && slot.scrollWidth <= slot.clientWidth + 1;
-    let s = max;
-    el.style.fontSize = `${s}px`;
-    let guard = 0;
-    // Proportional steps, so the loop converges at any card size instead of
-    // running out of its 60 iterations on a large one.
-    while (guard++ < 60 && s > min && !fits()) {
-      s = Math.max(min, s - Math.max(0.5, s * 0.04));
+    const fit = () => {
+      if (!active) return;
+      let s = max;
       el.style.fontSize = `${s}px`;
-    }
-    setSize(s);
+      let guard = 0;
+      // Refit after web fonts settle as well as after content changes.
+      while (guard++ < 60 && s > min && !fits()) {
+        s = Math.max(min, s - Math.max(0.5, s * 0.04));
+        el.style.fontSize = `${s}px`;
+      }
+      setSize(s);
+    };
+    fit();
+    document.fonts?.ready.then(fit);
+    document.fonts?.addEventListener("loadingdone", fit);
+    return () => {
+      active = false;
+      document.fonts?.removeEventListener("loadingdone", fit);
+    };
   }, [children, max, min]);
 
   return (
@@ -1300,6 +1342,11 @@ const RCANA_STYLES = `
   will-change: transform;
 }
 .rc-card:active { transition: none; }
+/* Print and reduced-motion cards need ordinary paint order. Retaining a
+   3D context when every layer collapses to zero lets Chromium occlude
+   transparent ink against the paper during screenshot/compositor updates. */
+.rc-card[data-flat] { transform-style: flat; transform: none; }
+.rc-card[data-flat] .rc-layer { transform: none; }
 
 .rc-layer {
   position: absolute;
@@ -1455,6 +1502,7 @@ const RCANA_STYLES = `
 }
 .rc-number { font-size: calc(var(--u) * .070); }
 .rc-class  { font-size: calc(var(--u) * .050); letter-spacing: .04em; }
+.rc-class[data-font="bebas"] { letter-spacing: .1em; }
 /* Blackletter trials for the class label (bench control). Title case, no
    tracking, sized up a little since blackletter x-heights run small. */
 .rc-class[data-font="blackletter"] span { font-family: "Blackletter", "UnifrakturCook", serif; font-weight: 400; letter-spacing: .01em; font-size: calc(var(--u) * .058); }
@@ -1517,86 +1565,93 @@ const RCANA_STYLES = `
     0 calc(var(--u) * .0035) 0 #6a4a08,
     0 calc(var(--u) * .007) calc(var(--u) * .007) rgba(0, 0, 0, .55);
 }
-.rc-body { padding: 1.6% 2.4%; align-items: start; }
+.rc-footer-paper {
+  position: absolute;
+  left: 4.5%; top: 78.2%; width: 91%; height: 18.7%;
+  background: linear-gradient(to bottom, transparent, #ffdf87 24%, #ffdf87);
+  border-radius: 0 0 calc(var(--u) * .025) calc(var(--u) * .025);
+}
+.rc-body { padding: 0; align-items: start; }
 /* The rule is what gets played, so it is the louder line: Medium weight,
    full size. The quote is the character's voice — true italic, a step
    smaller and lighter — so at table distance the eye lands on the mechanic
    first and the line second. */
 .rc-ability {
   margin: 0;
-  /* A longer ability splits evenly instead of orphaning its last words. */
+  text-align: center;
   text-wrap: balance;
   font-family: "IBM Plex Serif", Georgia, serif;
   font-weight: 500;
   color: #241a0a;
 }
 .rc-flavor {
-  margin: .35em 0 0;
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: 96%;
+  margin: .16em auto 0;
+  padding: 0 .4em;
   text-wrap: balance;
   font-family: "IBM Plex Serif", Georgia, serif;
   font-style: italic;
   font-weight: 400;
   color: #5a4524;
-  /* .92 rather than .88: on a printed 2.5" card .88 lands near 5pt, the
-     floor for an italic serif. Still a clear step under the rule. */
-  font-size: .92em;
+  font-size: .72em;
+  text-align: center;
 }
-/* Leading the panel, so its spacing sits below rather than above, and a
-   shade darker — it is the character speaking, not a footnote. */
-.rc-flavor--quote { margin: 0 0 .35em; color: #4f3b1c; }
+.rc-flavor::before {
+  content: "";
+  display: block;
+  width: 6em;
+  height: .75em;
+  max-width: 90%;
+  margin: 0 auto .12em;
+  /* Crop only the asset's transparent vertical padding; keep the flourish
+     at its original proportions in a single centered bar above the quote. */
+  background: url("/HorizontalBar3.png") center / 100% auto no-repeat;
+}
+.rc-ability-name { margin: 0 0 .12em; font-family: "IBM Plex Serif", Georgia, serif; font-size: .85em; font-weight: 600; }
 
 /* ---------------- rules furniture ----------------
    Everything here is in em, so AutoFit scales the badges with the line.
    The timing badge is enamel in the type's header colour with the gold
    keyline the tab wears — the same vocabulary as the frame, not a sticker
    on it. A trait is the outlined form of the same pill. */
+.rc-rules-labels { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .25em; margin-bottom: .22em; }
 .rc-kw {
-  display: inline-block;
-  vertical-align: .1em;
-  margin: 0 .42em .08em 0;
-  padding: .1em .42em .02em;
-  border-radius: .3em;
+  display: inline-flex;
+  align-items: center;
+  gap: .3em;
+  padding: .15em .65em .12em .4em;
+  border-radius: .15em .15em .65em .15em;
   background: var(--kw, #155b60);
   color: #fff0bc;
   font-family: "Bebas Neue", Impact, sans-serif;
   font-weight: 400;
   font-style: normal;
-  font-size: .76em;
+  font-size: .60em;
   letter-spacing: .07em;
   line-height: 1.05;
   text-transform: uppercase;
   white-space: nowrap;
   box-shadow: inset 0 0 0 .07em #f4cd61, 0 0 0 .06em #1d190f;
 }
+.rc-kw svg { flex: 0 0 1.05em; width: 1.05em; height: 1.05em; }
 .rc-kw--trait {
   background: #fff6d6;
   color: var(--kw, #155b60);
   box-shadow: inset 0 0 0 .08em var(--kw, #155b60);
 }
 .rc-term { font-weight: 600; color: #140f05; white-space: nowrap; }
-.rc-drop {
+.rc-coin {
   display: inline-block;
-  width: .62em;
+  width: .88em;
   height: .88em;
   margin: 0 .12em 0 .02em;
   vertical-align: -.1em;
-  overflow: visible;
+  object-fit: contain;
 }
-/* The rule is played, the flavor is read: a hairline between them says so
-   without spending a line. Short and centred, like the flourishes either
-   side of the wordmark. */
-.rc-sep {
-  width: 26%;
-  height: 0;
-  margin: .24em auto .2em;
-  border: 0;
-  border-top: .07em solid rgba(29, 25, 15, .38);
-}
-.rc-sep + .rc-flavor { margin-top: 0; }
-
-/* "19 / 80" in the gold margin, right-aligned to the drop box. Bebas at
-   this size is still a readable numeral on a printed card; the slash is
-   lighter so the two numbers read as a pair. */
+/* Collection number in the bottom-right gold margin. Keep it smaller than
+   the tier and lighten the slash so both numbers read as a single detail. */
 .rc-collector {
   display: flex;
   align-items: center;
@@ -1611,6 +1666,37 @@ const RCANA_STYLES = `
   font-variant-numeric: tabular-nums;
 }
 .rc-collector i { font-style: normal; opacity: .55; margin: 0 .14em; }
+.rc-rarity { display: flex; align-items: center; justify-content: center; overflow: visible; }
+.rc-rarity-seal {
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--u) * .012);
+  min-width: calc(var(--u) * .18);
+  max-width: 100%;
+  height: calc(var(--u) * .058);
+  padding: 0 calc(var(--u) * .016);
+  background: linear-gradient(135deg, #fff0b1, #b9822c 55%, #f7d675);
+  clip-path: polygon(6% 0, 94% 0, 100% 50%, 94% 100%, 6% 100%, 0 50%);
+}
+.rc-rarity-seal::before {
+  content: "";
+  position: absolute;
+  inset: calc(var(--u) * .0018);
+  z-index: -1;
+  background: linear-gradient(135deg, #ffeab1, #f4ce70);
+  clip-path: polygon(6% 0, 94% 0, 100% 50%, 94% 100%, 6% 100%, 0 50%);
+}
+.rc-rarity-seal > span {
+  font-family: "Bebas Neue", Impact, sans-serif;
+  font-size: calc(var(--u) * .027);
+  letter-spacing: .035em;
+  line-height: 1;
+  color: #4f3b1c;
+}
 .rc-stat {
   font-family: "Bebas Neue", "Anton", ui-sans-serif, system-ui;
   font-weight: 400;

@@ -3,7 +3,7 @@
 // /rcana-print?id=<face id>[&scale=1][&live=1]
 // /rcana-print?template=artifact[&subtype=remedy|grace|relic]
 // The template has an empty art window, number, name, rules and cost, ready
-// for export; its Artifact header and usage seal are the real components.
+// for export; its Artifact header and usage badge are the real components.
 // ?template=event&subtype=hazard|opportunity|market uses the same system.
 //
 // One card, flat, on a transparent page: the print target for

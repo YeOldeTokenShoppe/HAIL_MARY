@@ -57,15 +57,16 @@ injects `designs.js` and the faces into `pt2-table.src.html` and writes
 5. **Face** — add an entry to `faces.js`: `id`, `design` (the engine key,
    e.g. `"bull"` — never the name), `number` (unique), `rarity`, `ability`
    (printed line — shorter than the simulator's), `flavor`. Halo/hydro print
-   the design's `cred`/`liq` unless overridden. Traders' flavor prints as a
-   quote and leads the panel; everything else narrates after the rule.
+   the design's `cred`/`liq` unless overridden. Gameplay text leads every
+   class; flavor follows a separator. Traders' flavor is quoted. An optional
+   `abilityName` can name a signature power without changing its rule.
    The rules line dresses itself: a leading **keyword badge** (the usage
-   label — Equip, Single use, Until cleared, On draw — so don't open the
+   label and symbol — Equip, Single use, Until cleared, On draw — so don't open the
    ability with those words; the badge strips a duplicate), **trait pills**
    read off the design's flags (`gamble`, `bearProof`, `income`, `choice`;
-   override with `traits: [...]`), bold game terms with the drop on
-   "N Hydro", a hairline before the flavor, and the collector line
-   (`number / RCANA_SET_SIZE`) in the bottom margin. The bench's **Rules
+   override with `traits: [...]`), bold game terms with the coin on
+   "N Hydro", a short flourish before the flavor, and the collector line
+   (`number / RCANA_SET_SIZE`) in the bottom-right gold margin. The bench's **Rules
    furniture** and **Collector line** toggles show the plain face.
 
 6. **Check**
@@ -106,14 +107,16 @@ renderer captures.
 
 ## Plates and seals
 
-The stat boxes are painted into the plate, so the plate follows the card's
-type (`PLATES` in `artSpec.js`, chosen by `plate` from `buildFace()`):
+The plate follows the card's type (`PLATES` in `artSpec.js`, chosen by
+`plate` from `buildFace()`). The live paper surface covers the legacy painted
+footer; shared components draw labeled stats and a centered rarity mark.
+The front omits the RL80 wordmark; branding belongs on the card back.
 
-| plate | left box | right (drop) box | types |
+| plate | left stat | right coins | types |
 |---|---|---|---|
-| `boxed` (`LOTERIA_FRAME2`) | halo: Grace | cost = income | Trader |
+| `boxed` (`LOTERIA_FRAME2`) | shield: Credibility (engine: Grace) | separate cost and income coins | Trader |
 | `valued` (`LOTERIA_FRAME2_value`) | **ingot: Prosperity** | **cost** | Asset, Opportunity Event |
-| `sealed` (`LOTERIA_FRAME2_sealed`) | **usage seal** | **cost** (Market: **—**) | Hazard, Market, Remedy, Relic, Grace |
+| `sealed` (`LOTERIA_FRAME2_sealed`) | open; usage is above the rule | **cost** (Market: **—**) | Hazard, Market, Remedy, Relic, Grace |
 
 The name banner's border matches the type tab's colour (`HEADER_COLORS`).
 The plates above carry the Trader red; the other classes use a copy with the
@@ -122,41 +125,73 @@ border recoloured (`PLATES_BY_CLASS`, keyed plate → class): `_value_asset`,
 painted — after re-exporting a plate, re-run
 `node scripts/recolor-plate-banner.mjs <plate> <out> <#hex>` for each.
 
-The drop box is always "the Liquidity on this card": what you pay to play
-it — and on a Trader, also what they pay you a turn (hire cost = income, by
-rule). The class label is set in Blackletter, the wordmark's face. Events
-and Artifacts use live usage medallions instead of the legacy full-canvas
-type overlays in `public/TCG/badges/<type>.webp` (`TYPE_BADGE`). The rarity heart sits
-under the wordmark on every plate. An art file may still pin a `frame:`.
+The cost coin shows what you pay to play the card. Traders also show an
+income coin for what they pay each turn (hire cost = income, by rule).
+Type and subtype labels use spaced Bebas Neue capitals, while the banner
+title retains gilt Blackletter. Events
+and Artifacts pair their usage symbol with its label above the rule, with
+no duplicate footer seal. The rarity heart and printed tier share a fixed
+footer position. An art file may still pin a `frame:`.
 
 ### Artifact template
 
 Cards whose printed class is `Artifact` use the swept teal-and-gold header
 in `RcanaArtifactTemplate.jsx`. The larger subtype symbol sits to the left
 of `Remedy`, `Grace` or `Relic`; `Artifact` remains on the right. The engine's
-`artifact` type prints as `Relic` and uses the **Equip** seal.
+`artifact` type prints as `Relic` and uses the **Equip** rules badge.
 Traders and Assets use the compact swept header in `RcanaTypeHeader.jsx`:
 a gold number cell and a colored field with the type name in pale-gold
-Blackletter. `COMPACT_TYPE_HEADER` defines its footprint and FX clearance.
-`headerColors.js` assigns plum to Traders, forest green to Assets, teal to
+Bebas Neue capitals. `COMPACT_TYPE_HEADER` defines its footprint and FX clearance.
+`headerColors.js` assigns red to Traders, forest green to Assets, teal to
 Artifacts, and indigo to Events. All Artifact subtypes share teal; all Event
-subtypes share indigo. Hazard usage seals retain their red warning color.
+subtypes share indigo. Hazard usage badges retain their red warning color.
 
 Rarity is **Common → Uncommon → Rare → Mythic**. Relic is exclusively an
 Artifact subtype; it is not a rarity.
 
-The lower-left seal describes use: **Single use**, **Equip**, or **To shrine**.
+The badge above the rule describes use: **Single use**, **Equip**, or **To shrine**.
 `artifactTemplate.js` maps these from the engine type and handles the Grace
 exceptions: the Rose is **Offer**, and the Fountain is **Spend**. This is
 display information only. The old subtype badge is omitted for Artifacts.
 FX clearance follows the full header, including on La Tortilla's steam.
 
-All four card classes share `RcanaLiquidityBox.jsx`: deep teal, a gold inset
-and divider, a blue droplet with a pale-gold outline, and a pale-gold value.
-They cover each plate's painted cyan box at the positions in `liquidityBox.js`,
-so new frame artwork is not required. Liquidity stays teal across types,
-independent of header color. Trader and Asset Grace/Prosperity boxes retain
-their current designs.
+All four card classes share the compact stat frames in `RcanaLiquidityBox.jsx`:
+a small label accompanies each value. Trader standing uses the blue-and-gold
+shield in `/laurel2.png`, with a pale gold number centered on its blue face
+and **CRED** curved above the rim. A clipped background trims the asset's
+heavy shadow while preserving its bevel. The shield sits at the left edge
+of the footer's stat slot, balancing the coins at the right. The accessible label is
+**Credibility**. This replaces the halo and its separate frame without
+changing the underlying Grace value or rules. Prosperity uses
+`/RoundGoldFrame2.png` in the same position and at the same size as the CRED
+badge, with **PROSPERITY** curved above it. Its wider arc preserves the same
+type size and spacing, and the former separate ingot icon is omitted. Hydro
+uses `/GoldCoin.png` with a pale gold number centered on the coin, a thick dark
+edge for contrast, and no separate footer currency glyph. Its curved label
+uses the same enlarged type as **CRED**. Equal width and height preserve the supplied assets'
+proportions. Longer values use smaller type to fit, with a separate scale
+for the coin's inset face.
+Each populated stat gets a medallion. Rarity has a compact gold-edged seal
+in the center, with a larger faceted heart and metallic arrow beside the
+printed tier. Common/Uncommon use red enamel; Rare/Mythic use gold. Earlier
+foil treatments remain selectable through `HEART_HOLO.style`.
+The smaller collection number sits in the bottom-right gold margin, aligned
+with the cost/income coins. The center seal contains only the rarity mark and tier.
+Flavor text sits below a single centered `/HorizontalBar3.png` flourish.
+Its proportions are preserved, with only the transparent vertical padding
+cropped from view. There is no lower bar or separate footer divider. The acquisition coin is
+right-aligned with **COST** curved above it. Traders use two slightly smaller,
+overlapping coins: **COST** on the left and **INCOME** on the right. Only their
+rims overlap; both numbers and curved labels remain visible. Cost reads the
+card's acquisition cost, while income reads its Hydro value. These currently
+match under the Trader rules, but remain separate display values. Triggered
+payouts stay in the rules text rather than receiving an income coin. The same coin
+appears beside Hydro amounts in the rules text. La Calavera and El Diablito
+print their triggered payout as **+1 Hydro**, keeping the plus sign and amount
+together after the coin. Sale prices and acquisition costs remain unsigned.
+`liquidityBox.js` sets a common position for Hydro. Rules are larger and
+centered, with balanced line wrapping. Usage badges and ability names share
+that center alignment; text fit is rechecked when fonts finish loading.
 
 Blank templates are available from the same print renderer:
 
@@ -174,20 +209,20 @@ the component remains the editable source. Regenerate them with
 After a visible template change,
 render the affected Artifact faces again and run `npm run pt2:build`.
 
-### Event subtypes and usage seals
+### Event subtypes and usage badges
 
-Events share the full-width swept header and medallion components with
+Events share the full-width swept header and usage symbols with
 Artifacts (`RcanaSubtypeFurniture.jsx`). `eventTemplate.js` derives the
 printed subtype from the existing game type and `played` flag:
 
-| Engine behavior | Printed subtype | Lower-left information |
+| Engine behavior | Printed subtype | Usage / value information |
 |---|---|---|
-| `type: "hazard"` | Hazard | Red **Until cleared** seal; pinned-card symbol |
-| `type: "event", played: true` | Opportunity | Existing numeric **Prosperity** value |
-| `type: "event"`, no `played` | Market | Indigo **On draw** seal; draw-card symbol |
+| `type: "hazard"` | Hazard | Red **Until cleared** rules badge; pinned-card symbol |
+| `type: "event", played: true` | Opportunity | Labeled numeric **Prosperity** mark |
+| `type: "event"`, no `played` | Market | Indigo **On draw** rules badge; draw-card symbol |
 
 The header uses a skull, sparkles, or globe to the left of the subtype and
-`Event` in Blackletter on the gold right panel. Future cards inherit their
+`EVENT` in Bebas Neue capitals on the gold right panel. Future cards inherit their
 header and stamp automatically; they do not need new frame artwork.
 Market Events print **—** for Liquidity because they resolve automatically.
 The God Candle can leave an ongoing Market effect after resolving.
@@ -209,10 +244,10 @@ changes, render affected Event faces and rebuild the playtest table.
   Asset (assets), Event (events and hazards), Artifact (artifacts,
   remedies, graces). Event and Artifact subtypes print beside their class
   in the swept header. The engine's seven types are untouched.
-- ~~**Stats → boxes.**~~ Settled (`buildFace()`): the drop box is always
-  Liquidity; the halo box is standing — Grace on a Trader, **Prosperity (the
-  card's value)** on an Asset or a called Event. Other types print blank
-  boxes. Cost prints as a coin in the tab on every type. Rarity stays the
+- ~~**Stats → boxes.**~~ Settled (`buildFace()`): the coin represents
+  Liquidity; the left stat is standing — Credibility (engine: Grace) in a
+  shield on a Trader, **Prosperity (the card's value)** in a circular frame
+  on an Asset or a called Event. Other types omit the left stat. Rarity stays the
   heart; by convention an Asset's rarity tracks its Prosperity tier.
 - **Numbering.** Lotería numbers are assigned per face by hand. If the set
   should number by type (Traders 1–11, …), do it in `faces.js` deliberately

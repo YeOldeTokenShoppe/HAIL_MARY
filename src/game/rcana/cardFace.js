@@ -49,10 +49,7 @@ export const RCANA_CLASSES = {
   ARTIFACT: "Artifact",
 };
 
-// Classes that are a person. Their flavour line is something the character
-// says, so it sets as a quotation and leads the panel — the card introduces
-// who is speaking before it explains what they do. Everything else narrates,
-// and narration follows the rules text in the usual place.
+// People speak in quotations; other cards narrate. Both follow the rule.
 export const SPEAKING_CLASSES = [RCANA_CLASSES.TRADER];
 
 export const CLASS_TONE = {
@@ -80,21 +77,14 @@ export const POINT_TYPES = {
 // ---------------------------------------------------------------------------
 // Rarity
 // ---------------------------------------------------------------------------
-// Rarity reads as a single heart — the favicon's — poured full of a metal.
-// Colour alone carries the tier, so there are two: gold from Rare upward,
-// red below it. Re-cut the ladder by changing a card's `heart` here; no
-// other file needs to know.
-// The rarity mark is the whole favicon, heart and arrow. The arrow does cost
-// some colour legibility at footer size — it crosses the heart and the two
-// can merge at a glance — so the mark is drawn as large as the band allows
-// to keep the metal readable. Set false for the heart alone.
+// The faceted heart and arrow sit beside the printed rarity tier in a small
+// gold-edged seal. Red enamel covers Common/Uncommon; gold covers Rare/Mythic.
+// The written tier distinguishes rarities without relying on colour alone.
+// Set false to omit the arrow while preserving the heart and tier label.
 export const RARITY_HEART_ARROW = true;
 
-// `holo` swaps the flat metal for the security-hologram treatment: an opaque
-// dark substrate with hard-edged spectral bands that walk with the tilt. It is
-// on for gold and off for red on purpose — a basic card printed in flat ink
-// and a rare one carrying a foil patch is how the hierarchy reads at a glance,
-// and the flat red does not wash out against the parchment the way gold did.
+// These palettes and `holo` flags support the optional earlier foil finishes.
+// The default faceted finish uses warm metallic shading suited to print.
 export const HEART_METALS = {
   red: { lit: "#ff7a62", mid: "#f7160e", deep: "#9c0b06", sheen: 0.18 },
   // Gold prints as a foil patch rather than as ink. The flat version washed
@@ -166,13 +156,15 @@ export const HEART_HOLO = {
   // separates from the heart behind it.
   arrow: "ink",
 
+  // "faceted" is the print-first gold/enamel treatment used by the footer
+  // seal. The earlier holographic options remain available here.
   // How the patch is struck. "foil" is the full-colour patch described
   // above. "currency" is a banknote OVD: mirror-silver stock, engraved with
   // concentric diffraction rings, a hard spectral band sweeping across, a
   // latent numeral that only resolves at one angle, and a ring of
   // microtext. Nothing in it is a painted rainbow — the colour lives in the
   // engraving, and the tilt is what lights it.
-  style: "sigil",
+  style: "faceted",
 
   // "sigil" is the card body's motif foil, applied to the mark: the heart's
   // silhouette is the MASK over a pastel diffraction ramp and the iridescent
@@ -314,54 +306,16 @@ export const RCANA_LAYOUT = {
   // under the flourishes before AutoFit stepped in.
   nameBanner: { x: 21.6, y: 64.14, w: 56.4, h: 7.8 },
 
-  // Parchment between the ribbon's tails and the stat boxes. The ribbon's
-  // pointed tails hang to 78.09% out at the sides and the stat boxes now
-  // close in at 87.01%, so the band that is clear across the full width is
-  // 78.09%-86.87%. The panel starts above that, at 75.8%: the first line is
-  // the centred quote, which never reaches the width the tails occupy.
-  // Width stays at 7-93%: the tails pinch to 7.21% at y=78%, so widening
-  // into the parchment's full 4.48-95.6% would put the panel's own edge
-  // inside a tail.
-  //
-  // `h` is the CONTENT height: .rc-body adds 1.6% padding, and a vertical
-  // padding percentage resolves against the WIDTH, so each edge adds
-  // 1.6 * RCANA_ASPECT = 1.15% of the card's height. Text therefore runs
-  // from 76.95% to 76.95% + h, and has to stop above the boxes at 87.01%,
-  // which caps h at 10.06. The previous 10.4 ran 1.15% INTO the stat boxes,
-  // where the frame — one depth rung ahead of the ink — simply cut the last
-  // line in half. Against the old boxes the honest cap was 9.25%, so the
-  // smaller boxes are worth about 9% more text.
-  bodyPanel: { x: 7.0, y: 75.8, w: 86.0, h: 10.0 },
-
-  // Bottom strip, re-measured against the boxes as redrawn smaller again.
-  // Each box prints a glyph, a divider rule, then an empty value cell — only
-  // the value cell is drawn. Measured on the FILL, not the black border, the
-  // same way the previous pass was, so the numbers compare directly: both
-  // boxes lost about 2.7% of width and 0.6% of height, and their shared top
-  // dropped from 86.71% to 87.60%, which is what the body panel gains.
-  // Their dividers still sit at different fractions — 64.2% of the halo box
-  // against 56.2% of the hydro — so each cell is measured, not reflected.
-  haloBox: { x: 10.61, y: 87.6, w: 18.21, h: 7.3 },
-  hydroBox: { x: 71.86, y: 87.6, w: 18.11, h: 7.3 },
-  // The numeral areas, measured off each plate's divider and box edge at the
-  // strip's centre line (y 90.5%), so a value sits dead centre of its half.
-  //   halo plate   left box: divider 22.3% → edge 29.0% (the divider sits
-  //                further right than the value plate's; the halo is wider)
-  //   value plate  left box: divider 20.8% → edge 29.3%
-  //   both         drop box: divider 82.4% → edge 90.3%
-  haloValue: { x: 22.3, y: 87.6, w: 6.7, h: 7.3 },
-  haloValueValued: { x: 20.8, y: 87.6, w: 8.5, h: 7.3 },
-  hydroValue: { x: 82.4, y: 87.6, w: 7.9, h: 7.3 },
-
-  // Rarity mark, in the one clear band the footer leaves: under the RL80
-  // wordmark, between the flourish tips, above the bottom border. Measured
-  // across the full 33-67% the band is only 93.3%-96.7%, but the flourishes
-  // are what close it in at the sides — directly under the mark, at 44-56%,
-  // it runs 92.63% to 96.77%. The mark is 5.8% of the card wide, so that
-  // narrower reading is the one that governs, and the slot sits high in it:
-  // the heart lands 92.79%-96.25%, clear of the border by 0.59% instead of
-  // the 0.14% it had when it was centred on the wider band.
-  rarity: { x: 33.0, y: 92.72, w: 34.0, h: 3.6 },
+  // Gameplay first: the text starts inside the ribbon tails and ends above
+  // the compact live footer. No padding is added outside these bounds.
+  bodyPanel: { x: 9.5, y: 77.0, w: 81.0, h: 13.0 },
+  standingBox: { x: 9, y: 91.2, w: 27, h: 5.2 },
+  haloBox: { x: 9, y: 91.2, w: 27, h: 5.2 },
+  hydroBox: { x: 68, y: 91.2, w: 23, h: 5.2 },
+  haloValue: { x: 28, y: 91.2, w: 7, h: 5.2 },
+  haloValueValued: { x: 28, y: 91.2, w: 7, h: 5.2 },
+  hydroValue: { x: 83, y: 91.2, w: 7, h: 5.2 },
+  rarity: { x: 37.5, y: 91.2, w: 25, h: 5.2, heightFactor: 0.038 },
 };
 
 // ---------------------------------------------------------------------------
@@ -446,7 +400,7 @@ import {
 import { RCANA_ART } from "./art/index.js";
 import { getArtifactTemplate } from "./artifactTemplate.js";
 import { getEventTemplate } from "./eventTemplate.js";
-import { SUBTYPE_HEADER, SUBTYPE_USAGE_SLOT } from "./subtypeTemplate.js";
+import { SUBTYPE_HEADER } from "./subtypeTemplate.js";
 import { LIQUIDITY_BOXES } from "./liquidityBox.js";
 
 
@@ -457,8 +411,8 @@ export { RCANA_SET, RCANA_SET as RCANA_DEMO, UNPRINTED, TYPE_CLASS } from "./set
 import { RCANA_SET_SIZE } from "./set/index.js";
 import { HEADER_COLORS } from "./headerColors.js";
 
-// The collector line sits in the gold margin under the inner border — the
-// one strip of plate the ink never used — right-aligned to the drop box.
+// The collector line sits in the gold margin under the inner border,
+// right-aligned with the cost/income coins.
 export const COLLECTOR_SLOT = { x: 52, y: 97.15, w: 38.9, h: 2.3 };
 
 // ---------------------------------------------------------------------------
@@ -484,7 +438,6 @@ export function toRcanaCard(card, overrides = {}) {
     numberCell: { x: 4.3, y: 3.1, w: 9.1, h: 6.4 },
     classCell: { x: cls === "Event" ? 72 : 67, y: 3.1, w: cls === "Event" ? 23.4 : 28.4, h: 6.4 },
     subtypeCell: { x: 13.4, y: 3.1, w: cls === "Event" ? 58.6 : 53.6, h: 6.4 },
-    usageSeal: SUBTYPE_USAGE_SLOT,
   } : { ...RCANA_LAYOUT };
   if (compactTypeHeader) {
     layout.numberTab = COMPACT_TYPE_HEADER;
@@ -495,9 +448,9 @@ export function toRcanaCard(card, overrides = {}) {
   if (liquidityBox) {
     layout.hydroBox = liquidityBox;
     layout.hydroValue = {
-      x: liquidityBox.x + liquidityBox.w * .54,
+      x: liquidityBox.x + liquidityBox.w * .68,
       y: liquidityBox.y + .5,
-      w: liquidityBox.w * .46,
+      w: liquidityBox.w * .28,
       h: liquidityBox.h - 1,
     };
   }
@@ -520,16 +473,17 @@ export function toRcanaCard(card, overrides = {}) {
 
     // Ink
     ability: card.ability ?? null,
+    abilityName: card.abilityName ?? null,
     // The rules line leads with its timing keyword — Equip, Single use,
     // Until cleared, On draw — as a badge, the way Palworld prints CONT /
-    // AUTO. It is the usage medallion's label, so the two always agree.
+    // AUTO. The label and symbol come from the same usage definition.
     keyword: card.keyword ?? subtypeTemplate?.label ?? null,
     keywordColor: subtypeTemplate?.color || HEADER_COLORS[cls] || HEADER_COLORS.Artifact,
     traits: card.traits ?? [],
     // "19 / 80": the lotería number over the set size.
     collector: card.number != null ? { number: card.number, of: card.setSize ?? RCANA_SET_SIZE } : null,
     flavor: card.flavor ?? null,
-    // A person's line is quoted and leads; narration follows the rules.
+    // A person's flavor is quoted; all flavor follows the gameplay text.
     flavorQuoted: card.flavorQuoted ?? SPEAKING_CLASSES.includes(cls),
     halo: card.halo ?? card.grace ?? null,
     hydro: card.hydro ?? card.liquidity ?? null,

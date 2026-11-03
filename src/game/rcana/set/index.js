@@ -72,10 +72,11 @@ export function buildFace(face) {
     // A fired Event is never played, so it has no cost to print: a dash, not a
     // zero (a zero means "free to play", as on La Ofrenda).
     hydro: face.hydro ?? (design.type === "trader" ? design.liq : design.type === "event" && !design.played ? "—" : design.cost) ?? null,
-    // No tab coin any more: a Trader's hire cost equals their income, so the
-    // drop box's one number is both. Kept as an override hook only.
+    // The footer now prints a Trader's cost and income as separate coins.
+    // Keep the old header coin as an override hook only.
     tabCost: face.tabCost ?? null,
     ability: face.ability ?? design.text ?? null,
+    abilityName: face.abilityName ?? null,
     traits: face.traits ?? deriveTraits(design),
     flavor: face.flavor ?? null,
     flavorQuoted: face.flavorQuoted,

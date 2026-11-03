@@ -1,5 +1,5 @@
 // Artifact-only printed furniture. The game still uses its existing types;
-// the header describes the subtype and the footer describes how it is used.
+// the header describes the subtype and the rules badge describes its use.
 export { SUBTYPE_HEADER as ARTIFACT_HEADER, SUBTYPE_USAGE_SLOT as ARTIFACT_USAGE_SLOT } from "./subtypeTemplate.js";
 export const ARTIFACT_SUBTYPES = { remedy: "Remedy", grace: "Grace", artifact: "Relic" };
 

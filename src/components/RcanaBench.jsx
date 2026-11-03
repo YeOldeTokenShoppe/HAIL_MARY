@@ -23,7 +23,7 @@ export default function RcanaBench() {
   const [depth, setDepth] = useState(1);
   const [showSlots, setShowSlots] = useState(false);
   const [showFacets, setShowFacets] = useState(false);
-  const [classFont, setClassFont] = useState("gilt");
+  const [classFont, setClassFont] = useState("bebas");
   // The name on the ribbon: gilt blackletter (default) or the Nabla it replaced.
   const [nameFont, setNameFont] = useState("gilt");
 
@@ -222,9 +222,9 @@ export default function RcanaBench() {
           <label title="Typeface for the class label in the tab">
             Class type
             <select value={classFont} onChange={(e) => setClassFont(e.target.value)}>
-              <option value="gilt">Gilt (default) — gold blackletter subtype, Bebas class</option>
+              <option value="bebas">Bebas (default) — spaced capitals</option>
+              <option value="gilt">Gilt — gold blackletter subtype, Bebas class</option>
               <option value="blackletter">Blackletter, plain</option>
-              <option value="bebas">Bebas (caps)</option>
               <option value="grenze">Grenze Gotisch</option>
               <option value="unifraktur">UnifrakturCook</option>
               <option value="maguntia">UnifrakturMaguntia</option>

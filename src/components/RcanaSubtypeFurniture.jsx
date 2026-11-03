@@ -28,7 +28,7 @@ function SubtypeSymbol({ kind }) {
   );
 }
 
-export function RcanaSubtypeHeader({ data, template, hideFrame = false, classFont = "blackletter" }) {
+export function RcanaSubtypeHeader({ data, template, hideFrame = false, classFont = "bebas" }) {
   if (!template) return null;
   return (
     <div className={`rc-subtype-header rc-${data.cardClass.toLowerCase()}-header`} style={{ ...box(SUBTYPE_HEADER), "--subtype-enamel": HEADER_COLORS[data.cardClass] }} data-class={data.cardClass} data-hide-frame={hideFrame || undefined} data-subtype={template.subtype || undefined} aria-label={[data.number != null ? `No. ${data.number}` : null, template.subtype, data.cardClass].filter(Boolean).join(", ")}>
@@ -44,7 +44,7 @@ export function RcanaSubtypeHeader({ data, template, hideFrame = false, classFon
   );
 }
 
-function UsageSymbol({ kind }) {
+export function UsageSymbol({ kind }) {
   return (
     <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
       {kind === "single-use" || kind === "spend" ? <>
@@ -68,12 +68,16 @@ function UsageSymbol({ kind }) {
   );
 }
 
-export function RcanaUsageBadge({ template, cardClass }) {
+// `label` prints the words under the seal. Off when the rules line carries
+// the keyword pill — the same words twice, two inches apart, and this copy
+// was the smallest type on the card. The seal then grows a step and stands
+// as the glyph alone.
+export function RcanaUsageBadge({ template, cardClass, label = true }) {
   if (!template?.usage) return null;
   return (
-    <div className={`rc-subtype-usage rc-${cardClass.toLowerCase()}-usage`} style={{ ...box(SUBTYPE_USAGE_SLOT), "--usage-enamel": template.color || HEADER_COLORS[cardClass] }} data-usage={template.usage} role="img" aria-label={`${template.label}: ${template.description}`}>
+    <div className={`rc-subtype-usage rc-${cardClass.toLowerCase()}-usage`} style={{ ...box(SUBTYPE_USAGE_SLOT), "--usage-enamel": template.color || HEADER_COLORS[cardClass] }} data-usage={template.usage} data-icon-only={label ? undefined : "1"} role="img" aria-label={`${template.label}: ${template.description}`}>
       <div className="rc-subtype-medallion"><UsageSymbol kind={template.usage} /></div>
-      <span>{template.label}</span>
+      {label && <span>{template.label}</span>}
     </div>
   );
 }
@@ -126,6 +130,13 @@ export const SUBTYPE_FURNITURE_STYLES = `
 }
 .rc-subtype-label { white-space: nowrap; }
 .rc-subtype-label[data-long] { font-size: calc(var(--u) * .049); }
+.rc-subtype-field[data-font="bebas"] {
+  font-family: "Bebas Neue", Impact, sans-serif;
+  font-size: calc(var(--u) * .055);
+  font-weight: 400;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
 .rc-subtype-icon {
   display: flex;
   align-items: center;
@@ -147,7 +158,12 @@ export const SUBTYPE_FURNITURE_STYLES = `
   font-size: calc(var(--u) * .055);
   white-space: nowrap;
 }
-.rc-subtype-class[data-font="bebas"] { font-family: "Bebas Neue", Impact, sans-serif; }
+.rc-subtype-class[data-font="bebas"] {
+  font-family: "Bebas Neue", Impact, sans-serif;
+  font-size: calc(var(--u) * .048);
+  letter-spacing: .1em;
+  padding-top: calc(var(--u) * .004);
+}
 /* "gilt" puts the stamped gold letter where the enamel is — the subtype
    field — so the whole bar is one blackletter, and the icon takes the gold. */
 .rc-subtype-field[data-font="gilt"] .rc-subtype-label {
@@ -201,6 +217,10 @@ export const SUBTYPE_FURNITURE_STYLES = `
   box-shadow: inset 0 0 0 calc(var(--u) * .0015) #fff0bc, inset 0 0 0 calc(var(--u) * .005) var(--usage-enamel), inset 0 0 0 calc(var(--u) * .006) #fff0bc;
 }
 .rc-subtype-medallion svg { width: 70%; height: 70%; }
+.rc-subtype-usage[data-icon-only] .rc-subtype-medallion {
+  width: calc(var(--u) * .092);
+  height: calc(var(--u) * .092);
+}
 .rc-subtype-usage > span {
   font-family: "Bebas Neue", Impact, sans-serif;
   font-size: calc(var(--u) * .022);

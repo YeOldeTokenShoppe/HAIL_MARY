@@ -5,6 +5,6 @@ export function EventHeader({ data, hideFrame = false, classFont }) {
   return <RcanaSubtypeHeader data={data} template={data.eventTemplate} hideFrame={hideFrame} classFont={classFont} />;
 }
 
-export function EventUsageBadge({ template }) {
-  return <RcanaUsageBadge template={template} cardClass="Event" />;
+export function EventUsageBadge({ template, label }) {
+  return <RcanaUsageBadge template={template} cardClass="Event" label={label} />;
 }

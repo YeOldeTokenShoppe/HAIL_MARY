@@ -1,7 +1,7 @@
 import React from "react";
 import { HEADER_COLORS } from "../game/rcana/headerColors.js";
 
-export function RcanaTypeHeader({ data, slot, hideFrame = false, classFont = "blackletter" }) {
+export function RcanaTypeHeader({ data, slot, hideFrame = false, classFont = "bebas" }) {
   return (
     <div
       className="rc-type-header"
@@ -60,7 +60,12 @@ export const TYPE_HEADER_STYLES = `
   line-height: 1;
   white-space: nowrap;
 }
-.rc-type-class[data-font="bebas"] { font-family: "Bebas Neue", Impact, sans-serif; }
+.rc-type-class[data-font="bebas"] {
+  font-family: "Bebas Neue", Impact, sans-serif;
+  font-size: calc(var(--u) * .055);
+  letter-spacing: .1em;
+  padding-top: calc(var(--u) * .004);
+}
 /* "gilt": the ExtraBold struck in gold — hairline light on top, a dark bevel
    under, a soft drop — so the class reads as a stamped gilt letter, the same
    metal as the Nabla name on the banner. The shadow font was tried and

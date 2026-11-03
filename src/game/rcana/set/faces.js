@@ -27,7 +27,7 @@ export const FACES = [
     // to print something other than what the game plays.
     // Condensed: the old line carried its own flavour ("the devil keeps the
     // spread either way"), which is the quote's job now.
-    ability: "When your offer is refused, take 1 Hydro from the bank.",
+    ability: "When your offer is refused, take +1 Hydro from the bank.",
     // In his own voice, since a Trader's line is printed as a quotation.
     flavor: "I never lie about the price. Only about the cost.",
     // LOTERIA_FRAME2 prints no text at all — tab cells and banner both come
@@ -130,7 +130,7 @@ export const FACES = [
     // PROVISIONAL number and rarity.
     number: 19,
     rarity: "Uncommon",
-    ability: "Whenever a rival sells an Asset, collect 1 Hydro.",
+    ability: "Whenever a rival sells an Asset, collect +1 Hydro.",
     flavor: "Even the dead take their cut.",
     printed: {},
   },

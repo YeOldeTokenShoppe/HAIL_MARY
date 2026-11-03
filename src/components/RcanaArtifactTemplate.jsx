@@ -7,6 +7,6 @@ export function ArtifactHeader({ data, hideFrame = false, classFont }) {
   return <RcanaSubtypeHeader data={data} template={data.artifactTemplate} hideFrame={hideFrame} classFont={classFont} />;
 }
 
-export function ArtifactUsageBadge({ template }) {
-  return <RcanaUsageBadge template={template} cardClass="Artifact" />;
+export function ArtifactUsageBadge({ template, label }) {
+  return <RcanaUsageBadge template={template} cardClass="Artifact" label={label} />;
 }
