@@ -23,11 +23,11 @@ export const FACES = [
     design: "diablito",
     number: 7,
     rarity: "Mythic",
+    abilityName: "Devil’s Wager",
     // halo/hydro come from the design (cred 10 / liq 2); set them here only
     // to print something other than what the game plays.
-    // Condensed: the old line carried its own flavour ("the devil keeps the
-    // spread either way"), which is the quote's job now.
-    ability: "When your offer is refused, take +1 Hydro from the bank.",
+    // The coin in his art is the wager: income versus his reputation.
+    ability: "At turn start, flip a coin.\nHeads: +1 Hydro · Tails: -1 CRED.",
     // In his own voice, since a Trader's line is printed as a quotation.
     flavor: "I never lie about the price. Only about the cost.",
     // LOTERIA_FRAME2 prints no text at all — tab cells and banner both come

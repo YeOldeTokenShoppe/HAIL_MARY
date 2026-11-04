@@ -59,14 +59,16 @@ injects `designs.js` and the faces into `pt2-table.src.html` and writes
    (printed line — shorter than the simulator's), `flavor`. Halo/hydro print
    the design's `cred`/`liq` unless overridden. Gameplay text leads every
    class; flavor follows a separator. Traders' flavor is quoted. An optional
-   `abilityName` can name a signature power without changing its rule.
-   The rules line dresses itself: a leading **keyword badge** (the usage
-   label and symbol — Equip, Single use, Until cleared, On draw — so don't open the
-   ability with those words; the badge strips a duplicate), **trait pills**
-   read off the design's flags (`gamble`, `bearProof`, `income`, `choice`;
-   override with `traits: [...]`), bold game terms with the coin on
-   "N Hydro", a short flourish before the flavor, and the collector line
-   (`number / RCANA_SET_SIZE`) in the bottom-right gold margin. The bench's **Rules
+   `abilityName` names a signature power. On Traders it sits beside the
+   ABIL80 pill on the same row; authored newlines in `ability` separate
+   timing from outcomes when useful.
+   Trader abilities have an **ABIL80** (Ability) corner cap above the rule. Event and
+   Artifact rules retain their usage/timing pills — Equip, Single use,
+   Until cleared, On draw — removing a duplicate lead-in from the ability.
+   Traits come from the design's flags (`gamble`, `bearProof`, `income`, `choice`;
+   override with `traits: [...]`). Game terms are bold, with a coin on
+   "N Hydro". A short flourish precedes the flavor, and the collector line
+   (`number / RCANA_SET_SIZE`) sits in the bottom-right gold margin. The bench's **Rules
    furniture** and **Collector line** toggles show the plain face.
 
 6. **Check**
@@ -134,9 +136,9 @@ The cost coin shows what you pay to play the card. Traders also show an
 income coin for what they pay each turn (hire cost = income, by rule).
 The compact Trader/Asset labels and the six Event and Artifact
 subtypes use custom gold mosaic wordmarks inspired by the Lotería edition
-emblem, while the banner title retains gilt Blackletter. Events
-and Artifacts pair their usage symbol with its label above the rule, with
-no duplicate footer seal. The mosaic medallion shares a fixed footer position
+emblem, while the banner title retains gilt Blackletter. A teal-blue **ABIL80**
+pill sits above the first line's left edge on Trader abilities. Events and Artifacts retain their usage
+symbol and label above the rule. The mosaic medallion shares a fixed footer position
 across all card classes. An art file may still pin a `frame:`.
 
 ### Artifact template
@@ -229,11 +231,14 @@ These currently match under the Trader rules, but remain separate display
 values. Triggered payouts stay in the rules text rather than receiving an
 income coin. `/GoldCoin.png` also appears beside Hydro amounts in the rules
 text. La Calavera and El Diablito
-print their triggered payout as **+1 Hydro**, keeping the plus sign and amount
+print their payouts as **+1 Hydro**, keeping the plus sign and amount
 together after the coin. Sale prices and acquisition costs remain unsigned.
-`liquidityBox.js` sets a common position for Hydro. Rules are larger and
-centered, with balanced line wrapping. Usage badges and ability names share
-that center alignment; text fit is rechecked when fonts finish loading.
+`liquidityBox.js` sets a common position for Hydro. Rules use larger text
+with balanced line wrapping. Rules, usage badges and ability names stay
+centered. The Trader ability pill shares the usage badges' gold-trimmed
+shape and sits just above the first line's left edge. Its position is measured
+after text fitting and font loading, without changing the paragraph's width
+or alignment.
 
 Blank templates are available from the same print renderer:
 
@@ -251,16 +256,16 @@ the component remains the editable source. Regenerate them with
 After a visible template change,
 render the affected Artifact faces again and run `npm run pt2:build`.
 
-### Event subtypes and usage badges
+### Event subtypes and instructions
 
-Events share the full-width swept header and usage symbols with
+Events share the full-width swept header and instruction styling with
 Artifacts (`RcanaSubtypeFurniture.jsx`). `eventTemplate.js` derives the
 printed subtype from the existing game type and `played` flag:
 
 | Engine behavior | Printed subtype | Usage / value information |
 |---|---|---|
-| `type: "hazard"` | Calamity | Red **Until cleared** rules badge; pinned-card symbol |
-| `type: "event", played: true` | Opportunity | Labeled numeric **Prosperity** mark |
+| `type: "hazard"` | CALAM80 (Calamity) | Red **Until cleared** rules badge; pinned-card symbol |
+| `type: "event", played: true` | OPPORTUN80 (Opportunity) | Labeled numeric **Prosperity** mark |
 | `type: "event"`, no `played` | Market | Indigo **On draw** rules badge; draw-card symbol |
 
 The header uses a skull, sparkles, or globe to the left of the subtype and
@@ -296,6 +301,37 @@ plain font options for comparison.
 Source PNGs are saved under `set/labels/`; the built-in imagegen prompts,
 cleanup edits and output paths are recorded in `subtype-wordmarks.prompts.json`
 and `type-wordmarks.prompts.json`.
+
+The RL80 signature spellings **CALAM80** and **OPPORTUN80** are display
+labels for Calamity and Opportunity. Their original subtype keys, rules
+terms and gameplay behavior stay intact; accessible labels include both
+spellings. `rl80-signature-wordmarks.prompts.json` records the generated
+wordmarks and source PNG/WebP paths. The exploratory gold ACTIV80 wordmark
+is saved but is not used on the cards. Trader cards instead use **ABIL80**
+(Ability) in the same pill style as the usage labels: teal-blue fill
+(`#07536B`), pale-gold Bebas lettering and gold trim. The level pill forms a
+corner cap just above the first line's left edge; the ability paragraph and
+flavor remain centered. An optional ability title sits to the right of the
+pill on that same heading row. It uses the real IBM Plex Serif Bold face,
+larger than the regular-weight rules beneath it, so the title leads. The ABIL80
+pill appears only when a Trader has ability text, and follows the bench's Rules
+furniture toggle. Event and Artifact timing pills and Asset instructions retain
+their existing treatment. Eugene's ticket stamp remains in the other card set.
+
+The complete rules block (pill, title, rules and flavor) shares the parchment
+plane and its surface sheen, centered vertically between the ribbon and footer.
+The bench's explicit **Ink above FX** override can still lift it for comparison.
+The heading anchor is measured in untransformed layout coordinates. Tilt does
+not rerun rules layout, so the pill and title stay fixed on the parchment;
+content, scale and font changes still recalculate their alignment.
+
+El Diablito uses the existing coin-flipping art (`Diablito2.webp` plus the
+separate `Diablito_Coin.webp` prop). **Devil’s Wager** resolves at turn start:
+heads grants 1 Hydro; tails costs El Diablito 1 CRED. This replaces the old
+refused-offer face text and the playtest's old Calamity rebate. The playtest
+resolves the flip before income, respects Quantum Hack/Halo and the bench,
+and uses the existing disgrace/Shroud rules. Run the mechanic checks with
+`node --test scripts/rcana-diablito.test.mjs`.
 
 ## Open design calls (placeholders in code, flagged where they live)
 

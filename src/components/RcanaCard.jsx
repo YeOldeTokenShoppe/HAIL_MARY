@@ -113,7 +113,8 @@ export default function RcanaCard({
   // alt-arts, where loud is the job. (Nabla is a COLRv1 font: engines
   // without COLRv1 paint its flat fallback colour.)
   nameFont = "gilt",
-  // The rules line's furniture: a leading timing badge (Equip, On draw…),
+  // The rules line's furniture: an ABIL80 (Ability) pill for Traders,
+  // timing/usage badges for other types,
   // trait pills, bold game terms with the drop glyph on Hydro, and a
   // hairline before the flavor. One switch, so the bench can compare the
   // plain line against the dressed one.
@@ -398,7 +399,6 @@ export default function RcanaCard({
   const tone = CLASS_TONE[data.cardClass] || CLASS_TONE.Trader;
   const printed = data.printed || {};
   const L = data.layout || RCANA_LAYOUT;
-  const usage = data.artifactTemplate || data.eventTemplate;
   const categoryFont = classFont === "mosaic" ? "bebas" : classFont;
 
   const box = (slot) => ({
@@ -407,6 +407,9 @@ export default function RcanaCard({
     width: `${slot.w}%`,
     height: `${slot.h}%`,
   });
+
+  // A stable rules component keeps tilt renders from rerunning text layout.
+  const rulesPanel = <RcanaRulesPanel data={data} slot={L.bodyPanel} u={u} keywordBadges={keywordBadges} />;
 
   // One art layer, used for both passes. `behind` decides whether it is
   // boxed at the opening (and its image stretched back out to the card) or
@@ -515,7 +518,7 @@ export default function RcanaCard({
         {/* ---------------- plate: frame + ink, one depth ---------------- */}
         <div
           className="rc-layer rc-plate"
-          style={{ "--z": `${zPlate}px`, "--k": counterScale(zPlate, P) }}
+          style={{ "--z": `${zPlate}px`, "--k": counterScale(zPlate, P), "--ink": tone.ink, "--accent": tone.accent }}
         >
           {data.frameImage && !hideFrame && (
             <img
@@ -548,6 +551,8 @@ export default function RcanaCard({
               ))}
             </div>
           )}
+
+          {!inkOnTop && rulesPanel}
 
           {/* Sheen rides the plate so it reads as light on the card's own
               surface, not on the art behind the window. */}
@@ -610,28 +615,7 @@ export default function RcanaCard({
             </div>
           )}
 
-          <div className="rc-slot rc-body" style={box(L.bodyPanel)}>
-            <AutoFit max={u * 0.043} min={u * 0.036} block>
-              {keywordBadges && (data.keyword || data.traits?.length > 0) && (
-                <div className="rc-rules-labels" style={{ "--kw": data.keywordColor }}>
-                  {data.keyword && <b className="rc-kw">
-                    {usage?.usage && <UsageSymbol kind={usage.usage} />}
-                    {data.keyword}
-                  </b>}
-                  {(data.traits || []).map((t) => <b key={t} className="rc-kw rc-kw--trait">{t}</b>)}
-                </div>
-              )}
-              {data.abilityName && <p className="rc-ability-name">{data.abilityName}</p>}
-              {data.ability ? (
-                <p className="rc-ability">
-                  {keywordBadges ? <RulesText text={stripKeyword(data.ability, data.keyword)} /> : data.ability}
-                </p>
-              ) : null}
-              {data.flavor ? (
-                <p className="rc-flavor">{data.flavorQuoted ? `“${data.flavor}”` : data.flavor}</p>
-              ) : null}
-            </AutoFit>
-          </div>
+          {inkOnTop && rulesPanel}
 
           {/* Sealed cards put usage beside its label above the rule. */}
           {data.plate !== "sealed" && (
@@ -891,7 +875,7 @@ function CoinGlyph() {
 // footer badge read as the same currency. Explicit signs on printed payouts
 // stay with the count after the coin; costs and sale prices stay unsigned.
 const RULE_TERMS =
-  /([+-]?\d+\s+)?(Hydro|Liquidity|Prosperity|Grace|Assets?|Calamit(?:y|ies)|Events?|Traders?|Artifacts?|Remedy|Remedies|Hail Mary|Good Deeds?)\b/g;
+  /([+-]?\d+\s+)?(Hydro|Liquidity|Prosperity|Grace|CRED|Assets?|Calamit(?:y|ies)|Events?|Traders?|Artifacts?|Remedy|Remedies|Hail Mary|Good Deeds?)\b/g;
 
 // A rules line that opens with its own keyword ("Until cleared, the target
 // banks…") would print it twice once the badge carries it, so the badge
@@ -926,10 +910,73 @@ function RulesText({ text }) {
   return <>{out}</>;
 }
 
+// Rules are printed together on the parchment. Tilt changes the card transform,
+// not this component's layout; content, scale and furniture changes still refit it.
+const RcanaRulesPanel = React.memo(function RcanaRulesPanel({ data, slot, u, keywordBadges }) {
+  const usage = data.artifactTemplate || data.eventTemplate;
+  const abilityLabel = data.cardClass === "Trader" && Boolean(data.ability);
+  return (
+    <div className="rc-slot rc-body" data-named-ability={data.abilityName ? true : undefined} style={{ left: `${slot.x}%`, top: `${slot.y}%`, width: `${slot.w}%`, height: `${slot.h}%` }}>
+      <AutoFit max={u * 0.043} min={u * 0.036} block alignAbilityCap={keywordBadges && abilityLabel}>
+        {keywordBadges && (abilityLabel || data.keyword || data.traits?.length > 0) && (
+          <div className="rc-rules-labels" data-corner-cap={abilityLabel || undefined} style={{ "--kw": data.keywordColor }}>
+            {abilityLabel && (
+              <span className="rc-ability-heading">
+                <b className="rc-kw rc-kw--ability" aria-label="ABIL80 — Ability">ABIL80</b>
+                {data.abilityName && <span className="rc-ability-name rc-ability-name--inline">{data.abilityName}</span>}
+              </span>
+            )}
+            {data.keyword && <b className="rc-kw">
+              {usage?.usage && <UsageSymbol kind={usage.usage} />}
+              {data.keyword}
+            </b>}
+            {(data.traits || []).map((t) => <b key={t} className="rc-kw rc-kw--trait">{t}</b>)}
+          </div>
+        )}
+        {data.abilityName && !(keywordBadges && abilityLabel) && <p className="rc-ability-name">{data.abilityName}</p>}
+        {data.ability ? (
+          <p className="rc-ability">
+            {keywordBadges ? <RulesText text={stripKeyword(data.ability, data.keyword)} /> : data.ability}
+          </p>
+        ) : null}
+        {data.flavor ? (
+          <p className="rc-flavor">{data.flavorQuoted ? `“${data.flavor}”` : data.flavor}</p>
+        ) : null}
+      </AutoFit>
+    </div>
+  );
+});
+
+// A Range on the live card returns perspective-transformed screen coordinates.
+// Measure a hidden copy at the same local width and font instead, so the cap's
+// layout offset cannot drift when fonts settle or content changes during tilt.
+function firstLineOffset(ability) {
+  const style = getComputedStyle(ability);
+  const copy = ability.cloneNode(true);
+  copy.setAttribute("aria-hidden", "true");
+  Object.assign(copy.style, {
+    position: "fixed", left: "0", top: "0", margin: "0",
+    visibility: "hidden", pointerEvents: "none", transform: "none",
+    width: style.width, fontFamily: style.fontFamily, fontSize: style.fontSize,
+    fontWeight: style.fontWeight, fontStyle: style.fontStyle,
+    lineHeight: style.lineHeight, letterSpacing: style.letterSpacing,
+    wordSpacing: style.wordSpacing,
+  });
+  document.body.appendChild(copy);
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(copy);
+    const firstLine = range.getClientRects()[0];
+    return firstLine ? firstLine.left - copy.getBoundingClientRect().left : 0;
+  } finally {
+    copy.remove();
+  }
+}
+
 // Steps the font size down until the content stops overflowing its slot.
 // Cheaper and more predictable than measuring text metrics, and it reruns on
 // content change, which is what a programmatic ability line needs.
-function AutoFit({ children, max, min, block = false }) {
+function AutoFit({ children, max, min, block = false, alignAbilityCap = false }) {
   const ref = useRef(null);
   const [size, setSize] = useState(max);
 
@@ -950,6 +997,7 @@ function AutoFit({ children, max, min, block = false }) {
       slot.scrollHeight <= slot.clientHeight + 1 && slot.scrollWidth <= slot.clientWidth + 1;
     const fit = () => {
       if (!active) return;
+      el.style.removeProperty("--ability-cap-left");
       let s = max;
       el.style.fontSize = `${s}px`;
       let guard = 0;
@@ -957,6 +1005,17 @@ function AutoFit({ children, max, min, block = false }) {
       while (guard++ < 60 && s > min && !fits()) {
         s = Math.max(min, s - Math.max(0.5, s * 0.04));
         el.style.fontSize = `${s}px`;
+      }
+      if (alignAbilityCap) {
+        // The centered paragraph can wrap differently on each card. Anchor
+        // its cap to the rendered first line after the font has settled.
+        const ability = el.querySelector(".rc-ability");
+        const cap = el.querySelector(".rc-ability-heading");
+        if (ability && cap) {
+          const left = firstLineOffset(ability);
+          const room = Math.max(0, ability.clientWidth - cap.offsetWidth);
+          el.style.setProperty("--ability-cap-left", `${Math.max(0, Math.min(left, room))}px`);
+        }
       }
       setSize(s);
     };
@@ -967,7 +1026,7 @@ function AutoFit({ children, max, min, block = false }) {
       active = false;
       document.fonts?.removeEventListener("loadingdone", fit);
     };
-  }, [children, max, min]);
+  }, [children, max, min, alignAbilityCap]);
 
   return (
     <div
@@ -1225,19 +1284,19 @@ const RCANA_STYLES = `
   background: linear-gradient(to bottom, transparent, #ffdf87 24%, #ffdf87);
   border-radius: 0 0 calc(var(--u) * .025) calc(var(--u) * .025);
 }
-.rc-body { padding: 0; align-items: start; }
-/* The rule is what gets played, so it is the louder line: Medium weight,
-   full size. The quote is the character's voice — true italic, a step
-   smaller and lighter — so at table distance the eye lands on the mechanic
-   first and the line second. */
+.rc-body { padding: 0; align-items: center; pointer-events: none; }
+/* Named abilities lead with a bold title, followed by regular-weight rules.
+   Unnamed rules keep their Medium weight. Flavor is a smaller true italic. */
 .rc-ability {
   margin: 0;
   text-align: center;
   text-wrap: balance;
+  white-space: pre-line;
   font-family: "IBM Plex Serif", Georgia, serif;
   font-weight: 500;
   color: #241a0a;
 }
+.rc-body[data-named-ability] .rc-ability { font-size: .92em; font-weight: 400; }
 .rc-flavor {
   box-sizing: border-box;
   width: fit-content;
@@ -1252,6 +1311,7 @@ const RCANA_STYLES = `
   font-size: .72em;
   text-align: center;
 }
+.rc-body[data-named-ability] .rc-flavor { margin-top: .08em; }
 .rc-flavor::before {
   content: "";
   display: block;
@@ -1263,14 +1323,19 @@ const RCANA_STYLES = `
      at its original proportions in a single centered bar above the quote. */
   background: url("/HorizontalBar3.png") center / 100% auto no-repeat;
 }
-.rc-ability-name { margin: 0 0 .12em; font-family: "IBM Plex Serif", Georgia, serif; font-size: .85em; font-weight: 600; }
+.rc-ability-name { margin: 0 0 .12em; font-family: "IBM Plex Serif", Georgia, serif; font-size: 1.12em; font-weight: 700; }
+.rc-ability-heading { display: inline-flex; align-items: center; gap: .35em; }
+.rc-ability-name--inline { margin: 0; line-height: 1; color: #241a0a; }
 
 /* ---------------- rules furniture ----------------
    Everything here is in em, so AutoFit scales the badges with the line.
-   The timing badge is enamel in the type's header colour with the gold
-   keyline the tab wears — the same vocabulary as the frame, not a sticker
-   on it. A trait is the outlined form of the same pill. */
+   An ABIL80 corner cap labels Trader abilities; timing badges follow the
+   type accent. Traits use an outlined pill in the same accent color. */
 .rc-rules-labels { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .25em; margin-bottom: .22em; }
+.rc-rules-labels[data-corner-cap] {
+  justify-content: flex-start;
+  padding-left: var(--ability-cap-left, 0px);
+}
 .rc-kw {
   display: inline-flex;
   align-items: center;
@@ -1290,6 +1355,11 @@ const RCANA_STYLES = `
   box-shadow: inset 0 0 0 .07em #f4cd61, 0 0 0 .06em #1d190f;
 }
 .rc-kw svg { flex: 0 0 1.05em; width: 1.05em; height: 1.05em; }
+.rc-kw--ability {
+  --kw: #07536b;
+  margin-top: .08em;
+  padding-left: .65em;
+}
 .rc-kw--trait {
   background: #fff6d6;
   color: var(--kw, #155b60);

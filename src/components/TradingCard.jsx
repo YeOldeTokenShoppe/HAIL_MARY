@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { fxMaterial } from "../game/terminal-traders/fxMaterials.js";
 import HoloFoilFrame from "./HoloFoilFrame.jsx";
+import TimeStamp, { TIME_STAMP_STYLES } from "./CardTimeStamp.jsx";
 
 // A frame src with this prefix is not an image: the border is computed live
 // by HoloFoilFrame. See cardFrames.js HOLO_FRAME_SRC.
@@ -167,15 +168,6 @@ function RarityGlyph({ rarity }) {
       {spec.grail
         ? <GrailGlyph metal={spec.metal} id={`grail-glint-${key}`} />
         : Array.from({ length: spec.count }, (_, i) => <IconGlyph key={i} metal={spec.metal} />)}
-    </span>
-  );
-}
-
-function TimeStamp({ children, style, small = false, tilt }) {
-  const cls = ["tc-stamp", small && "tc-stamp--small", tilt === "left" && "tc-stamp--tilt-left"].filter(Boolean).join(" ");
-  return (
-    <span className={cls} style={style}>
-      <span className="tc-stamp__inner">{children}</span>
     </span>
   );
 }
@@ -2140,50 +2132,7 @@ const CARD_STYLES = `
   }
 
   /* ───── OBLIQUE LABELS (parallelogram, leaning right) ───── */
-  /* ───── TIME-STAMP BADGES (BADGE_STYLE = "ticket") ───── */
-  /* Time-stamp: double-ruled ink box, lens-coloured ink, worn with a
-     radial mask so it reads as pressed onto the ticket, not printed. */
-  .tc-stamp {
-    display: inline-block;
-    padding: 3px;
-    border: 2.5px solid var(--effect-ink, #07ddf0);
-    border-radius: 6px;
-    transform: rotate(-5deg);
-    background: rgba(0,0,0,.28);
-    box-shadow: 0 3px 8px rgba(0,0,0,.45);
-    -webkit-mask-image: radial-gradient(120% 90% at 42% 55%, #000 55%, rgba(0,0,0,.55) 100%);
-            mask-image: radial-gradient(120% 90% at 42% 55%, #000 55%, rgba(0,0,0,.55) 100%);
-  }
-  .tc-stamp__inner {
-    display: block;
-    padding: 4px 16px;
-    border: 1px solid var(--effect-ink, #07ddf0);
-    border-radius: 3px;
-    font-family: "IBM Plex Mono", "SF Mono", Menlo, monospace;
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: .26em;
-    text-transform: uppercase;
-    color: var(--effect-ink, #07ddf0);
-    text-shadow: 0 0 6px rgba(0,0,0,.6);
-  }
-
-  /* Type stamp (top-left): full size, rarity ink, tilted a touch less than
-     the ability stamp so the three never line up. */
-  .tc-stamp--tilt-left { transform: rotate(-3deg); }
-
-  /* Rarity stamp: same object, smaller, inked in the rarity colour and
-     tilted the other way so the stamps don't read as a pattern. */
-  .tc-stamp--small {
-    transform: rotate(3deg);
-    border-width: 2px;
-    padding: 2px;
-  }
-  .tc-stamp--small .tc-stamp__inner {
-    padding: 2px 10px;
-    font-size: 13px;
-    letter-spacing: .22em;
-  }
+  ${TIME_STAMP_STYLES}
   .tc-rglyph {
     display: inline-flex;
     align-items: center;

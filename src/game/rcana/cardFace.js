@@ -304,9 +304,9 @@ export const RCANA_LAYOUT = {
   // under the flourishes before AutoFit stepped in.
   nameBanner: { x: 21.6, y: 64.14, w: 56.4, h: 7.8 },
 
-  // Gameplay first: the text starts inside the ribbon tails and ends above
-  // the compact live footer. No padding is added outside these bounds.
-  bodyPanel: { x: 9.5, y: 77.0, w: 81.0, h: 12.1 },
+  // Center the rules block between the ribbon and the footer divider, with
+  // balanced breathing room above the heading and below the flavor text.
+  bodyPanel: { x: 9.5, y: 75.0, w: 81.0, h: 12.5 },
   footerPanel: { x: 4.3, y: 89.6, w: 91.4, h: 7.5 },
   standingBox: { x: 9, y: 91.2, w: 27, h: 5.2 },
   haloBox: { x: 9, y: 91.2, w: 27, h: 5.2 },
@@ -475,8 +475,8 @@ export function toRcanaCard(card, overrides = {}) {
     ability: card.ability ?? null,
     abilityName: card.abilityName ?? null,
     // The rules line leads with its timing keyword — Equip, Single use,
-    // Until cleared, On draw — as a badge, the way Palworld prints CONT /
-    // AUTO. The label and symbol come from the same usage definition.
+    // Until cleared, On draw — as a badge. The label and symbol come from
+    // the same usage definition; Traders use a separate ABIL80 heading.
     keyword: card.keyword ?? subtypeTemplate?.label ?? null,
     keywordColor: subtypeTemplate?.color || HEADER_COLORS[cls] || HEADER_COLORS.Artifact,
     traits: card.traits ?? [],

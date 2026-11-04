@@ -14,12 +14,14 @@ export const SUBTYPE_WORDMARKS = {
     viewBox: [184, 119, 1814, 513],
   },
   Opportunity: {
-    src: "/TCG/labels/subtype-opportunity.webp", width: 2172, height: 724,
-    viewBox: [53, 201, 2072, 297],
+    label: "OPPORTUN80",
+    src: "/TCG/labels/wordmark-opportun80.webp", width: 2172, height: 724,
+    viewBox: [71, 202, 2036, 298],
   },
   Calamity: {
-    src: "/TCG/labels/subtype-calamity.webp", width: 2172, height: 724,
-    viewBox: [53, 174, 2068, 367],
+    label: "CALAM80",
+    src: "/TCG/labels/wordmark-calam80.webp", width: 2172, height: 724,
+    viewBox: [54, 169, 2060, 373],
   },
   Market: {
     src: "/TCG/labels/subtype-market.webp", width: 2172, height: 724,

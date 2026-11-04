@@ -153,7 +153,6 @@ export class Game {
         const heart = t.artifacts.find((a) => a.key === 'heart');
         if (heart && await t.policy.useHeart(this, t, c, p)) { t.artifacts.splice(t.artifacts.indexOf(heart), 1); t.discard.push(heart); p.discard.push(c); this.log(`${t.name}'s SACRED HEART cancels ${c.name}`); return true; }
         c.owner = p; c.by = p.idx; t.hazards.push(c); p.stats.hazPlayed++;
-        if (this.is(p, 'diablito')) p.liq += 1;
         this.log(`${p.name} plays ${c.name} on ${t.name}`);
         if (c.key === 'escandalo') this.credDamage(t, 5, 'the SCANDAL breaks');
         break; }
@@ -264,6 +263,15 @@ export class Game {
     p.peekedThisTurn = false; p.enigmaUsed = false; p.stats.turns++; if (p.hazards.length) p.stats.hazTurns++;
     for (const k of Object.keys(this.fx)) if (this.fx[k].owner === p.idx) { delete this.fx[k]; this.log(`${byKey[k].name} blows over`); }
     p.swapUsed = false;
+    if (this.is(p, 'diablito')) {
+      if (this.rng() < 0.5) {
+        p.liq += 1;
+        this.log(`DEVIL'S WAGER — heads: ${p.name} collects 1 Liquidity`);
+      } else {
+        this.log(`DEVIL'S WAGER — tails: El Diablito loses 1 CRED`);
+        this.credDamage(p, 1, "Devil's Wager");
+      }
+    }
     const employed = p.trader && this.abilityOn(p);
     const spotless = employed && (p.trader.credNow == null || p.trader.credNow === p.trader.cred);
     p.liq += employed ? p.trader.liq + (spotless ? 1 : 0) : 1;

@@ -31,22 +31,25 @@ function SubtypeSymbol({ kind }) {
 
 export function RcanaSubtypeHeader({ data, template, hideFrame = false, classFont = "mosaic" }) {
   if (!template) return null;
-  const wordmark = classFont === "mosaic" ? SUBTYPE_WORDMARKS[template.subtype] : null;
+  const lettering = SUBTYPE_WORDMARKS[template.subtype];
+  const label = lettering?.label ?? template.subtype;
+  const accessibleLabel = label === template.subtype ? label : `${label} (${template.subtype})`;
+  const wordmark = classFont === "mosaic" ? lettering : null;
   const categoryFont = classFont === "mosaic" ? "bebas" : classFont;
   return (
-    <div className={`rc-subtype-header rc-${data.cardClass.toLowerCase()}-header`} style={{ ...box(SUBTYPE_HEADER), "--subtype-enamel": HEADER_COLORS[data.cardClass] }} data-class={data.cardClass} data-hide-frame={hideFrame || undefined} data-subtype={template.subtype || undefined} aria-label={[data.number != null ? `No. ${data.number}` : null, template.subtype, data.cardClass].filter(Boolean).join(", ")}>
+    <div className={`rc-subtype-header rc-${data.cardClass.toLowerCase()}-header`} style={{ ...box(SUBTYPE_HEADER), "--subtype-enamel": HEADER_COLORS[data.cardClass] }} data-class={data.cardClass} data-hide-frame={hideFrame || undefined} data-subtype={template.subtype || undefined} aria-label={[data.number != null ? `No. ${data.number}` : null, accessibleLabel, data.cardClass].filter(Boolean).join(", ")}>
       <span className="rc-subtype-number">{data.number ?? ""}</span>
       {template.subtype && (
         <span className="rc-subtype-field" data-font={classFont}>
           <span className="rc-subtype-icon"><SubtypeSymbol kind={template.symbol} /></span>
-          <span className="rc-subtype-label" data-long={template.subtype.length > 9 || undefined} data-wordmark={wordmark ? true : undefined}>
+          <span className="rc-subtype-label" data-long={label.length > 9 || undefined} data-wordmark={wordmark ? true : undefined}>
             {wordmark ? (
               <svg className="rc-subtype-wordmark" viewBox={wordmark.viewBox.join(" ")}
                 width={wordmark.viewBox[2]} height={wordmark.viewBox[3]}
-                preserveAspectRatio="xMinYMid meet" role="img" aria-label={template.subtype} focusable="false">
+                preserveAspectRatio="xMinYMid meet" role="img" aria-label={accessibleLabel} focusable="false">
                 <image href={wordmark.src} width={wordmark.width} height={wordmark.height} aria-hidden="true" />
               </svg>
-            ) : template.subtype}
+            ) : label}
           </span>
         </span>
       )}

@@ -17,13 +17,19 @@ Pokémon-style statlines, R-cana values:
 | El Unicornio | 3 | 3 | 20 | None — pure compounding, the best paycheck at the desk. |
 | El Gato | 2 | 2 | 16 | When seated, immediately knock one hazard off your table, free. |
 | El Monje | 1 | 1 | 22 | When you light a candle, bank 25 Prosperity. |
-| El Diablito | 2 | 2 | 10 | When a hazard you play lands, collect 1 Liquidity. |
+| El Diablito | 2 | 2 | 10 | Devil’s Wager: at turn start, flip a coin. Heads gains 1 Liquidity; tails loses 1 CRED (Grace). |
 | La Estrella | 3 | 3 | 8 | Pay 1 when banking from a card: +25 Prosperity. Fame is fragile. |
 | La Abuela | 2 | 2 | 18 | Your gambles moon on 4+ instead of 5+. |
 | El Papa | 3 | 3 | 25 | Once a game, a failed Hail Mary is absolved — attempt it again. |
 | El Gambusino | 2 | 2 | 15 | Assets you buy cost 1 less. |
 
 ### 2. The seat and the bench
+
+El Diablito's **Devil’s Wager** resolves before normal income. Only the seated,
+enabled Trader flips. Tails damages his own CRED using the normal disgrace and
+Shroud rules; it can also end his spotless-reputation income bonus. A benched
+or hacked El Diablito does not flip (the Halo still protects from the Hack).
+The coin replaces his former Calamity rebate.
 
 - **One seat** (ability + LIQ live) and a **bench of up to two**.
 - Hiring is a main action: the seat if it's empty, otherwise the bench.

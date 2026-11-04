@@ -28,7 +28,7 @@ export const DESIGNS = [
   D('unicornio', 'El Unicornio', 'trader', 3, { liq: 3, cred: 20, text: 'Pure compounding — the best paycheck at the desk' }),
   D('gato', 'El Gato', 'trader', 2, { liq: 2, cred: 16, text: 'When seated, immediately knock one Calamity off your table, free' }),
   D('monje', 'El Monje', 'trader', 1, { liq: 1, cred: 22, text: 'When you light a candle, bank 25 Prosperity' }),
-  D('diablito', 'El Diablito', 'trader', 2, { liq: 2, cred: 10, text: 'When a Calamity you play lands, collect 1 Liquidity' }),
+  D('diablito', 'El Diablito', 'trader', 2, { liq: 2, cred: 10, text: 'At the start of your turn, flip a coin: heads, collect 1 Liquidity; tails, El Diablito loses 1 CRED' }),
   D('celebridad', 'La Estrella', 'trader', 3, { liq: 3, cred: 8, text: 'The influencer: pay 1 when banking from a card, +25 Prosperity' }),
   D('abuela', 'La Abuela', 'trader', 2, { liq: 2, cred: 18, text: 'The gambling grandmother: your gambles moon on 4+ instead of 5+' }),
   D('pope', 'El Papa', 'trader', 3, { liq: 3, cred: 25, text: 'Once a game, a failed Hail Mary is absolved — you may attempt it again' }),

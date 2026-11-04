@@ -1,0 +1,61 @@
+{
+  "mode": "built-in imagegen",
+  "transparent_background": true,
+  "assets": [
+    {
+      "word": "CALAM80",
+      "original": "CALAMITY",
+      "source": "/Users/michellepaulson/HAIL_MARY/src/game/rcana/set/labels/subtype-calamity.png",
+      "prompt": "Use case: text-localization. Edit the attached CALAMITY wordmark into the exact text \"CALAM80\", spelled C A L A M 8 0. This is intentional RL80 brand wordplay: the ending is the DIGITS 8 and 0, not letters, not 8O, and not the original word ending. Create ONLY this single word, all capitals followed by 80, in one straight horizontal line. Match the reference's classical serif gold letterforms, carved bevels, warm amber-gold highlights, small mosaic tile detailing and restrained ornamental terminals. Give 8 and 0 the same gold mosaic and bevel treatment and the same cap height as the adjacent letters; 80 should feel naturally integrated in the word, not a badge or superscript. Preserve bold, easy-to-read silhouettes for a small card header. Genuine transparent background including all letter and number counters and spaces. No haze, pale glow, checkerboard, cast-shadow field, plaque, ribbon, border, background or extra decoration. Thin dark bronze edges may hug each letter closely. Keep every serif fully inside a wide 3:1 canvas, with transparent padding above and below to retain natural lettering proportions; do not stretch to fill canvas height.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a1ac-7563-7452-925f-c66c731e1bdf/exec-16ca2f88-cca2-4dbb-82c6-d3bbd59ff086.png",
+      "png": "src/game/rcana/set/labels/wordmark-calam80.png",
+      "webp": "public/TCG/labels/wordmark-calam80.webp",
+      "width": 2172,
+      "height": 724,
+      "viewBox": [
+        54,
+        169,
+        2060,
+        373
+      ]
+    },
+    {
+      "word": "OPPORTUN80",
+      "original": "OPPORTUNITY",
+      "source": "/Users/michellepaulson/HAIL_MARY/src/game/rcana/set/labels/subtype-opportunity.png",
+      "prompt": "Use case: text-localization. Edit the attached OPPORTUNITY wordmark into the exact text \"OPPORTUN80\", spelled O P P O R T U N 8 0. This is intentional RL80 brand wordplay: the ending is the DIGITS 8 and 0, not letters, not 8O, and not the original word ending. Create ONLY this single word, all capitals followed by 80, in one straight horizontal line. Match the reference's classical serif gold letterforms, carved bevels, warm amber-gold highlights, small mosaic tile detailing and restrained ornamental terminals. Give 8 and 0 the same gold mosaic and bevel treatment and the same cap height as the adjacent letters; 80 should feel naturally integrated in the word, not a badge or superscript. Preserve bold, easy-to-read silhouettes for a small card header. Genuine transparent background including all letter and number counters and spaces. No haze, pale glow, checkerboard, cast-shadow field, plaque, ribbon, border, background or extra decoration. Thin dark bronze edges may hug each letter closely. Keep every serif fully inside a wide 3:1 canvas, with transparent padding above and below to retain natural lettering proportions; do not stretch to fill canvas height.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a1ac-7563-7452-925f-c66c731e1bdf/exec-b865bd79-25b6-42e9-97de-b5f27e2120f6.png",
+      "png": "src/game/rcana/set/labels/wordmark-opportun80.png",
+      "webp": "public/TCG/labels/wordmark-opportun80.webp",
+      "width": 2172,
+      "height": 724,
+      "viewBox": [
+        71,
+        202,
+        2036,
+        298
+      ]
+    },
+    {
+      "word": "ACTIV80",
+      "original": "CALAMITY",
+      "source": "/Users/michellepaulson/HAIL_MARY/src/game/rcana/set/labels/subtype-calamity.png",
+      "prompt": "Use case: text-localization. Edit the attached CALAMITY wordmark into the exact text \"ACTIV80\", spelled A C T I V 8 0. This is intentional RL80 brand wordplay: the ending is the DIGITS 8 and 0, not letters, not 8O, and not the original word ending. Create ONLY this single word, all capitals followed by 80, in one straight horizontal line. Match the reference's classical serif gold letterforms, carved bevels, warm amber-gold highlights, small mosaic tile detailing and restrained ornamental terminals. Give 8 and 0 the same gold mosaic and bevel treatment and the same cap height as the adjacent letters; 80 should feel naturally integrated in the word, not a badge or superscript. Preserve bold, easy-to-read silhouettes for a small card header. Genuine transparent background including all letter and number counters and spaces. No haze, pale glow, checkerboard, cast-shadow field, plaque, ribbon, border, background or extra decoration. Thin dark bronze edges may hug each letter closely. Keep every serif fully inside a wide 3:1 canvas, with transparent padding above and below to retain natural lettering proportions; do not stretch to fill canvas height.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a1ac-7563-7452-925f-c66c731e1bdf/exec-45155889-c8ef-4a48-952a-5669b378aa8d.png",
+      "png": "src/game/rcana/set/labels/wordmark-activ80.png",
+      "webp": "public/TCG/labels/wordmark-activ80.webp",
+      "cleanup": {
+        "prompt": "Edit the attached ACTIV80 gold wordmark: remove ALL pale background, fog and haze behind and between the characters. Preserve the exact text \"ACTIV80\", its layout, gold mosaic texture, gold bevels and individual character shapes. Keep only the solid letters and digits, with a thin bronze contour tightly hugging their edges. Every pixel outside these character silhouettes must be genuinely transparent, including the holes inside A, 8 and 0 and all spaces between characters. No white or gray backing, glow, checkerboard, gradient, shadow field, rectangle or plaque. Keep the full word and every serif inside the canvas. Real alpha transparency.",
+        "reference": "/Users/michellepaulson/.codex/generated_images/01a1a1ac-7563-7452-925f-c66c731e1bdf/exec-6ea8899f-3c30-4e1a-9ef6-bb736a54f392.png"
+      },
+      "width": 2172,
+      "height": 724,
+      "viewBox": [
+        138,
+        181,
+        1930,
+        361
+      ]
+    }
+  ]
+}
