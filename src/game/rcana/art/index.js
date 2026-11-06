@@ -12,6 +12,7 @@ import tortilla from "./tortilla.js";
 import laCampana from "./la-campana.js";
 import rosario from "./rosario.js";
 import laCalavera from "./la-calavera.js";
+import elUnicornio from "./el-unicornio.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -24,4 +25,5 @@ export const RCANA_ART = {
   "la-campana": laCampana,
   rosario,
   "la-calavera": laCalavera,
+  "el-unicornio": elUnicornio,
 };

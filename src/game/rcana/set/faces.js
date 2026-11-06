@@ -137,4 +137,17 @@ export const FACES = [
     flavor: "Even the dead take their cut.",
     printed: {},
   },
+  {
+    id: "el-unicornio",
+    design: "unicornio",
+    // PROVISIONAL number and rarity.
+    number: 20,
+    rarity: "Rare",
+    // halo/hydro come from the design (cred 20 / liq 3). Shorter than the
+    // simulator's line; the trigger and the payout on their own lines.
+    ability: "At turn start, with 100+ banked Prosperity,\nbank 25 more.",
+    // A Trader speaks, so the line prints as a quotation.
+    flavor: "I don't chase the market. It compounds while I ride.",
+    printed: {},
+  },
 ];

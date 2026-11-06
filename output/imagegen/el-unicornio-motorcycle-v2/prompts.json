@@ -1,0 +1,44 @@
+{
+  "tool": "built-in image_gen",
+  "sourceDirectory": "../el-unicornio-motorcycle-v1",
+  "files": [
+    {
+      "file": "scene.png",
+      "role": "background",
+      "unchanged": true
+    },
+    {
+      "file": "tire-dust.png",
+      "role": "semi-transparent tire dust, source-canvas registration",
+      "prompt": "Use case: background-extraction. Create a separate transparent TIRE DUST EFFECT LAYER from the supplied original El Unicornio motorcycle artwork. Keep the exact source 1024 x 1536 portrait canvas and the original image registration. The input is a reference for the dust's shape, placement, color and style; the output contains ONLY golden tire dust and a few tiny airborne dust flecks.\n\nStudy the warm ochre-gold tire spray and pale golden speed dust thrown up along the LOWER-LEFT side of the motorcycle, especially the wisps beside and behind the small rear tire and along the lower road surface. Isolate and faithfully recreate that effect as a reusable semi-transparent layer. The main plume lives in the lower-left quadrant, trailing diagonally backward and toward the left edge, around y=800 to y=1330 in the 1536-high source. Retain the source's stylized angular brush-like wisps and energetic tapered sunlit streaks, a few small faceted dust particles, and softly fading warm amber powder. Extend obscured wisps naturally behind the bike where necessary so the effect is continuous, not cut into a motorcycle-shaped hole. Keep the dust moderately restrained, like the original, not a huge opaque smoke cloud or an explosion. Optional very faint thin low dust wisps can drift toward the front tire's ground-contact region near the bottom, but the visual focus is the rear-tire trail at left.\n\nThe upper half and almost all of the right side must be fully empty and transparent. Every dust wisp must fade to actual alpha transparency at its edges, with genuine intermediate opacity throughout the airy powder so the road will show through. Retain brighter gold along a few fast streaks, with soft amber midtones. The result should composite naturally over the existing warm asphalt using ordinary normal alpha-over blending; no screen blend is required. Do not include any road pixels, road markings, sand/ground slab, cast motorcycle shadow, black or white background, checkerboard, glow rectangle, sky, landscape, cacti, rock, grass, motorcycle parts, wheel silhouette, rider, horn, clothes, text or frame. This image is a transparent dust-only special-effects plate, NOT a masked-out scene with a black backdrop. Preserve the original composition's direction of motion and warm faceted illustration style. Output one full-canvas transparent RGBA PNG."
+    },
+    {
+      "file": "subject.png",
+      "role": "unicorn and main motorcycle body",
+      "unchanged": true
+    },
+    {
+      "file": "front-wheel-motion.png",
+      "role": "rotationally blurred wheel with crisp forks, headlight and signals; rock removed",
+      "prompt": "Use case: precise-object-edit. Edit the supplied transparent El Unicornio foreground layer. Return a true-transparent RGBA PNG at the SAME 1024 x 1536 portrait canvas, keeping the motorcycle front assembly exactly at its existing position, scale, angle and perspective so it aligns with the existing rider layer.\n\nMake TWO changes only:\n1. REMOVE THE ENTIRE LOWER-LEFT ROCK AND ALL GOLDEN GRASS to transparency. The rock is becoming a separate movable asset. No rock, grass, ground or dust should remain in this wheel layer.\n2. Make the FRONT WHEEL visibly SPINNING with convincing rotational motion blur. Apply a clear, tasteful curved radial/angular blur around the wheel's existing axle center, following the perspective ellipse of the wheel: blend the previously sharp gold/silver rim facets, inner rim reflections and rotating wheel details into flowing circular arcs; softly streak and blend the tire tread and rotating sidewall facets along their rotation. It should clearly look like a wheel turning at highway speed, not a sharp stationary wheel. Use medium-strong rotational blur inside the wheel with a subtly feathered moving tire edge, while preserving the exact tire silhouette, geometry, position and the wheel's readable dark rubber mass. Do not blur the wheel by generic out-of-focus Gaussian blur; emphasize motion around the axle, not a cloud of smudged color or straight trailing duplicates. Keep the axle attachment and fork-mounted hardware sharp as nonrotating parts.\n\nKEEP BOTH CHROME FRONT FORKS, fork caps and clamps, the front fender, round golden headlight and both amber signal lights CRISP and pixel-registered to the original. Their detailed faceted style, reflections, shapes and warm light must stay the same. The dark front fender is stationary and should not be blurred. Do not move or resize any part of the assembly. Do not introduce the rider, handlebars, fuel tank, engine or rear wheel. No neon motion rings, comic speed lines, flames, new dust clouds, backdrop, cast shadow, glow halo, text, frame or watermark. Actual transparent empty space all around the assembly and through mechanical openings. Preserve the entire original canvas including all transparent top and left space. Clean antialiased alpha edges, with natural partial alpha only for the subtle blurred tire contour. Output one isolated spinning-front-wheel-and-crisp-forks layer."
+    },
+    {
+      "file": "rock.png",
+      "role": "complete independent rock and grass cutout; position and scale freely in card frame",
+      "prompt": "Use case: precise-object-edit. Input image: the existing transparent foreground layer of El Unicornio's motorcycle card, containing a motorcycle front assembly and a red-orange corner rock. Create a separate reusable PROP CUTOUT containing ONLY that corner rock and its associated golden grass tufts, with the ENTIRE rock shown in full.\n\nExtract the red-orange angular sandstone boulder from the lower-left corner and reconstruct its cropped-off left and bottom portions into a complete natural boulder. Preserve its recognizable large warm yellow-orange top face, deep crimson-red side facets, irregular angular silhouette, smaller adjoining reddish stone facet at the front, and sparse golden dry grass emerging just behind and beside it. Keep the same rich, crisp polygonal illustrated style, warm sunlight from upper left, and original palette. The result should feel like the same familiar corner rock completed, not a different generic rock or a whole piece of terrain.\n\nCenter this compact rock-and-grass cluster on a 1024 x 1024 SQUARE transparent canvas at a useful large scale. Show every outer edge of the boulder, its rounded irregular lower contour, and the tips of every grass blade with at least 70 pixels of clear transparent margin on ALL FOUR sides. Nothing may touch or extend beyond the image boundary. Do not cut the base flat along the canvas. No opaque ground slab, rectangular pedestal, sand patch, horizon, cast shadow, scenery, dust, motorcycle wheel, forks, headlight, rider, extra plants, lettering or border. Exactly one isolated complete rock cluster with the existing sparse grass. Actual RGBA transparency outside the object, including spaces between grass blades, clean antialiased edges, no halo, no checkerboard printed into pixels. The user will position and scale this independent cutout at the corner of a card frame."
+    }
+  ],
+  "suggestedBackToFrontOrder": [
+    "scene.png",
+    "tire-dust.png",
+    "subject.png",
+    "front-wheel-motion.png",
+    "rock.png"
+  ],
+  "notes": [
+    "The rock is a centered complete asset rather than registered to the old lower-left corner.",
+    "Scene, subject, wheel and dust retain the original 1024 x 1536 source canvas.",
+    "Rock positioning is intentionally left to the user; stack-preview-no-rock.png checks the remaining layers.",
+    "No game source or card configuration was changed."
+  ]
+}
