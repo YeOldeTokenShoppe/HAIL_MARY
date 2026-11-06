@@ -263,6 +263,15 @@ export class Game {
     p.peekedThisTurn = false; p.enigmaUsed = false; p.stats.turns++; if (p.hazards.length) p.stats.hazTurns++;
     for (const k of Object.keys(this.fx)) if (this.fx[k].owner === p.idx) { delete this.fx[k]; this.log(`${byKey[k].name} blows over`); }
     p.swapUsed = false;
+    // Compound Interest belongs to the active, enabled Trader. Resolve it
+    // through bank() so Calamities and the victory check still apply.
+    if (this.is(p, 'unicornio') && p.pros >= 100) {
+      this.bank(p, 25, 'Compound Interest');
+      if (this.over) {
+        if (this.hooks && this.hooks.render) await this.hooks.render();
+        return;
+      }
+    }
     if (this.is(p, 'diablito')) {
       if (this.rng() < 0.5) {
         p.liq += 1;

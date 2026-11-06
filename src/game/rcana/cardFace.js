@@ -466,7 +466,7 @@ export function toRcanaCard(card, overrides = {}) {
     liquidityBox,
     layout,
     cost: card.cost ?? null,
-    // The coin in the tab: a Trader's hire cost (its boxes hold Grace and income).
+    // The coin in the tab: a Trader's play cost (its boxes hold Grace and income).
     tabCost: card.tabCost ?? null,
     name: card.name,
     rarity: card.rarity || "Common",
@@ -474,10 +474,9 @@ export function toRcanaCard(card, overrides = {}) {
     // Ink
     ability: card.ability ?? null,
     abilityName: card.abilityName ?? null,
-    // The rules line leads with its timing keyword — Equip, Single use,
-    // Until cleared, On draw — as a badge. The label and symbol come from
-    // the same usage definition; Traders use a separate ABIL80 heading.
-    keyword: card.keyword ?? subtypeTemplate?.label ?? null,
+    // One primary body badge per card. Traders use their named ABIL80;
+    // Assets use Invest; Event/Artifact badges describe usage or timing.
+    keyword: cls === "Trader" ? null : card.keyword ?? subtypeTemplate?.label ?? (cls === "Asset" ? "Invest" : null),
     keywordColor: subtypeTemplate?.color || HEADER_COLORS[cls] || HEADER_COLORS.Artifact,
     traits: card.traits ?? [],
     // "19 / 80": the lotería number over the set size.

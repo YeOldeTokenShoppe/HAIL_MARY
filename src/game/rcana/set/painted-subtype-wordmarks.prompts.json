@@ -1,0 +1,108 @@
+{
+  "mode": "built-in imagegen",
+  "transparent_background": true,
+  "reference": "src/game/rcana/set/labels/type-trader-painted.png",
+  "rendering": {
+    "treatment": "Same cream finish as Trader",
+    "midtone": "#f3e5c3",
+    "method": "Shared IVORY_PAINT_MATRIX in wordmarkPaint.js; source alpha preserved"
+  },
+  "assets": [
+    {
+      "key": "Remedy",
+      "word": "REMEDY",
+      "prompt": "Use case: text-localization.\nAsset type: transparent illustrated wordmark for the subtype header of a Lotería-inspired trading card.\nInput image: the approved painted TRADER wordmark, used as the exact lettering style reference and edit target.\nPrimary request: replace TRADER with \"REMEDY\", and keep the same painted serif lettering style, warm ochre/gold color, brush texture, stroke weight, and slightly irregular sign-painted character.\nText (verbatim): \"REMEDY\". Spell exactly R - E - M - E - D - Y. One word on one horizontal baseline.\nStyle: sturdy classical Roman serif capitals, broad wedge serifs, open counters, gently curved R legs, subtle pale brush highlights; flat painted pigment with restrained texture. Match the reference's letterforms where letters recur.\nComposition: wide horizontal wordmark with comfortable clear margins, all letters fully visible. Adjust the natural word width to fit without squeezing or distorting individual letters. Similar cap height throughout; digits 8 and 0 when present must share the same height and painted serif character.\nBackground: genuinely transparent, with clean alpha around each letter and inside all counters. Output only the lettering.\nAvoid: backdrop, plaque, border, card, illustration, flourishes, extra text, gothic/blackletter forms, mosaic tiles, jewel effects, metallic bevel, drop shadow, glow, hazy halos, detached flecks.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a60e-da12-78a2-ace1-bfc97c9e8ab6/exec-2db02013-7f27-4735-8cf3-001b4c5532d6.png",
+      "png": "src/game/rcana/set/labels/subtype-remedy-painted.png",
+      "webp": "public/TCG/labels/subtype-remedy-painted.webp",
+      "width": 2172,
+      "height": 724,
+      "viewBox": [
+        56,
+        162,
+        2066,
+        410
+      ]
+    },
+    {
+      "key": "Grace",
+      "word": "GRACE",
+      "prompt": "Use case: text-localization.\nAsset type: transparent illustrated wordmark for the subtype header of a Lotería-inspired trading card.\nInput image: the approved painted TRADER wordmark, used as the exact lettering style reference and edit target.\nPrimary request: replace TRADER with \"GRACE\", and keep the same painted serif lettering style, warm ochre/gold color, brush texture, stroke weight, and slightly irregular sign-painted character.\nText (verbatim): \"GRACE\". Spell exactly G - R - A - C - E. One word on one horizontal baseline.\nStyle: sturdy classical Roman serif capitals, broad wedge serifs, open counters, gently curved R legs, subtle pale brush highlights; flat painted pigment with restrained texture. Match the reference's letterforms where letters recur.\nComposition: wide horizontal wordmark with comfortable clear margins, all letters fully visible. Adjust the natural word width to fit without squeezing or distorting individual letters. Similar cap height throughout; digits 8 and 0 when present must share the same height and painted serif character.\nBackground: genuinely transparent, with clean alpha around each letter and inside all counters. Output only the lettering.\nAvoid: backdrop, plaque, border, card, illustration, flourishes, extra text, gothic/blackletter forms, mosaic tiles, jewel effects, metallic bevel, drop shadow, glow, hazy halos, detached flecks.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a60e-da12-78a2-ace1-bfc97c9e8ab6/exec-770c0318-e1c5-4523-9352-72a9ba9cfdac.png",
+      "png": "src/game/rcana/set/labels/subtype-grace-painted.png",
+      "webp": "public/TCG/labels/subtype-grace-painted.webp",
+      "width": 2172,
+      "height": 724,
+      "viewBox": [
+        130,
+        141,
+        1910,
+        467
+      ]
+    },
+    {
+      "key": "Relic",
+      "word": "RELIC",
+      "prompt": "Use case: text-localization.\nAsset type: transparent illustrated wordmark for the subtype header of a Lotería-inspired trading card.\nInput image: the approved painted TRADER wordmark, used as the exact lettering style reference and edit target.\nPrimary request: replace TRADER with \"RELIC\", and keep the same painted serif lettering style, warm ochre/gold color, brush texture, stroke weight, and slightly irregular sign-painted character.\nText (verbatim): \"RELIC\". Spell exactly R - E - L - I - C. One word on one horizontal baseline.\nStyle: sturdy classical Roman serif capitals, broad wedge serifs, open counters, gently curved R legs, subtle pale brush highlights; flat painted pigment with restrained texture. Match the reference's letterforms where letters recur.\nComposition: wide horizontal wordmark with comfortable clear margins, all letters fully visible. Adjust the natural word width to fit without squeezing or distorting individual letters. Similar cap height throughout; digits 8 and 0 when present must share the same height and painted serif character.\nBackground: genuinely transparent, with clean alpha around each letter and inside all counters. Output only the lettering.\nAvoid: backdrop, plaque, border, card, illustration, flourishes, extra text, gothic/blackletter forms, mosaic tiles, jewel effects, metallic bevel, drop shadow, glow, hazy halos, detached flecks.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a60e-da12-78a2-ace1-bfc97c9e8ab6/exec-16133d45-3d00-4e9f-860a-71ae0a71a415.png",
+      "png": "src/game/rcana/set/labels/subtype-relic-painted.png",
+      "webp": "public/TCG/labels/subtype-relic-painted.webp",
+      "width": 2172,
+      "height": 724,
+      "viewBox": [
+        181,
+        144,
+        1821,
+        471
+      ]
+    },
+    {
+      "key": "Opportunity",
+      "word": "OPPORTUN80",
+      "prompt": "Use case: text-localization.\nAsset type: transparent illustrated wordmark for the subtype header of a Lotería-inspired trading card.\nInput image: the approved painted TRADER wordmark, used as the exact lettering style reference and edit target.\nPrimary request: replace TRADER with \"OPPORTUN80\", and keep the same painted serif lettering style, warm ochre/gold color, brush texture, stroke weight, and slightly irregular sign-painted character.\nText (verbatim): \"OPPORTUN80\". Spell exactly O - P - P - O - R - T - U - N - 8 - 0. One word on one horizontal baseline.\nStyle: sturdy classical Roman serif capitals, broad wedge serifs, open counters, gently curved R legs, subtle pale brush highlights; flat painted pigment with restrained texture. Match the reference's letterforms where letters recur.\nComposition: wide horizontal wordmark with comfortable clear margins, all letters fully visible. Adjust the natural word width to fit without squeezing or distorting individual letters. Similar cap height throughout; digits 8 and 0 when present must share the same height and painted serif character.\nBackground: genuinely transparent, with clean alpha around each letter and inside all counters. Output only the lettering.\nAvoid: backdrop, plaque, border, card, illustration, flourishes, extra text, gothic/blackletter forms, mosaic tiles, jewel effects, metallic bevel, drop shadow, glow, hazy halos, detached flecks.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a60e-da12-78a2-ace1-bfc97c9e8ab6/exec-9e66a0fb-c297-4058-a071-27851fadaffe.png",
+      "png": "src/game/rcana/set/labels/wordmark-opportun80-painted.png",
+      "webp": "public/TCG/labels/wordmark-opportun80-painted.webp",
+      "width": 2172,
+      "height": 724,
+      "viewBox": [
+        47,
+        203,
+        2077,
+        315
+      ]
+    },
+    {
+      "key": "Calamity",
+      "word": "CALAM80",
+      "prompt": "Use case: text-localization.\nAsset type: transparent illustrated wordmark for the subtype header of a Lotería-inspired trading card.\nInput image: the approved painted TRADER wordmark, used as the exact lettering style reference and edit target.\nPrimary request: replace TRADER with \"CALAM80\", and keep the same painted serif lettering style, warm ochre/gold color, brush texture, stroke weight, and slightly irregular sign-painted character.\nText (verbatim): \"CALAM80\". Spell exactly C - A - L - A - M - 8 - 0. One word on one horizontal baseline.\nStyle: sturdy classical Roman serif capitals, broad wedge serifs, open counters, gently curved R legs, subtle pale brush highlights; flat painted pigment with restrained texture. Match the reference's letterforms where letters recur.\nComposition: wide horizontal wordmark with comfortable clear margins, all letters fully visible. Adjust the natural word width to fit without squeezing or distorting individual letters. Similar cap height throughout; digits 8 and 0 when present must share the same height and painted serif character.\nBackground: genuinely transparent, with clean alpha around each letter and inside all counters. Output only the lettering.\nAvoid: backdrop, plaque, border, card, illustration, flourishes, extra text, gothic/blackletter forms, mosaic tiles, jewel effects, metallic bevel, drop shadow, glow, hazy halos, detached flecks.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a60e-da12-78a2-ace1-bfc97c9e8ab6/exec-d56e5993-a474-4760-b3e5-ed4e684c38ab.png",
+      "png": "src/game/rcana/set/labels/wordmark-calam80-painted.png",
+      "webp": "public/TCG/labels/wordmark-calam80-painted.webp",
+      "width": 2172,
+      "height": 724,
+      "viewBox": [
+        47,
+        159,
+        2072,
+        406
+      ]
+    },
+    {
+      "key": "Market",
+      "word": "MARKET",
+      "prompt": "Use case: text-localization.\nAsset type: transparent illustrated wordmark for the subtype header of a Lotería-inspired trading card.\nInput image: the approved painted TRADER wordmark, used as the exact lettering style reference and edit target.\nPrimary request: replace TRADER with \"MARKET\", and keep the same painted serif lettering style, warm ochre/gold color, brush texture, stroke weight, and slightly irregular sign-painted character.\nText (verbatim): \"MARKET\". Spell exactly M - A - R - K - E - T. One word on one horizontal baseline.\nStyle: sturdy classical Roman serif capitals, broad wedge serifs, open counters, gently curved R legs, subtle pale brush highlights; flat painted pigment with restrained texture. Match the reference's letterforms where letters recur.\nComposition: wide horizontal wordmark with comfortable clear margins, all letters fully visible. Adjust the natural word width to fit without squeezing or distorting individual letters. Similar cap height throughout; digits 8 and 0 when present must share the same height and painted serif character.\nBackground: genuinely transparent, with clean alpha around each letter and inside all counters. Output only the lettering.\nAvoid: backdrop, plaque, border, card, illustration, flourishes, extra text, gothic/blackletter forms, mosaic tiles, jewel effects, metallic bevel, drop shadow, glow, hazy halos, detached flecks.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a60e-da12-78a2-ace1-bfc97c9e8ab6/exec-8f0d30e7-3659-495e-ab2a-631819018f04.png",
+      "png": "src/game/rcana/set/labels/subtype-market-painted.png",
+      "webp": "public/TCG/labels/subtype-market-painted.webp",
+      "width": 2172,
+      "height": 724,
+      "viewBox": [
+        65,
+        162,
+        2041,
+        408
+      ]
+    }
+  ]
+}

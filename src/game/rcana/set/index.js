@@ -29,9 +29,8 @@ export const TYPE_CLASS = {
 // not the lotería's fifty-four: the RL80 number.
 export const RCANA_SET_SIZE = 80;
 
-// Trait pills — the Palworld "Lucky Pal / Transporting" row, read off the
-// design's own flags so the face never restates a rule. A face may pass
-// `traits: []` to print none, or its own list.
+// Traits remain card metadata, derived from gameplay flags. The face uses
+// one primary badge; these do not add a second row of pills.
 export function deriveTraits(design) {
   const t = [];
   if (design.gamble) t.push("Gamble");
@@ -76,7 +75,7 @@ export function buildFace(face) {
     // Keep the old header coin as an override hook only.
     tabCost: face.tabCost ?? null,
     ability: face.ability ?? design.text ?? null,
-    abilityName: face.abilityName ?? null,
+    abilityName: face.abilityName ?? design.abilityName ?? null,
     traits: face.traits ?? deriveTraits(design),
     flavor: face.flavor ?? null,
     flavorQuoted: face.flavorQuoted,

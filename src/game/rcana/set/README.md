@@ -58,13 +58,19 @@ injects `designs.js` and the faces into `pt2-table.src.html` and writes
    e.g. `"bull"` — never the name), `number` (unique), `rarity`, `ability`
    (printed line — shorter than the simulator's), `flavor`. Halo/hydro print
    the design's `cred`/`liq` unless overridden. Gameplay text leads every
-   class; flavor follows a separator. Traders' flavor is quoted. An optional
-   `abilityName` names a signature power. On Traders it sits beside the
+   class; flavor follows a separator. Traders' flavor is quoted. Every Trader
+   inherits an `abilityName` from its design (a face can override it), beside the
    ABIL80 pill on the same row; authored newlines in `ability` separate
    timing from outcomes when useful.
-   Trader abilities have an **ABIL80** (Ability) corner cap above the rule. Event and
-   Artifact rules retain their usage/timing pills — Equip, Single use,
-   Until cleared, On draw — removing a duplicate lead-in from the ability.
+   Trader abilities have a centered **ABIL80** (Ability) heading above the rule.
+   The player inhabits one active Trader; other Traders can wait on the bench.
+   Traders use ABIL80 plus their ability title, with timing and limits
+   written in the rules. They do not need a separate usage pill. Add a timing
+   badge only if a future activation mechanic needs one.
+   Every other card has one usage/timing badge. Assets use Invest;
+   Opportunities use On play; Markets use On draw; Calamities use Until cleared.
+   Artifacts use Equip, Single use, To shrine, Offer or Spend as appropriate.
+   A duplicate badge lead-in is removed from the rules when badges are shown.
    Traits come from the design's flags (`gamble`, `bearProof`, `income`, `choice`;
    override with `traits: [...]`). Game terms are bold, with a coin on
    "N Hydro". A short flourish precedes the flavor, and the collector line
@@ -115,13 +121,14 @@ footer; shared components draw labeled stats and the centered RL80 mosaic
 heart-and-arrow medallion.
 The stats and medallion share one warm parchment band. The existing card
 frame supplies its side and bottom borders, with a matching horizontal divider
-above the stats. The medallion and CRED ribbon tips overlap the bottom border.
+above the stats. The medallion overlaps the bottom border; the CRED badge
+fits entirely inside the stat band.
 The body text fits above the divider. This shared background stays behind the
 footer artwork and is omitted from blank templates and the frame-hidden bench view.
 
 | plate | left stat | right coins | types |
 |---|---|---|---|
-| `boxed` (`LOTERIA_FRAME2`) | medal: Credibility (engine: Grace) | cost and income coin bar | Trader |
+| `boxed` (`LOTERIA_FRAME2`) | angel badge: Credibility (engine: Grace) | cost and income coin bar | Trader |
 | `valued` (`LOTERIA_FRAME2_value`) | gold coin and **PROSPERITY** ribbon | single cost ribbon | Asset, Opportunity Event |
 | `sealed` (`LOTERIA_FRAME2_sealed`) | open; usage is above the rule | **cost** (Market: **—**) | Calamity, Market, Remedy, Relic, Grace |
 
@@ -133,23 +140,31 @@ painted — after re-exporting a plate, re-run
 `node scripts/recolor-plate-banner.mjs <plate> <out> <#hex>` for each.
 
 The cost coin shows what you pay to play the card. Traders also show an
-income coin for what they pay each turn (hire cost = income, by rule).
-The compact Trader/Asset labels and the six Event and Artifact
-subtypes use custom gold mosaic wordmarks inspired by the Lotería edition
-emblem, while the banner title retains gilt Blackletter. A teal-blue **ABIL80**
-pill sits above the first line's left edge on Trader abilities. Events and Artifacts retain their usage
-symbol and label above the rule. The mosaic medallion shares a fixed footer position
+income coin for what you collect each turn (play cost = income, by rule).
+The compact Trader and Asset labels and all six Event and Artifact subtypes
+use hand-painted cream wordmarks with the same ivory finish, while the
+banner title retains gilt Blackletter. A teal-blue **ABIL80**
+pill sits beside the named power in a centered heading on Trader abilities.
+All body badges are text-only. Other types use solid class-colored badges with
+cream lettering and gold trim; Calamities use red. The body follows one shared type scale:
+badge/title, regular-weight rules with selective bold terms, then smaller italic
+flavor beneath the flourish. Traits remain metadata rather than extra pills.
+The mosaic medallion shares a fixed footer position
 across all card classes. An art file may still pin a `frame:`.
 
 ### Artifact template
 
 Cards whose printed class is `Artifact` use the swept teal-and-gold header
-in `RcanaArtifactTemplate.jsx`. The larger subtype symbol sits to the left
-of `Remedy`, `Grace` or `Relic`; `Artifact` remains on the right. The engine's
+in `RcanaArtifactTemplate.jsx`. The cream `Remedy`, `Grace` or `Relic`
+wordmark sits at the left with comfortable padding; `Artifact` remains
+on the right. Artifact and Event headers omit subtype icons. The engine's
 `artifact` type prints as `Relic` and uses the **Equip** rules badge.
 Traders and Assets use the compact swept header in `RcanaTypeHeader.jsx`:
-a gold number cell and a colored field with the type name in gold mosaic
-lettering. `COMPACT_TYPE_HEADER` defines its footprint and FX clearance.
+a gold number cell and a colored field with an illustrated type name.
+All card header numbers use locally bundled **Cinzel Bold**, registered as
+`Rcana Numerals`, with lining figures sized to leave room for two digits.
+The font and its SIL Open Font License are in `public/fonts/`.
+`COMPACT_TYPE_HEADER` defines its footprint and FX clearance.
 `headerColors.js` assigns red to Traders, forest green to Assets, teal to
 Artifacts, and indigo to Events. All Artifact subtypes share teal; all Event
 subtypes share indigo. Calamity usage badges retain their red warning color.
@@ -160,18 +175,40 @@ Artifact subtype; it is not a rarity.
 The badge above the rule describes use: **Single use**, **Equip**, or **To shrine**.
 `artifactTemplate.js` maps these from the engine type and handles the Grace
 exceptions: the Rose is **Offer**, and the Fountain is **Spend**. This is
-display information only. The old subtype badge is omitted for Artifacts.
+display information only. Artifact usage pills use solid teal (`#155b60`),
+centered cream lettering (`#fff0bc`), a fine gold inner rim and a dark outline.
+The usage pills are text-only for legibility at card size. All usage/timing
+badges share this treatment in their type color: green for Assets, indigo for
+Events, and red for Calamities.
+Their shape matches ABIL80, whose solid blue fill
+marks a Trader ability. The old subtype badge is omitted for Artifacts.
 FX clearance follows the full header, including on La Tortilla's steam.
 
 All four card classes share the stat furniture in `RcanaLiquidityBox.jsx`.
-Trader standing uses `/RL80_CRED_medal_clean.webp`: its artwork supplies the
-blue-and-gold medal, ribbons and **CRED** label. A live pale gold number sits
-in its blue center, with no duplicate text above it. The medal stays at the
-left of the footer, balancing the cost/income bar at the right. The medal is
-slightly enlarged and lowered so its blue center aligns with the cost/income
-coins, with the ribbon tips overlapping the bottom border. Its accessible
-label remains **Credibility**, without changing the underlying Grace value
-or rules. Assets and Opportunity Events use
+Trader standing uses `RcanaCredBadge.jsx` with `/RL80_CRED_angel_plain.webp`: a round
+blue enamel head with a smooth gold rim and the original floating elliptical
+halo above the circle, without rays. The head is
+attached to the original red **CRED** label extension. The hanging prize
+ribbon tails are removed. Its head is a blank field for the live cream value;
+the CRED label is painted into the extension. Transparent artwork retains its
+native proportions at a common height; longer values shrink to fit.
+The badge is centered in the left footer area, balancing the cost/income
+bar, with space above the halo and below the head inside the stat band.
+Its accessible label remains **Credibility**, without changing the underlying
+Grace value or rules. The **CRED badge** selector on `/card-template` →
+**R-cana** compares the default plain-halo angel, lateral rays (`angel-lateral`),
+three top rays (`angel`), a left-tilted
+halo (`angel-jaunty`), five soft irregular rays (`angel-soft-rays`), the earlier
+winged heart and oval, and the original ribbon. Print previews accept
+`?id=el-diablito&cred=angel-lateral|angel|angel-plain|angel-jaunty|angel-soft-rays|heart|oval|ribbon`; normal exports use
+the angel with a plain halo. Its source is `set/RL80_CRED_angel_plain.png`.
+The earlier transparent PNG sources are `set/RL80_CRED_angel.png`
+and `set/RL80_CRED_angel_lateral.png`; the other comparison sources are
+`set/RL80_CRED_angel_jaunty.png` and `set/RL80_CRED_angel_soft_rays.png`.
+The built-in imagegen edit prompts are
+recorded in `RL80_CRED_angel.prompts.json`. The earlier winged artwork and
+prompts remain in `set/RL80_CRED_winged*.png` and `RL80_CRED_winged.prompts.json`.
+Assets and Opportunity Events use
 class-colored versions of `/RL80_PROSPERITY_stack_ribbon.webp`: three stacked
 gold coins on the left and a wide ribbon with **PROSPERITY** written in full. The compact stack
 distinguishes accumulated Prosperity from the single Cost coin. Its broad,
@@ -203,7 +240,8 @@ Trader red (`#b20d19`), Asset forest green (`#315c3c`), Event indigo (`#38477e`)
 and Artifact teal (`#155b60`). `RcanaLiquidityBox.jsx` selects the corresponding
 `RL80_COST_ribbon_asset|event|artifact.webp` and
 `RL80_PROSPERITY_stack_ribbon_asset|event.webp` artwork. Gold frames, coin faces,
-lettering and the CRED medal's blue number well retain their existing colors.
+and lettering retain their existing colors. The earlier CRED ribbon remains
+available as a bench comparison.
 The color variants' source PNGs, saved paths and built-in imagegen prompts
 are recorded in `RL80_type_badges.prompts.json`; blank templates use the same
 type selection as populated cards.
@@ -221,6 +259,25 @@ lettering inside a complete gold rim, with transparency and native proportions
 preserved. The PNG source is `set/RL80_Mosaic_Medallion.png`. It replaces the
 rarity heart, seal and printed tier and overlaps the bottom card border;
 rarity remains in the card data for gameplay and foil.
+`RcanaMedallion.jsx` confines the holographic treatment to the heart, arrow
+and RL80 lettering. The gold rim and crest stay original; the mosaic backing
+and radial rays have a static warm-metal finish. A source-derived SVG mask
+isolates the colored logo pixels within three regions, preserving engraved
+edges and the holes in the lettering without a separate raster asset.
+Saturated gold, rose, teal and violet are visible at rest. The existing card
+tilt shifts the spectrum's hue and position, the metallic reflection, fine
+rings and a brief glint; every moving pass is inside the logo mask. A screen
+pass lifts the darker source before the color pass, keeping the foil vivid.
+The arrow has a separate emerald/lime spectrum that shifts toward turquoise
+with tilt. Its bright source is toned down before tinting so the greens stay
+vivid rather than washing out to near-white; a green-pixel mask preserves
+the heart and the arrow's engraved highlights.
+This follows the saturated-color-over-metal approach in Kivanfan's supplied
+[CodePen reference](https://codepen.io/kivsdev/pen/qQMrYv), implemented with
+the existing React/SVG tilt state and no added animation loop or dependency.
+The source artwork is unchanged. Static exports and reduced-motion views
+use the resting colors. In `/card-template` → **R-cana**, the **Holographic
+medallion** checkbox compares this treatment with the original mosaic.
 The smaller collection number sits in the bottom-right gold margin, aligned
 with the cost/income coins.
 Flavor text sits below a single centered `/HorizontalBar3.png` flourish.
@@ -236,9 +293,9 @@ together after the coin. Sale prices and acquisition costs remain unsigned.
 `liquidityBox.js` sets a common position for Hydro. Rules use larger text
 with balanced line wrapping. Rules, usage badges and ability names stay
 centered. The Trader ability pill shares the usage badges' gold-trimmed
-shape and sits just above the first line's left edge. Its position is measured
-after text fitting and font loading, without changing the paragraph's width
-or alignment.
+shape and centers with the optional ability title, independently of the rules'
+line breaks. Rules have explicit line spacing, and the complete block fits its
+natural height to the panel after fonts load.
 
 Blank templates are available from the same print renderer:
 
@@ -292,38 +349,57 @@ keeps its `hazard` type and existing gameplay behavior.
 Remedy, Grace, Relic, Calamity, Opportunity and Market use transparent
 WebP wordmarks in `public/TCG/labels/`. `subtypeWordmarks.js` records their
 native sizes and the view boxes that omit empty canvas at render time,
-preserving the lettering proportions. `typeWordmarks.js` supplies matching
-Trader and Asset wordmarks for the compact headers. Each SVG exposes its
+preserving the lettering proportions. The six subtype assets use painted
+lettering matched to Trader. Their displayed letter height matches the
+Trader wordmark after it fits within its narrower compact tab.
+`typeWordmarks.js` supplies the ivory-painted
+Trader and Asset wordmarks for the compact headers. Asset's shorter wordmark
+uses the same visible letter height as Trader and the subtypes. The shared Trader
+asset is `type-trader-painted.webp`, used by El Diablito, El Monje and La Abuela;
+its source PNG and approved mockup are retained under `set/labels/`. Its view
+box excludes transparent padding and retains a small margin around the brush
+edges. `type-asset-painted.webp` supplies the Asset label, currently used by
+Tech Stock; its source PNG is also retained under `set/labels/`.
+The shared color matrix in `wordmarkPaint.js` maps the original gold
+paint of Trader, Asset and all six subtypes to warm ivory (approximately
+`#f3e5c3` at the midtone) while preserving brush texture and the original alpha.
+Each rendered header has a unique filter ID so multiple cards can share the
+treatment. Each SVG exposes its
 type or subtype as an accessible text label. The secondary Artifact/Event
 class labels retain Bebas Neue. The bench defaults to **Lotería mosaic** and retains the
 plain font options for comparison.
 
 Source PNGs are saved under `set/labels/`; the built-in imagegen prompts,
-cleanup edits and output paths are recorded in `subtype-wordmarks.prompts.json`
-and `type-wordmarks.prompts.json`.
+cleanup edits and output paths are recorded in `painted-subtype-wordmarks.prompts.json`
+and `type-wordmarks.prompts.json`. `subtype-wordmarks.prompts.json` retains
+the earlier mosaic subtype provenance.
 
 The RL80 signature spellings **CALAM80** and **OPPORTUN80** are display
 labels for Calamity and Opportunity. Their original subtype keys, rules
 terms and gameplay behavior stay intact; accessible labels include both
-spellings. `rl80-signature-wordmarks.prompts.json` records the generated
+spellings. `rl80-signature-wordmarks.prompts.json` records the earlier mosaic
 wordmarks and source PNG/WebP paths. The exploratory gold ACTIV80 wordmark
 is saved but is not used on the cards. Trader cards instead use **ABIL80**
-(Ability) in the same pill style as the usage labels: teal-blue fill
-(`#07536B`), pale-gold Bebas lettering and gold trim. The level pill forms a
-corner cap just above the first line's left edge; the ability paragraph and
-flavor remain centered. An optional ability title sits to the right of the
-pill on that same heading row. It uses the real IBM Plex Serif Bold face,
+(Ability) in the same pill shape as the usage labels: teal-blue fill
+(`#07536B`), pale-gold Bebas lettering and gold trim. The pill and named
+ability title form one centered heading; the ability paragraph and flavor
+share that center axis. The title sits to the right of the pill and can wrap
+within the panel. It uses the real IBM Plex Serif Bold face,
 larger than the regular-weight rules beneath it, so the title leads. The ABIL80
-pill appears only when a Trader has ability text, and follows the bench's Rules
-furniture toggle. Event and Artifact timing pills and Asset instructions retain
-their existing treatment. Eugene's ticket stamp remains in the other card set.
+pill appears on every Trader and follows the bench's Rules furniture toggle.
+All other cards use one solid usage/timing badge with class-colored fill and
+cream lettering, including red for Calamities. Eugene's ticket stamp remains in the
+other card set.
 
 The complete rules block (pill, title, rules and flavor) shares the parchment
 plane and its surface sheen, centered vertically between the ribbon and footer.
 The bench's explicit **Ink above FX** override can still lift it for comparison.
-The heading anchor is measured in untransformed layout coordinates. Tilt does
-not rerun rules layout, so the pill and title stay fixed on the parchment;
-content, scale and font changes still recalculate their alignment.
+The heading uses ordinary flex layout, with no first-line measurement. Tilt
+does not rerun rules layout, so the pill and title stay fixed on the parchment;
+content, scale and font changes still refit the complete block. Flavor uses
+IBM Plex Serif Medium Italic at 80% of the shared rules size, with warm brown
+ink and a smaller flourish. The slightly
+stronger italic keeps the quote legible at smaller card scales.
 
 El Diablito uses the existing coin-flipping art (`Diablito2.webp` plus the
 separate `Diablito_Coin.webp` prop). **Devil’s Wager** resolves at turn start:

@@ -14,8 +14,11 @@
 //            called Event's Prosperity. Others print blank. Set them only to
 //            override deliberately. Cost prints in the tab automatically.
 //   ability  the rules line as printed. Defaults to the design's text, but a
-//            printed line is usually shorter than a simulator's.
-//   flavor   the character's line (quoted, leading) or narration (following).
+//            printed line is usually shorter than a simulator's. Use \n at
+//            a clause boundary to keep triggers and outcomes easy to scan.
+//   abilityName  optional override of a Trader's named ability in designs.js.
+//                The inherited name sits beside its centered ABIL80 badge.
+//   flavor   the character's line (quoted) or narration, below the rules.
 //   printed  slots the frame image already prints, so the face leaves blank.
 export const FACES = [
   {
@@ -23,11 +26,10 @@ export const FACES = [
     design: "diablito",
     number: 7,
     rarity: "Mythic",
-    abilityName: "Devil’s Wager",
     // halo/hydro come from the design (cred 10 / liq 2); set them here only
     // to print something other than what the game plays.
     // The coin in his art is the wager: income versus his reputation.
-    ability: "At turn start, flip a coin.\nHeads: +1 Hydro · Tails: -1 CRED.",
+    ability: "At turn start, flip a coin.\nHeads: +1 coin · Tails: -1 CRED.",
     // In his own voice, since a Trader's line is printed as a quotation.
     flavor: "I never lie about the price. Only about the cost.",
     // LOTERIA_FRAME2 prints no text at all — tab cells and banner both come
@@ -53,9 +55,9 @@ export const FACES = [
     // PROVISIONAL number and rarity.
     number: 12,
     rarity: "Uncommon",
-    // Printed in the face's own vocabulary (Hydro = Liquidity).
-    ability: "When you light a candle, bank 25 Prosperity.",
-    // A Trader speaks; the line prints as a quotation and leads the panel.
+    // Separate the trigger from its payout; the title has its own alignment.
+    ability: "When you light a candle,\nbank 25 Prosperity.",
+    // A Trader speaks; the quotation follows the rules and flourish.
     flavor: "The Lord provides. I merely set the rate.",
     printed: {},
   },
@@ -66,7 +68,7 @@ export const FACES = [
     number: 13,
     rarity: "Uncommon",
     // A Calamity narrates (the line follows the rule).
-    ability: "Until cleared, the target banks at most 75 from a single card.",
+    ability: "Until cleared, the target banks\nat most 75 from a single card.",
     flavor: "The market only ever remembers one direction.",
     printed: {},
   },
@@ -78,7 +80,7 @@ export const FACES = [
     rarity: "Common",
     // An Asset's line says what it sells for; the boxes print value (100)
     // and cost (3), so the text carries the cash option.
-    ability: "Sell for 5 Hydro, or bank 100 Prosperity.",
+    ability: "Sell for 5 coins,\nor bank 100 Prosperity.",
     flavor: "It only goes up, until the day it does not.",
     printed: {},
   },
@@ -88,8 +90,9 @@ export const FACES = [
     // PROVISIONAL number and rarity.
     number: 15,
     rarity: "Rare",
-    ability: "Your gambles moon on 4+ instead of 5+.",
-    // A Trader speaks; prints as a quotation and leads the panel.
+    // Keep the new threshold and the comparison on two balanced lines.
+    ability: "Your gambles moon on 4+\ninstead of 5+.",
+    // A Trader speaks; the quotation follows the rules and flourish.
     flavor: "I have buried two husbands and a bear market, mijo.",
     printed: {},
   },
@@ -120,7 +123,7 @@ export const FACES = [
     // PROVISIONAL number and rarity.
     number: 18,
     rarity: "Uncommon",
-    ability: "When you light a candle, draw a card.",
+    ability: "When you light a candle,\ndraw a card.",
     flavor: "A prayer for every bead. An answer in every hand.",
     printed: {},
   },
@@ -130,7 +133,7 @@ export const FACES = [
     // PROVISIONAL number and rarity.
     number: 19,
     rarity: "Uncommon",
-    ability: "Whenever a rival sells an Asset, collect +1 Hydro.",
+    ability: "Whenever a rival sells an Asset,\ncollect +1 coin.",
     flavor: "Even the dead take their cut.",
     printed: {},
   },

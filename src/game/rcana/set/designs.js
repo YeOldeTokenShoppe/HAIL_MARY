@@ -9,7 +9,7 @@
 // printed on a card should restate what is defined here.
 //
 // Types: trader, asset, event, hazard, remedy, artifact, grace.
-// A Trader's hire cost EQUALS their LIQ (income): the card prints one number.
+// A Trader's play cost EQUALS their LIQ (income).
 // (An Event with `played: true` is called from the hand instead of firing on draw.)
 //
 // `printName` is what the CARD prints when it differs from the engine's name.
@@ -21,20 +21,20 @@
 // Faces never carry a name.
 
 // ── The twenty-four designs of the shared starter ──
-// Players are symmetric: nobody IS a character. The Traders are cards in the deck,
-// lotería style — you hire one as your main action, and only one sits at your desk.
+// Players inhabit one active Trader at a time. Traders are cards in the deck;
+// playing one is a main action, to the active slot or the bench.
 const D = (key, name, type, cost, o = {}) => ({ key, name, type, cost, ...o });
 export const DESIGNS = [
-  D('unicornio', 'El Unicornio', 'trader', 3, { liq: 3, cred: 20, text: 'Pure compounding — the best paycheck at the desk' }),
-  D('gato', 'El Gato', 'trader', 2, { liq: 2, cred: 16, text: 'When seated, immediately knock one Calamity off your table, free' }),
-  D('monje', 'El Monje', 'trader', 1, { liq: 1, cred: 22, text: 'When you light a candle, bank 25 Prosperity' }),
-  D('diablito', 'El Diablito', 'trader', 2, { liq: 2, cred: 10, text: 'At the start of your turn, flip a coin: heads, collect 1 Liquidity; tails, El Diablito loses 1 CRED' }),
-  D('celebridad', 'La Estrella', 'trader', 3, { liq: 3, cred: 8, text: 'The influencer: pay 1 when banking from a card, +25 Prosperity' }),
-  D('abuela', 'La Abuela', 'trader', 2, { liq: 2, cred: 18, text: 'The gambling grandmother: your gambles moon on 4+ instead of 5+' }),
-  D('pope', 'El Papa', 'trader', 3, { liq: 3, cred: 25, text: 'Once a game, a failed Hail Mary is absolved — you may attempt it again' }),
-  D('prospector', 'El Gambusino', 'trader', 2, { liq: 2, cred: 15, text: 'Assets you buy cost 1 less' }),
-  // Unseen hands, now a Trader you hire rather than weather that blows through.
-  D('illuminati', 'El Ojo', 'trader', 3, { liq: 3, cred: 12, text: 'When hired, each rival passes you one random card' }),
+  D('unicornio', 'El Unicornio', 'trader', 3, { liq: 3, cred: 20, abilityName: 'Compound Interest', text: 'At turn start, if you have at least 100 banked Prosperity, bank 25 more.' }),
+  D('gato', 'El Gato', 'trader', 2, { liq: 2, cred: 16, abilityName: 'Clean Sweep', text: 'When seated, immediately knock one Calamity off your table, free' }),
+  D('monje', 'El Monje', 'trader', 1, { liq: 1, cred: 22, abilityName: 'Vow of Prosperity', text: 'When you light a candle, bank 25 Prosperity' }),
+  D('diablito', 'El Diablito', 'trader', 2, { liq: 2, cred: 10, abilityName: 'Devil’s Wager', text: 'At the start of your turn, flip a coin: heads, collect 1 Liquidity; tails, El Diablito loses 1 CRED' }),
+  D('celebridad', 'La Estrella', 'trader', 3, { liq: 3, cred: 8, abilityName: 'Star Power', text: 'The influencer: pay 1 when banking from a card, +25 Prosperity' }),
+  D('abuela', 'La Abuela', 'trader', 2, { liq: 2, cred: 18, abilityName: 'Lucky Streak', text: 'The gambling grandmother: your gambles moon on 4+ instead of 5+' }),
+  D('pope', 'El Papa', 'trader', 3, { liq: 3, cred: 25, abilityName: 'Absolution', text: 'Once a game, a failed Hail Mary is absolved — you may attempt it again' }),
+  D('prospector', 'El Gambusino', 'trader', 2, { liq: 2, cred: 15, abilityName: 'Prospector’s Eye', text: 'Assets you buy cost 1 less' }),
+  // Unseen hands: the effect resolves when played directly into the active slot.
+  D('illuminati', 'El Ojo', 'trader', 3, { liq: 3, cred: 12, abilityName: 'Unseen Hands', text: 'When played as your active Trader, each rival passes you one random card' }),
   D('tech', 'Tech Stock', 'asset', 3, { cash: 5, pros: 100 }),
   // The degen asset, and the only gamble: sell safe for cash, or roll the die for
   // Prosperity. (Was two cards — Meme Coin's body with Shitcoin's upside.)

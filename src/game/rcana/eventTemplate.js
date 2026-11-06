@@ -21,7 +21,11 @@ export function getEventTemplate(card) {
     usage: "on-draw",
     label: "On draw",
     description: "When drawn, reveal and resolve this card, discard it, then draw a replacement.",
-  } : { usage: null }; // Opportunities retain their Prosperity value box.
+  } : {
+    usage: "on-play",
+    label: "On play",
+    description: "Pay this card's cost and resolve its effect when played.",
+  };
   const printedSubtype = card.subClass === "Hazard" ? "Calamity" : card.subClass;
   return { subtype: printedSubtype ?? subtype, symbol: subtype.toLowerCase(), ...usage };
 }

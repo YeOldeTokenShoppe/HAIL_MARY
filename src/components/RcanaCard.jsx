@@ -2,6 +2,8 @@
 
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fxMaterial } from "../game/terminal-traders/fxMaterials.js";
+import { FRAMES } from "../game/terminal-traders/cardFrames.js";
+import HoloFoilFrame from "./HoloFoilFrame.jsx";
 import {
   RCANA_ASPECT,
   RCANA_LAYOUT,
@@ -13,19 +15,50 @@ import {
   behindClip,
 } from "../game/rcana/cardFace.js";
 import { ArtifactHeader } from "./RcanaArtifactTemplate.jsx";
+import { WORDMARK_CLASS_FONTS } from "../game/rcana/wordmarkFontStyles.js";
 import { EventHeader } from "./RcanaEventTemplate.jsx";
-import { SUBTYPE_FURNITURE_STYLES, UsageSymbol } from "./RcanaSubtypeFurniture.jsx";
+import { SUBTYPE_FURNITURE_STYLES } from "./RcanaSubtypeFurniture.jsx";
 
 import { RcanaLiquidityBox, RcanaValueBox, LIQUIDITY_BOX_STYLES } from "./RcanaLiquidityBox.jsx";
 import { RcanaTypeHeader, TYPE_HEADER_STYLES } from "./RcanaTypeHeader.jsx";
+import RcanaMedallion, { MEDALLION_STYLES } from "./RcanaMedallion.jsx";
 
-const REST = { rx: 0, ry: 0, mx: 50, my: 50, hyp: 0 };
+// `lift` is 1 while a pointer or finger (or the gyro) is driving the tilt
+// and 0 at rest — the frame shine fades up on it, the way TradingCard's
+// does, so a card on the table is not permanently lit.
+const REST = { rx: 0, ry: 0, mx: 50, my: 50, hyp: 0, lift: 0 };
 
 // Card box in CSS px at scale 1. Every slot is a percentage of this, so the
 // card re-renders identically at any scale — nothing is measured in px except
 // the parallax depths, which are deliberately absolute (a 90px push should
 // read as 90px of depth whether the card is a thumbnail or full bleed is
 // false — so depth scales with the card, see depthFor()).
+// The Terminal Traders rarity frames (cardFrames.js): stamped-metal borders
+// with a transparent centre and a foil plate that masks the shine to the
+// metal, plus the two live holo foils, which are WebGL (HoloFoilFrame).
+export const RCANA_METAL_FRAMES = FRAMES;
+const HOLO_SRC = /^holo:/;
+// The live foil is cut out over windows it is given; the Terminal card's
+// three slots do not apply here. The opening runs to the MIDDLE of the
+// Lotería frame's inner black line (x 36–45px of 1027, y 36–44px of 1424),
+// so the foil sits flush against the art window and the cream footer panel
+// with half the line left as their outline — the panel has no side or
+// bottom border of its own, the frame draws it. Stopping short of the line
+// (as the printed metals' 3.5% band does) read as a dark channel between
+// foil and panel. The shader unions its windows, which is how the opening
+// gets two corner radii: the top pair concentric with the art window's
+// corner (r ≈ 20px/1424 at the line's inner edge), the bottom pair
+// concentric with the footer panel's .025u corner.
+const RCANA_HOLO_WINDOWS = [
+  { x0: 0.040, y0: 0.028, x1: 0.960, y1: 0.90, r: 0.0175 },  // top corners
+  { x0: 0.040, y0: 0.10, x1: 0.960, y1: 0.972, r: 0.020 },   // bottom corners
+];
+// The Lotería frame's own corner, measured off LOTERIA_FRAME2.webp's alpha
+// (50px of 1424). HoloFoilFrame's default is the Terminal card's 32/1038,
+// a tighter corner, which left the foil's outer corner poking out past
+// the printed card's rounder one.
+const RCANA_HOLO_CORNER = 50 / 1424;
+
 const CARD_W = 744;
 
 // A layer at translateZ(z) under perspective P appears scaled by P/(P-z).
@@ -107,20 +140,48 @@ export default function RcanaCard({
   // Mosaic wordmarks identify compact types and subtypes; the secondary
   // Artifact/Event class labels remain condensed capitals.
   // Earlier text-only treatments remain available on the bench.
+  // "mosaic" is the wordmark bar (Trader/Asset type bar, Artifact/Event
+  // subtype bar). Its lettering is picked by the same prop: "tourney"
+  // (Tourney Italic, what plain "mosaic" means), "bungee" (Bungee Spice)
+  // or "painted" (the webp images). See wordmarkFontStyles.js.
   classFont = "mosaic",
+  // The ring around the wordmark letters: "ink", "cream" or "none".
+  wordmarkOutline = "ink",
+  // A Terminal Traders metal border laid over the Lotería frame: an id from
+  // RCANA_METAL_FRAMES ("gold", "silver", "polished silver", "rainbow",
+  // "polished grey", "holo", "holo gold") or null for the printed frame
+  // alone. A printed frame's two divider lines near the foot are clipped
+  // out, since here they would cut across the rules panel, and its shine is
+  // masked by the frame's plate. The holo pair are drawn live by
+  // HoloFoilFrame over RCANA_HOLO_WINDOWS.
+  metalFrame = null,
+  // The frame's shine, a port of TradingCard's card-level holo confined to
+  // the metal frame's plate (printed metals only; the live foils light
+  // themselves). frameShine: "off" | "soft" | "on". frameShineBlend:
+  // "dodge" (diffraction ramp + iridescence + glitter grain, color-dodge),
+  // "mirror" (one broad rainbow, overlay — chromes the light border),
+  // "glitter" (embedded flakes, gold frame only — falls back to mirror).
+  // frameShineStrength: 0..1 master dial. See the frame-shine CSS block.
+  frameShine = "on",
+  frameShineBlend = "mirror",
+  frameShineStrength = 1,
   // Typeface for the name on the ribbon. "gilt" is blackletter struck in gold.
   // "nabla" is the chromatic 3D sans it replaced; it stays for foils and
   // alt-arts, where loud is the job. (Nabla is a COLRv1 font: engines
   // without COLRv1 paint its flat fallback colour.)
   nameFont = "gilt",
-  // The rules line's furniture: an ABIL80 (Ability) pill for Traders,
-  // timing/usage badges for other types,
-  // trait pills, bold game terms with the drop glyph on Hydro, and a
+  // The rules line's furniture: one named ABIL80 for Traders, one type-colored
+  // timing/usage badge for every other type, bold game terms, and a
   // hairline before the flavor. One switch, so the bench can compare the
   // plain line against the dressed one.
   keywordBadges = true,
   // The "19 / 80" in the bottom margin.
   collectorLine = true,
+  // Confined to the medallion's inner disc. The bench can compare the
+  // holographic stock with the original enamel; static prints use rest.
+  medallionHolo = true,
+  // Angel CRED badge; earlier designs remain available on the bench.
+  credBadge = "angel-plain",
   // Tilt from the device's own orientation, phones and tablets. Off by
   // default: iOS only grants the sensor behind a user gesture, so the page
   // asks (see RcanaBench's "Tilt with device") and turns this on when
@@ -205,6 +266,7 @@ export default function RcanaCard({
         mx: 50 + dx * 50,
         my: 50 + dy * 50,
         hyp: Math.min(1, Math.hypot(dx, dy)),
+        lift: 1,
         rx: dy * -MAX_TILT.rx,
         ry: dx * MAX_TILT.ry,
       });
@@ -225,6 +287,7 @@ export default function RcanaCard({
       mx: x,
       my: y,
       hyp: Math.min(1, Math.hypot(dx, dy)),
+      lift: 1,
       // From MAX_TILT, because the clip bleed is sized against it: turn the
       // card further than this and the clip edges start to show.
       rx: dy * -MAX_TILT.rx,
@@ -396,10 +459,29 @@ export default function RcanaCard({
   const u = CARD_W * scale;
 
   const rarity = RCANA_RARITIES[data.rarity] || RCANA_RARITIES.Common;
+  const metal = metalFrame ? RCANA_METAL_FRAMES.find((f) => f.id === metalFrame) || null : null;
+  const metalPrinted = Boolean(metal && !HOLO_SRC.test(metal.src));
+  // Glitter is a gold-frame treatment (as on TradingCard); elsewhere it
+  // falls back to mirror so a caller can set it unconditionally.
+  const shineBlend =
+    frameShineBlend === "glitter" && !/frame_gold/.test(String(metal?.src || "")) ? "mirror" : frameShineBlend;
+  // Stable per-card sparkle seed: the glitter flake field and the texture
+  // tiling are offset by it, so two cards side by side never sparkle in the
+  // same places, and a given card sparkles the same way on every render.
+  const foilSeed = useMemo(() => {
+    const key = `${data.number ?? ""}|${data.name ?? ""}`;
+    let h = 2166136261;
+    for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619) >>> 0;
+    return { x: (h % 1000) / 1000, y: ((h >>> 10) % 1000) / 1000 };
+  }, [data.number, data.name]);
   const tone = CLASS_TONE[data.cardClass] || CLASS_TONE.Trader;
   const printed = data.printed || {};
   const L = data.layout || RCANA_LAYOUT;
-  const categoryFont = classFont === "mosaic" ? "bebas" : classFont;
+  // The wordmark class fonts collapse to "mosaic" for the headers, which
+  // take the lettering as a separate prop.
+  const wordmarkFont = WORDMARK_CLASS_FONTS[classFont];
+  const headerClassFont = wordmarkFont ? "mosaic" : classFont;
+  const categoryFont = headerClassFont === "mosaic" ? "bebas" : classFont;
 
   const box = (slot) => ({
     left: `${slot.x}%`,
@@ -472,6 +554,9 @@ export default function RcanaCard({
       <div
         ref={cardRef}
         className="rc-card"
+        data-metal={metal ? (HOLO_SRC.test(metal.src) ? "holo" : "printed") : undefined}
+        data-shine={metalPrinted ? frameShine : undefined}
+        data-shine-blend={metalPrinted ? shineBlend : undefined}
         data-flat={d === 0 || undefined}
         data-plate={data.plate}
         data-template={data.artifactTemplate ? "artifact" : undefined}
@@ -490,6 +575,19 @@ export default function RcanaCard({
           "--mx": `${tilt.mx}%`,
           "--my": `${tilt.my}%`,
           "--hyp": tilt.hyp,
+          // Frame-shine inputs, named as TradingCard names them so its
+          // recipes port verbatim. --posx/--posy are the pointer in %,
+          // --pointer-from-left/top the same normalised 0..1: the texture
+          // layers drift by these at a different rate than the gradients
+          // do, which is what sells them as separate depths.
+          "--lift": tilt.lift ?? 0,
+          "--posx": `${tilt.mx}%`,
+          "--posy": `${tilt.my}%`,
+          "--pointer-from-left": tilt.mx / 100,
+          "--pointer-from-top": tilt.my / 100,
+          "--seedx": foilSeed.x,
+          "--seedy": foilSeed.y,
+          "--shine-strength": frameShineStrength,
         }}
       >
         {/* ---------------- backdrop: the floor ----------------
@@ -537,6 +635,7 @@ export default function RcanaCard({
 
           {/* The editable paper covers the old painted logo, seal and stat
               boxes while keeping the illustration, ribbon and outer frame. */}
+          {metal && !HOLO_SRC.test(metal.src) && !hideFrame && <div className="rc-footer-gutter" aria-hidden />}
           {!hideFrame && <div className="rc-footer-paper" aria-hidden />}
           {!hideFrame && !data.templateOnly && (
             <div className="rc-footer-panel" style={box(L.footerPanel)} aria-hidden="true" />
@@ -557,6 +656,27 @@ export default function RcanaCard({
           {/* Sheen rides the plate so it reads as light on the card's own
               surface, not on the art behind the window. */}
           {!data.templateOnly && <div className="rc-gloss" style={{ "--foil": rarity.foil }} aria-hidden />}
+
+          {/* Metal border over the printed frame, then its shine, masked to
+              the plate so only the stamped metal catches the light. */}
+          {metal && !hideFrame && (HOLO_SRC.test(metal.src) ? (
+            <HoloFoilFrame
+              className="rc-metal rc-metal--holo"
+              tilt={tilt}
+              scale={scale}
+              options={{ ...(metal.holo || {}), windows: RCANA_HOLO_WINDOWS, cornerRadius: RCANA_HOLO_CORNER }}
+            />
+          ) : (
+            <>
+              <img className="rc-metal" src={metal.src} alt="" draggable={false} decoding="async" />
+              {metal.plate && (
+                <>
+                  <div className="rc-metal-shine" style={{ "--metal-plate": `url("${metal.plate}")` }} aria-hidden />
+                  <div className="rc-metal-glare" style={{ "--metal-plate": `url("${metal.plate}")` }} aria-hidden />
+                </>
+              )}
+            </>
+          ))}
         </div>
 
 
@@ -580,11 +700,11 @@ export default function RcanaCard({
           }}
         >
           {!printed.numberTab && (data.artifactTemplate ? (
-            <ArtifactHeader data={data} hideFrame={hideFrame} classFont={classFont} />
+            <ArtifactHeader data={data} hideFrame={hideFrame} classFont={headerClassFont} wordmarkFont={wordmarkFont} wordmarkOutline={wordmarkOutline} />
           ) : data.eventTemplate ? (
-            <EventHeader data={data} hideFrame={hideFrame} classFont={classFont} />
+            <EventHeader data={data} hideFrame={hideFrame} classFont={headerClassFont} wordmarkFont={wordmarkFont} wordmarkOutline={wordmarkOutline} />
           ) : data.compactTypeHeader ? (
-            <RcanaTypeHeader data={data} slot={L.numberTab} hideFrame={hideFrame} classFont={classFont} />
+            <RcanaTypeHeader data={data} slot={L.numberTab} hideFrame={hideFrame} classFont={headerClassFont} wordmarkFont={wordmarkFont} wordmarkOutline={wordmarkOutline} />
           ) : (
             <>
               <div className="rc-slot rc-number" style={box(L.numberCell)}>
@@ -594,7 +714,7 @@ export default function RcanaCard({
                 <span>
                   {categoryFont === "bebas" ? (data.cardClass || "").toUpperCase() : data.cardClass || ""}
                   {/* A coin after the class, only when a face sets tabCost —
-                      no card does by default, since a Trader's hire cost is
+                      no card does by default, since a Trader's play cost is
                       their income and the drop box carries it. */}
                   {data.tabCost > 0 && <i className="rc-cost" aria-label={`cost ${data.tabCost}`}>{data.tabCost}</i>}
                 </span>
@@ -617,9 +737,9 @@ export default function RcanaCard({
 
           {inkOnTop && rulesPanel}
 
-          {/* Sealed cards put usage beside its label above the rule. */}
+          {/* Sealed cards identify usage in the body and omit the value box. */}
           {data.plate !== "sealed" && (
-            <RcanaValueBox value={data.halo} slot={L.standingBox} hideFrame={hideFrame} cardClass={data.cardClass}
+            <RcanaValueBox value={data.halo} slot={L.standingBox} hideFrame={hideFrame} cardClass={data.cardClass} credBadge={credBadge}
               kind={data.plate === "valued" ? "prosperity" : "grace"}
               label={data.plate === "valued" ? "Prosperity" : "Credibility"} />
           )}
@@ -645,13 +765,9 @@ export default function RcanaCard({
 
           {!printed.rarity && (
             <div className="rc-slot rc-emblem" style={box(L.rarity)}>
-              <img
-                src="/RL80_Mosaic_Medallion.webp"
-                alt="RL80 heart-and-arrow medallion"
-                width={1254}
-                height={1254}
-                draggable={false}
-              />
+              <RcanaMedallion holo={medallionHolo}
+                dx={motionEnabled ? tilt.ry / MAX_TILT.ry : 0}
+                dy={motionEnabled ? -tilt.rx / MAX_TILT.rx : 0} />
             </div>
           )}
         </div>
@@ -730,7 +846,7 @@ export default function RcanaCard({
         })}
       </div>
 
-      <style>{RCANA_STYLES}{SUBTYPE_FURNITURE_STYLES}{LIQUIDITY_BOX_STYLES}{TYPE_HEADER_STYLES}</style>
+      <style>{RCANA_STYLES}{SUBTYPE_FURNITURE_STYLES}{LIQUIDITY_BOX_STYLES}{TYPE_HEADER_STYLES}{MEDALLION_STYLES}</style>
     </div>
   );
 }
@@ -913,24 +1029,23 @@ function RulesText({ text }) {
 // Rules are printed together on the parchment. Tilt changes the card transform,
 // not this component's layout; content, scale and furniture changes still refit it.
 const RcanaRulesPanel = React.memo(function RcanaRulesPanel({ data, slot, u, keywordBadges }) {
-  const usage = data.artifactTemplate || data.eventTemplate;
-  const abilityLabel = data.cardClass === "Trader" && Boolean(data.ability);
+  const abilityLabel = data.cardClass === "Trader";
   return (
     <div className="rc-slot rc-body" data-named-ability={data.abilityName ? true : undefined} style={{ left: `${slot.x}%`, top: `${slot.y}%`, width: `${slot.w}%`, height: `${slot.h}%` }}>
-      <AutoFit max={u * 0.043} min={u * 0.036} block alignAbilityCap={keywordBadges && abilityLabel}>
-        {keywordBadges && (abilityLabel || data.keyword || data.traits?.length > 0) && (
-          <div className="rc-rules-labels" data-corner-cap={abilityLabel || undefined} style={{ "--kw": data.keywordColor }}>
+      {/* All classes share a text scale and one primary badge. Named Trader
+          powers add a title; usage cards lead straight into their effect. */}
+      <AutoFit max={u * 0.038} min={u * 0.029} block>
+        {keywordBadges && (abilityLabel || data.keyword) && (
+          <div className="rc-rules-labels" style={{ "--kw": data.keywordColor }}>
             {abilityLabel && (
               <span className="rc-ability-heading">
                 <b className="rc-kw rc-kw--ability" aria-label="ABIL80 — Ability">ABIL80</b>
                 {data.abilityName && <span className="rc-ability-name rc-ability-name--inline">{data.abilityName}</span>}
               </span>
             )}
-            {data.keyword && <b className="rc-kw">
-              {usage?.usage && <UsageSymbol kind={usage.usage} />}
+            {!abilityLabel && data.keyword && <b className="rc-kw rc-kw--usage">
               {data.keyword}
             </b>}
-            {(data.traits || []).map((t) => <b key={t} className="rc-kw rc-kw--trait">{t}</b>)}
           </div>
         )}
         {data.abilityName && !(keywordBadges && abilityLabel) && <p className="rc-ability-name">{data.abilityName}</p>}
@@ -947,36 +1062,10 @@ const RcanaRulesPanel = React.memo(function RcanaRulesPanel({ data, slot, u, key
   );
 });
 
-// A Range on the live card returns perspective-transformed screen coordinates.
-// Measure a hidden copy at the same local width and font instead, so the cap's
-// layout offset cannot drift when fonts settle or content changes during tilt.
-function firstLineOffset(ability) {
-  const style = getComputedStyle(ability);
-  const copy = ability.cloneNode(true);
-  copy.setAttribute("aria-hidden", "true");
-  Object.assign(copy.style, {
-    position: "fixed", left: "0", top: "0", margin: "0",
-    visibility: "hidden", pointerEvents: "none", transform: "none",
-    width: style.width, fontFamily: style.fontFamily, fontSize: style.fontSize,
-    fontWeight: style.fontWeight, fontStyle: style.fontStyle,
-    lineHeight: style.lineHeight, letterSpacing: style.letterSpacing,
-    wordSpacing: style.wordSpacing,
-  });
-  document.body.appendChild(copy);
-  try {
-    const range = document.createRange();
-    range.selectNodeContents(copy);
-    const firstLine = range.getClientRects()[0];
-    return firstLine ? firstLine.left - copy.getBoundingClientRect().left : 0;
-  } finally {
-    copy.remove();
-  }
-}
-
 // Steps the font size down until the content stops overflowing its slot.
 // Cheaper and more predictable than measuring text metrics, and it reruns on
 // content change, which is what a programmatic ability line needs.
-function AutoFit({ children, max, min, block = false, alignAbilityCap = false }) {
+function AutoFit({ children, max, min, block = false }) {
   const ref = useRef(null);
   const [size, setSize] = useState(max);
 
@@ -989,33 +1078,21 @@ function AutoFit({ children, max, min, block = false, alignAbilityCap = false })
     // comparing the element with itself is permanently true and the text
     // collapses to the minimum however much room the slot has.
     const slot = el.parentElement;
-    // The SLOT's scroll size, not this element's. `.rc-fit` carries
-    // max-height: 100%, which clamps its own box — so its scrollHeight tops
-    // out at the slot's height and reports a fit however much text is really
-    // there. The slot, clipping at overflow: hidden, reports the truth.
-    const fits = () =>
-      slot.scrollHeight <= slot.clientHeight + 1 && slot.scrollWidth <= slot.clientWidth + 1;
+    // Rules keep their natural height: a centered, oversized block can clip
+    // at BOTH edges, so measure its full height rather than the slot's scroll.
+    // Ribbon titles retain their tight line box and existing slot measurement.
+    const fits = () => block
+      ? el.scrollHeight <= slot.clientHeight && el.scrollWidth <= slot.clientWidth
+      : slot.scrollHeight <= slot.clientHeight + 1 && slot.scrollWidth <= slot.clientWidth + 1;
     const fit = () => {
       if (!active) return;
-      el.style.removeProperty("--ability-cap-left");
       let s = max;
       el.style.fontSize = `${s}px`;
       let guard = 0;
       // Refit after web fonts settle as well as after content changes.
       while (guard++ < 60 && s > min && !fits()) {
-        s = Math.max(min, s - Math.max(0.5, s * 0.04));
+        s = Math.max(min, s * 0.96);
         el.style.fontSize = `${s}px`;
-      }
-      if (alignAbilityCap) {
-        // The centered paragraph can wrap differently on each card. Anchor
-        // its cap to the rendered first line after the font has settled.
-        const ability = el.querySelector(".rc-ability");
-        const cap = el.querySelector(".rc-ability-heading");
-        if (ability && cap) {
-          const left = firstLineOffset(ability);
-          const room = Math.max(0, ability.clientWidth - cap.offsetWidth);
-          el.style.setProperty("--ability-cap-left", `${Math.max(0, Math.min(left, room))}px`);
-        }
       }
       setSize(s);
     };
@@ -1026,7 +1103,7 @@ function AutoFit({ children, max, min, block = false, alignAbilityCap = false })
       active = false;
       document.fonts?.removeEventListener("loadingdone", fit);
     };
-  }, [children, max, min, alignAbilityCap]);
+  }, [children, max, min, block]);
 
   return (
     <div
@@ -1202,7 +1279,7 @@ const RCANA_STYLES = `
    the title is allowed to breathe past the box — AutoFit still holds it to
    the field's width. */
 .rc-slot.rc-name { overflow: visible; }
-.rc-fit--block { text-align: center; line-height: 1.22; }
+.rc-fit--block { max-height: none; text-align: center; line-height: 1.22; }
 
 /* Bebas Neue ships one weight. Asking for 700 made the browser smear the
    outline into a synthetic bold, which is what was clubbing the corners of
@@ -1285,59 +1362,66 @@ const RCANA_STYLES = `
   border-radius: 0 0 calc(var(--u) * .025) calc(var(--u) * .025);
 }
 .rc-body { padding: 0; align-items: center; pointer-events: none; }
-/* Named abilities lead with a bold title, followed by regular-weight rules.
-   Unnamed rules keep their Medium weight. Flavor is a smaller true italic. */
+/* Every body uses regular-weight rules with selective bold terms.
+   Named Trader powers add a bold title; flavor stays smaller and italic. */
 .rc-ability {
   margin: 0;
   text-align: center;
   text-wrap: balance;
   white-space: pre-line;
   font-family: "IBM Plex Serif", Georgia, serif;
-  font-weight: 500;
+  font-weight: 400;
+  line-height: 1.18;
   color: #241a0a;
 }
-.rc-body[data-named-ability] .rc-ability { font-size: .92em; font-weight: 400; }
 .rc-flavor {
   box-sizing: border-box;
   width: fit-content;
   max-width: 96%;
-  margin: .16em auto 0;
-  padding: 0 .4em;
+  margin: .12em auto 0;
+  padding: 0 .2em;
   text-wrap: balance;
   font-family: "IBM Plex Serif", Georgia, serif;
   font-style: italic;
-  font-weight: 400;
+  font-weight: 500;
   color: #5a4524;
-  font-size: .72em;
+  font-size: .8em;
+  line-height: 1.22;
   text-align: center;
 }
-.rc-body[data-named-ability] .rc-flavor { margin-top: .08em; }
 .rc-flavor::before {
   content: "";
   display: block;
-  width: 6em;
-  height: .75em;
+  width: 4.8em;
+  height: .6em;
   max-width: 90%;
-  margin: 0 auto .12em;
+  margin: 0 auto .14em;
   /* Crop only the asset's transparent vertical padding; keep the flourish
      at its original proportions in a single centered bar above the quote. */
   background: url("/HorizontalBar3.png") center / 100% auto no-repeat;
 }
-.rc-ability-name { margin: 0 0 .12em; font-family: "IBM Plex Serif", Georgia, serif; font-size: 1.12em; font-weight: 700; }
-.rc-ability-heading { display: inline-flex; align-items: center; gap: .35em; }
-.rc-ability-name--inline { margin: 0; line-height: 1; color: #241a0a; }
+.rc-ability-name {
+  min-width: 0;
+  margin: 0 0 .18em;
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-size: 1.08em;
+  font-weight: 700;
+  line-height: 1.12;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  color: #241a0a;
+}
+.rc-ability-heading { display: inline-flex; max-width: 100%; align-items: center; justify-content: center; gap: .4em; }
+.rc-ability-name--inline { margin: 0; }
 
 /* ---------------- rules furniture ----------------
    Everything here is in em, so AutoFit scales the badges with the line.
-   An ABIL80 corner cap labels Trader abilities; timing badges follow the
-   type accent. Traits use an outlined pill in the same accent color. */
-.rc-rules-labels { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .25em; margin-bottom: .22em; }
-.rc-rules-labels[data-corner-cap] {
-  justify-content: flex-start;
-  padding-left: var(--ability-cap-left, 0px);
-}
+   ABIL80 uses blue enamel. Usage/timing badges use solid type colors with
+   cream lettering and gold trim; Calamities use a red warning field. */
+.rc-rules-labels { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .25em; margin-bottom: .2em; }
 .rc-kw {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   gap: .3em;
   padding: .15em .65em .12em .4em;
@@ -1347,7 +1431,7 @@ const RCANA_STYLES = `
   font-family: "Bebas Neue", Impact, sans-serif;
   font-weight: 400;
   font-style: normal;
-  font-size: .60em;
+  font-size: .64em;
   letter-spacing: .07em;
   line-height: 1.05;
   text-transform: uppercase;
@@ -1357,13 +1441,10 @@ const RCANA_STYLES = `
 .rc-kw svg { flex: 0 0 1.05em; width: 1.05em; height: 1.05em; }
 .rc-kw--ability {
   --kw: #07536b;
-  margin-top: .08em;
   padding-left: .65em;
 }
-.rc-kw--trait {
-  background: #fff6d6;
-  color: var(--kw, #155b60);
-  box-shadow: inset 0 0 0 .08em var(--kw, #155b60);
+.rc-kw--usage {
+  padding-inline: .65em;
 }
 .rc-term { font-weight: 600; color: #140f05; white-space: nowrap; }
 .rc-coin {
@@ -1400,12 +1481,6 @@ const RCANA_STYLES = `
   pointer-events: none;
 }
 .rc-emblem { display: flex; align-items: center; justify-content: center; }
-.rc-emblem > img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
 .rc-stat {
   font-family: "Bebas Neue", "Anton", ui-sans-serif, system-ui;
   font-weight: 400;
@@ -1444,6 +1519,296 @@ const RCANA_STYLES = `
       rgba(255,230,160,.10) 30%,
       rgba(255,255,255,0) 75%);
 }
+
+/* ---------------- metal border ---------------- */
+/* The printed metal frames' windows are near-square at the corners (gold
+   ~1.4% of height, the rest ~0.6%), and the rainbow/silver bands run in
+   to 4.2–4.3% of width — right on the footer panel's edge. Against the
+   panel's .025u rounded corner that left a wedge of the Lotería frame's
+   dark inner corner showing between the two curves. Under a printed metal
+   the panel squares off to match its window. The live foils get their
+   own concentric corners (RCANA_HOLO_WINDOWS) and keep the round panel. */
+.rc-card[data-metal="printed"] .rc-footer-paper,
+.rc-card[data-metal="printed"] .rc-footer-panel {
+  border-radius: 0 0 calc(var(--u) * .006) calc(var(--u) * .006);
+}
+/* The bands' inner edges (gold 3.56% of width / 1.78% of height, rainbow
+   4.23 / 2.55, silver 4.30 / 2.78) all stop short of where the paper and
+   panel start (4.5% / 4.3%), and the Lotería frame's black inner line
+   showed in between as a dark strip. Under a printed metal the paper and
+   panel grow out past every band's inner edge (the panel's box is an
+   inline slot, hence the !important) and the opaque band covers the
+   overlap. The paper's top is a gradient from transparent, there to blend
+   the frame's gold into the cream — so what sits UNDER the widened paper
+   matters: in the gutter that would be the black line. .rc-footer-gutter,
+   rendered before the paper, lays the frame's own side gold (#fbd263,
+   measured at x 4.6%) over the line down each side, from where the gold
+   footer begins beside the band (76.5%) to the panel's foot. The paper
+   then blends over gold in the gutter exactly as it does next to it. An
+   opaque cream strip BESIDE the paper was tried first and read as a second
+   card layer: its own tone in the gradient zone, a seam, a notch at the
+   divider. */
+.rc-card[data-metal="printed"] .rc-footer-gutter {
+  position: absolute;
+  left: 3.2%; width: 93.6%; top: 76.5%; height: 22%;
+  pointer-events: none;
+  /* 1.3% of the card per side, in this box's 93.6%. */
+  background:
+    linear-gradient(#fbd263, #fbd263) left / 1.39% 100% no-repeat,
+    linear-gradient(#fbd263, #fbd263) right / 1.39% 100% no-repeat;
+}
+.rc-card[data-metal="printed"] .rc-footer-paper {
+  left: 3.2%; width: 93.6%;
+}
+.rc-card[data-metal="printed"] .rc-footer-panel {
+  border-radius: 0 0 calc(var(--u) * .006) calc(var(--u) * .006);
+}
+.rc-card[data-metal="printed"] .rc-footer-panel {
+  left: 3.2% !important; width: 93.6% !important; height: 8.9% !important;
+}
+/* Same at the top: the art and backdrop are clipped to a 3.2% corner that
+   ends past the metal window's edge, so a notch of the card's dark corner
+   showed between the art's arc and the band's square inner corner. */
+.rc-card[data-metal="printed"] .rc-depth,
+.rc-card[data-metal="printed"] .rc-backdrop {
+  border-radius: calc(var(--u) * .008);
+}
+/* The Terminal Traders frame art is 1488x2082 against this card's ratio —
+   object-fit: fill, the same way TradingCard stretches it. The evenodd
+   polygon punches a hole where the art draws its two divider lines
+   (~85% and ~89% of height, inside the band); on this layout they would
+   run straight through the rules panel. */
+.rc-metal {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: fill;
+  display: block;
+  pointer-events: none;
+}
+/* The hole must start INSIDE every band's inner edge (silver 4.30% of
+   width is the widest; the lines themselves begin at 4.9%). At 4% it cut
+   a sliver off the rainbow and silver bands over the rules zone, and the
+   paper showed through as a pale strip — the "extra layer" on the edge. */
+img.rc-metal {
+  clip-path: polygon(evenodd,
+    0 0, 100% 0, 100% 100%, 0 100%, 0 0,
+    4.6% 83%, 95.4% 83%, 95.4% 91%, 4.6% 91%, 4.6% 83%);
+}
+/* The live foil is a canvas sized to the card box; its windows are its
+   own cut-out, so no clip. */
+.rc-metal--holo { border-radius: 3.2%; }
+/* ---------------- frame shine ----------------
+   A port of TradingCard's card-level holo (.tc-card-shine / .tc-card-glare,
+   see the CARD-LEVEL HOLO SYSTEM block there), confined to the metal
+   frame: both layers are masked by the frame's foil plate, so only the
+   stamped metal catches light and the Lotería card body stays matte.
+   Same three blends, same two levels, same textures and tunables, driven
+   by the same pointer vars; the one deliberate difference is --shine-rest:
+   TradingCard keeps its rest-state wash in full, which read as milk over
+   the rainbow frame here, so at rest the shine runs at a fraction of its
+   constant term and fades up with --lift as the pointer arrives. */
+.rc-card[data-metal="printed"] {
+  --foil-glitter: url("/TCG/foils/rl80-glitter.webp");
+  --foil-iri: url("/TCG/foils/rl80-iri.webp");
+  --foil-flakes: url("/TCG/foils/rl80-flakes.webp");
+  /* 512px texture against a 744px card: ~69% renders the flakes 1:1. Much
+     below that they average into flat grey — no glitter, not small glitter. */
+  --flake-size: 68%;
+  --glitter-warm: #ffd96b;
+  --glitter-deep: #7a5410;
+  /* The six angles a diffraction grating throws, and the band period
+     (px, not %, so the bands stay fine at every scale). */
+  --sun-1: hsl(2, 100%, 73%);
+  --sun-2: hsl(53, 100%, 69%);
+  --sun-3: hsl(93, 100%, 69%);
+  --sun-4: hsl(176, 100%, 76%);
+  --sun-5: hsl(228, 100%, 74%);
+  --sun-6: hsl(283, 100%, 73%);
+  --sun-step: 7px;
+  --shine-rest: .3;
+  /* DODGE (default): color-dodge brightens every pixel the same way, so the
+     plate's whole metal lifts uniformly. Plated numbers from TradingCard. */
+  --shine-blend: color-dodge;
+  --shine-filter: brightness(calc(.34 + .40 * var(--hyp, 0))) contrast(1.9) saturate(.9);
+  --shine-op: calc(.30 * var(--shine-rest) + .58 * var(--lift, 0));
+}
+.rc-card[data-metal="printed"][data-shine="soft"] {
+  --shine-op: calc(.14 * var(--shine-rest) + .32 * var(--lift, 0));
+}
+/* MIRROR: overlay is a pivot blend — against light pixels it drives hard
+   to white and saturates, against dark ones it barely moves — and
+   contrast(3) crushes the sweep into hard bright/dark bands, which is what
+   reads as polished chrome rather than tinted glass. */
+.rc-card[data-metal="printed"][data-shine-blend="mirror"] {
+  --shine-blend: overlay;
+  --shine-filter: brightness(1.22) contrast(3) saturate(.75);
+  --shine-op: calc(.42 * var(--shine-rest) + .55 * var(--lift, 0));
+}
+.rc-card[data-metal="printed"][data-shine-blend="mirror"][data-shine="soft"] {
+  --shine-op: calc(.20 * var(--shine-rest) + .30 * var(--lift, 0));
+}
+/* GLITTER: embedded foil flakes. Dodging by black is the identity, so the
+   gaps between flakes leave the gold as painted while a lit flake blows
+   straight out of it. */
+.rc-card[data-metal="printed"][data-shine-blend="glitter"] {
+  --shine-blend: color-dodge;
+  --shine-filter: brightness(1.9) contrast(4.5) saturate(1.05);
+  --shine-op: calc(.68 * var(--shine-rest) + .30 * var(--lift, 0));
+}
+.rc-card[data-metal="printed"][data-shine-blend="glitter"][data-shine="soft"] {
+  --shine-filter: brightness(1.3) contrast(4.5) saturate(1.15);
+  --shine-op: calc(.30 * var(--shine-rest) + .30 * var(--lift, 0));
+}
+
+.rc-metal-shine,
+.rc-metal-glare {
+  position: absolute; inset: 0;
+  display: none;
+  pointer-events: none;
+  overflow: hidden;
+  transition: opacity 240ms ease;
+  /* The plate is a full-bleed alpha map (white RGB, plate value in alpha),
+     so it masks in the default alpha mode. */
+  -webkit-mask-image: var(--metal-plate);
+  mask-image: var(--metal-plate);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  /* Same hole the frame art gets, so no light lands where its divider
+     lines were cut away over the rules panel. */
+  clip-path: polygon(evenodd,
+    0 0, 100% 0, 100% 100%, 0 100%, 0 0,
+    4.6% 83%, 95.4% 83%, 95.4% 91%, 4.6% 91%, 4.6% 83%);
+}
+.rc-card[data-shine="on"] .rc-metal-shine,
+.rc-card[data-shine="soft"] .rc-metal-shine,
+.rc-card[data-shine="on"] .rc-metal-glare,
+.rc-card[data-shine="soft"] .rc-metal-glare { display: block; }
+
+/* Refraction: fine diffraction bands whose angle swings with the tilt (so
+   they sweep rather than slide), a broad iridescent smear parallaxed the
+   other way, and glitter grain anchored to the card by its seed. */
+.rc-metal-shine {
+  will-change: background-position, filter, opacity;
+  mix-blend-mode: var(--shine-blend);
+  opacity: calc(var(--shine-op) * var(--shine-strength, 1));
+  background-image:
+    repeating-linear-gradient(
+      calc(100deg + var(--ry, 0deg) * 3),
+      var(--sun-1) 0, var(--sun-2) var(--sun-step),
+      var(--sun-3) calc(var(--sun-step) * 2), var(--sun-4) calc(var(--sun-step) * 3),
+      var(--sun-5) calc(var(--sun-step) * 4), var(--sun-6) calc(var(--sun-step) * 5),
+      var(--sun-1) calc(var(--sun-step) * 6)
+    ),
+    var(--foil-iri),
+    var(--foil-glitter);
+  background-size: 100% 100%, 140% 140%, 26% 26%;
+  background-position:
+    calc(50% + (50% - var(--posx, 50%)) * 6) calc(50% + (50% - var(--posy, 50%)) * 3),
+    calc(var(--pointer-from-left, .5) * 140%) calc(var(--pointer-from-top, .5) * 140%),
+    calc(var(--seedx, 0) * 600px + (50% - var(--posx, 50%)) * .8)
+      calc(var(--seedy, 0) * 600px + (50% - var(--posy, 50%)) * .8);
+  background-blend-mode: overlay, soft-light;
+  filter: var(--shine-filter);
+}
+/* Mirror: one broad rainbow instead of the dodge stack — overlay already
+   supplies the contrast, so grain and glitter under it just muddy the
+   pivot. 400% keeps the bands wide enough to sweep. */
+.rc-card[data-shine-blend="mirror"] .rc-metal-shine {
+  background-image:
+    repeating-linear-gradient(
+      calc(10deg + var(--ry, 0deg) * 1.5),
+      var(--sun-1), var(--sun-2), var(--sun-3),
+      var(--sun-4), var(--sun-5), var(--sun-6), var(--sun-1)
+    );
+  background-size: 400% 400%;
+  background-position:
+    calc((50% - var(--posx, 50%)) + 50%) calc((50% - var(--posy, 50%)) + 50%);
+  background-blend-mode: normal;
+}
+/* The etched bars: two opposing bar gradients screened together, then
+   multiplied over the rainbow. This is the step that turns a smooth sheen
+   into banded metal. Fine unit and grey gaps (not black), which on a
+   near-black body would otherwise crush to one fat stripe. */
+.rc-card[data-shine-blend="mirror"] .rc-metal-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --bars: 1.6%;
+  --bar-color: hsla(0, 0%, 78%, 1);
+  --bar-bg: hsla(0, 0%, 12%, 1);
+  opacity: .5;
+  background-image:
+    repeating-linear-gradient(calc(var(--ry, 0deg) * 0.5),
+      var(--bar-bg) calc(var(--bars) * 2.5),
+      var(--bar-color) calc(var(--bars) * 3.25),
+      hsla(0, 0%, 75%, .5) calc(var(--bars) * 3.5),
+      var(--bar-color) calc(var(--bars) * 3.75),
+      var(--bar-bg) calc(var(--bars) * 4.5),
+      var(--bar-bg) calc(var(--bars) * 8)
+    ),
+    repeating-linear-gradient(calc(var(--ry, 0deg) * -0.5),
+      var(--bar-bg) calc(var(--bars) * 2.5),
+      var(--bar-color) calc(var(--bars) * 3.25),
+      hsla(0, 0%, 75%, .5) calc(var(--bars) * 3.5),
+      var(--bar-color) calc(var(--bars) * 3.75),
+      var(--bar-bg) calc(var(--bars) * 4.5),
+      var(--bar-bg) calc(var(--bars) * 8)
+    );
+  background-position:
+    50% calc(var(--posy, 50%) * 1.2),
+    50% calc(var(--posy, 50%) * -1.2);
+  background-size: 200% 200%, 200% 200%;
+  background-blend-mode: screen;
+  filter: brightness(1) contrast(2) saturate(.75);
+  mix-blend-mode: multiply;
+}
+/* Glitter: the flake field is STATIC, anchored by the seed, while two
+   sweeps at different rates move across it. Sweeps and flakes multiply,
+   then the very high contrast() acts as a threshold: a flake lights only
+   while a sweep is bright enough where it sits, so flakes pop on and off
+   IN PLACE as the card turns — what real glitter does. Sweep B floors at
+   grey, not black: a true-black stop would annihilate every flake under it. */
+.rc-card[data-shine-blend="glitter"] .rc-metal-shine {
+  background-image:
+    radial-gradient(farthest-corner circle at var(--mx, 50%) var(--my, 50%),
+      #ffffff 0%, var(--glitter-warm) 22%, var(--glitter-deep) 60%, #6b5a30 100%),
+    repeating-linear-gradient(calc(28deg + var(--ry, 0deg) * 7),
+      #5a5a5a 0%, #ffffff 14%, #5a5a5a 30%),
+    var(--foil-flakes);
+  background-size:
+    170% 170%,
+    240% 240%,
+    var(--flake-size) var(--flake-size);
+  background-position:
+    center,
+    calc(50% + (50% - var(--posx, 50%)) * 5) calc(50% + (50% - var(--posy, 50%)) * 5),
+    calc(var(--seedx, 0) * 400px) calc(var(--seedy, 0) * 400px);
+  background-blend-mode: multiply, multiply;
+}
+.rc-card[data-shine-blend="glitter"] .rc-metal-shine::after { display: none; }
+
+/* Specular: the wet highlight, on the metal only. */
+.rc-metal-glare {
+  will-change: background-image, opacity;
+  mix-blend-mode: overlay;
+  opacity: calc((.18 * var(--shine-rest) + .34 * var(--lift, 0)) * var(--shine-strength, 1));
+  background-image:
+    radial-gradient(farthest-corner circle at var(--mx, 50%) var(--my, 50%),
+      hsla(0, 0%, 100%, .55) 6%,
+      hsla(0, 0%, 100%, .26) 20%,
+      hsla(0, 0%, 0%, .45) 74%);
+  filter: brightness(.95) contrast(1.25);
+}
+.rc-card[data-shine="soft"] .rc-metal-glare {
+  opacity: calc((.10 * var(--shine-rest) + .20 * var(--lift, 0)) * var(--shine-strength, 1));
+}
+@media (prefers-reduced-motion: reduce) {
+  .rc-metal-shine, .rc-metal-glare { transition: none; }
+}
+
 
 /* ---------------- bench overlay ---------------- */
 .rc-slots { position: absolute; inset: 0; pointer-events: none; }

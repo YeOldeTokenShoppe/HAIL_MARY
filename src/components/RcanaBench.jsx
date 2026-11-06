@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import RcanaCard from "./RcanaCard";
+import RcanaCard, { RCANA_METAL_FRAMES } from "./RcanaCard";
 import {
   RCANA_DEMO,
   RCANA_RARITIES,
@@ -26,6 +26,8 @@ export default function RcanaBench() {
   const [classFont, setClassFont] = useState("mosaic");
   // The name on the ribbon: gilt blackletter (default) or the Nabla it replaced.
   const [nameFont, setNameFont] = useState("gilt");
+  // Outline ring around the header wordmark letters (Class type: wordmark).
+  const [wordmarkOutline, setWordmarkOutline] = useState("ink");
 
   // Device tilt. iOS hands out the orientation sensor only from inside a tap
   // (DeviceOrientationEvent.requestPermission), Android just fires events,
@@ -61,10 +63,20 @@ export default function RcanaBench() {
   // back, so the two never silently fight.
   const [nudge, setNudge] = useState(null);
   const [inkOnTop, setInkOnTop] = useState(false);
-  // Rules furniture (keyword badge, trait pills, bold terms, hairline) and
+  // Rules furniture (primary badge, bold terms, hairline) and
   // the collector line, each switchable to compare against the plain face.
   const [keywordBadges, setKeywordBadges] = useState(true);
   const [collectorLine, setCollectorLine] = useState(true);
+  const [medallionHolo, setMedallionHolo] = useState(true);
+  const [credBadge, setCredBadge] = useState("angel-plain");
+  // Terminal Traders metal border over the Lotería frame; null = printed frame only.
+  const [metalFrame, setMetalFrame] = useState(null);
+  // The metal frame's shine (TradingCard's card-level holo, on the plate).
+  const [frameShine, setFrameShine] = useState("on");
+  const [frameShineBlend, setFrameShineBlend] = useState("mirror");
+  const [frameShineStrength, setFrameShineStrength] = useState(1);
+  const metalPrinted = Boolean(metalFrame) && !/^holo/.test(metalFrame);
+  const glitterOk = metalFrame === "gold";
 
   const source = RCANA_DEMO.find((c) => c.id === cardId) || RCANA_DEMO[0];
   const [rarity, setRarity] = useState(source.rarity);
@@ -169,12 +181,19 @@ export default function RcanaBench() {
           showFacets={showFacets}
           classFont={classFont}
           nameFont={nameFont}
+          wordmarkOutline={wordmarkOutline}
           gyro={gyro}
           hideFrame={hideFrame}
           showFx={showFx}
           inkOnTop={inkOnTop}
           keywordBadges={keywordBadges}
           collectorLine={collectorLine}
+          medallionHolo={medallionHolo}
+          credBadge={credBadge}
+          metalFrame={metalFrame}
+          frameShine={frameShine}
+          frameShineBlend={frameShineBlend}
+          frameShineStrength={frameShineStrength}
           sway
         />
       </section>
@@ -222,7 +241,9 @@ export default function RcanaBench() {
           <label title="Typeface for the class label in the tab">
             Class type
             <select value={classFont} onChange={(e) => setClassFont(e.target.value)}>
-              <option value="mosaic">Lotería mosaic (default) — gold header lettering</option>
+              <option value="mosaic">Wordmark: Tourney Italic (default) — ivory</option>
+              <option value="bungee">Wordmark: Bungee Spice — orange gradient</option>
+              <option value="painted">Wordmark: painted — original webp lettering</option>
               <option value="bebas">Bebas — spaced capitals</option>
               <option value="gilt">Gilt — gold blackletter subtype, Bebas class</option>
               <option value="blackletter">Blackletter, plain</option>
@@ -237,6 +258,14 @@ export default function RcanaBench() {
             <select value={nameFont} onChange={(e) => setNameFont(e.target.value)}>
               <option value="gilt">Gilt blackletter (default)</option>
               <option value="nabla">Nabla (chromatic 3D)</option>
+            </select>
+          </label>
+          <label title="Outline ring around the wordmark letters (text fonts only)">
+            Wordmark outline
+            <select value={wordmarkOutline} onChange={(e) => setWordmarkOutline(e.target.value)}>
+              <option value="ink">Black ink (default)</option>
+              <option value="cream">Cream</option>
+              <option value="none">None</option>
             </select>
           </label>
           <label title="Where each FX sheet's light facets sit. Every ring should be on flame.">
@@ -277,7 +306,7 @@ export default function RcanaBench() {
             />
             Ink above FX
           </label>
-          <label title="Timing badge, trait pills, bold game terms and the hairline in the rules panel">
+          <label title="Primary ability or usage badge, bold game terms and the flavor separator">
             <input
               type="checkbox"
               checked={keywordBadges}
@@ -293,7 +322,89 @@ export default function RcanaBench() {
             />
             Collector line
           </label>
+          <label title="Holographic inner disc that catches light as the card tilts">
+            <input type="checkbox" checked={medallionHolo} onChange={(e) => setMedallionHolo(e.target.checked)} />
+            Holographic medallion
+          </label>
+          <label title="A Terminal Traders stamped-metal border over the Lotería frame, with its plated shine">
+            Metal frame
+            <select value={metalFrame ?? ""} onChange={(e) => setMetalFrame(e.target.value || null)}>
+              <option value="">None (printed frame)</option>
+              {RCANA_METAL_FRAMES.map((f) => (
+                <option key={f.id} value={f.id}>{f.label.replace(/^\w/, (c) => c.toUpperCase())}</option>
+              ))}
+            </select>
+          </label>
+          {card.cardClass === "Trader" && (
+            <label>
+              CRED badge
+              <select value={credBadge} onChange={(e) => setCredBadge(e.target.value)}>
+                <option value="angel-plain">Angel with plain halo (default)</option>
+                <option value="angel-lateral">Angel with lateral rays</option>
+                <option value="angel-jaunty">Angel with tilted halo</option>
+                <option value="angel-soft-rays">Angel with soft rays</option>
+                <option value="angel">Angel with rays</option>
+                <option value="heart">Winged heart</option>
+                <option value="oval">Winged oval</option>
+                <option value="ribbon">Original ribbon</option>
+              </select>
+            </label>
+          )}
         </div>
+
+        {metalPrinted && (
+          <>
+            <p className="rb-title">Frame shine</p>
+            <div className="rb-seg" role="radiogroup" aria-label="Frame shine blend">
+              {[
+                { id: "mirror", label: "Mirror", hint: "Overlay blend — pivots on luminance, so the light metal chromes" },
+                { id: "dodge", label: "Dodge", hint: "Color-dodge — diffraction ramp, iridescence and glitter grain, brightening every pixel the same way" },
+                { id: "glitter", label: "Glitter", goldOnly: true, hint: "Embedded foil flakes — gold frame only; elsewhere falls back to Mirror" },
+              ].map((m) => (
+                <button
+                  key={m.id}
+                  role="radio"
+                  aria-checked={frameShineBlend === m.id}
+                  className={frameShineBlend === m.id ? "is-active" : ""}
+                  style={{ "--chip": "#f4cd61", opacity: m.goldOnly && !glitterOk ? 0.45 : 1 }}
+                  onClick={() => setFrameShineBlend(m.id)}
+                  title={m.goldOnly && !glitterOk ? `${m.hint} — pick the Gold frame to use it` : m.hint}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <div className="rb-seg" role="radiogroup" aria-label="Frame shine level">
+              {[
+                { id: "off", label: "Off", hint: "No frame shine or glare" },
+                { id: "soft", label: "Soft", hint: "Dialled back — for commons, which a full sweep over-rarities" },
+                { id: "on", label: "Full", hint: "Full sweep and specular glare on the metal" },
+              ].map((l) => (
+                <button
+                  key={l.id}
+                  role="radio"
+                  aria-checked={frameShine === l.id}
+                  className={frameShine === l.id ? "is-active" : ""}
+                  style={{ "--chip": "#f4cd61" }}
+                  onClick={() => setFrameShine(l.id)}
+                  title={l.hint}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+            <label className="rb-range">
+              <span>
+                Shine strength <b>{frameShineStrength.toFixed(2)}</b>
+              </span>
+              <input
+                type="range" min="0" max="1" step="0.05"
+                value={frameShineStrength}
+                onChange={(e) => setFrameShineStrength(Number(e.target.value))}
+              />
+            </label>
+          </>
+        )}
 
         {fxShown.length > 0 && showFx && (
           <>

@@ -17,6 +17,48 @@
       "generated": "/Users/michellepaulson/.codex/generated_images/01a1a1ac-7563-7452-925f-c66c731e1bdf/exec-a0b5a24e-1429-4d9d-a15e-0ff0214691a4.png",
       "png": "src/game/rcana/set/labels/type-asset.png",
       "webp": "public/TCG/labels/type-asset.webp"
+    },
+    {
+      "word": "TRADER",
+      "variant": "painted-gold",
+      "source": "src/game/rcana/set/labels/type-trader-painted-mockup.png",
+      "prompt": "Use case: background-extraction.\nAsset type: transparent illustrated wordmark for an existing trading-card header.\nInput image 1 is the approved painted-gold mockup. Isolate ONLY its six gold letters \"TRADER\", spelled T R A D E R, from the red plaque.\nPreserve the approved lettering faithfully: the softly flared sturdy Renaissance serif shapes, broad T and E bars, distinctive curved R legs, warm ochre-gold paint, pale-gold brush marks, slightly irregular hand-painted contours, original natural proportions and spacing. Do not redesign or typeset the letters. Preserve the very subtle warm edge shadow attached to each stroke.\nRemove everything else: all red plaque, number 12, gold and black border, card frame, scenery, and character. All spaces between letters AND the counters inside R, A, D and R must be genuinely transparent. Clean antialiased alpha edges, with no residual red matte, white halo, checkerboard pattern, colored rectangle, backdrop, plaque, or presentation sheet.\nText (verbatim): \"TRADER\", exactly once on one straight horizontal baseline, fully inside the canvas, with no other content.\nOutput a wide landscape PNG with genuine transparent background. Keep the naturally wide and low proportions of the word in the reference; include transparent padding above and below rather than stretching it. This asset will render about 35–40 pixels tall on the existing red plaque.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a60e-da12-78a2-ace1-bfc97c9e8ab6/exec-c79c1495-295d-43f8-8bc3-6af73899f794.png",
+      "png": "src/game/rcana/set/labels/type-trader-painted.png",
+      "webp": "public/TCG/labels/type-trader-painted.webp",
+      "viewBox": [
+        64,
+        162,
+        2045,
+        406
+      ],
+      "notes": "Approved painted-gold source. Background extracted with built-in imagegen; original alpha preserved in lossless WebP. The active Trader header maps the original brush luminance to warm ivory using the shared wordmarkPaint.js matrix. Earlier mosaic asset is retained for reference.",
+      "rendering": {
+        "treatment": "warm ivory paint",
+        "midtone": "#f3e5c3",
+        "method": "Shared SVG color matrix in wordmarkPaint.js, referenced by typeWordmarks.js; RGB only, original alpha unchanged"
+      }
+    },
+    {
+      "word": "ASSET",
+      "variant": "painted-gold",
+      "source": "src/game/rcana/set/labels/type-trader-painted.png",
+      "prompt": "Use case: text-localization.\nAsset type: transparent illustrated wordmark for the compact type header of a Lotería-inspired trading card.\nInput image: the approved painted TRADER wordmark, used as the exact lettering style reference and edit target.\nPrimary request: replace TRADER with \"ASSET\", keeping the same painted serif lettering style, warm ochre/gold source color, brush texture, stroke weight, and slightly irregular sign-painted character. The card renderer applies the established cream finish to this gold source.\nText (verbatim): \"ASSET\". Spell exactly A - S - S - E - T. One word on one horizontal baseline.\nStyle: sturdy classical Roman serif capitals, broad wedge serifs, open counters, softly curved S forms, subtle pale brush highlights; flat painted pigment with restrained texture. Match the reference's A, E, and T letterforms faithfully.\nComposition: wide horizontal wordmark with comfortable clear margins and all letters fully visible. Natural letter widths and spacing, no stretching. Include transparent padding above and below the word.\nBackground: genuinely transparent, with clean alpha around each letter and inside all counters. Output only the lettering.\nAvoid: backdrop, plaque, border, card, illustration, flourishes, icons, extra text, gothic/blackletter forms, mosaic tiles, jewel effects, metallic bevel, drop shadow, glow, hazy halos, detached flecks.",
+      "generated": "/Users/michellepaulson/.codex/generated_images/01a1a60e-da12-78a2-ace1-bfc97c9e8ab6/exec-d94f5028-bfd2-478f-b930-10da659264a3.png",
+      "png": "src/game/rcana/set/labels/type-asset-painted.png",
+      "webp": "public/TCG/labels/type-asset-painted.webp",
+      "notes": "Generated from the approved painted Trader lettering with built-in imagegen. Source alpha is preserved in lossless WebP. The active header uses the same cream finish as Trader and the subtypes; the earlier mosaic asset is retained for reference.",
+      "rendering": {
+        "treatment": "warm ivory paint",
+        "midtone": "#f3e5c3",
+        "method": "Shared IVORY_PAINT_MATRIX in wordmarkPaint.js; RGB only, original alpha unchanged"
+      },
+      "viewBox": [
+        174,
+        139,
+        1878,
+        462
+      ]
     }
   ]
 }

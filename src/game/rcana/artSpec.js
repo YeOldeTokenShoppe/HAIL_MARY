@@ -143,7 +143,7 @@ export const DEFAULT_FRAME = "/TCG/frames/LOTERIA_FRAME2.webp";
 //             drop box kept — Hazard, Remedy, Artifact, Grace, fired Event
 // The drop box always holds "the Liquidity on this card": what you pay for
 // it on every type but Traders, where it is what they pay YOU (their income —
-// the one type that generates water). A Trader's hire cost prints as a coin
+// the one type that generates water). A Trader's play cost prints as a coin
 // in the tab instead, the one place that coin appears.
 export const PLATES = {
   // halo + drop: a Trader's Grace and income

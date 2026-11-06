@@ -10,11 +10,11 @@ Pokémon-style statlines, R-cana values:
 
 - **LIQ** is your income. At the start of your turn you collect your **seated Trader's LIQ** instead of a flat 2. No Trader seated (or your seat is hacked)? You collect **1** — you're between Traders.
 - **GRACE** is their reputation, their state of grace, and their health. Scandals drain it. At **zero, the Trader is disgraced**: discarded, seat empty, income back to 1 until someone else sits down.
-- **One ability**, as before.
+- **One named ability** for every Trader, printed beside **ABIL80**.
 
 | Trader | Cost | LIQ | GRACE | Ability |
 |---|---:|---:|---:|---|
-| El Unicornio | 3 | 3 | 20 | None — pure compounding, the best paycheck at the desk. |
+| El Unicornio | 3 | 3 | 20 | Compound Interest: at turn start, if you have at least 100 banked Prosperity, bank 25 more. |
 | El Gato | 2 | 2 | 16 | When seated, immediately knock one hazard off your table, free. |
 | El Monje | 1 | 1 | 22 | When you light a candle, bank 25 Prosperity. |
 | El Diablito | 2 | 2 | 10 | Devil’s Wager: at turn start, flip a coin. Heads gains 1 Liquidity; tails loses 1 CRED (Grace). |
@@ -25,14 +25,25 @@ Pokémon-style statlines, R-cana values:
 
 ### 2. The seat and the bench
 
+El Unicornio's **Compound Interest** resolves at the start of its controller's
+turn, before income and the draw. Only the active, enabled Trader earns it;
+playing or swapping it into the active slot does not pay immediately. Quantum
+Hack blocks it unless protected by the Halo. The payout uses normal banking
+rules, including El Naranja and the victory check. Its cost, income and CRED
+remain 3 / 3 / 20; the added ability still needs balance playtesting.
+A paired 200-game check (seeds 1–200, two Greedy bots, alternating seats,
+Devotion vs Degen) moved Degen from 107 wins without the ability to 127 with
+it, and shortened the average game from 16.73 to 15.67 rounds. This is a bot
+balance signal, not a claim of balance under human play.
+
 El Diablito's **Devil’s Wager** resolves before normal income. Only the seated,
 enabled Trader flips. Tails damages his own CRED using the normal disgrace and
 Shroud rules; it can also end his spotless-reputation income bonus. A benched
 or hacked El Diablito does not flip (the Halo still protects from the Hack).
 The coin replaces his former Calamity rebate.
 
-- **One seat** (ability + LIQ live) and a **bench of up to two**.
-- Hiring is a main action: the seat if it's empty, otherwise the bench.
+- **One active Trader** that you inhabit (ability + LIQ live) and a **bench of up to two**.
+- Playing a Trader is a main action: inhabit it if the active slot is empty, otherwise place it on the bench.
 - **Once a turn you may swap** seat ↔ bench, **free** — it does not use your main action.
 - Quantum Hack disables the *seat* (ability and LIQ) until cleared, whoever sits in it. The Halo still protects.
 
@@ -58,7 +69,7 @@ Upside:
 - **Traders are lotería figures in the engine too**: The Pope is El Papa, The Prospector El Gambusino, The Illuminati El Ojo — one name on the card, the table and in the log.
 - **La Semilla is Seed Round** — the Asset row prints in English throughout (the three Prospecting claims too: Treasure Map, The Mine, Oil Field Claim).
 - **Bull Run** and **Bear Market** are the printed names of the bull and the bear — they are Events, not lotería figures.
-- **Hire cost = income** for every Trader; La Estrella and The Illuminati go to LIQ 3, The Pope to LIQ 3. The card prints one number. Sim unchanged at 50/50.
+- **Play cost = income** for every Trader; La Estrella and The Illuminati go to LIQ 3, The Pope to LIQ 3. The card prints one number. Sim unchanged at 50/50.
 - **Eugene retired** — he is El Unicornio by another name, and the Fountain now owns the odds step. Degen runs El Unicornio ×2.
 - **El Jardín re-themed as Yield Farm** (La Granja) — same fragile income, no longer a plant beside the seed. Three Hail Mary Prospecting claims (all collectible): **Treasure Map** (cost 2 — 2 Liquidity or 75 Prosperity; *when sold, draw 2 cards*; El Mapa), **The Mine** (cost 4 — 4 Liquidity, or Prosperity that grows 25 a round from 75; La Mina), **Oil Field Claim** (cost 3 — *roll: 3+ gushes for 175, else runs dry for 25*; El Pozo). 57 designs: 54 numbered will be chosen from them.
 - **The Confession** (Grace, cost 1 — *light a candle, and your seated Trader’s Grace is restored in full*; La Confesión). The set reaches **54 numbered designs**.
@@ -67,7 +78,7 @@ Upside:
 - **The Shroud** (new Artifact, cost 2, collectible — in neither starter): *when your seated Trader would be disgraced, discard the Shroud instead; they stay, with 5 Grace.* (El Sudario.)
 - **The Fountain** (new Grace, cost 2, Devotion ×1 for one Ofrenda): *toss in 2 Liquidity — your Hail Mary odds rise one step, even past the shrine's three.* The odds ladder gains a fifth rung: 1 → 2 → 4 → 8 → **11** twelfths. (La Fuente.)
 - **Third pass.** **The Moon** is **Full Moon**, an Event you call (cost 4 → bank 150; prints La Luna). New Asset **Collectibles** (cost 3 — sell for 5 Liquidity or 125 Prosperity; La Colección), ×1 in both starters. **Enigma Machine** has a job again: *once a turn, discard up to 3 cards and draw that many* (free; bots feed it what they cannot afford). **Honeymoon** removed. Degen swaps one Tech Stock for Collectibles. Both 40; sim 49/51, 17.3 rounds.
-- **Second trim.** Removed: La Corrida, X-Ray Glasses, El Halving, The Airdrop. Changed: **The Skull** is an Artifact (cost 2 — *whenever a rival sells an Asset, collect 1 Liquidity*); **La Moneda** is the Event **Pay Day** (fires on draw — *every player collects 2 Liquidity*; prints as La Moneda); **The Illuminati** is a Trader (cost 3, LIQ 2, GRACE 12 — *when hired, each rival passes you one random card*); **Raphael's Cherub** is **The Votive** (El Exvoto). Enigma Machine's "cannot be peeked" now has nothing to block — pending. Devotion refilled with The Votive ×2, The Bell ×2, The Rose ×2; Degen with The Skull ×1, The Bull ×3. Both 40. Sim after: devotion/degen 49/51, 17.7 rounds.
+- **Second trim.** Removed: La Corrida, X-Ray Glasses, El Halving, The Airdrop. Changed: **The Skull** is an Artifact (cost 2 — *whenever a rival sells an Asset, collect 1 Liquidity*); **La Moneda** is the Event **Pay Day** (fires on draw — *every player collects 2 Liquidity*; prints as La Moneda); **The Illuminati** is a Trader (cost 3, LIQ 2, GRACE 12 — *when played as your active Trader, each rival passes you one random card*); **Raphael's Cherub** is **The Votive** (El Exvoto). Enigma Machine's "cannot be peeked" now has nothing to block — pending. Devotion refilled with The Votive ×2, The Bell ×2, The Rose ×2; Degen with The Skull ×1, The Bull ×3. Both 40. Sim after: devotion/degen 49/51, 17.7 rounds.
 - **La Sirena and The Snake retired** — too many hazards. Degen fills the two slots with The Inheritance ×2 (was 1) and Tech Stock ×2 (was 1); still 40. (A third Rocket was tried and tipped Degen to 63%; two more Assets to 64%.)
 - **No more "Progress" type.** The Bull, Rocket and The Inheritance are Events you *call* — played from the hand for their cost and banked on the spot — where the other Events fire on draw. Same play, one fewer kind of card; the engine keeps a `played` flag on them.
 - **St. GR80 and H80Z retired** — they were El Monje and El Diablito by other names. Devotion runs El Monje ×2, Degen El Diablito ×2 (both still 40). GR80's "bank 25 on a candle" and H80Z's "hazards cost 1 less" leave the set with them.
@@ -79,7 +90,7 @@ The lotería set stays **54 numbered designs**; specials (Moral Hazard, The Worl
 
 ## What this playtest needs to answer
 
-- Does income-through-Traders make hiring feel essential without making unemployment miserable?
+- Does income-through-Traders make inhabiting an active Trader feel essential without making the time between Traders miserable?
 - Does the bench create real decisions (who sits when a Scandal breaks)?
 - Is 3-Grace-per-candle the right lifeline, or does devotion trivialize scandals?
 - Does La Estrella (GRACE 8) die too fast? Does anyone ever disgrace at all?

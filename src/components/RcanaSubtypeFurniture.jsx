@@ -1,54 +1,46 @@
-import React from "react";
+import React, { useId } from "react";
+import { WORDMARK_FONT_FACES, wordmarkTextStyles } from "../game/rcana/wordmarkFontStyles.js";
 import { SUBTYPE_HEADER, SUBTYPE_USAGE_SLOT } from "../game/rcana/subtypeTemplate.js";
 import { HEADER_COLORS } from "../game/rcana/headerColors.js";
 import { SUBTYPE_WORDMARKS } from "../game/rcana/subtypeWordmarks.js";
 
 const box = ({ x, y, w, h }) => ({ left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%` });
 
-function SubtypeSymbol({ kind }) {
-  return (
-    <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-      {kind === "remedy" ? <>
-        <path d="M12 3h8M13 3v9a10 10 0 1 0 6 0V3M7 21h18" />
-        <circle cx="13" cy="18" r="1" fill="currentColor" stroke="none" />
-      </> : kind === "grace" ? <>
-        <path d="M11 17h10v12H11zM8 29h16M16 3c-1 4-5 5-5 8a5 5 0 0 0 10 0c0-3-4-4-5-8Z" />
-      </> : kind === "calamity" ? <>
-        <path d="M10 27v-5a11 11 0 1 1 12 0v5H10ZM14 24v3M18 24v3" />
-        <circle cx="11.5" cy="15" r="2" /><circle cx="20.5" cy="15" r="2" />
-        <path d="m16 19-1 2h2Z" fill="currentColor" stroke="none" />
-      </> : kind === "opportunity" ? <>
-        <path d="m13 5 3 8 8 3-8 3-3 8-3-8-8-3 8-3ZM25 2v6M22 5h6M25 24v6M22 27h6" />
-      </> : kind === "market" ? <>
-        <circle cx="16" cy="16" r="13" /><ellipse cx="16" cy="16" rx="6" ry="13" /><path d="M3 16h26" />
-      </> : <>
-        <path d="M9 5h14l6 8-13 16L3 13Z" />
-        <path d="M3 13h26M9 5l3 8 4 16 4-16 3-8" />
-      </>}
-    </svg>
-  );
-}
-
-export function RcanaSubtypeHeader({ data, template, hideFrame = false, classFont = "mosaic" }) {
+export function RcanaSubtypeHeader({ data, template, hideFrame = false, classFont = "mosaic", wordmarkFont = "tourney", wordmarkOutline = "ink" }) {
+  const inkFilterId = `rc-subtype-ink-${useId()}`;
   if (!template) return null;
   const lettering = SUBTYPE_WORDMARKS[template.subtype];
   const label = lettering?.label ?? template.subtype;
   const accessibleLabel = label === template.subtype ? label : `${label} (${template.subtype})`;
-  const wordmark = classFont === "mosaic" ? lettering : null;
+  // The mosaic treatment is the wordmark bar. Since 2026-11-05 it is live
+  // text (Bungee Spice or Tourney, see wordmarkFontStyles.js); "painted"
+  // brings back the webp lettering in SUBTYPE_WORDMARKS, which also still
+  // supplies the display label (OPPORTUN80 for Opportunity, etc.).
+  const wordmark = classFont === "mosaic";
+  const painted = wordmark && wordmarkFont === "painted" && lettering;
   const categoryFont = classFont === "mosaic" ? "bebas" : classFont;
   return (
     <div className={`rc-subtype-header rc-${data.cardClass.toLowerCase()}-header`} style={{ ...box(SUBTYPE_HEADER), "--subtype-enamel": HEADER_COLORS[data.cardClass] }} data-class={data.cardClass} data-hide-frame={hideFrame || undefined} data-subtype={template.subtype || undefined} aria-label={[data.number != null ? `No. ${data.number}` : null, accessibleLabel, data.cardClass].filter(Boolean).join(", ")}>
       <span className="rc-subtype-number">{data.number ?? ""}</span>
       {template.subtype && (
         <span className="rc-subtype-field" data-font={classFont}>
-          <span className="rc-subtype-icon"><SubtypeSymbol kind={template.symbol} /></span>
           <span className="rc-subtype-label" data-long={label.length > 9 || undefined} data-wordmark={wordmark ? true : undefined}>
-            {wordmark ? (
-              <svg className="rc-subtype-wordmark" viewBox={wordmark.viewBox.join(" ")}
-                width={wordmark.viewBox[2]} height={wordmark.viewBox[3]}
+            {painted ? (
+              <svg className="rc-subtype-wordmark-img" viewBox={painted.viewBox.join(" ")}
+                width={painted.viewBox[2]} height={painted.viewBox[3]}
                 preserveAspectRatio="xMinYMid meet" role="img" aria-label={accessibleLabel} focusable="false">
-                <image href={wordmark.src} width={wordmark.width} height={wordmark.height} aria-hidden="true" />
+                {painted.colorMatrix && (
+                  <defs>
+                    <filter id={inkFilterId} colorInterpolationFilters="sRGB">
+                      <feColorMatrix type="matrix" values={painted.colorMatrix} />
+                    </filter>
+                  </defs>
+                )}
+                <image href={painted.src} width={painted.width} height={painted.height}
+                  filter={painted.colorMatrix ? `url(#${inkFilterId})` : undefined} aria-hidden="true" />
               </svg>
+            ) : wordmark ? (
+              <span className="rc-subtype-wordmark" data-wordmark-font={wordmarkFont} data-outline={wordmarkOutline} aria-label={accessibleLabel}>{label.toUpperCase()}</span>
             ) : label}
           </span>
         </span>
@@ -118,10 +110,12 @@ export const SUBTYPE_FURNITURE_STYLES = `
   display: grid;
   place-items: center;
   flex: 0 0 10%;
-  font-family: "Bebas Neue", Impact, sans-serif;
-  font-size: calc(var(--u) * .07);
-  font-weight: 400;
-  padding-top: calc(var(--u) * .003);
+  font-family: "Rcana Numerals", "IBM Plex Serif", Georgia, serif;
+  font-size: calc(var(--u) * .064);
+  font-weight: 700;
+  font-variant-numeric: lining-nums proportional-nums;
+  /* Match the optically centered Cinzel figures in the Trader header. */
+  padding-top: calc(var(--u) * .009);
   border-right: calc(var(--u) * .004) solid var(--subtype-ink);
 }
 .rc-subtype-field {
@@ -129,7 +123,6 @@ export const SUBTYPE_FURNITURE_STYLES = `
   align-items: center;
   flex: 1;
   min-width: 0;
-  gap: calc(var(--u) * .018);
   padding: 0 calc(var(--u) * .07) 0 calc(var(--u) * .03);
   background: var(--subtype-enamel);
   color: #fff0bc;
@@ -153,7 +146,6 @@ export const SUBTYPE_FURNITURE_STYLES = `
   text-transform: uppercase;
 }
 .rc-subtype-field[data-font="mosaic"] {
-  gap: calc(var(--u) * .014);
   padding-left: calc(var(--u) * .026);
   padding-right: calc(var(--u) * .035);
 }
@@ -163,28 +155,23 @@ export const SUBTYPE_FURNITURE_STYLES = `
   flex: 1;
   min-width: 0;
 }
-.rc-subtype-wordmark {
+${WORDMARK_FONT_FACES}
+${wordmarkTextStyles(".rc-subtype-wordmark")}
+/* OPPORTUN80 is the longest word on any bar; Tourney narrows its width axis
+   rather than shrinking much, so it reads at the same height as the rest. */
+.rc-subtype-label[data-long] .rc-subtype-wordmark {
+  font-size: calc(var(--u) * .05);
+  --wordmark-wdth: 85;
+  letter-spacing: .015em;
+}
+/* The painted webp lettering ("painted" wordmark font). */
+.rc-subtype-wordmark-img {
   display: block;
   flex-shrink: 1;
   width: auto;
   max-width: 100%;
-  height: calc(var(--u) * .06);
+  height: calc(var(--u) * .0507);
 }
-.rc-subtype-field[data-font="mosaic"] .rc-subtype-icon {
-  flex-basis: calc(var(--u) * .055);
-  width: calc(var(--u) * .055);
-  height: calc(var(--u) * .055);
-  color: #f4cd61;
-}
-.rc-subtype-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 calc(var(--u) * .064);
-  width: calc(var(--u) * .064);
-  height: calc(var(--u) * .064);
-}
-.rc-subtype-icon svg { width: 100%; height: 100%; overflow: visible; }
 .rc-subtype-class {
   display: flex;
   align-items: center;
@@ -203,8 +190,7 @@ export const SUBTYPE_FURNITURE_STYLES = `
   letter-spacing: .1em;
   padding-top: calc(var(--u) * .004);
 }
-/* "gilt" puts the stamped gold letter where the enamel is — the subtype
-   field — so the whole bar is one blackletter, and the icon takes the gold. */
+/* "gilt" puts stamped gold lettering in the enamel subtype field. */
 .rc-subtype-field[data-font="gilt"] .rc-subtype-label {
   font-family: "Blackletter", "UnifrakturCook", serif;
   font-weight: 400;
@@ -217,7 +203,6 @@ export const SUBTYPE_FURNITURE_STYLES = `
     0 calc(var(--u) * .004) calc(var(--u) * .005) rgba(0, 0, 0, .45);
 }
 .rc-subtype-field[data-font="gilt"] .rc-subtype-label[data-long] { font-size: calc(var(--u) * .054); }
-.rc-subtype-field[data-font="gilt"] .rc-subtype-icon { color: #f4cd61; }
 /* With the subtype struck in gilt, the class beside it steps down to a
    label: the number cell's own Bebas, tracked caps, plain ink. Two
    blackletters on one bar compete; number → gilt subtype → category reads

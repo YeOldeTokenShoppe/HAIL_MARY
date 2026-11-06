@@ -58,6 +58,9 @@ for (const card of RCANA_SET) {
   // Resolve through the converter, so convention-derived paths (a layer with
   // no `src` → /TCG/rcana/<id>/<layer>.webp) are checked as the card sees them.
   const resolved = toRcanaCard(card);
+  if (card.cardClass === "Trader") {
+    if (!card.abilityName || !card.ability) err(id, "Trader needs a named ABIL80 and rules text");
+  } else if (!resolved.keyword) err(id, "missing primary usage/timing badge");
   const srcs = [
     resolved.frameImage,
     resolved.badgeImage,
@@ -121,6 +124,11 @@ for (const card of RCANA_SET) {
 }
 
 if (UNPRINTED.length) {
+  for (const design of UNPRINTED) {
+    if (design.type === "trader" && (!design.abilityName || !design.text)) {
+      err(design.key, "Trader design needs a named ability before its face is authored");
+    }
+  }
   console.log(`\nUnprinted designs (${UNPRINTED.length}):`);
   console.log("  " + UNPRINTED.map((d) => `${d.key} (${d.type})`).join(", "));
 }

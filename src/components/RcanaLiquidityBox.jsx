@@ -1,4 +1,5 @@
 import React, { useId } from "react";
+import RcanaCredBadge, { CRED_BADGE_STYLES } from "./RcanaCredBadge.jsx";
 
 const box = ({ x, y, w, h }) => ({ left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%` });
 
@@ -36,8 +37,11 @@ export function RcanaLiquidityBox({ value, income, slot, hideFrame = false, labe
   return <RcanaValueBox value={value} slot={slot} hideFrame={hideFrame} label={label} kind="hydro" ribbon={ribbon} cardClass={cardClass} />;
 }
 
-export function RcanaValueBox({ value, slot, hideFrame = false, label, showLabel = true, kind, ribbon = false, cardClass }) {
+export function RcanaValueBox({ value, slot, hideFrame = false, label, showLabel = true, kind, ribbon = false, cardClass, credBadge = "angel-plain" }) {
   const arcId = `rc-stat-${useId().replace(/:/g, "")}`;
+  if (kind === "grace" && credBadge !== "ribbon") {
+    return <RcanaCredBadge value={value} slot={slot} hideFrame={hideFrame} label={label} showLabel={showLabel} variant={credBadge} />;
+  }
   // CRED, PROSPERITY and COST ribbons already have their labels in the art.
   const ribbonBadge = ribbon || kind === "prosperity";
   const printedLabel = kind === "grace" || ribbonBadge;
@@ -71,6 +75,7 @@ export function RcanaValueBox({ value, slot, hideFrame = false, label, showLabel
 }
 
 export const LIQUIDITY_BOX_STYLES = `
+${CRED_BADGE_STYLES}
 .rc-liquidity {
   position: absolute;
   box-sizing: border-box;

@@ -1,6 +1,6 @@
 "use client";
 
-// /rcana-print?id=<face id>[&scale=1][&live=1]
+// /rcana-print?id=<face id>[&scale=1][&live=1][&cred=angel-lateral|angel|angel-plain|angel-jaunty|angel-soft-rays|heart|oval|ribbon]
 // /rcana-print?template=artifact[&subtype=remedy|grace|relic]
 // The template has an empty art window, number, name, rules and cost, ready
 // for export; its Artifact header and usage badge are the real components.
@@ -54,6 +54,8 @@ function PrintCard() {
   const subtype = subtypes.includes(requestedSubtype) ? requestedSubtype : subtypes[0];
   const id = params.get("id") || RCANA_SET[0]?.id;
   const scale = Number(params.get("scale") || 1);
+  const requestedCred = params.get("cred");
+  const credBadge = ["angel-lateral", "angel", "angel-plain", "angel-jaunty", "angel-soft-rays", "heart", "oval", "ribbon"].includes(requestedCred) ? requestedCred : "angel-plain";
   // ?live=1: the card as it is on the bench — depth, tilt, sway, touch — for
   // embedding (the Playtest 2 lightbox) rather than screenshotting.
   const live = params.get("live") === "1";
@@ -82,7 +84,7 @@ function PrintCard() {
           width: "100vw", height: "100dvh", display: "grid", placeItems: "center", overflow: "hidden",
         }}
       >
-        <RcanaCard data={card} scale={fitScale} depth={1} interactive showFx sway captureTouch />
+        <RcanaCard data={card} scale={fitScale} depth={1} interactive showFx sway captureTouch credBadge={credBadge} />
       </main>
     );
   }
@@ -91,7 +93,7 @@ function PrintCard() {
       data-print-ready
       style={{ margin: 0, padding: 0, background: "transparent", display: "inline-block", width: 744 * scale }}
     >
-      <RcanaCard data={card} scale={scale} depth={0} interactive={false} showFx sway={false} />
+      <RcanaCard data={card} scale={scale} depth={0} interactive={false} showFx sway={false} credBadge={credBadge} />
     </main>
   );
 }
