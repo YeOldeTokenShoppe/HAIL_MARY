@@ -1,0 +1,11 @@
+{
+  "tool": "built-in image_gen",
+  "file": "front.png",
+  "canvas": {
+    "width": 1024,
+    "height": 1536
+  },
+  "source": "../eugene-disco-front-v3/front.png",
+  "purpose": "Reduce both spotlight opacities, keeping their sources at the top and preserving the opaque disco ball.",
+  "prompt": "Use case: precise-object-edit.\nInput image 1 is the EDIT TARGET: a transparent foreground overlay for a playing card. The user says the spotlights are much too opaque.\nMake ONLY this correction: reduce the actual ALPHA OPACITY of BOTH the yellow and cyan spotlight cones by approximately 80%, including their broad halos. Keep their golden and cyan colors, soft edges, directions and locations exactly the same. Both narrow origins stay at the TOP edge: yellow upper-left and cyan near x=680, directed down-left. Preserve canvas 1024 x 1536 and all placements.\nThe light beams should be extremely sheer translucent colored light, almost invisible, so a character's facial features and a detailed crowd beneath remain clearly visible. Broad beam interiors should have only 10–18% opacity (alpha about 25–45 out of 255), maximum 20% except for tiny bright source points at the very top edge. Feather to fully transparent at the beam boundaries. Do not merely darken RGB or mute saturation: REDUCE ALPHA so underlying art shows through.\nKeep the mirrored disco ball at upper-right crisp and fully opaque, preserving its size, mirror tiles, color and star glint. Do not fade the ball when fading the beams.\nOutput an actual transparent RGBA PNG with all empty space alpha zero. No opaque black backing, no colored fog filling the canvas, no gray or checkerboard background. No character, crowd, floor, lettering, extra objects, or scene. This is a normal alpha-over foreground overlay, NOT a black image intended for screen blending."
+}

@@ -498,6 +498,11 @@ export function toRcanaCard(card, overrides = {}) {
       || PLATES[card.plate || "boxed"]
       || CLASS_FRAME[cls]
       || DEFAULT_FRAME,
+    // An art file may also pin a Terminal Traders metal border over the
+    // frame (an RCANA_METAL_FRAMES id). RcanaCard uses it when the caller
+    // passes no metalFrame of its own, so the print route and the bench's
+    // initial view agree with the card file.
+    metalFrame: art.metalFrame ?? null,
     // The type seal, on sealed plates only (it stands where the halo box was).
     badgeImage: !subtypeTemplate && card.plate === "sealed" ? TYPE_BADGE[card.type] || null : null,
     // "combined" means the figure is inside the frame image, not that the

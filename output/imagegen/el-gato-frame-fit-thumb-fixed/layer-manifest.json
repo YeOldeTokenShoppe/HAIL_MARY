@@ -1,0 +1,65 @@
+{
+  "name": "El Gato \u2014 frame-fit composition",
+  "width": 1309,
+  "height": 1201,
+  "aspect_ratio": 1.08992506244796,
+  "origin": {
+    "x": 0,
+    "y": 0
+  },
+  "trim": false,
+  "blend_mode": "source-over",
+  "layers": [
+    {
+      "file": "01-background.png",
+      "order": 0,
+      "transparent": false,
+      "motion_multiplier": 0
+    },
+    {
+      "file": "02-center.png",
+      "order": 1,
+      "transparent": true,
+      "motion_multiplier": 0.3
+    },
+    {
+      "file": "03-foreground.png",
+      "order": 2,
+      "transparent": true,
+      "motion_multiplier": 1
+    }
+  ],
+  "placement": {
+    "target": "inner artwork opening above title ribbon",
+    "all_layers_same_scale": true,
+    "all_layers_same_origin": true,
+    "height_for_target_width": "target_width * 1201 / 1309",
+    "frame_above_all_art_layers": true
+  },
+  "suggested_motion_source_pixels": {
+    "x": 6,
+    "y": 4
+  },
+  "suggested_shared_scale_during_motion": 1.02,
+  "frame_layout_proof": {
+    "status": "Approximate schematic, not the user's exact frame",
+    "canvas": {
+      "width": 1038,
+      "height": 1462
+    },
+    "art_rect": {
+      "x": 80,
+      "y": 120,
+      "width": 897,
+      "height": 823
+    },
+    "title_ribbon_top": 935,
+    "category_tab_rect": {
+      "x": 80,
+      "y": 120,
+      "width": 305,
+      "height": 92
+    }
+  },
+  "revision": "Red-sleeved hand thumb correction"
+}

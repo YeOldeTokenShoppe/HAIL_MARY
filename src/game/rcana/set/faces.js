@@ -147,7 +147,20 @@ export const FACES = [
     // simulator's line; the trigger and the payout on their own lines.
     ability: "At turn start, with 100+ banked Prosperity,\nbank 25 more.",
     // A Trader speaks, so the line prints as a quotation.
-    flavor: "I don't chase the market. It compounds while I ride.",
+    flavor: "I don't chase the market. It compounds while I dance.",
+    printed: {},
+  },
+  {
+    id: "el-gato",
+    design: "gato",
+    // PROVISIONAL number and rarity.
+    number: 21,
+    rarity: "Uncommon",
+    // halo/hydro come from the design (cred 16 / liq 2). The trigger and
+    // the outcome on their own lines.
+    ability: "When seated, knock one Calamity\noff your table, free.",
+    // A Trader speaks, so the line prints as a quotation.
+    flavor: "If it's on the table, it's fair game.",
     printed: {},
   },
 ];

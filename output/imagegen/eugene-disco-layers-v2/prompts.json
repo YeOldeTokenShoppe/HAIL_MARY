@@ -1,0 +1,30 @@
+{
+  "tool": "built-in image_gen",
+  "canvas": {
+    "width": 1024,
+    "height": 1536
+  },
+  "backToFront": [
+    "background.png",
+    "middle.png",
+    "front.png"
+  ],
+  "files": [
+    {
+      "file": "background.png",
+      "unchangedFrom": "../eugene-disco-layers-v1/background.png",
+      "role": "Crowd, room and complete dance floor"
+    },
+    {
+      "file": "middle.png",
+      "role": "Eugene alone, looking toward viewer, floor and reflections removed",
+      "prompt": "Use case: precise-object-edit / identity-preserve / background-extraction. Edit the supplied MIDDLE LAYER of Eugene the disco-dancing unicorn. Make ONLY TWO requested changes: (1) Eugene looks FORWARD TOWARD THE VIEWER, with his head and face turned into a clear frontal view; (2) REMOVE ALL OF THE DANCE FLOOR so the output is a standalone transparent character cutout that can be independently sized and positioned.\n\nKEEP THE BODY AND POSE: the approved playful bent-knee disco shuffle, the same arms bent with relaxed hands near waist/lower-rib height, the same torso lean, same legs, feet and footwear, same body position, size and silhouette below the collar. Keep his thin lanky nonmuscular build, narrow shoulders, pale aqua turtleneck with sage-mint high collar and cuffs, small purple-and-white unicorn-head chest emblem, butter-yellow trousers and simple pink shoes. Preserve the original vivid angular low-poly forms and warm/cool disco light patches ON the character. Do not add muscles, change the costume, or redesign the dancing limbs.\n\nHEAD CHANGE: rotate just the head and upper neck naturally so Eugene is looking DIRECTLY AT THE CAMERA / VIEWER rather than toward the right side of the frame. Clearly front-facing equine face with lavender muzzle centered below his forehead, TWO SMALL ROUND BLACK BEADY EYES visible, one on each side of his long pink face. Keep the deliberately simple original game-character design: tiny black bead eyes with NO whites, NO colored irises, NO eyelashes, NO human eyebrows or sculpted human eyelids. Maintain the long narrow pink neck and simply faceted pink equine head, two upright pink ears, ONE pastel pearlescent horn centered on the forehead, a short rigid blocky BANDED pastel rainbow mane partly visible behind the head/neck, and the same endearingly goofy gentle little smile. No big human grin or new giant teeth. Make the frontal head anatomically coherent with the original side-facing character; no second muzzle, extra eyes or extra horn. The head must remain similar in size and location above the existing collar, with ample canvas clearance above the horn. He should still be unmistakably the same sweet, slightly blank Eugene.\n\nFLOOR REMOVAL: remove EVERY dance-floor tile, line, colored square, ground plane, shoe reflection, foot shadow and floor-edge haze from the lower image. Preserve both pink shoes fully with clean complete soles. Everything outside Eugene's actual body, clothes, horn, mane, hands and shoes must be real alpha-zero transparency. The spaces between his legs, under his arms, between fingers and around his outline are also transparent. NO floor, NO cast shadow, NO floating platform, NO environmental glow halo, NO spotlight beam, NO disco ball, NO crowd, NO background. Retain the highlights on his actual surfaces only.\n\nCanvas: keep the SAME 1024 x 1536 portrait canvas and original body registration, do not crop away the empty canvas or center/resize the body. Character should be fully visible including horn, both hands and both feet. Clean antialiased cutout edges, full opaque character interiors except naturally antialiased boundaries. True transparent RGBA PNG, not black/white/color matte or a painted checkerboard. No text, border, watermark or additional objects. ONE standalone forward-looking Eugene layer."
+    },
+    {
+      "file": "front.png",
+      "unchangedFrom": "../eugene-disco-layers-v1/front.png",
+      "role": "Disco ball and translucent left spotlight"
+    }
+  ],
+  "note": "The standalone middle character can be resized and repositioned independently. All dance-floor tiles now come only from background.png."
+}

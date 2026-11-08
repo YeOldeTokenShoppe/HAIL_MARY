@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>El Gato · Parallax layers</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#181523;color:#f4e8d2;font:15px/1.5 system-ui,sans-serif}main{max-width:1120px;margin:auto;padding:26px}h1{font:30px Georgia,serif;margin:0 0 6px}p{color:#c7bac4;margin:0 0 20px}.controls{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin:16px 0 22px}label{cursor:pointer}input{accent-color:#e9ab50}button,a{color:inherit}button{background:#352b3e;border:1px solid #6c526c;border-radius:6px;padding:7px 13px;cursor:pointer}.grid{display:grid;grid-template-columns:1fr 1fr;gap:28px}.caption{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#dcc09a;margin-bottom:9px}.stage,.original{width:100%;aspect-ratio:2/3;position:relative;overflow:hidden;background:repeating-conic-gradient(#ddd 0% 25%,#aaa 0% 50%) 50%/20px 20px;box-shadow:0 14px 36px #0005}.layer,.original img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none}.layer{transform-origin:50% 50%;will-change:transform}.downloads{display:flex;flex-wrap:wrap;gap:18px;margin-top:20px}.note{font-size:13px;margin-top:20px;max-width:800px}output{font-variant-numeric:tabular-nums}@media(max-width:700px){main{padding:16px}.grid{gap:14px}.controls{gap:10px}.caption{letter-spacing:0;font-size:11px}}
+</style>
+<main>
+<h1>El Gato — The Helpful Knock</h1>
+<p>Move over the layered image to preview depth. Toggle layers to inspect the cutouts.</p>
+<div class="controls">
+<label><input type="checkbox" id="background" checked> Background</label>
+<label><input type="checkbox" id="center" checked> Center</label>
+<label><input type="checkbox" id="foreground" checked> Foreground</label>
+<label>Motion <input type="range" id="motion" min="0" max="12" value="6"> <output id="amount">6</output> px</label>
+<button id="neutral">Reset view</button><button id="demo">Play motion</button>
+</div>
+<div class="grid">
+<section><div class="caption">Three layers combined</div><div class="stage" id="stage">
+<img class="layer" id="layer-background" src="01-background.png" alt="Courtyard background">
+<img class="layer" id="layer-center" src="02-center.png" alt="Cat body, table and coins">
+<img class="layer" id="layer-foreground" src="03-foreground.png" alt="Reaching paw, falling card and traders' hands">
+</div></section>
+<section><div class="caption">Original reference</div><div class="original"><img src="original-reference.png" alt="Original Helpful Knock artwork"></div></section>
+</div>
+<div class="downloads"><a download href="01-background.png">Background PNG</a><a download href="02-center.png">Center PNG</a><a download href="03-foreground.png">Foreground PNG</a><a href="prompts.json">Generation prompts</a></div>
+<p class="note">Each layer uses the same 1024 × 1536 canvas and top-left origin. The center and foreground have alpha transparency. Stack background → center → foreground, without trimming transparent margins. Motion is expressed in source-image pixels; the demo uses a shared 3% zoom to conceal canvas edges. At rest, the preview uses the original full canvas. Generative separation reconstructs hidden areas and can introduce small differences from the original.</p>
+</main>
+<script>
+const stage=document.getElementById('stage'),motion=document.getElementById('motion');
+const layers=['background','center','foreground'];let running=false,raf=0;
+function render(x=0,y=0){const amount=Number(motion.value),moving=(x!==0||y!==0)&&amount>0,scale=stage.clientWidth/1024;layers.forEach((name,i)=>{const depth=[0,.3,1][i];document.getElementById('layer-'+name).style.transform=`translate(${x*amount*depth*scale}px,${y*amount*depth*scale}px) scale(${moving?1.03:1})`})}
+layers.forEach(name=>document.getElementById(name).addEventListener('change',e=>document.getElementById('layer-'+name).style.visibility=e.target.checked?'visible':'hidden'));
+motion.addEventListener('input',()=>document.getElementById('amount').value=motion.value);
+stage.addEventListener('pointermove',e=>{if(running)return;const r=stage.getBoundingClientRect();render((e.clientX-r.left)/r.width*2-1,(e.clientY-r.top)/r.height*2-1)});
+stage.addEventListener('pointerleave',()=>{if(!running)render()});
+function stop(){running=false;cancelAnimationFrame(raf);document.getElementById('demo').textContent='Play motion';render()}
+document.getElementById('neutral').addEventListener('click',stop);
+document.getElementById('demo').addEventListener('click',()=>{if(running){stop();return}running=true;document.getElementById('demo').textContent='Pause motion';function animate(t){render(Math.sin(t/1700),Math.cos(t/2100)*.6);raf=requestAnimationFrame(animate)}raf=requestAnimationFrame(animate)});
+</script>
+</html>

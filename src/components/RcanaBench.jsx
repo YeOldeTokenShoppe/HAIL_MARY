@@ -10,6 +10,7 @@ import {
   RCANA_DEPTHS,
   FX_BLENDS,
   FX_CLIPS,
+  RCANA_ART,
   toRcanaCard,
 } from "../game/rcana/cardFace.js";
 
@@ -69,8 +70,13 @@ export default function RcanaBench() {
   const [collectorLine, setCollectorLine] = useState(true);
   const [medallionHolo, setMedallionHolo] = useState(true);
   const [credBadge, setCredBadge] = useState("angel-plain");
-  // Terminal Traders metal border over the Lotería frame; null = printed frame only.
-  const [metalFrame, setMetalFrame] = useState(null);
+  // Terminal Traders metal border over the Lotería frame; null = printed
+  // frame only. Follows the card file's `metalFrame` when the card changes,
+  // and the select overrides from there.
+  const [metalFrame, setMetalFrame] = useState(RCANA_ART[RCANA_DEMO[0].id]?.metalFrame ?? null);
+  useEffect(() => {
+    setMetalFrame(RCANA_ART[cardId]?.metalFrame ?? null);
+  }, [cardId]);
   // The metal frame's shine (TradingCard's card-level holo, on the plate).
   const [frameShine, setFrameShine] = useState("on");
   const [frameShineBlend, setFrameShineBlend] = useState("mirror");

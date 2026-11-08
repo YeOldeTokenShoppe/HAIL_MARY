@@ -1,0 +1,11 @@
+{
+  "tool": "built-in image_gen",
+  "file": "front.png",
+  "canvas": {
+    "width": 1024,
+    "height": 1536
+  },
+  "source": "/Users/michellepaulson/.codex/generated_images/01a1af04-fb7c-7d01-acfe-0fee732e1ff0/exec-ed055af0-f349-4dac-a0bc-09c2e22dc4dc.png",
+  "purpose": "Move cyan spotlight source to top edge; preserve gold beam and disco ball.",
+  "prompt": "Use case: lighting-weather.\nAsset type: transparent foreground overlay for a vertical parallax playing card, 1024 x 1536.\nInput image 1 is the EDIT TARGET. Make a single targeted change: relocate the CYAN spotlight's source from the right side of the image to the TOP edge. Keep the warm yellow/gold spotlight and mirrored disco ball unchanged in size, location, color, and appearance.\nThe cyan cone must now have a narrow bright origin exactly on the TOP BORDER at approximately x=680, y=0 (just LEFT of the disco ball), shining diagonally DOWN AND LEFT, broadening toward x=250,y=850 and softly fading by y=1100. Its narrow origin must visibly touch and be clipped by the TOP edge. The cyan cone should cross the existing golden cone. Remove the old cyan source on the right edge at y=390 completely; no light should originate from either side edge. Both spotlights shine downward from the top edge.\nPreserve the disco ball upper-right, its golden star glint, existing gold beam from upper-left, and the painterly colorful disco aesthetic. No new objects, no character, no crowd, no floor, no text.\nCRITICAL OUTPUT: actual transparent RGBA PNG overlay, not a black-background image. Keep the ball opaque, beams genuinely semitransparent and feathered, and all empty space alpha zero, especially lower third and areas outside the beams. Preserve clean alpha transparency from the input; no black matte, no opaque colored fog filling the rectangle, no checkerboard baked in. This will be composited using normal alpha-over."
+}

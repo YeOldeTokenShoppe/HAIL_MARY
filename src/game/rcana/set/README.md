@@ -53,6 +53,10 @@ injects `designs.js` and the faces into `pt2-table.src.html` and writes
    a `src` only to point at a shared file (El Diablito's flame sheet). FX take
    `blend`, `clip`, `clear: ["numberTab"]` if the sheet crosses the tab, and
    `reflection`. Register the file in `art/index.js` — one import, one key.
+   A `metalFrame: "rainbow"` (any `RCANA_METAL_FRAMES` id) lays that
+   Terminal Traders border over the frame by default — on the bench, in the
+   print route and so on the table; the bench's **Metal frame** select
+   starts on it and can still override.
 
 5. **Face** — add an entry to `faces.js`: `id`, `design` (the engine key,
    e.g. `"bull"` — never the name), `number` (unique), `rarity`, `ability`

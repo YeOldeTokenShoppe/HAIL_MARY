@@ -1,0 +1,36 @@
+{
+  "name": "El Gato - The Helpful Knock",
+  "width": 1024,
+  "height": 1536,
+  "origin": {
+    "x": 0,
+    "y": 0
+  },
+  "blend_mode": "source-over",
+  "trim": false,
+  "layers": [
+    {
+      "file": "01-background.png",
+      "order": 0,
+      "transparent": false,
+      "motion_multiplier": 0
+    },
+    {
+      "file": "02-center.png",
+      "order": 1,
+      "transparent": true,
+      "motion_multiplier": 0.3
+    },
+    {
+      "file": "03-foreground.png",
+      "order": 2,
+      "transparent": true,
+      "motion_multiplier": 1
+    }
+  ],
+  "suggested_motion_source_pixels": {
+    "x": 6,
+    "y": 4
+  },
+  "suggested_shared_scale_during_motion": 1.03
+}

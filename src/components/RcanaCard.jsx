@@ -150,11 +150,13 @@ export default function RcanaCard({
   // A Terminal Traders metal border laid over the Lotería frame: an id from
   // RCANA_METAL_FRAMES ("gold", "silver", "polished silver", "rainbow",
   // "polished grey", "holo", "holo gold") or null for the printed frame
-  // alone. A printed frame's two divider lines near the foot are clipped
+  // alone. Left undefined, the card's own `metalFrame` (from its art file)
+  // applies; an explicit null is "none" even for a card that pins one.
+  // A printed frame's two divider lines near the foot are clipped
   // out, since here they would cut across the rules panel, and its shine is
   // masked by the frame's plate. The holo pair are drawn live by
   // HoloFoilFrame over RCANA_HOLO_WINDOWS.
-  metalFrame = null,
+  metalFrame,
   // The frame's shine, a port of TradingCard's card-level holo confined to
   // the metal frame's plate (printed metals only; the live foils light
   // themselves). frameShine: "off" | "soft" | "on". frameShineBlend:
@@ -459,7 +461,8 @@ export default function RcanaCard({
   const u = CARD_W * scale;
 
   const rarity = RCANA_RARITIES[data.rarity] || RCANA_RARITIES.Common;
-  const metal = metalFrame ? RCANA_METAL_FRAMES.find((f) => f.id === metalFrame) || null : null;
+  const metalId = metalFrame === undefined ? data.metalFrame ?? null : metalFrame;
+  const metal = metalId ? RCANA_METAL_FRAMES.find((f) => f.id === metalId) || null : null;
   const metalPrinted = Boolean(metal && !HOLO_SRC.test(metal.src));
   // Glitter is a gold-frame treatment (as on TradingCard); elsewhere it
   // falls back to mirror so a caller can set it unconditionally.
