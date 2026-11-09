@@ -1,0 +1,11 @@
+La Fuente - front-facing statue revision
+Canvas: 1254 x 1254 pixels, square.
+
+BOTTOM: la-fuente-courtyard-background.png
+TOP: la-fuente-front-facing-transparent.png
+
+Stack at equal size with centers aligned. The fountain, simplified statue, frontal halo and water remain together. The pool contains no coins.
+
+la-fuente-front-facing-preview.png is the combined design reference used to create the revised cutout.
+
+Edited with the built-in image generation tool; prompts included.

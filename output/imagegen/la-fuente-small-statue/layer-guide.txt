@@ -1,0 +1,11 @@
+La Fuente - smaller statue and submerged coins
+Canvas: 1254 x 1254 pixels, square.
+
+BOTTOM: la-fuente-courtyard-background.png
+TOP: la-fuente-small-statue-transparent.png
+
+Stack at equal canvas size and align centers. The statue is reduced by about 25% from the previous front-facing version. It faces forward and has no halo. Small muted coins rest beneath the water. All exterior basin panels remain solid stone. Use subtle relative motion for parallax.
+
+la-fuente-small-statue-preview.png is the combined design reference used for the final cutout.
+
+Edited with the built-in image generation tool; final revision prompts included.

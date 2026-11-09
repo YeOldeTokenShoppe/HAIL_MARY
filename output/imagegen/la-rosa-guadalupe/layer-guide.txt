@@ -1,0 +1,13 @@
+La Rosa - Our Lady of Guadalupe version
+Canvas: 1254 x 1254 pixels, square.
+
+Layer order, bottom to top:
+1. la-rosa-guadalupe-background.png - opaque shrine with traditional devotional image.
+2. la-rosa-flowers-transparent.png - red rose, marigolds and foliage, alpha transparency.
+3. la-rosa-green-candle-transparent.png - optional corner candle, saucer and flame, alpha transparency.
+
+Place all layers at the same canvas size and align their centers. The foreground layers retain their original padding and positions. Hide layer 3 to try the scene without the candle. For parallax, move the flowers slightly more than the shrine and the candle slightly more than the flowers. Clip the composition to the card window; the flower stem continues to the lower canvas edge.
+
+la-rosa-guadalupe-scene-preview.png is the original combined design reference used to produce these separated layers.
+
+Created with the built-in image generation tool. Full prompts are included in generation-prompts.txt.

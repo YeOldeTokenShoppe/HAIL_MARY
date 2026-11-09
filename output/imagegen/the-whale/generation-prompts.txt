@@ -1,0 +1,52 @@
+Created with the built-in image generation tool.
+
+SCENE PREVIEW
+Use case: stylized-concept.
+Asset: SQUARE 1:1 artwork for "The Whale", a MARKET EVENT trading card. It represents a financial whale: a very large player whose arrival moves the whole market. Create a powerful memorable hero image suitable for a gold-bordered card and later separation into parallax layers. ARTWORK ONLY, no card border or lettering.
+
+Reference image 1 is the established Meme Coin artwork, for its polished faceted low-poly 3D rendering, readable central subject and cinematic light. Reference image 2 is La Rosa, for rich color, dimensional sculptural planes and warm gold highlights. Do not copy their subjects, scene objects, roses, shrine or space background.
+
+Scene: a monumental humpback whale breaching out of a deep teal ocean, displacing a vast surge of water. It should convey enormous mass, calm authority and irresistible force. One unmistakable real whale rendered in a premium stylized way, not a humanoid, mascot, shark or fish.
+Whale anatomy and pose: broad substantial head, tiny calm eye, deep blue and charcoal back, lighter blue-gray throat with clean visible pleats, characteristic long pectoral flippers and horizontal tail flukes. Waterline three-quarter camera view emphasizes scale. Head rises toward the UPPER LEFT, the huge body sweeps across the center and curves down toward the LOWER RIGHT, with the tail flukes readable near the water. One near-side flipper sweeps forward/down with a powerful clean silhouette. Keep the head, main body, flipper and tail within frame with crop-safe margins; no clipped anatomy. The whale occupies about 70% of the square and is the dominant focal point.
+
+Style and materials: cohesive low-poly sculptural 3D illustration, broad intentional geometric planes following the whale's anatomy, rich deep cobalt, navy and teal, pale throat facets, glossy wet surfaces and restrained golden rim light. Organic living animal, not metal, origami or crystal. Carefully chosen large facets that remain legible at small card size.
+
+Water and lighting: layered dark-turquoise ocean swells and an explosive crest of ivory-white foam below the whale, with cinematic warm gold light catching the spray and upper water edges. The whale's immense wake is the visual metaphor for moving markets. Let foam and water feel dimensional and slightly stylized to match the animal. Deep atmospheric teal dusk sky behind the upper body, subtle warm haze near a low horizon and a soft shaft of amber light from upper left. Keep background contrast lower than the whale. Do not add a literal sun disk or distracting lightning.
+
+Layer-ready composition: clean subject separation, dark quiet sky behind the head, well-defined whale silhouette, foreground wake concentrated near the bottom third. No extra animals, boats, people, clothes, jewelry, coins, trading charts, slogans, text, numbers, frame, logos or watermark. Finish as a polished opaque square scene preview.
+
+WHALE FOREGROUND
+Use case: background-extraction.
+Edit target: the supplied square image of a huge faceted blue humpback whale breaching through teal waves.
+Deliverable: ONLY the complete whale as a true-alpha transparent PNG parallax layer, on the EXACT same square canvas, with the EXACT original whale size and pixel placement.
+Keep the head, tiny eye, entire body, pleated pale throat, both pectoral flippers, dorsal fin, tail stock and both tail flukes. Preserve every silhouette contour and broad colored facet, the dramatic curved pose, blue and pale-gray colors, warm gold rim light, proportions and wet surface highlights. Do not move, enlarge, rotate, crop or redesign the whale.
+Remove all scenery and all unattached water: sky, clouds, sunbeams, horizon, ocean, waves, foam and airborne spray. Clear every background gap between the flippers, body and tail. Naturally complete tiny portions of the whale's existing silhouette if obscured only by spray. No added anatomy. No independent water or foam kept around the whale; isolated surface moisture highlights are fine.
+True RGBA alpha. Entire empty background fully transparent, not black/white/gray, no checkerboard drawing. Opaque whale with clean antialiased edges and no teal matte or golden atmospheric halo. No added objects, text or watermark.
+
+OCEAN AND SKY BACKGROUND
+Use case: precise-object-edit.
+Edit target: the supplied square breaching-whale scene.
+Deliverable: a clean fully opaque OCEAN-AND-SKY BACKGROUND PLATE for parallax, at EXACTLY the original square canvas size and framing.
+Remove the entire whale, including every fin and tail, its silhouette and any associated shadow. Remove the tall nearby burst of airborne foam and the dramatic nearest foreground breaking waves; these will be separate foreground layers. Reconstruct the complete sky and underlying sea behind them seamlessly.
+Preserve the original dark atmospheric teal sky, amber sunbeams entering from upper left, subtle clouds and warm low horizon at about three-quarters of the way down. Preserve the scene's teal and antique-gold cinematic lighting and its sculptural stylized 3D rendering. Fill the lower quarter naturally with more distant rolling turquoise ocean swells and restrained golden water highlights. No giant splash, hole or crater marking where the whale was. The sea should continue plausibly all the way behind the removed foreground waves.
+Keep exact original horizon height, camera angle, light direction, scale and canvas geometry. No whale or other animals, boats, people, extra objects, text, frame or watermark. Full opaque background everywhere.
+
+FOREGROUND WAVES AND SPRAY
+Use case: background-extraction.
+Edit target: the supplied square breaching-whale illustration.
+Deliverable: a separate transparent FOREGROUND WAVES AND SPRAY layer to place in front of an independently extracted whale.
+Retain the original close turquoise breaking wave crests across the bottom quarter, their bright ivory-white foam and warm golden highlights, together with the rising plume of white splash and scattered droplets in the lower half around the whale. Keep the foamy arch of water rising near the center-left below the near flipper and the lower spray around the tail. Preserve these water forms' exact original shape, lighting, size and coordinates. The bottom-edge water can remain a continuous opaque strip; empty space above the wave contours and between airborne droplets must be truly transparent.
+Remove the ENTIRE whale, all fins and tail, the sky, clouds, horizon and distant open ocean. Where the whale overlaps the spray, reconstruct only the few interrupted water streaks needed for a natural spray layer; do not fill the whale's silhouette with a new wall of water. The top half should be essentially empty transparency apart from original tiny spray droplets near the lower body region. No whale-shaped gap outlined in foam and no ghost animal. Keep the waves sufficiently low that the whale's head and main body remain unobstructed.
+Maintain the original square canvas size and framing, without centering, scaling or moving the retained water. Rich faceted teal water, luminous white foam, warm gold light, matching the reference. True RGBA with fully transparent empty areas and natural partial alpha at thin spray edges. No black matte, colored background haze, checkerboard drawing, text or watermark.
+
+
+FOREGROUND LIGHT RAYS
+Use case: background-extraction / compositing.
+Reference: the supplied square artwork for The Whale. Use ONLY its warm sunlight entering from the extreme UPPER LEFT as a guide for a new foreground light overlay.
+Deliverable: a square 1254 x 1254 TRANSPARENT PNG containing ONLY soft golden light rays, suitable to place ABOVE the whale and waves in the layer stack.
+
+Create a subtle atmospheric fan of warm amber and pale-gold sunbeams entering from just outside the TOP-LEFT CORNER, aligned with the light direction already visible in the reference. The rays travel diagonally down and right across the upper-left and middle of the canvas. Several softly separated broad shafts, brightest at the extreme top-left edge, become wider and more diffuse as they travel toward the center and lower-right, fading completely before the far right and bottom. Keep the strongest illumination in the upper-left quarter and a much fainter continuation across where the whale's head, shoulder and flipper will be. This is gentle foreground volumetric sunlight, not lightning, laser beams, hard stripes or a sunburst emblem.
+
+CRITICAL ALPHA: The light itself must be naturally SEMI-TRANSPARENT throughout, approximately 10–30% opacity across most beams, with a modest brighter glow at the entry corner. Fade smoothly to zero alpha at the feathered sides and ends. The rest of the canvas must be truly transparent. No dark backing, no opaque amber fog, no black matte, no gray veil, no white solid shafts, no checkerboard drawing. The existing artwork must remain clearly visible through the rays when placed above it. Do not add a solid sun disk or star.
+
+Include ONLY the gold light beams and their restrained translucent glow. Remove/do not reproduce the whale, ocean, sky, clouds, water, foam, horizon, objects or text. Preserve the full square canvas and place the origin at the original upper-left corner so this overlay aligns with the existing 1254 x 1254 scene.

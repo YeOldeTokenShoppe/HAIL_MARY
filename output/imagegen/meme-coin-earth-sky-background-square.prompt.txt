@@ -1,0 +1,11 @@
+Edited with the built-in image generation tool.
+
+Use case: precise-object-edit / reframing.
+Edit target: the supplied corrected Earth-and-night-sky background layer.
+Requested deliverable: a SQUARE 1:1 version, 1536 x 1536 pixels, for a trading-card artwork window.
+
+Reframe the existing portrait scene into a square by widening the field of view horizontally and naturally completing the scenery at the sides. Preserve the original vertical scene content as much as possible. Do not stretch or squash the existing image. Preserve the same cinematic orbit view, detailed blue oceans, white cloud bands, subtle land and ocean reflections, electric-blue atmospheric rim, and deep navy starfield with fine blue-white stars.
+
+The most important invariant is Earth's geometry: it is ONE spherical planet with ONE perfectly smooth continuous circular limb, with a single center and constant radius. Extend the existing corrected circular arc naturally across the wider square frame. No kink, saddle, flat join, S-curve, merged spheres or secondary bulge. The thin blue atmosphere follows that same arc continuously.
+
+Composition: Earth occupies the lower-left and bottom of the square, and the open night sky occupies the top and upper-right. Keep the broad diagonal horizon and enough clear starfield behind the separately composited character-and-rocket layer. Maintain the existing color palette, lighting and level of detail. This is a full opaque background image only. No character, rocket, exhaust, extra planets, moons, text, card frame, guide marks, or watermark.

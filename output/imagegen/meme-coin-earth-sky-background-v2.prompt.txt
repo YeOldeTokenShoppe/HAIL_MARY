@@ -1,0 +1,12 @@
+Edited with the built-in image generation tool.
+
+Use case: precise-object-edit.
+Edit target: the supplied Earth-and-starfield background layer, 1024 x 1536 portrait.
+
+Fix the planet geometry. The current horizon has a visible kink and change in curvature near the middle, making it resemble two merged spheres. Reconstruct Earth as ONE geometrically correct spherical planet with ONE smooth circular silhouette, using a single constant-radius circle. This is the main requirement, and takes priority over preserving the erroneous horizon.
+
+Geometric construction for the new horizon: imagine a single large circle centered approximately at pixel (-700, 2170), outside the canvas below and to the left, with radius approximately 1960 pixels. Its visible upper-right limb enters the LEFT edge near (0,340), passes smoothly near (256,460), (512,630), and (768,875), and exits the RIGHT edge near (1024,1240). These are guide points on ONE continuous circular arc, not separate segments. The slope increases smoothly toward the right; there must be absolutely no saddle, waist, flat join, S-curve, duplicate arc, local bulge, or change of curvature direction. Only one planet. The Earth's surface is below/left of this arc; starfield is above/right. A thin continuous electric-blue atmosphere follows exactly the same circular limb at an even thickness.
+
+Retain the original cinematic blue palette, deep navy starfield, fine blue-white stars, deep-blue oceans, white cloud bands, subtle land and warm sunlit ocean reflections. Reproject and reconstruct clouds, oceans and land onto this ONE spherical surface so the entire planet agrees with its silhouette. Preserve the existing starfield where possible. The planet should convincingly read as a large round globe partially outside the frame, viewed from orbit.
+
+Keep the same 1024 x 1536 portrait canvas, overall diagonal composition, approximate planet coverage, detail level and lighting, suitable behind the existing separate rocket-and-character foreground. Full opaque background layer only: Earth, its thin atmosphere, and outer-space night sky. No character, rocket, exhaust, added planets, moon, text, border, labels, guide lines or watermark.

@@ -1,0 +1,23 @@
+Edited with the built-in image generation tool.
+
+SCENE REVISION
+Use case: precise-object-edit.
+Edit target: the supplied square La Fuente fountain scene.
+Change ONLY the statue's orientation: turn the simplified ivory Marian statue FULLY FORWARD, directly facing the viewer.
+
+The statue's head, face, hood opening, shoulders, torso, hips and feet all face straight toward the camera. Center the nose and chin on the vertical centerline; show the two sides of the face evenly, with no sideways head tilt and no three-quarter or profile turn. Keep a gentle, calm simplified expression and a subtly lowered gaze, but the face itself remains front-facing. Both shoulders are equally visible; both welcoming arms extend naturally to the left and right, with open palms facing the viewer. The mantle drapes naturally and approximately symmetrically. Rotate the thin golden halo into a circular frontal ring centered behind the head. Keep the statue's existing height, center position, and standing contact with the upper platform.
+
+Preserve the previously approved abstract sculptural style: fewer broad faceted ivory stone planes, a minimally described face, simple hands, and a handful of clean angular robe folds. Do not introduce detailed realistic facial features or elaborate drapery.
+Keep EVERYTHING ELSE unchanged: current fountain basin perspective, stone bowls and column, water streams and splashes, turquoise coin-free pool, gold-edged basin panels, courtyard architecture, plants, sky, lighting, camera position, square framing, and subject scale. No coins or floating discs. No new objects, words, border, or watermark.
+Output the revised opaque scene at the same 1254 x 1254 dimensions.
+
+TRANSPARENT FOUNTAIN
+Use case: background-extraction.
+Edit target: the supplied square La Fuente scene with the simplified statue facing FULLY FORWARD.
+Deliverable: the complete fountain isolated on genuine alpha transparency, preserving the exact 1254 x 1254 canvas, original size and placement.
+
+Keep the front-facing statue EXACTLY as shown: centered face and nose, evenly visible shoulders, straight torso, both open welcoming hands, simplified ivory faceted robe, and circular frontal gold halo. Do not turn or tilt her head or body. Preserve the approved abstract simplicity.
+Keep the entire top platform, middle bowl, column, octagonal basin and base, gold-edged panels, turquoise coin-free pool, cascading water, white splashes, reflections and restrained halo glow. No coins or floating objects. Preserve all silhouettes, perspective, facets and lighting.
+Remove the courtyard, walls, doors, arches, paving, sky, plants and planters. Clear all open gaps around the statue and between the fountain parts. Remove backdrop colors visible through the cascades while retaining translucent pale-aqua water highlights with partial alpha. The enclosed basin water stays intact. Stone and statue remain opaque.
+Retain only a small soft translucent contact shadow immediately beneath the fountain base, with no paving texture or solid ground patch. Keep empty areas fully transparent, with naturally antialiased edges and gentle partial alpha in the halo glow and thin water. No black/white matte, fake checkerboard, colored background haze or architecture remnants.
+Do not recenter, resize, crop, shift, rotate, or reframe anything. No added details, objects, text, borders or watermark.

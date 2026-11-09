@@ -1,0 +1,34 @@
+Created with the built-in image generation tool.
+
+SCENE PREVIEW PROMPT
+Use case: stylized-concept.
+Asset: square 1:1 illustration for the art window of "La Rosa", a Graces trading card, to be separated into foreground and background layers for a parallax scene. Artwork only, no card frame or typography.
+Reference image: the attached game-card overview is a STYLE AND THEME reference. Use the finished El Rosario and La Calavera cards as guidance for warm antique gold, rich turquoise/teal, sculptural faceted forms, luminous devotional folk-art imagery, and crisp readable subject hierarchy. Do not reproduce the overview, UI, any card text, or a complete card.
+
+Create a beautiful, dignified scene of a single magnificent RED ROSE offered at a shrine.
+Foreground: one hero rose with a large fully opened crimson-red bloom, lush overlapping petals with distinct sculpted planes, darker ruby crevices and warm scarlet highlights. Seen in a pleasing three-quarter view so its spiral center and generous cupped petals are clear. One gently curved deep-green stem with a few restrained thorns and two or three elegant rich emerald leaves. The bloom is large, approximately half the canvas width, centered slightly above mid-height; the full stem descends gently toward the lower right. Keep the complete flower, leaves and stem in frame with comfortable margins. The rose is the unmistakable focal point and reads beautifully at trading-card size. No bouquet, no vase, no hands.
+Style: premium sculptural low-poly 3D illustration with carefully chosen broad facets, warm cinematic lighting and rich material color. Match the dimensional carved forms of the reference skull and the saturated red roses around it. The bloom should feel soft and organic despite its simplified planar rendering, not metallic, crystalline or a flat vector icon.
+
+Background: a softly receding small shrine niche in deep teal and turquoise, with a graceful stone arch and subtle antique-gold architectural detailing. A restrained radiant golden circular sunburst is centered behind the rose bloom, integrated into the shrine wall, recalling the devotional rays in the finished reference cards. At the far lower left and far lower right, small warm candle flames and simple golden candleholders give quiet depth and warm fill. Keep the center uncluttered and background detail subdued enough for the foreground rose to stand out. No human figure or statue.
+Lighting: warm gold candlelight from below and soft upper-left light across the petals, against a cooler teal background. A reverent, generous, luminous mood, suitable for the theme of offering a rose and lighting a candle.
+Layer-readiness: distinct clean foreground rose silhouette, clear separation from all background objects, no flower-shaped shadow on the background, no foreground particles crossing the petals. All visible scene content fully within a square composition. Opaque finished composite preview. No words, letters, numbers, logos, border or watermark.
+
+ROSE FOREGROUND PROMPT
+Use case: background-extraction.
+Edit target: the supplied square illustration of a sculptural red rose before a teal-and-gold candlelit shrine.
+Deliverable: ONLY the existing rose as one foreground PNG layer with TRUE transparent alpha.
+Extract the exact single red rose bloom together with its green calyx, curved thorned green stem and both large green leaves. Preserve every petal, leaf and stem shape; the faceted sculptural rendering; all red, ruby, green and gold surface highlights; the exact scale, orientation and pixel placement. Preserve the original square canvas size and all transparent padding. Keep the stem extending to the bottom edge exactly as in the source. Do not recenter, resize, reframe or redesign the rose.
+
+Remove ALL background: the teal wall, circular gold sunburst and every ray, columns, arch, ornaments, shelf, candles, flames, candleholders and all ambient backdrop haze. In every empty gap between petals, stem and leaves there must be actual transparency. Preserve gold edge lighting attached to the flower surfaces, but do NOT retain any detached gold ray or shrine fragment.
+
+Clean precise extraction, fully opaque petals and leaves, naturally antialiased silhouette. The complete empty background must be zero alpha, not a black/white/gray fill or drawn checkerboard. No shadows, glow clouds, text, extra objects or watermark. This extracted rose will be overlaid in exactly the same position on a matching clean background.
+
+SHRINE BACKGROUND PROMPT
+Use case: precise-object-edit.
+Edit target: the supplied square illustration of a sculptural red rose before a teal-and-gold candlelit shrine.
+Deliverable: clean opaque shrine BACKGROUND layer for a parallax scene, at exactly the same square canvas size and framing as the reference.
+
+Remove the entire foreground rose: all red petals, green calyx, every leaf, stem, thorn and flower-specific shadow. Reconstruct the scene beneath it seamlessly, with no holes, rose silhouette, residual plant bits or blurred patches.
+Preserve the existing teal textured shrine wall, golden stone arch, columns, upper corner ornaments, two small lit candles in their gold holders at the lower sides, stone shelf, warm candlelight and cool teal shadows.
+Complete the circular golden sunburst on the shrine wall where the rose previously covered it: one elegant circular gold ring with clean straight gold rays radiating outward from one common center, matching the original ring's position, scale and lighting. The ring's interior is textured teal wall, not a new object. It remains simple flat architectural decoration on the wall. Reconstruct the entire formerly hidden center of the niche as clean teal texture.
+Preserve original background landmark locations exactly, without zooming, shifting, cropping or changing perspective. Match the original premium faceted sculptural illustration style and vivid antique-gold/teal palette. The independent rose layer must overlay at its original coordinates. Full opaque scene across the whole square canvas. No rose, other flowers, people, statues, new props, words, numbers, borders or watermark.

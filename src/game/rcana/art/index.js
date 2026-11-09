@@ -14,6 +14,10 @@ import rosario from "./rosario.js";
 import laCalavera from "./la-calavera.js";
 import elUnicornio from "./el-unicornio.js";
 import elGato from "./el-gato.js";
+import memeCoin from "./meme-coin.js";
+import laRosa from "./la-rosa.js";
+import theWhale from "./the-whale.js";
+import laFuente from "./la-fuente.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -28,4 +32,8 @@ export const RCANA_ART = {
   "la-calavera": laCalavera,
   "el-unicornio": elUnicornio,
   "el-gato": elGato,
+  "meme-coin": memeCoin,
+  "la-rosa": laRosa,
+  "the-whale": theWhale,
+  "la-fuente": laFuente,
 };

@@ -1,0 +1,11 @@
+Edited with the built-in image generation tool.
+
+Use case: precise-object-edit.
+Edit target: the supplied portrait trading-card illustration.
+Deliverable: a clean, full-canvas, opaque Earth-and-night-sky BACKGROUND LAYER for a parallax composition, at the exact source image size of 1024 x 1536 pixels.
+
+Remove the entire foreground: the man, all clothing and accessories, the complete rocket, its handlebar and footrest, every fin and nozzle, all exhaust flames, and all foreground shadows or orange engine glow. Seamlessly reconstruct the Earth, atmosphere and starfield behind every removed object. No holes, ghost silhouettes, blurred patches, residual hardware, flames or foreground shapes.
+
+Preserve the existing background composition as closely as possible: same camera, same Earth scale, same diagonal curved horizon, same blue atmospheric rim, same cloud patterns and geography in already-visible regions, same deep navy-black starfield and tiny blue-white stars. The atmospheric horizon enters the left edge roughly a quarter of the way down the canvas and sweeps diagonally downward to the right edge near the lower quarter. Earth fills the lower-left and bottom, while the deep night sky fills the top and upper-right. Complete that continuous gently curved horizon naturally where the character and rocket previously obscured it. Retain the cinematic blue-white light, deep blue oceans, white cloud bands and subtle sunlit reflections from the original.
+
+Critical alignment: Preserve the original framing and all existing background landmark positions so the previously extracted character-and-rocket foreground can be laid over this image in exactly its original location. Do not zoom, rotate, reframe, shift the horizon, or make a different Earth composition. Render plausible, detailed scenery underneath the removed foreground to allow parallax movement. This must be a fully opaque edge-to-edge background plate, NOT transparent. Only Earth, its atmosphere and the night starfield. No new planets, moon, spacecraft, people, text, card border or watermark.

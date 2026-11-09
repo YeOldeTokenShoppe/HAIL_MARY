@@ -1,0 +1,40 @@
+Created with the built-in image generation tool.
+
+SCENE PREVIEW
+Use case: compositing.
+Create a revised SQUARE "La Rosa" trading-card art scene, based on the supplied image. This is artwork only for a parallax scene, with no card frame or typography.
+
+Reference roles: image 1 supplies the current shrine scene and rich teal/gold visual language; image 2 supplies the exact style and recognizable sculpted red rose to retain.
+
+BACKGROUND CHANGE: Replace the old large circular geometric sunburst and BOTH gold candles/candleholders with a traditional devotional PAINTING of Our Lady of Guadalupe on the rear wall of the shrine. A recognizable, reverent traditional Mexican Catholic image: a gentle downcast warm brown face, hands joined in prayer, rose-pink patterned gown with dark waist ribbon, a blue-green mantle sprinkled with small gold stars, crescent moon and a small supporting angel at her feet. Render the holy image with the soft painted treatment of a traditional devotional print, visibly a painting within the shrine, rather than a modern character or faceted statue. Use a restrained warm luminous aureole around her figure; do NOT retain the previous oversized circular radial sun-wheel motif. Retain a simplified teal-and-antique-gold shrine arch as framing scenery, and give the devotional painting ample uncluttered space. Remove the two old candles completely.
+
+COMPOSITION: Make Our Lady clearly visible in the upper-center background, especially her entire face, starry mantle, shoulders and praying hands. Her image occupies roughly the central upper two-thirds of the square. The flower arrangement sits closer to the viewer across the lower half and may overlap only the bottom of her painted gown. Do not let any flower cover her face or praying hands.
+
+FOREGROUND FLOWERS: Keep one magnificent crimson-red rose with the same sculptural faceted petal style as image 2. Reposition and reduce its size to fit the new composition: rose bloom near horizontal center at about 64% down, roughly 40% of the canvas width; clear spiral center, ruby recesses and warm scarlet edges. Its green stem and emerald leaves descend toward the lower edge. Flank this central rose with small abundant clusters of golden-orange marigolds on BOTH sides, two or three rounded ruffled marigold heads per side, gently staggered in height. Distinctive dense frilly marigold petals, not daisies or additional roses. Marigolds remain subordinate to the red rose. Render all flowers in the premium faceted 3D illustration style already established by the rose. Keep the bouquets and leaves inside the square, with the stem allowed to reach the bottom.
+
+OPTIONAL FRONT LAYER: Include ONE simple small emerald-green pillar candle in the LOWER RIGHT CORNER, forward of the flowers. Plain unlabeled green wax, a little melted rim and a single warm golden flame, on a very small unobtrusive dark saucer. No elaborate holder, printed saint, label or ornament. Leave enough margin to see the whole candle and flame. It must be visually separate from the rose and not block the rose bloom. This candle will later be extracted as its own removable layer.
+
+LIGHTING AND MOOD: Warm devotional candlelight, softly luminous painted figure against teal, rich saturated crimson and orange flowers, warm antique-gold architectural accents. Respectful, intimate, generous mood. Strong depth separation: painted shrine behind, dimensional flowers in front, green candle closest. Square composition, highly readable at card size. No words, letters, numbers, new figures besides the traditional depicted Virgin and her small angel, border, logos or watermark.
+
+FLOWERS FOREGROUND
+Use case: background-extraction.
+Edit target: the supplied square La Rosa scene with Our Lady of Guadalupe, a red rose, four orange marigolds, and a green candle.
+Deliverable: ONLY the entire foreground FLOWER ARRANGEMENT as a transparent PNG layer.
+Keep the exact central faceted red rose, all four golden-orange marigold blossoms flanking it, and all of their green foliage, leaves, stems, calyxes and thorns. Preserve their exact shapes, colors, facets, lighting, scale and locations. Keep the original square canvas dimensions and padding, with the plants in their original lower-half positions and the rose stem continuing to the bottom edge. Do not center, crop, enlarge or rearrange the flowers.
+Remove every background element: Our Lady and her angel, all aureole light, teal wall, arch, columns, ornaments, ledge, and the COMPLETE green candle, saucer, flame and its floating glow. Remove gold ledge pieces from gaps in the foliage. All spaces around and between flowers and leaves must be genuinely transparent.
+Accurate clean alpha extraction: opaque plants with antialiased edges. Preserve only the gold light ON petals and leaf surfaces, not background haze or rays. No black or colored matte, checkerboard drawing, detached shrine pieces, cast shadows, labels or watermark. This layer must align when overlaid at original scale on the clean background.
+
+GUADALUPE BACKGROUND
+Use case: precise-object-edit.
+Edit target: the supplied square La Rosa scene with Our Lady of Guadalupe, a red rose, marigolds, and a green candle.
+Deliverable: opaque BACKGROUND PLATE, at exactly the same square canvas dimensions, position and framing.
+Keep the traditional painted devotional image of Our Lady of Guadalupe EXACTLY unchanged: the same face, joined hands, pink gown, starry teal mantle, crescent, angel, aureole, and all their current locations. Keep the teal shrine wall, golden arch, columns, corner decorations and lower stone ledge unchanged.
+Remove ALL foreground plants: the red rose and every petal, marigold blossom, green leaf, stem, thorn and associated shadow. Also remove the green candle completely, including wax, wick, flame, saucer and localized candle haze. Seamlessly reconstruct the empty teal wall, any tiny obscured part of the angel's lower edge, and the continuous stone ledge where these objects were. No plant-shaped holes or shadows, no blurred patches, no remnants of the flame.
+Preserve exact background alignment and the original traditional painting contrasted with faceted golden shrine architecture. Retain warm ambient lighting. No extra flowers, candles, new figures, added symbols, text, border or watermark. Full opaque image, not transparency.
+
+GREEN CANDLE
+Use case: background-extraction.
+Edit target: the supplied square La Rosa scene.
+Deliverable: ONLY the simple GREEN CANDLE in the lower-right corner as a separate transparent PNG foreground layer.
+Precisely extract the existing green wax pillar candle, melted rim and wax drips, black wick, one golden-yellow flame with a subtle naturally fading local glow, and its small dark gold-edged saucer. Preserve the existing candle design, exact size, exact position at lower right, original square canvas dimensions and all surrounding transparent padding. Do not enlarge, center, crop or reposition this candle.
+Remove everything else: all flowers and foliage, the stone ledge, shrine walls and columns, Our Lady of Guadalupe and all scenery. Empty space throughout the canvas must have real zero alpha. The candle and saucer are opaque; flame edges and a small restrained glow can have natural partial alpha. No rectangular glow patch, colored backdrop, black matte, fake checkerboard, floating cast shadow, labels or watermark. This layer must overlay its original location on the matching shrine background.

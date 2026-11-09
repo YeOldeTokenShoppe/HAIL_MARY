@@ -163,4 +163,54 @@ export const FACES = [
     flavor: "If it's on the table, it's fair game.",
     printed: {},
   },
+  {
+    id: "meme-coin",
+    design: "meme", // prints as "Meme Coin" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 22,
+    rarity: "Common",
+    // An Asset's line says what it sells for. The boxes print value (125)
+    // and cost (2); the text carries the cash option and the gamble.
+    ability: "Sell for 4 coins, or roll:\n5+ banks 125 Prosperity, else zero.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "To the moon, or to nothing. Never in between.",
+    printed: {},
+  },
+  {
+    id: "la-rosa",
+    design: "rose", // prints as "La Rosa" — the design's printName
+    // PROVISIONAL number and rarity.
+    number: 23,
+    rarity: "Uncommon",
+    // The offer and its two outcomes; the design's line is a simulator's.
+    ability: "Offer it to a rival. If they accept,\nthey keep 50 Prosperity and you light a candle.",
+    // A Grace narrates; the line follows the rule.
+    flavor: "Given freely, it is worth more than it costs.",
+    printed: {},
+  },
+  {
+    id: "the-whale",
+    design: "ballena", // prints as "The Whale" — a market force keeps its market name
+    // PROVISIONAL number and rarity.
+    number: 24,
+    rarity: "Rare",
+    // A Market Event fires on draw and hits the whole table; the printed
+    // line is the effect alone, shorter than the simulator's.
+    ability: "The richest portfolio's best Asset\nmoves to the poorest player.",
+    // An Event narrates; the line follows the rule.
+    flavor: "When it surfaces, the whole sea moves.",
+    printed: {},
+  },
+  {
+    id: "la-fuente",
+    design: "fountain", // prints as "La Fuente" — the design's printName
+    // PROVISIONAL number and rarity.
+    number: 25,
+    rarity: "Uncommon",
+    // The toss and what it buys; the design's line is a simulator's.
+    ability: "Toss in 2 Liquidity: your Hail Mary\nodds rise one step, past the shrine's three.",
+    // A Grace narrates; the line follows the rule.
+    flavor: "Every coin sinks. Every wish floats.",
+    printed: {},
+  },
 ];

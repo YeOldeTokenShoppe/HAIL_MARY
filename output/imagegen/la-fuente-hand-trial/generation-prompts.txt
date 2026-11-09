@@ -1,0 +1,27 @@
+Created with the built-in image generation tool.
+
+COMPOSITION TRIAL
+Use case: compositing.
+Edit target: the supplied final La Fuente scene: a faceted stone fountain with a small front-facing Marian statue, no halo, and small submerged coins.
+
+Create an OPTIONAL foreground composition trial by adding ONE naturally cropped sleeved forearm and hand tossing TWO coins toward the basin. Preserve every existing part of the fountain and courtyard.
+
+The viewer stands at the fountain. A human forearm in a simple deep-teal sleeve with a narrow ivory cuff enters CONTINUOUSLY from beyond the lower-right image edge. The sleeve must visibly connect the wrist to the edge of the frame, implying a person just outside the shot. There is no floating, detached or severed-looking hand. The visible hand has a warm natural medium-tan skin tone and anatomically coherent fingers. It is seen in a gentle underhand tossing gesture, palm partly upward, relaxed fingers extended toward the water just after release.
+
+Composition: keep this foreground element modest. The sleeve and wrist occupy the lower-right corner; the hand reaches toward the right-hand portion of the pool, with its fingertips around 78% across and 70% down the image. It may overlap the near right basin rim, but must not obscure the central pedestal, flowing center streams or statue. The hand occupies roughly 15–18% of the image width, not a giant close-up dominating the card. The forearm continues through the right/bottom edge, never ending inside the image.
+
+Show exactly TWO small warm gold coins in midair, separated from the fingertips along a short upward-and-left toss arc toward the water. One is nearer the hand and the second slightly farther toward the center of the basin. Keep both coins BELOW the middle fountain bowl and to the right of the central column, so the statue and main silhouette remain clear. The coins are seen at different natural tilted angles, slightly elliptical, with thin edges and warm glints. Their airborne placement should be unmistakable, distinct from the subdued coins already underwater. No printed numbers, currency logos, exaggerated trails or action arrows.
+
+Match the existing scene's polished LOW-POLY SCULPTURAL style: broad intentional skin and fabric planes, warm late-afternoon light from upper left, simple materials and restrained detail. Preserve the smaller statue, no halo, fountain geometry and scale, underwater coins, water, background, camera and exact 1254 x 1254 square framing. Add only the one sleeved forearm/hand and two airborne coins. No extra people, second hand, jewelry, text, frame or watermark. Output an opaque combined scene preview.
+
+TRANSPARENT FOREGROUND EXTRACTION
+Use case: background-extraction.
+Edit target: the supplied La Fuente composition trial with one teal-sleeved hand in the lower-right corner and two gold coins in midair.
+Deliverable: ONLY that one forearm/sleeve, ivory cuff, hand, and EXACTLY TWO AIRBORNE COINS on a genuine transparent PNG overlay.
+
+Preserve their exact source shapes, sizes, colors, faceted rendering, lighting and positions. Keep the entire original 1254 x 1254 square canvas. The sleeve continues through the lower-right/right edge exactly as in the source; do not bring the entire arm inside the frame. Keep the hand naturally connected to the sleeve, not isolated from it. Preserve the visible fingers and thumb and their relaxed tossing gesture.
+The two airborne coins are near approximately (875,783) and (933,821) on the original canvas. Keep ONLY these two, with their original tilted angles and warm highlights. Do not include any of the much duller coins beneath the fountain water.
+The hand lies roughly between x=910 and x=1135, y=825 and y=1000, with the sleeve extending to the image edge. These are alignment guides, not drawn marks. Do not shift, recenter, resize, crop or re-pose the hand, sleeve or coins.
+
+Remove absolutely everything else: statue, whole fountain, water, foam, submerged coins, architecture, plants, paving and sky. Every empty gap around the fingers and between the two airborne coins is truly transparent. No background-colored veil, no fountain-rim fragment, no ground or cast-shadow patch. Keep the hand, sleeve and coins opaque with clean antialiased silhouettes.
+Real alpha transparency, not black/white/gray fill or drawn checkerboard. No halo, extra object, text, border or watermark. This overlay will be placed above the original fountain image at its exact original alignment.

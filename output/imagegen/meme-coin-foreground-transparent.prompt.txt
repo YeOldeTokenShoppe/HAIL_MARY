@@ -1,0 +1,11 @@
+Edited with the built-in image generation tool. RGBA PNG, 1024 x 1536, alpha transparency verified.
+
+Use case: background-extraction with a precise-object-edit.
+Edit target: the supplied portrait artwork, which shows a low-poly man in a leopard-print blazer riding a white-and-gold rocket above Earth.
+Deliverable: a single clean foreground image layer with TRUE alpha transparency for use in a parallax composition. Keep the character and rocket TOGETHER in this one layer.
+
+Make exactly these two changes:
+1. Enlarge the rocket's side porthole to approximately 1.6 times its current diameter. Make it a beautiful clean ROUND circular window with a clearly circular outer silhouette, an even polished gold rim and dark glass. Preserve its position on the main side panel, adjusting only enough to fit the larger circle. It should read as a substantial round porthole rather than a small slanted oval. Do not change the rocket silhouette or other details.
+2. Remove the entire Earth, atmosphere, starfield and all background behind the subject. Leave only the complete character, complete rocket including gold handlebar and footrest, fins, rear nozzle, and its attached orange-gold exhaust flame. All empty surrounding areas must be genuine transparent alpha, NOT black, white, gray, a checkerboard drawing, a space scene, or a new backdrop. Extract carefully between the arms, legs, handlebar, and around fins and the silhouette. Preserve natural partial transparency at the flame's wispy edges without any blue atmospheric or Earth-colored residue.
+
+Critical invariants: The character is approved: preserve his exact face, hair, sunglasses, gold accessories, leopard jacket, dark clothing, shoes, pose, hands, proportions, low-poly facets and colors. Preserve the corrected coherent rocket perspective, ivory-and-gold palette, nose, fins, rear engine alignment and flame direction. Preserve the original portrait canvas size, subject position, subject scale and framing so the extracted layer aligns with the source image when overlaid. Do not center, crop, zoom, reposition or re-pose the subject. Preserve the existing lighting on the character and rocket as surface lighting, but remove all surrounding background haze. No new objects, text, border or watermark.

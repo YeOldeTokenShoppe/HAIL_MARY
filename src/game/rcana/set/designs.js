@@ -97,7 +97,7 @@ export const DESIGNS = [
   D('crash', 'Flash Crash', 'event', 0, { text: 'Everyone holding 8+ Liquidity loses half' }),
   D('ballena', 'The Whale', 'event', 0, { text: 'The whale surfaces: the richest portfolio’s best Asset moves to the poorest player' }),
   D('rueda', 'The Wheel', 'event', 0, { text: 'Every portfolio rotates one seat' }),
-  D('godcandle', 'The God Candle', 'event', 0, { text: 'Until the drawer’s next turn, Prosperity sales pay double' }),
+  D('godcandle', 'The God Candle', 'event', 0, { text: 'Until the drawer’s next turn, every Prosperity sale pays 100 more' }),
 
   D('world', 'The World', 'event', 0, { text: 'End all ongoing Market effects. Every player draws a card' }),
 

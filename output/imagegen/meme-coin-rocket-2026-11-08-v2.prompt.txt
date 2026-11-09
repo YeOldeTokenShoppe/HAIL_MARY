@@ -1,0 +1,11 @@
+Edited with the built-in image generation tool.
+
+Use case: precise-object-edit.
+Edit target: image 1, the finished portrait trading-card artwork with the leopard-jacket character riding a white-and-gold rocket above Earth.
+Supporting reference: image 2, the gray-background rocket model, is a guide for coherent rocket geometry and viewing angle.
+
+Requested correction: Fix only the rocket's inconsistent perspective. Its body currently reads as a side view while the engine opening turns toward the viewer. Rebuild the rocket shape and tail using image 2's unified side/three-quarter profile. The nose, long body, rear collar, fins, and engine must share one straight longitudinal axis from lower left to upper right. Copy the reference model's streamlined tapered silhouette and coherent fin placement. Retain the artwork's ivory-white and gold rocket palette, faceted low-poly rendering, side porthole, handlebar, and foot support. The character remains convincingly astride it.
+
+Critical geometry: Show the rocket primarily from its side, like image 2. The rear engine points directly backward along the same axis as the hull, toward the lower-left distance, NOT outward at the camera. Hide the rear-facing nozzle opening behind the rear collar and hull; show only the outside sidewall/profile of the short rear nozzle, with at most a very narrow edge of its aperture. NO broad front-facing circular or elliptical engine opening. Exhaust emerges behind the tail and streams straight backward along the rocket's centerline toward the lower left. The tail must not look twisted or bent toward the viewer. Keep all fins connected coherently to the aft body.
+
+Preserve exactly: The user approved the character. Keep his face, swept brown hair, gold sunglasses, leopard-print jacket, charcoal shirt and trousers, dollar-sign necklace, watch, shoes, hands gripping the gold handle, riding pose, scale, location and low-poly style unchanged. Preserve the Earth, starfield, horizon angle, lighting, portrait framing, and overall rocket travel direction. Make the smallest necessary image edit to the rocket geometry and exhaust. No text, no frame, no watermark, no new objects.

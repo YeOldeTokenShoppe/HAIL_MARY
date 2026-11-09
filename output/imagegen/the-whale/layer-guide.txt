@@ -1,0 +1,14 @@
+The Whale - market event artwork
+Canvas: 1254 x 1254 pixels, square.
+
+Layer order from bottom to top:
+1. the-whale-ocean-sky-background.png - opaque distant sea and sky.
+2. the-whale-transparent.png - whale only, alpha transparency.
+3. the-whale-waves-spray-transparent.png - nearest waves and airborne foam, alpha transparency.
+4. the-whale-light-rays-transparent.png - warm upper-left sunlight, translucent alpha overlay.
+
+Import all layers at the same size and align their centers. Start the light-ray layer around 20-30% layer opacity and adjust to taste, especially over the whale's head. Use subtle relative movement for parallax, keeping the whale close to the breaking water. Clip the foreground water to the card window.
+
+the-whale-scene-preview.png is the original combined design reference; the separate foreground light-ray overlay was added afterward.
+
+Created with the built-in image generation tool. All prompts are included in generation-prompts.txt.

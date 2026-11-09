@@ -1,0 +1,13 @@
+Edited with the built-in image generation tool. Alpha transparency and matching 1254 x 1254 canvas verified.
+
+Use case: precise-object-edit.
+Edit target: the supplied transparent square flower layer, with one faceted crimson rose and four orange marigolds arranged in two balanced pairs.
+Requested change: make the marigolds a more BUNCHED, NATURAL, IRREGULAR arrangement around the BASE of the rose.
+
+Preserve the main red rose blossom EXACTLY: its position, size, silhouette, spiral center, angular petals, lighting and colors. Preserve the overall original square canvas dimensions, the large transparent upper area, and the rose stem's original alignment at the lower center. This must continue to overlay the existing Guadalupe background without moving the rose.
+
+Rearrange the marigolds into one fuller, loosely gathered asymmetric cluster below and around the lower part of the rose blossom and its stem. Use roughly seven richly ruffled golden-orange marigold heads of varied sizes, some partly hidden by others, at uneven heights and with varied facing directions. Nest them closely together with overlapping blooms and short stems tucked into intertwined foliage. Let a larger bloom sit off-center and smaller partially hidden heads fill gaps naturally. Bring the marigolds inward and lower so they feel gathered around the rose's base; remove the current separated, evenly spaced pairs perched high on either side. The arrangement should feel hand-gathered and abundant, with an uneven outline, small pockets of space and organic depth, rather than a mirrored row, neat wreath, symmetric semicircle, or grid. Keep the central red rose clearly dominant and leave its spiral center and most of its petals unobstructed. Allow marigolds to overlap only the rose's very lowest outer petals, lower leaves and stem. Integrate varied deep-green rose leaves and finer marigold foliage. Keep the furthest lower-right corner clear for the existing separate candle layer. Keep flower heads inside the canvas; only the established rose stem can continue to the bottom edge.
+
+Style invariants: the same premium low-poly sculptural petals and leaves, saturated crimson, warm orange/gold marigolds, emerald foliage, warm gold edge lighting and rich shaded planes. No new flower species, pots, vase, ribbon or props.
+
+Transparent foreground ONLY. Retain genuine alpha transparency throughout all empty areas and gaps between the foliage. Opaque flowers and foliage, antialiased edges. No shrine, background, Virgin, candle, ground plane, cast-shadow patch, black matte, colored haze or checkerboard drawing. No text, border, watermark or crop/repositioning of the entire composition.

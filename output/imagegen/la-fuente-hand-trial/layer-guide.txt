@@ -1,0 +1,13 @@
+La Fuente - optional hand and two airborne coins
+Canvas: 1254 x 1254 pixels, square.
+
+Layer order, bottom to top:
+1. la-fuente-courtyard-background.png
+2. la-fuente-fountain-transparent.png
+3. la-fuente-hand-coins-transparent.png - optional foreground overlay
+
+Use equal canvas size and align centers. The sleeve intentionally continues beyond the lower-right edge; clip the artwork to the card window. Toggle the top layer to compare with and without the gesture.
+
+Two composition previews are included for comparison. The with-hand preview is the combined design reference used to generate the overlay. The existing fountain design is preserved as separate files.
+
+Created with the built-in image generation tool. Prompts included in generation-prompts.txt.

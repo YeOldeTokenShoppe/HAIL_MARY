@@ -1,0 +1,35 @@
+Created and edited with the built-in image generation tool.
+
+FINAL SCENE REVISION PROMPT
+Use case: precise-object-edit.
+Edit target: the supplied square La Fuente fountain scene.
+Make ONLY these two requested revisions:
+
+1. SIMPLIFY AND SOMEWHAT ABSTRACT THE STATUE. Keep Our Lady's welcoming open-arm pose, bowed head, mantle silhouette, thin golden halo, position, height and pale stone material. Redesign her as a restrained, elegant, hand-carved low-poly icon built from fewer, broader sculptural planes. Simplify the face to a few calm geometric planes with only minimal eye and nose indications, without realistic eyes, eyelashes, detailed lips or sculpted hair strands. Simplify the hands into graceful clean forms with minimal finger definition. Reduce the numerous intricate robe creases to a handful of broad flowing angular folds. Her robe and mantle should read clearly through silhouette and quiet geometry. A dignified abstracted stone devotional figure, not a detailed figurative sculpture, not an amorphous blob, toy or fully featureless mannequin. The simplification should be visibly meaningful while keeping the recognizable Marian posture and halo.
+
+2. REMOVE EVERY COIN from the fountain water. Remove all five visible gold circular discs and any other coin-like object. Replace each with continuous turquoise water, natural irregular ripples and reflected light consistent with the surrounding pool. No floating discs, lily pads, tokens or replacement objects. The pool contains only clear flowing water and light reflections.
+
+Preserve all other aspects exactly: entire fountain geometry and perspective, top platform and middle bowl, central column, octagonal stone basin, gold-edged recessed panels, falling water streams and splashes, lighting, existing halo size, color palette, background courtyard walls/arches/door/plants/sky, camera, scale, position and square canvas. No new objects, text, borders or watermark. Output a revised opaque scene preview at the same 1254 x 1254 square dimensions.
+
+FINAL TRANSPARENT FOUNTAIN PROMPT
+Use case: background-extraction.
+Edit target: the supplied REVISED square La Fuente scene, featuring a simplified abstract faceted statue and NO coins in the pool.
+Deliverable: the complete fountain isolated on a TRUE transparent background, at exactly the same 1254 x 1254 square canvas, with all elements at their original size and location.
+
+Keep the simplified ivory statue EXACTLY as shown: broad quiet robe planes, simplified gentle face and hands, welcoming arms, hooded mantle, thin gold ring halo. Do NOT restore detailed robe folds, realistic facial features or finger detail.
+Keep the entire fountain: top platform, middle bowl, central pedestal, octagonal lower basin and foot, gold-edged stone panels, turquoise pool, falling water streams, white splashes, reflections and the modest halo glow. Preserve all source shapes, lighting, colors, perspective and sculptural facets. The pool must remain entirely COIN-FREE, with only water and light reflections.
+
+Remove the whole courtyard: sky, architecture, doors, columns, paving, plants and planters. Empty gaps around and between all fountain parts must have genuine transparency. Preserve the cascading water's pale-aqua highlights with natural partial alpha and remove backdrop colors visible through the streams so the separately overlaid courtyard can show through. Keep the enclosed lower basin water intact as part of the fountain. Stone and statue surfaces remain opaque.
+Retain only a restrained soft translucent contact shadow immediately beneath the fountain foot; no paving texture, patch of ground or rectangular shadow panel.
+
+Do not crop, recenter, enlarge, reposition or reframe. Keep original padding and exact square canvas dimensions. Clean antialiased edges, partial alpha for thin water and soft halo glow, all surrounding empty areas zero alpha. No fake checkerboard, black matte, colored background haze, courtyard remnants, added detail, coins, other objects, text, border or watermark.
+
+CLEAN COURTYARD BACKGROUND PROMPT
+Use case: precise-object-edit.
+Edit target: the supplied square La Fuente scene.
+Deliverable: a clean fully opaque COURTYARD BACKGROUND layer for parallax, at exactly the original square canvas size, view and framing.
+
+Remove the entire central fountain: Our Lady statue, gold halo and all halo glow, both water bowls, pedestal, every falling water stream and splash, the entire octagonal collecting basin and base, its turquoise pool and every coin, and its cast/contact shadows.
+Seamlessly reconstruct all hidden scene areas as the same existing courtyard architecture and continuous stone paving. Restore the warm terracotta wall and simple arches behind the removed statue and fountain column. Extend the patterned limestone paving naturally across the whole central and lower region where the basin stood. No fountain-shaped outline, circular crater, plinth, residual pool, hole, glow or blurred patch.
+Preserve the current left recessed wooden doorway, background archway locations, terracotta walls with pale stone trim, corner plants and planters, upper-left leafy branches, visible soft dusk sky and pink clouds, and the same late-afternoon gold light and architectural shadows. Retain exact existing perspective and landmark placement, without moving the camera, zooming, cropping or changing the square framing. Match the original faceted sculptural low-poly illustration style and warm palette.
+A peaceful empty courtyard waiting for a separately overlaid fountain. Full opaque background across the canvas. No people, statues, fountains, water, coins, new props, text, interface controls, frame or watermark.

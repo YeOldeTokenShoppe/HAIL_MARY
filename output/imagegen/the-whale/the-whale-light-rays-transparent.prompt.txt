@@ -1,0 +1,11 @@
+Created with the built-in image generation tool. Semi-transparent alpha and matching canvas verified.
+
+Use case: background-extraction / compositing.
+Reference: the supplied square artwork for The Whale. Use ONLY its warm sunlight entering from the extreme UPPER LEFT as a guide for a new foreground light overlay.
+Deliverable: a square 1254 x 1254 TRANSPARENT PNG containing ONLY soft golden light rays, suitable to place ABOVE the whale and waves in the layer stack.
+
+Create a subtle atmospheric fan of warm amber and pale-gold sunbeams entering from just outside the TOP-LEFT CORNER, aligned with the light direction already visible in the reference. The rays travel diagonally down and right across the upper-left and middle of the canvas. Several softly separated broad shafts, brightest at the extreme top-left edge, become wider and more diffuse as they travel toward the center and lower-right, fading completely before the far right and bottom. Keep the strongest illumination in the upper-left quarter and a much fainter continuation across where the whale's head, shoulder and flipper will be. This is gentle foreground volumetric sunlight, not lightning, laser beams, hard stripes or a sunburst emblem.
+
+CRITICAL ALPHA: The light itself must be naturally SEMI-TRANSPARENT throughout, approximately 10–30% opacity across most beams, with a modest brighter glow at the entry corner. Fade smoothly to zero alpha at the feathered sides and ends. The rest of the canvas must be truly transparent. No dark backing, no opaque amber fog, no black matte, no gray veil, no white solid shafts, no checkerboard drawing. The existing artwork must remain clearly visible through the rays when placed above it. Do not add a solid sun disk or star.
+
+Include ONLY the gold light beams and their restrained translucent glow. Remove/do not reproduce the whale, ocean, sky, clouds, water, foam, horizon, objects or text. Preserve the full square canvas and place the origin at the original upper-left corner so this overlay aligns with the existing 1254 x 1254 scene.

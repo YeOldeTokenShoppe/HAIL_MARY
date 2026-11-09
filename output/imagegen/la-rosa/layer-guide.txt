@@ -1,0 +1,11 @@
+La Rosa - two-layer artwork
+Canvas: 1254 x 1254 pixels, square.
+
+BOTTOM: la-rosa-shrine-background.png - opaque teal and gold shrine with candles.
+TOP: la-rosa-foreground-transparent.png - rose, leaves and stem with alpha transparency.
+
+Place both at equal canvas size and align their centers. Move the foreground farther than the background for parallax. The stem intentionally continues to the lower canvas edge; keep it behind the card window's lower mask when animating.
+
+la-rosa-scene-preview.png is the original combined design reference used to create the separated layers.
+
+Generated with the built-in image generation tool. All prompts are included in generation-prompts.txt.

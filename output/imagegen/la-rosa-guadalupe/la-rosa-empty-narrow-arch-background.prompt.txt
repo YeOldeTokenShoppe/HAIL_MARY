@@ -1,0 +1,13 @@
+Edited with the built-in image generation tool.
+
+Use case: precise-object-edit.
+Edit target: the supplied square teal-and-gold shrine background with the painted image of Our Lady of Guadalupe.
+Deliverable: revised clean, opaque BACKGROUND LAYER for the same parallax card scene, with the same 1254 x 1254 square canvas.
+
+Make these two changes:
+1. Remove Our Lady of Guadalupe completely, including the figure, starry mantle, pink gown, moon, angel, every golden ray and the entire glowing aureole. Seamlessly reconstruct the textured teal wall behind her. The central wall must be empty and continuous, without a ghost silhouette, residual halo, patch, medallion or replacement artwork.
+2. NARROW THE ARCH horizontally. Bring its left and right supporting columns inward to make the arched opening approximately 25% narrower than the original, while retaining nearly the same overall height. The shrine should now be a taller, more intimate vertical niche centered within the square canvas. Keep its symmetrical rounded classical arch, antique-gold faceted stone, existing column detailing and substantial gold architectural trim. Make the curved crown fully visible near the top with a small margin. Do not simply crop or compress the entire image. Rebuild the arch and supports as coherent architecture at the narrower width, filling the newly exposed outer side panels with matching teal textured wall. Keep the supporting columns connected naturally to the arch and lower ledge.
+
+Preserve the original rich teal and warm antique-gold palette, subtle faceted handcrafted texture, architectural lighting, small decorative fan motifs in the upper outer areas, and the continuous golden stone shelf near the bottom. The empty central niche is intended to receive a separate tall Guadalupe cutout later, so its background should remain visually quiet. Retain plenty of open wall behind the lower foreground flowers.
+
+Background only: no Guadalupe or other figure, no angel, no aureole, no sunburst, no flowers or plants, no candles or holders, no extra props, no words or border graphics. Full opaque edge-to-edge square background, not transparency. Preserve overall image resolution and square framing.

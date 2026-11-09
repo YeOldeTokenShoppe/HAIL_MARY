@@ -1,0 +1,21 @@
+Edited with the built-in image generation tool.
+
+FINAL STATUE SIZE REVISION
+Use case: precise-object-edit.
+Edit target: the supplied latest La Fuente scene, with a front-facing simplified Marian statue, no halo, and small coins beneath the water.
+Make ONE change: reduce ONLY the statue to approximately 75% of its current height and width.
+
+Keep the statue's FEET in contact with the SAME upper fountain platform, at the SAME central horizontal position. Scale the entire statue proportionally around the contact point at her feet: her head becomes lower, arms become narrower, and the upper platform now has more visible room around her. Do not lower the platform or shrink any part of the fountain. The statue should feel like a modest sculpted ornament crowning the fountain, with the water and basin receiving more visual emphasis. Preserve her exact frontal orientation, welcoming open-hand pose, abstract ivory faceted forms, calm minimal face and simple broad robe folds. No halo, crown, rays or glow.
+
+Seamlessly fill the space previously occupied by the larger statue with the appropriate existing sky and courtyard backdrop. Maintain the same warm light on the smaller statue and coherent contact with the platform.
+
+Everything else must remain unchanged: complete fountain geometry, top platform, middle bowl, pedestal, falling water, splashes, pool waterline, small muted coins SUBMERGED on the basin floor beneath the water reflections, solid opaque gold-bordered stone exterior panels, courtyard, plants, sky, camera, overall subject scale, perspective and square framing. No floating coins, no glass side panels. Do not resize or move the entire fountain. Output the same 1254 x 1254 opaque scene. No added objects, words, border or watermark.
+
+FINAL TRANSPARENT EXTRACTION
+BACKGROUND REMOVAL ONLY. The supplied image is the exact final subject design; do not redesign or rescale any part of it.
+
+Keep the fountain and statue exactly as they are in the source image. Delete only the courtyard background and floor, replacing them with true transparency. Retain all source fountain pixels as faithfully as possible, including the statue, water, basin, stone, coins seen beneath the pool water, and fine splash edges. Use partial alpha for the falling water where appropriate.
+
+CRITICAL GEOMETRY: Preserve the entire 1254 x 1254 canvas without cropping or recentering. The statue's head is at approximately y=166, feet at y=443. The top water platform is at y=445 and the broad middle bowl rim is at y=530. The basin base remains near y=1210. The statue's arm span is approximately x=548 to x=717. These are alignment anchors, not drawn guides. Keep exactly this existing statue height and width, fountain height and width, and placement. Do not shorten, shrink, enlarge, move, stretch or reinterpret the statue or fountain. Do not optimize framing.
+
+Remove the sky, stucco walls, doors, arches, trees, planters and paving, and clear every empty gap between fountain parts. Preserve only a subtle contact shadow directly beneath the base. No halo. Do not add one. No new objects or detail. All exterior panels remain opaque stone; the pool and its small submerged coins stay intact as pictured. Do not make the coins larger or more prominent. Clean genuine alpha transparency outside the subject, no color matte, no fake checkerboard, no text or watermark.

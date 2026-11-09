@@ -1,0 +1,12 @@
+Created with the built-in image generation tool. Alpha transparency verified.
+
+Use case: stylized-concept.
+Asset: isolated rocket-exhaust VFX layer for a trading-card parallax scene, on TRUE transparent alpha, square canvas.
+
+The supplied image is ONLY a reference for the rocket exhaust's color, lighting, style, and diagonal direction. Create ONLY a more voluminous fiery exhaust plume as its own movable image layer. Do not include the character, rocket, nozzle, hardware, planet, sky or any other object.
+
+Composition: Show one COMPLETE flame plume with comfortable transparent margins on all sides. Its narrow bright ignition root is near the upper-right, approximately 80% across and 30% down the canvas; its thrust trail flows diagonally toward the lower-left, approximately 20% across and 70% down. This matches the rocket flying up and right in the reference, with exhaust emitted backward down and left. Do not clip the flame or glow against the canvas edge. The narrow root can be placed behind the existing engine nozzle during compositing. Preserve a clear single directional axis.
+
+Appearance: A substantially fuller, thicker and wider plume than the thin original jet, roughly 2–3 times its relative width. A dazzling white-hot and pale-yellow luminous core expands into layered golden-yellow flames, rich orange billowing turbulent curls, and reddish-orange wispy trailing flame tongues. Make the fire feel three-dimensional, energetic and voluminous, with overlapping flame lobes and varied fine detail. Keep forward-to-back directional motion obvious. Match the cinematic luminous stylized 3D aesthetic of the supplied card artwork. Visually dense, bright fire with natural organic turbulence, not a flat triangular icon, not a rigid straight laser beam, and not a solid explosion ball.
+
+Transparency: Genuine RGBA cutout. Only the flame and its restrained soft emissive glow have alpha; the rest of the entire canvas must be fully transparent. Wispy fire edges and glow fade naturally to zero alpha, with no black matte, white matte, gray fog, checkerboard drawing, rectangular halo or background color baked in. No dark opaque smoke. No stars or blue atmosphere. No text, border or watermark.

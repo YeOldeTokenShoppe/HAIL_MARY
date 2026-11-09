@@ -1,0 +1,14 @@
+La Fuente - revised two-layer artwork
+Canvas: 1254 x 1254 pixels, square.
+
+Final design: simplified abstract faceted Marian statue, welcoming hands, gold halo, cascading turquoise water, octagonal stone basin. No coins.
+
+Layer order, bottom to top:
+1. la-fuente-courtyard-background.png - opaque courtyard and paving.
+2. la-fuente-fountain-transparent.png - complete fountain, statue, halo, water, basin and subtle contact shadow; alpha transparency.
+
+Import the layers at the same canvas size and align their centers. Use small relative movements for parallax to keep the fountain grounded on the courtyard paving. Keep the halo inside the card artwork window. Water and statue remain together so all fountain components stay aligned.
+
+la-fuente-scene-preview.png is the revised combined design reference used to create the final fountain cutout.
+
+Created and edited with the built-in image generation tool. Final prompts are included in generation-prompts.txt.

@@ -1,0 +1,12 @@
+Edited with the built-in image generation tool. Alpha transparency verified.
+
+Use case: background-extraction with style-preserving cleanup.
+Edit target: the supplied traditional illustrated image of Our Lady of Guadalupe against a hot-pink patterned background.
+
+Create a high-resolution isolated Guadalupe illustration in EXACTLY this simpler graphic devotional style: flat saturated color shapes, fine dark ink contours, minimal shading, delicate interior decorative linework, warm tan face with eyes downcast, hands joined in prayer, green mantle scattered with small yellow-gold stars and edged in yellow, red gown, black waist ribbon, gold-yellow radiating mandorla, dark crescent moon, and the small winged supporting angel beneath her feet. Preserve her dignified pose, recognizable proportions, the source's simple drawn face and its charming printed-illustration character. Do not convert this into a photorealistic image, oil painting, ornate gold relief, or low-poly 3D model.
+
+Remove the ENTIRE hot-pink background and its floral/paisley pattern, including pink areas peeking through around the angel, wings and bottom of the crescent. Replace those empty areas with true alpha transparency.
+Keep the complete yellow-gold rays and their fine dark outlines, the source's narrow scalloped white outer edging, the small white crown-like crest at the top, the figure, moon, and angel as one unified cutout. The white outline belongs to the illustration and should remain only as a narrow trim around its silhouette. Avoid large white background patches.
+
+Use a high-resolution portrait canvas appropriate for the tall full-length subject, with a small clear transparent margin on every side. Restore crisp clean lines and solid color regions at the larger resolution while preserving the source design. Keep the entire figure and aureole in frame, including the crest and angel wings; no cropping.
+True RGBA transparent PNG: all outside-background pixels are transparent, not pink, black, white, gray or a fake checkerboard. Clean antialiased edges with no pink fringe. No flowers, candles, shrine architecture, new objects, text, logos or watermark.
