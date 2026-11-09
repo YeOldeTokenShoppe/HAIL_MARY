@@ -10,7 +10,7 @@ import { getEventSubtype } from "../eventTemplate.js";
 // Design type -> printed class. The face has four classes and the game has
 // seven types, so this is where they meet. The printed class is what the
 // card SAYS it is; the type and `played` flag determine how it PLAYS.
-// Events print a Calamity, Opportunity or Market subtype without changing
+// Events print a Calamity, Opportunity or Ambiguity subtype without changing
 // their engine type or timing.
 // Artifacts print as Remedy, Grace or Relic while retaining their engine type.
 // (Literal strings rather than RCANA_CLASSES, so this module never imports

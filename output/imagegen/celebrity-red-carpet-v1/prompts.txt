@@ -1,0 +1,50 @@
+Mode: Built-in image_gen.
+All PNG outputs copied without raster alteration.
+Final layer canvas: 1254 x 1254.
+
+MASTER COMPOSITION — transparent_background: false
+Input 1: user's Screenshot 2026-11-09 at 10.16.23 AM.png, character reference.
+Input 2: ../marisol-low-poly-v2/combined-preview.png, primary style.
+Input 3: ../el-gambusino-one-more-swing-v3/combined-preview.png, secondary camera attitude.
+Use case: stylized-concept.
+Asset type: full square illustration for "The Celebrity", a Trader-type card in a loteria-inspired general investing game. This composition will later be split into background, celebrity, and foreground parallax layers.
+Input 1: CHARACTER REFERENCE. Preserve the retro male star's high black pompadour, long sideburns, gold aviator sunglasses, white high-collared jumpsuit with deep red inset neckline, red-and-gold jeweled decorations and broad gold medallion belt. Change the T-pose into a natural charismatic arrival pose.
+Input 2: PRIMARY STYLE REFERENCE. Match its bold shapes, clean angular low-poly illustration, saturated colors and moderate detail readable on a small card.
+Input 3: secondary reference for dynamic camera attitude, not its dense rock texture. Do not reproduce any people, symbols, or objects from inputs 2 and 3.
+
+Scene: a glamorous nighttime red-carpet arrival, viewed from slightly below through the photographers surrounding the star. He has just paused among paparazzi and fans. The mood is swaggering, a little absurd and intimidating: a celebrity completely at ease amid a crush of attention.
+Composition: square 1254 x 1254. Large star centered slightly right, head in upper middle, portrait from upper thighs upward, occupying about 60% of image width. His body is turned three-quarter with weight on one hip; face turned toward our camera with a knowing half-smile, chin nearly level. One hand casually hooked at the broad belt, the other relaxed at his hip or pocket. Shoulders relaxed. No reaching arms, no waving hand projected toward viewer. Sunglasses sit naturally over his eyes.
+Paparazzi surround him on BOTH sides behind his shoulders, about five distinct photographers in dark clothes raising cameras toward HIM, with a small loosely suggested crowd further back. Cameras and faces readable in broad shapes; do not fill scene with dozens of tiny faces. Simple red velvet ropes and a sliver of red carpet establish arrival. A restrained warm-gold doorway or premiere entrance behind, with dark midnight navy and plum recesses. Background can be softly painted rather than faceted.
+Foreground: just TWO large cropped dark camera silhouettes entering from bottom left and bottom right, angled inward toward the star, including small believable portions of photographers' hands. Strong foreshortening establishes that we stand among the press. Confine these to lower corners and outer edges, keep his face, suit chest, belt and central silhouette clearly visible. No giant reaching hand. No foreground head blocking the star.
+Lighting: warm amber from entrance on one side, cool pale blue-white photographic flash from the opposite side, crisp graphic reflections in aviators, luminous ivory suit as dominant focal shape. Only two or three restrained flash glints associated with cameras, not a field of stars.
+Style: polished low-poly loteria character art with broad faceted anatomy and cloth, expressive handsome face, simple bold silhouettes, controlled texture. Rich cream, warm gold, red accents, midnight blue and plum. Enough detail for the existing Trader cards, not photorealistic, not flat clip art, not excessive cinematic effects. Pose and press crowd provide the edge.
+No text, lettering, logos, event branding, card borders, title ribbon, stats, watermarks, crypto motifs, money, microphone, stage performance, shushing gesture, random symbols, confetti, or grain. Generate a single finished composition, not a contact sheet.
+
+BACKGROUND — transparent_background: false
+Input: generated master composition.
+Use case: precise-object-edit.
+Asset type: opaque background layer for a three-layer parallax card.
+Input image: exact edit target, 1254 x 1254.
+REMOVE the large central celebrity in the ivory jeweled jumpsuit completely, including his head, hair, sunglasses, body, hands and trousers. Also REMOVE the TWO giant cropped foreground cameras and their holding hands in the bottom left and bottom right corners.
+KEEP the five smaller paparazzi photographers around him, their own cameras, hands and flash units, the small distant fans, gold entrance, night sky, red velvet ropes, gold stanchions, red carpet, and existing top-left camera flash. Preserve their exact positions, proportions, angular illustration style, palette and lighting.
+Naturally reconstruct all missing scenery and any obscured background crowd behind the removed celebrity: entrance walls/doors, simple distant fan silhouettes, continuing ropes and carpet. Do not leave a celebrity-shaped silhouette, spotlight, hole or empty cutout. The middle should be believable continuous premiere scenery, not another prominent person. Reconstruct the carpet and lower stanchions behind the removed corner cameras.
+Output full-bleed opaque background plate on exactly the same square canvas. Do not zoom, recenter, crop, change camera viewpoint, add extra flashes, or redesign visible paparazzi. No celebrity, white suit fragments, giant bottom-corner cameras, text, card border or new props.
+
+CELEBRITY — transparent_background: true
+Input: generated master composition.
+Use case: background-extraction.
+Asset type: solo central celebrity layer for a three-layer parallax card.
+Input image: exact edit target, 1254 x 1254.
+Extract ONLY the large central retro male celebrity in the ivory/red/gold jeweled jumpsuit onto true transparent alpha. Preserve his exact pixel placement, scale, head pitch, confident half-smile, faceted black pompadour, sideburns, gold aviator sunglasses, suit jewels, high collar, red neckline, belt, hands at hip/belt, pose and lighting. Keep the entire visible person down to the image bottom. Reconstruct any tiny edge of his trousers or body hidden by the two lower corner foreground cameras so his body has a continuous natural silhouette.
+Remove ALL other people, ALL cameras, foreground hands, crowd, architecture, sky, flash starbursts, ropes, stanchions and carpet. Empty region inside the bend of his left elbow must be transparent. Retain all light falling directly on his body, including warm gold and cool pale-blue rim; no separate floating lighting effects.
+Genuine transparency everywhere outside this one person's silhouette. Preserve original full square canvas and transparent margins exactly, no zoom, recentering, tight crop, body redesign, additional hands, shadows on a surface, matte, baked checkerboard, text or card border.
+
+FOREGROUND CAMERAS — transparent_background: true
+Input: generated master composition.
+Use case: background-extraction.
+Asset type: sparse foreground camera layer for a three-layer parallax card.
+Input image: exact edit target, 1254 x 1254.
+Extract ONLY the TWO enormous cropped cameras nearest the viewer at BOTTOM LEFT and BOTTOM RIGHT, including each camera's connected holding hand/visible fingers. Left foreground camera spans approximately x0%-28%, y60%-100%; right foreground camera approximately x77%-100%, y60%-100%. They are seen from behind/side and point inward. Preserve exact silhouettes, crop, scale, placement, facets, blue and warm edge highlights, and natural camera-hand contact.
+Do NOT include the five smaller cameras held by the paparazzi behind the celebrity. Remove those background photographers completely. Remove the whole central celebrity, all other people, crowd, ropes, stanchions, entrance, sky, flashes, carpet and backdrop.
+The entire upper 60% and central region must be EMPTY TRUE TRANSPARENCY. Only the two existing dark foreground cameras and their own holding hands remain in the bottom corners. No added flashes, light bursts, new props, duplicated fingers, people, camera straps floating between corners or silhouettes of removed objects.
+Preserve exact square 1254 x 1254 canvas and transparent margins. Do not enlarge, zoom, move or recenter the cameras. Transparent background, no matte, checkerboard, text, border or shadow on a ground surface.

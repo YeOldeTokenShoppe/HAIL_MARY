@@ -103,6 +103,30 @@
         2041,
         408
       ]
+    },
+    {
+      "key": "Remedy (REM80)",
+      "word": "REM80",
+      "prompt": null,
+      "composited": "Not generated: R-E-M cut from subtype-remedy-painted.png (x 60-1151, y 167-567) and 8-0 from wordmark-calam80-painted.png (x 1561-2114, y 164-560, the M's serif runs erased, scaled 1.01 to the letter height), set 6 px apart and centred. 2026-11-09.",
+      "png": "src/game/rcana/set/labels/wordmark-rem80-painted.png",
+      "webp": "public/TCG/labels/wordmark-rem80-painted.webp",
+      "width": 2172,
+      "height": 724,
+      "viewBox": [
+        252,
+        162,
+        1668,
+        410
+      ]
+    },
+    {
+      "key": "Ambiguity",
+      "word": "AMBIGU80",
+      "status": "NOT YET GENERATED — the card prints the text label until this sheet exists; then add src/width/height/viewBox to the Ambiguity entry in subtypeWordmarks.js",
+      "prompt": "Use case: text-localization.\nAsset type: transparent illustrated wordmark for the subtype header of a Lotería-inspired trading card.\nInput image: the approved painted TRADER wordmark, used as the exact lettering style reference and edit target.\nPrimary request: replace TRADER with \"AMBIGU80\", and keep the same painted serif lettering style, warm ochre/gold color, brush texture, stroke weight, and slightly irregular sign-painted character.\nText (verbatim): \"AMBIGU80\". Spell exactly A - M - B - I - G - U - 8 - 0. One word on one horizontal baseline.\nStyle: sturdy classical Roman serif capitals, broad wedge serifs, open counters, gently curved R legs, subtle pale brush highlights; flat painted pigment with restrained texture. Match the reference's letterforms where letters recur.\nComposition: wide horizontal wordmark with comfortable clear margins, all letters fully visible. Adjust the natural word width to fit without squeezing or distorting individual letters. Similar cap height throughout; digits 8 and 0 when present must share the same height and painted serif character.\nBackground: genuinely transparent, with clean alpha around each letter and inside all counters. Output only the lettering.\nAvoid: backdrop, plaque, border, card, illustration, flourishes, extra text, gothic/blackletter forms, mosaic tiles, jewel effects, metallic bevel, drop shadow, glow, hazy halos, detached flecks.",
+      "png": "src/game/rcana/set/labels/wordmark-ambigu80-painted.png",
+      "webp": "public/TCG/labels/wordmark-ambigu80-painted.webp"
     }
   ]
 }

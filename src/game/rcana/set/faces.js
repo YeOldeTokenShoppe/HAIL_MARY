@@ -194,8 +194,8 @@ export const FACES = [
     // PROVISIONAL number and rarity.
     number: 24,
     rarity: "Rare",
-    // A Market Event fires on draw and hits the whole table; the printed
-    // line is the effect alone, shorter than the simulator's.
+    // An on-draw Event (an Ambiguity: it moves value, and who gains is not
+    // known until it fires); the printed line is the effect alone.
     ability: "The richest portfolio's best Asset\nmoves to the poorest player.",
     // An Event narrates; the line follows the rule.
     flavor: "When it surfaces, the whole sea moves.",
@@ -211,6 +211,54 @@ export const FACES = [
     ability: "Toss in 2 Liquidity: your Hail Mary\nodds rise one step, past the shrine's three.",
     // A Grace narrates; the line follows the rule.
     flavor: "Every coin sinks. Every wish floats.",
+    printed: {},
+  },
+  {
+    id: "la-investigadora",
+    design: "investigadora", // prints as "La Investigadora" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 26,
+    rarity: "Uncommon",
+    // The peek and the choice; the design's line is a simulator's.
+    ability: "Once a turn, peek at the deck's top card.\nYou may send it to the bottom.",
+    // A Trader speaks; the quotation follows the rules and flourish.
+    flavor: "Everything is in the ledger. I just read it closer than you.",
+    printed: {},
+  },
+  {
+    id: "el-gambusino",
+    design: "prospector", // prints as "El Gambusino" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 27,
+    rarity: "Uncommon",
+    // The design's line is already a card's length; printed as is.
+    ability: "Assets you buy cost 1 less.",
+    // A Trader speaks; the quotation follows the rules and flourish.
+    flavor: "Gold's where you dig, not where they tell you.",
+    printed: {},
+  },
+  {
+    id: "the-illumin80",
+    design: "illuminati", // prints as "The Illumin80" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 28,
+    rarity: "Rare",
+    // The trigger and the take; the design's line is a simulator's.
+    ability: "You are initiated.\nEach rival passes you one random card.",
+    // An Event narrates; the line follows the rule.
+    flavor: "You never see them buy. You only see the price move.",
+    printed: {},
+  },
+  {
+    id: "the-celebrity",
+    design: "celebridad", // prints as "La Estrella" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 29,
+    rarity: "Uncommon",
+    // The fee and the bonus; the design's line is a simulator's.
+    ability: "Pay 1 when banking from a card:\n+25 Prosperity.",
+    // A Trader speaks; the quotation follows the rules and flourish.
+    flavor: "Every eye on me is a dollar in the bank.",
     printed: {},
   },
 ];

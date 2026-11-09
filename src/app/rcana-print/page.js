@@ -4,7 +4,7 @@
 // /rcana-print?template=artifact[&subtype=remedy|grace|relic]
 // The template has an empty art window, number, name, rules and cost, ready
 // for export; its Artifact header and usage badge are the real components.
-// ?template=event&subtype=calamity|opportunity|market uses the same system.
+// ?template=event&subtype=calamity|opportunity|ambiguity uses the same system.
 //
 // One card, flat, on a transparent page: the print target for
 // scripts/rcana-render-faces.mjs, which screenshots `.rc-stage` here into
@@ -50,7 +50,7 @@ function PrintCard() {
   // Keep the original Artifact and Hazard template URLs working as aliases.
   const subtypeAliases = { artifact: "relic", hazard: "calamity" };
   const requestedSubtype = subtypeAliases[params.get("subtype")] ?? params.get("subtype");
-  const subtypes = eventTemplate ? ["calamity", "opportunity", "market"] : ["remedy", "grace", "relic"];
+  const subtypes = eventTemplate ? ["calamity", "opportunity", "ambiguity"] : ["remedy", "grace", "relic"];
   const subtype = subtypes.includes(requestedSubtype) ? requestedSubtype : subtypes[0];
   const id = params.get("id") || RCANA_SET[0]?.id;
   const scale = Number(params.get("scale") || 1);

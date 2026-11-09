@@ -27,14 +27,13 @@ const D = (key, name, type, cost, o = {}) => ({ key, name, type, cost, ...o });
 export const DESIGNS = [
   D('unicornio', 'El Unicornio', 'trader', 3, { liq: 3, cred: 20, abilityName: 'Compound Interest', text: 'At turn start, if you have at least 100 banked Prosperity, bank 25 more.' }),
   D('gato', 'El Gato', 'trader', 2, { liq: 2, cred: 16, abilityName: 'Clean Sweep', text: 'When seated, immediately knock one Calamity off your table, free' }),
+  // PROVISIONAL stats and text — the card exists for its face; not yet in any deck list or sim hook.
+  D('investigadora', 'La Investigadora', 'trader', 3, { liq: 3, cred: 14, abilityName: 'Due Diligence', text: 'Once per turn, look at the top card of the deck; you may put it on the bottom' }),
   D('monje', 'El Monje', 'trader', 1, { liq: 1, cred: 22, abilityName: 'Vow of Prosperity', text: 'When you light a candle, bank 25 Prosperity' }),
   D('diablito', 'El Diablito', 'trader', 2, { liq: 2, cred: 10, abilityName: 'Devil’s Wager', text: 'At the start of your turn, flip a coin: heads, collect 1 Liquidity; tails, El Diablito loses 1 CRED' }),
   D('celebridad', 'La Estrella', 'trader', 3, { liq: 3, cred: 8, abilityName: 'Star Power', text: 'The influencer: pay 1 when banking from a card, +25 Prosperity' }),
   D('abuela', 'La Abuela', 'trader', 2, { liq: 2, cred: 18, abilityName: 'Lucky Streak', text: 'The gambling grandmother: your gambles moon on 4+ instead of 5+' }),
-  D('pope', 'El Papa', 'trader', 3, { liq: 3, cred: 25, abilityName: 'Absolution', text: 'Once a game, a failed Hail Mary is absolved — you may attempt it again' }),
   D('prospector', 'El Gambusino', 'trader', 2, { liq: 2, cred: 15, abilityName: 'Prospector’s Eye', text: 'Assets you buy cost 1 less' }),
-  // Unseen hands: the effect resolves when played directly into the active slot.
-  D('illuminati', 'El Ojo', 'trader', 3, { liq: 3, cred: 12, abilityName: 'Unseen Hands', text: 'When played as your active Trader, each rival passes you one random card' }),
   D('tech', 'Tech Stock', 'asset', 3, { cash: 5, pros: 100 }),
   // The degen asset, and the only gamble: sell safe for cash, or roll the die for
   // Prosperity. (Was two cards — Meme Coin's body with Shitcoin's upside.)
@@ -85,7 +84,7 @@ export const DESIGNS = [
   D('rose', 'The Rose', 'grace', 0, { pros: 50, cash: 2, text: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise', printName: 'La Rosa' }),
   D('moneda', 'Pay Day', 'event', 0, { text: 'Every player collects 2 Liquidity' }),
   // Yield farming: fat income until the market moves and wipes it.
-  D('jardin', 'Yield Farm', 'asset', 4, { cash: 2, pros: 50, income: 2, text: 'While held: collect 2 a turn. Discard this Asset when any Market Event triggers' }),
+  D('jardin', 'Yield Farm', 'asset', 4, { cash: 2, pros: 50, income: 2, text: 'While held: collect 2 a turn. Discard this Asset when any Event fires on draw' }),
   // Hail Mary Prospecting Co. — three claims:
   // the map leads somewhere (cards), the mine pays the longer you dig, the well is a wildcat.
   D('map', 'Treasure Map', 'asset', 2, { cash: 2, pros: 75, text: 'When sold, draw 2 cards' }),
@@ -94,14 +93,20 @@ export const DESIGNS = [
   D('semilla', 'Seed Round', 'asset', 1, { cash: 1, pros: 25, bloom: 150, text: 'Sell for 25 Prosperity — or hold four rounds and it blooms to 150' }),
   // Events: the market's own voice. They fire the moment they are drawn, hit the whole
   // table, then the drawer draws a replacement card. Nobody chooses an Event.
-  D('crash', 'Flash Crash', 'event', 0, { text: 'Everyone holding 8+ Liquidity loses half' }),
-  D('ballena', 'The Whale', 'event', 0, { text: 'The whale surfaces: the richest portfolio’s best Asset moves to the poorest player' }),
-  D('rueda', 'The Wheel', 'event', 0, { text: 'Every portfolio rotates one seat' }),
+  // On-draw events print a subtype by outcome (eventTemplate.js): a windfall
+  // is an Opportunity (the default), a loss a Calamity, a shake-up whose
+  // winner is unknown an Ambiguity.
+  D('crash', 'Flash Crash', 'event', 0, { subtype: 'Calamity', text: 'Everyone holding 8+ Liquidity loses half' }),
+  D('ballena', 'The Whale', 'event', 0, { subtype: 'Ambiguity', text: 'The whale surfaces: the richest portfolio’s best Asset moves to the poorest player' }),
+  // Initiation: the drawer is taken into the society; fires on draw like the
+  // other market weather but PRINTS as an Opportunity (the face sets subClass).
+  D('illuminati', 'The Illumin80', 'event', 0, { text: 'Unseen hands: the drawer is initiated — each rival passes them one random card' }),
+  D('rueda', 'The Wheel', 'event', 0, { subtype: 'Ambiguity', text: 'Every portfolio rotates one seat' }),
   D('godcandle', 'The God Candle', 'event', 0, { text: 'Until the drawer’s next turn, every Prosperity sale pays 100 more' }),
 
-  D('world', 'The World', 'event', 0, { text: 'End all ongoing Market effects. Every player draws a card' }),
+  D('world', 'The World', 'event', 0, { text: 'End all ongoing Event effects. Every player draws a card' }),
 
-  D('moralhazard', 'Moral Hazard', 'event', 0, { text: 'The bailout: the poorest player collects 5; the richest loses 2' }),
+  D('moralhazard', 'Moral Hazard', 'event', 0, { subtype: 'Ambiguity', text: 'The bailout: the poorest player collects 5; the richest loses 2' }),
 ];
 
 export const DESIGN_TYPES = ["trader", "asset", "event", "hazard", "remedy", "artifact", "grace"];

@@ -1,0 +1,16 @@
+Mode: Built-in image_gen.
+transparent_background: true
+Reference: user's Screenshot 2026-11-09 at 12.22.36 PM.png.
+PNG copied without raster alteration.
+
+Use case: precise-object-edit.
+Asset type: transparent rider-and-rocket layer for the "Meme Coin" card.
+Input image is the EXACT EDIT TARGET. It is a screenshot of the approved subject over a checkerboard transparency display.
+
+Make ONE localized art change: illuminate the currently black circular PORTHOLE on the side of the rocket.
+Inside the existing gold-rimmed window, create a soft ethereal light glowing from within the rocket: a luminous pearly cyan-white center, gently swirling pale aqua mist, a restrained hint of lavender toward the edges, and deeper indigo/teal at the inner perimeter to preserve depth. Add a subtle curved glass reflection so it still reads as a window rather than a flat glowing button. The glow is contained inside the existing glass opening, with only a very small cool reflected glint along the INNER gold rim. Keep the outer gold ring's exact size, shape and material. No large external halo, beam, rays, floating particles, eyeball, face, creature, text or emblem. Elegant mysterious interior light, clearly no longer a black hole.
+
+Preserve every other part of this exact composition as closely as possible: the man's face and upward head angle, gold sunglasses, hair, leopard-print jacket, dollar necklace, black trousers and boots, watch, both hands and their grip, handlebars, cream faceted rocket body, gold trim, fins, footrest, vents, orange indicator lights, and the small existing exhaust flames. Keep the same low-poly style, colors, lighting, camera angle and entire rider/rocket silhouette. Do not add a long exhaust plume or redesign anything.
+
+Maintain the input's near-square portrait aspect ratio (768:832) and original complete-object framing with the same proportional margins. No tight crop, no zoom, no recentering, no extra scenery or added props.
+Return TRUE ALPHA TRANSPARENCY outside the rider, rocket and small flames. The checkerboard shown in the input is a screenshot transparency preview: REMOVE it completely, do not reproduce it. Preserve soft alpha on flame edges. Window itself remains opaque glass with the new interior glow. Output the edited isolated rider and rocket only, with no matte, background, card frame or lettering.

@@ -1,0 +1,39 @@
+Mode: Built-in image_gen.
+Output PNGs copied without raster alteration.
+
+CHARACTER DESIGN — transparent_background: true
+Reference 1: ../la-estrella-red-carpet-v2/02-female-celebrity.png
+Reference 2: ../la-estrella-red-carpet-v2/combined-preview.png
+Use case: precise-object-edit.
+Asset type: transparent central character variant for La Estrella, a low-poly loteria-style investing game.
+Input 1: edit target — previous celebrity layer. Replace the celebrity design completely while keeping the same placement, camera angle, pose, framing and illustration family.
+Input 2: composition reference only — paparazzi scene. Existing background and foreground layers will remain unchanged. Do not redraw them.
+
+USER GOAL: a Black female celebrity who triggers the feeling "I think I know who that is": iconic star presence, a distinctive face and unmistakable silhouette, not a generic fashion model and not a simple recoloring of the previous blonde woman.
+
+Design a fictional adult Black musical superstar, with the familiar red-carpet glamour of Beyoncé and the spectacular hair silhouette of a classic soul diva. This is a stylized character, not a photographic portrait.
+Give her luminous rich warm-brown skin, a distinct gently heart-shaped face, full cheekbones, almond-shaped brown eyes, softly arched brows, a naturally broad nose, full lips and a radiant welcoming tooth-showing smile with raised cheeks. Use coherent, beautiful natural anatomy rather than exaggerated features. She looks toward our camera, confidently enjoying the attention.
+Her signature is a glorious high-volume mane of long honey-blonde and caramel curls with visibly dark espresso roots, broad sculpted curl clusters flowing over and behind the shoulders. The dark roots and brown shadow shapes should keep her silhouette clear against the gold entrance. Make the hair exuberant, not a small tidy bob. Face fully visible, no hat or sunglasses.
+
+Wardrobe: a showstopping fitted antique-gold/champagne evening gown, off-the-shoulder sweetheart neckline, sculpted diagonal folds through bodice and waist. Bold graphic gold paillettes and angular bright reflections create sparkle that remains readable at card size. Use bronze/ochre shadow facets and champagne highlights rather than uniformly yellow fabric. Luxurious and glamorous, not gold armor, not microscopic glitter.
+Oversized diamond-and-gold chandelier earrings, a broad gleaming cuff and one or two statement rings. Bare arms and natural hands, remove the previous dark opera gloves. No emerald fabric, green shoulder fan or old necklace.
+Keep the confident hand-on-hip pose, other hand relaxed along thigh; shoulders relaxed, weight on one hip, torso slightly three-quarter, chin near level. No reaching, pointing, waving, microphone or props.
+
+Framing/invariants: exactly 1254 x 1254, upper-thigh portrait. Keep same body scale and overall central placement as input 1. Face center around x57%, y25%, hair top near y5%, full mane within roughly x30%-82%, allowing photographers to read at the outer edges. Dress continues beyond image bottom. Keep both hands attached and natural. True transparency between bent arm and torso.
+
+Style: the existing Trader card's bold medium-detail low-poly illustration, broad planes on skin and cloth, expressive graphic face, sculpted angular curls, limited smooth shading. Strong iconic silhouette at thumbnail size. Do not drift toward photorealistic beauty rendering. Preserve cool pale-blue light from left and warm gold rim light from right. Bright smile and face are the focal point.
+
+Output ONLY this new Black female star, hair, gold dress and jewelry on TRUE ALPHA TRANSPARENCY. Entire background and margins transparent. No paparazzi, cameras, other people, ropes, carpet, architecture, frames, text, card UI, watermarks, opaque matte, baked checkerboard, ground shadow, floating sparkles or glow cloud.
+
+SUNGLASSES EDIT — transparent_background: true
+Reference: ../la-estrella-red-carpet-v3/02-female-celebrity.png
+Use case: precise-object-edit.
+Asset type: transparent central celebrity layer for La Estrella.
+Input image is the exact edit target.
+
+Make ONE localized change: add a pair of oversized, glamorous cat-eye sunglasses with bold angular gold rims and opaque dark espresso-black lenses. Fit them naturally to her face over both eyes, with a believable bridge across her nose and temples extending toward her ears beneath the hair. Slight restrained blue-white flash reflections on the lenses are welcome, but NO visible eyes, pupils or brows through the lenses. Keep the frames stylishly upswept, not novelty eyewear.
+
+The sunglasses should obscure her eye region and add a little mystery while leaving her radiant smile fully visible.
+Preserve EVERYTHING ELSE exactly: this same adult Black woman's face and warm-brown skin, tooth-showing smile and lipstick, facial proportions, head angle, enormous honey-blonde curls with dark roots, diamond chandelier earrings, gold sequined off-shoulder gown, jewelry, hands, hand-on-hip pose, body proportions, placement, broad angular low-poly illustration and warm/cool lighting. Do not beautify, change the face, alter expression, restyle hair, redesign dress, add a hat, move hands, or add other objects.
+
+Retain exact 1254 x 1254 square framing, scale and full transparent margins. Genuine transparent alpha outside the character, including the elbow gap. No scenery, paparazzi, cameras, card frame, text, logo, matte or checkerboard. Only add the sunglasses; all other pixels should remain as close to the source as possible.

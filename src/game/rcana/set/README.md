@@ -134,7 +134,7 @@ footer artwork and is omitted from blank templates and the frame-hidden bench vi
 |---|---|---|---|
 | `boxed` (`LOTERIA_FRAME2`) | angel badge: Credibility (engine: Grace) | cost and income coin bar | Trader |
 | `valued` (`LOTERIA_FRAME2_value`) | gold coin and **PROSPERITY** ribbon | single cost ribbon | Asset, Opportunity Event |
-| `sealed` (`LOTERIA_FRAME2_sealed`) | open; usage is above the rule | **cost** (Market: **—**) | Calamity, Market, Remedy, Relic, Grace |
+| `sealed` (`LOTERIA_FRAME2_sealed`) | open; usage is above the rule | **cost** (on-draw Events: **—**) | Calamity, Ambiguity, on-draw Opportunity, Remedy, Relic, Grace |
 
 The name banner's border matches the type tab's colour (`HEADER_COLORS`).
 The plates above carry the Trader red; the other classes use a copy with the
@@ -236,7 +236,7 @@ extends inward; its label stays centered within the wider ribbon. The stat
 ribbons share a baseline; Prosperity's number sits on the top of its stack.
 The widened Cost artwork's edit prompt is
 saved in `RL80_COST_ribbon_wide.prompt.txt`.
-Calamities omit the left stat; Market Events retain a dash for cost. All four
+Calamities omit the left stat; on-draw Events retain a dash for cost. All four
 ribbon badges omit the interior gold ornaments beside their lettering,
 leaving clear space around each label while retaining the outer borders.
 Their ribbon backgrounds follow the header accent palette in `headerColors.js`:
@@ -320,26 +320,35 @@ render the affected Artifact faces again and run `npm run pt2:build`.
 ### Event subtypes and instructions
 
 Events share the full-width swept header and instruction styling with
-Artifacts (`RcanaSubtypeFurniture.jsx`). `eventTemplate.js` derives the
-printed subtype from the existing game type and `played` flag:
+Artifacts (`RcanaSubtypeFurniture.jsx`). `eventTemplate.js` sorts every
+Event into one of three printed subtypes by what it does to you, while the
+usage badge keeps the engine's timing:
 
-| Engine behavior | Printed subtype | Usage / value information |
+| Engine behavior | Printed subtype | Usage badge |
 |---|---|---|
-| `type: "hazard"` | CALAM80 (Calamity) | Red **Until cleared** rules badge; pinned-card symbol |
-| `type: "event", played: true` | OPPORTUN80 (Opportunity) | Labeled numeric **Prosperity** mark |
-| `type: "event"`, no `played` | Market | Indigo **On draw** rules badge; draw-card symbol |
+| `type: "hazard"` | CALAM80 (Calamity) | Red **Until cleared** |
+| `type: "event", played: true` | OPPORTUN80 (Opportunity) | **On play**, with the **Prosperity** mark |
+| `type: "event"`, on draw, `subtype: 'Calamity'` | CALAM80 | Red **On draw** |
+| `type: "event"`, on draw, no `subtype` | OPPORTUN80 | **On draw** |
+| `type: "event"`, on draw, `subtype: 'Ambiguity'` | AMBIGU80 (Ambiguity) | **On draw** |
 
-The header uses a skull, sparkles, or globe to the left of the subtype and
-`EVENT` in Bebas Neue capitals on the gold right panel. Future cards inherit their
-header and stamp automatically; they do not need new frame artwork.
-Market Events print **—** for Liquidity because they resolve automatically.
-The God Candle can leave an ongoing Market effect after resolving.
+An on-draw event names its sort on the design: a loss is a Calamity (Flash
+Crash), a windfall an Opportunity (Pay Day, The God Candle, The World, The
+Illumin80), and a shake-up whose winner is unknown until it resolves an
+Ambiguity (The Whale, The Wheel, Moral Hazard). A face can still override
+with `subClass`. In rules text, **Calamity** keeps its narrow meaning — the
+attached kind that Remedies clear, El Gato knocks off and the Sacred Heart
+cancels; a one-shot Calamity is not cleared or cancelled, which its **On
+draw** badge shows. The header prints `EVENT` in Bebas Neue capitals on the
+gold right panel. Future cards inherit their header and stamp automatically.
+On-draw Events print **—** for Liquidity because they resolve automatically.
+The God Candle can leave an ongoing effect after resolving.
 
 The playtest gallery groups all Event designs under these three subtypes,
 including designs without art. The build injects the same subtype mapping
-used by the live cards, without changing engine rules. Exit Scam's text
-names Opportunities, Yield Farm's text names Market Events, and The World
-ends ongoing Market effects; it does not clear attached Calamities.
+used by the live cards, without changing engine rules. Yield Farm's text
+names Events that fire on draw, and The World ends ongoing Event effects; it
+does not clear attached Calamities.
 
 Blank templates are also available at
 `/rcana-print?template=event&subtype=calamity`, `subtype=opportunity`, and
@@ -350,8 +359,9 @@ keeps its `hazard` type and existing gameplay behavior.
 
 ### Header lettering
 
-Remedy, Grace, Relic, Calamity, Opportunity and Market use transparent
-WebP wordmarks in `public/TCG/labels/`. `subtypeWordmarks.js` records their
+Remedy, Grace, Relic, Calamity and Opportunity use transparent
+WebP wordmarks in `public/TCG/labels/` (Ambiguity prints AMBIGU80 as text until
+its sheet is painted; the retired Market sheet stays in the folder). `subtypeWordmarks.js` records their
 native sizes and the view boxes that omit empty canvas at render time,
 preserving the lettering proportions. The six subtype assets use painted
 lettering matched to Trader. Their displayed letter height matches the
@@ -378,8 +388,9 @@ cleanup edits and output paths are recorded in `painted-subtype-wordmarks.prompt
 and `type-wordmarks.prompts.json`. `subtype-wordmarks.prompts.json` retains
 the earlier mosaic subtype provenance.
 
-The RL80 signature spellings **CALAM80** and **OPPORTUN80** are display
-labels for Calamity and Opportunity. Their original subtype keys, rules
+The RL80 signature spellings **CALAM80**, **OPPORTUN80** and **REM80** are display
+labels for Calamity, Opportunity and Remedy (REM80's painted sheet is composited
+from the REMEDY and CALAM80 lettering, recorded in `painted-subtype-wordmarks.prompts.json`). Their original subtype keys, rules
 terms and gameplay behavior stay intact; accessible labels include both
 spellings. `rl80-signature-wordmarks.prompts.json` records the earlier mosaic
 wordmarks and source PNG/WebP paths. The exploratory gold ACTIV80 wordmark

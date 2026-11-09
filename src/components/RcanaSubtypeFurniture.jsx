@@ -17,7 +17,7 @@ export function RcanaSubtypeHeader({ data, template, hideFrame = false, classFon
   // brings back the webp lettering in SUBTYPE_WORDMARKS, which also still
   // supplies the display label (OPPORTUN80 for Opportunity, etc.).
   const wordmark = classFont === "mosaic";
-  const painted = wordmark && wordmarkFont === "painted" && lettering;
+  const painted = wordmark && wordmarkFont === "painted" && lettering?.src ? lettering : null;
   const categoryFont = classFont === "mosaic" ? "bebas" : classFont;
   return (
     <div className={`rc-subtype-header rc-${data.cardClass.toLowerCase()}-header`} style={{ ...box(SUBTYPE_HEADER), "--subtype-enamel": HEADER_COLORS[data.cardClass] }} data-class={data.cardClass} data-hide-frame={hideFrame || undefined} data-subtype={template.subtype || undefined} aria-label={[data.number != null ? `No. ${data.number}` : null, accessibleLabel, data.cardClass].filter(Boolean).join(", ")}>

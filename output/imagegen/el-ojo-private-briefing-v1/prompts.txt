@@ -1,0 +1,37 @@
+Created with the built-in image_gen tool. Art direction: simpler loteria symbols, a limited palette, minimal angular shading, one compact group around a laptop; general investing rather than crypto.
+The concept used the user's original masked-figure screenshot as a character-cue reference only. Two layers were then generated from the concept master.
+All PNGs copied without alteration.
+
+CONCEPT MASTER
+==============
+Create ONE square 1254 x 1254 art illustration for a simple loteria-style card: "The Private Briefing."
+
+CRITICAL STYLE: SIMPLE, BOLD, ICONIC. A traditional loteria picture modernized with just a little angular shading. Flat opaque colors, strong silhouette, broad hand-cut shapes, very few details. NOT a cinematic scene, NOT a detailed 3D render, NOT hundreds of tiny polygon facets. Each robe uses only 2-3 large black/charcoal planes; each mask uses only 3-5 large flat planes. Quiet matte finish, almost no texture. No metallic micro-detail, gradients, shine, haze, volumetric light, or distressed paper. The picture must read clearly as a small card thumbnail.
+
+The input image is ONLY a reference for mysterious hooded and masked people, not for its number of figures, grain, red robe, room or lighting.
+
+SUBJECT: Exactly THREE imposing black-cloaked, hooded figures huddled very closely around ONE comically small cream-colored laptop. One figure has a simple ochre GOLD mask. The other two faces are mostly hood shadow, with only small muted gray or ivory mask profiles. All three tilt their heads inward and stare intently at the tiny screen, as though this very ordinary investment chart is a great forbidden secret. Their similar posture is quietly funny and slightly unsettling. Make the group one compact, recognizable triangular silhouette, centered and filling about 80% of the square, with clean negative space around it. No arm reaching toward the viewer. Hands mostly concealed in sleeves; at most one small, naturally sized glove touches the trackpad inside the group.
+
+CAMERA: A modestly elevated three-quarter view INTO the huddle so we can see the masks in partial profile and the reclined laptop's screen. Make the people genuinely look toward the screen, not at the back of its lid. Simple graphic perspective, no huge foreground hand, no extreme wide-angle effects. Three distinct hood shapes, not a crowd. The central gold mask is higher, the two side hoods lean inward.
+
+LAPTOP: Small, chunky, plain cream laptop, wide-open/reclined so its screen can be read from above. Place it in the lower center nestled inside the huddle, about 23% of canvas width. The screen shows ONLY one simple red rising zigzag line on a cream field with two quiet dark axes. No numbers, words, logos, icons, tickers, candlesticks, buttons, crypto symbols or busy interface. A narrow simple dark surface underneath can merge into the robes, no elaborate table. Do not show a second chart anywhere.
+
+BACKGROUND: ONE flat muted forest-green color, evenly filled edge to edge. No room, horizon, columns, architecture, pyramid, floating eye, stars, spotlight, vignette, shadows on background, furniture scene, money, paper fragments or decorative motifs.
+
+LIMITED PALETTE: near-black and one charcoal shade for robes, cream, ochre gold, one muted forest-green backdrop, and a small vermilion-red chart line. Strong clear boundaries and a light touch of deliberate ink-outline character. No neon. No rich cinematic treatment. This is general investing, not crypto.
+
+No card frame, title, writing, labels or watermark. The entire idea is simply THREE SECRETIVE HOODS + ONE TINY LAPTOP against flat green. Resist adding anything else.
+
+LAYER PROMPTS
+=============
+01-background
+transparent_background: false
+
+Use case: precise-object-edit. Input image 1 is the edit target, a simple graphic loteria illustration. Produce ONLY its plain muted forest-green background plate, extended uninterrupted over the entire square 1254 x 1254 canvas. Remove all THREE hooded people, masks, robes, hand, laptop and chart completely. Match the calm matte forest-green hue visible in the original upper corners. The result is deliberately just a quiet, essentially uniform field of green, with only the original faint natural surface variation if present. No objects, silhouettes, shadows, lighting effects, vignettes, gradients, scenes, patterns, grain, text or decoration. Fully opaque edge-to-edge square. This minimal background is intentional; do not add visual interest.
+
+
+02-private-briefing
+transparent_background: true
+
+Use case: background-extraction. Extract the EXACT THREE-HOODED-FIGURE GROUP AND ITS LAPTOP from input image 1 as a single transparent parallax subject layer. Keep the full original square 1254 x 1254 canvas, exact positions, proportions, simple broad shapes and composition. NO redrawing, recentering, zooming or automatic trimming. Keep the three solemn masks, central ochre gold mask and two neutral side masks, all black/charcoal robe shapes, the one hand resting on the trackpad, the small cream laptop and its one rising red zigzag chart with simple axes. Keep all original dark forms at the bottom as part of the connected group silhouette. Remove ONLY the green backdrop, including all green gaps around the three hood outlines and between subjects. Mask eye holes and robe interiors stay dark and opaque. Genuine alpha transparency outside the group, no green halos, no white/black matte, no checkerboard painting. Preserve the simple graphic loteria look: very few broad angular color planes, no added facets, no more realistic 3D material, no embroidery or cloth texture, no gradients, glow, background scene or new prop. Keep the ordinary investing chart unchanged, no text, no logos, no crypto symbols. Exactly three figures and one laptop, all together on a transparent square canvas.
+

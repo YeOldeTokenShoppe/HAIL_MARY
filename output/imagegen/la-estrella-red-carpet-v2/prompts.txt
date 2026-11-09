@@ -1,0 +1,26 @@
+Mode: Built-in image_gen.
+transparent_background: true
+Reference 1: ../la-estrella-red-carpet-v1/02-female-celebrity.png — edit target.
+Reference 2: user's Screenshot 2026-11-09 at 11.43.12 AM.png — assembled card context.
+Generated PNG copied without raster alteration.
+
+Use case: precise-object-edit.
+Asset type: revised transparent central celebrity layer for La Estrella, a loteria-inspired parallax game card.
+Input 1 is the exact EDIT TARGET: the transparent blonde female celebrity. Input 2 is the assembled card, for palette, visual hierarchy and context ONLY; do not include its frame, lettering or scenery.
+
+Primary change: make her a much flashier, more exuberant red-carpet star, with an unforgettable glamorous gown and a radiant MILLION-WATT SMILE.
+
+FACE AND HAIR:
+Remove the hat and sunglasses completely so her full expression is visible. Preserve the same adult blonde woman's recognizable face shape and general identity. Give her voluminous glossy sculpted Old Hollywood blonde waves, framing her face and flowing toward her shoulders. Hair must form a distinctive elegant silhouette, not a beehive or crown.
+Her face turns toward our camera with a broad, joyful, camera-ready smile showing a clean band of upper teeth, warmly raised cheeks and lively smiling eyes. Red lipstick outlines the smile. Natural attractive facial anatomy; no exaggerated rictus, no enormous mouth, no individually overdrawn teeth. The expression should be confident, delighted and magnetic. Keep chin near level rather than tilted upward.
+
+DRESS:
+Replace the simple coral dress with a rich jewel-EMERALD couture evening gown. Dramatic asymmetrical one-shoulder neckline with a large sculpted fan of folded emerald satin rising from the viewer-left shoulder. Make this a small number of bold angular pleats, a striking fashion silhouette readable at card scale, not dozens of frills. Tailored fitted waist, long skirt continuing beyond image bottom.
+The gown catches camera flashes through broad emerald facets, brighter mint-green highlights, and selective oversized crystal/sequin shapes on the bodice and upper hip. It should read as sparkling glamorous fabric using graphic angular highlights, NOT dense tiny glitter, photoreal beadwork, uniform metal armor or random floating stars.
+Retain the long charcoal opera gloves and the confident pose with one hand on hip, opposite hand resting by thigh. Add bright crystal drop earrings and a refined diamond necklace to complete the red-carpet look. Dress should remain tasteful and elegant.
+
+PRESERVE:
+The original figure's overall size, location and three-quarter stance, hands/arms arrangement, anatomy, lower edge crop, slightly low camera angle and aligned 1254 x 1254 square framing. Head/face near the same x57%, y25% location. Hair can rise to about y7% after removing hat. Do not shift the whole person, add reaching arms, or expand the shoulders across the whole frame.
+Match existing clean medium-detail low-poly illustration: bold facets, controlled texture, expressive face, saturated colors. Keep warm gold illumination from upper right and cool pale-blue rim from left so she fits the unchanged paparazzi background. Green gown must clearly contrast with red carpet and gold entrance.
+
+Output ONLY the complete updated female celebrity, dress, hair, jewelry and gloves on TRUE TRANSPARENT ALPHA. Transparent margins and gap inside bent elbow. No hat, sunglasses, coral dress, other people, cameras, paparazzi, background, carpet, ropes, frame, text, card UI, floor shadow, glow cloud, floating particles, matte or baked checkerboard.

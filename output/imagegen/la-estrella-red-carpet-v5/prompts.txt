@@ -1,0 +1,30 @@
+Mode: Built-in image_gen.
+transparent_background: true
+Reference 1: ../la-estrella-red-carpet-v4/02-female-celebrity.png — exact edit target.
+Reference 2: user's Screenshot 2026-11-09 at 11.52.45 AM.png — existing Trader cards style guide.
+Reference 3: ../marisol-low-poly-v2/combined-preview.png — high-resolution style guide.
+Generated PNG copied without raster alteration.
+
+Use case: style-transfer.
+Asset type: revised transparent central character layer for La Estrella, a loteria-style parallax card.
+Input 1 is the EXACT EDIT TARGET, the approved Black celebrity with huge honey-blonde curls, gold cat-eye sunglasses, gold gown and radiant smile.
+Input 2 is the user's STYLE TARGET: existing Trader cards, especially the clean angular faces and broad faceted clothes of the investigator and devil.
+Input 3 is a higher-resolution supporting STYLE REFERENCE for the investigator's strong low-poly planes.
+Inputs 2 and 3 are style guides only. Do not import their characters, objects, symbols, colors, poses, text or frames.
+
+PRIMARY REQUEST: keep this approved celebrity design and composition, but make her A LITTLE MORE LOW-POLY to match the other characters. This is a controlled rendering simplification, NOT a character redesign or a drastic crude polygon reduction. The change should be clearly visible in the face, curls and dress.
+
+FACE AND SKIN:
+Preserve her identity, warm-brown skin tone, precise facial proportions, nose, lipstick, bright smiling mouth shape, raised cheeks, tooth-showing expression, head angle and oversized opaque gold cat-eye sunglasses.
+Replace airbrushed skin and beauty-render gradients with clean confident broad polygonal planes on forehead, cheeks, jaw, neck, shoulders, arms and hands, comparable to the investigator and devil references. Crisp planar transitions, no triangle wireframes, no random geometric mosaic overlay. Facial shapes remain attractive and natural. Smile has a simple bright teeth shape with restrained division detail, not dozens of tiny highlights or overdrawn teeth.
+
+HAIR:
+Preserve the exact enormous silhouette, curl pattern, dark roots, honey/caramel colors and length. Simplify each big curl into a few sculpted angular ribbon planes with strong gold highlight and brown shadow shapes. Remove tiny shiny strands and smooth glossy gradients. Keep beautiful flowing curls expressed through facets, not straightened hair, spikes, beads or a different hairstyle.
+
+GOWN AND JEWELRY:
+Preserve the off-shoulder sweetheart neckline, tailored draped gold gown, folds, waist and silhouette. Replace the many tiny round bokeh-like sequin highlights with fewer deliberate angular gold/champagne sparkle shapes grouped along the same folds. The dress must still read as glittering glamorous eveningwear, using bold faceted gold fabric and clean geometric highlights. Do not remove all sparkle or turn the gown into armor. Jewelry remains chandelier earrings, cuff and rings in the same placements, simplified into clear crystalline facets.
+Keep naturally formed hands and fingers and all original limb placement.
+
+INVARIANTS:
+Same person, smile, glasses, pose with hand on hip and other hand by thigh, framing, body scale, full hair outline, color palette, jewelry, warm-right and cool-left light direction, aligned 1254 x 1254 square canvas and full transparent margins. No repositioning, cropping, enlarging, face alteration, skin-tone shift, changed age, added objects or new costume. Rendering style is the only change.
+Output ONLY the celebrity on TRUE ALPHA TRANSPARENCY, including the elbow gap. No background, paparazzi, scenery, floor shadow, card borders, lettering, opaque matte or baked checkerboard. Clean edges.

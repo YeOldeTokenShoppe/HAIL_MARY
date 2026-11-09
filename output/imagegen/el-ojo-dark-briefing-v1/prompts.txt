@@ -1,0 +1,32 @@
+Created with the built-in image_gen tool. Subject is the user-approved intermediate head-angle version with sculpted masks and empty dark eye apertures. A new dark blue-black/teal background was generated separately. PNGs copied without alteration.
+
+FINAL BACKGROUND — transparent_background: false
+================================================
+Generate ONE square 1254 x 1254 BACKGROUND PLATE for an El Ojo loteria-style investing game card.
+The attached image is a PALETTE AND COMPOSITING REFERENCE ONLY: the accepted transparent group of three purple-black hooded masks with cyan phone glow and warm amber edge light. Do NOT include or redraw any part of those figures. This output is only the background that will sit behind that exact group.
+
+The user wants SOMETHING DARK. Create a rich deep blue-black / midnight ink backdrop, with a very restrained soft dark-teal atmospheric variation behind the upper-center and upper sides where the three hoods sit. The background should feel quiet, secretive and nocturnal. Near-black outer edges, slightly lighter charcoal-teal in the broad upper-middle so the dark purple hood silhouettes remain readable when composited. Keep this subtle: no bright central spotlight, no luminous oval, no visible halo around a human silhouette, no strong vignette framing. The deep colors should complement cyan phone lighting and amber cloth rims, not compete with them.
+A faint softly painted surface texture is welcome at the same medium-detail game-art quality; no grain, scratches, stars or busy patterns. Large quiet tonal shapes with gentle transitions, not flat pure black and not a photoreal environment. Keep the whole field dark, including the bottom where the group will cover it.
+
+ABSOLUTELY NO people, faces, masks, hoods, phones, hands, eyes, eye symbols, pyramids, columns, arches, scenery, furniture, charts, numbers, candles, coins, floating objects, rays, light beams, particles, neon borders, occult patterns, logos, lettering or card frame. No figure-shaped negative-space outlines. This is a simple atmospheric color field, not another symbolic scene.
+Fully OPAQUE, edge-to-edge square background.
+
+ACCEPTED SUBJECT EDIT — transparent_background: true
+====================================================
+Use case: precise-object-edit.
+We are adjusting ONLY the pitch of three masked heads.
+Image 1 is the newest version: CHINS TOO HIGH, masks tilted back too far.
+Image 2 is the earlier version: HEADS A LITTLE TOO LOW, appearing to look down at phones.
+
+Produce the NEUTRAL MIDDLE POSITION between these two references. Use Image 1 as the edit target and rotate each of the three masked heads gently forward/down by about HALF the difference toward Image 2. Do not go all the way back to Image 2. This is a subtle correction, not another dramatic pose change.
+
+TARGET HEAD ORIENTATION:
+The three mask faces are held UPRIGHT at EYE LEVEL, facing straight outward at the viewer. Chins are level, neither tucked toward the phones nor raised proudly toward the ceiling. The nose points straight at the camera, not up and not down. Show a normal front view of the nose with only very small subtle nostril indications; remove the pronounced underside-of-nose view from Image 1. The lower jaw should have just a narrow bottom bevel, not a big exposed underside plane. Forehead, cheeks and chin occupy balanced proportions. Place each mask a little lower within its hood than in Image 1, roughly midway between the two references' positions, keeping head scale coherent. The central gold head and BOTH ivory side heads must use this same neutral pitch.
+The desired feeling is that they have looked up from their phones and stopped at the viewer, not continued looking upward. Calm straight-on neutral masks.
+
+MASK APPEARANCE:
+Keep rigid sculpted mask shells, central metallic gold and two ivory/silver masks. Two completely dark, opaque black eye apertures per mask. NO visible human eyes, pupils, irises, sclera, catchlights, eyelashes or skin. The mask shapes and head angle establish orientation. Keep neutral fixed mouth slots and the same moderate low-poly styling. Do not add facial expression or turn them into real faces.
+
+PRESERVE:
+The original triangular grouping, all three hood silhouettes and robe folds, phones and gripping hands at their current positions and size, warm orange edge light, cool cyan screen illumination, full square 1254 x 1254 framing and genuine alpha transparency outside the group. Make only small local hood/neck changes needed for the intermediate head pitch. Do not move the phones, raise the hands, redesign masks, add objects, alter the palette, recenter, crop or zoom. No matte, checkerboard, text or scenery.
+The result should be visually halfway between Image 1's overly raised chin angle and Image 2's slightly bowed angle.

@@ -228,14 +228,13 @@ const D = (key, name, type, cost, o = {}) => ({ key, name, type, cost, ...o });
 const DESIGNS = [
   D('unicornio', 'El Unicornio', 'trader', 3, { liq: 3, cred: 20, abilityName: 'Compound Interest', text: 'At turn start, if you have at least 100 banked Prosperity, bank 25 more.' }),
   D('gato', 'El Gato', 'trader', 2, { liq: 2, cred: 16, abilityName: 'Clean Sweep', text: 'When seated, immediately knock one Calamity off your table, free' }),
+  // PROVISIONAL stats and text — the card exists for its face; not yet in any deck list or sim hook.
+  D('investigadora', 'La Investigadora', 'trader', 3, { liq: 3, cred: 14, abilityName: 'Due Diligence', text: 'Once per turn, look at the top card of the deck; you may put it on the bottom' }),
   D('monje', 'El Monje', 'trader', 1, { liq: 1, cred: 22, abilityName: 'Vow of Prosperity', text: 'When you light a candle, bank 25 Prosperity' }),
   D('diablito', 'El Diablito', 'trader', 2, { liq: 2, cred: 10, abilityName: 'Devil’s Wager', text: 'At the start of your turn, flip a coin: heads, collect 1 Liquidity; tails, El Diablito loses 1 CRED' }),
   D('celebridad', 'La Estrella', 'trader', 3, { liq: 3, cred: 8, abilityName: 'Star Power', text: 'The influencer: pay 1 when banking from a card, +25 Prosperity' }),
   D('abuela', 'La Abuela', 'trader', 2, { liq: 2, cred: 18, abilityName: 'Lucky Streak', text: 'The gambling grandmother: your gambles moon on 4+ instead of 5+' }),
-  D('pope', 'El Papa', 'trader', 3, { liq: 3, cred: 25, abilityName: 'Absolution', text: 'Once a game, a failed Hail Mary is absolved — you may attempt it again' }),
   D('prospector', 'El Gambusino', 'trader', 2, { liq: 2, cred: 15, abilityName: 'Prospector’s Eye', text: 'Assets you buy cost 1 less' }),
-  // Unseen hands: the effect resolves when played directly into the active slot.
-  D('illuminati', 'El Ojo', 'trader', 3, { liq: 3, cred: 12, abilityName: 'Unseen Hands', text: 'When played as your active Trader, each rival passes you one random card' }),
   D('tech', 'Tech Stock', 'asset', 3, { cash: 5, pros: 100 }),
   // The degen asset, and the only gamble: sell safe for cash, or roll the die for
   // Prosperity. (Was two cards — Meme Coin's body with Shitcoin's upside.)
@@ -286,7 +285,7 @@ const DESIGNS = [
   D('rose', 'The Rose', 'grace', 0, { pros: 50, cash: 2, text: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise', printName: 'La Rosa' }),
   D('moneda', 'Pay Day', 'event', 0, { text: 'Every player collects 2 Liquidity' }),
   // Yield farming: fat income until the market moves and wipes it.
-  D('jardin', 'Yield Farm', 'asset', 4, { cash: 2, pros: 50, income: 2, text: 'While held: collect 2 a turn. Discard this Asset when any Market Event triggers' }),
+  D('jardin', 'Yield Farm', 'asset', 4, { cash: 2, pros: 50, income: 2, text: 'While held: collect 2 a turn. Discard this Asset when any Event fires on draw' }),
   // Hail Mary Prospecting Co. — three claims:
   // the map leads somewhere (cards), the mine pays the longer you dig, the well is a wildcat.
   D('map', 'Treasure Map', 'asset', 2, { cash: 2, pros: 75, text: 'When sold, draw 2 cards' }),
@@ -295,14 +294,20 @@ const DESIGNS = [
   D('semilla', 'Seed Round', 'asset', 1, { cash: 1, pros: 25, bloom: 150, text: 'Sell for 25 Prosperity — or hold four rounds and it blooms to 150' }),
   // Events: the market's own voice. They fire the moment they are drawn, hit the whole
   // table, then the drawer draws a replacement card. Nobody chooses an Event.
-  D('crash', 'Flash Crash', 'event', 0, { text: 'Everyone holding 8+ Liquidity loses half' }),
-  D('ballena', 'The Whale', 'event', 0, { text: 'The whale surfaces: the richest portfolio’s best Asset moves to the poorest player' }),
-  D('rueda', 'The Wheel', 'event', 0, { text: 'Every portfolio rotates one seat' }),
+  // On-draw events print a subtype by outcome (eventTemplate.js): a windfall
+  // is an Opportunity (the default), a loss a Calamity, a shake-up whose
+  // winner is unknown an Ambiguity.
+  D('crash', 'Flash Crash', 'event', 0, { subtype: 'Calamity', text: 'Everyone holding 8+ Liquidity loses half' }),
+  D('ballena', 'The Whale', 'event', 0, { subtype: 'Ambiguity', text: 'The whale surfaces: the richest portfolio’s best Asset moves to the poorest player' }),
+  // Initiation: the drawer is taken into the society; fires on draw like the
+  // other market weather but PRINTS as an Opportunity (the face sets subClass).
+  D('illuminati', 'The Illumin80', 'event', 0, { text: 'Unseen hands: the drawer is initiated — each rival passes them one random card' }),
+  D('rueda', 'The Wheel', 'event', 0, { subtype: 'Ambiguity', text: 'Every portfolio rotates one seat' }),
   D('godcandle', 'The God Candle', 'event', 0, { text: 'Until the drawer’s next turn, every Prosperity sale pays 100 more' }),
 
-  D('world', 'The World', 'event', 0, { text: 'End all ongoing Market effects. Every player draws a card' }),
+  D('world', 'The World', 'event', 0, { text: 'End all ongoing Event effects. Every player draws a card' }),
 
-  D('moralhazard', 'Moral Hazard', 'event', 0, { text: 'The bailout: the poorest player collects 5; the richest loses 2' }),
+  D('moralhazard', 'Moral Hazard', 'event', 0, { subtype: 'Ambiguity', text: 'The bailout: the poorest player collects 5; the richest loses 2' }),
 ];
 
 const DESIGN_TYPES = ["trader", "asset", "event", "hazard", "remedy", "artifact", "grace"];
@@ -316,7 +321,7 @@ const byKey = Object.fromEntries(DESIGNS.map((d) => [d.key, d]));
 // Two 40-card starter recipes: Devotion (deeds, remedies, slow money) and Degen
 // (hazards, gambles, the Unicorn's compounding). Deck identity is the collectible premise.
 const RECIPES = {
-  devotion: [['monje', 2], ['gato', 1], ['celebridad', 1], ['pope', 1],
+  devotion: [['monje', 2], ['gato', 2], ['celebridad', 1],
     ['tech', 1], ['collectibles', 1], ['moon', 1], ['bluechip', 1], ['moneda', 2], ['semilla', 1],
     ['bull', 2], ['rocket', 2], ['inherit', 1],
     ['bear', 1], ['rug', 1],
@@ -389,6 +394,7 @@ class Game {
       this.log('THE WHEEL turns — every portfolio rotates one seat');
     }
     if (c.key === 'moneda') { for (const q of this.players) { q.liq += 2; } this.log('PAY DAY — every player collects 2'); }
+    if (c.key === 'illuminati') for (const q of this.players) if (q !== p && q.hand.length) { const t = q.hand.splice(Math.floor(this.rng() * q.hand.length), 1)[0]; p.hand.push(t); this.log(`THE ILLUMIN80 initiate ${p.name} — unseen hands move a card from ${q.name}${q.policy.human ? ` (your ${t.name})` : p.policy.human ? ` (${t.name})` : ''}`); }
     if (c.key === 'world') { for (const k of Object.keys(this.fx)) { this.log(`${byKey[k].name} blows over`); delete this.fx[k]; } }
     if (this.hooks && this.hooks.onEvent) this.hooks.onEvent(p, c);
     if (c.key === 'world') for (const q of this.players) this.draw(q);
@@ -467,8 +473,7 @@ class Game {
       case 'trader': {
         c.credNow = c.cred; p.stats.hires++;
         if (!p.trader) { p.trader = c; this.log(`${p.name} seats ${c.name} at the desk (LIQ ${c.liq} · GRACE ${c.cred})`);
-          if (c.key === 'gato' && p.hazards.length && this.abilityOn(p)) { const h = choice.hazard || p.hazards[0]; this.clearHazard(p, h, p, 'EL GATO knocks it off the table'); }
-          if (c.key === 'illuminati' && this.abilityOn(p)) for (const q of this.players) if (q !== p && q.hand.length) { const t = q.hand.splice(Math.floor(this.rng() * q.hand.length), 1)[0]; p.hand.push(t); this.log(`unseen hands move a card from ${q.name} to ${p.name}${q.policy.human ? ` (your ${t.name})` : p.policy.human ? ` (${t.name})` : ''}`); } }
+          if (c.key === 'gato' && p.hazards.length && this.abilityOn(p)) { const h = choice.hazard || p.hazards[0]; this.clearHazard(p, h, p, 'EL GATO knocks it off the table'); } }
         else { p.bench.push(c); this.log(`${c.name} joins ${p.name}'s bench`); }
         break; }
       case 'grace': {
@@ -522,7 +527,6 @@ class Game {
     const roll = 1 + Math.floor(this.rng() * 12); const ok = roll <= twelfths;
     this.log(`✝ ${p.name} attempts the HAIL MARY at ${twelfths}/12 with ${p.deeds} candle${p.deeds === 1 ? '' : 's'}… the die shows ${roll}: ${ok ? 'ANSWERED' : 'unanswered'}`);
     if (ok) { for (const h of [...p.hazards]) this.clearHazard(p, h, p, 'grace'); p.stats.hailWon++; this.bank(p, p.artifacts.some((a) => a.key === 'grail') ? 300 : 200, 'hail'); }
-    else if (this.is(p, 'pope') && !p.popeUsed) { p.popeUsed = true; p.hailUsed = false; this.log('EL PAPA absolves the attempt — Our Lady may be petitioned once more'); }
     return ok;
   }
 
@@ -779,15 +783,47 @@ const FACES = {
     "rarity": "Uncommon",
     "face": "/TCG/rcana/la-fuente/face.webp",
     "art": null
+  },
+  "investigadora": {
+    "id": "la-investigadora",
+    "name": "La Investigadora",
+    "number": 26,
+    "rarity": "Uncommon",
+    "face": "/TCG/rcana/la-investigadora/face.webp",
+    "art": null
+  },
+  "prospector": {
+    "id": "el-gambusino",
+    "name": "El Gambusino",
+    "number": 27,
+    "rarity": "Uncommon",
+    "face": "/TCG/rcana/el-gambusino/face.webp",
+    "art": null
+  },
+  "illuminati": {
+    "id": "the-illumin80",
+    "name": "The Illumin80",
+    "number": 28,
+    "rarity": "Rare",
+    "face": "/TCG/rcana/the-illumin80/face.webp",
+    "art": null
+  },
+  "celebridad": {
+    "id": "the-celebrity",
+    "name": "La Estrella",
+    "number": 29,
+    "rarity": "Uncommon",
+    "face": "/TCG/rcana/the-celebrity/face.webp",
+    "art": null
   }
 };
 const TYPE_CLASS = {"trader":"Trader","asset":"Asset","event":"Event","hazard":"Event","remedy":"Artifact","artifact":"Artifact","grace":"Artifact"};
-const EVENT_SUBTYPES = {"bull":"Opportunity","rocket":"Opportunity","moon":"Opportunity","inherit":"Opportunity","bear":"Calamity","hack":"Calamity","rug":"Calamity","taxman":"Calamity","escandalo":"Calamity","naranja":"Calamity","scam":"Calamity","moneda":"Market","crash":"Market","ballena":"Market","rueda":"Market","godcandle":"Market","world":"Market","moralhazard":"Market"};
+const EVENT_SUBTYPES = {"bull":"Opportunity","rocket":"Opportunity","moon":"Opportunity","inherit":"Opportunity","bear":"Calamity","hack":"Calamity","rug":"Calamity","taxman":"Calamity","escandalo":"Calamity","naranja":"Calamity","scam":"Calamity","moneda":"Opportunity","crash":"Calamity","ballena":"Ambiguity","illuminati":"Opportunity","rueda":"Ambiguity","godcandle":"Opportunity","world":"Opportunity","moralhazard":"Ambiguity"};
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const FX = { unicornio: 'Compound Interest: at turn start, if you have at least 100 banked Prosperity, bank 25 more', gato: 'When seated: knock one Calamity off your table, free', monje: 'When you light a candle, bank 25 Prosperity', diablito: 'Devil’s Wager: at turn start, flip a coin — heads gains 1 Liquidity; tails loses 1 CRED', celebridad: 'The influencer: pay 1 when banking from a card, +25 Prosperity', abuela: 'The gambling grandmother: your gambles moon on 4+ instead of 5+', pope: 'Once a game, a failed Hail Mary is absolved — try again', prospector: 'Assets you buy cost 1 less', bluechip: 'Sell later: 10 Liquidity or 250 Prosperity', halving: 'Fires when drawn: until the drawer’s next turn, turn income is 1', crash: 'Fires when drawn: everyone holding 8+ Liquidity loses half', airdrop: 'Fires when drawn: every player draws a card', tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell for 4 Liquidity — or roll the die for Prosperity: 5+ moons for 125, else zero', moon: 'Invest 4 → bank 150 Prosperity', bull: 'Invest 2 → bank 100 Prosperity', rocket: 'Invest 4 → bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', taxman: 'They pay 1 to the bank at the start of each turn', naranja: 'The Orange One takes his cut: when they bank, the Calamity’s owner collects 2', escandalo: 'Scandal: their seated Trader loses 5 Grace when it breaks, 2 more each turn', bell: 'Clears Bear Market', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one Calamity', publicista: 'Clear a Scandal — or polish: your seated Trader regains 5 Grace', heart: 'A shield, not a cure: while equipped, discard it to cancel a Calamity AS it lands — it cannot clear one already on you', halo: 'Any Trader seated at your desk cannot be disabled', rosary: 'Draw a card when you light a candle', grail: 'An answered Hail Mary banks 300 instead of 200', enigma: 'Once a turn, tap: discard up to 3 cards and draw that many — free', fountain: 'Toss in 2 Liquidity: your Hail Mary odds rise one step, even past the shrine’s three', shroud: 'When your seated Trader would be disgraced, the Shroud is spent instead: they stay, with 5 Grace', collectibles: 'Sell later: 5 Liquidity or 125 Prosperity', gold: 'Sell later: 6 Liquidity or 75 Prosperity — the safe haven', realestate: 'Sell later: 8 Liquidity or 150 Prosperity — Bear Market cannot cap it', stablecoin: 'While held: collect 1 Liquidity at the start of your turn', confession: 'To the shrine: light a candle, and your seated Trader’s Grace is restored in full', ofrenda: 'Offer it to Our Lady: it goes to the shrine and lights a candle (max 3)', moneda: 'Fires when drawn: every player collects 2 Liquidity', map: 'Sell later: 2 Liquidity or 75 Prosperity — and draw 2 cards', mine: 'Sell later: 4 Liquidity, or Prosperity that grows 25 each round held (from 75)', oil: 'Sell for Prosperity: a die decides — 3+ gushes for 175, else it runs dry for 25', semilla: 'Sell for 25 Prosperity — or hold four rounds and it blooms to 150', ballena: 'Fires when drawn: the richest portfolio’s best Asset moves to the poorest player', rueda: 'Fires when drawn: every portfolio rotates one seat', godcandle: 'Fires when drawn: every Prosperity sale pays 100 more until the drawer’s next turn', skull: 'Exit liquidity: whenever a rival sells an Asset, collect 1 Liquidity', illuminati: 'When played as your active Trader, each rival passes you one random card', moralhazard: 'Fires when drawn: the bailout — the poorest player collects 5; the richest loses 2', rose: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise' };
+const FX = { unicornio: 'Compound Interest: at turn start, if you have at least 100 banked Prosperity, bank 25 more', gato: 'When seated: knock one Calamity off your table, free', monje: 'When you light a candle, bank 25 Prosperity', diablito: 'Devil’s Wager: at turn start, flip a coin — heads gains 1 Liquidity; tails loses 1 CRED', celebridad: 'The influencer: pay 1 when banking from a card, +25 Prosperity', abuela: 'The gambling grandmother: your gambles moon on 4+ instead of 5+', prospector: 'Assets you buy cost 1 less', bluechip: 'Sell later: 10 Liquidity or 250 Prosperity', halving: 'Fires when drawn: until the drawer’s next turn, turn income is 1', crash: 'Fires when drawn: everyone holding 8+ Liquidity loses half', airdrop: 'Fires when drawn: every player draws a card', tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell for 4 Liquidity — or roll the die for Prosperity: 5+ moons for 125, else zero', moon: 'Invest 4 → bank 150 Prosperity', bull: 'Invest 2 → bank 100 Prosperity', rocket: 'Invest 4 → bank 200 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', taxman: 'They pay 1 to the bank at the start of each turn', naranja: 'The Orange One takes his cut: when they bank, the Calamity’s owner collects 2', escandalo: 'Scandal: their seated Trader loses 5 Grace when it breaks, 2 more each turn', bell: 'Clears Bear Market', resist: 'Clears Quantum Hack', keys: 'Clears Rug Pull', tortilla: 'Clears any one Calamity', publicista: 'Clear a Scandal — or polish: your seated Trader regains 5 Grace', heart: 'A shield, not a cure: while equipped, discard it to cancel a Calamity AS it lands — it cannot clear one already on you', halo: 'Any Trader seated at your desk cannot be disabled', rosary: 'Draw a card when you light a candle', grail: 'An answered Hail Mary banks 300 instead of 200', enigma: 'Once a turn, tap: discard up to 3 cards and draw that many — free', fountain: 'Toss in 2 Liquidity: your Hail Mary odds rise one step, even past the shrine’s three', shroud: 'When your seated Trader would be disgraced, the Shroud is spent instead: they stay, with 5 Grace', collectibles: 'Sell later: 5 Liquidity or 125 Prosperity', gold: 'Sell later: 6 Liquidity or 75 Prosperity — the safe haven', realestate: 'Sell later: 8 Liquidity or 150 Prosperity — Bear Market cannot cap it', stablecoin: 'While held: collect 1 Liquidity at the start of your turn', confession: 'To the shrine: light a candle, and your seated Trader’s Grace is restored in full', ofrenda: 'Offer it to Our Lady: it goes to the shrine and lights a candle (max 3)', moneda: 'Fires when drawn: every player collects 2 Liquidity', map: 'Sell later: 2 Liquidity or 75 Prosperity — and draw 2 cards', mine: 'Sell later: 4 Liquidity, or Prosperity that grows 25 each round held (from 75)', oil: 'Sell for Prosperity: a die decides — 3+ gushes for 175, else it runs dry for 25', semilla: 'Sell for 25 Prosperity — or hold four rounds and it blooms to 150', ballena: 'Fires when drawn: the richest portfolio’s best Asset moves to the poorest player', rueda: 'Fires when drawn: every portfolio rotates one seat', godcandle: 'Fires when drawn: every Prosperity sale pays 100 more until the drawer’s next turn', skull: 'Exit liquidity: whenever a rival sells an Asset, collect 1 Liquidity', illuminati: 'Fires when drawn: the drawer is initiated — each rival passes them one random card', moralhazard: 'Fires when drawn: the bailout — the poorest player collects 5; the richest loses 2', rose: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise' };
 
 let S = null;
 const toast = (t) => { const el = $('toast'); el.innerHTML = `<span>${esc(t)}</span><button class="tx" aria-label="dismiss">\u00d7</button>`; el.querySelector('.tx').onclick = () => el.classList.remove('show'); el.classList.add('show'); };
@@ -1131,9 +1167,9 @@ function buildGallery() {
   const rows = [
     { cls: 'Trader', type: 'trader', label: 'Traders — LIQ is your income while seated, CRED is their reputation; one seat, two bench spots' },
     { cls: 'Asset', type: 'asset', label: 'Assets — buy now, sell later for cash or Prosperity' },
-    { cls: 'Event', subtype: 'Calamity', label: 'Calamities — play on a rival; stay attached until cleared' },
-    { cls: 'Event', subtype: 'Opportunity', label: 'Opportunities — keep in your hand and play when you choose' },
-    { cls: 'Event', subtype: 'Market', label: 'Market Events — reveal when drawn, resolve for the table, then draw a replacement' },
+    { cls: 'Event', subtype: 'Calamity', label: 'Calamities — losses: played on a rival and attached until cleared, or fired on the table when drawn' },
+    { cls: 'Event', subtype: 'Opportunity', label: 'Opportunities — windfalls: played from your hand when you choose, or fired for the table when drawn' },
+    { cls: 'Event', subtype: 'Ambiguity', label: 'Ambiguities — shake-ups whose winner is unknown until they resolve; fire for the table when drawn' },
     { cls: 'Artifact', type: 'remedy', label: 'Remedies — clear Calamities, yours or a rival’s' },
     { cls: 'Artifact', type: 'artifact', label: 'Relics — equip up to two' },
     { cls: 'Artifact', type: 'grace', label: 'Graces — offerings to Our Lady; candles raise the Hail Mary' },

@@ -1,0 +1,17 @@
+Mode: Built-in image_gen.
+transparent_background: true
+Reference 1: ../el-ojo-symbol-v1/02-eye-symbol.png
+Reference 2: ../el-ojo-symbol-v1/combined-preview.png
+Generated PNG copied without raster alteration.
+Preview symbol opacity: 0.55.
+
+Use case: precise-object-edit.
+Asset type: transparent alternate symbol overlay for the El Ojo loteria-style card.
+Input 1: edit target — a small antique-gold eye and triangle on a full transparent square canvas.
+Input 2: placement/palette reference only — existing assembled card art.
+
+Replace the eye-and-triangle symbol in Input 1 with ONE SKULL AND CROSSBONES emblem. Keep the same muted antique-gold/bronze finish, understated surface texture, restrained highlights, and overall visual weight. Simple bold recognizable skull facing straight forward, two empty eye sockets, a small nasal opening, a few clean squared teeth, and exactly two long bones crossing diagonally behind it. Modest angular planes and confident contours appropriate to the card's low-poly loteria illustration; sinister but elegant, symbolic rather than realistic. No gore.
+
+Retain exact square 1254 x 1254 canvas and transparent margins. Place the new complete emblem in the SAME UPPER-LEFT REGION as the old one: bounded approximately x3%-33%, y5%-30%, centered around x18%, y18%. Do not zoom to fill the canvas or recenter it. The emblem must fit beside the leader's hood when used with the existing art.
+Remove the original eye and triangle completely. Output only the skull and its two crossed bones on TRUE ALPHA TRANSPARENCY. Eye sockets, nasal opening, and open gaps between bones are also transparent. No background, people, cloak, phones, blue backdrop, text, frame, plaque, circle, triangle, eye symbol, hat, weapons, coins, extra decorations, smoke, glow, or baked checkerboard.
+The source images are only for the symbol's style and aligned position; do not include any part of the figures.

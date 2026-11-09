@@ -5,8 +5,12 @@ import { IVORY_PAINT_MATRIX } from "./wordmarkPaint.js";
 
 export const SUBTYPE_WORDMARKS = {
   Remedy: {
-    src: "/TCG/labels/subtype-remedy-painted.webp", width: 2172, height: 724,
-    viewBox: [56, 162, 2066, 410],
+    label: "REM80",
+    // Composited from the REMEDY and CALAM80 painted sheets (R-E-M + 8-0);
+    // see painted-subtype-wordmarks.prompts.json. subtype-remedy-painted.webp
+    // is the earlier full REMEDY lettering.
+    src: "/TCG/labels/wordmark-rem80-painted.webp", width: 2172, height: 724,
+    viewBox: [252, 162, 1668, 410],
     colorMatrix: IVORY_PAINT_MATRIX,
   },
   Grace: {
@@ -31,9 +35,10 @@ export const SUBTYPE_WORDMARKS = {
     viewBox: [47, 159, 2072, 406],
     colorMatrix: IVORY_PAINT_MATRIX,
   },
-  Market: {
-    src: "/TCG/labels/subtype-market-painted.webp", width: 2172, height: 724,
-    viewBox: [65, 162, 2041, 408],
-    colorMatrix: IVORY_PAINT_MATRIX,
+  // No painted sheet yet: the text lettering prints the label, and the
+  // painted mode falls back to it. A prompt for the sheet is recorded in
+  // set/painted-subtype-wordmarks.prompts.json.
+  Ambiguity: {
+    label: "AMBIGU80",
   },
 };

@@ -1,0 +1,45 @@
+MODE: Built-in image_gen. PNG outputs copied without raster alteration.
+Canvas: 1254 x 1254.
+
+BACKGROUND (reused approved asset; transparent_background: false)
+Generate ONE square 1254 x 1254 BACKGROUND PLATE for an El Ojo loteria-style investing game card.
+The attached image is a PALETTE AND COMPOSITING REFERENCE ONLY: the accepted transparent group of three purple-black hooded masks with cyan phone glow and warm amber edge light. Do NOT include or redraw any part of those figures. This output is only the background that will sit behind that exact group.
+
+The user wants SOMETHING DARK. Create a rich deep blue-black / midnight ink backdrop, with a very restrained soft dark-teal atmospheric variation behind the upper-center and upper sides where the three hoods sit. The background should feel quiet, secretive and nocturnal. Near-black outer edges, slightly lighter charcoal-teal in the broad upper-middle so the dark purple hood silhouettes remain readable when composited. Keep this subtle: no bright central spotlight, no luminous oval, no visible halo around a human silhouette, no strong vignette framing. The deep colors should complement cyan phone lighting and amber cloth rims, not compete with them.
+A faint softly painted surface texture is welcome at the same medium-detail game-art quality; no grain, scratches, stars or busy patterns. Large quiet tonal shapes with gentle transitions, not flat pure black and not a photoreal environment. Keep the whole field dark, including the bottom where the group will cover it.
+
+ABSOLUTELY NO people, faces, masks, hoods, phones, hands, eyes, eye symbols, pyramids, columns, arches, scenery, furniture, charts, numbers, candles, coins, floating objects, rays, light beams, particles, neon borders, occult patterns, logos, lettering or card frame. No figure-shaped negative-space outlines. This is a simple atmospheric color field, not another symbolic scene.
+Fully OPAQUE, edge-to-edge square background.
+
+MASTER COMPOSITION (transparent_background: false)
+Input 1: ../el-ojo-dark-briefing-v1/combined-preview.png
+Input 2: /Users/michellepaulson/Desktop/Screenshot 2026-11-09 at 9.08.44 AM.png
+Use case: compositing.
+Asset type: square art composition for El Ojo, a loteria-inspired investing game, to be separated into parallax layers.
+Input image 1: edit target and approved visual style, mask design, neutral head pitch, angular robes and lighting.
+Input image 2: composition reference ONLY for a single dominant leader in front of several smaller masked followers. Do not copy its noisy/grainy rendering or shushing gesture.
+Primary request: restructure image 1 into ONE central gold-masked leader prominently in the FOREGROUND, with SIX smaller, dimmer masked hooded figures standing behind, three to either side in staggered rows. ONLY the central leader holds a smartphone. The crowd has NO phones; their hands are concealed inside their cloaks.
+Composition: square canvas 1254x1254. Leader's hood top near 7% height, head centered at x50%, mask at y30%, torso occupies central 55% of canvas and continues beyond bottom. Leader overlaps and occludes the crowd. Crowd heads smaller, staggered near y43-55%, all visible to left/right of leader, bodies continuing to bottom. Keep some dark empty space above the group. Phone held naturally close to leader's chest at y60%, back toward viewer, screen toward mask, hand fully connected to body; no arm reaching toward viewer.
+Style: match image 1's moderately detailed low-poly illustration, broad clean polygonal facets, sculpted metallic masks, flowing angular cloaks, readable at small card size. Leader retains burgundy-purple hood and faceted GOLD mask. Followers have muted bone/pewter masks and near-black plum/navy robes. They are visibly dimmer and less contrasty than the leader.
+Faces: all rigid expressionless masks with EMPTY BLACK EYE APERTURES, absolutely no visible eyeballs or pupils. All face directly outward at viewer. Heads perfectly upright with NEUTRAL pitch, chins level; do not bow toward the phone and do not tilt chins up. Preserve gold mask orientation from image 1.
+Lighting: one restrained cyan phone glow illuminating lower gold mask and central hand; soft amber rim at upper left of leader. Followers receive only subdued dim ambient light, no blue beams from chest.
+Background: simple dark blue-black painted atmosphere with faint teal variation, matching image 1. Clean simple scene. No text, borders, logos, eye symbols, pyramids, coins, crypto elements, furniture, extra props, or shushing gesture. Output full composition, not a layer sheet.
+
+CENTRAL FIGURE (transparent_background: true)
+Input: generated master composition.
+Use case: background-extraction.
+Asset type: central foreground character layer for parallax card artwork.
+Input image: exact edit target. Extract ONLY the large central gold-masked hooded leader, with the one smartphone and its holding hand, onto TRUE TRANSPARENT alpha background.
+Keep the leader's original exact silhouette, size, pixel placement, head orientation, face, black empty eye holes, neutral chin, gold mask, burgundy-purple angular robe facets, amber rim highlights, and cyan phone illumination. Keep the phone, hand and ALL light falling on this character together on this layer.
+Remove ALL six smaller background figures completely; remove the entire dark teal backdrop. No shadow silhouettes or remnants of other people behind the character.
+The result is the SOLO CENTRAL LEADER, including full hood and full robe down to the bottom edge exactly as in the source. Preserve same 1254x1254 square canvas and all original transparent margins; do not zoom, recenter, crop tighter, or change pose. Pixels outside leader silhouette must be genuinely transparent. No text, no border, no checkerboard baked into image, no floor, no extra objects. Preserve existing source art rather than redesigning it.
+
+BACKGROUND FIGURES (transparent_background: true)
+Input: generated master composition.
+Use case: background-extraction.
+Asset type: separate middle-depth crowd layer for parallax card artwork.
+Input image: exact edit target. Extract ONLY the SIX smaller hooded masked followers behind the central leader, on a TRUE TRANSPARENT alpha background.
+REMOVE the entire large central gold-masked leader, its robe, hand, smartphone, and all its bright cyan and amber lighting. REMOVE the dark teal atmospheric backdrop too. There must be ZERO phones, ZERO hands, ZERO gold masks, and ZERO central foreground leader in this output.
+Preserve each of the six smaller followers' original position and scale: three on the left and three on the right, staggered as in source, muted pewter/bone rigid masks, completely black empty eye apertures, neutral heads looking directly outward, near-black plum/navy low-poly angular cloaks and dim ambient lighting.
+Reconstruct the portions of follower shoulders and robes previously hidden behind leader, extending these cloaks naturally down to the bottom edge. Each follower must be a complete plausible upper-body silhouette, with hands concealed in robe; no large leader-shaped cutout in their bodies. Do not invent additional figures in center; leave naturally empty space transparent between the two groups if needed. Do not move any heads inward or enlarge them.
+Retain exact 1254x1254 square canvas, original head placements and surrounding margins. Do not recenter, zoom or make a contact sheet. Sharp clean silhouettes, true transparent alpha wherever there is no follower, including entire upper region. Preserve source's angular moderate-detail art and subdued colors. No text, border, architecture, shadows of removed leader, cyan phone glow, or baked checkerboard.

@@ -22,7 +22,7 @@ export const byKey = Object.fromEntries(DESIGNS.map((d) => [d.key, d]));
 // Two 40-card starter recipes: Devotion (deeds, remedies, slow money) and Degen
 // (hazards, gambles, the Unicorn's compounding). Deck identity is the collectible premise.
 export const RECIPES = {
-  devotion: [['monje', 2], ['gato', 1], ['celebridad', 1], ['pope', 1],
+  devotion: [['monje', 2], ['gato', 2], ['celebridad', 1],
     ['tech', 1], ['collectibles', 1], ['moon', 1], ['bluechip', 1], ['moneda', 2], ['semilla', 1],
     ['bull', 2], ['rocket', 2], ['inherit', 1],
     ['bear', 1], ['rug', 1],
@@ -95,6 +95,7 @@ export class Game {
       this.log('THE WHEEL turns — every portfolio rotates one seat');
     }
     if (c.key === 'moneda') { for (const q of this.players) { q.liq += 2; } this.log('PAY DAY — every player collects 2'); }
+    if (c.key === 'illuminati') for (const q of this.players) if (q !== p && q.hand.length) { const t = q.hand.splice(Math.floor(this.rng() * q.hand.length), 1)[0]; p.hand.push(t); this.log(`THE ILLUMIN80 initiate ${p.name} — unseen hands move a card from ${q.name}${q.policy.human ? ` (your ${t.name})` : p.policy.human ? ` (${t.name})` : ''}`); }
     if (c.key === 'world') { for (const k of Object.keys(this.fx)) { this.log(`${byKey[k].name} blows over`); delete this.fx[k]; } }
     if (this.hooks && this.hooks.onEvent) this.hooks.onEvent(p, c);
     if (c.key === 'world') for (const q of this.players) this.draw(q);
@@ -173,8 +174,7 @@ export class Game {
       case 'trader': {
         c.credNow = c.cred; p.stats.hires++;
         if (!p.trader) { p.trader = c; this.log(`${p.name} seats ${c.name} at the desk (LIQ ${c.liq} · GRACE ${c.cred})`);
-          if (c.key === 'gato' && p.hazards.length && this.abilityOn(p)) { const h = choice.hazard || p.hazards[0]; this.clearHazard(p, h, p, 'EL GATO knocks it off the table'); }
-          if (c.key === 'illuminati' && this.abilityOn(p)) for (const q of this.players) if (q !== p && q.hand.length) { const t = q.hand.splice(Math.floor(this.rng() * q.hand.length), 1)[0]; p.hand.push(t); this.log(`unseen hands move a card from ${q.name} to ${p.name}${q.policy.human ? ` (your ${t.name})` : p.policy.human ? ` (${t.name})` : ''}`); } }
+          if (c.key === 'gato' && p.hazards.length && this.abilityOn(p)) { const h = choice.hazard || p.hazards[0]; this.clearHazard(p, h, p, 'EL GATO knocks it off the table'); } }
         else { p.bench.push(c); this.log(`${c.name} joins ${p.name}'s bench`); }
         break; }
       case 'grace': {
@@ -228,7 +228,6 @@ export class Game {
     const roll = 1 + Math.floor(this.rng() * 12); const ok = roll <= twelfths;
     this.log(`✝ ${p.name} attempts the HAIL MARY at ${twelfths}/12 with ${p.deeds} candle${p.deeds === 1 ? '' : 's'}… the die shows ${roll}: ${ok ? 'ANSWERED' : 'unanswered'}`);
     if (ok) { for (const h of [...p.hazards]) this.clearHazard(p, h, p, 'grace'); p.stats.hailWon++; this.bank(p, p.artifacts.some((a) => a.key === 'grail') ? 300 : 200, 'hail'); }
-    else if (this.is(p, 'pope') && !p.popeUsed) { p.popeUsed = true; p.hailUsed = false; this.log('EL PAPA absolves the attempt — Our Lady may be petitioned once more'); }
     return ok;
   }
 

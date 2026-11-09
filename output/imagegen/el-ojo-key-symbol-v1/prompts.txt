@@ -1,0 +1,16 @@
+Mode: Built-in image_gen.
+transparent_background: true
+Reference 1: ../el-ojo-symbol-v1/02-eye-symbol.png
+Reference 2: ../el-ojo-skull-symbol-v1/combined-preview.png
+Generated PNG copied without raster alteration.
+Preview key display settings: opacity 0.55; scale 0.80; transform origin top left.
+
+Use case: precise-object-edit.
+Asset type: a standalone transparent KEY SYMBOL overlay for the El Ojo loteria-style investing card game.
+Input 1: edit target — antique-gold eye/triangle symbol on transparent square canvas. Replace this with a key.
+Input 2: palette, style, and placement reference only — the approved card composition with an alternate skull symbol. Do not include the skull or the figures.
+
+Create ONE bold antique-gold skeleton key, suggesting secret access and private knowledge. A large open octagonal geometric bow, a sturdy straight shaft, and two or three chunky rectangular teeth at its tip. Clearly readable as a key at small card size. Orient it on a gentle diagonal, with bow toward the upper left and toothed tip toward the lower right, fully contained in the upper-left empty area of the card. Simple elegant proportions, broad lightly faceted surfaces, modest bevels, muted old gold and bronze with subtle painted patina and restrained highlights. Match the existing symbol family. No elaborate scrollwork or tiny engravings.
+
+CRITICAL canvas and placement: square 1254 x 1254 with real transparency. The entire key fits within approximately x4%-32%, y6%-29%, centered near x18%, y18%. Keep the rest of the square completely empty and transparent, matching the aligned symbol layers. Do not enlarge it to fill the frame, center it on the whole canvas, or crop the transparent margins.
+Output ONLY this single isolated key. The bow's open center is transparent. Remove the original eye and triangle completely. Do not draw any skull, crossbones, eye, triangle, plaque, border, text, second key, keyring, chain, locks, hands, people, phones, background, glow, shadow on an opaque surface, or baked checkerboard. Antique-gold symbol only on genuine alpha transparency.

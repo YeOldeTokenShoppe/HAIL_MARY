@@ -1,0 +1,38 @@
+Created with the built-in image_gen tool. Revision: moderately richer low-poly rendering to match the user's Trader-card lineup; all three figures face the viewer, each holding a phone whose screen lights their mask. The compact composition is retained. General investing theme, no crypto-specific imagery.
+Inputs: el-ojo-private-briefing-v1/concept-master.png as the composition target, and the user's Screenshot 2026-11-09 at 8.40.29 AM.png as the card-style reference.
+Two layers generated from the revised concept. All PNGs copied without alteration.
+
+CONCEPT MASTER
+==============
+Use case: precise-object-edit / style-transfer.
+Revise Image 1, the three hooded figures around a laptop. Image 2 is the user's actual Trader card lineup and is the STYLE REFERENCE. Deliver one square 1254 x 1254 artwork-only illustration, without a frame, titles, labels, lettering or watermark.
+
+KEEP THE COMPOSITION: the compact triangular group of EXACTLY THREE black-hooded, masked figures, one higher in the middle and two slightly lower on either side, against a quiet green background. Keep the grouping, scale and bold readability that Image 1 already has. The center figure wears a gold mask; the side figures have pale ivory/silver masks. This group is the sole symbol. No eye, pyramid, columns, extra people, floating currency, coins, ledger, ornamental motifs or narrative scenery.
+
+MAKE IT MODERATELY MORE DIMENSIONAL: match the attractive stylized low-poly illustration of La Investigadora, El Monje and El Diablito in Image 2. Add a controlled amount of geometric modeling to the faces, masks, hood rims, robe folds and hands; use broad sculpted planes, clear cast shadows within the hoods, subtle material highlights and richer color variation. This is the middle ground between the overly flat original and a highly detailed cinematic rendering. Masks should have perhaps a dozen purposeful planes, not hundreds of glittering triangles. Cloaks have readable cloth volume and a few generous folds, not intricate embroidery. Clean painted game-art finish. No photorealism, no fabric microtexture, no excessive scratches, no grunge or ink distress. Preserve a loteria-like strong silhouette and clear small-card reading.
+
+NEW EXPRESSION AND POSE: All THREE masks now FACE THE VIEWER and meet the viewer's gaze, as though they have just looked up together after receiving the same private tip. The side faces must turn from inward profile to near-frontal. A tiny difference in head tilt is welcome but all three eyes/sockets should clearly be directed toward us. Quiet, knowing, eerie expressions. Center mask gold, left warm ivory, right cool silver/ivory. Mask eye openings remain dark, with only subtle reflected light. Keep all arms close to their bodies, elbows tucked.
+
+REMOVE THE LAPTOP COMPLETELY, including its screen, keyboard, trackpad, chart and old laptop-touching hand pose. EACH of the THREE figures now holds EXACTLY ONE small ordinary smartphone upright at lower-chest level, close to their own body. Three figures, three phones total. The central phone sits a little higher than the side phones. One naturally sized gloved hand supports each phone; the other arm can be concealed beneath the robe to avoid clutter. Coherent connected fingers and wrists, no extra hands or floating phones. No reaching arm toward the viewer, no oversized foreshortened hand, no device being offered.
+
+SCREEN LIGHT IS THE KEY NEW DETAIL: the phones' screens face INWARD/UPWARD toward their owners, with the dark unbranded backs or slim edges mostly seen by the viewer. Their screens cast cool pale cyan/blue light up onto each mask's chin, nose planes, lower eye sockets, inner hood and supporting glove. We should visibly understand that each face is illuminated by THEIR OWN phone. Keep the light local and believable, not laser beams or glowing magical halos. Gold mask stays warm gold with a cool screen-lit underside; ivory masks catch the blue light more strongly. Soft restrained warm ambient light on the hood edges keeps all three dark silhouettes readable. The faces must remain bright and legible, not buried in black.
+No brands, crypto logos, token symbols, app branding, tiny text, interface panels or floating charts. This is general investing, not crypto. Phone displays do not need to be readable.
+
+BACKGROUND: maintain a restrained muted forest-green/teal backdrop, with at most a soft painted tonal variation for separation. No architectural environment, horizon, ground props, starburst, rays, particles or additional symbols. Depth comes from the figures and phone illumination.
+
+OVERALL: the same iconic three-person arrangement as Image 1, all looking straight at us, three modest phones illuminating their masks. Richer but still economical illustration matching the existing cards in Image 2. Exactly three figures and no laptop.
+
+LAYER PROMPTS
+=============
+01-background
+transparent_background: false
+
+Use case: precise-object-edit. Input image is the edit target. Generate ONLY the complete green BACKGROUND PLATE from this illustration, square 1254 x 1254. Remove all three people, masks, hoods, garments, gloves, phones and their cyan light completely. Seamlessly extend the existing quiet muted emerald/forest-green painted backdrop over the whole square. Preserve the source's understated soft tonal variation and light painted surface, but no figure-shaped shadows, cyan glows or silhouettes. No objects, architecture, floor, particles, eye, pyramid, symbols, graphics, gradients that outline people, text, vignette, border or card frame. Fully opaque edge-to-edge background, deliberately minimal. Match the green at the source's upper corners and outer sides, so the original group can be composited back on top without a color change.
+
+
+02-phone-group
+transparent_background: true
+
+Use case: background-extraction. Precisely extract the entire THREE-FIGURE GROUP from the input illustration onto a genuine alpha-transparent square canvas, 1254 x 1254. Preserve original framing, positions, scale, proportions, all three forward-facing masks, hood silhouettes, large robe folds, THREE phones and their THREE holding hands. The central mask is gold; side masks are ivory/silver. Keep the original moderate low-poly detail and rich painted shading. Preserve the cool cyan screen illumination reflected ON the chin/cheeks, inner hoods, gloves and robes, and warm outer edge lighting. These light effects move with the figures and should stay on their surfaces. Remove only the green backdrop and any green negative-space gaps between silhouettes. Do not leave a broad glowing fog or translucent green matte outside the group. Where phone light is surrounded by robes, keep that glow and opaque dark robe underneath it unchanged.
+Exactly three figures, three phones, no laptop, no additional hands, no shifted finger positions. All masks face directly toward viewer, keep their dark eye sockets opaque. No new logos, text, coins, symbols, chart interfaces or decorative detail. Full untrimmed square canvas, no recentering, no enlarging or reducing the group, no reconstruction of new scenery. Keep natural edge cropping of the robes at left/right/bottom, extending cleanly to the canvas edge without a gap. No white/black matte, no checkerboard painting, no border. Actual alpha transparency only outside the complete figure group.
+

@@ -1,0 +1,22 @@
+Edited with the built-in image_gen tool, transparent_background: true.
+Edit target: el-ojo-private-briefing-v3/02-phone-group.png.
+Mask-style reference: el-ojo-private-briefing-v2/02-phone-group.png.
+Revision restores rigid sculpted masks and empty dark eye apertures while keeping the raised front-facing heads from v3. Background copied from v3. Generated PNG copied without alteration.
+
+FINAL EDIT PROMPT
+=================
+Use case: precise-object-edit.
+Image 1 is the EDIT TARGET: three masked figures with raised heads and visible human eyes, each holding a phone. Image 2 is a MASK-STYLE REFERENCE ONLY: the previous version with sculpted masks and completely dark eye openings.
+
+Make one narrow correction to Image 1: restore the unmistakable MASK appearance from Image 2 while retaining Image 1's raised, level, front-facing head positions.
+
+For ALL THREE masks:
+- Completely REMOVE every visible eyeball, iris, pupil, sclera, eyelid, lash and eye catchlight.
+- Replace each eye opening with a clean, deep, entirely dark almond-shaped aperture, like Image 2. These openings are opaque near-black, NOT transparent holes through the PNG. No visible face or eye behind them.
+- The faces are rigid sculpted masks, not human faces painted gold/ivory: angular molded nose and brow planes, a small fixed dark mouth slit, smooth solid shell material and a restrained bevel along mask edges. No skin, fleshy lips, wrinkles or human eyebrows.
+- Center mask remains metallic ochre-gold; the two side masks remain opaque warm ivory and cool ivory/silver. Preserve moderate low-poly modeling and original colors.
+- Keep the SAME head positions and pitch as Image 1: heads raised, chins level, all three masks squarely facing the viewer. Do not restore the downward-looking head angles from Image 2. Front-facing posture, not visible pupils, conveys that they are looking at us.
+
+Everything else must stay as in Image 1: exact triangular grouping, hoods, robe geometry, warm edge lighting, three phones, three hands, phone positions, cyan screen light on lower masks and hood interiors, scale and composition. Do not add props, extra people, logos, text, background or symbols. Preserve all silhouette edges and natural canvas cropping.
+
+Return a square 1254 x 1254 PNG with genuine alpha transparency outside the group, preserving the existing transparency. Keep full canvas, no recentering, zooming, auto-cropping or solid matte. No checkerboard pattern. Only the mask appearance and eye apertures are edited.

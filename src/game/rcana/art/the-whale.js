@@ -1,4 +1,4 @@
-// The Whale — the breaching whale, a Market Event. Three planes, all behind
+// The Whale — the breaching whale, an Event. Three planes, all behind
 // the plate (+44) so the window crops the stack: the sunlit sea and sky, the
 // whale in the air, and the wave it breaks through, nearest the viewer.
 //

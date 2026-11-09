@@ -1,0 +1,18 @@
+Mode: Built-in image_gen.
+Use: Generate separate transparent symbol with existing composition as a placement and palette reference.
+transparent_background: true
+Reference: ../el-ojo-leader-and-crowd-v1/combined-preview.png
+No raster changes were made after generation.
+Preview display opacity: 0.55.
+
+Use case: stylized-concept.
+Asset type: a standalone transparent SYMBOL OVERLAY for an existing El Ojo loteria-style game card, square 1254 x 1254 canvas.
+Input image: placement and palette reference ONLY. DO NOT redraw its people, masks, phones or backdrop. The existing art will remain unchanged and this new PNG will sit between its blue background and its figures.
+
+Generate ONE simple Eye of Providence emblem: a stylized almond-shaped eye with one round iris/pupil, enclosed inside an upright equilateral triangle. Clean, confident antique-brass linework, slight hand-painted irregularity and subtle tonal texture, moderately broad strokes readable at card size. A restrained mysterious emblem, like an unobtrusive gold marking on a dark wall. Outline only, no filled triangle, no plaque. The transparent space inside the triangle and around the eye must remain truly transparent.
+
+CRITICAL placement and size: retain the FULL SQUARE CANVAS as an aligned game layer; the emblem occupies ONLY the empty UPPER-LEFT AREA of the reference image, not the canvas center. Triangle apex at approximately x18%, y4%; bottom-left at x3%, y29%; bottom-right at x33%, y29%. Eye centered at x18%, y20%, contained inside triangle. The entire remaining roughly 90% of the square is empty transparent space. This placement keeps the eye clearly visible beside the leader's hood, not hidden directly behind the leader's face. Do not zoom the emblem to fill the image or crop away transparent margins.
+
+Color/finish: muted antique gold and bronze, significantly quieter and darker than the leader's vivid gold mask and amber rim light; softly aged brass, not glowing yellow. Very simple two-tone painted linework, not photoreal jewelry or a 3D object, not overdecorated. Modest detail matching the broad angular art, no fine banknote hatching.
+
+Output ONLY this one isolated eye-within-triangle emblem on TRUE alpha transparency. No people, masks, hands, phones, scenery, blue background, paper, opaque matte, checkerboard pattern, frame, text, lettering, currency, coins, crypto imagery, pyramid bricks, rays, sunburst, outer circle, stars, particles or extra symbols.

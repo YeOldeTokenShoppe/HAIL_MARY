@@ -1,0 +1,18 @@
+Edited with the built-in image_gen tool, transparent_background: true.
+Edit target: el-ojo-private-briefing-v2/02-phone-group.png.
+Revision: all three figures raise their heads and make direct eye contact through the mask openings. Background copied from v2. Generated subject PNG copied without alteration.
+
+FINAL EDIT PROMPT
+=================
+Use case: precise-object-edit.
+Edit the attached transparent THREE-MASKED-FIGURE GROUP. The user's requested change is UNMISTAKABLE DIRECT EYE CONTACT WITH THE VIEWER.
+
+CHANGE ONLY HEAD ANGLE AND EYES:
+All three figures currently read as bowing their heads toward their phones. Make all THREE visibly LOOK UP FROM THEIR PHONES and stare straight into the camera. Raise each chin slightly, rotate each mask into an upright frontal plane, and level the heads rather than pitching the faces down. Keep their neck/hood anatomy natural. The center gold mask and both side ivory masks must be squarely directed toward us. Do not leave any figure looking at a screen, glancing sideways or lowering its gaze.
+
+Crucially, replace the completely black empty eye openings with understated VISIBLE HUMAN EYES behind the masks: small natural pale sclera, dark gray/brown irises and centered dark pupils, with a tiny cool catchlight from the phone. Exactly two eyes per figure. The pupils must establish sustained direct eye contact; keep them aligned and avoid crossed eyes. The expressions should be calm, secretive and quietly unnerving, not angry, surprised, bug-eyed, or cartoonish. The mask still covers the whole face apart from its eye openings. No glowing supernatural eyeballs or laser eyes. Render the eyes in the same economical stylized game-art language as the faceted masks, not pasted photorealistic eyes. Keep eye openings restrained and natural, with enough visible contrast that the gaze reads at card size. Do NOT just add a highlight to the empty black sockets; real directional eyes and lifted head pitch are required.
+
+PRESERVE EVERYTHING ELSE:
+Exactly three figures, original triangular grouping, central gold mask and side ivory/silver masks, the dark burgundy/charcoal hoods, moderate low-poly modeling, warm edge light, all three phones and holding hands in their existing positions close to the chest, and cool cyan phone illumination on the lower faces/hood interiors. Phones still face inward toward their owners, who have now raised their heads to look at US. Do not move or enlarge the devices or hands. No reaching arms, no new props, no laptop, no logos or text. Preserve original canvas size and alignment; only very local hood adjustments are allowed to accommodate the raised heads.
+
+Output one square 1254 x 1254 PNG with TRUE ALPHA TRANSPARENCY outside the group, retaining the existing transparent background. Do not add a backdrop, checkerboard pattern, matte, shadow outside the figures, extra glow fog, frame or labels. Keep full canvas and original natural cropping along the lower and side edges. No recentering, zoom or auto-trimming.

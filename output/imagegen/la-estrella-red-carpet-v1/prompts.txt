@@ -1,0 +1,19 @@
+Mode: Built-in image_gen.
+transparent_background: true
+Reference 1: ../celebrity-red-carpet-v1/02-celebrity.png — edit target/framing.
+Reference 2: user's Screenshot 2026-11-09 at 11.31.18 AM.png — female character design.
+Reference 3: ../celebrity-red-carpet-v1/combined-preview.png — style, lighting, composition.
+Output PNG copied without raster alteration.
+
+Use case: precise-object-edit.
+Asset type: transparent central FEMALE CELEBRITY character layer for a loteria-style parallax card.
+Input 1: EDIT TARGET — transparent male celebrity layer. Replace this person entirely with the female celebrity described below, retaining the overall framing, occupied central area, camera angle, character scale, low-poly rendering quality and lighting.
+Input 2: CHARACTER DESIGN REFERENCE — adult glamorous blonde woman in a fitted coral-red evening dress, oversized ivory wide-brimmed hat with dark edging and band, gold-framed dark sunglasses, charcoal opera gloves, earrings and a pale V-shaped necklace with a small blue stone. Transfer these distinctive features faithfully, changing her T-pose into a natural poised arrival pose.
+Input 3: COMPOSITION AND LIGHTING REFERENCE ONLY — the approved red-carpet scene. The new subject PNG will be placed directly over the existing background and behind the foreground cameras, which will remain unchanged. Do NOT include any scenery or other figures in this output.
+
+Create a confident adult female movie star with sculpted blonde waves tucked beneath her hat, angular gold-framed sunglasses, red lipstick and a subtle knowing smile. Her wide ivory hat tilts stylishly but leaves her face visible; make it a broad clear graphic silhouette, not a giant brim covering the crowd. Preserve the reference's dark brim edging. Dress is a refined fitted sleeveless coral/scarlet-red gown with V neckline and broad faceted folds, natural elegant proportions. Long charcoal-gray gloves extend to her elbows. One gloved hand rests on her hip with elbow slightly outward; the other relaxed close along her opposite hip/thigh. No props, no reaching toward viewer, no waving, no T-pose. Relaxed shoulders, weight on one hip, torso three-quarter like the original, face turned toward our camera, head held nearly level.
+
+Composition: 1254 x 1254 square, same slightly low-angle upper-thigh portrait as input 1. Hat top stays inside frame near y3%-5%; face centered approximately x57%, y26%; waist near x55%, y68%; dress continues off bottom. Occupy the central region similar to the original male. Hat can extend approximately x31%-85%, leaving the left background flash position clear. Keep both gloves and hands fully connected, and keep the lower outer corners mostly empty for foreground cameras.
+Style: match the approved illustration's clean bold polygonal facets, confident face planes, painterly low-poly game art, moderate detail, vivid but controlled palette. Warm gold light from upper right and cool pale-blue flash rim from left, keeping the red dress readable against a red carpet. Ivory hat and illuminated face are the main light accents. Not photoreal, not a plastic doll, no hyper-detailed pores, no rough vintage distressing.
+
+Output ONLY the complete female celebrity, hat, hair, accessories, dress and gloves on genuine transparent alpha, including transparency inside any elbow gaps. No male features, black pompadour, jeweled white jumpsuit, crowd, photographers, cameras, foreground hands, ropes, carpet, backdrop, cast ground shadow, floating glints, logos, text, frame, opaque matte or baked checkerboard. Retain full square transparent margins; do not crop tight or recenter the subject.
