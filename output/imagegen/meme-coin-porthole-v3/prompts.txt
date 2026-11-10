@@ -1,0 +1,22 @@
+Mode: Built-in image_gen.
+transparent_background: true
+Reference: ../meme-coin-porthole-v2/rocket-purple-interior.png.
+PNG copied without raster alteration.
+Revision: remove the complete handlebar assembly and rest both hands on the upper hull, preserving the softly lavender-lit porthole.
+
+Use case: precise-object-edit.
+Asset type: transparent rider-and-rocket layer for the Meme Coin card.
+Input is the EXACT edit target.
+
+The user has approved removing the faulty handlebar rather than keeping an awkward attachment.
+REMOVE the entire gold handlebar assembly completely: horizontal bar, both grips/endcaps, vertical stem and circular mounting collar. Restore a smooth continuous cream-colored faceted rocket surface where the mount was. Leave no hardware stubs, holes, brackets, screws or handrails.
+
+Adjust ONLY the rider's forearms, wrists and hands as needed so he remains naturally braced while straddling the rocket:
+Both hands now rest directly on the rounded UPPER hull in front of his knees. Palms visibly contact the surface; fingers relax and curve naturally along the hull. The near hand is clearly visible resting flat on the top-facing cream panel, and the far hand rests slightly beyond it on the top crest with natural perspective foreshortening. Keep his elbows gently bent and shoulders relaxed. Every finger must be anatomically plausible. No closed fists gripping empty air, hovering hands, fingers passing through metal, extra fingers, extra arms, or newly invented control devices. Show small natural contact shadows under the palms.
+Retain the same seated posture and forward-reaching arm direction overall; this is a subtle local adjustment to rest his hands on the hull, not a new riding pose.
+
+PRESERVE THE WINDOW EXACTLY: simple softly lavender/purple-lit interior behind glass, faint straight reflections, existing gold rim. No galaxy, spiral, swirl, stars, orb, bright white hotspot or extra glow effects.
+
+Preserve all other approved details as closely as possible: man's face/head direction and sunglasses, hair, leopard jacket, necklace, wristwatch, body/leg positions, trousers, boots, rocket angle, hull shape, fins, gold trim, footrest, orange indicators, vents, short exhaust, colors, low-poly facets and lighting.
+Same near-square portrait aspect ratio, proportional placement and full-object framing, no zoom or cropping.
+Output only rider and rocket with genuine alpha transparency outside the subject and inside gaps, soft alpha on flames. No backdrop, checkerboard, matte, text or card frame.

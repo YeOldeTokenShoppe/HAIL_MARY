@@ -1,12 +1,12 @@
 // Meme Coin — the pony on the crescent moon, an Asset.
-// Two planes behind the plate, the starfield and the pony on the moon, and
-// the rainbow sweep as a prop in front of the frame.
+// Three planes behind the plate: the starfield, the pony on the moon, and
+// the rainbow sweep nearest the window.
 //
 // The sweep was authored on the card's own canvas, already sized to the art
 // window, so it is a plain art layer (scale 1, no clip) rather than an FX
-// sheet: it lands where it was drawn and composites with its own alpha. On
-// the prop rung (+118) it swings against the pony on tilt, which is what a
-// trail of light should do.
+// sheet: it lands where it was drawn and composites with its own alpha.
+// Ahead of the pony but still BEHIND the plate (z < 44), so the window clips
+// it at the frame's edge while it still swings against her on tilt.
 //
 // No paths: public/TCG/rcana/meme-coin/<id>.webp by convention (artPath).
 import { ART_PLANES } from "../artSpec.js";
@@ -24,7 +24,7 @@ export default {
     // The pony on her moon, inside the window on the subject rung.
     { id: "subject", z: ART_PLANES.subject, scale: 1 },
 
-    // The rainbow sweep and stars — in front of the frame, nearest the viewer.
-    { id: "prop", z: ART_PLANES.prop, scale: 1 },
+    // The rainbow sweep and stars — nearest the window, under the frame.
+    { id: "prop", z: 24, scale: 1 },
   ],
 };

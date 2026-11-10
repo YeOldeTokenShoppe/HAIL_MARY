@@ -1,0 +1,21 @@
+Mode: Built-in image_gen.
+transparent_background: true
+Reference: ../meme-coin-front-three-quarter-v1/rocket-front-three-quarter.png.
+PNG copied without raster alteration.
+Revisions: near hand shifted backward toward knee/tail while retaining side grip; clenched-teeth expression added.
+
+Use case: precise-object-edit.
+Asset type: transparent rider-and-rocket layer for the Meme Coin card.
+Input image is the EXACT edit target. The user likes this new front three-quarter perspective. Make ONLY TWO localized changes:
+
+1. MOVE THE NEAR HAND BACK A LITTLE:
+This means the large hand on the LEFT SIDE OF THE IMAGE, beside the purple porthole, WITHOUT the wristwatch. Move it a modest distance backward along the rocket toward the TAIL and the rider's near knee: approximately half a hand-width to one hand-width, diagonally toward the UPPER LEFT in image space (roughly 5% of canvas width leftward and 3% upward). The hand should now be clearly behind the porthole, closer to the knee.
+IMPORTANT: retain its side-gripping orientation. Thumb near the upper curve, palm pressed against the visible SIDE WALL, four fingers curling DOWN the side toward the underside. Do NOT move it onto the roof, make the fingers point forward, or turn it into a flat palm on top. Keep it fully on the rocket's hull and out of the porthole and indicator lights. Adjust only this forearm/elbow minimally to keep natural anatomy and contact; same hand size and plausible arm length. Restore the old hand location with continuous cream facets.
+Do not move the opposite hand with the gold watch.
+
+2. ADD A CLENCHED-TEETH MOUTH:
+The lower face is currently too blank. Give him a clearly visible, expressive gritted-teeth grimace as if bracing against tremendous speed: lips pulled taut, mouth corners slightly tense, closed jaws showing a short clean ivory band of clenched teeth, a few simple tooth divisions, subtle tension in cheeks. Determined with a comic hint of "hold on!" rather than a happy smile. Natural mouth placement beneath the nose, appropriate perspective for his upward-turned face. Keep the mouth proportionate and readable at card size; no enormous grin, open screaming mouth, tongue, fangs, gore, wrinkles or realistic dental detail.
+Preserve his identity, head angle, nose, jaw silhouette, sunglasses, hair and sideburns. Tiny local cheek changes for expression only.
+
+EVERYTHING ELSE stays unchanged: the approved front three-quarter camera angle, rocket nose pointing toward lower-right, rider pose and leg positions, leopard jacket, jewelry, clothes, boots, cream-and-gold rocket silhouette, fins, foot supports, orange indicators, vents, short exhaust, and softly lavender-lit window with simple glass reflection. No bar or grip hardware. No new effects or objects.
+Same clean bold low-poly rendering, palette and lighting. Exact 1254 x 1254 square framing, scale, object placement and transparent margins. Output TRUE ALPHA TRANSPARENCY outside the subject and in gaps, with soft flame edges. No backdrop, checkerboard, matte, text or border.

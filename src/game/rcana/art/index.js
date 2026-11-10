@@ -22,6 +22,8 @@ import laInvestigadora from "./la-investigadora.js";
 import elGambusino from "./el-gambusino.js";
 import theIllumin80 from "./the-illumin80.js";
 import theCelebrity from "./the-celebrity.js";
+import collectibles from "./collectibles.js";
+import gold from "./gold.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -44,4 +46,6 @@ export const RCANA_ART = {
   "el-gambusino": elGambusino,
   "the-illumin80": theIllumin80,
   "the-celebrity": theCelebrity,
+  collectibles,
+  gold,
 };

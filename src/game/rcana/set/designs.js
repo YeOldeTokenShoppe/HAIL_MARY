@@ -31,7 +31,7 @@ export const DESIGNS = [
   D('investigadora', 'La Investigadora', 'trader', 3, { liq: 3, cred: 14, abilityName: 'Due Diligence', text: 'Once per turn, look at the top card of the deck; you may put it on the bottom' }),
   D('monje', 'El Monje', 'trader', 1, { liq: 1, cred: 22, abilityName: 'Vow of Prosperity', text: 'When you light a candle, bank 25 Prosperity' }),
   D('diablito', 'El Diablito', 'trader', 2, { liq: 2, cred: 10, abilityName: 'Devil’s Wager', text: 'At the start of your turn, flip a coin: heads, collect 1 Liquidity; tails, El Diablito loses 1 CRED' }),
-  D('celebridad', 'La Estrella', 'trader', 3, { liq: 3, cred: 8, abilityName: 'Star Power', text: 'The influencer: pay 1 when banking from a card, +25 Prosperity' }),
+  D('celebridad', 'La Celebridad', 'trader', 3, { liq: 3, cred: 8, abilityName: 'Star Power', text: 'The influencer: pay 1 when banking from a card, +25 Prosperity' }),
   D('abuela', 'La Abuela', 'trader', 2, { liq: 2, cred: 18, abilityName: 'Lucky Streak', text: 'The gambling grandmother: your gambles moon on 4+ instead of 5+' }),
   D('prospector', 'El Gambusino', 'trader', 2, { liq: 2, cred: 15, abilityName: 'Prospector’s Eye', text: 'Assets you buy cost 1 less' }),
   D('tech', 'Tech Stock', 'asset', 3, { cash: 5, pros: 100 }),

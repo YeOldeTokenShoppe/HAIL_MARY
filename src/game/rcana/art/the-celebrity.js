@@ -1,4 +1,4 @@
-// La Estrella (folder: the-celebrity) — the influencer on the red carpet, a
+// La Celebridad (folder: the-celebrity) — the influencer on the red carpet, a
 // Trader. Three planes behind the plate: the paparazzi line, the figure, and
 // two foreground cameras at the lower corners nearest the window.
 //

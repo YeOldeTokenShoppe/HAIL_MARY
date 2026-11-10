@@ -1,0 +1,22 @@
+Mode: Built-in image_gen.
+transparent_background: true
+Reference: ../meme-coin-porthole-v1/rocket-glowing-porthole.png.
+PNG copied without raster alteration.
+Revisions: simple lavender-lit interior, replacing the galaxy effect; T-handlebar with one centered mount, replacing the uneven side supports.
+
+Use case: precise-object-edit.
+Asset type: transparent low-poly rider-and-rocket layer for the Meme Coin card.
+The supplied image is the exact edit target. Make ONLY the following two corrections.
+
+1. WINDOW INTERIOR:
+Replace the swirling galaxy in the gold-rimmed porthole with a quiet, softly PURPLE-LIT CABIN INTERIOR. Simple pale lavender ambient illumination across the glass, gently darker muted violet near the lower inner rim. A faint straight reflected glass highlight and perhaps a barely visible softly lit interior wall plane establish depth.
+The interior light is diffuse and even, not a glowing object. ABSOLUTELY NO spiral, swirl, galaxy, nebula, stars, sparkles, cloudy vortex, central light orb, white hotspot or cyan center. No concentric rings. The whole window should read as ordinary glass showing a softly lavender-lit interior. Keep the exact round opening, gold rim, size and placement.
+
+2. HANDLEBAR — REPLACE THE FAULTY MOUNTING GEOMETRY:
+The current grab bar has inconsistent side supports. Remove both old supports, including the long bent gold strut descending beside the near hand to the left-side hull attachment. Restore clean cream rocket surface where that old side mount was.
+Replace the entire assembly with a mechanically coherent compact T-HANDLEBAR: ONE central steering stem, ONE centered mounting collar on the rocket's upper dorsal centerline immediately in front of the rider's knees, and ONE straight gold crossbar with equal-length left and right grips. The single central stem rises from this top-center mount to the exact midpoint of the crossbar BETWEEN the rider's two hands. The two arms of the crossbar have identical construction and equal physical lengths, naturally foreshortened in this camera view.
+Both hands visibly grip the two ends of this same crossbar; small adjustments of fingers and wrists are allowed to establish believable contact. No separate near-side support, no asymmetrical side anchor, no second support reaching down toward the side porthole, no floating bar, no extra handles. Make the single central stem and its top-center mount readable. Use the existing gold material and faceted style. This is a simple centered scooter-like control bar fitted to a retro rocket, not complicated machinery.
+
+Preserve everything else: same rider identity and upward head angle, sunglasses, hair, leopard-print jacket, necklace, trousers, boots, watch, basic riding pose, rocket angle and complete silhouette, cream/gold hull, fins, footrest, indicator lights, vents and existing short exhaust. No costume or face changes. No long new flame. Maintain existing low-poly illustration and light directions.
+Keep the same near-square portrait canvas aspect ratio and proportional composition, with full object and original margins. No crop, zoom or recenter.
+Output actual alpha transparency around rider/rocket and in gaps, preserving soft flame alpha. No background, checkerboard, matte, text or card frame.

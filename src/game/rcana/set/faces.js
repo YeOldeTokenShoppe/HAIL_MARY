@@ -251,7 +251,7 @@ export const FACES = [
   },
   {
     id: "the-celebrity",
-    design: "celebridad", // prints as "La Estrella" — the design's name
+    design: "celebridad", // prints as "La Celebridad" — the design's name
     // PROVISIONAL number and rarity.
     number: 29,
     rarity: "Uncommon",
@@ -259,6 +259,32 @@ export const FACES = [
     ability: "Pay 1 when banking from a card:\n+25 Prosperity.",
     // A Trader speaks; the quotation follows the rules and flourish.
     flavor: "Every eye on me is a dollar in the bank.",
+    printed: {},
+  },
+  {
+    id: "collectibles",
+    design: "collectibles", // prints as "Collectibles" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 30,
+    rarity: "Uncommon",
+    // An Asset's line says what it sells for; the boxes print value (125)
+    // and cost (3), so the text carries the cash option.
+    ability: "Sell for 5 coins,\nor bank 125 Prosperity.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "Worth exactly what the next buyer says it is.",
+    printed: {},
+  },
+  {
+    id: "gold",
+    design: "gold", // prints as "Gold" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 31,
+    rarity: "Common",
+    // An Asset's line says what it sells for; the boxes print value (75)
+    // and cost (3), so the text carries the cash option.
+    ability: "The mother lode. Sell for 6 coins,\nor bank 75 Prosperity.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "The mother lode never pays a dividend. It never has to.",
     printed: {},
   },
 ];

@@ -1,0 +1,29 @@
+Mode: Built-in image_gen.
+transparent_background: true
+Reference: ../meme-coin-porthole-v3/rocket-no-handlebar.png.
+PNG copied without raster alteration.
+Alternate front three-quarter viewpoint to show the hands wrapping opposite sides of the rocket.
+
+Use case: precise-object-edit.
+Asset type: alternate-perspective transparent low-poly rider-and-rocket artwork for the Meme Coin game card.
+Input image is the character/rocket DESIGN reference. The user requests a clearer viewpoint because the current side angle makes the hands appear incorrectly placed.
+
+PRIMARY CHANGE: re-stage the SAME rider and SAME rocket in a slightly elevated FRONT THREE-QUARTER view, looking back along the rocket from near its nose. Camera is about 25 degrees to one side of the rocket's forward axis and about 15 degrees above it, so we clearly see the top surface and the two opposite upper side edges. The nose is closer to the viewer, angled toward the LOWER-RIGHT of the canvas; the tail recedes toward the upper-left. Use moderate foreshortening, not an extreme fisheye or enormous nose hiding the rider.
+The figure remains large and readable in the upper-middle, seated astride the rocket with legs straddling opposite sides. Complete rocket and rider fit in the same near-square portrait canvas with breathing room. Dynamic diagonal silhouette, clean game-card composition.
+
+CRITICAL HAND PLACEMENT:
+NO HANDLEBAR OR OTHER GRIP HARDWARE.
+He holds the hull directly with his hands on OPPOSITE SIDES at the SAME longitudinal station just ahead of his knees. His forearms angle down toward the outer edges, not inward toward the center.
+The hand on the LEFT SIDE OF THE IMAGE wraps over the rocket's LEFT visible upper edge: thumb remains near the top edge, palm presses against the SIDE WALL and fingers curl DOWN the curved side, pointing toward the underside. The hand must visibly hang down the side of the barrel, not lie flat along its roof.
+The other hand wraps the OPPOSITE right edge similarly; its fingertips may be partly occluded by the far-side curvature. Clear anatomical symmetry in the rocket's own coordinates, natural perspective foreshortening. Both hands genuinely contact the hull, wrists align naturally with their forearms, small contact shadows. No palms resting flat on the top centerline, no floating fists, no extra arms or fingers. Both shoulders and elbows relaxed, natural human arm lengths.
+
+PRESERVE DESIGN:
+Same low-poly adult man, sculpted dark brown hair and sideburns, gold sunglasses, leopard-print jacket with black lapels, black shirt and trousers, dollar-sign pendant, gold wristwatch and black boots. Keep his confident forward-looking/upward expression and jaunty celebrity-like attitude. Do not turn him into another character.
+Same cream faceted retro rocket, gold nose band and trim, dark gold-edged fins, gold boot supports, small orange indicator lights, dark vents, short orange exhaust.
+Keep a gold-rimmed circular porthole on the visible side behind the nose, with a SIMPLE SOFTLY LAVENDER-LIT INTERIOR: diffuse purple glass, subtle straight reflection, no galaxy, spiral, nebula, stars or central glowing orb.
+Do not obscure the porthole with either hand. Place the hands just behind it if needed, but symmetrically on opposite sides.
+No bar, center stem, mount, saddle handle or rails.
+
+STYLE AND OUTPUT:
+Match original clean bold low-poly planes, warm gold details and cool pale-blue edge light. Clear solid geometry, no photorealism, no excessively intricate mechanics.
+One finished isolated rider-and-rocket illustration on TRUE ALPHA TRANSPARENCY, near-square portrait aspect ratio matching input. Maintain full figure/object framing with transparent margins. No background, checkerboard, text, border or extra scene elements.
