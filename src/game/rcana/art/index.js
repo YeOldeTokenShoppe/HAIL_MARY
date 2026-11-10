@@ -24,6 +24,9 @@ import theIllumin80 from "./the-illumin80.js";
 import theCelebrity from "./the-celebrity.js";
 import collectibles from "./collectibles.js";
 import gold from "./gold.js";
+import realEstate from "./real-estate.js";
+import treasureMap from "./treasure-map.js";
+import oilField from "./oil-field.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -48,4 +51,7 @@ export const RCANA_ART = {
   "the-celebrity": theCelebrity,
   collectibles,
   gold,
+  "real-estate": realEstate,
+  "treasure-map": treasureMap,
+  "oil-field": oilField,
 };

@@ -11,6 +11,9 @@ import {
 import { ROGUES } from "@/game/terminal-traders/rogues";
 import { LOTERIA_CARDS, toLoteriaCard } from "@/game/terminal-traders/loteria";
 import RcanaBench from "@/components/RcanaBench";
+import RcanaCard from "@/components/RcanaCard";
+import { RCANA_SET, UNPRINTED, TYPE_CLASS, toRcanaCard } from "@/game/rcana/cardFace";
+import { RCANA_SET_SIZE } from "@/game/rcana/set/index.js";
 
 // Every card renders straight from the engine through the game's own converter,
 // so the preview matches what the table shows (art comes from CARD_ART, keyed
@@ -94,6 +97,21 @@ const THUMB_SCALE = 0.2;
 
 const TOTAL_WIRED = COLLECTION.reduce((n, g) => n + g.wired, 0);
 
+// ── R-cana binder ──────────────────────────────────────────────────────────
+// The lotería set as a binder page, by printed class: every printed face as
+// a real RcanaCard thumbnail (flat, no FX), then the designs still waiting
+// for a face as empty pockets, so coverage of the 80 reads at a glance.
+const RCANA_CLASS_ORDER = ["Trader", "Asset", "Event", "Artifact"];
+const RCANA_COLLECTION = RCANA_CLASS_ORDER.map((cls) => {
+  const printed = RCANA_SET.filter((face) => face.cardClass === cls)
+    .sort((a, b) => (a.number ?? 999) - (b.number ?? 999))
+    .map((face) => ({ id: face.id, name: face.name, rarity: face.rarity, number: face.number, card: toRcanaCard(face) }));
+  const pending = UNPRINTED.filter((d) => TYPE_CLASS[d.type] === cls)
+    .map((d) => ({ id: `design-${d.key}`, name: d.printName || d.name, rarity: d.type, card: null }));
+  return { title: `${cls}s`, cards: [...printed, ...pending], wired: printed.length };
+});
+const RCANA_PRINTED = RCANA_SET.length;
+
 // ── Rogues gallery ─────────────────────────────────────────────────────────
 // A cross-cutting index by character, never a fifth card type: every rogue's
 // card already lives in a type group above, so this section double-lists but
@@ -128,6 +146,8 @@ export default function CardTemplatePage() {
   // Front/back, for cards that carry a printed back.
   const [flipped, setFlipped] = useState(false);
   const [view, setView] = useState("single");
+  // The card the R-cana bench opens on; a binder slot sets it before switching.
+  const [rcanaCardId, setRcanaCardId] = useState(null);
   // null = follow the card's rarity; a frame id pins an override for preview.
   const [frameOverride, setFrameOverride] = useState(null);
   const [fxPicks, setFxPicks] = useState([]);
@@ -235,12 +255,23 @@ export default function CardTemplatePage() {
       <header className="ct-top">
         <div>
           <p className="ct-kicker">Terminal Traders // Card Template</p>
-          <h1>{view === "single" ? "Trading Card Overlay" : "The Genesis 80"}</h1>
+          <h1>{view === "single" ? "Trading Card Overlay" : view === "rcana-collection" ? "R-cana · The Lotería 80" : view === "rcana" ? "R-cana Bench" : "The Genesis 80"}</h1>
           <p className="ct-sub">
             {view === "single" ? (
               <>
                 Move your mouse over the card to tilt it. Same dimensions (744 ×
                 1038) for every card type; swap <code>backgroundImage</code> per card.
+              </>
+            ) : view === "rcana-collection" ? (
+              <>
+                Every printed R-cana face by class, flat and without FX, then the
+                designs still waiting for art as empty pockets. Click a face to
+                open it on the bench.
+              </>
+            ) : view === "rcana" ? (
+              <>
+                One R-cana card with its planes, FX sheets and frame live. Pick a
+                card on the left; the binder view lists them all.
               </>
             ) : (
               <>
@@ -256,7 +287,8 @@ export default function CardTemplatePage() {
           {[
             { id: "single", label: "Single" },
             { id: "collection", label: `Collection ${TOTAL_WIRED}/${GENESIS_SET.length}` },
-            { id: "rcana", label: "R-cana" },
+            { id: "rcana", label: "R-cana Bench" },
+            { id: "rcana-collection", label: `R-cana ${RCANA_PRINTED}/${RCANA_SET_SIZE}` },
           ].map((v) => (
             <button
               key={v.id}
@@ -354,7 +386,41 @@ export default function CardTemplatePage() {
         </section>
       )}
 
-      {view === "rcana" && <RcanaBench />}
+      {view === "rcana-collection" && (
+        <section className="ct-collection">
+          {RCANA_COLLECTION.map((group) => (
+            <div className="ct-binder-group" key={group.title}>
+              <p className="ct-binder-title">
+                {group.title}
+                <span>{group.wired}/{group.cards.length}</span>
+              </p>
+              <div className="ct-binder">
+                {group.cards.map((slot) => (
+                  <button
+                    key={slot.id}
+                    className={`ct-slot ct-slot--${String(slot.rarity).toLowerCase()}${slot.card ? "" : " is-empty"}`}
+                    onClick={slot.card ? () => { setRcanaCardId(slot.id); setView("rcana"); } : undefined}
+                    disabled={!slot.card}
+                    title={slot.card ? `${slot.name} — open on the bench` : `${slot.name} — art pending`}
+                  >
+                    <span className="ct-slot-art">
+                      {slot.card ? (
+                        <RcanaCard data={slot.card} scale={THUMB_SCALE} interactive={false} depth={0} showFx={false} />
+                      ) : (
+                        <span className="ct-slot-pending" aria-hidden>+</span>
+                      )}
+                    </span>
+                    <span className="ct-slot-name">{slot.number != null ? `${slot.number} · ` : ""}{slot.name}</span>
+                    <span className="ct-slot-rarity">{slot.rarity}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {view === "rcana" && <RcanaBench initialCardId={rcanaCardId} />}
 
       <div className="ct-workspace" hidden={view !== "single"}>
         <aside className="ct-column ct-picker">
@@ -975,7 +1041,8 @@ const PAGE_STYLES = `
     transition: transform 160ms ease, filter 160ms ease;
   }
 
-  .ct-slot-art > .tc-stage {
+  .ct-slot-art > .tc-stage,
+  .ct-slot-art > .rc-stage {
     border-radius: 9px;
     overflow: hidden;
   }

@@ -18,8 +18,11 @@ import {
 // is editable here, so a slot can be proved against real text before any of
 // the 88 are written — a long ability, a four-digit Hydro, a name that has to
 // shrink to fit the banner.
-export default function RcanaBench() {
-  const [cardId, setCardId] = useState(RCANA_DEMO[0].id);
+// `initialCardId`: the card the bench opens on (the binder view passes the
+// slot that was clicked); null means the first card in the set.
+export default function RcanaBench({ initialCardId = null }) {
+  const [cardId, setCardId] = useState(initialCardId ?? RCANA_DEMO[0].id);
+  useEffect(() => { if (initialCardId) setCardId(initialCardId); }, [initialCardId]);
   const [scale, setScale] = useState(0.62);
   const [depth, setDepth] = useState(1);
   const [showSlots, setShowSlots] = useState(false);

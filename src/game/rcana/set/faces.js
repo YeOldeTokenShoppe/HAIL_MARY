@@ -287,4 +287,43 @@ export const FACES = [
     flavor: "The mother lode never pays a dividend. It never has to.",
     printed: {},
   },
+  {
+    id: "real-estate",
+    design: "realestate", // prints as "Real Estate" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 32,
+    rarity: "Rare",
+    // An Asset's line says what it sells for; the boxes print value (150)
+    // and cost (5), so the text carries the cash option and the bear-proofing.
+    ability: "Sell for 8 coins, or bank 150 Prosperity.\nBear Market cannot cap it.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "They are not making any more of it.",
+    printed: {},
+  },
+  {
+    id: "treasure-map",
+    design: "map", // prints as "Treasure Map" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 33,
+    rarity: "Uncommon",
+    // An Asset's line says what it sells for; the boxes print value (75)
+    // and cost (2), so the text carries the cash option and the draw.
+    ability: "Sell for 2 coins, or bank 75 Prosperity.\nEither way, draw 2 cards.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "Untold riches. Approximate directions.",
+    printed: {},
+  },
+  {
+    id: "oil-field",
+    design: "oil", // prints as "Oil Field Claim" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 34,
+    rarity: "Rare",
+    // An Asset's line says what it sells for. The boxes print value (175)
+    // and cost (3); the text carries the cash option and the gamble.
+    ability: "Sell for 3 coins, or roll:\n3+ gushes 175 Prosperity, else 25.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "Every dry hole was a sure thing on paper.",
+    printed: {},
+  },
 ];
