@@ -42,6 +42,7 @@ for (const c of RCANA_SET) {
   faces[c.designKey] = {
     id: c.id,
     name: c.name,
+    gloss: c.gloss ?? null,
     number: c.number,
     rarity: c.rarity,
     face: existsSync(join(root, 'public', facePath)) ? facePath : null,

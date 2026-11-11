@@ -54,6 +54,9 @@ export function buildFace(face) {
     subClass: face.subClass ?? getEventSubtype(design) ?? ARTIFACT_SUBTYPES[design.type] ?? null,
     cost: design.cost,
     name: face.name || design.printName || design.name,
+    // The Spanish title in English, for on-screen captions only: the viewer,
+    // the binder label and the table's enlarged view. Never printed.
+    gloss: face.gloss ?? null,
     rarity: face.rarity || "Common",
     // The two printed boxes, by type (POINT_TYPES): the drop is always
     // Liquidity; the halo is standing — Grace on a Trader, Prosperity on an

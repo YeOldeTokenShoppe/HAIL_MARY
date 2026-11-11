@@ -15,6 +15,7 @@
 import React, { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import RcanaCard from "@/components/RcanaCard";
+import RcanaFlipCard from "@/components/RcanaFlipCard";
 import { RCANA_SET, RCANA_ASPECT, toRcanaCard } from "@/game/rcana/cardFace";
 
 // Live mode fits the card to the window it is embedded in. The embedding
@@ -56,8 +57,9 @@ function PrintCard() {
   const scale = Number(params.get("scale") || 1);
   const requestedCred = params.get("cred");
   const credBadge = ["angel-lateral", "angel", "angel-plain", "angel-jaunty", "angel-soft-rays", "heart", "oval", "ribbon"].includes(requestedCred) ? requestedCred : "angel-plain";
-  // ?live=1: the card as it is on the bench — depth, tilt, sway, touch — for
-  // embedding (the Playtest 2 lightbox) rather than screenshotting.
+  // ?live=1: the card as it is on the bench — depth, tilt, sway, touch, and
+  // the lotería back on a click — for embedding (the Playtest 2 lightbox)
+  // rather than screenshotting.
   const live = params.get("live") === "1";
   const fitScale = useFitScale(live);
   const source = templateOnly ? {
@@ -84,7 +86,10 @@ function PrintCard() {
           width: "100vw", height: "100dvh", display: "grid", placeItems: "center", overflow: "hidden",
         }}
       >
-        <RcanaCard data={card} scale={fitScale} depth={1} interactive showFx sway captureTouch credBadge={credBadge} />
+        {/* A wider flip perspective than the bench's: the turning card's near
+            edge swells under perspective, and the lightbox iframe only has 12%
+            of slack around the card box for it to swing into. */}
+        <RcanaFlipCard perspective={2000} data={card} scale={fitScale} depth={1} interactive showFx sway captureTouch credBadge={credBadge} />
       </main>
     );
   }

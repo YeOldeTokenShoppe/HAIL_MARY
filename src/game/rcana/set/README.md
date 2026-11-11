@@ -94,6 +94,14 @@ injects `designs.js` and the faces into `pt2-table.src.html` and writes
 The table (`/playtest2`) is a built, self-contained page. It reads the same
 designs as the face, and shows the printed card for any design that has one.
 
+**Card back.** Every R-cana card shares one back: the lotería poster
+(`public/TCG/rcana/cardBack.webp`, a webp of the un-weathered
+`public/TCG/loteria/background_layer/cardBack_New.png`;
+the path is `RCANA_CARD_BACK` in `cardFace.js`). `RcanaFlipCard` wraps
+`RcanaCard` with it — click, Enter or Space turns the card — and the bench
+shows it that way. The table paints the same image on the deck pile and on
+rivals' hidden hands.
+
 ```
 npm run dev                 # terminal 1 — the print route needs the app up
 npm run rcana:faces         # terminal 2 — screenshots every face to
@@ -147,7 +155,11 @@ The cost coin shows what you pay to play the card. Traders also show an
 income coin for what you collect each turn (play cost = income, by rule).
 The compact Trader and Asset labels and all six Event and Artifact subtypes
 use hand-painted cream wordmarks with the same ivory finish, while the
-banner title retains gilt Blackletter. A teal-blue **ABIL80**
+banner title is set in Nabla, the chromatic 3D face (the gilt Blackletter
+it replaced on 2026-11-11 drew r and c as the same shape; it remains a
+bench option). Browsers without COLRv1 colour fonts get Nabla's outline
+struck in the gilt bevel; printed faces are Chromium screenshots and never
+take that path. A teal-blue **ABIL80**
 pill sits beside the named power in a centered heading on Trader abilities.
 All body badges are text-only. Other types use solid class-colored badges with
 cream lettering and gold trim; Calamities use red. The body follows one shared type scale:

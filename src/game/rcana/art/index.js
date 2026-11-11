@@ -32,6 +32,9 @@ import taxCollector from "./tax-collector.js";
 import seedRound from "./seed-round.js";
 import flashCrash from "./flash-crash.js";
 import rugPull from "./rug-pull.js";
+import quantumHack from "./quantum-hack.js";
+import mardiGras from "./mardi-gras.js";
+import laHorchata from "./la-horchata.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -64,4 +67,7 @@ export const RCANA_ART = {
   "seed-round": seedRound,
   "flash-crash": flashCrash,
   "rug-pull": rugPull,
+  "quantum-hack": quantumHack,
+  "mardi-gras": mardiGras,
+  "la-horchata": laHorchata,
 };

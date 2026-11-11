@@ -167,11 +167,13 @@ export default function RcanaCard({
   frameShine = "on",
   frameShineBlend = "mirror",
   frameShineStrength = 1,
-  // Typeface for the name on the ribbon. "gilt" is blackletter struck in gold.
-  // "nabla" is the chromatic 3D sans it replaced; it stays for foils and
-  // alt-arts, where loud is the job. (Nabla is a COLRv1 font: engines
-  // without COLRv1 paint its flat fallback colour.)
-  nameFont = "gilt",
+  // Typeface for the name on the ribbon. "nabla" is the chromatic 3D sans:
+  // the set default since 2026-11-11, when the gilt blackletter's r and c
+  // turned out to be the same shape (La Horchata read as "La Hocchata").
+  // "gilt" stays as the blackletter struck in gold. (Nabla is a COLRv1
+  // font: engines without COLRv1 get its flat outline, which the fallback
+  // rule below strikes in the gilt bevel instead.)
+  nameFont = "nabla",
   // The rules line's furniture: one named ABIL80 for Traders, one type-colored
   // timing/usage badge for every other type, bold game terms, and a
   // hairline before the flavor. One switch, so the bench can compare the
@@ -732,7 +734,7 @@ export default function RcanaCard({
                   title fills the band height with a little headroom and its
                   width still clears the flourishes. AutoFit only steps in for
                   a name longer than this one. */}
-              <AutoFit max={u * 0.08} min={u * 0.038}>
+              <AutoFit max={u * 0.08} min={u * 0.038} refit={nameFont}>
                 {data.name}
               </AutoFit>
             </div>
@@ -1068,7 +1070,9 @@ const RcanaRulesPanel = React.memo(function RcanaRulesPanel({ data, slot, u, key
 // Steps the font size down until the content stops overflowing its slot.
 // Cheaper and more predictable than measuring text metrics, and it reruns on
 // content change, which is what a programmatic ability line needs.
-function AutoFit({ children, max, min, block = false }) {
+// `refit` is any value whose change should re-measure — the name's typeface,
+// say, which changes the width of the same text without changing `children`.
+function AutoFit({ children, max, min, block = false, refit = null }) {
   const ref = useRef(null);
   const [size, setSize] = useState(max);
 
@@ -1106,7 +1110,7 @@ function AutoFit({ children, max, min, block = false }) {
       active = false;
       document.fonts?.removeEventListener("loadingdone", fit);
     };
-  }, [children, max, min, block]);
+  }, [children, max, min, block, refit]);
 
   return (
     <div
@@ -1344,6 +1348,17 @@ const RCANA_STYLES = `
   /* Nabla's bevel extrudes downward, so the glyphs sit optically low in the
      ribbon; this lifts them back onto its centre line. */
   transform: translateY(-2%);
+}
+/* Without COLRv1 (Safari, as of 18) Nabla is a flat outline in the banner's
+   gold. Strike that outline with the gilt bevel so it still reads as metal;
+   the printed faces are Chromium screenshots and never take this path. */
+@supports not (font-tech(color-COLRv1)) {
+  .rc-name[data-font="nabla"] {
+    text-shadow:
+      0 calc(var(--u) * -.0015) 0 #fff6d0,
+      0 calc(var(--u) * .0035) 0 #6a4a08,
+      0 calc(var(--u) * .007) calc(var(--u) * .007) rgba(0, 0, 0, .55);
+  }
 }
 /* The name in the tab's metal: gold ExtraBold with a hairline light on top,
    a bevel under and a soft drop, scaled up from the tab's stack because the

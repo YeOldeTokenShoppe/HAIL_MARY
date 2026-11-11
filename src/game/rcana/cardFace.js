@@ -38,6 +38,11 @@ export const artPath = (id, name, ext = "webp") => `${RCANA_DIR}/${id}/${name}.$
 // trims nothing. Keep new art on that canvas: a layer at a different aspect
 // gets cropped to fit and silently falls out of register with the others.
 export const RCANA_ASPECT = 1027 / 1424;
+// The back of every R-cana card: the lotería poster back (Our Lady of
+// Perpetual Profit), the clean un-weathered version — a webp of
+// public/TCG/loteria/background_layer/cardBack_New.png.
+// RcanaFlipCard shows it; the playtest2 table paints it on face-down cards.
+export const RCANA_CARD_BACK = "/TCG/rcana/cardBack.webp";
 
 // ---------------------------------------------------------------------------
 // Classes
@@ -469,6 +474,8 @@ export function toRcanaCard(card, overrides = {}) {
     // The coin in the tab: a Trader's play cost (its boxes hold Grace and income).
     tabCost: card.tabCost ?? null,
     name: card.name,
+    // The Spanish title in English, for captions; the face never prints it.
+    gloss: card.gloss ?? null,
     rarity: card.rarity || "Common",
 
     // Ink

@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import RcanaCard, { RCANA_METAL_FRAMES } from "./RcanaCard";
+import { RCANA_METAL_FRAMES } from "./RcanaCard";
+import RcanaFlipCard from "./RcanaFlipCard";
 import {
   RCANA_DEMO,
   RCANA_RARITIES,
@@ -22,6 +23,8 @@ import {
 // slot that was clicked); null means the first card in the set.
 export default function RcanaBench({ initialCardId = null }) {
   const [cardId, setCardId] = useState(initialCardId ?? RCANA_DEMO[0].id);
+  // Face up or the lotería back. Clicking the card turns it too.
+  const [flipped, setFlipped] = useState(false);
   useEffect(() => { if (initialCardId) setCardId(initialCardId); }, [initialCardId]);
   const [scale, setScale] = useState(0.62);
   const [depth, setDepth] = useState(1);
@@ -29,7 +32,7 @@ export default function RcanaBench({ initialCardId = null }) {
   const [showFacets, setShowFacets] = useState(false);
   const [classFont, setClassFont] = useState("mosaic");
   // The name on the ribbon: gilt blackletter (default) or the Nabla it replaced.
-  const [nameFont, setNameFont] = useState("gilt");
+  const [nameFont, setNameFont] = useState("nabla");
   // Outline ring around the header wordmark letters (Class type: wordmark).
   const [wordmarkOutline, setWordmarkOutline] = useState("ink");
 
@@ -182,7 +185,9 @@ export default function RcanaBench({ initialCardId = null }) {
       </aside>
 
       <section className="rb-stage">
-        <RcanaCard
+        <RcanaFlipCard
+          flipped={flipped}
+          onFlip={setFlipped}
           data={card}
           scale={scale}
           depth={depth}
@@ -205,6 +210,12 @@ export default function RcanaBench({ initialCardId = null }) {
           frameShineStrength={frameShineStrength}
           sway
         />
+        <p className="rb-flip">
+          <button type="button" onClick={() => setFlipped((f) => !f)}>
+            {flipped ? "Show face" : "Show back"}
+          </button>
+          <span>or click the card</span>
+        </p>
       </section>
 
       <aside className="rb-col">
@@ -265,8 +276,8 @@ export default function RcanaBench({ initialCardId = null }) {
           <label title="Typeface for the name on the ribbon">
             Name type
             <select value={nameFont} onChange={(e) => setNameFont(e.target.value)}>
-              <option value="gilt">Gilt blackletter (default)</option>
-              <option value="nabla">Nabla (chromatic 3D)</option>
+              <option value="nabla">Nabla (chromatic 3D, default)</option>
+              <option value="gilt">Gilt blackletter</option>
             </select>
           </label>
           <label title="Outline ring around the wordmark letters (text fonts only)">
@@ -585,9 +596,18 @@ const BENCH_STYLES = `
   color: #6f8390;
 }
 .rb-stage {
-  display: grid; place-items: center;
+  display: grid; place-items: center; align-content: center; gap: 14px;
   min-height: 70vh;
   padding: 24px 0;
+}
+.rb-flip {
+  display: flex; align-items: center; gap: 10px; margin: 0;
+  font-size: 12px; color: #6f8390;
+}
+.rb-flip button {
+  padding: 6px 12px; border-radius: 7px; cursor: pointer;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12);
+  color: #d6e2ea; font: inherit; font-weight: 600;
 }
 .rb-list { display: flex; flex-direction: column; gap: 4px; }
 .rb-list button {

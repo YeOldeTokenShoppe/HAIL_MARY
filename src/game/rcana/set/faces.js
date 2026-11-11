@@ -24,6 +24,10 @@ export const FACES = [
   {
     id: "el-diablito",
     design: "diablito",
+    // `gloss`: the Spanish title in English, for the viewer caption, the
+    // binder label and the table's enlarged view. It never prints on the
+    // face — lotería names stay in Spanish on the card.
+    gloss: "The Little Devil",
     number: 7,
     rarity: "Mythic",
     // halo/hydro come from the design (cred 10 / liq 2); set them here only
@@ -52,6 +56,7 @@ export const FACES = [
   {
     id: "el-monje",
     design: "monje",
+    gloss: "The Monk",
     // PROVISIONAL number and rarity.
     number: 12,
     rarity: "Uncommon",
@@ -87,6 +92,7 @@ export const FACES = [
   {
     id: "abuela",
     design: "abuela",
+    gloss: "The Grandmother",
     // PROVISIONAL number and rarity.
     number: 15,
     rarity: "Rare",
@@ -110,6 +116,7 @@ export const FACES = [
   {
     id: "la-campana",
     design: "bell",
+    gloss: "The Bell",
     // PROVISIONAL number and rarity.
     number: 17,
     rarity: "Uncommon",
@@ -120,6 +127,7 @@ export const FACES = [
   {
     id: "rosario",
     design: "rosary",
+    gloss: "The Rosary",
     // PROVISIONAL number and rarity.
     number: 18,
     rarity: "Uncommon",
@@ -130,6 +138,7 @@ export const FACES = [
   {
     id: "la-calavera",
     design: "skull",
+    gloss: "The Skull",
     // PROVISIONAL number and rarity.
     number: 19,
     rarity: "Uncommon",
@@ -140,6 +149,7 @@ export const FACES = [
   {
     id: "el-unicornio",
     design: "unicornio",
+    gloss: "The Unicorn",
     // PROVISIONAL number and rarity.
     number: 20,
     rarity: "Rare",
@@ -153,6 +163,7 @@ export const FACES = [
   {
     id: "el-gato",
     design: "gato",
+    gloss: "The Cat",
     // PROVISIONAL number and rarity.
     number: 21,
     rarity: "Uncommon",
@@ -179,6 +190,7 @@ export const FACES = [
   {
     id: "la-rosa",
     design: "rose", // prints as "La Rosa" — the design's printName
+    gloss: "The Rose",
     // PROVISIONAL number and rarity.
     number: 23,
     rarity: "Uncommon",
@@ -204,6 +216,7 @@ export const FACES = [
   {
     id: "la-fuente",
     design: "fountain", // prints as "La Fuente" — the design's printName
+    gloss: "The Fountain",
     // PROVISIONAL number and rarity.
     number: 25,
     rarity: "Uncommon",
@@ -216,6 +229,7 @@ export const FACES = [
   {
     id: "la-investigadora",
     design: "investigadora", // prints as "La Investigadora" — the design's name
+    gloss: "The Investigator",
     // PROVISIONAL number and rarity.
     number: 26,
     rarity: "Uncommon",
@@ -228,6 +242,7 @@ export const FACES = [
   {
     id: "el-gambusino",
     design: "prospector", // prints as "El Gambusino" — the design's name
+    gloss: "The Prospector",
     // PROVISIONAL number and rarity.
     number: 27,
     rarity: "Uncommon",
@@ -252,6 +267,7 @@ export const FACES = [
   {
     id: "the-celebrity",
     design: "celebridad", // prints as "La Celebridad" — the design's name
+    gloss: "The Celebrity",
     // PROVISIONAL number and rarity.
     number: 29,
     rarity: "Uncommon",
@@ -383,6 +399,42 @@ export const FACES = [
     // A Calamity narrates (the line follows the rule).
     ability: "Until cleared, the target\ncannot sell Assets.",
     flavor: "Nobody checks who is holding the other end.",
+    printed: {},
+  },
+  {
+    id: "quantum-hack",
+    design: "hack", // prints as "Quantum Hack" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 40,
+    rarity: "Uncommon",
+    // A Calamity narrates (the line follows the rule).
+    ability: "Until cleared, the target's\nTrader ability is switched off.",
+    flavor: "The lock held. The math did not.",
+    printed: {},
+  },
+  {
+    id: "mardi-gras",
+    design: "mardigras", // prints as "Mardi Gras" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 41,
+    rarity: "Uncommon",
+    // The throws; the design's line is a simulator's.
+    ability: "Every player rolls the die\nand collects that much Liquidity.",
+    // An Event narrates; the line follows the rule.
+    flavor: "Everybody catches something. The die says how much.",
+    printed: {},
+  },
+  {
+    id: "la-horchata",
+    design: "horchata", // prints as "La Horchata" — the design's printName
+    gloss: "The Rice Drink",
+    // PROVISIONAL number and rarity.
+    number: 42,
+    rarity: "Common",
+    // The refresh; the design's line is a simulator's.
+    ability: "Discard up to 2 cards,\nthen draw that many plus one.",
+    // A Remedy narrates; the line follows the rule.
+    flavor: "Sweet, cold, and gone too soon.",
     printed: {},
   },
 ];

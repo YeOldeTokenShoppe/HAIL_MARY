@@ -117,12 +117,15 @@ button:disabled{opacity:.4;cursor:default}
 @keyframes fxglow{from{box-shadow:0 0 0 rgba(255,215,0,0)}to{box-shadow:0 0 10px rgba(255,215,0,.45)}}
 .flycoin{position:fixed;z-index:68;width:.85rem;height:.85rem;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f7dc8f,#c9941f 70%);border:1px solid #8a6210;pointer-events:none;transition:transform .52s cubic-bezier(.2,.7,.3,1),opacity .2s}
 .minihand{display:flex;gap:3px;margin-top:7px;flex-wrap:wrap}
-.miniback{width:2.1rem;height:3rem;border-radius:4px;background:linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 1px 3px #0007}
+.miniback{width:2.1rem;height:3rem;border-radius:4px;background:url(/TCG/rcana/cardBack.webp) center/cover no-repeat,linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 1px 3px #0007}
 .flycard{position:fixed;z-index:70;width:var(--cw);height:calc(var(--cw)*1.06);border-radius:.55em;background:linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 6px 18px #0009;pointer-events:none;transition:transform .42s cubic-bezier(.2,.7,.3,1),opacity .42s}
 .card.dealt{animation:dealIn .45s cubic-bezier(.2,.7,.3,1)}
 @keyframes dealIn{from{transform:translate(-18rem,-6rem) rotate(-7deg);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion: reduce){.flycard,.flycoin,.flyface{transition:none}.card.dealt{animation:none}}
-.card.back{background:linear-gradient(170deg,#3d2f73,#2a1f52);color:#cfc3f2;border-color:var(--violet);align-items:center;justify-content:center;text-align:center}
+.card.back{background:url(/TCG/rcana/cardBack.webp) center/cover no-repeat,linear-gradient(170deg,#3d2f73,#2a1f52);color:#f3ead2;border-color:var(--violet);align-items:center;justify-content:center;text-align:center}
+/* The lotería back carries its own RL80 mark, so the deck pile only needs the count — on a scrim so it reads over the art. */
+.card.back .nm{display:none}
+.card.back .fx{background:#140c24d9;border-radius:.4em;padding:.25em .5em;color:#f3ead2;text-shadow:0 1px 2px #000}
 .card.back.drawable{cursor:pointer;outline:2px solid var(--gold);box-shadow:0 0 18px #e8b84b66;transform:translateY(-2px)}
 .card.playable{cursor:pointer;outline:2px solid transparent;transition:outline-color .15s,transform .15s}
 .card.playable:hover{outline-color:var(--gold);transform:translateY(-2px)}
@@ -710,6 +713,7 @@ const FACES = {
   "diablito": {
     "id": "el-diablito",
     "name": "El Diablito",
+    "gloss": "The Little Devil",
     "number": 7,
     "rarity": "Mythic",
     "face": "/TCG/rcana/el-diablito/face.webp",
@@ -718,6 +722,7 @@ const FACES = {
   "bull": {
     "id": "el-toro",
     "name": "Bull Run",
+    "gloss": null,
     "number": 11,
     "rarity": "Common",
     "face": "/TCG/rcana/el-toro/face.webp",
@@ -726,6 +731,7 @@ const FACES = {
   "monje": {
     "id": "el-monje",
     "name": "El Monje",
+    "gloss": "The Monk",
     "number": 12,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/el-monje/face.webp",
@@ -734,6 +740,7 @@ const FACES = {
   "bear": {
     "id": "el-oso",
     "name": "Bear Market",
+    "gloss": null,
     "number": 13,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/el-oso/face.webp",
@@ -742,6 +749,7 @@ const FACES = {
   "tech": {
     "id": "tech-stock",
     "name": "Tech Stock",
+    "gloss": null,
     "number": 14,
     "rarity": "Common",
     "face": "/TCG/rcana/tech-stock/face.webp",
@@ -750,6 +758,7 @@ const FACES = {
   "abuela": {
     "id": "abuela",
     "name": "La Abuela",
+    "gloss": "The Grandmother",
     "number": 15,
     "rarity": "Rare",
     "face": "/TCG/rcana/abuela/face.webp",
@@ -758,6 +767,7 @@ const FACES = {
   "tortilla": {
     "id": "tortilla",
     "name": "La Tortilla",
+    "gloss": null,
     "number": 16,
     "rarity": "Rare",
     "face": "/TCG/rcana/tortilla/face.webp",
@@ -766,6 +776,7 @@ const FACES = {
   "bell": {
     "id": "la-campana",
     "name": "La Campana",
+    "gloss": "The Bell",
     "number": 17,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/la-campana/face.webp",
@@ -774,6 +785,7 @@ const FACES = {
   "rosary": {
     "id": "rosario",
     "name": "El Rosario",
+    "gloss": "The Rosary",
     "number": 18,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/rosario/face.webp",
@@ -782,6 +794,7 @@ const FACES = {
   "skull": {
     "id": "la-calavera",
     "name": "La Calavera",
+    "gloss": "The Skull",
     "number": 19,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/la-calavera/face.webp",
@@ -790,6 +803,7 @@ const FACES = {
   "unicornio": {
     "id": "el-unicornio",
     "name": "El Unicornio",
+    "gloss": "The Unicorn",
     "number": 20,
     "rarity": "Rare",
     "face": "/TCG/rcana/el-unicornio/face.webp",
@@ -798,6 +812,7 @@ const FACES = {
   "gato": {
     "id": "el-gato",
     "name": "El Gato",
+    "gloss": "The Cat",
     "number": 21,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/el-gato/face.webp",
@@ -806,6 +821,7 @@ const FACES = {
   "meme": {
     "id": "meme-coin",
     "name": "Meme Coin",
+    "gloss": null,
     "number": 22,
     "rarity": "Common",
     "face": "/TCG/rcana/meme-coin/face.webp",
@@ -814,6 +830,7 @@ const FACES = {
   "rose": {
     "id": "la-rosa",
     "name": "La Rosa",
+    "gloss": "The Rose",
     "number": 23,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/la-rosa/face.webp",
@@ -822,6 +839,7 @@ const FACES = {
   "ballena": {
     "id": "the-whale",
     "name": "The Whale",
+    "gloss": null,
     "number": 24,
     "rarity": "Rare",
     "face": "/TCG/rcana/the-whale/face.webp",
@@ -830,6 +848,7 @@ const FACES = {
   "fountain": {
     "id": "la-fuente",
     "name": "La Fuente",
+    "gloss": "The Fountain",
     "number": 25,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/la-fuente/face.webp",
@@ -838,6 +857,7 @@ const FACES = {
   "investigadora": {
     "id": "la-investigadora",
     "name": "La Investigadora",
+    "gloss": "The Investigator",
     "number": 26,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/la-investigadora/face.webp",
@@ -846,6 +866,7 @@ const FACES = {
   "prospector": {
     "id": "el-gambusino",
     "name": "El Gambusino",
+    "gloss": "The Prospector",
     "number": 27,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/el-gambusino/face.webp",
@@ -854,6 +875,7 @@ const FACES = {
   "illuminati": {
     "id": "the-illumin80",
     "name": "The Illumin80",
+    "gloss": null,
     "number": 28,
     "rarity": "Rare",
     "face": "/TCG/rcana/the-illumin80/face.webp",
@@ -862,6 +884,7 @@ const FACES = {
   "celebridad": {
     "id": "the-celebrity",
     "name": "La Celebridad",
+    "gloss": "The Celebrity",
     "number": 29,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/the-celebrity/face.webp",
@@ -870,6 +893,7 @@ const FACES = {
   "collectibles": {
     "id": "collectibles",
     "name": "Collectibles",
+    "gloss": null,
     "number": 30,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/collectibles/face.webp",
@@ -878,6 +902,7 @@ const FACES = {
   "mine": {
     "id": "the-mine",
     "name": "The Mine",
+    "gloss": null,
     "number": 31,
     "rarity": "Common",
     "face": "/TCG/rcana/the-mine/face.webp",
@@ -886,6 +911,7 @@ const FACES = {
   "realestate": {
     "id": "real-estate",
     "name": "Real Estate",
+    "gloss": null,
     "number": 32,
     "rarity": "Rare",
     "face": "/TCG/rcana/real-estate/face.webp",
@@ -894,6 +920,7 @@ const FACES = {
   "map": {
     "id": "treasure-map",
     "name": "Treasure Map",
+    "gloss": null,
     "number": 33,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/treasure-map/face.webp",
@@ -902,6 +929,7 @@ const FACES = {
   "oil": {
     "id": "oil-field",
     "name": "Oil Field Claim",
+    "gloss": null,
     "number": 34,
     "rarity": "Rare",
     "face": "/TCG/rcana/oil-field/face.webp",
@@ -910,6 +938,7 @@ const FACES = {
   "rideordie": {
     "id": "ride-or-die",
     "name": "Ride or Die",
+    "gloss": null,
     "number": 35,
     "rarity": "Rare",
     "face": "/TCG/rcana/ride-or-die/face.webp",
@@ -918,6 +947,7 @@ const FACES = {
   "taxman": {
     "id": "tax-collector",
     "name": "Tax Collector",
+    "gloss": null,
     "number": 36,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/tax-collector/face.webp",
@@ -926,6 +956,7 @@ const FACES = {
   "semilla": {
     "id": "seed-round",
     "name": "Seed Round",
+    "gloss": null,
     "number": 37,
     "rarity": "Common",
     "face": "/TCG/rcana/seed-round/face.webp",
@@ -934,6 +965,7 @@ const FACES = {
   "crash": {
     "id": "flash-crash",
     "name": "Flash Crash",
+    "gloss": null,
     "number": 38,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/flash-crash/face.webp",
@@ -942,9 +974,37 @@ const FACES = {
   "rug": {
     "id": "rug-pull",
     "name": "Rug Pull",
+    "gloss": null,
     "number": 39,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/rug-pull/face.webp",
+    "art": null
+  },
+  "hack": {
+    "id": "quantum-hack",
+    "name": "Quantum Hack",
+    "gloss": null,
+    "number": 40,
+    "rarity": "Uncommon",
+    "face": "/TCG/rcana/quantum-hack/face.webp",
+    "art": null
+  },
+  "mardigras": {
+    "id": "mardi-gras",
+    "name": "Mardi Gras",
+    "gloss": null,
+    "number": 41,
+    "rarity": "Uncommon",
+    "face": "/TCG/rcana/mardi-gras/face.webp",
+    "art": null
+  },
+  "horchata": {
+    "id": "la-horchata",
+    "name": "La Horchata",
+    "gloss": "The Rice Drink",
+    "number": 42,
+    "rarity": "Common",
+    "face": "/TCG/rcana/la-horchata/face.webp",
     "art": null
   }
 };
@@ -1003,7 +1063,7 @@ function showFace(face, c) {
   let lb = document.getElementById('lightbox');
   if (!lb) { lb = document.createElement('div'); lb.id = 'lightbox'; document.body.appendChild(lb); }
   const title = face.name || c.name;
-  const sub = [face.number != null ? `No. ${face.number}` : null, face.rarity, classLabel(c), face.name && face.name !== c.name ? `"${c.name}" in play` : null].filter(Boolean).join(' · ');
+  const sub = [face.gloss || null, face.number != null ? `No. ${face.number}` : null, face.rarity, classLabel(c), face.name && face.name !== c.name ? `"${c.name}" in play` : null].filter(Boolean).join(' · ');
   // The picture first (instant), then the live layered card over it once the
   // app route has loaded — same size, so the swap is invisible. The live card
   // is the real component on /rcana-print, in an iframe, so it tilts, sways
@@ -1011,14 +1071,15 @@ function showFace(face, c) {
   const liveSrc = `/rcana-print?id=${encodeURIComponent(face.id)}&live=1&scale=1`;
   lb.innerHTML = `<div class="lightbox" role="dialog" aria-label="${esc(c.name)}">
     <div class="lbcard"><img src="${face.face}" alt="${esc(c.name)}"><iframe src="${liveSrc}" title="${esc(c.name)}" loading="eager" scrolling="no"></iframe></div>
-    <div class="cap">${esc(title)}<small>${esc(sub)} · tilt it</small></div>
+    <div class="cap">${esc(title)}<small>${esc(sub)} · tilt it · tap to flip</small></div>
     <button class="lbx" type="button" aria-label="Close">×</button></div>`;
   const close = () => { lb.innerHTML = ''; document.removeEventListener('keydown', onKey); };
   const onKey = (e) => { if (e.key === 'Escape') close(); };
   const box = lb.querySelector('.lightbox');
   const fr = lb.querySelector('iframe');
   fr.onload = () => fr.classList.add('ready');
-  // Clicks on the backdrop or the × close; the card itself is for tilting.
+  // Clicks on the backdrop or the × close; the card itself is for tilting
+  // and flipping (the live card in the iframe handles that click).
   box.onclick = (e) => { if (e.target === box || e.target.classList.contains('cap') || e.target.closest('.lbx')) close(); };
   document.addEventListener('keydown', onKey);
 }

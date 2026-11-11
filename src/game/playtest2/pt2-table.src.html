@@ -117,12 +117,15 @@ button:disabled{opacity:.4;cursor:default}
 @keyframes fxglow{from{box-shadow:0 0 0 rgba(255,215,0,0)}to{box-shadow:0 0 10px rgba(255,215,0,.45)}}
 .flycoin{position:fixed;z-index:68;width:.85rem;height:.85rem;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f7dc8f,#c9941f 70%);border:1px solid #8a6210;pointer-events:none;transition:transform .52s cubic-bezier(.2,.7,.3,1),opacity .2s}
 .minihand{display:flex;gap:3px;margin-top:7px;flex-wrap:wrap}
-.miniback{width:2.1rem;height:3rem;border-radius:4px;background:linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 1px 3px #0007}
+.miniback{width:2.1rem;height:3rem;border-radius:4px;background:url(/TCG/rcana/cardBack.webp) center/cover no-repeat,linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 1px 3px #0007}
 .flycard{position:fixed;z-index:70;width:var(--cw);height:calc(var(--cw)*1.06);border-radius:.55em;background:linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 6px 18px #0009;pointer-events:none;transition:transform .42s cubic-bezier(.2,.7,.3,1),opacity .42s}
 .card.dealt{animation:dealIn .45s cubic-bezier(.2,.7,.3,1)}
 @keyframes dealIn{from{transform:translate(-18rem,-6rem) rotate(-7deg);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion: reduce){.flycard,.flycoin,.flyface{transition:none}.card.dealt{animation:none}}
-.card.back{background:linear-gradient(170deg,#3d2f73,#2a1f52);color:#cfc3f2;border-color:var(--violet);align-items:center;justify-content:center;text-align:center}
+.card.back{background:url(/TCG/rcana/cardBack.webp) center/cover no-repeat,linear-gradient(170deg,#3d2f73,#2a1f52);color:#f3ead2;border-color:var(--violet);align-items:center;justify-content:center;text-align:center}
+/* The lotería back carries its own RL80 mark, so the deck pile only needs the count — on a scrim so it reads over the art. */
+.card.back .nm{display:none}
+.card.back .fx{background:#140c24d9;border-radius:.4em;padding:.25em .5em;color:#f3ead2;text-shadow:0 1px 2px #000}
 .card.back.drawable{cursor:pointer;outline:2px solid var(--gold);box-shadow:0 0 18px #e8b84b66;transform:translateY(-2px)}
 .card.playable{cursor:pointer;outline:2px solid transparent;transition:outline-color .15s,transform .15s}
 .card.playable:hover{outline-color:var(--gold);transform:translateY(-2px)}
@@ -244,7 +247,7 @@ function showFace(face, c) {
   let lb = document.getElementById('lightbox');
   if (!lb) { lb = document.createElement('div'); lb.id = 'lightbox'; document.body.appendChild(lb); }
   const title = face.name || c.name;
-  const sub = [face.number != null ? `No. ${face.number}` : null, face.rarity, classLabel(c), face.name && face.name !== c.name ? `"${c.name}" in play` : null].filter(Boolean).join(' · ');
+  const sub = [face.gloss || null, face.number != null ? `No. ${face.number}` : null, face.rarity, classLabel(c), face.name && face.name !== c.name ? `"${c.name}" in play` : null].filter(Boolean).join(' · ');
   // The picture first (instant), then the live layered card over it once the
   // app route has loaded — same size, so the swap is invisible. The live card
   // is the real component on /rcana-print, in an iframe, so it tilts, sways
@@ -252,14 +255,15 @@ function showFace(face, c) {
   const liveSrc = `/rcana-print?id=${encodeURIComponent(face.id)}&live=1&scale=1`;
   lb.innerHTML = `<div class="lightbox" role="dialog" aria-label="${esc(c.name)}">
     <div class="lbcard"><img src="${face.face}" alt="${esc(c.name)}"><iframe src="${liveSrc}" title="${esc(c.name)}" loading="eager" scrolling="no"></iframe></div>
-    <div class="cap">${esc(title)}<small>${esc(sub)} · tilt it</small></div>
+    <div class="cap">${esc(title)}<small>${esc(sub)} · tilt it · tap to flip</small></div>
     <button class="lbx" type="button" aria-label="Close">×</button></div>`;
   const close = () => { lb.innerHTML = ''; document.removeEventListener('keydown', onKey); };
   const onKey = (e) => { if (e.key === 'Escape') close(); };
   const box = lb.querySelector('.lightbox');
   const fr = lb.querySelector('iframe');
   fr.onload = () => fr.classList.add('ready');
-  // Clicks on the backdrop or the × close; the card itself is for tilting.
+  // Clicks on the backdrop or the × close; the card itself is for tilting
+  // and flipping (the live card in the iframe handles that click).
   box.onclick = (e) => { if (e.target === box || e.target.classList.contains('cap') || e.target.closest('.lbx')) close(); };
   document.addEventListener('keydown', onKey);
 }

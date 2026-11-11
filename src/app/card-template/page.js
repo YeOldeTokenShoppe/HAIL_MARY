@@ -12,6 +12,7 @@ import { ROGUES } from "@/game/terminal-traders/rogues";
 import { LOTERIA_CARDS, toLoteriaCard } from "@/game/terminal-traders/loteria";
 import RcanaBench from "@/components/RcanaBench";
 import RcanaCard from "@/components/RcanaCard";
+import RcanaViewer from "@/components/RcanaViewer";
 import { RCANA_SET, UNPRINTED, TYPE_CLASS, toRcanaCard } from "@/game/rcana/cardFace";
 import { RCANA_SET_SIZE } from "@/game/rcana/set/index.js";
 
@@ -105,12 +106,14 @@ const RCANA_CLASS_ORDER = ["Trader", "Asset", "Event", "Artifact"];
 const RCANA_COLLECTION = RCANA_CLASS_ORDER.map((cls) => {
   const printed = RCANA_SET.filter((face) => face.cardClass === cls)
     .sort((a, b) => (a.number ?? 999) - (b.number ?? 999))
-    .map((face) => ({ id: face.id, name: face.name, rarity: face.rarity, number: face.number, card: toRcanaCard(face) }));
+    .map((face) => ({ id: face.id, name: face.name, gloss: face.gloss ?? null, rarity: face.rarity, number: face.number, card: toRcanaCard(face) }));
   const pending = UNPRINTED.filter((d) => TYPE_CLASS[d.type] === cls)
     .map((d) => ({ id: `design-${d.key}`, name: d.printName || d.name, rarity: d.type, card: null }));
   return { title: `${cls}s`, cards: [...printed, ...pending], wired: printed.length };
 });
 const RCANA_PRINTED = RCANA_SET.length;
+// The binder's printed cards in reading order, for the viewer's arrows.
+const RCANA_VIEW_ORDER = RCANA_COLLECTION.flatMap((g) => g.cards.filter((c) => c.card));
 
 // ── Rogues gallery ─────────────────────────────────────────────────────────
 // A cross-cutting index by character, never a fifth card type: every rogue's
@@ -145,7 +148,15 @@ export default function CardTemplatePage() {
   const [effectsOn, setEffectsOn] = useState(true);
   // Front/back, for cards that carry a printed back.
   const [flipped, setFlipped] = useState(false);
-  const [view, setView] = useState("single");
+  // The page opens on the R-cana binder: that is what testers are sent to.
+  // The Genesis template, its binder and the R-cana bench are the workbench,
+  // shown only with ?tools=1 or the Workbench switch — the same page, just
+  // with the tools put away.
+  const [view, setView] = useState("rcana-collection");
+  const [tools, setTools] = useState(false);
+  // The card held up in the viewer (null = none). Mirrored to ?card= so a
+  // tester can be sent straight to one card.
+  const [viewerId, setViewerId] = useState(null);
   // The card the R-cana bench opens on; a binder slot sets it before switching.
   const [rcanaCardId, setRcanaCardId] = useState(null);
   // null = follow the card's rarity; a frame id pins an override for preview.
@@ -236,6 +247,19 @@ export default function CardTemplatePage() {
   };
 
   useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("tools") === "1") setTools(true);
+    const c = q.get("card");
+    if (c && RCANA_VIEW_ORDER.some((x) => x.id === c)) setViewerId(c);
+  }, []);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (viewerId) q.set("card", viewerId); else q.delete("card");
+    const qs = q.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+  }, [viewerId]);
+
+  useEffect(() => {
     const adjust = () => {
       const w = window.innerWidth;
       if (w < 820) setScale(Math.max(0.36, (w - 60) / 744));
@@ -254,7 +278,7 @@ export default function CardTemplatePage() {
 
       <header className="ct-top">
         <div>
-          <p className="ct-kicker">Terminal Traders // Card Template</p>
+          <p className="ct-kicker">{tools ? "Terminal Traders // Card Template" : "R-cana // The Lotería 80"}</p>
           <h1>{view === "single" ? "Trading Card Overlay" : view === "rcana-collection" ? "R-cana · The Lotería 80" : view === "rcana" ? "R-cana Bench" : "The Genesis 80"}</h1>
           <p className="ct-sub">
             {view === "single" ? (
@@ -264,9 +288,9 @@ export default function CardTemplatePage() {
               </>
             ) : view === "rcana-collection" ? (
               <>
-                Every printed R-cana face by class, flat and without FX, then the
-                designs still waiting for art as empty pockets. Click a face to
-                open it on the bench.
+                Click any card to pick it up: move the mouse to tilt it, click it
+                to turn it over, and use the arrows to browse. The outlined
+                pockets are cards still waiting for their art.
               </>
             ) : view === "rcana" ? (
               <>
@@ -283,23 +307,36 @@ export default function CardTemplatePage() {
           </p>
         </div>
 
-        <div className="ct-view-toggle" role="radiogroup" aria-label="View">
-          {[
-            { id: "single", label: "Single" },
-            { id: "collection", label: `Collection ${TOTAL_WIRED}/${GENESIS_SET.length}` },
-            { id: "rcana", label: "R-cana Bench" },
-            { id: "rcana-collection", label: `R-cana ${RCANA_PRINTED}/${RCANA_SET_SIZE}` },
-          ].map((v) => (
-            <button
-              key={v.id}
-              role="radio"
-              aria-checked={view === v.id}
-              className={view === v.id ? "is-active" : ""}
-              onClick={() => setView(v.id)}
-            >
-              {v.label}
-            </button>
-          ))}
+        <div className="ct-top-tools">
+          {tools && (
+            <div className="ct-view-toggle" role="radiogroup" aria-label="View">
+              {[
+                { id: "single", label: "Single" },
+                { id: "collection", label: `Collection ${TOTAL_WIRED}/${GENESIS_SET.length}` },
+                { id: "rcana", label: "R-cana Bench" },
+                { id: "rcana-collection", label: `R-cana ${RCANA_PRINTED}/${RCANA_SET_SIZE}` },
+              ].map((v) => (
+                <button
+                  key={v.id}
+                  role="radio"
+                  aria-checked={view === v.id}
+                  className={view === v.id ? "is-active" : ""}
+                  onClick={() => setView(v.id)}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            className="ct-tools-switch"
+            aria-pressed={tools}
+            title={tools ? "Put the workbench away" : "Show the template, the Genesis binder and the R-cana bench"}
+            onClick={() => { if (tools) setView("rcana-collection"); setTools(!tools); }}
+          >
+            {tools ? "Hide workbench" : "Workbench"}
+          </button>
         </div>
       </header>
 
@@ -399,9 +436,9 @@ export default function CardTemplatePage() {
                   <button
                     key={slot.id}
                     className={`ct-slot ct-slot--${String(slot.rarity).toLowerCase()}${slot.card ? "" : " is-empty"}`}
-                    onClick={slot.card ? () => { setRcanaCardId(slot.id); setView("rcana"); } : undefined}
+                    onClick={slot.card ? () => setViewerId(slot.id) : undefined}
                     disabled={!slot.card}
-                    title={slot.card ? `${slot.name} — open on the bench` : `${slot.name} — art pending`}
+                    title={slot.card ? `${slot.name} — pick it up` : `${slot.name} — art pending`}
                   >
                     <span className="ct-slot-art">
                       {slot.card ? (
@@ -411,6 +448,7 @@ export default function CardTemplatePage() {
                       )}
                     </span>
                     <span className="ct-slot-name">{slot.number != null ? `${slot.number} · ` : ""}{slot.name}</span>
+                    {slot.gloss && <span className="ct-slot-gloss">{slot.gloss}</span>}
                     <span className="ct-slot-rarity">{slot.rarity}</span>
                   </button>
                 ))}
@@ -421,6 +459,14 @@ export default function CardTemplatePage() {
       )}
 
       {view === "rcana" && <RcanaBench initialCardId={rcanaCardId} />}
+
+      <RcanaViewer
+        cards={RCANA_VIEW_ORDER}
+        id={viewerId}
+        onChange={setViewerId}
+        onClose={() => setViewerId(null)}
+        onBench={tools ? (id) => { setViewerId(null); setRcanaCardId(id); setView("rcana"); } : null}
+      />
 
       <div className="ct-workspace" hidden={view !== "single"}>
         <aside className="ct-column ct-picker">
@@ -948,6 +994,21 @@ const PAGE_STYLES = `
     border-radius: 4px;
   }
 
+  .ct-top-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .ct-tools-switch {
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.14);
+    background: rgba(0,0,0,.35);
+    color: rgba(239,255,249,.6);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .ct-tools-switch:hover { border-color: #53ffd6; color: #53ffd6; }
+  .ct-tools-switch[aria-pressed="true"] { border-color: rgba(255,209,102,.5); color: #ffd166; }
   .ct-view-toggle {
     display: flex;
     gap: 6px;
@@ -1083,6 +1144,14 @@ const PAGE_STYLES = `
     line-height: 1.25;
   }
 
+  /* The Spanish title's English, under the name in the same small type. */
+  .ct-slot-gloss {
+    margin-top: -4px;
+    font-size: 10px;
+    letter-spacing: .04em;
+    color: rgba(239,255,249,.55);
+    font-style: italic;
+  }
   .ct-slot-rarity {
     font-size: 9px;
     letter-spacing: .18em;
@@ -1147,6 +1216,9 @@ const PAGE_STYLES = `
 
   /* Cards on the left, stage in the middle, effects on the right. Below
      1100px the columns stack and the stage leads. */
+  /* The grid display below would override the hidden attribute's display:
+     none, so the workspace off the single view is put away explicitly. */
+  .ct-workspace[hidden] { display: none; }
   .ct-workspace {
     position: relative;
     z-index: 1;
