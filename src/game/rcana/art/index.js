@@ -35,6 +35,11 @@ import rugPull from "./rug-pull.js";
 import quantumHack from "./quantum-hack.js";
 import mardiGras from "./mardi-gras.js";
 import laHorchata from "./la-horchata.js";
+import stablecoin from "./stablecoin.js";
+import yieldFarm from "./yield-farm.js";
+import blueChip from "./blue-chip.js";
+import scandal from "./scandal.js";
+import exitScam from "./exit-scam.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -70,4 +75,9 @@ export const RCANA_ART = {
   "quantum-hack": quantumHack,
   "mardi-gras": mardiGras,
   "la-horchata": laHorchata,
+  "stablecoin": stablecoin,
+  "yield-farm": yieldFarm,
+  "blue-chip": blueChip,
+  "scandal": scandal,
+  "exit-scam": exitScam,
 };

@@ -23,16 +23,16 @@ export const byKey = Object.fromEntries(DESIGNS.map((d) => [d.key, d]));
 // (hazards, gambles, the Unicorn's compounding). Deck identity is the collectible premise.
 export const RECIPES = {
   devotion: [['monje', 2], ['gato', 2], ['celebridad', 1],
-    ['tech', 1], ['collectibles', 1], ['moon', 1], ['bluechip', 1], ['moneda', 2], ['semilla', 1],
+    ['tech', 2], ['collectibles', 1], ['moon', 1], ['bluechip', 1], ['moneda', 1], ['semilla', 1],
     ['bull', 2], ['inherit', 1], ['squeeze', 2],
     ['bear', 1], ['rug', 1],
     ['bell', 2], ['resist', 2], ['keys', 1], ['tortilla', 2], ['publicista', 2], ['horchata', 2],
     ['heart', 1], ['halo', 1], ['rosary', 1], ['grail', 1], ['dashboard', 1],
     ['ofrenda', 2], ['cherub', 1], ['rose', 1], ['fountain', 1]],
   degen: [['diablito', 2], ['unicornio', 2], ['gato', 1], ['prospector', 1], ['abuela', 1],
-    ['meme', 2], ['tech', 1], ['collectibles', 1], ['moon', 1], ['bluechip', 1], ['jardin', 1],
-    ['bull', 2], ['inherit', 2], ['unlock', 2],
-    ['ballena', 1], ['rueda', 1], ['moralhazard', 1], ['mardigras', 1], ['godcandle', 1],
+    ['meme', 2], ['tech', 2], ['collectibles', 1], ['moon', 1], ['bluechip', 1], ['jardin', 1],
+    ['bull', 1], ['inherit', 1], ['unlock', 2],
+    ['ballena', 1], ['rueda', 1], ['moralhazard', 1], ['mardigras', 1], ['godcandle', 1], ['techwreck', 1],
     ['illuminati', 1],
     ['bear', 1], ['hack', 1], ['rug', 1], ['escandalo', 2],
     ['tortilla', 1], ['keys', 1],
@@ -73,6 +73,7 @@ export class Game {
     this.log(`✦ EVENT — ${c.name} (drawn by ${p.name}): ${c.text}`);
     for (const q of this.players) for (const a of [...q.invest]) if (a.key === 'jardin') { q.invest.splice(q.invest.indexOf(a), 1); q.discard.push(a); this.log(`${q.name}'s YIELD FARM is wiped by the weather`); }
     if (c.key === 'godcandle') this.fx[c.key] = { owner: p.idx };
+    if (c.key === 'techwreck') { let hit = 0; for (const q of this.players) for (const a of [...q.invest]) if (a.key === 'tech') { q.invest.splice(q.invest.indexOf(a), 1); q.discard.push(a); q.liq += 1; hit++; this.log(`${q.name}'s TECH STOCK is wrecked — scrapped for 1`); } if (!hit) this.log('TECH WRECK — no Tech Stock on the table; the bubble bursts over nobody'); }
     if (c.key === 'crash') for (const q of this.players) if (q.liq >= 8) { const lost = Math.floor(q.liq / 2); q.liq -= lost; this.log(`${q.name} loses ${lost} Liquidity in the crash`); }
     if (c.key === 'ballena') {
       const worth = (q) => q.invest.reduce((s2, a2) => s2 + this.prosOf(a2), 0);

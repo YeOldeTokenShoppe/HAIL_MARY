@@ -110,6 +110,8 @@ export const DESIGNS = [
   // is an Opportunity (the default), a loss a Calamity, a shake-up whose
   // winner is unknown an Ambiguity.
   D('crash', 'Flash Crash', 'event', 0, { subtype: 'Calamity', text: 'Everyone holding 8+ Liquidity loses half' }),
+  // The dot-com bust: it finds every Tech Stock on the table, whoever holds it.
+  D('techwreck', 'Tech Wreck', 'event', 0, { subtype: 'Calamity', text: 'The bubble bursts: every Tech Stock on the table is wrecked — scrapped for 1 Liquidity' }),
   D('ballena', 'The Whale', 'event', 0, { subtype: 'Ambiguity', text: 'The whale surfaces: the richest portfolio’s best Asset moves to the poorest player' }),
   // Initiation: the drawer is taken into the society; fires on draw like the
   // other market weather but PRINTS as an Opportunity (the face sets subClass).

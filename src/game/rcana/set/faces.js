@@ -437,4 +437,69 @@ export const FACES = [
     flavor: "Sweet, cold, and gone too soon.",
     printed: {},
   },
+  {
+    id: "stablecoin",
+    design: "stablecoin", // prints as "Stablecoin" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 43,
+    rarity: "Common",
+    // An Asset's line says what it sells for. The boxes print value (50)
+    // and cost (2); the text carries the cash option and the yield.
+    ability: "Sell for 3 coins, or bank 50 Prosperity.\nWhile held: collect 1 Liquidity each turn.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "It never moons. It never has to.",
+    printed: {},
+  },
+  {
+    id: "yield-farm",
+    design: "jardin", // prints as "Yield Farm" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 44,
+    rarity: "Uncommon",
+    // An Asset's line says what it sells for. The boxes print value (50)
+    // and cost (4); the text carries the cash option, the yield and the
+    // catch — the design discards it when any Event fires on draw.
+    ability: "Sell for 2 coins, or bank 50 Prosperity.\nCollect 2 Liquidity a turn; an Event discards it.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "Fat harvests, right up until the weather turns.",
+    printed: {},
+  },
+  {
+    id: "blue-chip",
+    design: "bluechip", // prints as "Blue Chip" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 45,
+    rarity: "Rare",
+    // An Asset's line says what it sells for. The boxes print value (250)
+    // and cost (6); the text carries the cash option. No yield — it just
+    // holds.
+    ability: "Sell for 10 coins, or bank 250 Prosperity.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "It was here before you. It will be here after.",
+    printed: {},
+  },
+  {
+    id: "scandal",
+    design: "escandalo", // prints as "Scandal" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 46,
+    rarity: "Uncommon",
+    // A Calamity narrates (the line follows the rule). The design: the seated
+    // Trader loses 5 Grace when it breaks, then 2 more each turn until cleared.
+    ability: "Until cleared, the seated Trader\nloses 5 Grace now, then 2 each turn.",
+    flavor: "The ink was dry before the story was.",
+    printed: {},
+  },
+  {
+    id: "exit-scam",
+    design: "scam", // prints as "Exit Scam" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 47,
+    rarity: "Uncommon",
+    // A Calamity narrates (the line follows the rule). The design: the target
+    // cannot play Opportunity Events until cleared.
+    ability: "Until cleared, the target\ncannot play Opportunities.",
+    flavor: "The sign says closed. The money says gone.",
+    printed: {},
+  },
 ];
