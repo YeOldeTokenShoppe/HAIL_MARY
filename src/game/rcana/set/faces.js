@@ -275,16 +275,16 @@ export const FACES = [
     printed: {},
   },
   {
-    id: "gold",
-    design: "gold", // prints as "Gold" — the design's name
-    // PROVISIONAL number and rarity.
+    id: "the-mine",
+    design: "mine", // prints as "The Mine" — the design's name
+    // PROVISIONAL number and rarity. (Inherited from Gold, whose art this is.)
     number: 31,
     rarity: "Common",
     // An Asset's line says what it sells for; the boxes print value (75)
-    // and cost (3), so the text carries the cash option.
-    ability: "The mother lode. Sell for 6 coins,\nor bank 75 Prosperity.",
+    // and cost (4), so the text carries the cash option and the growth.
+    ability: "Sell for 4 coins, or bank 75 Prosperity.\nEach round held: worth 25 more.",
     // An Asset narrates, so the flavor follows the rule unquoted.
-    flavor: "The mother lode never pays a dividend. It never has to.",
+    flavor: "Nobody strikes the mother lode on the first day.",
     printed: {},
   },
   {
@@ -324,6 +324,65 @@ export const FACES = [
     ability: "Sell for 3 coins, or roll:\n3+ gushes 175 Prosperity, else 25.",
     // An Asset narrates, so the flavor follows the rule unquoted.
     flavor: "Every dry hole was a sure thing on paper.",
+    printed: {},
+  },
+  {
+    id: "ride-or-die",
+    design: "rideordie", // prints as "Ride or Die" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 35,
+    rarity: "Rare",
+    // A Relic equips; the printed line is the protection alone, shorter than
+    // the simulator's.
+    ability: "Your Assets stay with you.\nThe Whale and The Wheel pass you by.",
+    // A Relic narrates; the line follows the rule.
+    flavor: "Nobody gets out of the car.",
+    printed: {},
+  },
+  {
+    id: "tax-collector",
+    design: "taxman", // prints as "Tax Collector" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 36,
+    rarity: "Uncommon",
+    // A Calamity narrates (the line follows the rule).
+    ability: "Until cleared, the target pays 1\nto the bank at the start of each turn.",
+    flavor: "He always finds the door. He never knocks.",
+    printed: {},
+  },
+  {
+    id: "seed-round",
+    design: "semilla", // prints as "Seed Round" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 37,
+    rarity: "Common",
+    // An Asset's line says what it sells for. The boxes print value (25)
+    // and cost (1); the text carries the cash option and the bloom.
+    ability: "Sell for 1 coin, or bank 25 Prosperity.\nHeld four rounds, it blooms to 150.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "Everything that blooms was buried first.",
+    printed: {},
+  },
+  {
+    id: "flash-crash",
+    design: "crash", // prints as "Flash Crash" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 38,
+    rarity: "Uncommon",
+    // A Calamity narrates (the line follows the rule).
+    ability: "Everyone holding 8 or more Liquidity\nloses half of it.",
+    flavor: "The bottom is wherever the last bid was.",
+    printed: {},
+  },
+  {
+    id: "rug-pull",
+    design: "rug", // prints as "Rug Pull" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 39,
+    rarity: "Uncommon",
+    // A Calamity narrates (the line follows the rule).
+    ability: "Until cleared, the target\ncannot sell Assets.",
+    flavor: "Nobody checks who is holding the other end.",
     printed: {},
   },
 ];

@@ -1,8 +1,10 @@
-// Gold — the mother lode, an Asset. Two planes behind the plate: the
-// timbered gallery, and the foreground ledges with drifting sparks nearest
-// the window. (subject.webp, the ore mound, is still in the folder but unused.)
+// The Mine — the claim that pays the longer you dig, an Asset. Two planes
+// behind the plate: the timbered gallery, and the foreground ledges with
+// drifting sparks nearest the window. (subject.webp, the ore mound, is still
+// in the folder but unused.) This art was authored for Gold; Gold was dropped
+// 2026-11-10 and the folder moved here whole.
 //
-// No paths: public/TCG/rcana/gold/<id>.webp by convention (artPath).
+// No paths: public/TCG/rcana/the-mine/<id>.webp by convention (artPath).
 import { ART_PLANES } from "../artSpec.js";
 
 export default {

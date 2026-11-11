@@ -23,10 +23,15 @@ import elGambusino from "./el-gambusino.js";
 import theIllumin80 from "./the-illumin80.js";
 import theCelebrity from "./the-celebrity.js";
 import collectibles from "./collectibles.js";
-import gold from "./gold.js";
+import theMine from "./the-mine.js";
 import realEstate from "./real-estate.js";
 import treasureMap from "./treasure-map.js";
 import oilField from "./oil-field.js";
+import rideOrDie from "./ride-or-die.js";
+import taxCollector from "./tax-collector.js";
+import seedRound from "./seed-round.js";
+import flashCrash from "./flash-crash.js";
+import rugPull from "./rug-pull.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -50,8 +55,13 @@ export const RCANA_ART = {
   "the-illumin80": theIllumin80,
   "the-celebrity": theCelebrity,
   collectibles,
-  gold,
+  "the-mine": theMine,
   "real-estate": realEstate,
   "treasure-map": treasureMap,
   "oil-field": oilField,
+  "ride-or-die": rideOrDie,
+  "tax-collector": taxCollector,
+  "seed-round": seedRound,
+  "flash-crash": flashCrash,
+  "rug-pull": rugPull,
 };

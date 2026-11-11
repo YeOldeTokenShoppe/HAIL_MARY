@@ -3,7 +3,7 @@ export { SUBTYPE_HEADER as EVENT_HEADER, SUBTYPE_USAGE_SLOT as EVENT_USAGE_SLOT 
 // Every Event prints one of three subtypes, sorted by what it does to you:
 //   Calamity     a loss — a hazard played on a rival (attached until cleared),
 //                or an on-draw event that takes from the table
-//   Opportunity  a windfall — a called event (Bull Run, Rocket), or an
+//   Opportunity  a windfall — a called event (Bull Run, Full Moon), or an
 //                on-draw event that gives
 //   Ambiguity    a shake-up whose winner is unknown until it resolves — on
 //                draw only (The Whale, The Wheel, Moral Hazard)

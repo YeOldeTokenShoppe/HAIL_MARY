@@ -16,8 +16,10 @@
 // The rule: lotería names for FIGURES, devotional objects and classic lotería
 // The rule is by ROW: things you hold are lotería — Traders, Artifacts,
 // Remedies, Graces (El Monje, La Máquina, La Campana, El Exvoto); the market
-// is English — Assets, Events, Calamities (Blue Chip, Bull Run, Rug Pull). Two
-// deliberate exception keeps its lotería name: El Naranja (he is a figure).
+// is English — Assets, Events, Calamities (Blue Chip, Bull Run, Rug Pull). One
+// deliberate exception: Ride or Die keeps its English name in the lotería row
+// (it is a caption, the words painted on the car, not a title). El Naranja,
+// the exception the other way, was dropped 2026-11-10.
 // Faces never carry a name.
 
 // ── The twenty-four designs of the shared starter ──
@@ -40,8 +42,6 @@ export const DESIGNS = [
   D('meme', 'Meme Coin', 'asset', 2, { cash: 4, pros: 125, gamble: true, text: 'Sell for Prosperity: a die decides — 5+ moons for 125, else zero' }),
   // Collectibles — the flip that pays in standing more than in cash.
   D('collectibles', 'Collectibles', 'asset', 3, { cash: 5, pros: 125 }),
-  // The safe haven: pays in cash, not in standing.
-  D('gold', 'Gold', 'asset', 3, { cash: 6, pros: 75 }),
   // Slow and safe: the one pile The Bear cannot cap.
   D('realestate', 'Real Estate', 'asset', 5, { cash: 8, pros: 150, bearProof: true, text: 'While held, immune to The Bear' }),
   // The old Moneda's job — a trickle of income — on a coin that holds its value.
@@ -50,31 +50,44 @@ export const DESIGNS = [
   // Events you CALL: played from the hand for their cost, banked on the spot —
   // where the other Events fire the moment they are drawn. `played` is the flag.
   D('bull', 'Bull Run', 'event', 2, { pros: 100, played: true }),
-  D('rocket', 'Rocket', 'event', 4, { pros: 200, played: true }),
   D('moon', 'Full Moon', 'event', 4, { pros: 150, played: true }),
   D('inherit', 'The Inheritance', 'event', 0, { cash: 3, pros: 50, choice: true, played: true }),
+  // The two that replaced Rocket (2026-11-10). Called Events that care what is on
+  // your table: suffering pays for Devotion, the Degen windfall leaks to the room.
+  D('squeeze', 'Short Squeeze', 'event', 3, { pros: 100, perHaz: 50, bearProof: true, played: true, text: 'Bank 100, plus 50 for each Calamity on you. Bear Market cannot cap it' }),
+  D('unlock', 'Token Unlock', 'event', 4, { pros: 200, rivalsCollect: 1, played: true, text: 'Bank 200 — and every rival collects 1 Liquidity' }),
   D('bear', 'Bear Market', 'hazard', 2, { text: 'Bank at most 75 Prosperity from a single card' }),
   D('hack', 'Quantum Hack', 'hazard', 2, { text: 'Trader ability disabled' }),
   D('rug', 'Rug Pull', 'hazard', 3, { text: 'Cannot sell Assets' }),
   D('taxman', 'Tax Collector', 'hazard', 2, { text: 'Pay 1 to the bank at the start of each turn' }),
   D('escandalo', 'Scandal', 'hazard', 2, { text: 'Scandal: the seated Trader loses 5 Grace when it breaks, 2 more each turn' }),
-  D('naranja', 'El Naranja', 'hazard', 3, { text: 'The Orange One takes his cut: whenever the target banks, the Calamity’s owner collects 2' }),
   D('scam', 'Exit Scam', 'hazard', 3, { text: 'The target cannot play Opportunity Events until cleared' }),
   D('bell', 'The Bell', 'remedy', 1, { clears: 'bear', printName: 'La Campana' }),
   D('resist', 'Quantum Resistance', 'remedy', 1, { clears: 'hack', printName: 'La Resistencia' }),
   D('keys', 'The Keys', 'remedy', 1, { clears: 'rug', printName: 'Las Llaves' }),
   D('tortilla', 'Miracle Tortilla', 'remedy', 2, { clears: 'any', printName: 'La Tortilla' }),
-  D('publicista', 'El Publicista', 'remedy', 1, { clears: 'escandalo', text: 'Clear a Scandal — or polish: your seated Trader regains 5 Grace' }),
+  // The thing the publicist hands you, not the man: the Remedies row is objects.
+  D('publicista', 'The Press Release', 'remedy', 1, { clears: 'escandalo', text: 'Clear a Scandal — or polish: your seated Trader regains 5 Grace', printName: 'El Comunicado' }),
+  // The refreshment: a Remedy that clears nothing. It replaces itself (the +1),
+  // so it is never a dead card — the snack-item shape. The one-shot cousin of
+  // the Enigma Machine's old cycle, which now decodes the deck instead.
+  D('horchata', 'Horchata', 'remedy', 0, { refresh: 2, text: 'Refresh: discard up to 2 cards, then draw that many plus one', printName: 'La Horchata' }),
   D('heart', 'Sacred Heart', 'artifact', 2, { text: 'A shield, not a cure: discard to cancel a Calamity as it lands', printName: 'El Corazón' }),
   D('halo', 'The Halo', 'artifact', 3, { text: 'Any Trader seated at your desk cannot be disabled', printName: 'La Aureola' }),
   D('rosary', 'The Rosary Beads', 'artifact', 2, { text: 'When you light a candle, draw a card', printName: 'El Rosario' }),
   D('grail', 'The Grail', 'artifact', 3, { text: 'An answered Hail Mary banks 300 instead of 200', printName: 'El Cáliz' }),
-  D('enigma', 'Enigma Machine', 'artifact', 2, { text: 'Once a turn: discard up to 3 cards and draw that many', printName: 'La Máquina' }),
+  D('enigma', 'Enigma Machine', 'artifact', 2, { text: 'Decode: once a turn, look at the top card of your deck — keep it, or send it to the bottom', printName: 'La Máquina' }),
   // Exit liquidity, held rather than fired: the Skull's owner is the one every
   // seller pays.
   D('skull', 'The Skull', 'artifact', 2, { text: 'Whenever a rival sells an Asset, collect 1 Liquidity', printName: 'La Calavera' }),
   // The relic that raises the dead: one disgrace, undone.
   D('shroud', 'The Shroud', 'artifact', 2, { text: 'When your seated Trader would be disgraced, discard the Shroud instead: they stay, with 5 Grace', printName: 'El Sudario' }),
+  // Loyalty through the dip: the one defence for a PORTFOLIO. The Whale and
+  // The Wheel are the only effects that move Assets between players; this
+  // holder's stay put. Deliberately no printName (see the row rule above).
+  D('rideordie', 'Ride or Die', 'artifact', 2, { text: 'Ride or die: your Assets stay with you. The Whale and The Wheel pass your portfolio by' }),
+  // The kitsch dashboard Virgin: a lucky charm for the road. One bad roll, undone.
+  D('dashboard', 'Dashboard Figure', 'artifact', 2, { text: 'Our Lady of the Dashboard: when a die fails you — a gamble that busts, an unanswered Hail Mary — discard her and roll again', printName: 'La Virgencita' }),
   D('ofrenda', 'La Ofrenda', 'grace', 0, { text: 'Offer this card to Our Lady: it goes to the shrine and lights a candle' }),
   D('cherub', 'The Votive', 'grace', 1, { text: 'To the shrine: light a candle, then draw a card', printName: 'El Exvoto' }),
   // Coins in the water: not a candle (the shrine holds three) but a better roll.
@@ -104,9 +117,13 @@ export const DESIGNS = [
   D('rueda', 'The Wheel', 'event', 0, { subtype: 'Ambiguity', text: 'Every portfolio rotates one seat' }),
   D('godcandle', 'The God Candle', 'event', 0, { text: 'Until the drawer’s next turn, every Prosperity sale pays 100 more' }),
 
-  D('world', 'The World', 'event', 0, { text: 'End all ongoing Event effects. Every player draws a card' }),
+  // A reset, not a windfall: the weather clears and every hand grows. Whom it
+  // helps depends on the table, so it prints as an Ambiguity, not an Opportunity.
+  D('world', 'The World', 'event', 0, { subtype: 'Ambiguity', text: 'End all ongoing Event effects. Every player draws a card' }),
 
   D('moralhazard', 'Moral Hazard', 'event', 0, { subtype: 'Ambiguity', text: 'The bailout: the poorest player collects 5; the richest loses 2' }),
+  // Fat Tuesday: the throws. Everyone catches something; the die says how much.
+  D('mardigras', 'Mardi Gras', 'event', 0, { text: 'Let the good times roll: every player rolls the die and collects that much Liquidity' }),
 ];
 
 export const DESIGN_TYPES = ["trader", "asset", "event", "hazard", "remedy", "artifact", "grace"];

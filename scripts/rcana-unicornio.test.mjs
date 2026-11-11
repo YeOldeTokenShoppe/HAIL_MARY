@@ -71,14 +71,10 @@ test('crossing the threshold later in the turn waits until the next turn', async
   assert.equal(player.pros, 125);
 });
 
-test('interest follows normal banking rules, including El Naranja', async () => {
-  const { game, player } = setup({ hazards: ['bear', 'naranja'] });
-  const rival = game.players[1];
-  rival.liq = 0;
-  player.hazards.find(h => h.key === 'naranja').owner = rival;
+test('interest follows normal banking rules: Bear Market lets a 25 payout through', async () => {
+  const { game, player } = setup({ hazards: ['bear'] });
   await game.turn(player);
   assert.equal(player.pros, 125);
-  assert.equal(rival.liq, 2);
 });
 
 test('a winning interest payout ends the turn before income, draw or actions', async () => {
