@@ -266,8 +266,8 @@ export const FACES = [
   },
   {
     id: "the-celebrity",
-    design: "celebridad", // prints as "La Celebridad" — the design's name
-    gloss: "The Celebrity",
+    design: "celebridad", // prints as "La Influencer" — the design's print name (was La Celebridad until 2026-11-12)
+    gloss: "The Influencer",
     // PROVISIONAL number and rarity.
     number: 29,
     rarity: "Uncommon",
@@ -512,6 +512,19 @@ export const FACES = [
     // Stock on the table, whoever holds it, is scrapped for 1 Liquidity.
     ability: "Every Tech Stock on the table is wrecked:\nits holder scraps it for 1 Liquidity.",
     flavor: "The next big thing is a pile by the road.",
+    printed: {},
+  },
+  {
+    id: "full-moon",
+    design: "moon", // prints as "Full Moon" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 49,
+    rarity: "Uncommon",
+    // The design has no rules text of its own (it is a flat 150 Prosperity,
+    // played from the hand), so the printed line is written here.
+    ability: "Bank 150 Prosperity.",
+    // An Event narrates; the line follows the rule.
+    flavor: "Held close enough, any coin is the moon.",
     printed: {},
   },
 ];

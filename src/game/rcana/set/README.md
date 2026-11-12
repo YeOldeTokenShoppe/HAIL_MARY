@@ -7,6 +7,7 @@ table. A card is three things, each in its own place:
 |---|---|---|
 | **Design** | `set/designs.js` | key, name, type, cost, game stats, rules text — the game's truth |
 | **Face** | `set/faces.js` | number, rarity, halo/hydro, the printed ability line, flavor |
+| **Number** | `set/numbers.js` | the reserved number for every design, 1–80; a face's `number` must match it (lint) |
 | **Art** | `art/<id>.js` + `public/TCG/rcana/<id>/` | backdrop, depth layers, FX sheets and their light |
 
 `set/index.js` merges design + face into `RCANA_SET`; `art/index.js` collects

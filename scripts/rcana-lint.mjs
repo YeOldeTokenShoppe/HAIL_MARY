@@ -5,13 +5,15 @@
 //   node scripts/rcana-lint.mjs --strict   # exit 1 on warnings too
 //
 // Checks, per printed face:
-//   - its design exists; its number is set and unique; rarity is a known tier
+//   - its design exists; its number is set, unique and matches the reservation
+//     in set/numbers.js; rarity is a known tier
 //   - it has an art file, and every src that art names exists under public/
 //   - ability / flavor fit the panel (soft limits; the face auto-fits, but
 //     past these it shrinks to unreadable)
 //   - each FX facet lands on a bright pixel of its own sheet (needs sharp;
 //     skipped with a note if sharp will not load on this machine)
 // And for the set:
+//   - every design has a reserved number, each 1..RCANA_SET_SIZE and unique
 //   - designs with no printed face yet (informational)
 //
 // Exit 0 clean, 1 on errors (or warnings with --strict).
@@ -26,6 +28,9 @@ const strict = process.argv.includes("--strict");
 const { RCANA_SET, UNPRINTED, RARITY_ORDER, RCANA_ART, toRcanaCard } = await import(
   path.join(root, "src/game/rcana/cardFace.js")
 );
+const { RESERVED_NUMBERS } = await import(path.join(root, "src/game/rcana/set/numbers.js"));
+const { DESIGNS } = await import(path.join(root, "src/game/rcana/set/designs.js"));
+const { RCANA_SET_SIZE } = await import(path.join(root, "src/game/rcana/set/index.js"));
 
 // Soft limits for the body panel, in characters. The ability sets at full
 // size and the quote a step down; two lines each is the comfortable ceiling.
@@ -48,6 +53,7 @@ for (const card of RCANA_SET) {
   if (card.number == null) err(id, "no number");
   else if (numbers.has(card.number)) err(id, `number ${card.number} already used by ${numbers.get(card.number)}`);
   else numbers.set(card.number, id);
+  if (card.number != null && RESERVED_NUMBERS[card.designKey] !== card.number) err(id, `number ${card.number} but set/numbers.js reserves ${RESERVED_NUMBERS[card.designKey] ?? 'nothing'} for "${card.designKey}"`);
   if (!RARITY_ORDER.includes(card.rarity)) err(id, `unknown rarity "${card.rarity}"`);
   if (card.ability && card.ability.length > MAX_ABILITY) warn(id, `ability is ${card.ability.length} chars (soft max ${MAX_ABILITY})`);
   if (card.flavor && card.flavor.length > MAX_FLAVOR) warn(id, `flavor is ${card.flavor.length} chars (soft max ${MAX_FLAVOR})`);
@@ -121,6 +127,20 @@ for (const card of RCANA_SET) {
     if (stale.length) warn("playtest2", `table.html is older than ${stale.map((p) => path.basename(p)).join(", ")} — run npm run pt2:build`);
     else ok("playtest2", "table.html is up to date with the set");
   }
+}
+
+// The reservation table: one number per design, 1..RCANA_SET_SIZE, unique.
+{
+  const seen = new Map();
+  for (const d of DESIGNS) {
+    const n = RESERVED_NUMBERS[d.key];
+    if (n == null) err(d.key, "no reserved number in set/numbers.js");
+    else if (!Number.isInteger(n) || n < 1 || n > RCANA_SET_SIZE) err(d.key, `reserved number ${n} is outside 1..${RCANA_SET_SIZE}`);
+    else if (seen.has(n)) err(d.key, `reserved number ${n} is also reserved for ${seen.get(n)}`);
+    else seen.set(n, d.key);
+  }
+  for (const k of Object.keys(RESERVED_NUMBERS)) if (!DESIGNS.some((d) => d.key === k)) warn(k, "reserved number for a design that no longer exists");
+  if (!errors) ok("numbers", `${DESIGNS.length} designs reserved 1..${RCANA_SET_SIZE}, all unique`);
 }
 
 if (UNPRINTED.length) {

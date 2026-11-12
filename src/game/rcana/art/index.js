@@ -41,6 +41,7 @@ import blueChip from "./blue-chip.js";
 import scandal from "./scandal.js";
 import exitScam from "./exit-scam.js";
 import techWreck from "./tech-wreck.js";
+import fullMoon from "./full-moon.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -82,4 +83,5 @@ export const RCANA_ART = {
   "scandal": scandal,
   "exit-scam": exitScam,
   "tech-wreck": techWreck,
+  "full-moon": fullMoon,
 };
