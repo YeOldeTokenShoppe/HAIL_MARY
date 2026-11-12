@@ -40,6 +40,7 @@ import yieldFarm from "./yield-farm.js";
 import blueChip from "./blue-chip.js";
 import scandal from "./scandal.js";
 import exitScam from "./exit-scam.js";
+import techWreck from "./tech-wreck.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -80,4 +81,5 @@ export const RCANA_ART = {
   "blue-chip": blueChip,
   "scandal": scandal,
   "exit-scam": exitScam,
+  "tech-wreck": techWreck,
 };

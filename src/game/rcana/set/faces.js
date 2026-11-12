@@ -502,4 +502,16 @@ export const FACES = [
     flavor: "The sign says closed. The money says gone.",
     printed: {},
   },
+  {
+    id: "tech-wreck",
+    design: "techwreck", // prints as "Tech Wreck" — the design's name
+    // PROVISIONAL number and rarity.
+    number: 48,
+    rarity: "Uncommon",
+    // A Calamity narrates (the line follows the rule). The design: every Tech
+    // Stock on the table, whoever holds it, is scrapped for 1 Liquidity.
+    ability: "Every Tech Stock on the table is wrecked:\nits holder scraps it for 1 Liquidity.",
+    flavor: "The next big thing is a pile by the road.",
+    printed: {},
+  },
 ];
