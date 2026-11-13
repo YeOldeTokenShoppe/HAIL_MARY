@@ -527,4 +527,45 @@ export const FACES = [
     flavor: "Held close enough, any coin is the moon.",
     printed: {},
   },
+  {
+    id: "holy-roller",
+    design: "holyroller", // prints as "The Holy Roller" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 52,
+    rarity: "Common",
+    // An on-draw Event; the design's line is a simulator's, so the printed
+    // one is written here.
+    ability: "She rolls through: every player\ndraws a card and collects 1 Liquidity.",
+    // An Event narrates; the line follows the rule.
+    flavor: "She stops for nobody and leaves nobody out.",
+    printed: {},
+  },
+  {
+    id: "virtual-mary",
+    design: "virtual", // prints as "The Virtual Mary" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 54,
+    rarity: "Common",
+    // An on-draw Event (an Ambiguity: it reshuffles every hand, and whether
+    // that helps is not known until it fires); the printed line is the
+    // effect alone.
+    ability: "Every player shuffles their hand\ninto their deck and draws that many.",
+    // An Event narrates; the line follows the rule.
+    flavor: "Every screen shows her. None of them agree.",
+    printed: {},
+  },
+  {
+    id: "fire-horse",
+    design: "fuego", // prints as "Nuestra Señora en Fuego" — the design's name
+    gloss: "Our Lady on Fire",
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 53,
+    rarity: "Common",
+    // An on-draw Event; the design's line is a simulator's, so the printed
+    // one is written here.
+    ability: "She rides the fire horse through the market:\nevery player banks 75 Prosperity.",
+    // An Event narrates; the line follows the rule.
+    flavor: "Everything she rides through catches.",
+    printed: {},
+  },
 ];

@@ -42,6 +42,9 @@ import scandal from "./scandal.js";
 import exitScam from "./exit-scam.js";
 import techWreck from "./tech-wreck.js";
 import fullMoon from "./full-moon.js";
+import holyRoller from "./holy-roller.js";
+import virtualMary from "./virtual-mary.js";
+import fireHorse from "./fire-horse.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -84,4 +87,7 @@ export const RCANA_ART = {
   "exit-scam": exitScam,
   "tech-wreck": techWreck,
   "full-moon": fullMoon,
+  "holy-roller": holyRoller,
+  "virtual-mary": virtualMary,
+  "fire-horse": fireHorse,
 };

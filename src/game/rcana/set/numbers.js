@@ -26,9 +26,7 @@ export const RESERVED_NUMBERS = {
   tech: 14,
   meme: 22,
   collectibles: 30,
-  motherboard: 5, // The Motherboard — unfaced
   realestate: 32,
-  cathedral: 6, // The Neural Cathedral — unfaced
   stablecoin: 43,
   bluechip: 45,
   jardin: 44,
@@ -87,6 +85,7 @@ export const RESERVED_NUMBERS = {
   geometry: 72, // La Geometría — unfaced
   tattoo: 73, // El Tatuaje — unfaced
   dashboard: 74, // La Virgencita — unfaced
+  motherboard: 5, // La Placa Madre — unfaced (a Relic since 2026-11-12)
   // Graces
   ofrenda: 75, // La Ofrenda — unfaced
   cherub: 76, // El Exvoto — unfaced
@@ -96,6 +95,7 @@ export const RESERVED_NUMBERS = {
   confession: 80, // La Confesión — unfaced
   fountain: 25,
   rose: 23,
+  lagrimas: 6, // Las Lágrimas — unfaced (took The Neural Cathedral's number)
 };
 
 export const numberOf = (key) => RESERVED_NUMBERS[key];

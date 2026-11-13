@@ -1,7 +1,7 @@
 // Artifact-only printed furniture. The game still uses its existing types;
 // the header describes the subtype and the rules badge describes its use.
 export { SUBTYPE_HEADER as ARTIFACT_HEADER, SUBTYPE_USAGE_SLOT as ARTIFACT_USAGE_SLOT } from "./subtypeTemplate.js";
-export const ARTIFACT_SUBTYPES = { remedy: "Remedy", grace: "Grace", artifact: "Relic" };
+export const ARTIFACT_SUBTYPES = { remedy: "Remedy", grace: "Grace", artifact: "Relic", location: "Location" };
 
 const USAGES = {
   "single-use": { label: "Single use", description: "Resolve the effect, then discard this card." },
@@ -16,7 +16,7 @@ export function getArtifactTemplate(card) {
   const subtypeType = card.subClass?.toLowerCase();
   const type = card.type || (subtypeType === "relic" ? "artifact" : subtypeType) || "artifact";
   const design = card.designKey || card.design || card.key;
-  let usage = type === "remedy" ? "single-use" : type === "grace" ? "shrine" : type === "artifact" ? "equip" : null;
+  let usage = type === "remedy" ? "single-use" : type === "grace" ? "shrine" : type === "artifact" ? "equip" : type === "location" ? "build" : null;
   // Grace includes two exceptions: the Rose is transferred or returned to
   // hand; the Fountain improves the odds without entering the shrine.
   if (type === "grace" && design === "rose") usage = "offer";

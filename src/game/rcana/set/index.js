@@ -23,6 +23,7 @@ export const TYPE_CLASS = {
   remedy: "Artifact",
   artifact: "Artifact",
   grace: "Artifact",
+  location: "Artifact",
 };
 
 // The printed size of the set, for the collector line ("19 / 80"). Eighty,

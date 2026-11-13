@@ -50,12 +50,8 @@ export const DESIGNS = [
   D('meme', 'Meme Coin', 'asset', 2, { cash: 4, pros: 125, gamble: true, text: 'Sell for Prosperity: a die decides — 5+ moons for 125, else zero' }),
   // Collectibles — the flip that pays in standing more than in cash.
   D('collectibles', 'Collectibles', 'asset', 3, { cash: 5, pros: 125 }),
-  // Tech (`tech: true`): Tech Wreck finds it.
-  D('motherboard', 'The Motherboard', 'asset', 3, { cash: 4, pros: 125, tech: true, text: 'Tech: sell later for 4 Liquidity or 125 Prosperity. Tech Wreck takes it too' }),
   // Slow and safe: the one pile The Bear cannot cap.
   D('realestate', 'Real Estate', 'asset', 5, { cash: 8, pros: 150, bearProof: true, text: 'While held, immune to The Bear' }),
-  // The AI build-out: the biggest tech on the table, and Tech Wreck finds it.
-  D('cathedral', 'The Neural Cathedral', 'asset', 4, { cash: 6, pros: 150, tech: true, text: 'Tech: sell later for 6 Liquidity or 150 Prosperity. Tech Wreck takes it too' }),
   // The old Moneda's job — a trickle of income — on a coin that holds its value.
   D('stablecoin', 'Stablecoin', 'asset', 2, { cash: 3, pros: 50, income: 1, text: 'While held: collect 1 Liquidity at the start of your turn' }),
   D('bluechip', 'Blue Chip', 'asset', 6, { cash: 10, pros: 250 }),
@@ -112,6 +108,8 @@ export const DESIGNS = [
   // Ink of devotion: a slow, permanent heal for whoever sits at the desk.
   // Everything aligns: the called Events (Bull Run, Full Moon…) pay a little more.
   D('geometry', 'Sacred Geometry', 'artifact', 2, { text: 'Everything aligns: your called Events bank 25 more', printName: 'La Geometría' }),
+  // The board that holds it all: the one card that touches the two-slot limit.
+  D('motherboard', 'The Motherboard', 'artifact', 2, { slots: true, text: 'Expansion slots: the board takes no Relic slot, and you may hold a third Relic', printName: 'La Placa Madre' }),
   D('tattoo', 'The Tattoo', 'artifact', 2, { text: 'Inked devotion: at the start of your turn, your seated Trader regains 1 Grace', printName: 'El Tatuaje' }),
   D('dashboard', 'Dashboard Figure', 'artifact', 2, { text: 'Our Lady of the Dashboard: when a die fails you — a gamble that busts, an unanswered Hail Mary — discard her and roll again', printName: 'La Virgencita' }),
   D('ofrenda', 'La Ofrenda', 'grace', 0, { savingGrace: 2, text: 'Offer this card to Our Lady: it goes to the shrine and lights a candle' }),
@@ -128,6 +126,8 @@ export const DESIGNS = [
   D('intervention', 'Divine Intervention', 'grace', 3, { savingGrace: 3, text: 'To the shrine: light a candle, and every Calamity on you is lifted', printName: 'La Intervención' }),
   // The lonely soul in the flames: a disgraced Trader comes back from purgatory.
   D('anima', 'Ánima Sola', 'grace', 1, { text: 'To the shrine: light a candle, and a disgraced Trader returns from your discard to your bench, with 5 Grace' }),
+  // Her tears fall for the fallen: a plain candle, and the strongest rescue in the hand.
+  D('lagrimas', 'Las Lágrimas', 'grace', 1, { savingGrace: 4, text: 'To the shrine: light a candle' }),
   D('confession', 'The Confession', 'grace', 1, { savingGrace: 3, text: 'To the shrine: light a candle, and your seated Trader’s Grace is restored in full', printName: 'La Confesión' }),
   D('fountain', 'The Fountain', 'grace', 2, { text: 'Toss in 2 Liquidity: your Hail Mary odds rise one step, even past the shrine’s three', printName: 'La Fuente' }),
   D('rose', 'The Rose', 'grace', 0, { pros: 50, cash: 2, text: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise', printName: 'La Rosa' }),
@@ -171,7 +171,13 @@ export const DESIGNS = [
   D('moralhazard', 'Moral Hazard', 'event', 0, { subtype: 'Ambiguity', text: 'The bailout: the poorest player collects 5; the richest loses 2' }),
   // Fat Tuesday: the throws. Everyone catches something; the die says how much.
   D('mardigras', 'Mardi Gras', 'event', 0, { text: 'Let the good times roll: every player rolls the die and collects that much Liquidity' }),
+
+  // Locations (type 'location'): places you build, not things you hold. One
+  // stands per player (a new one replaces the old), no Relic slot, never sold;
+  // printed under the Artifact class with their own subtype. The engine and
+  // the table support them; the row is empty in Genesis (The Neural Cathedral
+  // stood here for an hour on 2026-11-12 and became Las Lágrimas, a Grace).
 ];
 
-export const DESIGN_TYPES = ["trader", "asset", "event", "hazard", "remedy", "artifact", "grace"];
+export const DESIGN_TYPES = ["trader", "asset", "event", "hazard", "remedy", "artifact", "grace", "location"];
 export const designByKey = Object.fromEntries(DESIGNS.map((d) => [d.key, d]));
