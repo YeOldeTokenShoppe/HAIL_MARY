@@ -568,4 +568,31 @@ export const FACES = [
     flavor: "Everything she rides through catches.",
     printed: {},
   },
+  {
+    id: "anima-sola",
+    design: "anima", // prints as "Ánima Sola" — the design's name
+    gloss: "The Lonely Soul",
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 79,
+    rarity: "Common",
+    // The candle and who it brings back; the design's line is a simulator's.
+    ability: "Light a candle. A disgraced Trader\nreturns from your discard with 5 Grace.",
+    // A Grace narrates; the line follows the rule.
+    flavor: "No one is left in the fire for good.",
+    printed: {},
+  },
+  {
+    id: "enigma-machine",
+    design: "enigma", // prints as "El Enigma" — the design's printName
+    gloss: "The Enigma",
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 69,
+    rarity: "Common",
+    // A Relic equips; the printed line is the intercept, shorter than the
+    // design's simulator line.
+    ability: "Discard it when an Event fires on your draw:\nthat Event is cancelled for everyone.",
+    // A Relic narrates; the line follows the rule.
+    flavor: "Every message was read. Not one was received.",
+    printed: {},
+  },
 ];

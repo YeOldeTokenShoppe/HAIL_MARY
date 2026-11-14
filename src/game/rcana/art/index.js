@@ -45,6 +45,8 @@ import fullMoon from "./full-moon.js";
 import holyRoller from "./holy-roller.js";
 import virtualMary from "./virtual-mary.js";
 import fireHorse from "./fire-horse.js";
+import animaSola from "./anima-sola.js";
+import enigmaMachine from "./enigma-machine.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -90,4 +92,6 @@ export const RCANA_ART = {
   "holy-roller": holyRoller,
   "virtual-mary": virtualMary,
   "fire-horse": fireHorse,
+  "anima-sola": animaSola,
+  "enigma-machine": enigmaMachine,
 };
