@@ -24,7 +24,9 @@ button:disabled{opacity:.4;cursor:default}
 .board{display:grid;gap:1rem}
 .rivals{display:grid;gap:0.8rem;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr))}
 .panel{border:1px solid var(--line);border-radius:0.8rem;padding:0.9rem;background:var(--felt2);min-width:0}
-.panel.me{border-color:var(--gold)}
+.panel.me{--desk-teal:#173d40;--desk-edge:#68cbbb;border-color:#477a77;border-left:5px solid var(--desk-edge);background:linear-gradient(115deg,var(--desk-teal),#192b39 68%)}
+.panel.me>.phead{padding-bottom:.4rem;color:#cbf3eb}
+.panel.me>.phead .who:not(.active){color:#a3e8dc}
 .phead{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline}
 .phead .who{font-family:var(--display);font-size:.95rem}
 .phead .who.active{color:var(--gold)}
@@ -83,8 +85,17 @@ button:disabled{opacity:.4;cursor:default}
 #gallery .card{cursor:default}
 #gallery .classhead{font-family:var(--display);color:var(--gold);font-size:1.05rem;margin:14px 0 2px;padding-top:10px;border-top:1px solid var(--line)}
 #gallery .classhead:first-child{border-top:0;padding-top:0;margin-top:0}
-/* A design with a printed face: the rendered card fills the top, chips sit under it. */
-.card.printed{padding:.35em;gap:3px}
+/* The artwork defines the card edge. Only live table state overlays the face. */
+.card.printed,.card.mini.printed,.playbanner .card.printed,.card.back{
+  padding:0;border:0;min-height:0;background:transparent;box-shadow:none;gap:0;align-self:flex-start
+}
+.card.printed .chips,.card.back .fx{position:absolute;bottom:.25rem;left:.25rem;right:.25rem;pointer-events:none}
+.card.printed .chips span{background:#23182aeb;color:#fff3d7}
+.card.printed .credbar{position:absolute;bottom:0;left:0;right:0;margin:0}
+.card.printed .zoom{opacity:0}
+.card.printed:hover .zoom,.card.printed:focus-within .zoom{opacity:1}
+@media(hover:none){.card.printed.playable .zoom{opacity:.85}}
+.lightbox>.card{width:min(17rem,75vw);font-size:1.4rem;cursor:default}
 .card.printed .face{display:block;width:100%;aspect-ratio:1027/1424;object-fit:cover;border-radius:.4em;opacity:0;transition:opacity .25s ease-out;background:linear-gradient(160deg,#efe2b4,#d9c48b)}
 .card.printed .face.ok{opacity:1}
 .card .num{position:absolute;top:.35em;right:.5em;font-family:var(--display);font-size:.8rem;color:var(--gold);opacity:.8}
@@ -112,14 +123,24 @@ button:disabled{opacity:.4;cursor:default}
 .lightbox .cap small{display:block;font-family:var(--body);color:var(--muted);font-size:.85rem;margin-top:2px}
 @keyframes lbIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
 .copychips{font-size:.68rem;color:var(--muted);margin-top:4px;max-width:var(--cw)}
-.coinrow{display:inline-flex;gap:2px;align-items:center;vertical-align:middle}
-.coin{width:.8rem;height:.8rem;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f7dc8f,#c9941f 70%);border:1px solid #8a6210;display:inline-block;box-shadow:0 1px 2px #0007}
-.coin.five{width:1.05rem;height:1.05rem;background:radial-gradient(circle at 35% 30%,#ffeab0,#d9a02e 70%);position:relative}
-.coin.five::after{content:'5';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.55rem;font-weight:700;color:#6b4a0c}
+.coinrow{display:inline-flex;align-items:center;vertical-align:middle;min-width:2px;padding:.12rem 0}
+.coin{
+  --rim:#8f5140;--high:#ffcd9b;--metal:#c4875e;--shade:#965537;--stamp:#613a29;
+  width:1.32rem;height:1.32rem;box-sizing:border-box;border-radius:50%;position:relative;display:inline-grid;
+  place-items:center;flex:none;border:1px solid var(--rim);background:repeating-conic-gradient(from 8deg,var(--high) 0 4deg,var(--shade) 5deg 9deg);
+  box-shadow:0 2px 0 var(--rim),0 3px 4px #100a1880;
+}
+.coin.five{--rim:#936625;--high:#fff0b4;--metal:#dfb65b;--shade:#ae802e;--stamp:#6b4819;width:1.64rem;height:1.64rem}
+.coin::after{content:'1';position:absolute;inset:9%;border:1px solid var(--rim);border-radius:50%;display:grid;place-items:center;
+  background:linear-gradient(145deg,var(--high),var(--metal) 58%,var(--shade));box-shadow:inset 0 0 0 1px var(--high);
+  color:var(--stamp);font:700 .8rem/1 Georgia,serif;text-shadow:0 1px var(--high)}
+.coin.five::after{content:'5';font-size:1rem}
+.coinrow .coin+.coin{margin-left:-.31rem}
 .bankchip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-size:.78rem;color:var(--muted);letter-spacing:.08em}
 .fxbadge{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--gold);border-radius:6px;padding:4px 9px;font-size:.78rem;color:var(--gold);letter-spacing:.08em;background:var(--felt2);animation:fxglow 1.6s ease-in-out infinite alternate}
 @keyframes fxglow{from{box-shadow:0 0 0 rgba(255,215,0,0)}to{box-shadow:0 0 10px rgba(255,215,0,.45)}}
-.flycoin{position:fixed;z-index:68;width:.85rem;height:.85rem;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f7dc8f,#c9941f 70%);border:1px solid #8a6210;pointer-events:none;transition:transform .52s cubic-bezier(.2,.7,.3,1),opacity .2s}
+.flycoin{position:fixed;z-index:68;pointer-events:none;transition:transform .52s cubic-bezier(.2,.7,.3,1),opacity .2s}
+
 .minihand{display:flex;gap:3px;margin-top:7px;flex-wrap:wrap}
 .miniback{width:2.1rem;height:3rem;border-radius:4px;background:url(/TCG/rcana/cardBack.webp) center/cover no-repeat,linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 1px 3px #0007}
 .flycard{position:fixed;z-index:70;width:var(--cw);height:calc(var(--cw)*1.06);border-radius:.55em;background:linear-gradient(170deg,#3d2f73,#2a1f52);border:1px solid var(--violet);box-shadow:0 6px 18px #0009;pointer-events:none;transition:transform .42s cubic-bezier(.2,.7,.3,1),opacity .42s}
@@ -153,46 +174,288 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 .toast.show{pointer-events:auto}
 .toast .tx{background:none;border:0;color:#2a2040;font-size:1.25rem;line-height:1;cursor:pointer;padding:0 2px;font-weight:700}
 .toast.show{opacity:1}
+
+[hidden]{display:none!important}
+.rivals{align-items:start}
+.rivals .panel{padding:.55rem .8rem}
+.rivals summary{color:var(--ink)}
+.rivals summary::marker{color:var(--gold)}
+.rivals summary .who{font-family:var(--display);font-size:.85rem}
+.rivals .minihand{display:inline-flex;vertical-align:middle;margin:0 .3rem;gap:0}
+.rivals .miniback{width:.72rem;height:1rem;margin-right:-.18rem}
+.rivals details[open]>.phead{margin-top:.7rem}
+.dealing-area{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1rem;margin-top:.7rem;padding:.8rem;border-radius:.65rem;background:radial-gradient(ellipse at top left,#39294f,transparent 72%),var(--felt)}
+.dealing-area h2{font:400 1rem var(--display);color:var(--ink);margin:0}
+.coin-tray{align-self:start;min-width:0;padding:.55rem .65rem .65rem;border-radius:.55rem;
+  border:1px solid #966c4e;background:linear-gradient(160deg,#65424a,#3d2634);box-shadow:inset 0 1px #c49568,0 3px 5px #130d19}
+.coin-tray h2{display:flex;align-items:baseline;justify-content:space-between;gap:.6rem;padding:0 .2rem .4rem}
+.coin-tray h2 b{font:600 1.5rem/1 var(--body);color:#ffdf98;font-variant-numeric:tabular-nums}
+.coin-tray .coinrow{display:flex;flex-wrap:wrap;align-content:center;min-height:3.3rem;padding:.3rem .45rem;gap:.25rem 0;
+  background:radial-gradient(ellipse at center,#42313b,#241a25);border-radius:.35rem;box-shadow:inset 0 2px 5px #150e19,0 1px #997359}
+.coin-tray .coin{width:2.2rem;height:2.2rem}
+.coin-tray .coin.five{width:2.65rem;height:2.65rem}
+.coin-tray .coin::after{font-size:1.28rem}
+.coin-tray .coin.five::after{font-size:1.55rem}
+.coin-tray .coin+.coin{margin-left:-.25rem}
+.desk-supplies{display:grid;align-self:start;gap:.8rem;min-width:0;padding-left:1rem;border-left:1px solid var(--line)}
+#meHand,#mePiles{margin-top:.55rem;align-items:flex-start}
+.hand-zone{min-width:0}
+.hand-heading,.turn-steps{display:flex;align-items:center;flex-wrap:wrap;gap:.4rem .8rem}
+.turn-steps{list-style:none;margin:0;padding:0;gap:.3rem;font-size:.85rem;color:var(--muted)}
+.turn-steps li{padding:.15rem .35rem}
+.turn-steps li[aria-current="step"]{background:var(--desk-teal);color:#fff;box-shadow:inset 0 0 0 1px var(--desk-edge);border-radius:.3rem;font-weight:bold}
+.turn-steps li[data-pidx][aria-current="step"]{background:var(--plum);color:#fff;box-shadow:inset 0 0 0 1px var(--plum-edge)}
+.turn-steps .identity-portrait{width:1.8rem;height:1.8rem;border-width:1px;margin-right:.3rem}
+.turn-steps li+li::before{content:"›" / "";margin-right:.35rem}
+#meHand{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--cw)),var(--cw)));align-items:start;padding:5px 4px 8px}
+#meHand>.card{box-sizing:border-box;width:100%;max-width:var(--cw);min-width:0;overflow-wrap:anywhere}
+#meHand .playable,#meInvest .playable{outline-color:var(--gold)}
+#mePiles{display:flex;align-items:flex-start;flex-wrap:nowrap}
+#mePiles .back{box-sizing:border-box;width:var(--cw);flex:none}
+#mePiles .card:not(.back){--cw:4.8rem;box-sizing:border-box;min-width:0;font-size:.78rem;overflow-wrap:anywhere}
+.desk-supplies .coin-tray{width:0;min-width:100%;box-sizing:border-box}
+.actionbar{position:sticky;bottom:0;z-index:5;background:var(--felt2);padding:.6rem .8rem;border:1px solid var(--line);border-top-color:var(--gold);border-radius:.5rem;margin:.4rem 0}
+#turnNote{margin-right:auto;color:var(--ink)}
+#hailBtn:enabled{border-color:var(--gold);color:var(--gold)}
+.card.slot{min-height:3rem}
+@media(max-width:640px){
+  .dealing-area{grid-template-columns:minmax(0,1fr);gap:.8rem;padding:.5rem}
+  .desk-supplies{justify-self:start;max-width:100%;padding:0;border:0}
+  .actionbar{gap:.4rem;padding:.45rem;bottom:env(safe-area-inset-bottom,0px)}
+  #turnNote{flex-basis:100%;font-size:.88rem}
+  .rivals{grid-template-columns:minmax(0,1fr)}
+}
+
+/* Bound oxblood cover, a ruled endpaper, and corner mounts for held cards. */
+.folio{
+  position:relative; margin:.9rem 0; padding:.58rem .65rem .68rem 1.3rem;
+  border:1px solid #885244; border-radius:.35rem .8rem .8rem .35rem;
+  background:linear-gradient(90deg,#3c1923,#81484c .42rem,#391722 .67rem,#652f39 .86rem,#512831 1.05rem);
+  box-shadow:0 3px 8px #10091866;
+}
+.folio::before{content:"";position:absolute;inset:.23rem .24rem .23rem .93rem;border:1px dashed #c590735e;border-radius:.25rem .5rem .5rem .25rem;pointer-events:none}
+.folio header{display:flex;align-items:baseline;justify-content:space-between;gap:.6rem;padding:0 .45rem .48rem;color:#f6dca6}
+.folio h3{margin:0;font:400 1.05rem var(--display);text-shadow:0 1px #2c1017}
+.folio .holding-count{font:600 .88rem var(--body);font-variant-numeric:tabular-nums}
+.folio-page{padding:.8rem;border-radius:.12rem .32rem .32rem .12rem;color:#483329;
+  background:repeating-linear-gradient(transparent 0 1.32rem,#91795e36 1.32rem calc(1.32rem + 1px)),linear-gradient(90deg,#c9b389,#ecddbd .85rem,#e6d5b2);
+  box-shadow:0 2px #b99e7d,0 3px #452330}
+.folio-page p{margin:0;font-style:italic;font-size:.92rem}
+.folio-page .cards{align-items:flex-start;gap:.75rem}
+.folio-page .cards:empty{display:none}
+.folio .card.dim{opacity:.9}
+.folio .holding-tip{display:block;margin-top:.5rem;font-size:.85rem;color:#553e31}
+.rivals .folio{margin-bottom:.2rem}
+.rival-cards{display:flex;gap:.75rem;overflow-x:auto;padding:0 .1rem .25rem}
+.rival-cards section{flex:none}
+.rival-cards .cards,.rivals .folio-page .cards{flex-wrap:nowrap}
+.rivals .folio-page{overflow-x:auto}
+.rivals .folio .card{flex:none}
+.rival-cards .mini:not(.printed) .fx,.rivals .folio .mini:not(.printed) .fx{display:block}
+
+.welcome{max-width:92rem;margin:clamp(0rem,3vh,2rem) auto 1rem;box-sizing:border-box;min-height:min(80svh,49rem);
+ display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);align-items:center;gap:2rem;padding:clamp(1.25rem,5vw,5rem);
+ border:1px solid #6f5363;border-radius:1rem;background:radial-gradient(ellipse at 74% 45%,#47304e,transparent 55%),linear-gradient(120deg,#241932,#301f39);
+ box-shadow:inset 0 0 0 .32rem #281c30,inset 0 0 0 .38rem #84645580}
+.welcome h1{font-size:clamp(2.8rem,5.5vw,6rem);line-height:1.02;text-wrap:balance}
+.welcome .brand{font-family:var(--display);color:var(--ink);margin:0 0 .8rem}
+.welcome p{max-width:32ch;line-height:1.45}
+.welcome select{background:var(--felt);border:1px solid var(--line);border-radius:.4rem;color:var(--ink);padding:.45rem;font:inherit}
+.deck-choices{margin:0 0 .8rem;padding:0;border:0;display:grid;gap:.4rem;min-width:0}
+.deck-choices legend{padding:0;margin:0 0 .35rem;font-weight:600;color:var(--ink)}
+.deck-choices label{display:flex;align-items:flex-start;gap:.55rem;padding:.48rem .65rem;border:1px solid var(--line);border-radius:.4rem;cursor:pointer}
+.deck-choices label:has(:checked){border-color:var(--gold);background:#e8b84b0d}
+.deck-choices input{accent-color:var(--gold);margin:.35rem 0 0}
+.deck-choices strong,.deck-choices small{display:block}
+.deck-choices strong{color:var(--ink)}
+.deck-choices small{line-height:1.25;color:#d3c4df}
+.welcome-controls,.welcome-options{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap}
+.welcome #deal{display:block;margin:.9rem 0;padding:.65rem 1.4rem;font-weight:bold}
+.welcome-options{margin-top:.6rem}
+.sample-hand{display:flex;align-items:center;justify-content:center;padding:4% 3% 6%;isolation:isolate;min-width:0}
+.sample-hand button{padding:0;border:0;background:none;width:36%;flex:none;box-shadow:0 .7rem 1.4rem #100b1c99;cursor:zoom-in}
+.sample-hand button+button{margin-left:-6%}
+.sample-hand button:first-child{transform:rotate(-11deg) translateY(5%)}
+.sample-hand button:last-child{transform:rotate(11deg) translateY(5%)}
+.sample-hand button:nth-child(2){z-index:1}
+.sample-hand button:is(:hover,:focus-visible){z-index:2;outline:2px solid var(--gold)}
+.sample-hand img{display:block;width:100%;aspect-ratio:1027/1424;border-radius:.45rem}
+@media(max-width:760px){
+ .welcome{grid-template-columns:minmax(0,1fr);gap:.8rem;padding:1.35rem;min-height:0;margin-top:0}
+ .sample-hand{grid-row:1;width:min(90%,27rem);justify-self:center;padding:5% 0}
+ .welcome .brand{margin-bottom:.35rem}
+ .welcome h1{font-size:clamp(2.1rem,9vw,3.5rem)}
+}
+#feed{margin:.65rem 0 0;padding:.45rem .7rem;border-left:3px solid var(--gold);background:#1c152d;color:var(--ink)}
+@keyframes balanceChange{0%,65%{background:#ffe29a;color:#36213b;box-shadow:0 0 0 .16rem #ffe29a}100%{background:transparent}}
+.balance-change{animation:balanceChange 1.7s ease-out;border-radius:.15rem}
+@media(prefers-reduced-motion:reduce){.balance-change{animation-timing-function:step-end}}
+.play-reason{position:relative;z-index:1;max-width:32rem;margin:0;padding:.5rem .85rem;border-left:3px solid var(--gold);background:var(--felt2);color:var(--ink);text-align:center}
+.lightbox:has(.play-reason:not([hidden])) .lbcard{height:min(68dvh,calc(88vw * 1424 / 1027))}
+.draw-cue{display:block;margin:.3rem 0;color:var(--gold);font-weight:700}
+#mePiles .back{font-family:inherit}
+#mePiles .back:disabled{opacity:.65;cursor:default}
+#mePiles .back.drawable{outline:3px solid var(--gold);outline-offset:3px}
+#enterTable,#openingDeal #deal,#drawBtn.first-draw,.first-draw.drawable{
+  --glow-rest:0 0 0 2px #39243d,0 0 0 4px #ffde82,0 0 .85rem .15rem #ffbd49a8;
+  box-shadow:var(--glow-rest)
+}
+@media(prefers-reduced-motion:no-preference){
+  #enterTable,#openingDeal #deal,#drawBtn.first-draw,.first-draw.drawable{animation:drawGlow 1.6s ease-in-out infinite}
+  @keyframes drawGlow{
+    0%,100%{box-shadow:var(--glow-rest)}
+    50%{box-shadow:0 0 0 2px #39243d,0 0 0 6px #fff1b8,0 0 1.5rem .4rem #ffba49dc}
+  }
+}
+
+[data-pidx]{--plum:#522d4c;--plum-dark:#342137;--plum-edge:#da9cc9}
+[data-pidx="2"]{--plum:#4b355f;--plum-dark:#30253f;--plum-edge:#bb9ce6}
+[data-pidx="3"]{--plum:#633343;--plum-dark:#402332;--plum-edge:#eea6ab}
+.rivals .panel{container-type:inline-size;background:linear-gradient(105deg,var(--plum),var(--plum-dark) 75%);border-color:var(--plum);border-left:5px solid var(--plum-edge)}
+.titlecard .tc{background:var(--plum-dark);border-left:5px solid var(--plum-edge);border-radius:.3rem;padding:.4em .75em}
+.coachbar{display:flex;align-items:flex-start;gap:.65rem}
+.coach-portrait{flex:none;width:2.7rem;height:2.7rem;border-radius:50%;border:2px solid var(--teal);background:radial-gradient(circle,#536961,#263934);overflow:hidden}
+.coach-portrait img{width:100%;height:100%;object-fit:cover;object-position:50% 30%;transform:scale(1.7);transform-origin:50% 26%}
+.rivals .panel.hot{box-shadow:inset 0 0 0 1px var(--gold)}
+.rivals .opponent-head{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem 1.5rem;list-style:none;padding:.15rem 0}
+.opponent-head::-webkit-details-marker{display:none}
+.opponent-id{display:flex;align-items:center;gap:.7rem;min-width:0;margin-right:auto}
+.opponent-avatar{width:3.35rem;height:3.35rem;border-radius:50%;flex:none;object-fit:cover;object-position:center 20%;background:radial-gradient(circle,#9e7285,#46304a);border:2px solid #cda572}
+.opponent-id small,.opponent-stats small{display:block;color:var(--muted);font-size:.82rem}
+.rivals .opponent-id .who{font-size:1.12rem;color:#f5d2ea}
+.opponent-id .opponent-turn{color:var(--gold);font-weight:600}
+.opponent-stats{display:flex;align-items:flex-start;flex-wrap:wrap;gap:.4rem 1.3rem;font-variant-numeric:tabular-nums}
+.opponent-race{min-width:8rem}.opponent-race .prosbar{display:block;height:.25rem;margin-top:.15rem}
+.opponent-head .minihand{margin-left:.35rem}
+.desk-toggle{font-size:.86rem;color:var(--ink);text-decoration:underline;text-underline-offset:.18em}
+.desk-toggle::after{content:' ▾'}
+details[open] .desk-toggle::after{content:' ▴'}
+@container(max-width:35rem){
+ .opponent-head .opponent-stats{order:3;flex-basis:100%;gap:.4rem 1rem}
+ .opponent-avatar{width:2.65rem;height:2.65rem}
+ .opponent-head .miniback{width:.5rem;height:.8rem}
+}
+.identity-portrait{display:inline-grid;place-items:center;overflow:hidden;vertical-align:middle;font-family:var(--display);color:var(--ink)}
+.identity-portrait img{width:100%;height:100%;object-fit:cover;object-position:center 20%}
+.identity-portrait .trader-art{transform:scale(1.75);transform-origin:50% 36%}
+#avatarPicker{display:inline-flex;align-items:center;gap:.4rem}
+#avatarPicker .identity-portrait{width:1.9rem;height:1.9rem}
+#openingDeal{padding:1.1rem .35rem}
+#board.awaiting-deal .panel.me> :not(.phead,.dealing-area),#board.awaiting-deal .rivals,#board.awaiting-deal .coin-tray{display:none}
+.inspect-actions{display:flex;position:relative;flex:none;justify-content:center;gap:.5rem;flex-wrap:wrap;max-width:38rem;max-height:28dvh;overflow:auto}
+.lightbox:has(.inspect-actions) .lbcard{height:min(62dvh,calc(88vw * 1424 / 1027))}
+.lightbox:has(.inspect-actions)>.card{max-height:55dvh;overflow:auto;min-height:0}
+#rules{box-sizing:border-box;width:min(35rem,94vw);max-height:85dvh;padding:0;color:var(--ink);background:var(--felt2);border:1px solid var(--gold);border-radius:.75rem}
+#rules::backdrop{background:#110b1cd9}
+#rules header{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;gap:1em;padding:.8rem 1.1rem;background:var(--felt2);border-bottom:1px solid var(--line)}
+#rules h2,#rules h3{font:400 1.15rem var(--display);color:var(--gold);margin:0}
+#rules article{padding:.9rem 1.1rem 1.2rem;line-height:1.45}
+#rules p{margin:0 0 .8rem}
+#rules ol{padding-left:1.5rem;margin:.5rem 0 1rem}
+#rules li{padding:.15rem 0 .25rem .2rem}
+#rules details{border-top:1px solid var(--line);padding:.45rem 0}
+#rules summary{color:var(--ink);font-weight:600}
+#rules details p{margin:.45rem 0 0}
 </style>
 
-<div class="bar">
+<section id="welcome" class="welcome" aria-labelledby="welcomeTitle">
+  <div>
+    <p class="brand">R-CANA</p>
+    <h1 id="welcomeTitle">The Trading Desk</h1>
+    <p>Take a seat. Build your trading team and portfolio and be the first to bank 1,000 Prosperity.</p>
+    <fieldset class="deck-choices">
+      <legend>Choose your deck</legend>
+      <label><input type="radio" name="starter" value="devotion" checked>
+        <span><strong>Devotion</strong><small>Protect your Trader and light candles. With El Monje seated, every candle you light banks 25 Prosperity.</small></span></label>
+      <label><input type="radio" name="starter" value="degen">
+        <span><strong>Degen</strong><small>Disrupt rival Traders and bet on risky Assets. Sell Meme Coin for cash, or roll the die for a bigger payout.</small></span></label>
+    </fieldset>
+    <div class="welcome-controls" id="welcomeControls"></div>
+    <button class="primary" id="enterTable" type="button">Take a seat</button>
+    <button type="button" data-rules aria-haspopup="dialog" aria-controls="rules"><span aria-hidden="true">📖</span> Rules</button>
+    <details><summary>Table settings</summary><div class="welcome-options" id="welcomeOptions"></div></details>
+  </div>
+  <div class="sample-hand" id="sampleHand" role="group" aria-label="Explore cards from your deck"></div>
+</section>
+<div class="bar" id="gameBar" hidden>
   <h1>R-CANA · PLAYTEST 2 · THE TRADING DESK</h1>
   <select id="meDeck"><option value="devotion" selected>Your deck: Devotion</option><option value="degen">Your deck: Degen</option></select>
   <select id="nBots"><option value="1" selected>1 rival</option><option value="2">2 rivals</option><option value="3">3 rivals</option></select>
+  <label id="avatarPicker"><span id="avatarPreview"></span><select id="avatarChoice" aria-label="Your avatar"><option value="auto">Avatar: seated Trader</option><option value="gato">Avatar: El Gato</option><option value="monje">Avatar: El Monje</option><option value="unicornio">Avatar: El Unicornio</option><option value="bot">Avatar: El Octobot</option></select></label>
   <label class="note">Seed <input id="seed" type="number" placeholder="random" min="1" style="width:76px"></label>
   <label class="note"><input type="checkbox" id="slowMode"> Tap-to-continue</label>
   <label class="note"><input type="checkbox" id="coachMode" checked> Coach</label>
+  <label class="note"><input type="checkbox" id="revealHands"> Show rival hands</label>
   <button class="primary" id="deal">Deal</button>
-  <span class="bankchip" id="bank"><span class="coin five"></span> LA BANCA</span>
+  <button type="button" data-rules aria-haspopup="dialog" aria-controls="rules"><span aria-hidden="true">📖</span> Rules</button>
+  <button type="button" id="tableSound" aria-label="Table sounds" aria-pressed="false">Sound off</button>
+  <span class="bankchip" id="bank"><span class="coin five" aria-hidden="true"></span> LA BANCA</span>
   <span class="fxbadge" id="fxBadge" hidden></span><span class="note" id="status">Press Deal. Your Trader’s LIQ is your income; scandals drain their GRACE. First to bank 1,000.</span>
 </div>
 <div class="ticker" id="ticker" hidden><span class="tlabel">RL80 NEWS</span><span id="tickText"></span></div>
 <div class="board" id="board" hidden>
   <section class="rivals" id="rivals"></section>
   <section class="panel me">
-    <div class="phead"><span class="who" id="meWho">YOU</span><span class="stat">Liquidity <b id="meLiq">0</b> <span class="coinrow" id="meCoins"></span></span><span class="stat">Banked <b id="mePros">0</b> / 1,000</span><span class="stat">Candles <b class="candles" id="meDeeds"></b></span><span class="stat" id="meHail"></span><span class="stat" id="meHaz"></span></div>
+    <div class="phead"><span id="myPortrait"></span><span class="who" id="meWho">YOU</span><span class="stat">Banked <b id="mePros">0</b> / 1,000</span><span class="stat">Candles <b class="candles" id="meDeeds"></b></span><span class="stat" id="meHail"></span><span class="stat" id="meHaz"></span></div>
     <div class="prosbar"><i id="meBar" style="width:0%"></i></div>
-    <div class="rowlabel">Your investments · tap to sell (not the turn they arrive)</div><div class="cards" id="meInvest"></div>
+    <p id="feed" role="status" aria-label="Latest action" hidden></p>
+    <div class="dealing-area">
+      <section class="hand-zone" aria-label="Your hand">
+        <div class="hand-heading"><h2>Your hand</h2>
+          <ol class="turn-steps" id="turnSteps" aria-label="Turn sequence" hidden>
+            <li>Draw</li><li>Choose one action</li><li>Rivals play</li>
+          </ol>
+        </div>
+        <div id="openingDeal" hidden></div>
+        <div class="cards" id="meHand"></div>
+      </section>
+      <div class="desk-supplies">
+        <section class="piles-zone"><h2>Deck &amp; discard</h2><span class="draw-cue" id="drawCue" role="status" hidden></span><div class="cards" id="mePiles"></div></section>
+        <section class="coin-tray" aria-label="Your coin tray">
+          <h2>Liquidity <b id="meLiq">0</b></h2>
+          <div class="coinrow" id="meCoins" aria-hidden="true"></div>
+        </section>
+      </div>
+    </div>
+    <div class="actionbar">
+      <b class="stat" id="turnNote" role="status"></b>
+      <button class="primary" id="drawBtn" hidden>Draw a card</button>
+      <button id="hailBtn">Hail Mary</button>
+      <button id="passBtn">Pass</button>
+
+    </div>
+    <div id="coach" hidden class="coachbar"><span class="coach-portrait"><img src="/TCG/rcana/la-investigadora/subject.webp" alt=""></span><div><span class="clabel">Coach</span> <span id="coachTxt"></span></div></div>
+    <div id="myPortfolio"></div>
+    <div class="cards" id="meSeeds" hidden></div>
     <div style="display:flex;gap:1.2rem;flex-wrap:wrap">
-      <div style="min-width:0"><div class="rowlabel">Deck &amp; discard · tap the deck to draw</div><div class="cards" id="mePiles"></div></div>
+
       <div style="min-width:0;max-width:16rem"><div class="rowlabel">Your Trader · seat</div><div class="cards" id="meTrader"></div><div class="note" style="margin-top:5px">Grace is reputation: when all is lost the Trader is <b>disgraced</b> (discarded; income back to 1). Lost Grace persists — candles restore 3, a Press Release 5. At <b>full Grace: +1 LIQ</b>.</div></div>
       <div style="min-width:0"><div class="rowlabel">Bench · tap to swap (free, once a turn)</div><div class="cards" id="meBench"></div></div>
       <div style="min-width:0"><div class="rowlabel" id="meArtsLabel">Relics (max 2)</div><div class="cards" id="meArts"></div></div>
       <div style="min-width:0"><div class="rowlabel">Calamities on you</div><div class="cards" id="meHazards"></div></div>
     </div>
-    <div class="rowlabel">Your hand · one main action a turn</div><div class="cards" id="meHand"></div>
-    <div class="rowlabel" style="margin-top:12px">At the table</div><div id="feed" class="note" style="display:grid;gap:2px;min-height:3.2em"></div>
-    <div class="actionbar">
-      <b class="stat" id="turnNote"></b>
-      <button id="hailBtn">Hail Mary</button>
-      <button id="passBtn">Pass</button>
-      
-    </div>
-    <div id="coach" hidden class="coachbar"><span class="clabel">COACH</span> <span id="coachTxt"></span></div>
   </section>
 </div>
 <details class="history" id="hist" hidden><summary>Table history</summary><div class="log" id="log"></div></details>
 <details class="history" id="galleryD"><summary>All cards in this playtest</summary><div id="gallery"></div></details>
+<dialog id="rules" aria-labelledby="rulesTitle">
+  <header><h2 id="rulesTitle">Trading Desk rules</h2><form method="dialog"><button autofocus>Close</button></form></header>
+  <article>
+    <p><strong>Be the first to bank 1,000 Prosperity.</strong> Liquidity is the money you spend to play cards. Banked Prosperity is your score.</p>
+    <p>Choose Devotion or Degen, take a seat, then select <strong>Deal opening hand</strong>. Each player starts with five cards, 5 Liquidity, and an empty Trader seat.</p>
+    <h3>Your turn</h3>
+    <ol>
+      <li><strong>Collect income.</strong> Your seated Trader earns their LIQ, plus 1 at full Grace. An empty or disabled seat earns 1. The table handles this automatically.</li>
+      <li><strong>Draw a card.</strong> Tap your deck. An Event marked “fires on draw” resolves immediately, then you draw a replacement.</li>
+      <li><strong>Choose one main action.</strong> Play a card and pay its cost, sell a holding, pay 3 Liquidity to clear one of your Calamities, attempt a Hail Mary, or pass. Some cards give you another choice, such as uncorking La Cava. Reading a card is free.</li>
+      <li><strong>Finish your turn.</strong> If you have more than seven cards in hand, choose cards to discard until you have seven.</li>
+    </ol>
+    <details><summary>Traders, the bench, and Grace</summary><p>Your first Trader takes the seat. Up to two more can wait on the bench. Once per turn, you may swap in a benched Trader for free before your main action. A Trader who loses all their Grace is disgraced unless a card saves them. Lighting a candle restores up to 3 Grace to your seated Trader.</p></details>
+    <details><summary>Assets and your portfolio</summary><p>An Asset you buy goes into your portfolio. Starting on your next turn, you can use your main action to sell it for Liquidity to spend or Prosperity to bank. Inspect the holding to see its current payouts. Some sales depend on a die roll. Rug Pull blocks sales until cleared.</p></details>
+    <details><summary>Events, Calamities, and Artifacts</summary><p>Some Events fire when drawn. Others stay in your hand until you play them. A persistent Calamity sits on the affected desk until cleared. Use a matching Remedy or pay to clear one from your own desk.</p><p>Relics give ongoing effects. You normally have two Relic slots and one separate Location. Graces let you make offerings at the shrine. Each card describes its effect.</p></details>
+    <details><summary>Candles and the Hail Mary</summary><p>Once per game, you may spend your main action to attempt a Hail Mary. With zero, one, two, or three lit candles, the usual odds are 1, 2, 4, or 8 chances in 12. Your desk shows the odds after card effects. An answered prayer clears your Calamities and banks 200 Prosperity. A miss spends the attempt.</p></details>
+  </article>
+</dialog>
 <div id="overlayHost"></div><div class="toast" id="toast"></div>
 
 <script type="module">
@@ -203,6 +466,71 @@ details.history{margin-top:14px}summary{color:var(--muted);cursor:pointer}
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// Kenney Casino Audio (CC0), the same samples used in the blackjack pen.
+const soundFiles = {
+  collect: ['chipsStack1', 'chipsStack2'],
+  spend: ['chipsCollide1'],
+  card: ['cardPlace1', 'cardPlace2'],
+};
+const samples = new Map();
+let audioContext;
+let soundEnabled = true;
+try { soundEnabled = localStorage.getItem('rcana.pt2.sound') !== 'off'; } catch {}
+let tableGain;
+let loadingSounds;
+let lastCardSound = -Infinity;
+function updateSoundButton() {
+  $('tableSound').setAttribute('aria-pressed', String(soundEnabled));
+  $('tableSound').textContent = soundEnabled ? 'Sound on' : 'Sound off';
+}
+updateSoundButton();
+async function prepareSounds() {
+  if (!soundEnabled) return;
+  try {
+    if (!audioContext) {
+      audioContext = new AudioContext();
+      tableGain = audioContext.createGain();
+      tableGain.connect(audioContext.destination);
+    }
+    tableGain.gain.value = .38;
+    const resume = audioContext.resume();
+    loadingSounds ??= Promise.all(Object.values(soundFiles).flat().map(async name => {
+      if (samples.has(name)) return;
+      const response = await fetch('/playtest2/audio/' + name + '.ogg');
+      if (!response.ok) throw Error('Audio unavailable');
+      samples.set(name, await audioContext.decodeAudioData(await response.arrayBuffer()));
+    }));
+    await Promise.all([resume, loadingSounds]);
+  } catch {
+    loadingSounds = null;
+    soundEnabled = false;
+    updateSoundButton();
+    toast('Table sounds could not load. Tap Sound off to retry.');
+  }
+}
+$('tableSound').onclick = async () => {
+  soundEnabled = !soundEnabled;
+  updateSoundButton();
+  try { localStorage.setItem('rcana.pt2.sound', soundEnabled ? 'on' : 'off'); } catch {}
+  if (!soundEnabled) { if (tableGain) tableGain.gain.value = 0; return; }
+  await prepareSounds();
+  playSound('collect');
+};
+function playSound(kind) {
+  if (!soundEnabled || audioContext?.state !== 'running') return;
+  const files = soundFiles[kind];
+  const buffer = samples.get(files[Math.floor(Math.random() * files.length)]);
+  if (!buffer) return;
+  const now = audioContext.currentTime;
+  if (kind === 'card') {
+    if (now - lastCardSound < .16) return;
+    lastCardSound = now;
+  }
+  const source = audioContext.createBufferSource();
+  source.buffer = buffer;
+  source.connect(tableGain);
+  source.start();
+}
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const FX = { unicornio: 'Compound Interest: at turn start, if you have at least 100 banked Prosperity, bank 25 more', gato: 'When seated: knock one Calamity off your table, free', monje: 'When you light a candle, bank 25 Prosperity', diablito: 'Devil’s Wager: at turn start, flip a coin — heads gains 1 Liquidity; tails loses 1 CRED', celebridad: 'The influencer: pay 1 when banking from a card, +25 Prosperity', abuela: 'The gambling grandmother: your gambles moon on 4+ instead of 5+', prospector: 'Assets you buy cost 1 less', bluechip: 'Sell later: 10 Liquidity or 250 Prosperity', halving: 'Fires when drawn: until the drawer’s next turn, turn income is 1', crash: 'Fires when drawn: everyone holding 8+ Liquidity loses half', shady: 'Insider Tip: when you play a Calamity on a rival, draw a card', angel: 'Angel Round: when you invest in an Asset, collect 1 Liquidity back', lagrimas: 'To the shrine: light a candle — her tears fall for the fallen', infierno: 'Hellfire: they cannot attempt the Hail Mary or offer a Grace until cleared', ponzi: 'New money pays the old: bank 25 for every Asset your rivals hold — then every rival collects 1', catedral: 'Green candles: whenever any player lights a candle, bank 25', feast: 'Fires when drawn: feast day — every player lights a candle', general: 'Consensus: a Calamity played on you must reach consensus — roll the die; on a 1 or 2 it fails', bot: 'No Soul: Scandal cannot touch it. It cannot pray — while it sits, your Graces go unheard', motherboard: 'Expansion slots: the board takes no Relic slot, and you may hold a third Relic', virtue: 'Performative piety: their candles count for nothing — Hail Mary odds fall to 1 in 12 until cleared', burro: 'Stubborn: clear one Calamity — and kick it back onto the rival who played it', geometry: 'Everything aligns: your called Events (Bull Run, Full Moon, Short Squeeze, Token Unlock) bank 25 more', limpia: 'To the shrine: light a candle, and the egg sweeps one Calamity off you', anima: 'To the shrine: light a candle, and a disgraced Trader returns from your discard to your bench, with 5 Grace', holyroller: 'Fires when drawn: she rolls through — every player draws a card and collects 1 Liquidity', fuego: 'Fires when drawn: she rides the fire horse through the market — every player banks 75 Prosperity', virtual: 'Fires when drawn: she flickers on every screen — every player shuffles their hand into their deck and draws that many', fall: 'Fires when drawn: the fall — every seated Trader loses 4 Grace', techwreck: 'Fires when drawn: the bubble bursts — every Tech Stock on the table is wrecked, scrapped for 1 Liquidity', airdrop: 'Fires when drawn: every player draws a card', tech: 'Sell later: 5 Liquidity or 100 Prosperity', meme: 'Sell for 4 Liquidity — or roll the die for Prosperity: 5+ moons for 125, else zero', moon: 'Invest 4 → bank 150 Prosperity', squeeze: 'Invest 3 → bank 100, plus 50 for each Calamity on you — Bear Market cannot cap it', unlock: 'Invest 4 → bank 200, and every rival collects 1 Liquidity', bull: 'Invest 2 → bank 100 Prosperity', inherit: 'Take 3 Liquidity, or bank 50 Prosperity', bear: 'Rival banks at most 75 from a single card', hack: 'Rival’s Trader ability is disabled', rug: 'Rival cannot sell Assets', taxman: 'They pay 1 to the bank at the start of each turn', escandalo: 'Scandal: their seated Trader loses 5 Grace when it breaks, 2 more each turn', bell: 'Clears Bear Market', catacumbas: 'Buried with honors: at the start of your turn you may bury your seated Trader — bank 5 Prosperity per Grace they have left', keys: 'Clears Rug Pull', tortilla: 'Clears any one Calamity', publicista: 'Clear a Scandal — or polish: your seated Trader regains 5 Grace', heart: 'A shield, not a cure: while equipped, discard it to cancel a Calamity AS it lands — it cannot clear one already on you', halo: 'Any Trader seated at your desk cannot be disabled', rosary: 'Draw a card when you light a candle', grail: 'Gem mint: sells for 125 — or 250 while you hold three lit candles', enigma: 'Intercept: when an Event fires on your draw, discard the Machine — the Event is cancelled for everyone', horchata: 'Refresh: discard up to 2 cards, then draw that many plus one', fountain: 'Toss in 2 Liquidity: your Hail Mary odds rise one step, even past the shrine’s three', shroud: 'When your seated Trader would be disgraced, the Shroud is spent instead: they stay, with 5 Grace', rideordie: 'Ride or die: while the Lowrider is in your portfolio, your Assets stay with you — the Whale and the Wheel pass you by', lottery: 'Scratch it at the start of each turn: roll the die — a 6 wins 150 Prosperity, and the Ticket is spent', tattoo: 'Inked devotion: at the start of your turn, your seated Trader regains 1 Grace', dashboard: 'Our Lady of the Dashboard: when a die fails you — a gamble that busts, an unanswered Hail Mary — discard her and roll again', nacimiento: 'Build it: a figure at the start of each turn; at the third the Niño arrives at midnight — light a candle and bank 75, then it is packed away', realestate: 'Sell later: 8 Liquidity or 150 Prosperity — Bear Market cannot cap it', stablecoin: 'While held: collect 1 Liquidity at the start of your turn', confession: 'To the shrine: light a candle, and your seated Trader’s Grace is restored in full', ofrenda: 'Offer it to Our Lady: it goes to the shrine and lights a candle (max 3)', moneda: 'Fires when drawn: every player collects 2 Liquidity', map: 'X marks the spot: whenever you sell an Asset, draw a card', mine: 'Sell later: 4 Liquidity, or Prosperity that grows 25 each round held (from 75)', oil: 'Sell for Prosperity: a die decides — 3+ gushes for 175, else it runs dry for 25', cava: 'Vintage: worth 25 more each round held — or uncork it: discard to light a candle', gallo: 'The fighting rooster: at the start of your turn, roll — a 6 collects 2; a 1, and he is dead', vaca: 'Milk: collect 1 at the start of your turn — or sell her for meat, 6 Liquidity', aguacate: 'Green gold: ripe on the second round, worth 150. Green before, 50 — then it rots, 50 less each round', bono: 'Grandmother’s gift: worth 25 more each round held, and immune to The Bear', plata: 'Flight to safety: in a Flash Crash you lose nothing, and bank 25', perp: 'Leverage: sells for double — but a Bear Market played on you while it is held liquidates it', semilla: 'Plant it: four rounds on, it blooms — bank 150 (a Bear Market holds the harvest until cleared)', ballena: 'Fires when drawn: the richest portfolio’s best Asset moves to the poorest player', rueda: 'Fires when drawn: every portfolio rotates one seat', godcandle: 'Fires when drawn: every Prosperity sale pays 100 more until the drawer’s next turn', skull: 'Exit liquidity: whenever a rival sells an Asset, collect 1 Liquidity', illuminati: 'Fires when drawn: the drawer is initiated — each rival passes them one random card', moralhazard: 'Fires when drawn: the bailout — the poorest player collects 5; the richest loses 2', mardigras: 'Fires when drawn: let the good times roll — every player rolls the die and collects that much Liquidity', rose: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise' };
 
@@ -217,7 +545,19 @@ const cap = (s) => s ? s[0].toUpperCase() + s.slice(1) : '';
 function announceTurn(g) { if (S.turnToasted !== g.turnNo) { S.turnToasted = g.turnNo; toast(`Round ${g.turnNo} · YOUR TURN — you collect your Trader’s LIQ (1 if the seat is empty) and draw. Then one main action.`); } }
 class HumanPolicy {
   human = true;
-  beforeDraw(g, p) { announceTurn(g); return new Promise((res) => { S.drawResolve = res; render(); }); }
+  beforeDraw(g, p) {
+    if (S.hasDrawn) announceTurn(g); else S.turnToasted = g.turnNo;
+    return new Promise(res => {
+      S.drawResolve = res;
+      render();
+      if (!S.hasDrawn && !document.querySelector('.lightbox')) {
+        const deck = $('mePiles').querySelector('.drawable');
+        deck.focus({preventScroll:true});
+        const rect = deck.getBoundingClientRect();
+        if (rect.bottom > innerHeight || rect.top < 0) deck.scrollIntoView({block:'center'});
+      }
+    });
+  }
   main(g, p) { announceTurn(g); return new Promise((res) => { S.mainResolve = res; render(); }); }
   discardOne(g, p) { return new Promise((res) => pickCard('Discard down to seven — tap a card to let go', p.hand, res)); }
   useHeart(g, p, c, by) { return ask(`${by.name} plays ${c.name} on you`, `Discard your SACRED HEART to cancel it?`, 'Cancel it', 'Take the Calamity'); }
@@ -252,18 +592,30 @@ const typeClass = (c) => c.type === 'hazard' ? 'hazard' : c.type === 'remedy' ? 
 // Card text with the SAVING GRACE line, and the keyword's chip.
 const fxText = (c) => (FX[c.key] || c.text || '') + (c.savingGrace ? ` · SAVING GRACE ${c.savingGrace}: discard from your hand when your seated Trader would be disgraced — they stay with ${c.savingGrace} Grace` : '');
 const sgChip = (c) => c.savingGrace ? `<span>✝ SG ${c.savingGrace}</span>` : '';
-const miniChips = (c) => `<div class="chips">${sgChip(c)}${c.pile ? `<span>TRAPPED ${c.pile}</span>` : ''}${c.type === 'location' && c.figures != null ? `<span>FIGURES ${c.figures}/3</span>` : ''}${c.liq ? `<span>LIQ ${c.liq}</span>` : ''}${c.cred ? `<span>GRACE ${c.credNow != null ? c.credNow + '/' + c.cred : c.cred}</span>` : ''}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}${c.bloom && c.bornTurn != null && S && S.g ? (S.g.turnNo - c.bornTurn >= 4 ? '<span>\uD83C\uDF38</span>' : `<span>blooms in ${Math.max(0, 4 - (S.g.turnNo - c.bornTurn))}</span>`) : ''}</div>`;
-// Rival cards: the printed face when the set has one (data-i points back at the
-// owner's invest array so a tap can enlarge it), else the text mini.
-const miniHTML = (c, i) => { const face = typeof FACES !== 'undefined' ? FACES[c.key] : null;
-  if (face && face.face) return `<div class="card mini printed ${typeClass(c)}" data-i="${i}" title="${esc(c.name)} — ${esc(fxText(c))} (tap to enlarge)"><button class="zoom" type="button" aria-label="Enlarge ${esc(c.name)}" title="Enlarge">⤢</button><img class="face" src="${face.face}" alt="${esc(c.name)}" loading="lazy" decoding="async" onload="this.classList.add('ok')">${miniChips(c)}</div>`;
-  return `<div class="card mini ${typeClass(c)}" title="${esc(fxText(c))}"><div class="nm">${esc(c.name)}</div><div class="ty">${esc(classLabel(c))}</div><div class="chips">${c.liq ? `<span>LIQ ${c.liq}</span>` : ''}${c.cred ? `<span>GRACE ${c.credNow != null ? c.credNow + '/' + c.cred : c.cred}</span>` : ''}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}${c.bloom && c.bornTurn != null && S && S.g ? (S.g.turnNo - c.bornTurn >= 4 ? '<span>\uD83C\uDF38</span>' : `<span>blooms in ${Math.max(0, 4 - (S.g.turnNo - c.bornTurn))}</span>`) : ''}</div></div>`; };
+function miniHTML(card, index) {
+  const el = cardEl(card);
+  el.classList.add('mini');
+  el.dataset.i = index;
+  return el.outerHTML;
+}
 // The enlarged view of a printed card. Its own layer (not overlayHost), so
 // it can open over a play prompt without replacing it; any click or Escape
 // closes it.
 function showFace(face, c) {
   let lb = document.getElementById('lightbox');
   if (!lb) { lb = document.createElement('div'); lb.id = 'lightbox'; document.body.appendChild(lb); }
+  if (!face?.face) {
+    lb.innerHTML = '<div class="lightbox" role="dialog"><button class="lbx" type="button" aria-label="Close">×</button></div>';
+    const box = lb.firstElementChild;
+    box.setAttribute('aria-label', c.name);
+    box.prepend(cardEl(c));
+    const close = () => { lb.replaceChildren(); document.removeEventListener('keydown', onKey); };
+    const onKey = e => { if (e.key === 'Escape') close(); };
+    box.onclick = e => { if (e.target === box || e.target.closest('.lbx')) close(); };
+    document.addEventListener('keydown', onKey);
+    box.querySelector('.lbx').focus();
+    return close;
+  }
   const title = face.name || c.name;
   const sub = [face.gloss || null, face.number != null ? `No. ${face.number}` : null, face.rarity, classLabel(c), face.name && face.name !== c.name ? `"${c.name}" in play` : null].filter(Boolean).join(' · ');
   // The picture first (instant), then the live layered card over it once the
@@ -284,6 +636,7 @@ function showFace(face, c) {
   // and flipping (the live card in the iframe handles that click).
   box.onclick = (e) => { if (e.target === box || e.target.classList.contains('cap') || e.target.closest('.lbx')) close(); };
   document.addEventListener('keydown', onKey);
+  return close;
 }
 // Event labels use the same automatic subtype mapping as the printed header.
 const classLabel = (c) => {
@@ -294,20 +647,47 @@ const classLabel = (c) => {
 };
 function cardEl(c) {
   const el = document.createElement('div'); el.className = 'card ' + typeClass(c);
-  // A printed face, when the set has one for this design: the rendered card
-  // on top, the play chips kept beneath it so the table still reads at a glance.
   const face = typeof FACES !== 'undefined' ? FACES[c.key] : null;
   if (face && face.face) {
     el.classList.add('printed');
-    el.innerHTML = `<button class="zoom" type="button" aria-label="Enlarge ${esc(c.name)}" title="Enlarge">⤢</button><img class="face" src="${face.face}" alt="${esc(c.name)}" loading="lazy" decoding="async" onload="this.classList.add('ok')"><div class="chips">${c.type === 'event' && !c.played ? '<span>fires on draw</span>' : c.type === 'grace' ? '<span>to the shrine</span>' : `<span>cost ${c.cost}</span>`}${c.liq ? `<span>LIQ ${c.liq}</span>` : ''}${c.cred ? `<span>GRACE ${c.credNow != null ? c.credNow + '/' + c.cred : c.cred}</span>` : ''}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}${sgChip(c)}</div>`;
+    el.innerHTML = `<button class="zoom" type="button" aria-label="Enlarge ${esc(c.name)}" title="Enlarge">⤢</button><img class="face" src="${face.face}" alt="${esc(c.name)}" loading="lazy" decoding="async" onload="this.classList.add('ok')"><div class="chips">${c.credNow != null && c.credNow !== c.cred ? `<span>Grace ${c.credNow}/${c.cred}</span>` : ''}${c.pile ? `<span>Trapped ${c.pile}</span>` : ''}${c.figures != null ? `<span>Figures ${c.figures}/3</span>` : ''}</div>`;
+    el.onclick = () => showFace(face, c);
     el.querySelector('.zoom').onclick = (e) => { e.stopPropagation(); showFace(face, c); };
     return el;
   }
   el.innerHTML = `${face && face.number != null ? `<div class="num">${face.number}</div>` : ''}<div class="nm">${esc(c.name)}</div><div class="ty">${esc(classLabel(c))}</div><div class="chips">${c.type === 'event' && !c.played ? '<span>fires on draw</span>' : c.type === 'grace' ? '<span>to the shrine</span>' : `<span>cost ${c.cost}</span>`}${c.liq ? `<span>LIQ ${c.liq}</span>` : ''}${c.cred ? `<span>GRACE ${c.credNow != null ? c.credNow + '/' + c.cred : c.cred}</span>` : ''}${c.pros ? `<span>${c.pros}P</span>` : ''}${c.cash ? `<span>${c.cash}L</span>` : ''}${sgChip(c)}</div><div class="fx">${esc(fxText(c))}</div>`;
   return el;
 }
+$('coachMode').onchange = () => { if (S) coachTips(); };
+$('revealHands').onchange = () => { if (S) render(); };
+for (const button of document.querySelectorAll('[data-rules]')) {
+  button.onclick = () => $('rules').showModal();
+}
+$('enterTable').onclick = () => {
+  for (const [control, marker] of setupPositions) marker.replaceWith(control);
+  $('welcome').hidden = true;
+  $('gameBar').hidden = false;
+  $('board').hidden = false;
+  $('board').classList.add('awaiting-deal');
+  $('status').textContent = 'Deal your opening hand to begin.';
+  $('mePiles').innerHTML = '<div class="card back"><img class="face" src="/TCG/rcana/cardBack.webp" alt="Undealt deck"></div>';
+  $('openingDeal').hidden = false;
+  $('openingDeal').appendChild($('deal'));
+  $('deal').textContent = 'Deal opening hand';
+  window.scrollTo(0, 0);
+  $('deal').focus({preventScroll:true});
+};
 $('deal').onclick = async () => {
-  if (S && S.running) return;
+  if (S?.running || $('deal').disabled) return;
+  $('deal').disabled = true;
+  const audioReady = prepareSounds();
+  $('board').classList.remove('awaiting-deal');
+  $('openingDeal').hidden = true;
+  $('gameBar').insertBefore($('deal'), $('tableSound'));
+  $('deal').hidden = true;
+  $('deal').textContent = 'Deal again';
+  $('feed').hidden = true;
+  $('feed').textContent = '';
   const seed = +$('seed').value > 0 ? +$('seed').value : 1 + Math.floor(Math.random() * 999983);
   $('seed').placeholder = 'last: ' + seed;
   const n = +$('nBots').value;
@@ -315,17 +695,41 @@ $('deal').onclick = async () => {
   const players = [ { name: 'YOU', recipe: myDeck, policy: new HumanPolicy() },
     ...Array.from({ length: n }, (_, i) => ({ name: ['EL BOT', 'LA BOT', 'EL OTRO'][i], recipe: i % 2 ? myDeck : otherDeck, policy: new GreedyBot() })) ];
   const g = new Game({ players, seed, verbose: true });
-  S = { g, me: g.players[0], running: true, mainResolve: null, lastActive: null };
+  S = { g, me: g.players[0], startingLiquidity: g.players[0].liq, running: true, mainResolve: null, lastActive: null };
   g.hooks = {
     render: async () => { render();
       if (S.running && S.dealt && g.active && g.active !== S.lastActive) { S.lastActive = g.active; if (g.active !== S.me) await showTurnCard(g.active); }
       if (g.active !== S.me) await sleep(240); },
-    onAction: async (p, a) => { if (a.t !== 'pass') tick(headline(g.lines[g.lines.length - 1] || '')); if (p === S.me || !S.running) { render(); return; } render(); await showPlay(g, p, a); },
+    beforeAction: () => ({
+      balances: g.players.map(q => ({ liq: q.liq, pros: q.pros })),
+      logStart: g.lines.length,
+    }),
+    onAction: async (p, a, before, result) => {
+      if (a.t === 'play') playSound('card');
+      const lines = g.lines.slice(before.logStart).map(line => line.replace(/^\[T\d+\] /, ''));
+      const line = actionOutcome(p, a, before.balances[p.idx], result, lines);
+      if (a.t !== 'pass') tick(headline(line));
+      render();
+      $('feed').hidden = false;
+      $('feed').textContent = line;
+      for (const q of g.players) {
+        for (const stat of ['pros', 'liq']) {
+          if (q[stat] === before.balances[q.idx][stat]) continue;
+          const value = q === S.me ? $(stat === 'pros' ? 'mePros' : 'meLiq') : panelOf(q).querySelector(`[data-balance="${stat}"]`);
+          value.classList.remove('balance-change');
+          void value.offsetWidth;
+          value.classList.add('balance-change');
+        }
+      }
+      if (p !== S.me && S.running) await showPlay(g, p, a, line);
+    },
     onEvent: (p, c) => { render(); tick('MARKET WIRE · ' + (c.name + ': ' + c.text).toUpperCase()); showEvent(p, c); },
   };
-  $('board').hidden = false; $('hist').hidden = false; S.dealt = false; S.lastHandLen = g.players[0].hand.length; render();
+  $('board').hidden = false; $('hist').hidden = false; S.dealt = false; S.lastHandLen = g.players[0].hand.length;
+  await Promise.race([audioReady, sleep(1500)]);
+  render();
   await dealFlights(); S.dealt = true;
-  const r = await g.run(); S.running = false; render(); bell(r);
+  const r = await g.run(); S.running = false; $('deal').hidden = false; $('deal').disabled = false; render(); bell(r);
 };
 async function dealFlights() {
   const deckEl = document.querySelector('#mePiles .card.back'); if (!deckEl) return;
@@ -338,6 +742,7 @@ async function dealFlights() {
   const maxN = Math.max(handEls.length, ...riv.map((b) => b.length), 0);
   for (let i = 0; i < maxN; i++) { if (handEls[i]) flights.push(handEls[i]); riv.forEach((b) => { if (b[i]) flights.push(b[i]); }); }
   for (const target of flights) {
+    playSound('card');
     const to = target.getBoundingClientRect(); const fly = document.createElement('div'); fly.className = 'flycard';
     fly.style.left = from.left + 'px'; fly.style.top = from.top + 'px';
     if (to.width < 60) { fly.style.width = to.width + 'px'; fly.style.height = to.height + 'px'; }
@@ -350,14 +755,16 @@ async function dealFlights() {
 }
 function coinHTML(n) {
   const fives = Math.min(5, Math.floor(n / 5)), ones = Math.min(4, n % 5);
-  return '<span class="coin five"></span>'.repeat(fives) + '<span class="coin"></span>'.repeat(ones) + (n > 29 ? '…' : '');
+  return '<span class="coin five" aria-hidden="true"></span>'.repeat(fives) + '<span class="coin" aria-hidden="true"></span>'.repeat(ones) + (n > 29 ? '…' : '');
 }
 function flyCoins(fromEl, toEl, n) {
-  if (!fromEl || !toEl) return;
+  if (!fromEl || !toEl || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const f = fromEl.getBoundingClientRect(), t = toEl.getBoundingClientRect();
-  const count = Math.min(6, Math.max(1, n));
+  const fives = Math.floor(n / 5);
+  const count = Math.min(6, fives + n % 5);
   for (let i = 0; i < count; i++) setTimeout(() => {
-    const c = document.createElement('div'); c.className = 'flycoin';
+    const c = document.createElement('div'); c.className = i < fives ? 'coin five flycoin' : 'coin flycoin';
+    c.setAttribute('aria-hidden', 'true');
     c.style.left = (f.left + f.width / 2) + 'px'; c.style.top = (f.top + f.height / 2) + 'px';
     document.body.appendChild(c);
     const dx = t.left + t.width / 2 - (f.left + f.width / 2) + (Math.random() * 16 - 8), dy = t.top + t.height / 2 - (f.top + f.height / 2) + (Math.random() * 10 - 5);
@@ -377,7 +784,7 @@ async function flyFace(c, fromEl, toEl) {
   await sleep(620); d.style.opacity = '0'; await sleep(180); d.remove();
 }
 async function showTurnCard(p) {
-  const d = document.createElement('div'); d.className = 'titlecard'; d.innerHTML = `<div class="tc">${esc(p.name)}&#39;S TURN</div>`;
+  const d = document.createElement('div'); d.className = 'titlecard'; d.dataset.pidx = p.idx; d.innerHTML = `<div class="tc">${esc(p.name)}&#39;S TURN</div>`;
   document.body.appendChild(d); requestAnimationFrame(() => d.classList.add('show'));
   await sleep(750); d.classList.remove('show'); setTimeout(() => d.remove(), 220);
 }
@@ -389,8 +796,38 @@ async function showEvent(p, c) {
   requestAnimationFrame(() => b.classList.add('show'));
   await sleep(3400); b.classList.remove('show'); setTimeout(() => b.remove(), 220);
 }
-async function showPlay(g, p, a) {
-  const line = (g.lines[g.lines.length - 1] || '').replace(/^\[T\d+\] /, '');
+function actionOutcome(p, a, before, result, lines) {
+  const actor = p === S.me ? 'You' : p.name;
+  const banked = p.pros - before.pros;
+  const cash = p.liq - before.liq;
+  if (a.t === 'pass') return `${actor} passed.`;
+  if (a.t === 'sell') {
+    if (result === false) return `${actor} kept ${a.a.name} after the sale was blocked.`;
+    let outcome = '';
+    if (banked > 0) outcome = ` and banked ${banked} Prosperity`;
+    else if (a.pros) outcome = ' for 0 Prosperity';
+    else if (lines.some(line => line.includes('falls into the LIQUIDITY TRAP'))) outcome = ' and the Liquidity went into the trap';
+    else outcome = ` for ${a.a.cash} Liquidity`;
+    return `${actor} sold ${a.a.name}${outcome}.`;
+  }
+  if (a.t === 'play') {
+    const target = a.choice?.target;
+    const played = `${actor} played ${a.c.name}${target && target !== p ? ' on ' + (target === S.me ? 'you' : target.name) : ''}`;
+    if (result === false) return `${actor} tried to play ${a.c.name}, but the play was blocked.`;
+    const blocked = lines.find(line => line.includes(' cancels ') || line.includes('no CONSENSUS'));
+    if (blocked) return `${played}. ${blocked}.`;
+    if (banked > 0) return `${played} and banked ${banked} Prosperity.`;
+    if (a.c.type === 'asset') return `${actor} added ${a.c.name} to ${p === S.me ? 'your' : 'their'} portfolio${cash < 0 ? ' for ' + -cash + ' Liquidity' : ''}.`;
+    if (a.c.type === 'trader') return `${actor} ${p.trader === a.c ? 'seated' : 'benched'} ${a.c.name}.`;
+    if (a.c.type === 'hazard') return `${played}.`;
+    if (cash > 0) return `${played} and collected ${cash} Liquidity.`;
+    const effect = lines.filter(line => !line.startsWith('***')).at(-1);
+    return effect && !effect.includes(a.c.name) ? `${played}. ${effect}.` : effect || played;
+  }
+  if (a.t === 'hail') return `${actor} attempted a Hail Mary${result ? ' and banked ' + banked + ' Prosperity' : ' and the prayer went unanswered'}.`;
+  return lines.filter(line => !line.startsWith('***')).at(-1) || `${actor} finished the action.`;
+}
+async function showPlay(g, p, a, line) {
   const card = a.c || a.a || a.h || null;
   if (a.t === 'play' && card) {
     const src = panelOf(p); const from = (src && src.querySelector('.minihand')) || src;
@@ -434,15 +871,91 @@ function showPeek(r) { const cards = S.g.peek(S.me, r); if (!cards || !cards.len
   render(); const again = host.querySelector('#peekRow'); // re-render refreshes panels; keep the modal content
   if (!again || !again.childElementCount) { /* no-op */ }
 }
+function handPlayReason(c) {
+  const {g, me} = S;
+  if (!S.running) return 'The game is over.';
+  if (!me.hand.includes(c)) return 'This card has left your hand.';
+  const cost = g.costOf(me, c);
+  if (me.liq < cost) return `Costs ${cost} Liquidity. You have ${me.liq}.`;
+  if (S.drawResolve) return 'Draw from your deck before playing a card.';
+  if (!S.mainResolve) return 'You can play a card when it’s your turn to choose a main action.';
+  if (acts().some(a => a.t === 'play' && a.c === c)) return '';
+  switch (c.type) {
+    case 'trader': return 'Your Trader seat and both bench spots are occupied.';
+    case 'hazard': return 'Every rival already has this Calamity.';
+    case 'remedy': {
+      const target = byKey[c.clears]?.name;
+      const clear = target ? `There is no ${target} on the table to clear.` : 'There is no matching Calamity on the table to clear.';
+      return c.key === 'publicista' ? clear + ' Polishing also requires a seated Trader with missing Grace.' : clear;
+    }
+    case 'event':
+      if (!c.played) return 'This Event takes effect when drawn.';
+      if (g.hasHaz(me, 'scam')) return 'Exit Scam blocks your Events.';
+      return 'Bear Market blocks payouts above 75 Prosperity.';
+    case 'grace':
+      if (g.is(me, 'bot')) return 'Your seated Bot cannot pray.';
+      if (g.hasHaz(me, 'infierno')) return 'Infierno blocks offerings.';
+      if (c.key === 'fountain') return 'You have already used your Hail Mary.';
+      return 'You already have three lit candles.';
+    default: return 'There is no legal play for this card right now.';
+  }
+}
+function prosperityQuote(g, p, asset) {
+  const price = g.saleValue(asset);
+  const payout = base => g.celebrityBankBonus(p, base, !!asset.bearProof)
+    ? `${base + 25} Prosperity (spend 1 Liquidity)` : `${base} Prosperity`;
+  if (!asset.gamble) return payout(price);
+  const need = (asset.gambleOn || 5) - (g.is(p, 'abuela') ? 1 : 0);
+  return `roll ${need}+ for ${payout(price)}, otherwise ${asset.bust ? payout(asset.bust) : '0'}`;
+}
+function assetSaleNote(asset, options = S.g.legalActions(S.me)) {
+  const {g, me} = S;
+  if (!S.running) return 'The game is over.';
+  if (!me.invest.includes(asset)) return 'This Asset has left your portfolio.';
+  if (asset.bornTurn === g.turnNo) return 'Sell next turn.';
+  if (g.hasHaz(me, 'rug')) return 'Rug Pull blocks sales. Clear it to sell this Asset.';
+  const cash = `${asset.cash} Liquidity${g.hasHaz(me, 'trap') ? ' (held in Liquidity Trap)' : ''}`;
+  if (!options.some(action => action.t === 'sell' && action.a === asset && action.pros))
+    return `Sell for ${cash}. Bear Market blocks the Prosperity sale.`;
+  return `Sell for ${cash} or ${prosperityQuote(g, me, asset)}.`;
+}
+function inspectPlayableCard(card, choices) {
+  const close = showFace(FACES[card.key], card);
+  const actions = document.createElement('div');
+  actions.className = 'inspect-actions';
+  const back = document.createElement('button');
+  back.textContent = 'Back to hand';
+  back.onclick = close;
+  actions.appendChild(back);
+  for (const [label, play] of choices) {
+    const button = document.createElement('button');
+    button.className = 'primary';
+    button.textContent = label;
+    button.onclick = () => { close(); play(); };
+    actions.appendChild(button);
+  }
+  document.querySelector('#lightbox .lightbox').appendChild(actions);
+  back.focus();
+}
+function explainCard(c, describe) {
+  showFace(FACES[c.key], c);
+  const note = document.createElement('p');
+  note.className = 'play-reason';
+  note.refresh = () => describe(c);
+  note.textContent = note.refresh();
+  note.hidden = !note.textContent;
+  document.querySelector('#lightbox .lightbox').appendChild(note);
+}
 function acts() { return S.mainResolve ? S.g.legalActions(S.me) : []; }
 const COACH = new GreedyBot();
 function coachLabel(g, p, a) {
   if (a.t === 'swap') return `swap ${p.bench[a.i].name} into the seat (free)`;
   if (a.t === 'hail') return `attempt the Hail Mary at ${g.odds(p)}/12`;
   if (a.t === 'payclear') return `pay 3 to clear ${a.h.name}`;
-  if (a.t === 'sell') return a.pros ? (a.a.gamble ? `sell ${a.a.name} — roll the die for ${a.a.pros + g.saleBonus()}` : `sell ${a.a.name} to bank ${g.saleValue(a.a)}`) : `sell ${a.a.name} for ${a.a.cash} Liquidity (refuel)`;
+  if (a.t === 'sell') return `sell ${a.a.name} for ${a.pros ? 'Prosperity' : 'Liquidity'}`;
+  if (a.t === 'uncork') return `uncork ${a.a.name} to light a candle`;
   const c = a.c, t = a.choice && a.choice.target;
-  if (c.type === 'event' && c.played) return a.choice && a.choice.cash ? `cash ${c.name} for ${c.cash} Liquidity` : `bank ${c.name} for ${g.eventPayout(me, c)}`;
+  if (c.type === 'event' && c.played) return a.choice && a.choice.cash ? `cash ${c.name} for ${c.cash} Liquidity` : `bank ${c.name} for ${g.eventPayout(p, c)}`;
   if (c.type === 'asset') return `invest in ${c.name}${c.income ? ' (pays ' + c.income + '/turn)' : ''}`;
   if (c.type === 'hazard') return `hit ${t.name} with ${c.name}`;
   if (c.type === 'remedy') { if (a.choice && a.choice.polish) return `polish your Trader: +5 Grace`; if (a.choice && a.choice.refresh) return `drink ${c.name} — refresh the hand`; return t === p ? `clear your ${a.choice.hazard.name}` : `clear ${t.name}'s ${a.choice.hazard.name} (goodwill)`; }
@@ -455,11 +968,43 @@ function coachTips() {
   const el = $('coach'); const on = $('coachMode').checked && !!S.mainResolve && S.running;
   el.hidden = !on; if (!on) return;
   const g = S.g, me = S.me;
-  const scored = acts().filter((a) => a.t !== 'pass').map((a) => ({ a, s: COACH.score(g, me, a) })).sort((x, y) => y.s - x.s);
+  const actions = acts();
+  const scored = actions.filter((a) => a.t !== 'pass').map((a) => ({ a, s: COACH.score(g, me, a) })).sort((x, y) => y.s - x.s);
   if (!scored.length) { $('coachTxt').textContent = 'Nothing playable — pass and bank up next turn.'; return; }
   const seen = new Set(); const tips = [];
   for (const x of scored) { if (tips.length && x.s <= 8) break; const l = coachLabel(g, me, x.a); if (!seen.has(l)) { seen.add(l); tips.push(l); } if (tips.length === 3) break; }
   $('coachTxt').innerHTML = `<b>${esc(tips[0])}</b>` + (tips.length > 1 ? ` <span class="note">\u00b7 other options: ${tips.slice(1).map(esc).join(' \u00b7 ')}</span>` : '');
+  const ready = new Set(actions.filter(action => action.t === 'sell').map(action => action.a));
+  for (const asset of ready) {
+    const line = document.createElement('span');
+    line.style.display = 'block';
+    line.textContent = `${asset.name} is ready to sell. ${assetSaleNote(asset, actions)}`;
+    $('coachTxt').appendChild(line);
+  }
+}
+function portfolioHTML(owner, isMine) {
+  const count = owner.invest.length;
+  const title = isMine ? 'Your portfolio' : esc(owner.name) + '’s portfolio';
+  const cards = isMine ? '' : owner.invest.map(miniHTML).join('');
+  const empty = isMine ? 'Play an Asset from your hand to file it here.' : 'No holdings yet.';
+  return `<section class="folio"><header><h3>${title}</h3><span class="holding-count">${count} holding${count === 1 ? '' : 's'}</span></header>
+    <div class="folio-page"><div class="cards" ${isMine ? 'id="meInvest"' : ''}>${cards}</div>
+    ${count ? '' : `<p>${empty}</p>`}${isMine && count ? '<span class="holding-tip">Select a holding to sell it after its first turn.</span>' : ''}</div></section>`;
+}
+function portraitHTML(trader, fallback) {
+  const face = trader && FACES[trader.key];
+  const title = trader ? trader.name : 'No Trader seated';
+  const src = trader ? face?.face : fallback;
+  const content = src ? `<img src="${esc(src)}" alt="" class="${trader ? 'trader-art' : ''}">` : esc(title.split(' ').map(word => word[0]).slice(-2).join(''));
+  return `<span class="opponent-avatar identity-portrait" title="${esc(title)}" aria-hidden="true">${content}</span>`;
+}
+function updateMyPortrait() {
+  const choice = $('avatarChoice').value;
+  const portrait = portraitHTML(choice === 'auto' ? S?.me.trader : byKey[choice], '/TCG/rcana/cardBack.webp');
+  $('avatarPreview').innerHTML = portrait;
+  $('myPortrait').innerHTML = portrait;
+  const activeIdentity = document.querySelector('#turnSteps li[aria-current="step"]:not([data-pidx]) .identity-portrait');
+  if (activeIdentity) activeIdentity.replaceWith($('myPortrait').firstElementChild.cloneNode(true));
 }
 function render() {
   if (!S) return; const g = S.g, me = S.me; const mine = !!S.mainResolve; const A = acts();
@@ -467,23 +1012,57 @@ function render() {
   const fxb = $('fxBadge'); const gc = S.running && g.fx.godcandle; fxb.hidden = !gc;
   if (gc) { const owner = g.players[gc.owner]; fxb.textContent = `\uD83D\uDD6F THE GOD CANDLE · every sale pays +${g.saleBonus()} until ${owner === me ? 'your' : owner.name + '’s'} next turn`; }
   // rivals
-  const rv = $('rivals'); rv.innerHTML = '';
+  const rv = $('rivals');
+  const expanded = new Set([...rv.querySelectorAll('details[open]')].map(el => el.dataset.pidx));
+  rv.innerHTML = '';
   for (const q of g.players) { if (q === me) continue;
     const d = document.createElement('section'); d.className = 'panel'; d.dataset.pidx = q.idx;
     if (g.active === q && S.running) d.classList.add('hot');
-    d.innerHTML = `<div class="phead"><span class="who ${g.active === q && S.running ? 'active' : ''}">${esc(q.name)}</span><span class="stat">${esc(cap(q.recipe))}</span>
-      <span class="stat">Liq <b>${q.liq}</b> <span class="coinrow">${coinHTML(q.liq)}</span></span><span class="stat">Banked <b>${q.pros}</b></span><span class="stat">Hand <b>${q.hand.length}</b></span><span class="stat candles">${'🕯'.repeat(q.deeds)}</span><span class="stat">${q.hailUsed ? 'Hail Mary: spent' : `Hail Mary: ${g.odds(q)}/12`}</span></div>
-      <div class="prosbar"><i style="width:${Math.min(100, q.pros / 10)}%"></i></div>
-      <div class="minihand">${'<span class="miniback"></span>'.repeat(Math.min(9, q.hand.length))}</div>
+    d.innerHTML = `<details data-pidx="${q.idx}" ${expanded.has(String(q.idx)) ? 'open' : ''}><summary class="opponent-head">
+      <span class="opponent-id">${portraitHTML(q.trader, '/TCG/rcana/' + ['octobot/prop','el-gato/subject','el-monje/subject'][q.idx - 1] + '.webp')}
+        <span><small>Computer opponent · ${esc(cap(q.recipe))}</small><span class="who">${esc(q.name)}</span><small>${q.trader ? 'Seated Trader · ' + esc(q.trader.name) : 'No Trader seated'}</small>
+        ${g.active === q && S.running ? '<small class="opponent-turn">Taking a turn</small>' : ''}</span></span>
+      <span class="opponent-stats"><span class="opponent-race"><small>Banked Prosperity</small><b data-balance="pros">${q.pros}</b> / 1,000
+        <span class="prosbar"><i style="width:${Math.min(100,q.pros / 10)}%"></i></span></span>
+        <span><small>Liquidity</small><b data-balance="liq">${q.liq}</b></span>
+        <span><small>Cards in hand</small><b>${q.hand.length}</b><span class="minihand" aria-hidden="true">${'<span class="miniback"></span>'.repeat(Math.min(9,q.hand.length))}</span></span>
+      </span><span class="desk-toggle">Desk details</span></summary>
+      <div class="phead"><span class="stat"><span class="coinrow">${coinHTML(q.liq)}</span></span>
+      <span class="stat">Candles <b>${q.deeds}</b></span><span class="stat">${q.hailUsed ? 'Hail Mary: spent' : `Hail Mary: ${g.odds(q)}/12`}</span></div>
       ${(S.known || []).filter((k) => k.idx === q.idx && q.hand.includes(k.c)).map((k) => `<span class="chip eye" title="seen through the X-Ray Glasses">\uD83D\uDC41 ${esc(k.c.name)} in hand</span>`).join(' ')}
       ${q.lastLine ? `<div class="note" style="margin-top:6px">Last turn: ${esc(q.lastLine)}</div>` : ''}
       <div style="margin-top:6px">${q.trader ? `<span class="chip trader" title="${esc(FX[q.trader.key] || '')}">Trader: ${esc(q.trader.name)} · LIQ ${q.trader.liq} · GRACE ${q.trader.credNow}/${q.trader.cred}${g.abilityOn(q) ? '' : ' · HACKED'}</span>` : '<span class="chip">no Trader — income 1</span>'} ${q.bench.map((b) => `<span class="chip trader" title="${esc(FX[b.key] || '')}">bench: ${esc(b.name)} · ${b.credNow}/${b.cred}</span>`).join(' ')} ${q.artifacts.map((a) => `<span class="chip" title="${esc(FX[a.key] || '')}">${esc(a.name)}</span>`).join(' ')} ${q.location ? `<span class="chip" title="${esc(FX[q.location.key] || '')}">⛪ ${esc(q.location.name)}</span>` : ''} ${q.hazards.map((h) => `<span class="chip haz" title="${esc(FX[h.key] || '')}">${esc(h.name)}</span>`).join(' ')}</div>
-      <div class="rowlabel" style="margin:9px 0 5px">Their investments</div>
-      <div class="cards">${q.invest.length || (q.seeds || []).length ? q.invest.map((a, i) => miniHTML(a, i)).join('') + (q.seeds || []).map((sd) => `<span class="chip" title="${esc(fxText(sd))}">\uD83C\uDF31 ${esc(sd.name)} · blooms in ${Math.max(0, sd.bloom - (g.turnNo - sd.bornTurn))}</span>`).join(' ') : '<span class="note">none yet</span>'}</div>`;
-    d.querySelectorAll('.card.mini.printed').forEach((el) => { const c = q.invest[+el.dataset.i]; if (c) el.onclick = (e) => { e.stopPropagation(); showFace(FACES[c.key], c); }; });
+      ${(q.seeds || []).map((sd) => `<span class="chip" title="${esc(fxText(sd))}">\uD83C\uDF31 ${esc(sd.name)} · blooms in ${Math.max(0, sd.bloom - (g.turnNo - sd.bornTurn))}</span>`).join(' ')}</details>`;
+    const details = d.querySelector('details');
+    if (q.invest.length) d.insertAdjacentHTML('beforeend', portfolioHTML(q, false));
+    else details.insertAdjacentHTML('beforeend', portfolioHTML(q, false));
+    d.querySelectorAll('.folio .card.mini').forEach((el) => {
+      const c = q.invest[Number(el.dataset.i)];
+      el.onclick = () => showFace(FACES[c.key], c);
+    });
+    const revealed = $('revealHands').checked ? q.hand : q.hand.filter(c => (S.known || []).some(k => k.idx === q.idx && k.c === c));
+    const groups = [
+      ['Seated Trader', q.trader ? [q.trader] : []], ['Bench', q.bench], ['Relics', q.artifacts],
+      ['Location', q.location ? [q.location] : []], ['Calamities', q.hazards], ['Pending Events', q.seeds || []],
+      [$('revealHands').checked ? 'Hand' : 'Revealed in hand', revealed],
+    ];
+    const row = document.createElement('div'); row.className = 'rival-cards';
+    for (const [label, cards] of groups) {
+      if (!cards.length) continue;
+      const group = document.createElement('section');
+      group.innerHTML = `<div class="rowlabel">${label}</div><div class="cards"></div>`;
+      for (const card of cards) {
+        const el = cardEl(card); el.classList.add('mini');
+        el.onclick = () => showFace(FACES[card.key], card);
+        group.lastElementChild.appendChild(el);
+      }
+      row.appendChild(group);
+    }
+    if (row.childElementCount) d.appendChild(row);
     rv.appendChild(d);
   }
   // me
+  updateMyPortrait();
   $('meWho').textContent = 'YOU · ' + cap(me.recipe); $('meWho').classList.toggle('active', mine && S.running);
   $('meLiq').textContent = me.liq; $('meCoins').innerHTML = coinHTML(me.liq); $('mePros').textContent = me.pros; $('meBar').style.width = Math.min(100, me.pros / 10) + '%';
   $('meDeeds').textContent = '🕯'.repeat(me.deeds) || '—';
@@ -502,23 +1081,46 @@ function render() {
     bn.appendChild(el); });
   else { const slot = document.createElement('div'); slot.className = 'card slot'; slot.innerHTML = '<div class="fx">empty bench — place reserve Traders here (max 2)</div>'; bn.appendChild(slot); }
   const piles = $('mePiles'); piles.innerHTML = '';
-  { const dk = document.createElement('div'); dk.className = 'card back' + (S.drawResolve ? ' drawable' : ' dim');
+  const cue = $('drawCue');
+  cue.hidden = !S.running || S.hasDrawn;
+  cue.textContent = S.drawResolve ? 'Draw here ↓' : 'Dealing…';
+  { const dk = document.createElement('button');
+    dk.type = 'button';
+    dk.disabled = !S.drawResolve;
+    dk.setAttribute('aria-label', 'Draw a card from your deck');
+    dk.className = 'card back' + (S.drawResolve ? ' drawable' : ' dim');
+    dk.classList.toggle('first-draw', !S.hasDrawn);
     dk.innerHTML = `<img class="face" src="/TCG/rcana/cardBack.webp" alt="" decoding="async" draggable="false"><div class="fx">${me.deck.length} left${S.drawResolve ? ' · TAP TO DRAW' : ''}</div>`;
-    if (S.drawResolve) dk.onclick = () => { const r = S.drawResolve; S.drawResolve = null; r(); };
+    if (S.drawResolve) dk.onclick = () => { playSound('card'); const r = S.drawResolve; if (!r) return; S.hasDrawn = true; S.drawResolve = null; dk.disabled = true; cue.hidden = true; r(); };
     piles.appendChild(dk);
     const dc = document.createElement('div');
     if (me.discard.length) { const top = cardEl(me.discard[me.discard.length - 1]); top.classList.add('dim'); top.title = 'Your discard pile · ' + me.discard.length + ' cards'; top.insertAdjacentHTML('afterbegin', `<div class="pilelabel">DISCARD · ${me.discard.length}</div>`); piles.appendChild(top); }
   }
-  const inv = $('meInvest'); inv.innerHTML = '';
+  $('myPortfolio').innerHTML = portfolioHTML(me, true);
+  const inv = $('meInvest');
   me.invest.forEach((a) => { const el = cardEl(a);
     if (a.ripe && a.bornTurn != null) { const held = g.turnNo - a.bornTurn; const ch = el.querySelector('.chips'); if (ch) ch.insertAdjacentHTML('beforeend', held < 2 ? `<span>green — ripe in ${2 - held}</span>` : held === 2 ? '<span>\uD83E\uDD51 RIPE — 150P</span>' : `<span>rotting — ${g.prosOf(a)}P</span>`); }
     if (a.perp && g.hasHaz(me, 'bear')) { const ch = el.querySelector('.chips'); if (ch) ch.insertAdjacentHTML('beforeend', '<span>leveraged</span>'); }
     if (a.bloom && a.bornTurn != null) { const held = g.turnNo - a.bornTurn; const ch = el.querySelector('.chips');
       if (ch) ch.insertAdjacentHTML('beforeend', held >= 4 ? '<span>\uD83C\uDF38 IN BLOOM \u2014 150P</span>' : `<span>blooms in ${4 - held} round${4 - held === 1 ? '' : 's'}</span>`); } const sc = A.find((x) => x.t === 'sell' && x.a === a && !x.pros); const sp = A.find((x) => x.t === 'sell' && x.a === a && x.pros);
-    const items = []; const uc = A.find((x) => x.t === 'uncork' && x.a === a); if (uc) items.push(['Uncork it — light a candle', () => resolveMain(uc)]); if (sc) items.push([`Sell for ${a.cash} Liquidity`, () => resolveMain(sc)]); if (sp) items.push([a.gamble ? 'Sell for Prosperity — roll the die' : `Sell for ${g.prosOf(a)} Prosperity${a.bloom && g.prosOf(a) === a.bloom ? ' — IN BLOOM' : ''}`, () => resolveMain(sp)]);
-    if (items.length) { el.classList.add('playable'); el.onclick = () => popMenu(items.reverse()); } else el.classList.add('dim'); inv.appendChild(el); });
+    const items = []; const uc = A.find((x) => x.t === 'uncork' && x.a === a); if (uc) items.push(['Uncork it — light a candle', () => resolveMain(uc)]); if (sc) items.push([`Sell for ${a.cash} Liquidity`, () => resolveMain(sc)]); if (sp) items.push([(a.gamble ? 'Gamble: ' : 'Sell for ') + prosperityQuote(g, me, a), () => resolveMain(sp)]);
+    const inspect = () => explainCard(a, assetSaleNote);
+    let zoom = el.querySelector('.zoom');
+    if (!zoom) {
+      zoom = document.createElement('button');
+      zoom.type = 'button';
+      zoom.className = 'zoom';
+      zoom.setAttribute('aria-label', 'Enlarge ' + a.name);
+      zoom.textContent = '⤢';
+      el.appendChild(zoom);
+    }
+    zoom.onclick = e => { e.stopPropagation(); inspect(); };
+    el.classList.add(items.length ? 'playable' : 'dim');
+    el.onclick = items.length ? () => popMenu([...items].reverse()) : inspect;
+    inv.appendChild(el); });
+  const seeds = $('meSeeds'); seeds.replaceChildren(); seeds.hidden = !me.seeds?.length;
   (me.seeds || []).forEach((sd) => { const el = cardEl(sd); const left = sd.bloom - (g.turnNo - sd.bornTurn); const ch = el.querySelector('.chips');
-    if (ch) ch.insertAdjacentHTML('beforeend', left <= 0 ? '<span>\uD83C\uDF38 IN BLOOM</span>' : `<span>\uD83C\uDF31 blooms in ${left} round${left === 1 ? '' : 's'}</span>`); el.classList.add('dim'); inv.appendChild(el); });
+    if (ch) ch.insertAdjacentHTML('beforeend', left <= 0 ? '<span>\uD83C\uDF38 IN BLOOM</span>' : `<span>\uD83C\uDF31 blooms in ${left} round${left === 1 ? '' : 's'}</span>`); el.classList.add('dim'); seeds.appendChild(el); });
   const ar = $('meArts'); ar.innerHTML = ''; $('meArtsLabel').textContent = `Relics (max ${g.relicSlots(me)}${g.relicSlots(me) > 2 ? ' + the board' : ''})${me.location ? ' · Location' : ''}`;
   me.artifacts.forEach((a) => { const el = cardEl(a);
     ar.appendChild(el); });
@@ -539,14 +1141,66 @@ function render() {
       if (x.choice && x.choice.polish) label = `Polish ${me.trader ? me.trader.name : 'your Trader'}: +5 Grace (${g.costOf(me, c)} Liq)`;
       if (x.choice && x.choice.refresh) label = `Drink: let go of up to ${c.refresh}, draw that many +1`;
       return [label, () => x.choice && x.choice.refresh ? refreshUI(x) : resolveMain(x)]; });
-    if (items.length && mine) { el.classList.add('playable'); el.onclick = () => popMenu(items); } else el.classList.add('dim');
+    if (items.length && mine) {
+      el.classList.add('playable');
+      el.onclick = () => inspectPlayableCard(c, items);
+      const zoom = el.querySelector('.zoom');
+      if (zoom) zoom.onclick = e => { e.stopPropagation(); el.click(); };
+      else {
+        el.tabIndex = 0;
+        el.setAttribute('role','button');
+        el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); } };
+      }
+    } else {
+      el.classList.add('dim');
+      el.onclick = () => explainCard(c, handPlayReason);
+      const zoom = el.querySelector('.zoom');
+      if (zoom) zoom.onclick = e => { e.stopPropagation(); explainCard(c, handPlayReason); };
+      else {
+        el.tabIndex = 0;
+        el.setAttribute('role','button');
+        el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); } };
+      }
+    }
     mh.appendChild(el); });
-  $('turnNote').textContent = S.drawResolve ? 'YOUR TURN · tap your deck to draw' : mine ? 'YOUR TURN · choose one main action:' : S.running ? (g.active && g.active !== me ? 'Turn over · ' + g.active.name + ' is playing…' : '') : '';
+  const reason = document.querySelector('#lightbox .play-reason');
+  if (reason) {
+    reason.textContent = reason.refresh();
+    reason.hidden = !reason.textContent;
+  }
+  const steps = $('turnSteps');
+  const phase = g.active && g.active !== me ? 2 : mine ? 1 : S.drawResolve ? 0 : -1;
+  const rivalStep = steps.lastElementChild;
+  if (phase === 2) rivalStep.dataset.pidx = g.active.idx;
+  else delete rivalStep.dataset.pidx;
+  rivalStep.textContent = phase === 2
+    ? g.active.name + ' is playing' : 'Rivals play';
+  steps.hidden = !S.running || !S.dealt;
+  Array.from(steps.children).forEach((step, index) => {
+    step.querySelector('.turn-identity')?.remove();
+    if (index !== phase) {
+      step.removeAttribute('aria-current');
+      return;
+    }
+    step.setAttribute('aria-current', 'step');
+    const portrait = panelOf(g.active).querySelector('.identity-portrait');
+    const identity = document.createElement('span');
+    identity.className = 'turn-identity';
+    identity.append(portrait.cloneNode(true));
+    if (g.active === me) identity.append('You · ');
+    step.prepend(identity);
+  });
+  const drawPrompt = S.hasDrawn ? 'Your turn · draw from your deck' :
+    `You started with ${S.startingLiquidity} Liquidity and collected ${me.liq - S.startingLiquidity}. Draw a card.`;
+  $('turnNote').textContent = S.drawResolve ? drawPrompt : mine ? 'Your turn · choose one main action' : S.running ? (g.active && g.active !== me ? 'Turn over · ' + g.active.name + ' is playing…' : '') : '';
+  $('drawBtn').classList.toggle('first-draw', !!S.drawResolve && !S.hasDrawn);
+  $('drawBtn').hidden = !S.drawResolve;
+  $('drawBtn').onclick = () => $('mePiles').querySelector('.drawable')?.click();
   const hailAct = A.find((x) => x.t === 'hail');
   $('hailBtn').disabled = !mine || !hailAct;
   $('hailBtn').onclick = () => ask('once per game', `Attempt the Hail Mary at ${tw}/12? Answered: your Calamities clear and you bank 200.`, 'Pray', 'Hold').then((y) => { if (y) { resolveMain(hailAct); setTimeout(() => { const last = S.g.lines.filter((l) => /HAIL MARY/.test(l)).pop(); if (last) toast(last.replace(/^\[T\d+\] /, '')); }, 60); } });
   $('passBtn').disabled = !mine; $('passBtn').onclick = () => resolveMain({ t: 'pass' });
-  $('feed').innerHTML = g.lines.slice(-3).map((l) => `<div>${esc(l)}</div>`).join('');
+
   $('log').innerHTML = g.lines.map((l) => `<div>${esc(l)}</div>`).join(''); $('log').scrollTop = $('log').scrollHeight;
   coachTips();
   // money is visible: coins fly between LA BANCA and whoever gained or spent
@@ -554,7 +1208,10 @@ function render() {
   for (const q of g.players) {
     const prev = S.coinLiq[q.idx];
     if (S.dealt && S.running && prev != null && prev !== q.liq) {
-      const el = q === me ? $('meCoins') : (panelOf(q) && panelOf(q).querySelector('.coinrow'));
+      const panel = panelOf(q);
+      const row = panel.querySelector('.coinrow');
+      const el = row?.getClientRects().length ? row : panel.querySelector('summary');
+      playSound(q.liq > prev ? 'collect' : 'spend');
       if (q.liq > prev) flyCoins($('bank'), el, q.liq - prev); else flyCoins(el, $('bank'), prev - q.liq);
     }
     S.coinLiq[q.idx] = q.liq;
@@ -584,5 +1241,48 @@ function buildGallery() {
     const row = document.createElement('div'); row.className = 'cards'; host.appendChild(row);
     for (const d of ds) { const wrap = document.createElement('div'); const ce = cardEl(d); const f = typeof FACES !== 'undefined' ? FACES[d.key] : null; if (f && f.face) ce.onclick = () => showFace(f, d); wrap.appendChild(ce); const cc = document.createElement('div'); cc.className = 'copychips'; cc.textContent = copies(d.key); wrap.appendChild(cc); row.appendChild(wrap); } }
 }
+const setupPositions = new Map();
+function placeSetup(control, destination) {
+  const marker = document.createComment('setup control');
+  control.before(marker);
+  setupPositions.set(control, marker);
+  $(destination).appendChild(control);
+}
+placeSetup($('nBots'), 'welcomeControls');
+placeSetup($('avatarPicker'), 'welcomeControls');
+const picker = $('avatarChoice');
+try {
+  const saved = localStorage.getItem('rcana.pt2.avatar');
+  if ([...picker.options].some(option => option.value === saved)) picker.value = saved;
+} catch {}
+picker.onchange = () => {
+  updateMyPortrait();
+  try { localStorage.setItem('rcana.pt2.avatar', picker.value); } catch {}
+};
+updateMyPortrait();
+for (const label of [...$('gameBar').querySelectorAll('label')]) placeSetup(label, 'welcomeOptions');
+placeSetup($('tableSound'), 'welcomeOptions');
+function showSampleHand() {
+  const keys = $('meDeck').value === 'devotion' ? ['grail','monje','fountain'] : ['meme','unicornio','rideordie'];
+  $('sampleHand').replaceChildren(...keys.map(key => {
+    const card = DESIGNS.find(d => d.key === key);
+    const face = FACES[key];
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute('aria-label', 'Inspect ' + face.name);
+    const img = document.createElement('img');
+    img.src = face.face;
+    img.alt = face.name;
+    button.appendChild(img);
+    button.onclick = () => showFace(face, card);
+    return button;
+  }));
+}
+document.querySelector('.deck-choices').addEventListener('change', event => {
+  $('meDeck').value = event.target.value;
+  showSampleHand();
+});
+$('meDeck').value = document.querySelector('[name="starter"]:checked').value;
+showSampleHand();
 buildGallery();
 </script>

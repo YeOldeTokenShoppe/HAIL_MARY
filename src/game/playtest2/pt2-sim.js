@@ -122,10 +122,13 @@ export class Game {
     if (c.key === 'illuminati') for (const q of this.players) if (q !== p && q.hand.length) { const t = q.hand.splice(Math.floor(this.rng() * q.hand.length), 1)[0]; p.hand.push(t); this.log(`THE ILLUMIN80 initiate ${p.name} — unseen hands move a card from ${q.name}${q.policy.human ? ` (your ${t.name})` : p.policy.human ? ` (${t.name})` : ''}`); }
     if (this.hooks && this.hooks.onEvent) this.hooks.onEvent(p, c);
   }
+  celebrityBankBonus(p, n, bearProof = false) {
+    return this.is(p, 'celebridad') && p.liq >= 1 && (bearProof || !this.hasHaz(p, 'bear')) && !(this.hasHaz(p, 'bear') && n + 25 > 75) ? 25 : 0;
+  }
   bank(p, n, src, allowBonus = true, bearProof = false) {
     if (this.hasHaz(p, 'bear') && src !== 'hail' && !bearProof) { if (n > 75) return false; // larger payouts cannot be chosen
       p.pros += n; } else {
-      if (allowBonus && this.is(p, 'celebridad') && p.liq >= 1 && src !== 'hail' && !(this.hasHaz(p, 'bear') && n + 25 > 75)) { p.liq -= 1; n += 25; }
+      if (allowBonus && src !== 'hail' && this.celebrityBankBonus(p, n, bearProof)) { p.liq -= 1; n += 25; }
       p.pros += n;
     }
     this.log(`${p.name} banks ${n} (${src}) → ${p.pros}`);
@@ -264,6 +267,7 @@ export class Game {
   }
   async sell(p, a, wantPros) {
     if (this.hasHaz(p, 'rug')) return false; if (a.bornTurn === this.turnNo) return false;
+    const base = this.prosOf(a);
     p.invest.splice(p.invest.indexOf(a), 1); p.stats.sells++;
     for (const q of this.players) if (q !== p && q.artifacts.some((x) => x.key === 'skull')) { this.collect(q, 1); this.log(`${q.name} holds THE SKULL: +1 from ${p.name}'s sale`); }
     if (wantPros && a.gamble) {
@@ -276,7 +280,7 @@ export class Game {
       await this.mapDraw(p);
       return true;
     }
-    if (wantPros) { const base = this.prosOf(a); const bonus = this.saleBonus(); const ok = this.bank(p, base + bonus, a.name + (a.bloom && base === a.bloom ? ' IN BLOOM' : '') + (bonus ? ` · GOD CANDLE +${bonus}` : ''), true, !!a.bearProof); if (!ok) { p.invest.push(a); p.stats.sells--; return false; } p.stats.sellPros++; /* banked */ }
+    if (wantPros) { const bonus = this.saleBonus(); const ok = this.bank(p, base + bonus, a.name + (a.bloom && base === a.bloom ? ' IN BLOOM' : '') + (bonus ? ` · GOD CANDLE +${bonus}` : ''), true, !!a.bearProof); if (!ok) { p.invest.push(a); p.stats.sells--; return false; } p.stats.sellPros++; /* banked */ }
     else { this.collect(p, a.cash); p.discard.push(a); p.stats.sellCash++; this.log(`${p.name} sells ${a.name} for ${a.cash}`); }
     await this.mapDraw(p);
     return true;
@@ -401,7 +405,13 @@ export class Game {
     if (yield2) { this.collect(p, yield2); this.log(`${p.name} collects ${yield2} from investments`); }
     if (p.policy.beforeDraw) await p.policy.beforeDraw(this, p);
     await this.draw(p);
-    let guard = 0; while (guard++ < 4) { const a = await p.policy.main(this, p); const kind = a ? a.t : 'pass'; await this.act(p, a || { t: 'pass' }); if (this.hooks && this.hooks.onAction) await this.hooks.onAction(p, a || { t: 'pass' }); if (kind !== 'swap' || this.over) break; }
+    for (let step = 0; step < 4; step++) {
+      const action = await p.policy.main(this, p) || { t: 'pass' };
+      const before = this.hooks?.beforeAction?.();
+      const result = await this.act(p, action);
+      await this.hooks?.onAction?.(p, action, before, result);
+      if (action.t !== 'swap' || this.over) break;
+    }
     while (p.hand.length > 7) { const d = await p.policy.discardOne(this, p); p.hand.splice(p.hand.indexOf(d), 1); p.discard.push(d); p.stats.discards++; }
     if (this.hooks && this.hooks.render) await this.hooks.render();
   }
