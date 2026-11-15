@@ -34,8 +34,10 @@ export const DESIGNS = [
   // a real trader should hold onto; printed as three "-ity" words.
   D('unicornio', 'El Unicornio', 'trader', 3, { liq: 3, cred: 20, eq: 1, abilityName: 'Compound Interest', text: 'At turn start, if you have at least 100 banked Prosperity, bank 25 more.' }),
   D('gato', 'El Gato', 'trader', 2, { liq: 2, cred: 16, eq: 1, abilityName: 'Clean Sweep', text: 'When seated, immediately knock one Calamity off your table, free' }),
-  // PROVISIONAL stats and text — the card exists for its face; not yet in any deck list or sim hook.
-  D('investigadora', 'La Investigadora', 'trader', 3, { liq: 3, cred: 14, eq: 1, abilityName: 'Due Diligence', text: 'Once per turn, look at the top card of the deck; you may put it on the bottom' }),
+  // The investigator: she reads the tape before the market does. Before her
+  // turn's draw she peeks at the top card and may send it to the bottom —
+  // the one Trader who can dodge the weather instead of weathering it.
+  D('investigadora', 'La Investigadora', 'trader', 3, { liq: 3, cred: 14, eq: 1, abilityName: 'Due Diligence', text: 'Before you draw, look at the top card of your deck; you may put it on the bottom' }),
   D('monje', 'El Monje', 'trader', 1, { liq: 1, cred: 22, eq: 2, abilityName: 'Vow of Prosperity', text: 'When you light a candle, bank 25 Prosperity' }),
   D('diablito', 'El Diablito', 'trader', 2, { liq: 2, cred: 10, eq: 0, abilityName: 'Devil’s Wager', text: 'At the start of your turn, flip a coin: heads, collect 1 Liquidity; tails, El Diablito loses 1 CRED' }),
   D('celebridad', 'The Influencer', 'trader', 3, { liq: 3, cred: 8, eq: 0, abilityName: 'Star Power', text: 'The influencer: pay 1 when banking from a card, +25 Prosperity', printName: 'La Influencer' }),
@@ -45,10 +47,6 @@ export const DESIGNS = [
   D('general', 'Byzantine General', 'trader', 2, { liq: 2, cred: 14, eq: 3, abilityName: 'Fault Tolerance', text: 'When a Calamity fails against your Equanimity, collect 1 Liquidity', printName: 'El General' }),
   // The trading bot: fat income, no soul. Scandal has nothing to grip; the shrine hears nothing.
   D('bot', 'The Bot', 'trader', 3, { liq: 3, cred: 6, eq: 3, abilityName: 'No Soul', text: 'Scandal cannot touch it. It cannot pray: while it sits, your Graces go unheard', printName: 'El Octobot' }),
-  // The angel investor: heavenly seed money. Every Asset you buy returns a coin.
-  D('angel', 'The Angel Investor', 'trader', 2, { liq: 2, cred: 16, eq: 2, abilityName: 'Angel Round', text: 'When you invest in an Asset, collect 1 Liquidity back', printName: 'El Ángel' }),
-  // The ethically challenged trader: every hit she orders comes with a tip.
-  D('shady', 'Shady Lady', 'trader', 2, { liq: 2, cred: 8, eq: 1, abilityName: 'Insider Tip', text: 'When you play a Calamity on a rival, draw a card', printName: 'La Pícara' }),
   D('tech', 'Tech Stock', 'asset', 3, { cash: 5, pros: 100, tech: true }),
   // The degen asset, and the only gamble: sell safe for cash, or roll the die for
   // Prosperity. (Was two cards — Meme Coin's body with Shitcoin's upside.)

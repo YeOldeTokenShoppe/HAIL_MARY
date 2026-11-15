@@ -20,8 +20,6 @@ export const RESERVED_NUMBERS = {
   prospector: 27,
   general: 1, // El General — unfaced
   bot: 2, // El Robot — unfaced
-  angel: 3, // El Ángel — unfaced
-  shady: 4, // La Tramposa — unfaced
   // Assets
   tech: 14,
   meme: 22,
@@ -35,8 +33,8 @@ export const RESERVED_NUMBERS = {
   bono: 84, // The Savings Bond — unfaced
   plata: 85, // La Plata — unfaced
   perp: 86, // The Perp — unfaced
-  cava: 87, // La Cava — unfaced
-  catedral: 88, // La Catedral — unfaced
+  cava: 3, // La Cava — unfaced (took El Ángel's number when the Angel and Shady Lady were cut, 2026-11-15)
+  catedral: 4, // La Catedral — unfaced (took La Tramposa's number)
   jardin: 44,
   map: 33,
   mine: 31,

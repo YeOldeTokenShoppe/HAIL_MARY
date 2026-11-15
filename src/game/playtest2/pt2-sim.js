@@ -23,13 +23,13 @@ export const byKey = Object.fromEntries(DESIGNS.map((d) => [d.key, d]));
 // (hazards, gambles, the Unicorn's compounding). Deck identity is the collectible premise.
 export const RECIPES = {
   devotion: [['monje', 2], ['gato', 1], ['celebridad', 1], ['general', 1],
-    ['tech', 1], ['vaca', 1], ['cava', 1], ['plata', 1], ['nacimiento', 1], ['moon', 1], ['catedral', 1], ['bluechip', 1], ['semilla', 1], ['angel', 1],
+    ['tech', 1], ['vaca', 1], ['cava', 1], ['plata', 1], ['nacimiento', 1], ['moon', 1], ['catedral', 1], ['bluechip', 1], ['semilla', 1], ['investigadora', 1],
     ['bull', 2], ['squeeze', 2],
     ['bear', 1], ['rug', 1],
     ['bell', 1], ['tortilla', 2], ['publicista', 1], ['horchata', 1], ['burro', 1], ['ofrenda', 1],
     ['heart', 1], ['halo', 1], ['rosary', 1], ['grail', 1], ['dashboard', 1], ['tattoo', 1], ['geometry', 1],
     ['cherub', 1], ['fountain', 1], ['limpia', 1], ['anima', 1], ['lagrimas', 1]],
-  degen: [['diablito', 1], ['unicornio', 2], ['shady', 1], ['prospector', 1], ['abuela', 1], ['bot', 1],
+  degen: [['diablito', 2], ['unicornio', 2], ['prospector', 1], ['abuela', 1], ['bot', 1],
     ['meme', 1], ['tech', 2], ['gallo', 1], ['aguacate', 1], ['perp', 1], ['bluechip', 1], ['jardin', 1], ['ponzi', 1], ['catacumbas', 1],
     ['unlock', 1],
     ['ballena', 1], ['rueda', 1], ['moralhazard', 1], ['mardigras', 1], ['godcandle', 1], ['techwreck', 1],
@@ -200,7 +200,7 @@ export class Game {
     p.hand.splice(p.hand.indexOf(c), 1); p.stats.plays++;
     switch (c.type) {
       case 'asset': c.bornTurn = this.turnNo; p.invest.push(c); this.log(`${p.name} invests in ${c.name}`);
-        if (this.is(p, 'angel')) { this.collect(p, 1); this.log(`ANGEL ROUND — ${p.name} collects 1 back`); } break;
+        break;
       case 'event': { // a played Event (Bull Run, Full Moon, The Inheritance); fired ones never reach a hand
         if (c.bloom) { c.bornTurn = this.turnNo; p.seeds.push(c); this.log(`${p.name} plants ${c.name} — it blooms in ${c.bloom} rounds`); break; }
         if (c.choice && choice.cash) { this.collect(p, c.cash); p.discard.push(c); this.log(`${p.name} cashes ${c.name} for ${c.cash}`); }
@@ -221,7 +221,6 @@ export class Game {
         c.owner = p; c.by = p.idx; t.hazards.push(c); p.stats.hazPlayed++;
         this.log(`${p.name} plays ${c.name} on ${t.name}`);
         if (c.key === 'bear') for (const a of [...t.invest]) if (a.perp) { t.invest.splice(t.invest.indexOf(a), 1); t.discard.push(a); this.log(`${t.name}'s ${a.name} is LIQUIDATED by the Bear`); }
-        if (this.is(p, 'shady')) { await this.draw(p, true); this.log(`INSIDER TIP — ${p.name} draws a card`); }
         if (c.key === 'escandalo') await this.credDamage(t, 5, 'the SCANDAL breaks');
         break; }
       case 'remedy': {
@@ -409,6 +408,13 @@ export class Game {
     const yield2 = p.invest.reduce((s2, a2) => s2 + (a2.income || 0), 0);
     if (yield2) { this.collect(p, yield2); this.log(`${p.name} collects ${yield2} from investments`); }
     if (p.policy.beforeDraw) await p.policy.beforeDraw(this, p);
+    // DUE DILIGENCE: La Investigadora reads the top card before the draw and may send it to the bottom.
+    if (this.is(p, 'investigadora') && p.policy.dueDiligence) {
+      if (!p.deck.length && p.discard.length) { p.deck = this.shuffle(p.discard.splice(0)); this.log(`${p.name} reshuffles`); }
+      const top = p.deck[0];
+      if (top) { if (await p.policy.dueDiligence(this, p, top)) { p.deck.shift(); p.deck.push(top); this.log(`DUE DILIGENCE — ${p.name} reads the tape and sends ${top.name} to the bottom`); }
+        else this.log(`DUE DILIGENCE — ${p.name} reads the tape${p.policy.human ? ` (${top.name})` : ''} and leaves it`); }
+    }
     await this.draw(p);
     for (let step = 0; step < 4; step++) {
       const action = await p.policy.main(this, p) || { t: 'pass' };
@@ -438,6 +444,7 @@ export class RandomBot {
   useSavingGrace(g, p, cards) { return this.rng() < 0.5 ? cards[Math.floor(this.rng() * cards.length)] : null; }
   buryTrader(g, p) { return p.bench.length > 0 && this.rng() < 0.2; }
   useEnigma() { return this.rng() < 0.5; }
+  dueDiligence() { return this.rng() < 0.5; }
   main(g, p) { const A = g.legalActions(p); return A[Math.floor(this.rng() * A.length)]; }
 }
 export class GreedyBot {
@@ -452,6 +459,13 @@ export class GreedyBot {
   // Bury a seated Trader in the Catacombs when a replacement waits and the honors are worth it, or a Scandal is grinding them down.
   buryTrader(g, p) { const c = p.trader.credNow ?? p.trader.cred; return p.bench.length > 0 && (c * 5 >= 60 || g.hasHaz(p, 'escandalo')); }
   useSavingGrace(g, p, cards) { return [...cards].sort((a, b) => b.savingGrace - a.savingGrace)[0]; }
+  // Bottoms the weather that would hurt (the Enigma's rule), a Trader when the desk and bench are full, or a card too dear to play soon.
+  dueDiligence(g, p, c) {
+    if (c.type === 'event' && !c.played) return c.subtype === 'Calamity' || c.subtype === 'Ambiguity';
+    if (c.type === 'trader') return !!p.trader && p.bench.length > 0;
+    if (c.type === 'location') return !!p.location;
+    return c.cost > p.liq + 3;
+  }
   discardOne(g, p) { const order = { hazard: 0, remedy: 1, artifact: 2, trader: 3, grace: 4, asset: 5, event: 6 } /* an event in hand is a played one */; return [...p.hand].sort((a, b) => (order[a.type] ?? 9) - (order[b.type] ?? 9))[0]; }
   score(g, p, a) {
     const lead = [...g.rivals(p)].sort((x, y) => y.pros - x.pros)[0];
