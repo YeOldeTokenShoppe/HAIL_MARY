@@ -1,4 +1,4 @@
-// Treasure Map — the island with its X, an Asset. Three planes behind the
+// Treasure Map (El Mapa) — the island with its X, a Relic since 2026-11-14. Three planes behind the
 // plate: open sea and sky, the island itself, and the unrolled map with its
 // compass nearest the window.
 //

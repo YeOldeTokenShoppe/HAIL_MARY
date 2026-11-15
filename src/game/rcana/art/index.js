@@ -47,6 +47,8 @@ import virtualMary from "./virtual-mary.js";
 import fireHorse from "./fire-horse.js";
 import animaSola from "./anima-sola.js";
 import enigmaMachine from "./enigma-machine.js";
+import byzantineGeneral from "./byzantine-general.js";
+import octobot from "./octobot.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -94,4 +96,6 @@ export const RCANA_ART = {
   "fire-horse": fireHorse,
   "anima-sola": animaSola,
   "enigma-machine": enigmaMachine,
+  "byzantine-general": byzantineGeneral,
+  "octobot": octobot,
 };

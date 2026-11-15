@@ -278,19 +278,6 @@ export const FACES = [
     printed: {},
   },
   {
-    id: "collectibles",
-    design: "collectibles", // prints as "Collectibles" — the design's name
-    // PROVISIONAL number and rarity.
-    number: 30,
-    rarity: "Uncommon",
-    // An Asset's line says what it sells for; the boxes print value (125)
-    // and cost (3), so the text carries the cash option.
-    ability: "Sell for 5 coins,\nor bank 125 Prosperity.",
-    // An Asset narrates, so the flavor follows the rule unquoted.
-    flavor: "Worth exactly what the next buyer says it is.",
-    printed: {},
-  },
-  {
     id: "the-mine",
     design: "mine", // prints as "The Mine" — the design's name
     // PROVISIONAL number and rarity. (Inherited from Gold, whose art this is.)
@@ -318,14 +305,12 @@ export const FACES = [
   },
   {
     id: "treasure-map",
-    design: "map", // prints as "Treasure Map" — the design's name
+    design: "map", // prints as "El Mapa" — the design's printName
     // PROVISIONAL number and rarity.
     number: 33,
     rarity: "Uncommon",
-    // An Asset's line says what it sells for; the boxes print value (75)
-    // and cost (2), so the text carries the cash option and the draw.
-    ability: "Sell for 2 coins, or bank 75 Prosperity.\nEither way, draw 2 cards.",
-    // An Asset narrates, so the flavor follows the rule unquoted.
+    // A Relic: held, never sold. The box prints its cost (2).
+    ability: "X marks the spot:\nwhenever you sell an Asset,\ndraw a card.",
     flavor: "Untold riches. Approximate directions.",
     printed: {},
   },
@@ -593,6 +578,32 @@ export const FACES = [
     ability: "Discard it when an Event fires on your draw:\nthat Event is cancelled for everyone.",
     // A Relic narrates; the line follows the rule.
     flavor: "Every message was read. Not one was received.",
+    printed: {},
+  },
+  {
+    id: "byzantine-general",
+    design: "general", // prints as "El General" — the design's printName
+    gloss: "The General",
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 1,
+    rarity: "Common",
+    // The consensus roll; the design's line is a simulator's.
+    ability: "A Calamity played on you must reach consensus:\nroll the die. On a 1 or 2, it fails.",
+    // A Trader speaks; the quotation follows the rules and flourish.
+    flavor: "Two of my generals say no. Then it is no.",
+    printed: {},
+  },
+  {
+    id: "octobot",
+    design: "bot", // prints as "El Octobot" — the design's printName
+    gloss: "The Octobot",
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 2,
+    rarity: "Common",
+    // The design's line is already a card's length; printed as is.
+    ability: "Scandal cannot touch it. It cannot pray:\nwhile it sits, your Graces go unheard.",
+    // A Trader speaks; the quotation follows the rules and flourish.
+    flavor: "I do not pray. I execute.",
     printed: {},
   },
 ];

@@ -346,7 +346,7 @@ usage badge keeps the engine's timing:
 | `type: "event"`, on draw, `subtype: 'Ambiguity'` | AMBIGU80 (Ambiguity) | **On draw** |
 
 An on-draw event names its sort on the design: a loss is a Calamity (Flash
-Crash), a windfall an Opportunity (Pay Day, The God Candle, The World, The
+Crash), a windfall an Opportunity (The Airdrop, The God Candle, The
 Illumin80), and a shake-up whose winner is unknown until it resolves an
 Ambiguity (The Whale, The Wheel, Moral Hazard). A face can still override
 with `subClass`. In rules text, **Calamity** keeps its narrow meaning — the
@@ -360,8 +360,7 @@ The God Candle can leave an ongoing effect after resolving.
 The playtest gallery groups all Event designs under these three subtypes,
 including designs without art. The build injects the same subtype mapping
 used by the live cards, without changing engine rules. Yield Farm's text
-names Events that fire on draw, and The World ends ongoing Event effects; it
-does not clear attached Calamities.
+names Events that fire on draw.
 
 Blank templates are also available at
 `/rcana-print?template=event&subtype=calamity`, `subtype=opportunity`, and

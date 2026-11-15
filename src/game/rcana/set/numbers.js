@@ -25,7 +25,7 @@ export const RESERVED_NUMBERS = {
   // Assets
   tech: 14,
   meme: 22,
-  collectibles: 30,
+  nacimiento: 30, // El Nacimiento — unfaced (was Collectibles, whose face keeps its art for a later set)
   realestate: 32,
   stablecoin: 43,
   bluechip: 45,
@@ -40,7 +40,7 @@ export const RESERVED_NUMBERS = {
   inherit: 8, // The Inheritance — unfaced
   squeeze: 9, // Short Squeeze — unfaced
   unlock: 10, // Token Unlock — unfaced
-  moneda: 50, // Pay Day — unfaced
+  moneda: 50, // The Airdrop — unfaced
   crash: 38,
   fall: 51, // Fall From Grace — unfaced
   holyroller: 52, // The Holy Roller — unfaced
@@ -52,10 +52,10 @@ export const RESERVED_NUMBERS = {
   illuminati: 28,
   rueda: 56, // The Wheel — unfaced
   godcandle: 57, // The God Candle — unfaced
-  world: 58, // The World — unfaced
   moralhazard: 59, // Moral Hazard — unfaced
   mardigras: 41,
   // Hazards
+  trap: 58, // Liquidity Trap — unfaced (was The World)
   bear: 13,
   hack: 40,
   virtue: 60, // The Virtue Signal — unfaced
@@ -66,7 +66,7 @@ export const RESERVED_NUMBERS = {
   scam: 47,
   // Remedies
   bell: 17,
-  resist: 62, // La Resistencia — unfaced
+  catacumbas: 62, // Las Catacumbas — unfaced (was Quantum Resistance)
   keys: 63, // Las Llaves — unfaced
   tortilla: 16,
   publicista: 64, // El Comunicado — unfaced
@@ -89,8 +89,8 @@ export const RESERVED_NUMBERS = {
   // Graces
   ofrenda: 75, // La Ofrenda — unfaced
   cherub: 76, // El Exvoto — unfaced
-  intercession: 77, // La Intercesión — unfaced
-  intervention: 78, // La Intervención — unfaced
+  limpia: 77, // La Limpia — unfaced (was The Intercession)
+  piramide: 78, // La Pirámide — unfaced (was Divine Intervention)
   anima: 79, // Ánima Sola — unfaced
   confession: 80, // La Confesión — unfaced
   fountain: 25,

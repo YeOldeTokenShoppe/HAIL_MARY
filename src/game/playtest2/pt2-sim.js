@@ -23,19 +23,19 @@ export const byKey = Object.fromEntries(DESIGNS.map((d) => [d.key, d]));
 // (hazards, gambles, the Unicorn's compounding). Deck identity is the collectible premise.
 export const RECIPES = {
   devotion: [['monje', 2], ['gato', 1], ['celebridad', 1], ['general', 1],
-    ['tech', 2], ['collectibles', 1], ['moon', 1], ['bluechip', 1], ['semilla', 1], ['angel', 1],
+    ['tech', 2], ['nacimiento', 1], ['moon', 1], ['bluechip', 1], ['semilla', 1], ['angel', 1],
     ['bull', 2], ['inherit', 1], ['squeeze', 2],
     ['bear', 1], ['rug', 1],
-    ['bell', 1], ['resist', 1], ['tortilla', 2], ['publicista', 1], ['horchata', 1], ['burro', 1], ['intervention', 1],
+    ['bell', 1], ['tortilla', 3], ['publicista', 1], ['horchata', 1], ['burro', 1], ['ofrenda', 1],
     ['heart', 1], ['halo', 1], ['rosary', 1], ['grail', 1], ['dashboard', 1], ['tattoo', 1], ['geometry', 1],
-    ['cherub', 1], ['rose', 1], ['fountain', 1], ['intercession', 1], ['anima', 1], ['lagrimas', 1]],
+    ['cherub', 1], ['rose', 1], ['fountain', 1], ['limpia', 1], ['anima', 1], ['lagrimas', 1]],
   degen: [['diablito', 1], ['unicornio', 2], ['shady', 1], ['prospector', 1], ['abuela', 1], ['bot', 1],
-    ['meme', 2], ['tech', 2], ['moon', 1], ['bluechip', 1], ['jardin', 1],
+    ['meme', 1], ['tech', 1], ['moon', 1], ['bluechip', 1], ['jardin', 1], ['piramide', 1], ['catacumbas', 1],
     ['unlock', 1],
     ['ballena', 1], ['rueda', 1], ['moralhazard', 1], ['mardigras', 1], ['godcandle', 1], ['techwreck', 1],
-    ['holyroller', 1], ['fuego', 1], ['virtual', 1],
+    ['holyroller', 1], ['fuego', 1],
     ['illuminati', 1],
-    ['bear', 1], ['rug', 1], ['escandalo', 1], ['fall', 1], ['virtue', 1], ['infierno', 1],
+    ['bear', 1], ['rug', 1], ['escandalo', 1], ['fall', 1], ['virtue', 1], ['infierno', 1], ['trap', 1],
     ['tortilla', 1],
     ['heart', 1], ['skull', 1], ['enigma', 1], ['rideordie', 1], ['lottery', 1], ['feast', 1], ['motherboard', 1],
     ['ofrenda', 1]],
@@ -82,10 +82,10 @@ export class Game {
     if (c.key === 'godcandle') this.fx[c.key] = { owner: p.idx };
     if (c.key === 'fall') for (const q of this.players) if (q.trader) await this.credDamage(q, 4, 'the FALL FROM GRACE');
     if (c.key === 'feast') { this.log('THE FEAST OF PERPETUAL PROFIT — every player lights a candle'); for (const q of this.players) await this.lightCandle(q, 'the Feast'); }
-    if (c.key === 'holyroller') { for (const q of this.players) { q.liq += 1; await this.draw(q, true); } this.log('THE HOLY ROLLER rolls through — every player draws a card and collects 1'); }
+    if (c.key === 'holyroller') { for (const q of this.players) { this.collect(q, 1); await this.draw(q, true); } this.log('THE HOLY ROLLER rolls through — every player draws a card and collects 1'); }
     if (c.key === 'fuego') { this.log('NUESTRA SEÑORA EN FUEGO rides through the market'); for (const q of this.players) { this.bank(q, 75, 'Nuestra Señora en Fuego'); if (this.over) break; } }
     if (c.key === 'virtual') { for (const q of this.players) { const n = q.hand.length; q.deck.push(...q.hand.splice(0)); q.deck = this.shuffle(q.deck); for (let i = 0; i < n; i++) await this.draw(q, true); this.log(`THE VIRTUAL MARY flickers — ${q.name} shuffles ${n} back and draws ${n}`); } }
-    if (c.key === 'techwreck') { let hit = 0; for (const q of this.players) for (const a of [...q.invest]) if (a.tech) { q.invest.splice(q.invest.indexOf(a), 1); q.discard.push(a); q.liq += 1; hit++; this.log(`${q.name}'s ${a.name.toUpperCase()} is wrecked — scrapped for 1`); } for (const q of this.players) if (q.location && q.location.tech) { this.log(`${q.name}'s ${q.location.name.toUpperCase()} burns down`); q.discard.push(q.location); q.location = null; hit++; }
+    if (c.key === 'techwreck') { let hit = 0; for (const q of this.players) for (const a of [...q.invest]) if (a.tech) { q.invest.splice(q.invest.indexOf(a), 1); q.discard.push(a); this.collect(q, 1); hit++; this.log(`${q.name}'s ${a.name.toUpperCase()} is wrecked — scrapped for 1`); } for (const q of this.players) if (q.location && q.location.tech) { this.log(`${q.name}'s ${q.location.name.toUpperCase()} burns down`); q.discard.push(q.location); q.location = null; hit++; }
       if (!hit) this.log('TECH WRECK — no tech on the table; the bubble bursts over nobody'); }
     if (c.key === 'crash') for (const q of this.players) if (q.liq >= 8) { const lost = Math.floor(q.liq / 2); q.liq -= lost; this.log(`${q.name} loses ${lost} Liquidity in the crash`); }
     if (c.key === 'ballena') {
@@ -103,7 +103,7 @@ export class Game {
     if (c.key === 'moralhazard') {
       const byLiq = [...this.players].sort((a2, b2) => a2.liq - b2.liq);
       const poor = byLiq[0], rich = byLiq[byLiq.length - 1];
-      if (poor !== rich && rich.liq > poor.liq) { poor.liq += 5; rich.liq = Math.max(0, rich.liq - 2); this.log(`TOO BIG TO FAIL: ${poor.name} is bailed out (+5); ${rich.name} pays for prudence (-2)`); }
+      if (poor !== rich && rich.liq > poor.liq) { this.collect(poor, 5); rich.liq = Math.max(0, rich.liq - 2); this.log(`TOO BIG TO FAIL: ${poor.name} is bailed out (+5); ${rich.name} pays for prudence (-2)`); }
     }
     if (c.key === 'rueda') {
       const seats = this.players.filter((q) => !this.rideOrDie(q)); const held = this.players.filter((q) => this.rideOrDie(q));
@@ -112,15 +112,13 @@ export class Game {
       this.log(n > 1 ? 'THE WHEEL turns — every portfolio rotates one seat' : 'THE WHEEL turns — but nobody\'s portfolio moves');
       for (const q of held) this.log(`RIDE OR DIE: THE WHEEL passes ${q.name}'s portfolio by`);
     }
-    if (c.key === 'moneda') { for (const q of this.players) { q.liq += 2; } this.log('PAY DAY — every player collects 2'); }
+    if (c.key === 'moneda') { for (const q of this.players) { this.collect(q, 2); } this.log('THE AIRDROP — every player collects 2'); }
     if (c.key === 'mardigras') { // Fat Tuesday: one die each, everyone catches their roll
-      const rolls = this.players.map((q) => { const r = 1 + Math.floor(this.rng() * 6); q.liq += r; return `${q.name} ${r}`; });
+      const rolls = this.players.map((q) => { const r = 1 + Math.floor(this.rng() * 6); this.collect(q, r); return `${q.name} ${r}`; });
       this.log(`MARDI GRAS — the dice show ${rolls.join(' · ')}: everyone collects their roll`);
     }
     if (c.key === 'illuminati') for (const q of this.players) if (q !== p && q.hand.length) { const t = q.hand.splice(Math.floor(this.rng() * q.hand.length), 1)[0]; p.hand.push(t); this.log(`THE ILLUMIN80 initiate ${p.name} — unseen hands move a card from ${q.name}${q.policy.human ? ` (your ${t.name})` : p.policy.human ? ` (${t.name})` : ''}`); }
-    if (c.key === 'world') { for (const k of Object.keys(this.fx)) { this.log(`${byKey[k].name} blows over`); delete this.fx[k]; } }
     if (this.hooks && this.hooks.onEvent) this.hooks.onEvent(p, c);
-    if (c.key === 'world') for (const q of this.players) await this.draw(q);
   }
   bank(p, n, src, allowBonus = true, bearProof = false) {
     if (this.hasHaz(p, 'bear') && src !== 'hail' && !bearProof) { if (n > 75) return false; // larger payouts cannot be chosen
@@ -170,10 +168,19 @@ export class Game {
   relicsHeld(p) { return p.artifacts.filter((a) => !a.slots); }
   prosOf(a) { if (a.bloom && this.turnNo - a.bornTurn >= 4) return a.bloom; if (a.grow) return a.pros + a.grow * Math.max(0, Math.floor((this.turnNo - a.bornTurn) / this.players.length)); return a.pros; }
   clearHazard(victim, h, by, why) {
+    this.releaseTrap(victim, h);
     victim.hazards.splice(victim.hazards.indexOf(h), 1); h.owner.discard.push(h); victim.stats.hazCleared++;
     this.log(`${why}: ${h.name} off ${victim.name}`);
   }
   spend(p, n) { if (p.liq < n) return false; p.liq -= n; return true; }
+  // Income, not refunds: under a LIQUIDITY TRAP the coins pile on the card instead.
+  collect(p, n) {
+    if (!(n > 0)) return 0;
+    const trap = p.hazards.find((h) => h.key === 'trap');
+    if (trap) { trap.pile = (trap.pile || 0) + n; this.log(`${p.name}'s ${n} Liquidity falls into the LIQUIDITY TRAP (${trap.pile} trapped)`); return 0; }
+    p.liq += n; return n;
+  }
+  releaseTrap(victim, h) { if (h.key === 'trap' && h.pile) { victim.liq += h.pile; this.log(`the trap springs open: ${victim.name} recovers ${h.pile} Liquidity`); h.pile = 0; } }
   costOf(p, c) { let n = c.cost; if (c.type === 'asset' && this.is(p, 'prospector')) n = Math.max(0, n - 1); return n; }
   odds(p) { const lit = this.hasHaz(p, 'virtue') ? 0 : Math.min(3, p.deeds); return ODDS[Math.min(ODDS.length - 1, lit + (p.fountain || 0))]; }
 
@@ -182,11 +189,12 @@ export class Game {
     const cost = this.costOf(p, c); if (!this.spend(p, cost)) return false;
     p.hand.splice(p.hand.indexOf(c), 1); p.stats.plays++;
     switch (c.type) {
-      case 'asset': c.bornTurn = this.turnNo; p.invest.push(c); this.log(`${p.name} invests in ${c.name}`); if (this.is(p, 'angel')) { p.liq += 1; this.log(`ANGEL ROUND — ${p.name} collects 1 back`); } break;
+      case 'asset': c.bornTurn = this.turnNo; p.invest.push(c); this.log(`${p.name} invests in ${c.name}`);
+        for (const q of this.rivals(p)) if (q.location && q.location.key === 'piramide') { this.collect(q, 1); this.log(`LA PIRÁMIDE: ${q.name} collects 1 from ${p.name}'s buy-in`); } if (this.is(p, 'angel')) { this.collect(p, 1); this.log(`ANGEL ROUND — ${p.name} collects 1 back`); } break;
       case 'event': { // a played Event (Bull Run, Full Moon, The Inheritance); fired ones never reach a hand
-        if (c.choice && choice.cash) { p.liq += c.cash; p.discard.push(c); this.log(`${p.name} cashes ${c.name} for ${c.cash}`); }
+        if (c.choice && choice.cash) { this.collect(p, c.cash); p.discard.push(c); this.log(`${p.name} cashes ${c.name} for ${c.cash}`); }
         else { const n = this.eventPayout(p, c); const ok = this.bank(p, n, c.name + (c.perHaz && p.hazards.length ? ` · ${p.hazards.length} Calamit${p.hazards.length === 1 ? 'y' : 'ies'} squeezed` : '') + (p.artifacts.some((a) => a.key === 'geometry') ? ' · SACRED GEOMETRY +25' : ''), true, !!c.bearProof); if (!ok) { p.liq += cost; p.hand.push(c); p.stats.plays--; return false; } /* banked cards leave the deck */
-          if (c.rivalsCollect) { for (const q of this.rivals(p)) q.liq += c.rivalsCollect; this.log(`${c.name.toUpperCase()}: every rival collects ${c.rivalsCollect}`); } }
+          if (c.rivalsCollect) { for (const q of this.rivals(p)) this.collect(q, c.rivalsCollect); this.log(`${c.name.toUpperCase()}: every rival collects ${c.rivalsCollect}`); } }
         break; }
       case 'hazard': {
         const t = choice.target; if (!t || this.hasHaz(t, c.key)) { p.liq += cost; p.hand.push(c); p.stats.plays--; return false; }
@@ -209,14 +217,14 @@ export class Game {
         const t = choice.target || p; const h = choice.hazard || t.hazards.find((x) => c.clears === 'any' || x.key === c.clears);
         if (!h) { p.liq += cost; p.hand.push(c); p.stats.plays--; return false; }
         const back = c.bounce && h.owner !== t && !this.hasHaz(h.owner, h.key) ? h.owner : null;
-        if (back) { t.hazards.splice(t.hazards.indexOf(h), 1); t.stats.hazCleared++; back.hazards.push(h); this.log(`${p.name} plays ${c.name}: ${h.name} off ${t.name} — kicked back onto ${back.name}`); }
+        if (back) { this.releaseTrap(t, h); t.hazards.splice(t.hazards.indexOf(h), 1); t.stats.hazCleared++; back.hazards.push(h); this.log(`${p.name} plays ${c.name}: ${h.name} off ${t.name} — kicked back onto ${back.name}`); }
         else this.clearHazard(t, h, p, `${p.name} plays ${c.name}`);
         p.discard.push(c);
         if (t !== p) p.stats.remedyRival++;
         break; }
       case 'location': {
         if (p.location) { p.discard.push(p.location); this.log(`${p.name} tears down ${p.location.name}`); }
-        p.location = c; this.log(`${p.name} builds ${c.name}`); break; }
+        c.figures = 0; p.location = c; this.log(`${p.name} builds ${c.name}`); break; }
       case 'artifact': {
         if (!c.slots && this.relicsHeld(p).length >= this.relicSlots(p)) { const drop = choice.drop || this.relicsHeld(p)[0]; p.artifacts.splice(p.artifacts.indexOf(drop), 1); p.discard.push(drop); this.log(`${p.name} unequips ${drop.name}`); }
         p.artifacts.push(c); this.log(`${p.name} equips ${c.name}`); break; }
@@ -238,8 +246,7 @@ export class Game {
         this.log(`${p.name} places ${c.name} at Our Lady’s shrine`);
         await this.lightCandle(p, c.name);
         if (c.key === 'cherub') await this.draw(p);
-        if (c.key === 'intercession' && p.hazards.length) this.clearHazard(p, choice.hazard || p.hazards[0], p, 'THE INTERCESSION');
-        if (c.key === 'intervention') for (const h of [...p.hazards]) this.clearHazard(p, h, p, 'DIVINE INTERVENTION');
+        if (c.key === 'limpia' && p.hazards.length) this.clearHazard(p, choice.hazard || p.hazards[0], p, 'LA LIMPIA sweeps it away');
         if (c.key === 'anima') { const back = [...p.discard].reverse().find((x) => x.type === 'trader'); if (back && (!p.trader || p.bench.length < 2)) { p.discard.splice(p.discard.indexOf(back), 1); back.credNow = Math.min(5, back.cred); if (p.trader) p.bench.push(back); else p.trader = back; this.log(`ÁNIMA SOLA — ${back.name} returns from purgatory to ${p.name}'s ${p.trader === back ? 'desk' : 'bench'} with ${back.credNow} Grace`); } else this.log('ÁNIMA SOLA — nobody to bring back'); }
         if (c.key === 'confession' && p.trader && p.trader.credNow != null && p.trader.credNow < p.trader.cred) { p.trader.credNow = p.trader.cred; this.log(`${p.trader.name} is absolved — Grace restored to ${p.trader.cred}`); }
         break; }
@@ -249,7 +256,7 @@ export class Game {
   async sell(p, a, wantPros) {
     if (this.hasHaz(p, 'rug')) return false; if (a.bornTurn === this.turnNo) return false;
     p.invest.splice(p.invest.indexOf(a), 1); p.stats.sells++;
-    for (const q of this.players) if (q !== p && q.artifacts.some((x) => x.key === 'skull')) { q.liq += 1; this.log(`${q.name} holds THE SKULL: +1 from ${p.name}'s sale`); }
+    for (const q of this.players) if (q !== p && q.artifacts.some((x) => x.key === 'skull')) { this.collect(q, 1); this.log(`${q.name} holds THE SKULL: +1 from ${p.name}'s sale`); }
     if (wantPros && a.gamble) {
       let roll = 1 + Math.floor(this.rng() * 6); p.stats.sellPros++;
       const need = (a.gambleOn || 5) - (this.is(p, 'abuela') ? 1 : 0);
@@ -257,13 +264,15 @@ export class Game {
       if (roll >= need) { const ok = this.bank(p, a.pros + this.saleBonus(), `${a.name} — the die shows ${roll}: IT ${a.gambleOn ? 'GUSHES' : 'MOONS'}${this.saleBonus() ? ` · GOD CANDLE +${this.saleBonus()}` : ''}`); if (!ok) { p.invest.push(a); p.stats.sells--; p.stats.sellPros--; return false; } }
       else if (a.bust) { p.discard.push(a); this.bank(p, a.bust, `${a.name} — the die shows ${roll}: it runs dry`); }
       else { p.discard.push(a); this.log(`${p.name} sells ${a.name}… the die shows ${roll}: it goes to zero`); }
+      await this.mapDraw(p);
       return true;
     }
     if (wantPros) { const base = this.prosOf(a); const bonus = this.saleBonus(); const ok = this.bank(p, base + bonus, a.name + (a.bloom && base === a.bloom ? ' IN BLOOM' : '') + (bonus ? ` · GOD CANDLE +${bonus}` : ''), true, !!a.bearProof); if (!ok) { p.invest.push(a); p.stats.sells--; return false; } p.stats.sellPros++; /* banked */ }
-    else { p.liq += a.cash; p.discard.push(a); p.stats.sellCash++; this.log(`${p.name} sells ${a.name} for ${a.cash}`); }
-    if (a.key === 'map') { await this.draw(p); await this.draw(p); this.log(`${p.name} follows THE TREASURE MAP and draws 2`); }
+    else { this.collect(p, a.cash); p.discard.push(a); p.stats.sellCash++; this.log(`${p.name} sells ${a.name} for ${a.cash}`); }
+    await this.mapDraw(p);
     return true;
   }
+  async mapDraw(p) { if (p.artifacts.some((a) => a.key === 'map')) { await this.draw(p); this.log(`${p.name} follows EL MAPA and draws a card`); } }
   payClear(p, h) { if (!this.spend(p, 3)) return false; this.clearHazard(p, h, p, `${p.name} pays 3`); return true; }
   // The Dashboard Figure: when a die fails you, she may be spent for one more
   // roll. The policy decides (a human is asked); returns true when she was spent.
@@ -340,22 +349,36 @@ export class Game {
     }
     if (this.is(p, 'diablito')) {
       if (this.rng() < 0.5) {
-        p.liq += 1;
+        this.collect(p, 1);
         this.log(`DEVIL'S WAGER — heads: ${p.name} collects 1 Liquidity`);
       } else {
         this.log(`DEVIL'S WAGER — tails: El Diablito loses 1 CRED`);
         await this.credDamage(p, 1, "Devil's Wager");
       }
     }
+    // EL NACIMIENTO: a figure a turn; the third brings the Niño, and the scene is packed away.
+    if (p.location && p.location.key === 'nacimiento') {
+      const nac = p.location; nac.figures = (nac.figures || 0) + 1;
+      if (nac.figures < 3) this.log(`${p.name} places a figure in EL NACIMIENTO (${nac.figures} of 3)`);
+      else { this.log(`midnight at EL NACIMIENTO — the Niño arrives for ${p.name}`); await this.lightCandle(p, 'El Nacimiento'); this.bank(p, 75, 'El Nacimiento'); nac.figures = 0; p.location = null; p.discard.push(nac); this.log(`${p.name} packs the Nativity away`);
+        if (this.over) { if (this.hooks && this.hooks.render) await this.hooks.render(); return; } }
+    }
+    // LAS CATACUMBAS: bury the seated Trader with honors — 5 Prosperity per Grace they have left.
+    if (p.location && p.location.key === 'catacumbas' && p.trader && p.policy.buryTrader && await p.policy.buryTrader(this, p)) {
+      const t = p.trader; const honors = 5 * (t.credNow ?? t.cred);
+      this.log(`⚰ ${p.name} buries ${t.name} in LAS CATACUMBAS with honors`); p.trader = null; p.discard.push(t); p.stats.buried = (p.stats.buried || 0) + 1;
+      this.bank(p, honors, 'Las Catacumbas');
+      if (this.over) { if (this.hooks && this.hooks.render) await this.hooks.render(); return; }
+    }
     const employed = p.trader && this.abilityOn(p);
     const spotless = employed && (p.trader.credNow == null || p.trader.credNow === p.trader.cred);
-    p.liq += employed ? p.trader.liq + (spotless ? 1 : 0) : 1;
+    this.collect(p, employed ? p.trader.liq + (spotless ? 1 : 0) : 1);
     if (spotless) this.log(`${p.trader.name}'s spotless reputation pays ${p.name} +1`);
     if (!employed) this.log(`${p.name} is between Traders — collects only 1`);
     if (this.hasHaz(p, 'escandalo')) await this.credDamage(p, 2, 'the Scandal grinds on');
     if (this.hasHaz(p, 'taxman') && p.liq > 0) { p.liq -= 1; this.log(`${p.name} pays 1 to the TAX COLLECTOR`); }
     const yield2 = p.invest.reduce((s2, a2) => s2 + (a2.income || 0), 0);
-    if (yield2) { p.liq += yield2; this.log(`${p.name} collects ${yield2} from investments`); }
+    if (yield2) { this.collect(p, yield2); this.log(`${p.name} collects ${yield2} from investments`); }
     if (p.policy.beforeDraw) await p.policy.beforeDraw(this, p);
     await this.draw(p);
     let guard = 0; while (guard++ < 4) { const a = await p.policy.main(this, p); const kind = a ? a.t : 'pass'; await this.act(p, a || { t: 'pass' }); if (this.hooks && this.hooks.onAction) await this.hooks.onAction(p, a || { t: 'pass' }); if (kind !== 'swap' || this.over) break; }
@@ -378,6 +401,7 @@ export class RandomBot {
   discardOne(g, p) { return p.hand[Math.floor(this.rng() * p.hand.length)]; }
   useDashboard() { return this.rng() < 0.5; }
   useSavingGrace(g, p, cards) { return this.rng() < 0.5 ? cards[Math.floor(this.rng() * cards.length)] : null; }
+  buryTrader(g, p) { return p.bench.length > 0 && this.rng() < 0.2; }
   useEnigma() { return this.rng() < 0.5; }
   main(g, p) { const A = g.legalActions(p); return A[Math.floor(this.rng() * A.length)]; }
 }
@@ -390,6 +414,8 @@ export class GreedyBot {
   // Intercepts the weather that is not a plain windfall: Calamities and shake-ups.
   useEnigma(g, p, c) { return c.subtype === 'Calamity' || c.subtype === 'Ambiguity'; }
   // Always saves the Trader, with the card that leaves the most Grace.
+  // Bury a seated Trader in the Catacombs when a replacement waits and the honors are worth it, or a Scandal is grinding them down.
+  buryTrader(g, p) { const c = p.trader.credNow ?? p.trader.cred; return p.bench.length > 0 && (c * 5 >= 60 || g.hasHaz(p, 'escandalo')); }
   useSavingGrace(g, p, cards) { return [...cards].sort((a, b) => b.savingGrace - a.savingGrace)[0]; }
   discardOne(g, p) { const order = { hazard: 0, remedy: 1, artifact: 2, trader: 3, grace: 4, asset: 5, event: 6 } /* an event in hand is a played one */; return [...p.hand].sort((a, b) => (order[a.type] ?? 9) - (order[b.type] ?? 9))[0]; }
   score(g, p, a) {
@@ -403,13 +429,13 @@ export class GreedyBot {
     if (a.t === 'play' && a.c.type === 'remedy') { const mine = a.choice.target === p; s = mine ? 80 : 8; }
     if (a.t === 'play' && a.choice && a.choice.refresh) { const dead = p.hand.filter((c) => c !== a.c && c.type !== 'event' && c.cost > p.liq + 1).slice(0, a.c.refresh); a.choice.discards = dead; s = 28 + 10 * dead.length; }
     if (a.t === 'play' && a.c.type === 'artifact') s = 35;
-    if (a.t === 'play' && a.c.type === 'location') s = p.location ? 4 : 33;
+    if (a.t === 'play' && a.c.type === 'location') s = p.location ? 4 : (p.liq >= a.c.cost + 2 ? 58 : 30);
     if (a.t === 'play' && a.c.type === 'grace') s = !p.hailUsed ? 57 - p.deeds * 4 : 2;
     if (a.t === 'play' && a.c.type === 'trader') s = !p.trader ? 72 + a.c.liq * 3 : (p.bench.length < 2 ? 26 + a.c.liq * 3 : 4);
     if (a.t === 'swap') { const b = p.bench[a.i]; s = !p.trader ? 85 : (p.trader.credNow != null && p.trader.credNow <= 4 && b.credNow > p.trader.credNow ? 46 : 3); }
     if (a.t === 'play' && a.c.key === 'escandalo' && a.choice && !a.choice.target.trader) s = 5;
     if (a.t === 'play' && a.choice && a.choice.polish) s = p.trader && p.trader.credNow <= p.trader.cred - 5 ? 42 : 6;
-    if (a.t === 'payclear') s = p.liq >= 5 ? 66 : 20;
+    if (a.t === 'payclear') s = (p.liq >= 5 ? 66 : 20) + (a.h.key === 'trap' ? (a.h.pile || 0) * 8 : 0);
     if (a.t === 'hail') s = p.pros + 200 >= g.winAt ? (twelfths >= 4 ? 90 : 30) : twelfths >= 8 ? 72 : lead && lead.pros >= g.winAt - 150 ? 45 : hailEV / 4;
     if (a.t === 'pass') s = 1;
     return s;
