@@ -22,6 +22,7 @@ import { SUBTYPE_FURNITURE_STYLES } from "./RcanaSubtypeFurniture.jsx";
 import { RcanaLiquidityBox, RcanaValueBox, LIQUIDITY_BOX_STYLES } from "./RcanaLiquidityBox.jsx";
 import { RcanaTypeHeader, TYPE_HEADER_STYLES } from "./RcanaTypeHeader.jsx";
 import RcanaMedallion, { MEDALLION_STYLES } from "./RcanaMedallion.jsx";
+import RcanaEqBadge, { EQ_BADGE_STYLES } from "./RcanaEqBadge.jsx";
 
 // `lift` is 1 while a pointer or finger (or the gyro) is driving the tilt
 // and 0 at rest — the frame shine fades up on it, the way TradingCard's
@@ -776,7 +777,13 @@ export default function RcanaCard({
           ) : data.eventTemplate ? (
             <EventHeader data={data} hideFrame={hideFrame} classFont={headerClassFont} wordmarkFont={wordmarkFont} wordmarkOutline={wordmarkOutline} />
           ) : data.compactTypeHeader ? (
-            <RcanaTypeHeader data={data} slot={L.numberTab} hideFrame={hideFrame} classFont={headerClassFont} wordmarkFont={wordmarkFont} wordmarkOutline={wordmarkOutline} />
+            <>
+              <RcanaTypeHeader data={data} slot={L.numberTab} hideFrame={hideFrame} classFont={headerClassFont} wordmarkFont={wordmarkFont} wordmarkOutline={wordmarkOutline} />
+              {/* The trinity's third box: EQUANIMITY, Traders only, in the header's free right half. */}
+              {data.cardClass === "Trader" && data.equanimity != null && (
+                <RcanaEqBadge value={data.equanimity} slot={L.eqBox} hideFrame={hideFrame} cardClass={data.cardClass} />
+              )}
+            </>
           ) : (
             <>
               <div className="rc-slot rc-number" style={box(L.numberCell)}>
@@ -918,7 +925,7 @@ export default function RcanaCard({
         })}
       </div>
 
-      <style>{RCANA_STYLES}{SUBTYPE_FURNITURE_STYLES}{LIQUIDITY_BOX_STYLES}{TYPE_HEADER_STYLES}{MEDALLION_STYLES}</style>
+      <style>{RCANA_STYLES}{SUBTYPE_FURNITURE_STYLES}{LIQUIDITY_BOX_STYLES}{TYPE_HEADER_STYLES}{MEDALLION_STYLES}{EQ_BADGE_STYLES}</style>
     </div>
   );
 }
@@ -1063,7 +1070,7 @@ function CoinGlyph() {
 // footer badge read as the same currency. Explicit signs on printed payouts
 // stay with the count after the coin; costs and sale prices stay unsigned.
 const RULE_TERMS =
-  /([+-]?\d+\s+)?(Hydro|Liquidity|Prosperity|Grace|CRED|Assets?|Calamit(?:y|ies)|Events?|Traders?|Artifacts?|Remedy|Remedies|Hail Mary|Good Deeds?)\b/g;
+  /([+-]?\d+\s+)?(Hydro|Liquidity|Prosperity|Credibility|Equanimity|Grace|CRED|Assets?|Calamit(?:y|ies)|Events?|Traders?|Artifacts?|Remedy|Remedies|Hail Mary|Good Deeds?)\b/g;
 
 // A rules line that opens with its own keyword ("Until cleared, the target
 // banks…") would print it twice once the badge carries it, so the badge

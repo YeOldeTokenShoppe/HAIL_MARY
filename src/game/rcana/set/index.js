@@ -73,6 +73,8 @@ export function buildFace(face) {
     // Asset or a called Event; the drop box is "the Liquidity on this card" —
     // the cost to play on every type but Traders, where it is their income.
     plate: face.plate ?? (design.type === "trader" ? "boxed" : design.type === "asset" || (design.type === "event" && design.played) ? "valued" : "sealed"),
+    // The trinity's third stat, Traders only: composure against Calamities.
+    eq: design.type === "trader" ? design.eq ?? 0 : null,
     halo: face.halo ?? (design.type === "trader" ? design.cred : design.pros) ?? null,
     // A fired Event is never played, so it has no cost to print: a dash, not a
     // zero (a zero means "free to play", as on La Ofrenda).

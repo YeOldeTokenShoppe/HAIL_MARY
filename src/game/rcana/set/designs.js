@@ -27,23 +27,28 @@
 // playing one is a main action, to the active slot or the bench.
 const D = (key, name, type, cost, o = {}) => ({ key, name, type, cost, ...o });
 export const DESIGNS = [
-  D('unicornio', 'El Unicornio', 'trader', 3, { liq: 3, cred: 20, abilityName: 'Compound Interest', text: 'At turn start, if you have at least 100 banked Prosperity, bank 25 more.' }),
-  D('gato', 'El Gato', 'trader', 2, { liq: 2, cred: 16, abilityName: 'Clean Sweep', text: 'When seated, immediately knock one Calamity off your table, free' }),
+  // The trinity: every Trader carries LIQUIDITY (liq — income a turn),
+  // CREDIBILITY (cred — reputation; Scandal erodes it, candles restore it, at
+  // zero the Trader is discredited) and EQUANIMITY (eq — composure: a
+  // Calamity played on you fails on a die roll of eq or lower). Three things
+  // a real trader should hold onto; printed as three "-ity" words.
+  D('unicornio', 'El Unicornio', 'trader', 3, { liq: 3, cred: 20, eq: 1, abilityName: 'Compound Interest', text: 'At turn start, if you have at least 100 banked Prosperity, bank 25 more.' }),
+  D('gato', 'El Gato', 'trader', 2, { liq: 2, cred: 16, eq: 1, abilityName: 'Clean Sweep', text: 'When seated, immediately knock one Calamity off your table, free' }),
   // PROVISIONAL stats and text — the card exists for its face; not yet in any deck list or sim hook.
-  D('investigadora', 'La Investigadora', 'trader', 3, { liq: 3, cred: 14, abilityName: 'Due Diligence', text: 'Once per turn, look at the top card of the deck; you may put it on the bottom' }),
-  D('monje', 'El Monje', 'trader', 1, { liq: 1, cred: 22, abilityName: 'Vow of Prosperity', text: 'When you light a candle, bank 25 Prosperity' }),
-  D('diablito', 'El Diablito', 'trader', 2, { liq: 2, cred: 10, abilityName: 'Devil’s Wager', text: 'At the start of your turn, flip a coin: heads, collect 1 Liquidity; tails, El Diablito loses 1 CRED' }),
-  D('celebridad', 'The Influencer', 'trader', 3, { liq: 3, cred: 8, abilityName: 'Star Power', text: 'The influencer: pay 1 when banking from a card, +25 Prosperity', printName: 'La Influencer' }),
-  D('abuela', 'La Abuela', 'trader', 2, { liq: 2, cred: 18, abilityName: 'Lucky Streak', text: 'The gambling grandmother: your gambles moon on 4+ instead of 5+' }),
-  D('prospector', 'El Gambusino', 'trader', 2, { liq: 2, cred: 15, abilityName: 'Prospector’s Eye', text: 'Assets you buy cost 1 less' }),
+  D('investigadora', 'La Investigadora', 'trader', 3, { liq: 3, cred: 14, eq: 1, abilityName: 'Due Diligence', text: 'Once per turn, look at the top card of the deck; you may put it on the bottom' }),
+  D('monje', 'El Monje', 'trader', 1, { liq: 1, cred: 22, eq: 2, abilityName: 'Vow of Prosperity', text: 'When you light a candle, bank 25 Prosperity' }),
+  D('diablito', 'El Diablito', 'trader', 2, { liq: 2, cred: 10, eq: 0, abilityName: 'Devil’s Wager', text: 'At the start of your turn, flip a coin: heads, collect 1 Liquidity; tails, El Diablito loses 1 CRED' }),
+  D('celebridad', 'The Influencer', 'trader', 3, { liq: 3, cred: 8, eq: 0, abilityName: 'Star Power', text: 'The influencer: pay 1 when banking from a card, +25 Prosperity', printName: 'La Influencer' }),
+  D('abuela', 'La Abuela', 'trader', 2, { liq: 2, cred: 18, eq: 1, abilityName: 'Lucky Streak', text: 'The gambling grandmother: your gambles moon on 4+ instead of 5+' }),
+  D('prospector', 'El Gambusino', 'trader', 2, { liq: 2, cred: 15, eq: 1, abilityName: 'Prospector’s Eye', text: 'Assets you buy cost 1 less' }),
   // The Byzantine Generals: a Calamity has to reach consensus before it lands.
-  D('general', 'Byzantine General', 'trader', 2, { liq: 2, cred: 14, abilityName: 'Consensus', text: 'A Calamity played on you must reach consensus: roll the die — on a 1 or 2 it fails', printName: 'El General' }),
+  D('general', 'Byzantine General', 'trader', 2, { liq: 2, cred: 14, eq: 3, abilityName: 'Fault Tolerance', text: 'When a Calamity fails against your Equanimity, collect 1 Liquidity', printName: 'El General' }),
   // The trading bot: fat income, no soul. Scandal has nothing to grip; the shrine hears nothing.
-  D('bot', 'The Bot', 'trader', 3, { liq: 3, cred: 6, abilityName: 'No Soul', text: 'Scandal cannot touch it. It cannot pray: while it sits, your Graces go unheard', printName: 'El Octobot' }),
+  D('bot', 'The Bot', 'trader', 3, { liq: 3, cred: 6, eq: 3, abilityName: 'No Soul', text: 'Scandal cannot touch it. It cannot pray: while it sits, your Graces go unheard', printName: 'El Octobot' }),
   // The angel investor: heavenly seed money. Every Asset you buy returns a coin.
-  D('angel', 'The Angel Investor', 'trader', 2, { liq: 2, cred: 16, abilityName: 'Angel Round', text: 'When you invest in an Asset, collect 1 Liquidity back', printName: 'El Ángel' }),
+  D('angel', 'The Angel Investor', 'trader', 2, { liq: 2, cred: 16, eq: 2, abilityName: 'Angel Round', text: 'When you invest in an Asset, collect 1 Liquidity back', printName: 'El Ángel' }),
   // The ethically challenged trader: every hit she orders comes with a tip.
-  D('shady', 'Shady Lady', 'trader', 2, { liq: 2, cred: 8, abilityName: 'Insider Tip', text: 'When you play a Calamity on a rival, draw a card', printName: 'La Pícara' }),
+  D('shady', 'Shady Lady', 'trader', 2, { liq: 2, cred: 8, eq: 1, abilityName: 'Insider Tip', text: 'When you play a Calamity on a rival, draw a card', printName: 'La Pícara' }),
   D('tech', 'Tech Stock', 'asset', 3, { cash: 5, pros: 100, tech: true }),
   // The degen asset, and the only gamble: sell safe for cash, or roll the die for
   // Prosperity. (Was two cards — Meme Coin's body with Shitcoin's upside.)
@@ -83,13 +88,13 @@ export const DESIGNS = [
   D('rug', 'Rug Pull', 'hazard', 3, { text: 'Cannot sell Assets' }),
   D('taxman', 'Tax Collector', 'hazard', 2, { text: 'Pay 1 to the bank at the start of each turn' }),
   D('trap', 'Liquidity Trap', 'hazard', 3, { text: 'Trapped: every Liquidity they collect goes under this card instead. Clear it, and the pile is theirs' }),
-  D('escandalo', 'Scandal', 'hazard', 2, { text: 'Scandal: the seated Trader loses 5 Grace when it breaks, 2 more each turn' }),
+  D('escandalo', 'Scandal', 'hazard', 2, { text: 'Scandal: the seated Trader loses 5 Credibility when it breaks, 2 more each turn' }),
   D('scam', 'Exit Scam', 'hazard', 3, { text: 'The target cannot play Opportunity Events until cleared' }),
   D('bell', 'The Bell', 'remedy', 1, { clears: 'bear', printName: 'La Campana' }),
   D('keys', 'The Keys', 'remedy', 1, { clears: 'rug', printName: 'Las Llaves' }),
   D('tortilla', 'Miracle Tortilla', 'remedy', 2, { clears: 'any', printName: 'La Tortilla' }),
   // The thing the publicist hands you, not the man: the Remedies row is objects.
-  D('publicista', 'The Press Release', 'remedy', 1, { clears: 'escandalo', savingGrace: 2, text: 'Clear a Scandal — or polish: your seated Trader regains 5 Grace', printName: 'El Comunicado' }),
+  D('publicista', 'The Press Release', 'remedy', 1, { clears: 'escandalo', savingGrace: 2, text: 'Clear a Scandal — or polish: your seated Trader regains 5 Credibility', printName: 'El Comunicado' }),
   // The refreshment: a Remedy that clears nothing. It replaces itself (the +1),
   // so it is never a dead card — the snack-item shape. The one-shot cousin of
   // the Enigma Machine's old cycle, which now decodes the deck instead.
@@ -105,7 +110,7 @@ export const DESIGNS = [
   // seller pays.
   D('skull', 'The Skull', 'artifact', 2, { text: 'Whenever a rival sells an Asset, collect 1 Liquidity', printName: 'La Calavera' }),
   // The relic that raises the dead: one disgrace, undone.
-  D('shroud', 'The Shroud', 'artifact', 2, { savingGrace: 5, text: 'When your seated Trader would be disgraced, discard the Shroud instead: they stay, with 5 Grace', printName: 'El Sudario' }),
+  D('shroud', 'The Shroud', 'artifact', 2, { savingGrace: 5, text: 'When your seated Trader would be discredited, discard the Shroud instead: they stay, with 5 Credibility', printName: 'El Sudario' }),
   // Loyalty through the dip: the one defence for a PORTFOLIO. The Whale and
   // The Wheel are the only effects that move Assets between players; this
   // holder's stay put. Deliberately no printName (see the row rule above).
@@ -118,11 +123,11 @@ export const DESIGNS = [
   // The board that holds it all: the one card that touches the two-slot limit.
   D('motherboard', 'The Motherboard', 'artifact', 2, { slots: true, text: 'Expansion slots: the board takes no Relic slot, and you may hold a third Relic', printName: 'La Placa Madre' }),
   D('map', 'Treasure Map', 'artifact', 2, { text: 'X marks the spot: whenever you sell an Asset, draw a card', printName: 'El Mapa' }),
-  D('tattoo', 'The Tattoo', 'artifact', 2, { text: 'Inked devotion: at the start of your turn, your seated Trader regains 1 Grace', printName: 'El Tatuaje' }),
+  D('tattoo', 'The Tattoo', 'artifact', 2, { text: 'Inked devotion: at the start of your turn, your seated Trader regains 1 Credibility', printName: 'El Tatuaje' }),
   D('dashboard', 'Dashboard Figure', 'artifact', 2, { text: 'Our Lady of the Dashboard: when a die fails you — a gamble that busts, an unanswered Hail Mary — discard her and roll again', printName: 'La Virgencita' }),
   D('ofrenda', 'La Ofrenda', 'grace', 0, { savingGrace: 2, text: 'Offer this card to Our Lady: it goes to the shrine and lights a candle' }),
   // SAVING GRACE N (keyword): discard this from your hand when your seated
-  // Trader would be disgraced — they stay, with N Grace. Printed as a line
+  // Trader would be discredited — they stay, with N Credibility. Printed as a line
   // under the card's own text; the engine reads `savingGrace`. It gives a
   // Grace a second life once the shrine's three candles are lit.
   D('cherub', 'The Votive', 'grace', 1, { savingGrace: 3, text: 'To the shrine: light a candle, then draw a card', printName: 'El Exvoto' }),
@@ -130,17 +135,17 @@ export const DESIGNS = [
   // Absolution: a candle, and the slate wiped clean.
   // Someone prays on your behalf: a candle, and a Calamity lifted.
   D('limpia', 'La Limpia', 'grace', 2, { savingGrace: 3, text: 'To the shrine: light a candle, and the egg sweeps one Calamity off you' }),
-  // The lonely soul in the flames: a disgraced Trader comes back from purgatory.
-  D('anima', 'Ánima Sola', 'grace', 1, { text: 'To the shrine: light a candle, and a disgraced Trader returns from your discard to your bench, with 5 Grace' }),
+  // The lonely soul in the flames: a discredited Trader comes back from purgatory.
+  D('anima', 'Ánima Sola', 'grace', 1, { text: 'To the shrine: light a candle, and a discredited Trader returns from your discard to your bench, with 5 Credibility' }),
   // Her tears fall for the fallen: a plain candle, and the strongest rescue in the hand.
   D('lagrimas', 'Las Lágrimas', 'grace', 1, { savingGrace: 4, text: 'To the shrine: light a candle' }),
-  D('confession', 'The Confession', 'grace', 1, { savingGrace: 3, text: 'To the shrine: light a candle, and your seated Trader’s Grace is restored in full', printName: 'La Confesión' }),
+  D('confession', 'The Confession', 'grace', 1, { savingGrace: 3, text: 'To the shrine: light a candle, and your seated Trader’s Credibility is restored in full', printName: 'La Confesión' }),
   D('fountain', 'The Fountain', 'grace', 2, { text: 'Toss in 2 Liquidity: your Hail Mary odds rise one step, even past the shrine’s three', printName: 'La Fuente' }),
   D('rose', 'The Rose', 'grace', 0, { pros: 50, cash: 2, text: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise', printName: 'La Rosa' }),
   // Locations — places you build. One stands per player, takes no Relic slot, is never sold.
   D('nacimiento', 'The Nativity Scene', 'location', 2, { text: 'Build it: place a figure at the start of each turn. At the third, the Niño arrives at midnight — light a candle and bank 75, then pack it away', printName: 'El Nacimiento' }),
   D('catedral', 'The Chart Cathedral', 'location', 2, { text: 'Green candles: whenever any player lights a candle, bank 25', printName: 'La Catedral' }),
-  D('catacumbas', 'The Catacombs', 'location', 2, { text: 'Buried with honors: at the start of your turn you may bury your seated Trader — bank 5 Prosperity per Grace they have left', printName: 'Las Catacumbas' }),
+  D('catacumbas', 'The Catacombs', 'location', 2, { text: 'Buried with honors: at the start of your turn you may bury your seated Trader — bank 5 Prosperity per point of Credibility they have left', printName: 'Las Catacumbas' }),
   D('moneda', 'The Airdrop', 'event', 0, { text: 'Free money falls from the sky: every player collects 2 Liquidity' }),
   // Yield farming: fat income until the market moves and wipes it.
   D('jardin', 'Yield Farm', 'asset', 4, { cash: 2, pros: 50, income: 2, text: 'While held: collect 2 a turn. Discard this Asset when any Event fires on draw' }),
@@ -157,7 +162,7 @@ export const DESIGNS = [
   D('crash', 'Flash Crash', 'event', 0, { subtype: 'Calamity', text: 'Everyone holding 8+ Liquidity loses half' }),
   // The dot-com bust: it finds every Tech Stock on the table, whoever holds it.
   // The reputational crash: the Calamity that makes SAVING GRACE matter.
-  D('fall', 'Fall From Grace', 'event', 0, { subtype: 'Calamity', text: 'The fall: every seated Trader loses 4 Grace' }),
+  D('fall', 'Fall From Grace', 'event', 0, { subtype: 'Calamity', text: 'The fall: every seated Trader loses 4 Credibility' }),
   // Apparitions: Our Lady appears to the whole table, unbidden. Each is an
   // on-draw Event named for her; the names are hers, so the Spanish one stays.
   D('holyroller', 'The Holy Roller', 'event', 0, { text: 'She rolls through: every player draws a card and collects 1 Liquidity' }),

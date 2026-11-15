@@ -315,6 +315,9 @@ export const RCANA_LAYOUT = {
   footerPanel: { x: 4.3, y: 89.6, w: 91.4, h: 7.5 },
   standingBox: { x: 9, y: 91.2, w: 27, h: 5.2 },
   haloBox: { x: 9, y: 91.2, w: 27, h: 5.2 },
+  // EQUANIMITY pill, Traders only: the header row's free right half, clear of
+  // the compact type tab (which ends at x 44.1) and the frame's right border.
+  eqBox: { x: 58, y: 3.3, w: 37.3, h: 6.0 },
   hydroBox: { x: 68, y: 91.2, w: 23, h: 5.2 },
   haloValue: { x: 28, y: 91.2, w: 7, h: 5.2 },
   haloValueValued: { x: 28, y: 91.2, w: 7, h: 5.2 },
@@ -492,6 +495,7 @@ export function toRcanaCard(card, overrides = {}) {
     // A person's flavor is quoted; all flavor follows the gameplay text.
     flavorQuoted: card.flavorQuoted ?? SPEAKING_CLASSES.includes(cls),
     halo: card.halo ?? card.grace ?? null,
+    equanimity: card.equanimity ?? card.eq ?? null,
     hydro: card.hydro ?? card.liquidity ?? null,
 
     // An opaque floor. Art layers carry real transparency, so without this

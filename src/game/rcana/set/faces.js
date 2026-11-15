@@ -482,8 +482,8 @@ export const FACES = [
     number: 46,
     rarity: "Uncommon",
     // A Calamity narrates (the line follows the rule). The design: the seated
-    // Trader loses 5 Grace when it breaks, then 2 more each turn until cleared.
-    ability: "Until cleared, the seated Trader\nloses 5 Grace now, then 2 each turn.",
+    // Trader loses 5 Credibility when it breaks, then 2 more each turn until cleared.
+    ability: "Until cleared, the seated Trader\nloses 5 Credibility now, then 2 each turn.",
     flavor: "The ink was dry before the story was.",
     printed: {},
   },
@@ -573,7 +573,7 @@ export const FACES = [
     number: 79,
     rarity: "Common",
     // The candle and who it brings back; the design's line is a simulator's.
-    ability: "Light a candle. A disgraced Trader\nreturns from your discard with 5 Grace.",
+    ability: "Light a candle. A discredited Trader\nreturns from your discard with 5 Credibility.",
     // A Grace narrates; the line follows the rule.
     flavor: "No one is left in the fire for good.",
     printed: {},
@@ -599,8 +599,8 @@ export const FACES = [
     // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
     number: 1,
     rarity: "Common",
-    // The consensus roll; the design's line is a simulator's.
-    ability: "A Calamity played on you must reach consensus:\nroll the die. On a 1 or 2, it fails.",
+    // Equanimity 3 is his stat; the ability rewards the fail.
+    ability: "When a Calamity fails against\nyour Equanimity, collect 1 coin.",
     // A Trader speaks; the quotation follows the rules and flourish.
     flavor: "Two of my generals say no. Then it is no.",
     printed: {},

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // RL80 R-cana — Playtest 2: THE TRADING DESK (PLAYTEST2.md).
 // Traders carry CRED (durability) and LIQ (your income); one seat + a bench of two,
-// one free swap a turn. Scandals drain Grace — disgrace when all is lost. Candles restore it.
+// one free swap a turn. Scandals drain Credibility — discredited when all is lost. Candles restore it.
 // 3–4 players, constructed 40-card decks, one main action a turn, race to bank 1,000 Prosperity.
 // Liquidity funds plays; Assets sell later for cash or Prosperity; Hazards stick until cleared;
 // Remedies, Artifacts (max two equipped); La Ofrenda lights candles at Our Lady's shrine (max three),
@@ -30,12 +30,12 @@ export const RECIPES = {
     ['heart', 1], ['halo', 1], ['rosary', 1], ['grail', 1], ['dashboard', 1], ['tattoo', 1], ['geometry', 1],
     ['cherub', 1], ['fountain', 1], ['limpia', 1], ['anima', 1], ['lagrimas', 1]],
   degen: [['diablito', 1], ['unicornio', 2], ['shady', 1], ['prospector', 1], ['abuela', 1], ['bot', 1],
-    ['meme', 1], ['tech', 1], ['gallo', 1], ['aguacate', 1], ['perp', 1], ['bluechip', 1], ['jardin', 1], ['ponzi', 1], ['catacumbas', 1],
+    ['meme', 1], ['tech', 2], ['gallo', 1], ['aguacate', 1], ['perp', 1], ['bluechip', 1], ['jardin', 1], ['ponzi', 1], ['catacumbas', 1],
     ['unlock', 1],
     ['ballena', 1], ['rueda', 1], ['moralhazard', 1], ['mardigras', 1], ['godcandle', 1], ['techwreck', 1],
     ['fuego', 1],
     ['illuminati', 1],
-    ['bear', 1], ['rug', 1], ['escandalo', 1], ['fall', 1], ['virtue', 1], ['infierno', 1], ['trap', 1],
+    ['bear', 1], ['rug', 1], ['escandalo', 1], ['fall', 1], ['infierno', 1], ['trap', 1],
     ['tortilla', 1],
     ['heart', 1], ['skull', 1], ['enigma', 1], ['rideordie', 1], ['lottery', 1], ['motherboard', 1],
     ['ofrenda', 1]],
@@ -63,7 +63,7 @@ export class Game {
   abilityOn(p) { return !(p.hazards.some((h) => h.key === 'hack') && !p.artifacts.some((a) => a.key === 'halo')); }
   is(p, key) { return !!p.trader && p.trader.key === key && this.abilityOn(p); }
   hasHaz(p, key) { return p.hazards.some((h) => h.key === key); }
-  // Async: an on-draw Event can ask a player a question (SAVING GRACE on a Fall).
+  // Async: an on-draw Event can ask a player a question (SAVING FACE on a Fall).
   async draw(p, silent = false) {
     if (!p.deck.length && p.discard.length) { p.deck = this.shuffle(p.discard.splice(0)); this.log(`${p.name} reshuffles`); }
     const c = p.deck.shift(); if (!c) return null;
@@ -146,21 +146,21 @@ export class Game {
     for (const q of this.players) if (q.location && q.location.key === 'catedral') { this.log(`a green candle in LA CATEDRAL — ${q.name} banks 25`); this.bank(q, 25, 'La Catedral'); }
     return true;
   }
-  // Grace damage. At zero the Trader is disgraced — unless the Shroud is on the
-  // table, or a card with SAVING GRACE is spent from the hand (the policy picks).
+  // Credibility damage. At zero the Trader is discredited — unless the Shroud is on the
+  // table, or a card with SAVING FACE is spent from the hand (the policy picks).
   async credDamage(p, n, why) {
     if (!p.trader) return;
     if (/scandal/i.test(why) && this.is(p, 'bot')) { this.log(`THE BOT has no soul — the Scandal finds nothing to grip`); return; }
     p.trader.credNow = (p.trader.credNow == null ? p.trader.cred : p.trader.credNow) - n;
-    this.log(`${p.trader.name} loses ${n} Grace (${why}) → ${Math.max(0, p.trader.credNow)}/${p.trader.cred}`);
+    this.log(`${p.trader.name} loses ${n} Credibility (${why}) → ${Math.max(0, p.trader.credNow)}/${p.trader.cred}`);
     if (p.trader.credNow <= 0) {
       const shroud = p.artifacts.find((a) => a.key === 'shroud');
       if (shroud) { p.artifacts.splice(p.artifacts.indexOf(shroud), 1); p.discard.push(shroud); p.trader.credNow = Math.min(5, p.trader.cred); this.log(`✝ THE SHROUD is spent — ${p.trader.name} rises again at ${p.name}'s desk with 5 Grace`); }
       else {
         const saviours = p.hand.filter((c) => c.savingGrace);
         const pick = saviours.length ? await p.policy.useSavingGrace(this, p, saviours) : null;
-        if (pick && saviours.includes(pick)) { p.hand.splice(p.hand.indexOf(pick), 1); p.discard.push(pick); p.trader.credNow = Math.min(pick.savingGrace, p.trader.cred); p.stats.savingGrace = (p.stats.savingGrace || 0) + 1; this.log(`✝ SAVING GRACE — ${p.name} gives up ${pick.name}: ${p.trader.name} stays at the desk with ${p.trader.credNow} Grace`); }
-        else { this.log(`☠ ${p.trader.name} is DISGRACED and leaves ${p.name}'s desk`); p.discard.push(p.trader); p.trader = null; p.stats.disgraces++; }
+        if (pick && saviours.includes(pick)) { p.hand.splice(p.hand.indexOf(pick), 1); p.discard.push(pick); p.trader.credNow = Math.min(pick.savingGrace, p.trader.cred); p.stats.savingGrace = (p.stats.savingGrace || 0) + 1; this.log(`✝ SAVING FACE — ${p.name} gives up ${pick.name}: ${p.trader.name} stays at the desk with ${p.trader.credNow} Grace`); }
+        else { this.log(`☠ ${p.trader.name} is DISCREDITED and leaves ${p.name}'s desk`); p.discard.push(p.trader); p.trader = null; p.stats.disgraces++; }
       }
     }
   }
@@ -212,7 +212,12 @@ export class Game {
         // reaction: Sacred Heart
         const heart = t.artifacts.find((a) => a.key === 'heart');
         if (heart && await t.policy.useHeart(this, t, c, p)) { t.artifacts.splice(t.artifacts.indexOf(heart), 1); t.discard.push(heart); p.discard.push(c); this.log(`${t.name}'s SACRED HEART cancels ${c.name}`); return true; }
-        if (this.is(t, 'general')) { const roll = 1 + Math.floor(this.rng() * 6); if (roll <= 2) { p.discard.push(c); this.log(`${p.name} plays ${c.name} on ${t.name} — the die shows ${roll}: no CONSENSUS, it fails`); return true; } this.log(`the die shows ${roll}: CONSENSUS — ${c.name} lands`); }
+        // EQUANIMITY: a seated Trader's composure. The Calamity fails on a roll of eq or lower — a stat, so a Quantum Hack does not switch it off.
+        const eq = t.trader ? (t.trader.eq || 0) : 0;
+        if (eq > 0) { const roll = 1 + Math.floor(this.rng() * 6);
+          if (roll <= eq) { p.discard.push(c); this.log(`${p.name} plays ${c.name} on ${t.name} — the die shows ${roll} against EQUANIMITY ${eq}: ${t.trader.name} does not flinch, it fails`); t.stats.eqSaves = (t.stats.eqSaves || 0) + 1;
+            if (this.is(t, 'general')) { this.collect(t, 1); this.log(`FAULT TOLERANCE — ${t.name} collects 1`); } return true; }
+          this.log(`the die shows ${roll} against EQUANIMITY ${eq} — ${c.name} lands`); }
         c.owner = p; c.by = p.idx; t.hazards.push(c); p.stats.hazPlayed++;
         this.log(`${p.name} plays ${c.name} on ${t.name}`);
         if (c.key === 'bear') for (const a of [...t.invest]) if (a.perp) { t.invest.splice(t.invest.indexOf(a), 1); t.discard.push(a); this.log(`${t.name}'s ${a.name} is LIQUIDATED by the Bear`); }
@@ -242,7 +247,7 @@ export class Game {
         p.artifacts.push(c); this.log(`${p.name} equips ${c.name}`); break; }
       case 'trader': {
         c.credNow = c.cred; p.stats.hires++;
-        if (!p.trader) { p.trader = c; this.log(`${p.name} seats ${c.name} at the desk (LIQ ${c.liq} · GRACE ${c.cred})`);
+        if (!p.trader) { p.trader = c; this.log(`${p.name} seats ${c.name} at the desk (LIQ ${c.liq} · CRED ${c.cred} · EQ ${c.eq || 0})`);
           if (c.key === 'gato' && p.hazards.length && this.abilityOn(p)) { const h = choice.hazard || p.hazards[0]; this.clearHazard(p, h, p, 'EL GATO knocks it off the table'); } }
         else { p.bench.push(c); this.log(`${c.name} joins ${p.name}'s bench`); }
         break; }
@@ -352,7 +357,7 @@ export class Game {
       }
     }
     if (p.artifacts.some((a) => a.key === 'tattoo') && p.trader && p.trader.credNow != null && p.trader.credNow < p.trader.cred) {
-      p.trader.credNow += 1; this.log(`THE TATTOO: ${p.trader.name} regains 1 Grace → ${p.trader.credNow}/${p.trader.cred}`);
+      p.trader.credNow += 1; this.log(`THE TATTOO: ${p.trader.name} regains 1 Credibility → ${p.trader.credNow}/${p.trader.cred}`);
     }
     for (const g of [...p.invest]) if (g.rooster) { const r = 1 + Math.floor(this.rng() * 6);
       if (r === 6) { this.collect(p, 2); this.log(`EL GALLO wins the fight — ${p.name} collects 2`); }
@@ -382,7 +387,7 @@ export class Game {
       else { this.log(`midnight at EL NACIMIENTO — the Niño arrives for ${p.name}`); await this.lightCandle(p, 'El Nacimiento'); this.bank(p, 75, 'El Nacimiento'); nac.figures = 0; p.location = null; p.discard.push(nac); this.log(`${p.name} packs the Nativity away`);
         if (this.over) { if (this.hooks && this.hooks.render) await this.hooks.render(); return; } }
     }
-    // LAS CATACUMBAS: bury the seated Trader with honors — 5 Prosperity per Grace they have left.
+    // LAS CATACUMBAS: bury the seated Trader with honors — 5 Prosperity per point of Credibility they have left.
     if (p.location && p.location.key === 'catacumbas' && p.trader && p.policy.buryTrader && await p.policy.buryTrader(this, p)) {
       const t = p.trader; const honors = 5 * (t.credNow ?? t.cred);
       this.log(`⚰ ${p.name} buries ${t.name} in LAS CATACUMBAS with honors`); p.trader = null; p.discard.push(t); p.stats.buried = (p.stats.buried || 0) + 1;
@@ -443,7 +448,7 @@ export class GreedyBot {
   useDashboard(g, p, w) { return w.kind === 'hail' || p.hailUsed; }
   // Intercepts the weather that is not a plain windfall: Calamities and shake-ups.
   useEnigma(g, p, c) { return c.subtype === 'Calamity' || c.subtype === 'Ambiguity'; }
-  // Always saves the Trader, with the card that leaves the most Grace.
+  // Always saves the Trader, with the card that leaves the most Credibility.
   // Bury a seated Trader in the Catacombs when a replacement waits and the honors are worth it, or a Scandal is grinding them down.
   buryTrader(g, p) { const c = p.trader.credNow ?? p.trader.cred; return p.bench.length > 0 && (c * 5 >= 60 || g.hasHaz(p, 'escandalo')); }
   useSavingGrace(g, p, cards) { return [...cards].sort((a, b) => b.savingGrace - a.savingGrace)[0]; }
@@ -458,7 +463,7 @@ export class GreedyBot {
     if (a.t === 'sell' && a.a.gem && a.pros && p.deeds < 3 && p.pros + g.saleValue(a.a) < g.winAt) { s = 6; return s; }
     if (a.t === 'sell') { const pv = g.prosOf(a.a); const sv = g.saleValue(a.a); s = a.pros ? (a.a.gamble ? (p.pros + sv >= g.winAt ? 70 : 34) : sv - 10 + (p.pros + sv >= g.winAt ? 9999 : 0)  - (a.a.bloom && pv < a.a.bloom ? 30 : 0)) : (p.liq <= 2 ? 65 : 25) - (a.a.bloom && pv < a.a.bloom ? 40 : 0); }
     if (a.t === 'play' && a.c.type === 'asset') s = (p.liq >= a.c.cost + 2 ? 55 + a.c.pros / 10 : 30) + (a.c.income ? 16 : 0) + (a.c.bloom ? 8 : 0);
-    if (a.t === 'play' && a.c.type === 'hazard') s = a.choice.target === lead && lead.pros > p.pros ? 70 + lead.pros / 20 : 15;
+    if (a.t === 'play' && a.c.type === 'hazard') s = (a.choice.target === lead && lead.pros > p.pros ? 70 + lead.pros / 20 : 15) - (a.choice.target.trader ? (a.choice.target.trader.eq || 0) * 4 : 0);
     if (a.t === 'play' && a.c.type === 'remedy') { const mine = a.choice.target === p; s = mine ? 80 : 8; }
     if (a.t === 'play' && a.choice && a.choice.refresh) { const dead = p.hand.filter((c) => c !== a.c && c.type !== 'event' && c.cost > p.liq + 1).slice(0, a.c.refresh); a.choice.discards = dead; s = 28 + 10 * dead.length; }
     if (a.t === 'play' && a.c.type === 'artifact') s = 35;
