@@ -1,4 +1,4 @@
-// R-cana set numbers — one reserved number per design, 1 to 80.
+// R-cana set numbers — one reserved number per design, 1 to RCANA_SET_SIZE.
 //
 // A face entry (set/faces.js) prints its `number`; rcana:lint checks that it
 // matches the reservation here, so numbers are not handed out ad hoc as art
@@ -29,6 +29,14 @@ export const RESERVED_NUMBERS = {
   realestate: 32,
   stablecoin: 43,
   bluechip: 45,
+  gallo: 81, // El Gallo — unfaced (the set passed 80 on 2026-11-15)
+  vaca: 82, // La Vaca — unfaced
+  aguacate: 83, // El Aguacate — unfaced
+  bono: 84, // The Savings Bond — unfaced
+  plata: 85, // La Plata — unfaced
+  perp: 86, // The Perp — unfaced
+  cava: 87, // La Cava — unfaced
+  catedral: 88, // La Catedral — unfaced
   jardin: 44,
   map: 33,
   mine: 31,
@@ -44,7 +52,7 @@ export const RESERVED_NUMBERS = {
   crash: 38,
   fall: 51, // Fall From Grace — unfaced
   holyroller: 52, // The Holy Roller — unfaced
-  fuego: 53, // Nuestra Señora en Fuego — unfaced
+  fuego: 53, // Nuestra Señora del Fuego — unfaced
   virtual: 54, // The Virtual Mary — unfaced
   feast: 55, // The Feast of Perpetual Profit — unfaced
   techwreck: 48,
@@ -76,7 +84,7 @@ export const RESERVED_NUMBERS = {
   heart: 66, // El Corazón — unfaced
   halo: 67, // La Aureola — unfaced
   rosary: 18,
-  grail: 68, // El Cáliz — unfaced
+  grail: 68, // The Grail — the graded card in the vault (was the El Cáliz Relic, retired 2026-11-15)
   enigma: 69, // El Enigma — unfaced
   skull: 19,
   shroud: 70, // El Sudario — unfaced
@@ -90,7 +98,7 @@ export const RESERVED_NUMBERS = {
   ofrenda: 75, // La Ofrenda — unfaced
   cherub: 76, // El Exvoto — unfaced
   limpia: 77, // La Limpia — unfaced (was The Intercession)
-  piramide: 78, // La Pirámide — unfaced (was Divine Intervention)
+  ponzi: 78, // The Ponzi — unfaced (was La Pirámide, before that Divine Intervention)
   anima: 79, // Ánima Sola — unfaced
   confession: 80, // La Confesión — unfaced
   fountain: 25,

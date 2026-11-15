@@ -16,9 +16,9 @@
 // The rule: lotería names for FIGURES, devotional objects and classic lotería
 // The rule is by ROW: things you hold are lotería — Traders, Artifacts,
 // Remedies, Graces (El Monje, La Máquina, La Campana, El Exvoto); the market
-// is English — Assets, Events, Calamities (Blue Chip, Bull Run, Rug Pull). One
-// deliberate exception: Ride or Die keeps its English name in the lotería row
-// (it is a caption, the words painted on the car, not a title). El Naranja,
+// is English — Assets, Events, Calamities (Blue Chip, Bull Run, Rug Pull).
+// (Ride or Die was once the English exception in the lotería row; since
+// 2026-11-15 it is The Lowrider, an Asset, and the words are its caption.) El Naranja,
 // the exception the other way, was dropped 2026-11-10.
 // Faces never carry a name.
 
@@ -54,6 +54,15 @@ export const DESIGNS = [
   // The old Moneda's job — a trickle of income — on a coin that holds its value.
   D('stablecoin', 'Stablecoin', 'asset', 2, { cash: 3, pros: 50, income: 1, text: 'While held: collect 1 Liquidity at the start of your turn' }),
   D('bluechip', 'Blue Chip', 'asset', 6, { cash: 10, pros: 250 }),
+  D('grail', 'The Holy Grail', 'asset', 3, { cash: 5, pros: 100, gem: 250, text: 'Gem mint: sells for 100 — or 250 while you hold three lit candles' }),
+  D('rideordie', 'The Lowrider', 'asset', 3, { cash: 4, pros: 100, text: 'Ride or die: while the Lowrider is in your portfolio, your Assets stay with you — the Whale and the Wheel pass you by' }),
+  D('gallo', 'El Gallo', 'asset', 2, { cash: 2, pros: 75, rooster: true, text: 'The fighting rooster: at the start of your turn, roll — a 6 collects 2; a 1, and he is dead' }),
+  D('vaca', 'La Vaca', 'asset', 3, { cash: 6, pros: 75, income: 1, text: 'Milk: collect 1 at the start of your turn — or sell her for meat, 6 Liquidity' }),
+  D('aguacate', 'El Aguacate', 'asset', 3, { cash: 2, pros: 50, ripe: true, text: 'Green gold: ripe on the second round, worth 150. Green before, 50 — then it rots, 50 less each round' }),
+  D('cava', 'La Cava', 'asset', 3, { cash: 3, pros: 50, grow: 25, uncork: true, text: 'Vintage: worth 25 more each round held — or uncork it: discard to light a candle' }),
+  D('bono', 'The Savings Bond', 'asset', 2, { cash: 2, pros: 25, grow: 25, bearProof: true, text: 'Grandmother’s gift: worth 25 more each round held, and immune to The Bear' }),
+  D('plata', 'La Plata', 'asset', 3, { cash: 3, pros: 125, silver: true, text: 'Flight to safety: in a Flash Crash you lose nothing, and bank 25' }),
+  D('perp', 'The Perp', 'asset', 4, { cash: 4, pros: 75, perp: true, text: 'Leverage: sells for double — but a Bear Market played on you while it is held liquidates it' }),
   // Events you CALL: played from the hand for their cost, banked on the spot —
   // where the other Events fire the moment they are drawn. `played` is the flag.
   D('bull', 'Bull Run', 'event', 2, { pros: 100, played: true }),
@@ -62,6 +71,7 @@ export const DESIGNS = [
   // The two that replaced Rocket (2026-11-10). Called Events that care what is on
   // your table: suffering pays for Devotion, the Degen windfall leaks to the room.
   D('squeeze', 'Short Squeeze', 'event', 3, { pros: 100, perHaz: 50, bearProof: true, played: true, text: 'Bank 100, plus 50 for each Calamity on you. Bear Market cannot cap it' }),
+  D('ponzi', 'The Ponzi', 'event', 2, { pros: 0, perRivalAsset: 25, rivalsCollect: 1, played: true, text: 'New money pays the old: bank 25 for every Asset your rivals hold — then every rival collects 1' }),
   D('unlock', 'Token Unlock', 'event', 4, { pros: 200, rivalsCollect: 1, played: true, text: 'Bank 200 — and every rival collects 1 Liquidity' }),
   D('bear', 'Bear Market', 'hazard', 2, { text: 'Bank at most 75 Prosperity from a single card' }),
   D('hack', 'Quantum Hack', 'hazard', 2, { text: 'Trader ability disabled' }),
@@ -89,7 +99,6 @@ export const DESIGNS = [
   D('heart', 'Sacred Heart', 'artifact', 2, { text: 'A shield, not a cure: discard to cancel a Calamity as it lands', printName: 'El Corazón' }),
   D('halo', 'The Halo', 'artifact', 3, { text: 'Any Trader seated at your desk cannot be disabled', printName: 'La Aureola' }),
   D('rosary', 'The Rosary Beads', 'artifact', 2, { text: 'When you light a candle, draw a card', printName: 'El Rosario' }),
-  D('grail', 'The Grail', 'artifact', 3, { text: 'An answered Hail Mary banks 300 instead of 200', printName: 'El Cáliz' }),
   // Intercepted traffic: the market's message is decoded before it is sent.
   D('enigma', 'Enigma Machine', 'artifact', 2, { text: 'Intercept: when an Event fires on your draw, discard the Machine — the Event is cancelled for everyone', printName: 'El Enigma' }),
   // Exit liquidity, held rather than fired: the Skull's owner is the one every
@@ -100,7 +109,6 @@ export const DESIGNS = [
   // Loyalty through the dip: the one defence for a PORTFOLIO. The Whale and
   // The Wheel are the only effects that move Assets between players; this
   // holder's stay put. Deliberately no printName (see the row rule above).
-  D('rideordie', 'Ride or Die', 'artifact', 2, { text: 'Ride or die: your Assets stay with you. The Whale and The Wheel pass your portfolio by' }),
   // The kitsch dashboard Virgin: a lucky charm for the road. One bad roll, undone.
   // The scratcher: a Relic slot spent on a long shot that usually pays before the game ends.
   D('lottery', 'The Lottery Ticket', 'artifact', 1, { text: 'Scratch it at the start of each turn: roll the die — a 6 wins 150 Prosperity, and the Ticket is spent', printName: 'El Boleto' }),
@@ -131,7 +139,7 @@ export const DESIGNS = [
   D('rose', 'The Rose', 'grace', 0, { pros: 50, cash: 2, text: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise', printName: 'La Rosa' }),
   // Locations — places you build. One stands per player, takes no Relic slot, is never sold.
   D('nacimiento', 'The Nativity Scene', 'location', 2, { text: 'Build it: place a figure at the start of each turn. At the third, the Niño arrives at midnight — light a candle and bank 75, then pack it away', printName: 'El Nacimiento' }),
-  D('piramide', 'The Pyramid Scheme', 'location', 2, { text: 'Ponzi: whenever a rival invests in an Asset, collect 1 Liquidity', printName: 'La Pirámide' }),
+  D('catedral', 'The Chart Cathedral', 'location', 2, { text: 'Green candles: whenever any player lights a candle, bank 25', printName: 'La Catedral' }),
   D('catacumbas', 'The Catacombs', 'location', 2, { text: 'Buried with honors: at the start of your turn you may bury your seated Trader — bank 5 Prosperity per Grace they have left', printName: 'Las Catacumbas' }),
   D('moneda', 'The Airdrop', 'event', 0, { text: 'Free money falls from the sky: every player collects 2 Liquidity' }),
   // Yield farming: fat income until the market moves and wipes it.
@@ -140,7 +148,7 @@ export const DESIGNS = [
   // the map leads somewhere (cards), the mine pays the longer you dig, the well is a wildcat.
   D('mine', 'The Mine', 'asset', 4, { cash: 4, pros: 75, grow: 25, text: 'Each round held, worth 25 more Prosperity' }),
   D('oil', 'Oil Field Claim', 'asset', 3, { cash: 3, pros: 175, gamble: true, gambleOn: 3, bust: 25, text: 'Sell for Prosperity: a die decides — 3+ gushes for 175, else it runs dry for 25' }),
-  D('semilla', 'Seed Round', 'asset', 1, { cash: 1, pros: 25, bloom: 150, text: 'Sell for 25 Prosperity — or hold four rounds and it blooms to 150' }),
+  D('semilla', 'Seed Round', 'event', 1, { pros: 150, bloom: 4, played: true, text: 'Plant it: four rounds on, it blooms — bank 150' }),
   // Events: the market's own voice. They fire the moment they are drawn, hit the whole
   // table, then the drawer draws a replacement card. Nobody chooses an Event.
   // On-draw events print a subtype by outcome (eventTemplate.js): a windfall
@@ -153,7 +161,7 @@ export const DESIGNS = [
   // Apparitions: Our Lady appears to the whole table, unbidden. Each is an
   // on-draw Event named for her; the names are hers, so the Spanish one stays.
   D('holyroller', 'The Holy Roller', 'event', 0, { text: 'She rolls through: every player draws a card and collects 1 Liquidity' }),
-  D('fuego', 'Nuestra Señora en Fuego', 'event', 0, { text: 'She rides the fire horse through the market: every player banks 75 Prosperity' }),
+  D('fuego', 'Nuestra Señora del Fuego', 'event', 0, { text: 'She rides the fire horse through the market: every player banks 75 Prosperity' }),
   D('virtual', 'The Virtual Mary', 'event', 0, { subtype: 'Ambiguity', text: 'She flickers on every screen: every player shuffles their hand into their deck and draws that many' }),
   // The feast day of the shrine's own saint: the whole table lights a candle.
   D('feast', 'The Feast of Perpetual Profit', 'event', 0, { text: 'Feast day: every player lights a candle' }),

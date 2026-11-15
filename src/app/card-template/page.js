@@ -278,8 +278,8 @@ export default function CardTemplatePage() {
 
       <header className="ct-top">
         <div>
-          <p className="ct-kicker">{tools ? "Terminal Traders // Card Template" : "R-cana // The Lotería 80"}</p>
-          <h1>{view === "single" ? "Trading Card Overlay" : view === "rcana-collection" ? "R-cana · The Lotería 80" : view === "rcana" ? "R-cana Bench" : "The Genesis 80"}</h1>
+          <p className="ct-kicker">{tools ? "Terminal Traders // Card Template" : `R-cana // The Lotería ${RCANA_SET_SIZE}`}</p>
+          <h1>{view === "single" ? "Trading Card Overlay" : view === "rcana-collection" ? `R-cana · The Lotería ${RCANA_SET_SIZE}` : view === "rcana" ? "R-cana Bench" : "The Genesis 80"}</h1>
           <p className="ct-sub">
             {view === "single" ? (
               <>

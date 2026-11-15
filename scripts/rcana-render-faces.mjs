@@ -74,7 +74,10 @@ try {
       await explain(url);
       throw e;
     }
-    // Fonts and the frame image settle after networkidle; give them a beat.
+    // The card hides behind a blank plate until every image has decoded
+    // (RcanaCard's readiness gate), then flags itself ready. Wait for that.
+    await page.locator(".rc-card[data-ready]").first().waitFor({ state: "attached", timeout: 30000 }).catch(() => {});
+    // Fonts settle after networkidle; give them a beat.
     await page.evaluate(() => document.fonts?.ready);
     await page.waitForTimeout(400);
     const dir = path.join(root, "public/TCG/rcana", c.id);

@@ -38,6 +38,18 @@ const REST = { rx: 0, ry: 0, mx: 50, my: 50, hyp: 0, lift: 0 };
 // metal, plus the two live holo foils, which are WebGL (HoloFoilFrame).
 export const RCANA_METAL_FRAMES = FRAMES;
 const HOLO_SRC = /^holo:/;
+// Image sources that have loaded and decoded in this session. The readiness
+// gate below consults it so a card re-rendered with the same art (a bench
+// toggle, a flip) never drops back behind the blank plate.
+const DECODED = new Set();
+const decodeOne = (src) => new Promise((resolve) => {
+  if (DECODED.has(src)) { resolve(); return; }
+  const im = new window.Image();
+  const done = () => { DECODED.add(src); resolve(); };
+  im.onload = () => (im.decode ? im.decode().then(done, done) : done());
+  im.onerror = resolve; // a missing file is the lint's business, not the gate's
+  im.src = src;
+});
 // The live foil is cut out over windows it is given; the Terminal card's
 // three slots do not apply here. The opening runs to the MIDDLE of the
 // Lotería frame's inner black line (x 36–45px of 1027, y 36–44px of 1424),
@@ -466,6 +478,58 @@ export default function RcanaCard({
   const metalId = metalFrame === undefined ? data.metalFrame ?? null : metalFrame;
   const metal = metalId ? RCANA_METAL_FRAMES.find((f) => f.id === metalId) || null : null;
   const metalPrinted = Boolean(metal && !HOLO_SRC.test(metal.src));
+
+  // ---------------- readiness gate ----------------
+  // The face is a stack of images behind a frame mask. Painted as each
+  // arrives, the plate shows first, then every sheet's raw edge until the
+  // frame lands over it. So the card stays hidden behind a blank plate until
+  // every image it names has loaded and decoded, then fades in whole.
+  const imageSrcs = useMemo(() => {
+    const list = [];
+    if (!hideFrame) { if (data.frameImage) list.push(data.frameImage); if (data.badgeImage) list.push(data.badgeImage); }
+    if (metalPrinted) list.push(metal.src);
+    for (const l of data.artLayers || []) if (l.src) list.push(l.src);
+    if (showFx) for (const f of data.fxLayers || []) if (f.src) list.push(f.src);
+    if (typeof data.backdrop === "string") {
+      const m = data.backdrop.match(/url\(["']?([^"')]+)["']?\)/);
+      if (m) list.push(m[1]); else if (data.backdrop.startsWith("/")) list.push(data.backdrop);
+    }
+    return Array.from(new Set(list));
+  }, [data, hideFrame, metalPrinted, metal, showFx]);
+  // Every mount starts behind the plate, even when its sources are already
+  // in memory: a cached file still has to be decoded at THIS element's
+  // display size, and the frame lands a frame after the art planes — the
+  // flash of unmasked layers an enlarged card showed. Once a card has been
+  // shown, a prop change whose images are all known skips the plate.
+  const [ready, setReady] = useState(false);
+  const shownRef = useRef(false);
+  useEffect(() => {
+    let alive = true;
+    const pending = imageSrcs.filter((s) => !DECODED.has(s));
+    if (shownRef.current && !pending.length) { setReady(true); return undefined; }
+    setReady(false);
+    const settle = () => { if (!alive) return; shownRef.current = true; setReady(true); };
+    // A file that never arrives must not hold the card forever.
+    const ceiling = window.setTimeout(settle, 8000);
+    Promise.all(pending.map(decodeOne))
+      // Then this card's own elements, decoded for paint at their size.
+      .then(() => Promise.all([...(cardRef.current?.querySelectorAll("img") || [])].map((im) => (im.decode ? im.decode().catch(() => {}) : Promise.resolve()))))
+      // One frame more, so the decoded bitmaps are composited before the fade begins.
+      .then(() => new Promise((r) => window.requestAnimationFrame(() => window.requestAnimationFrame(r))))
+      .then(settle);
+    return () => { alive = false; window.clearTimeout(ceiling); };
+  }, [imageSrcs]);
+  // The plate stays mounted ON TOP of the card through its own fade-out. The
+  // card's opacity is never animated: opacity below 1 on a preserve-3d
+  // element flattens it, and flat, the layers' counter-scale applies without
+  // the depth that cancels it — the behind planes bulge past the frame for
+  // the length of the fade.
+  const [plate, setPlate] = useState(true);
+  useEffect(() => {
+    if (!ready) { setPlate(true); return undefined; }
+    const t = window.setTimeout(() => setPlate(false), 360);
+    return () => window.clearTimeout(t);
+  }, [ready]);
   // Glitter is a gold-frame treatment (as on TradingCard); elsewhere it
   // falls back to mirror so a caller can set it unconditionally.
   const shineBlend =
@@ -556,9 +620,12 @@ export default function RcanaCard({
         "--ratio": RCANA_ASPECT,
       }}
     >
+      {plate && <div className={`rc-blank${ready ? " rc-blank--out" : ""}`} aria-hidden="true" />}
       <div
         ref={cardRef}
         className="rc-card"
+        data-ready={ready || undefined}
+        data-blank={plate || undefined}
         data-metal={metal ? (HOLO_SRC.test(metal.src) ? "holo" : "printed") : undefined}
         data-shine={metalPrinted ? frameShine : undefined}
         data-shine-blend={metalPrinted ? shineBlend : undefined}
@@ -1125,6 +1192,7 @@ function AutoFit({ children, max, min, block = false, refit = null }) {
 
 const RCANA_STYLES = `
 .rc-stage {
+  position: relative;
   width: calc(var(--cw) * 1px);
   perspective: calc(var(--p) * 1px);
   perspective-origin: 50% 50%;
@@ -1138,6 +1206,28 @@ const RCANA_STYLES = `
   transition: transform 220ms cubic-bezier(.2,.7,.3,1);
   will-change: transform;
 }
+/* Until every image has decoded the card is in the layout but unpainted
+   (visibility, never opacity — see the plate note above), and a blank plate
+   stands in over it, then fades out once the card is ready. */
+.rc-card:not([data-ready]) { visibility: hidden; pointer-events: none; }
+/* While the plate is up, layers snap to their depth instead of easing into
+   it: the 220ms settle would otherwise still be running as the plate thins. */
+.rc-card[data-blank] .rc-layer { transition: none; }
+.rc-blank {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 4.5% / 3.2%;
+  background: linear-gradient(160deg, #efe2b4 0%, #e3d09a 55%, #d9c48b 100%);
+  box-shadow: inset 0 0 0 calc(var(--u) * 0.012) rgba(120, 90, 30, .18);
+  animation: rc-blank-breathe 1.6s ease-in-out infinite;
+}
+/* The breath is brightness, not opacity, so opacity is free to transition when the plate goes. */
+@keyframes rc-blank-breathe { 0%, 100% { filter: brightness(.86); } 50% { filter: brightness(1.02); } }
+.rc-blank { transition: opacity 300ms ease-out; }
+.rc-blank--out { animation: none; opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .rc-blank { animation: none; } }
 .rc-card:active { transition: none; }
 /* Print and reduced-motion cards need ordinary paint order. Retaining a
    3D context when every layer collapses to zero lets Chromium occlude

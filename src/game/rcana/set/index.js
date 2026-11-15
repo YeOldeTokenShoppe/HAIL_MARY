@@ -26,9 +26,11 @@ export const TYPE_CLASS = {
   location: "Artifact",
 };
 
-// The printed size of the set, for the collector line ("19 / 80"). Eighty,
-// not the lotería's fifty-four: the RL80 number.
-export const RCANA_SET_SIZE = 80;
+// The printed size of the set, for the collector line ("19 / 88"): the number
+// of designs, so it is always the actual count. It was a fixed eighty, the
+// RL80 number, until the Assets row grew past it on 2026-11-15. Lint checks
+// that the reserved numbers run 1..this with no gaps, so a cut means a renumber.
+export const RCANA_SET_SIZE = DESIGNS.length;
 
 // Traits remain card metadata, derived from gameplay flags. The face uses
 // one primary badge; these do not add a second row of pills.

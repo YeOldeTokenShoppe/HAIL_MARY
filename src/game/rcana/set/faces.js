@@ -278,6 +278,20 @@ export const FACES = [
     printed: {},
   },
   {
+    id: "collectibles", // the art id: the velvet case of graded cards in the vault
+    design: "grail", // prints as "The Holy Grail" — the design's name
+    // PROVISIONAL number and rarity. The collector's grail: the one card
+    // you chase. Number inherited from the retired El Cáliz Relic.
+    number: 68,
+    rarity: "Rare",
+    // An Asset's line says what it sells for; the boxes print value (100)
+    // and cost (3), so the text carries the cash option and the gem price.
+    ability: "Sell for 5 coins, or bank 100 —\n250 while three candles burn.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "Worth exactly what the next buyer says it is.",
+    printed: {},
+  },
+  {
     id: "the-mine",
     design: "mine", // prints as "The Mine" — the design's name
     // PROVISIONAL number and rarity. (Inherited from Gold, whose art this is.)
@@ -329,14 +343,13 @@ export const FACES = [
   },
   {
     id: "ride-or-die",
-    design: "rideordie", // prints as "Ride or Die" — the design's name
+    design: "rideordie", // prints as "The Lowrider" — the design's name
     // PROVISIONAL number and rarity.
     number: 35,
     rarity: "Rare",
-    // A Relic equips; the printed line is the protection alone, shorter than
-    // the simulator's.
-    ability: "Your Assets stay with you.\nThe Whale and The Wheel pass you by.",
-    // A Relic narrates; the line follows the rule.
+    // An Asset since 2026-11-15: the boxes print value (100) and cost (3);
+    // the caption painted on the car opens the rules line.
+    ability: "Ride or die: your Assets stay with you.\nThe Whale and The Wheel pass you by.",
     flavor: "Nobody gets out of the car.",
     printed: {},
   },
@@ -357,10 +370,9 @@ export const FACES = [
     // PROVISIONAL number and rarity.
     number: 37,
     rarity: "Common",
-    // An Asset's line says what it sells for. The boxes print value (25)
-    // and cost (1); the text carries the cash option and the bloom.
-    ability: "Sell for 1 coin, or bank 25 Prosperity.\nHeld four rounds, it blooms to 150.",
-    // An Asset narrates, so the flavor follows the rule unquoted.
+    // A called Event you plant: the boxes print value (150) and cost (1);
+    // the text carries the wait.
+    ability: "Plant it: four rounds on,\nit blooms — bank 150.",
     flavor: "Everything that blooms was buried first.",
     printed: {},
   },
@@ -541,7 +553,7 @@ export const FACES = [
   },
   {
     id: "fire-horse",
-    design: "fuego", // prints as "Nuestra Señora en Fuego" — the design's name
+    design: "fuego", // prints as "Nuestra Señora del Fuego" — the design's name
     gloss: "Our Lady on Fire",
     // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
     number: 53,

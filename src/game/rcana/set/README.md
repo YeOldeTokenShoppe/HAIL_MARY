@@ -112,6 +112,7 @@ npm run pt2:build           # rebuild the table with designs + face images
 ```
 
 - **Changed a design or a face's text?** `npm run pt2:build` is enough.
+- **Loading.** `RcanaCard` hides behind a blank cream plate until every image it names (frame, badge, metal, art and FX sheets, an image backdrop) has loaded and decoded, then sets `data-ready` on `.rc-card` and the plate fades out over it (the card's own opacity is never animated: opacity below 1 flattens a preserve-3d element, and flat, the layers' counter-scale bulges past the frame for the length of the fade) — so no half-painted stack or exposed layer edge ever shows. Every new mount waits on its own image elements' `decode()` too — a cached file still decodes at the element's display size, and the frame lands a frame after the art, which is the flash an enlarged card used to show. Once shown, a prop change whose images are all known skips the plate. The face renderer waits for `data-ready` before its screenshot. The playtest table fades each pre-rendered face in on load the same way.
 - **Changed art, frame, type or anything visible?** `rcana:faces` for that
   card, then `pt2:build`: `npm run rcana:faces -- el-diablito && npm run pt2:build`.
 - `npm run rcana:lint` warns when `table.html` is older than its inputs.

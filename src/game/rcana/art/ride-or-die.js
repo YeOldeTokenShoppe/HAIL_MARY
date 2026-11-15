@@ -1,4 +1,4 @@
-// Ride or Die — the lowrider under Our Lady of the boulevard, a Relic. Three
+// The Lowrider (Ride or Die) — the lowrider under Our Lady of the boulevard, an Asset. Three
 // planes: the street and skyline behind the plate, her apparition hovering
 // over it inside the window, and the car itself in front of the frame.
 //

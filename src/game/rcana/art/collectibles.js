@@ -1,4 +1,4 @@
-// Collectibles — the velvet case of graded cards inside the vault, an Asset.
+// The Holy Grail (art id "collectibles") — the velvet case of graded cards inside the vault, an Asset.
 // Three planes behind the plate: the vault door and its shaft of light, the
 // case itself, and the holo sun card floating above it nearest the window.
 //
