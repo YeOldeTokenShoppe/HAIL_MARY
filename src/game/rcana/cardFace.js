@@ -526,6 +526,8 @@ export function toRcanaCard(card, overrides = {}) {
       id: l.id || `layer-${i}`,
       src: l.src || artPath(card.id, l.id || `layer-${i}`),
       swingOrigin: l.swingOrigin,
+      clapperRestAngle: l.clapperRestAngle,
+      clapperOrigin: l.clapperOrigin,
       swingSound: l.swingSound,
       drop: l.drop,
       priceReveal: l.priceReveal,

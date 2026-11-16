@@ -24,7 +24,7 @@
 
 // ── The twenty-four designs of the shared starter ──
 // Players inhabit one active Trader at a time. Traders are cards in the deck;
-// playing one is a main action, to the active slot or the bench.
+// playing one is a main action, discarding the current Trader and taking the seat.
 const D = (key, name, type, cost, o = {}) => ({ key, name, type, cost, ...o });
 export const DESIGNS = [
   // The trinity: every Trader carries LIQUIDITY (liq — income a turn),
@@ -79,7 +79,7 @@ export const DESIGNS = [
   D('bear', 'Bear Market', 'hazard', 2, { text: 'Bank at most 75 Prosperity from a single card' }),
   D('hack', 'Quantum Hack', 'hazard', 2, { text: 'Trader ability disabled' }),
   // Performative piety: the candles are lit, and count for nothing.
-  D('virtue', 'The Virtue Signal', 'hazard', 2, { text: 'Performative piety: their candles count for nothing — Hail Mary odds fall to 1 in 12 until cleared' }),
+  D('virtue', 'The Virtue Signal', 'hazard', 2, { text: 'Performative piety: their candles add no winning faces to the Hail Mary until cleared' }),
   // Hellfire: a spiritual lock, not damage. Prayers do not leave hell. (Keeps
   // its Spanish name in the English row by the user's choice, like the apparitions.)
   D('infierno', 'El Infierno', 'hazard', 3, { text: 'Hellfire: they cannot attempt the Hail Mary or offer a Grace until cleared' }),
@@ -134,7 +134,7 @@ export const DESIGNS = [
   // Someone prays on your behalf: a candle, and a Calamity lifted.
   D('limpia', 'La Limpia', 'grace', 2, { savingGrace: 3, text: 'To the shrine: light a candle, and the egg sweeps one Calamity off you' }),
   // The lonely soul in the flames: a discredited Trader comes back from purgatory.
-  D('anima', 'Ánima Sola', 'grace', 1, { text: 'To the shrine: light a candle, and a discredited Trader returns from your discard to your bench, with 5 Credibility' }),
+  D('anima', 'Ánima Sola', 'grace', 1, { text: 'To the shrine: light a candle, and return the most recently discarded Trader with 5 Credibility to your empty seat or to your hand' }),
   // Her tears fall for the fallen: a plain candle, and the strongest rescue in the hand.
   D('lagrimas', 'Las Lágrimas', 'grace', 1, { savingGrace: 4, text: 'To the shrine: light a candle' }),
   D('confession', 'The Confession', 'grace', 1, { savingGrace: 3, text: 'To the shrine: light a candle, and your seated Trader’s Credibility is restored in full', printName: 'La Confesión' }),

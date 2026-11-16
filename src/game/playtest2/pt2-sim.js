@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // RL80 R-cana — Playtest 2: THE TRADING DESK (PLAYTEST2.md).
-// Traders carry CRED (durability) and LIQ (your income); one seat + a bench of two,
-// one free swap a turn. Scandals drain Credibility — discredited when all is lost. Candles restore it.
+// Traders carry CRED (durability) and LIQ (your income); one active seat.
+// Scandals drain Credibility — discredited when all is lost. Candles restore it.
 // 3–4 players, constructed 40-card decks, one main action a turn, race to bank 1,000 Prosperity.
 // Liquidity funds plays; Assets sell later for cash or Prosperity; Hazards stick until cleared;
 // Remedies, Artifacts (max two equipped); La Ofrenda lights candles at Our Lady's shrine (max three),
-// each doubling the one-per-game Hail Mary from 1/12 up to 8/12 — success clears your hazards and banks 200.
+// each adding a winning face to the once-per-game Hail Mary, from 1/8 to 4/8 — success clears your hazards and banks 200.
 //   node pt-sim.js --games 2000 --players 3 --bots greedy,greedy,random
 //   node pt-sim.js --verbose --seed 7 --players 3
 export function makeRng(seed) { let s = seed >>> 0 || 1; return () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -41,21 +41,32 @@ export const RECIPES = {
     ['ofrenda', 1]],
 };
 export const STARTER = RECIPES.devotion;
-export const ODDS = [1, 2, 4, 8, 11]; // twelfths, by recorded deeds (cap 3); the fifth rung is only reached by The Fountain
+export const HAIL_DIE_SIDES = 8;
+export const ODDS = [1, 2, 3, 4, 5]; // winning faces, by recorded deeds (cap 3); the fifth rung is only reached by The Fountain
 
 export class Game {
   constructor({ players, seed = 1, verbose = false, winAt = 1000, maxTurns = 300 }) {
     this.rng = makeRng(seed); this.verbose = verbose; this.lines = []; this.winAt = winAt; this.maxTurns = maxTurns;
     this.fx = {}; this.dealing = true;
-    this.players = players.map((cfg, idx) => ({ idx, name: cfg.name, policy: cfg.policy, trader: null, bench: [], recipe: cfg.recipe || 'devotion',
+    this.players = players.map((cfg, idx) => ({ idx, name: cfg.name, policy: cfg.policy, trader: null, recipe: cfg.recipe || 'devotion',
       deck: this.shuffle(RECIPES[cfg.recipe || 'devotion'].flatMap(([k, n]) => Array.from({ length: n }, () => ({ ...byKey[k] })))),
       hand: [], discard: [], invest: [], seeds: [], artifacts: [], location: null, hazards: [], liq: 5, pros: 0, deeds: 0, hailUsed: false,
       stats: { plays: 0, hires: 0, disgraces: 0, sells: 0, sellCash: 0, sellPros: 0, hazPlayed: 0, hazCleared: 0, remedyRival: 0, candles: 0, hail: 0, hailWon: 0, passes: 0, discards: 0, turns: 0, hazTurns: 0 } }));
     // draw() is async, but while dealing no Event fires, so each call mutates
     // before its first await and the hands are full when the constructor returns.
-    for (const p of this.players) for (let i = 0; i < 5; i++) this.draw(p, true);
-    this.dealing = false;
     this.turnNo = 0; this.over = false; this.winner = null;
+    for (const p of this.players) for (let i = 0; i < 5; i++) this.draw(p, true);
+    // The opening rule (2026-11-16): an opening five must hold a Trader. A hand without one
+    // goes back into the deck and is dealt again, so nobody starts the game unable to fill the seat.
+    for (const p of this.players) {
+      let redeals = 0;
+      while (!p.hand.some((c) => c.type === 'trader') && p.deck.some((c) => c.type === 'trader') && redeals < 20) {
+        p.deck.push(...p.hand.splice(0)); this.shuffle(p.deck); for (let i = 0; i < 5; i++) this.draw(p, true); redeals++;
+      }
+      p.stats.redeals = redeals;
+      if (redeals) this.log(`${p.name} was dealt no Trader — the hand goes back and five more are dealt${redeals > 1 ? ` (${redeals} times)` : ''}`);
+    }
+    this.dealing = false;
   }
   shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(this.rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
   log(t) { if (this.verbose) this.lines.push(`[T${this.turnNo}] ${t}`); }
@@ -74,7 +85,11 @@ export class Game {
       if (machine && await p.policy.useEnigma(this, p, c)) { p.artifacts.splice(p.artifacts.indexOf(machine), 1); p.discard.push(machine); this.log(`✦ ${c.name} is drawn by ${p.name} — the ENIGMA MACHINE intercepts it: the message never goes out`); return await this.draw(p, silent); }
       await this.event(p, c); return await this.draw(p, silent); // the market speaks, then you draw a replacement
     }
-    p.hand.push(c); if (!silent) this.log(`${p.name} draws${p.policy && p.policy.human ? ' ' + c.name : ''}`); return c;
+    if (c.type === 'trader') delete c.credNow;
+    p.hand.push(c);
+    if (!silent) this.hooks?.onDraw?.(p, c);
+    if (!silent) this.log(`${p.name} draws${p.policy && p.policy.human ? ' ' + c.name : ''}`);
+    return c;
   }
   async event(p, c) {
     this.log(`✦ EVENT — ${c.name} (drawn by ${p.name}): ${c.text}`);
@@ -115,12 +130,31 @@ export class Game {
       for (const q of held) this.log(`RIDE OR DIE: THE WHEEL passes ${q.name}'s portfolio by`);
     }
     if (c.key === 'moneda') { for (const q of this.players) { this.collect(q, 2); } this.log('THE AIRDROP — every player collects 2'); }
-    if (c.key === 'mardigras') { // Fat Tuesday: one die each, everyone catches their roll
-      const rolls = this.players.map((q) => { const r = 1 + Math.floor(this.rng() * 6); this.collect(q, r); return `${q.name} ${r}`; });
-      this.log(`MARDI GRAS — the dice show ${rolls.join(' · ')}: everyone collects their roll`);
+    const eventResult = {};
+    if (c.key === 'mardigras') {
+      eventResult.rolls = this.players.map(player => {
+        const roll = 1 + Math.floor(this.rng() * 6);
+        const collected = this.collect(player, roll);
+        return { player, roll, collected };
+      });
+      this.log('MARDI GRAS — ' + eventResult.rolls.map(({player, roll, collected}) =>
+        `${player.name} rolled ${roll}: ${collected ? '+' + collected + ' Liquidity' : roll + ' to Liquidity Trap'}`).join(' · '));
     }
-    if (c.key === 'illuminati') for (const q of this.players) if (q !== p && q.hand.length) { const t = q.hand.splice(Math.floor(this.rng() * q.hand.length), 1)[0]; p.hand.push(t); this.log(`THE ILLUMIN80 initiate ${p.name} — unseen hands move a card from ${q.name}${q.policy.human ? ` (your ${t.name})` : p.policy.human ? ` (${t.name})` : ''}`); }
-    if (this.hooks && this.hooks.onEvent) this.hooks.onEvent(p, c);
+    if (c.key === 'illuminati') {
+      const transfers = eventResult.transfers = [];
+      for (const from of this.rivals(p)) {
+        if (!from.hand.length) {
+          transfers.push({ from, card: null });
+          continue;
+        }
+        const [card] = from.hand.splice(Math.floor(this.rng() * from.hand.length), 1);
+        p.hand.push(card);
+        transfers.push({ from, card });
+        const visible = from.policy.human || p.policy.human;
+        this.log(`THE ILLUMIN80 — ${from.name} passed ${visible ? card.name : 'a card'} to ${p.name}`);
+      }
+    }
+    if (this.hooks?.onEvent) await this.hooks.onEvent(p, c, eventResult);
   }
   celebrityBankBonus(p, n, bearProof = false) {
     return this.is(p, 'celebridad') && p.liq >= 1 && (bearProof || !this.hasHaz(p, 'bear')) && !(this.hasHaz(p, 'bear') && n + 25 > 75) ? 25 : 0;
@@ -211,11 +245,11 @@ export class Game {
         const t = choice.target; if (!t || this.hasHaz(t, c.key)) { p.liq += cost; p.hand.push(c); p.stats.plays--; return false; }
         // reaction: Sacred Heart
         const heart = t.artifacts.find((a) => a.key === 'heart');
-        if (heart && await t.policy.useHeart(this, t, c, p)) { t.artifacts.splice(t.artifacts.indexOf(heart), 1); t.discard.push(heart); p.discard.push(c); this.log(`${t.name}'s SACRED HEART cancels ${c.name}`); return true; }
+        if (heart && await t.policy.useHeart(this, t, c, p)) { t.artifacts.splice(t.artifacts.indexOf(heart), 1); t.discard.push(heart); p.discard.push(c); this.log(`${t.name} spent ${heart.name} to block ${c.name}. ${c.name} went to ${p.policy.human ? 'your' : p.name + "’s"} discard pile.`); return true; }
         // EQUANIMITY: a seated Trader's composure. The Calamity fails on a roll of eq or lower — a stat, so a Quantum Hack does not switch it off.
         const eq = t.trader ? (t.trader.eq || 0) : 0;
         if (eq > 0) { const roll = 1 + Math.floor(this.rng() * 6);
-          if (roll <= eq) { p.discard.push(c); this.log(`${p.name} plays ${c.name} on ${t.name} — the die shows ${roll} against EQUANIMITY ${eq}: ${t.trader.name} does not flinch, it fails`); t.stats.eqSaves = (t.stats.eqSaves || 0) + 1;
+          if (roll <= eq) { p.discard.push(c); this.log(`${t.name} blocked ${c.name}. ${t.trader.name} rolled ${roll} on a d6. Equanimity ${eq} blocks on ${eq} or lower. ${c.name} went to ${p.policy.human ? 'your' : p.name + "’s"} discard pile.`); t.stats.eqSaves = (t.stats.eqSaves || 0) + 1;
             if (this.is(t, 'general')) { this.collect(t, 1); this.log(`FAULT TOLERANCE — ${t.name} collects 1`); } return true; }
           this.log(`the die shows ${roll} against EQUANIMITY ${eq} — ${c.name} lands`); }
         c.owner = p; c.by = p.idx; t.hazards.push(c); p.stats.hazPlayed++;
@@ -245,10 +279,17 @@ export class Game {
         if (!c.slots && this.relicsHeld(p).length >= this.relicSlots(p)) { const drop = choice.drop || this.relicsHeld(p)[0]; p.artifacts.splice(p.artifacts.indexOf(drop), 1); p.discard.push(drop); this.log(`${p.name} unequips ${drop.name}`); }
         p.artifacts.push(c); this.log(`${p.name} equips ${c.name}`); break; }
       case 'trader': {
-        c.credNow = c.cred; p.stats.hires++;
-        if (!p.trader) { p.trader = c; this.log(`${p.name} seats ${c.name} at the desk (LIQ ${c.liq} · CRED ${c.cred} · EQ ${c.eq || 0})`);
-          if (c.key === 'gato' && p.hazards.length && this.abilityOn(p)) { const h = choice.hazard || p.hazards[0]; this.clearHazard(p, h, p, 'EL GATO knocks it off the table'); } }
-        else { p.bench.push(c); this.log(`${c.name} joins ${p.name}'s bench`); }
+        if (p.trader) {
+          this.log(`${p.name} discards ${p.trader.name} to seat ${c.name}`);
+          p.discard.push(p.trader);
+        }
+        c.credNow ??= c.cred;
+        p.trader = c;
+        p.stats.hires++;
+        this.log(`${p.name} seats ${c.name} at the desk (LIQ ${c.liq} · CRED ${c.credNow} · EQ ${c.eq || 0})`);
+        if (c.key === 'gato' && p.hazards.length && this.abilityOn(p)) {
+          this.clearHazard(p, choice.hazard || p.hazards[0], p, 'EL GATO knocks it off the table');
+        }
         break; }
       case 'grace': {
         if (c.key === 'rose') {
@@ -257,13 +298,13 @@ export class Game {
           if (await t.policy.acceptRose(this, t, p)) { c.bornTurn = this.turnNo; t.invest.push(c); this.log(`${t.name} accepts the Rose`); await this.lightCandle(p, 'the Rose, accepted'); }
           else { p.hand.push(c); this.log(`${t.name} declines the Rose`); }
           break; }
-        if (c.key === 'fountain') { p.fountain = (p.fountain || 0) + 1; this.log(`${p.name} tosses a coin in THE FOUNTAIN — Hail Mary odds rise to ${this.odds(p)}/12`); break; }
+        if (c.key === 'fountain') { p.fountain = (p.fountain || 0) + 1; this.log(`${p.name} tosses a coin in THE FOUNTAIN — Hail Mary odds rise to ${this.odds(p)}/${HAIL_DIE_SIDES}`); break; }
         // the card itself is the offering: it leaves the game for the shrine
         this.log(`${p.name} places ${c.name} at Our Lady’s shrine`);
         await this.lightCandle(p, c.name);
         if (c.key === 'cherub') await this.draw(p);
         if (c.key === 'limpia' && p.hazards.length) this.clearHazard(p, choice.hazard || p.hazards[0], p, 'LA LIMPIA sweeps it away');
-        if (c.key === 'anima') { const back = [...p.discard].reverse().find((x) => x.type === 'trader'); if (back && (!p.trader || p.bench.length < 2)) { p.discard.splice(p.discard.indexOf(back), 1); back.credNow = Math.min(5, back.cred); if (p.trader) p.bench.push(back); else p.trader = back; this.log(`ÁNIMA SOLA — ${back.name} returns from purgatory to ${p.name}'s ${p.trader === back ? 'desk' : 'bench'} with ${back.credNow} Grace`); } else this.log('ÁNIMA SOLA — nobody to bring back'); }
+        if (c.key === 'anima') { const back = [...p.discard].reverse().find((x) => x.type === 'trader'); if (back) { p.discard.splice(p.discard.indexOf(back), 1); back.credNow = Math.min(5, back.cred); if (p.trader) p.hand.push(back); else p.trader = back; this.log(`ÁNIMA SOLA — ${back.name} returns from purgatory to ${p.name}'s ${p.trader === back ? 'desk' : 'hand'} with ${back.credNow} Grace`); } else this.log('ÁNIMA SOLA — nobody to bring back'); }
         if (c.key === 'confession' && p.trader && p.trader.credNow != null && p.trader.credNow < p.trader.cred) { p.trader.credNow = p.trader.cred; this.log(`${p.trader.name} is absolved — Grace restored to ${p.trader.cred}`); }
         break; }
     }
@@ -300,12 +341,18 @@ export class Game {
     this.log(`${w.kind === 'hail' ? 'the Hail Mary' : w.name} shows ${w.roll} — ${p.name}'s DASHBOARD FIGURE nods: roll again`); return true;
   }
   async hailMary(p) {
-    p.hailUsed = true; p.stats.hail++; const twelfths = this.odds(p);
-    let roll = 1 + Math.floor(this.rng() * 12);
-    if (roll > twelfths && await this.dashboard(p, { kind: 'hail', roll })) roll = 1 + Math.floor(this.rng() * 12);
-    const ok = roll <= twelfths;
-    this.log(`✝ ${p.name} attempts the HAIL MARY at ${twelfths}/12 with ${p.deeds} candle${p.deeds === 1 ? '' : 's'}… the die shows ${roll}: ${ok ? 'ANSWERED' : 'unanswered'}`);
+    p.hailUsed = true; p.stats.hail++; const winningFaces = this.odds(p);
+    const rolls = [1 + Math.floor(this.rng() * HAIL_DIE_SIDES)];
+    if (rolls[0] > winningFaces && await this.dashboard(p, { kind: 'hail', roll: rolls[0] })) {
+      rolls.push(1 + Math.floor(this.rng() * HAIL_DIE_SIDES));
+    }
+    const roll = rolls[rolls.length - 1];
+    const before = p.pros;
+    const cleared = roll <= winningFaces ? p.hazards.map(h => h.name) : [];
+    const ok = roll <= winningFaces;
+    this.log(`✝ ${p.name} attempts the HAIL MARY at ${winningFaces}/${HAIL_DIE_SIDES} with ${p.deeds} candle${p.deeds === 1 ? '' : 's'}… the die shows ${roll}: ${ok ? 'ANSWERED' : 'unanswered'}`);
     if (ok) { for (const h of [...p.hazards]) this.clearHazard(p, h, p, 'grace'); p.stats.hailWon++; this.bank(p, 200, 'hail'); }
+    await this.hooks?.onHailResult?.(p, { rolls, winningFaces, ok, banked: p.pros - before, cleared });
     return ok;
   }
 
@@ -313,8 +360,7 @@ export class Game {
     const A = [];
     for (const c of p.hand) {
       const cost = this.costOf(p, c); if (p.liq < cost) continue;
-      if (c.type === 'asset' || c.type === 'artifact' || c.type === 'location') A.push({ t: 'play', c });
-      else if (c.type === 'trader') { if (!p.trader || p.bench.length < 2) A.push({ t: 'play', c }); }
+      if (c.type === 'asset' || c.type === 'artifact' || c.type === 'location' || c.type === 'trader') A.push({ t: 'play', c });
       else if (c.type === 'event' && c.played) { if (this.hasHaz(p, 'scam')) continue; if (!c.choice) { if (c.bearProof || c.bloom || !(this.hasHaz(p, 'bear') && this.eventPayout(p, c) > 75)) A.push({ t: 'play', c }); } else { A.push({ t: 'play', c, choice: { cash: true } }); if (!(this.hasHaz(p, 'bear') && c.pros > 75)) A.push({ t: 'play', c, choice: {} }); } }
       else if (c.type === 'hazard') { for (const r of this.rivals(p)) if (!this.hasHaz(r, c.key)) A.push({ t: 'play', c, choice: { target: r } }); }
       else if (c.type === 'remedy') { for (const q of this.players) for (const h of q.hazards) if (c.clears === 'any' || h.key === c.clears) A.push({ t: 'play', c, choice: { target: q, hazard: h } }); if (c.key === 'publicista' && p.trader && p.trader.credNow != null && p.trader.credNow < p.trader.cred) A.push({ t: 'play', c, choice: { polish: true } }); if (c.refresh) A.push({ t: 'play', c, choice: { refresh: true } }); }
@@ -323,7 +369,6 @@ export class Game {
     for (const a of p.invest) if (a.uncork && p.deeds < 3 && !this.is(p, 'bot')) A.push({ t: 'uncork', a });
     for (const a of p.invest) { if (this.hasHaz(p, 'rug') || a.bornTurn === this.turnNo) continue; A.push({ t: 'sell', a, pros: false }); if (a.bearProof || !(this.hasHaz(p, 'bear') && this.saleValue(a) > 75)) A.push({ t: 'sell', a, pros: true }); }
     if (p.liq >= 3) for (const h of p.hazards) A.push({ t: 'payclear', h });
-    if (!p.swapUsed) for (let i = 0; i < p.bench.length; i++) A.push({ t: 'swap', i });
     if (!p.hailUsed && !this.hasHaz(p, 'infierno')) A.push({ t: 'hail' });
     A.push({ t: 'pass' });
     return A;
@@ -335,17 +380,12 @@ export class Game {
       case 'uncork': { const w = a.a; p.invest.splice(p.invest.indexOf(w), 1); p.discard.push(w); this.log(`${p.name} uncorks ${w.name}`); await this.lightCandle(p, 'La Cava'); return true; }
       case 'payclear': return this.payClear(p, a.h);
       case 'hail': return this.hailMary(p);
-      case 'swap': { p.swapUsed = true; const b = p.bench[a.i];
-        if (p.trader) { p.bench[a.i] = p.trader; this.log(`${p.name} swaps: ${b.name} takes the seat, ${p.trader.name} to the bench`); p.trader = b; }
-        else { p.bench.splice(a.i, 1); p.trader = b; this.log(`${p.name} promotes ${b.name} from the bench`); }
-        return true; }
       case 'pass': this.log(`${p.name} passes`); return true;
     }
   }
   async turn(p) {
     p.peekedThisTurn = false; p.stats.turns++; if (p.hazards.length) p.stats.hazTurns++;
     for (const k of Object.keys(this.fx)) if (this.fx[k].owner === p.idx) { delete this.fx[k]; this.log(`${byKey[k].name} blows over`); }
-    p.swapUsed = false;
     // Compound Interest belongs to the active, enabled Trader. Resolve it
     // through bank() so Calamities and the victory check still apply.
     if (this.is(p, 'unicornio') && p.pros >= 100) {
@@ -416,13 +456,10 @@ export class Game {
         else this.log(`DUE DILIGENCE — ${p.name} reads the tape${p.policy.human ? ` (${top.name})` : ''} and leaves it`); }
     }
     await this.draw(p);
-    for (let step = 0; step < 4; step++) {
-      const action = await p.policy.main(this, p) || { t: 'pass' };
-      const before = this.hooks?.beforeAction?.();
-      const result = await this.act(p, action);
-      await this.hooks?.onAction?.(p, action, before, result);
-      if (action.t !== 'swap' || this.over) break;
-    }
+    const action = await p.policy.main(this, p) || { t: 'pass' };
+    const before = this.hooks?.beforeAction?.();
+    const result = await this.act(p, action);
+    await this.hooks?.onAction?.(p, action, before, result);
     while (p.hand.length > 7) { const d = await p.policy.discardOne(this, p); p.hand.splice(p.hand.indexOf(d), 1); p.discard.push(d); p.stats.discards++; }
     if (this.hooks && this.hooks.render) await this.hooks.render();
   }
@@ -442,7 +479,7 @@ export class RandomBot {
   discardOne(g, p) { return p.hand[Math.floor(this.rng() * p.hand.length)]; }
   useDashboard() { return this.rng() < 0.5; }
   useSavingGrace(g, p, cards) { return this.rng() < 0.5 ? cards[Math.floor(this.rng() * cards.length)] : null; }
-  buryTrader(g, p) { return p.bench.length > 0 && this.rng() < 0.2; }
+  buryTrader(g, p) { return p.hand.some(c => c.type === 'trader' && g.costOf(p, c) <= p.liq) && this.rng() < 0.2; }
   useEnigma() { return this.rng() < 0.5; }
   dueDiligence() { return this.rng() < 0.5; }
   main(g, p) { const A = g.legalActions(p); return A[Math.floor(this.rng() * A.length)]; }
@@ -457,19 +494,19 @@ export class GreedyBot {
   useEnigma(g, p, c) { return c.subtype === 'Calamity' || c.subtype === 'Ambiguity'; }
   // Always saves the Trader, with the card that leaves the most Credibility.
   // Bury a seated Trader in the Catacombs when a replacement waits and the honors are worth it, or a Scandal is grinding them down.
-  buryTrader(g, p) { const c = p.trader.credNow ?? p.trader.cred; return p.bench.length > 0 && (c * 5 >= 60 || g.hasHaz(p, 'escandalo')); }
+  buryTrader(g, p) { const c = p.trader.credNow ?? p.trader.cred; return p.hand.some(c => c.type === 'trader' && g.costOf(p, c) <= p.liq) && (c * 5 >= 60 || g.hasHaz(p, 'escandalo')); }
   useSavingGrace(g, p, cards) { return [...cards].sort((a, b) => b.savingGrace - a.savingGrace)[0]; }
-  // Bottoms the weather that would hurt (the Enigma's rule), a Trader when the desk and bench are full, or a card too dear to play soon.
+  // Bottoms the weather that would hurt (the Enigma's rule), a Trader when a spare is already affordable, or a card too dear to play soon.
   dueDiligence(g, p, c) {
     if (c.type === 'event' && !c.played) return c.subtype === 'Calamity' || c.subtype === 'Ambiguity';
-    if (c.type === 'trader') return !!p.trader && p.bench.length > 0;
+    if (c.type === 'trader') return !!p.trader && p.hand.some(c => c.type === 'trader' && g.costOf(p, c) <= p.liq);
     if (c.type === 'location') return !!p.location;
     return c.cost > p.liq + 3;
   }
   discardOne(g, p) { const order = { hazard: 0, remedy: 1, artifact: 2, trader: 3, grace: 4, asset: 5, event: 6 } /* an event in hand is a played one */; return [...p.hand].sort((a, b) => (order[a.type] ?? 9) - (order[b.type] ?? 9))[0]; }
   score(g, p, a) {
     const lead = [...g.rivals(p)].sort((x, y) => y.pros - x.pros)[0];
-    const twelfths = g.odds(p); const hailEV = (twelfths / 12) * 200;
+    const winningFaces = g.odds(p); const hailEV = (winningFaces / HAIL_DIE_SIDES) * 200;
     let s = 0;
     if (a.t === 'play' && a.c.type === 'event' && a.c.played) { const ev = g.eventPayout(p, a.c); s = a.choice && a.choice.cash ? (p.liq < 3 ? 60 : 20) : ev - a.c.cost * 5 - (a.c.bloom ? 60 : 0) - (a.c.rivalsCollect ? 8 : 0) + (p.pros + ev >= g.winAt ? 9999 : 0); }
     if (a.t === 'uncork') s = p.deeds === 2 && !p.hailUsed ? 52 : p.deeds < 3 && p.liq >= 4 ? 18 : 0;
@@ -483,12 +520,11 @@ export class GreedyBot {
     if (a.t === 'play' && a.c.type === 'artifact') s = 35;
     if (a.t === 'play' && a.c.type === 'location') s = p.location ? 0 : (p.liq >= a.c.cost + 2 ? 58 : 30); // never tear a standing place down for another
     if (a.t === 'play' && a.c.type === 'grace') s = !p.hailUsed ? 57 - p.deeds * 4 : 2;
-    if (a.t === 'play' && a.c.type === 'trader') s = !p.trader ? 72 + a.c.liq * 3 : (p.bench.length < 2 ? 26 + a.c.liq * 3 : 4);
-    if (a.t === 'swap') { const b = p.bench[a.i]; s = !p.trader ? 85 : (p.trader.credNow != null && p.trader.credNow <= 4 && b.credNow > p.trader.credNow ? 46 : 3); }
+    if (a.t === 'play' && a.c.type === 'trader') s = !p.trader ? 72 + a.c.liq * 3 : (p.trader.credNow <= 4 && (a.c.credNow ?? a.c.cred) > p.trader.credNow ? 46 : a.c.liq > p.trader.liq ? 30 : 0);
     if (a.t === 'play' && a.c.key === 'escandalo' && a.choice && !a.choice.target.trader) s = 5;
     if (a.t === 'play' && a.choice && a.choice.polish) s = p.trader && p.trader.credNow <= p.trader.cred - 5 ? 42 : 6;
     if (a.t === 'payclear') s = (p.liq >= 5 ? 66 : 20) + (a.h.key === 'trap' ? (a.h.pile || 0) * 8 : 0);
-    if (a.t === 'hail') s = p.pros + 200 >= g.winAt ? (twelfths >= 4 ? 90 : 30) : twelfths >= 8 ? 72 : lead && lead.pros >= g.winAt - 150 ? 45 : hailEV / 4;
+    if (a.t === 'hail') s = p.pros + 200 >= g.winAt ? (winningFaces >= 3 ? 90 : 30) : winningFaces >= 4 ? 72 : lead && lead.pros >= g.winAt - 150 ? 45 : hailEV / 4;
     if (a.t === 'pass') s = 1;
     return s;
   }

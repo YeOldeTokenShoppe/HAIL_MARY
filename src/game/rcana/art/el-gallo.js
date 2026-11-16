@@ -24,10 +24,6 @@ export default {
 
     // The bell, on the subject rung with the bracket it hangs from, so the
     // two move as one on tilt.
-    {
-      id: "prop", z: ART_PLANES.subject, scale: 1,
-      swingSound: "/audio/churchBell.mp3",
-      swingOrigin: "32% 43%", // Hanging ring on the full prop image.
-    },
+    { id: "prop", z: ART_PLANES.subject, scale: 1 },
   ],
 };

@@ -68,7 +68,7 @@ injects `designs.js` and the faces into `pt2-table.src.html` and writes
    ABIL80 pill on the same row; authored newlines in `ability` separate
    timing from outcomes when useful.
    Trader abilities have a centered **ABIL80** (Ability) heading above the rule.
-   The player inhabits one active Trader; other Traders can wait on the bench.
+   The player inhabits one active Trader; spare Traders stay in hand until played to replace them.
    Traders use ABIL80 plus their ability title, with timing and limits
    written in the rules. They do not need a separate usage pill. Add a timing
    badge only if a future activation mechanic needs one.
@@ -434,7 +434,7 @@ El Diablito uses the existing coin-flipping art (`Diablito2.webp` plus the
 separate `Diablito_Coin.webp` prop). **Devil’s Wager** resolves at turn start:
 heads grants 1 Hydro; tails costs El Diablito 1 CRED. This replaces the old
 refused-offer face text and the playtest's old Calamity rebate. The playtest
-resolves the flip before income, respects Quantum Hack/Halo and the bench,
+resolves the flip before income, respects Quantum Hack/Halo and active-seat status,
 and uses the existing disgrace/Shroud rules. Run the mechanic checks with
 `node --test scripts/rcana-diablito.test.mjs`.
 

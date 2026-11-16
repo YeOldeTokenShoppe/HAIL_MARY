@@ -748,7 +748,14 @@ export default function RcanaCard({
           ...(clip ? pctBox(clip) : null),
         }}
       >
-        {layer.src ? (
+        {layer.clapperOrigin ? (
+          <div className="rc-clapper-mount" data-swing={ready && !plate && d > 0 ? "" : undefined}
+            style={{ ...(clip ? cardSpan(clip) : null), transformOrigin: layer.swingOrigin,
+              transform: `translate(${layer.offset.x}%, ${layer.offset.y}%) scale(${layer.scale})` }}>
+            <img src={layer.src} alt="" draggable={false} decoding="async"
+              style={{ transformOrigin: layer.clapperOrigin, transform: `rotate(${layer.clapperRestAngle ?? "0deg"})` }} />
+          </div>
+        ) : layer.src ? (
           <img
             data-candle-base={layer.candleReveal && d > 0 ? "" : undefined}
             data-swing={layer.swingOrigin && ready && !plate && d > 0 ? "" : undefined}
@@ -1466,7 +1473,8 @@ const RCANA_STYLES = `
 @media screen and (prefers-reduced-motion: no-preference) {
   .rc-depth img[data-drop-wait] { translate: 0 var(--drop-start, 0%); }
   .rc-depth img[data-drop] { animation: rc-coin-drop 580ms cubic-bezier(.35,0,.8,.65) 260ms both; }
-  .rc-depth img[data-swing] { animation: rc-ring-swing 1.9s ease-in-out 1; }
+  .rc-clapper-mount[data-swing] img { animation: rc-clapper-lag 1.9s ease-in-out 1; }
+  .rc-clapper-mount[data-swing], .rc-depth img[data-swing] { animation: rc-ring-swing 1.9s ease-in-out 1; }
 }
 .rc-marquee { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; transform-origin: 50% 45%; }
 .rc-marquee circle { opacity: 0; }
@@ -1533,6 +1541,14 @@ const RCANA_STYLES = `
   from { translate: 0 var(--drop-start, 0%); scale: 1 1; }
   55% { scale: .85 1; }
   to { translate: 0 var(--drop-travel); scale: .16 1; }
+}
+/* Relative to the moving shell: trail the first upswing, then overshoot. */
+@keyframes rc-clapper-lag {
+  0%, 100% { rotate: 0deg; }
+  16% { rotate: -17deg; }
+  39% { rotate: 16deg; }
+  61% { rotate: -8deg; }
+  81% { rotate: 3deg; }
 }
 @keyframes rc-ring-swing {
   0%, 100% { rotate: 0deg; }

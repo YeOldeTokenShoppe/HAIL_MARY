@@ -4977,7 +4977,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				(function setupChurchBellSfx() {
 					const BELL_VOLUME = 0.7;              // 0..1 base level (tune here)
 					const MUTE_KEY = 'fountain_water_muted';
-					const SRC = '/audio/churchBell.mp3';
+					const SRC = 'public/audio/churchBell.mp3';
 
 					const AC = window.AudioContext || window.webkitAudioContext;
 					let ctx = null, buffer = null, decoding = false, failed = false;

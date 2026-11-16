@@ -53,8 +53,9 @@ for (const c of RCANA_SET) {
 // way the cards themselves do; the engine keeps playing by type.
 const facesSrc = `const FACES = ${JSON.stringify(faces, null, 2)};\nconst TYPE_CLASS = ${JSON.stringify(TYPE_CLASS)};\nconst EVENT_SUBTYPES = ${JSON.stringify(eventSubtypes)};`;
 
+const confetti = readFileSync(join(root, 'node_modules/canvas-confetti/dist/confetti.browser.js'), 'utf8');
 let page = readFileSync(join(here, 'pt2-table.src.html'), 'utf8');
-for (const [slot, src] of [['/*__ENGINE__*/', engine], ['/*__FACES__*/', facesSrc]]) {
+for (const [slot, src] of [['/*__CONFETTI__*/', confetti], ['/*__ENGINE__*/', engine], ['/*__FACES__*/', facesSrc]]) {
   if (!page.includes(slot)) throw new Error(`pt2-table.src.html is missing its ${slot} slot`);
   page = page.replace(slot, () => src);
 }
