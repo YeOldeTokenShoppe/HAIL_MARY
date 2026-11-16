@@ -525,6 +525,15 @@ export function toRcanaCard(card, overrides = {}) {
     artLayers: layers.map((l, i) => ({
       id: l.id || `layer-${i}`,
       src: l.src || artPath(card.id, l.id || `layer-${i}`),
+      swingOrigin: l.swingOrigin,
+      swingSound: l.swingSound,
+      drop: l.drop,
+      priceReveal: l.priceReveal,
+      candleReveal: l.candleReveal,
+      scaleReveal: l.scaleReveal,
+      fadingShadow: l.fadingShadow,
+      sealLight: l.sealLight,
+      marquee: l.marquee,
       scale: l.scale ?? 1.06,
       offset: { x: 0, y: 0, ...l.offset },
       // Optional CSS filter for the layer. `blur` is a shorthand: a number in

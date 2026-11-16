@@ -117,6 +117,145 @@ const clearMask = (boxes) => {
   return `url("data:image/svg+xml,${svg}")`;
 };
 
+// The board and pointer overlays use their respective La Plata art canvases.
+function ScaleReveal({ layer, style, running, playSound }) {
+  const id = React.useId().replace(/:/g, "");
+  const { part, patch, sound } = layer.scaleReveal;
+  return (
+    <svg aria-hidden="true" className="rc-scale-reveal" data-running={running || undefined}
+      style={style} viewBox="0 0 1070 1470" preserveAspectRatio="xMidYMid slice">
+      {part === "board" ? (
+        <image className="rc-chart-cover" href={patch} width="1070" height="590" />
+      ) : (
+        <g className="rc-live-dial">
+          <defs>
+            <clipPath id={id + "-pointer"}>
+              <path d="M550 748 L628 669 L631 667 L630 672 L566 758 Z" />
+            </clipPath>
+            <clipPath id={id + "-hub"}><ellipse cx="555.5" cy="759" rx="20" ry="20" /></clipPath>
+          </defs>
+          <image href={patch} x="548" y="664" width="96" height="108" />
+          <g className="rc-scale-pointer" onAnimationEnd={event => {
+            if (event.animationName === "rc-scale-settle") playSound(sound);
+          }}>
+            <image href={layer.src} width="1070" height="1470" clipPath={`url(#${id}-pointer)`} />
+          </g>
+          <image href={layer.src} width="1070" height="1470" clipPath={`url(#${id}-hub)`} />
+        </g>
+      )}
+    </svg>
+  );
+}
+
+function MarqueeChase({ layer, style, running }) {
+  const id = React.useId().replace(/:/g, "");
+  const { bulbs, viewBox } = layer.marquee;
+  let delay = 240;
+  return (
+    <svg aria-hidden="true" className="rc-marquee" data-running={running || undefined}
+      style={style} viewBox={viewBox} preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id={id + "-bulb"}>
+          <stop offset="0%" stopColor="#fff" />
+          <stop offset="25%" stopColor="#fff7cc" />
+          <stop offset="55%" stopColor="#ffd357" stopOpacity=".85" />
+          <stop offset="100%" stopColor="#ffac36" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <g fill={`url(#${id}-bulb)`}>
+        {bulbs.map(([x, y], i) => {
+          // Travel at constant speed, including behind the crossing and frame.
+          if (i) delay += 1.7 * Math.hypot(x - bulbs[i - 1][0], y - bulbs[i - 1][1]);
+          return <circle key={i} cx={x} cy={y} r="7" style={{ animationDelay: `${delay}ms` }} />;
+        })}
+      </g>
+    </svg>
+  );
+}
+
+function SealLight({ layer, style, running }) {
+  const id = React.useId().replace(/:/g, "");
+  const { width, height, x, y, rx, ry } = layer.sealLight;
+  return (
+    <svg aria-hidden="true" className="rc-seal-light" data-running={running || undefined}
+      style={style} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id={id + "-falloff"}>
+          <stop offset="40%" stopColor="white" /><stop offset="100%" stopColor="white" stopOpacity="0" />
+        </radialGradient>
+        <mask id={id + "-seal"} maskUnits="userSpaceOnUse" x="0" y="0" width={width} height={height}>
+          <ellipse cx={x} cy={y} rx={rx} ry={ry} fill={`url(#${id}-falloff)`} />
+        </mask>
+      </defs>
+      <image href={layer.src} width={width} height={height} mask={`url(#${id}-seal)`}
+        style={{ filter: "brightness(1.35) saturate(1.12)" }} />
+    </svg>
+  );
+}
+
+function CandleReveal({ layer, style, running, playSound }) {
+  const id = React.useId().replace(/:/g, "");
+  const { width, height, wickX, wickY, candleBody, sound } = layer.candleReveal;
+  const href = (part) => `url(#${id}-${part})`;
+  return (
+    <svg aria-hidden="true" className="rc-candle-reveal" data-running={running || undefined}
+      style={style}
+      viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id={id + "-edge"}>
+          <stop offset=".65" stopColor="white" /><stop offset="1" stopColor="white" stopOpacity="0" />
+        </radialGradient>
+        <mask id={id + "-wick"} maskUnits="userSpaceOnUse" x="0" y="0" width={width} height={height}>
+          <rect width={width} height={height} fill="white" />
+          <ellipse cx={wickX} cy={wickY - 30} rx="180" ry="163" fill="black" />
+          <path d={candleBody} fill="white" />
+          <circle className="rc-wick-light" cx={wickX} cy={wickY} r="315" fill={href("edge")}
+            style={{ transformOrigin: `${wickX}px ${wickY}px` }}
+            onAnimationStart={event => { if (event.animationName === "rc-wick-catch") playSound(sound); }} />
+        </mask>
+      </defs>
+      <image href={layer.src} width={width} height={height} mask={href("wick")} className="rc-cellar-art" />
+    </svg>
+  );
+}
+
+function PriceReveal({ layer, style, running, playSound }) {
+  const id = React.useId().replace(/:/g, "");
+  const { width, height, digit, pit, sound } = layer.priceReveal;
+  // Both SVG and the subject image cover the same art canvas through tilt.
+  return (
+    <svg aria-hidden="true" className="rc-price-reveal" data-running={running || undefined}
+      style={style} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id={id + "-drum"} x2="0" y2="1" gradientUnits="objectBoundingBox">
+          <stop stopColor="#493a2c" /><stop offset=".53" stopColor="#372c22" />
+          <stop offset="1" stopColor="#261c15" />
+        </linearGradient>
+        <linearGradient id={id + "-shine"}>
+          <stop stopColor="#fff4bd" stopOpacity="0" /><stop offset=".5" stopColor="#fff7d3" stopOpacity=".75" />
+          <stop offset="1" stopColor="#fff4bd" stopOpacity="0" />
+        </linearGradient>
+        <clipPath id={id + "-pit"}>
+          <ellipse cx={pit.x} cy={pit.y} rx={pit.rx} ry={pit.ry} transform={`rotate(${pit.angle} ${pit.x} ${pit.y})`} />
+        </clipPath>
+      </defs>
+      <svg {...digit} overflow="hidden">
+        <rect width="100%" height="100%" fill={`url(#${id}-drum)`} />
+        <g className="rc-price-digit" style={{ "--drum-step": digit.height + "px" }} onAnimationEnd={event => {
+          if (event.animationName === "rc-price-roll") playSound(sound);
+        }}>
+          <svg width={digit.width} height={digit.height} viewBox={`${digit.x} ${digit.y} ${digit.width} ${digit.height}`}>
+            <image href={layer.src} width={width} height={height} />
+          </svg>
+        </g>
+      </svg>
+      <g clipPath={`url(#${id}-pit)`}>
+        <rect className="rc-price-glint" x={pit.x} y={pit.y - 180} width="24" height="360" fill={`url(#${id}-shine)`} />
+      </g>
+    </svg>
+  );
+}
+
 export default function RcanaCard({
   data,
   scale = 1,
@@ -207,9 +346,28 @@ export default function RcanaCard({
 }) {
   const cardRef = useRef(null);
   const interactingRef = useRef(false);
+  const revealAudio = useRef(null);
   const [tilt, setTilt] = useState(REST);
   const [reducedMotion, setReducedMotion] = useState(true);
   const motionEnabled = interactive && !reducedMotion;
+
+  useEffect(() => () => {
+    revealAudio.current?.pause();
+    revealAudio.current = null;
+  }, [motionEnabled, depth, data.number]);
+
+  function playRevealSound(src) {
+    if (document.hidden) return;
+    try {
+      if (window.localStorage.getItem("rcana.pt2.sound") === "off") return;
+    } catch { /* Storage can be unavailable in an embedded viewer. */ }
+    revealAudio.current?.pause();
+    const audio = new Audio(src);
+    revealAudio.current = audio;
+    audio.volume = 0.35;
+    // A direct link may open before the browser permits audible playback.
+    audio.play().catch(() => {});
+  }
 
   // A card scrolled out of view has no depth to show, so it should not be
   // paying for an animation frame. Without IntersectionObserver, assume on.
@@ -489,14 +647,17 @@ export default function RcanaCard({
     const list = [];
     if (!hideFrame) { if (data.frameImage) list.push(data.frameImage); if (data.badgeImage) list.push(data.badgeImage); }
     if (metalPrinted) list.push(metal.src);
-    for (const l of data.artLayers || []) if (l.src) list.push(l.src);
+    for (const l of data.artLayers || []) {
+      if (l.src) list.push(l.src);
+      if (interactive && l.scaleReveal) list.push(l.scaleReveal.patch);
+    }
     if (showFx) for (const f of data.fxLayers || []) if (f.src) list.push(f.src);
     if (typeof data.backdrop === "string") {
       const m = data.backdrop.match(/url\(["']?([^"')]+)["']?\)/);
       if (m) list.push(m[1]); else if (data.backdrop.startsWith("/")) list.push(data.backdrop);
     }
     return Array.from(new Set(list));
-  }, [data, hideFrame, metalPrinted, metal, showFx]);
+  }, [data, hideFrame, metalPrinted, metal, showFx, interactive]);
   // Every mount starts behind the plate, even when its sources are already
   // in memory: a cached file still has to be decoded at THIS element's
   // display size, and the frame lands a frame after the art planes — the
@@ -589,6 +750,17 @@ export default function RcanaCard({
       >
         {layer.src ? (
           <img
+            data-candle-base={layer.candleReveal && d > 0 ? "" : undefined}
+            data-swing={layer.swingOrigin && ready && !plate && d > 0 ? "" : undefined}
+            data-shadow-fade={layer.fadingShadow && d > 0 ? (ready && !plate ? "running" : "waiting") : undefined}
+            data-drop-wait={layer.drop && plate && d > 0 ? "" : undefined}
+            data-drop={layer.drop && ready && !plate && d > 0 ? "" : undefined}
+            onAnimationEnd={layer.drop?.sound ? (event) => {
+              if (event.animationName === "rc-coin-drop") playRevealSound(layer.drop.sound);
+            } : undefined}
+            onAnimationStart={layer.swingSound ? (event) => {
+              if (event.animationName === "rc-ring-swing") playRevealSound(layer.swingSound);
+            } : undefined}
             src={layer.src}
             alt=""
             draggable={false}
@@ -597,6 +769,8 @@ export default function RcanaCard({
               // Puts the image back on the card rect inside that box, so a
               // percent offset means the same thing on either kind of layer.
               ...(clip ? cardSpan(clip) : null),
+              ...(layer.drop ? { transformOrigin: layer.drop.origin, "--drop-start": layer.drop.start, "--drop-travel": layer.drop.travel } : null),
+              ...(layer.swingOrigin ? { transformOrigin: layer.swingOrigin } : null),
               transform: `translate(${layer.offset.x}%, ${layer.offset.y}%) scale(${layer.scale})`,
               // Per-layer treatment from the art file — a soft far plane is
               // depth of field, and sells the parallax harder than the
@@ -606,6 +780,31 @@ export default function RcanaCard({
           />
         ) : (
           <div className="rc-missing">{layer.id}</div>
+        )}
+        {layer.scaleReveal && d > 0 && (
+          <ScaleReveal layer={layer} running={ready && !plate} playSound={playRevealSound}
+            style={{ ...(clip ? cardSpan(clip) : null),
+              transform: `translate(${layer.offset.x}%, ${layer.offset.y}%) scale(${layer.scale})` }} />
+        )}
+        {layer.marquee && d > 0 && (
+          <MarqueeChase layer={layer} running={ready && !plate}
+            style={{ ...(clip ? cardSpan(clip) : null),
+              transform: `translate(${layer.offset.x}%, ${layer.offset.y}%) scale(${layer.scale})` }} />
+        )}
+        {layer.sealLight && d > 0 && (
+          <SealLight layer={layer} running={ready && !plate}
+            style={{ ...(clip ? cardSpan(clip) : null),
+              transform: `translate(${layer.offset.x}%, ${layer.offset.y}%) scale(${layer.scale})` }} />
+        )}
+        {layer.candleReveal && d > 0 && (
+          <CandleReveal layer={layer} running={ready && !plate} playSound={playRevealSound}
+            style={{ ...(clip ? cardSpan(clip) : null),
+              transform: `translate(${layer.offset.x}%, ${layer.offset.y}%) scale(${layer.scale})` }} />
+        )}
+        {layer.priceReveal && d > 0 && (
+          <PriceReveal layer={layer} running={ready && !plate} playSound={playRevealSound}
+            style={{ ...(clip ? cardSpan(clip) : null),
+              transform: `translate(${layer.offset.x}%, ${layer.offset.y}%) scale(${layer.scale})` }} />
         )}
       </div>
     );
@@ -1263,6 +1462,84 @@ const RCANA_STYLES = `
   object-fit: cover;
   display: block;
   transform-origin: 50% 45%;
+}
+@media screen and (prefers-reduced-motion: no-preference) {
+  .rc-depth img[data-drop-wait] { translate: 0 var(--drop-start, 0%); }
+  .rc-depth img[data-drop] { animation: rc-coin-drop 580ms cubic-bezier(.35,0,.8,.65) 260ms both; }
+  .rc-depth img[data-swing] { animation: rc-ring-swing 1.9s ease-in-out 1; }
+}
+.rc-marquee { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; transform-origin: 50% 45%; }
+.rc-marquee circle { opacity: 0; }
+@media screen and (prefers-reduced-motion: no-preference) {
+  .rc-marquee[data-running] circle { animation: rc-marquee-pulse 260ms ease-out both; }
+}
+@keyframes rc-marquee-pulse { 0%, 100% { opacity: 0; } 22% { opacity: 1; } }
+.rc-seal-light { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; transform-origin: 50% 45%; }
+@media screen and (prefers-reduced-motion: no-preference) {
+  .rc-depth img[data-shadow-fade] { translate: -10% 0; }
+  .rc-depth img[data-shadow-fade="running"] { animation: rc-bear-fade 1450ms ease-in-out 650ms both; }
+  .rc-seal-light[data-running] { animation: rc-seal-catch 1050ms ease-in-out 1460ms both; }
+}
+@keyframes rc-bear-fade {
+  from { opacity: 1; filter: blur(0); }
+  to { opacity: 0; filter: blur(4px); }
+}
+@keyframes rc-seal-catch { 0%, 100% { opacity: 0; } 46% { opacity: .9; } }
+.rc-scale-reveal { display: none; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; transform-origin: 50% 45%; }
+@media screen and (prefers-reduced-motion: no-preference) {
+  .rc-scale-reveal { display: block; }
+  .rc-scale-pointer { transform-origin: 555.5px 759px; transform: rotate(-72deg); }
+  .rc-scale-reveal[data-running] .rc-chart-cover { animation: rc-market-fall 740ms ease-in 240ms both; }
+  .rc-scale-reveal[data-running] .rc-scale-pointer { animation: rc-scale-settle 490ms ease-out 1080ms both; }
+  .rc-scale-reveal[data-running] .rc-live-dial { animation: rc-dial-finish 1ms step-end 1570ms forwards; }
+}
+@keyframes rc-market-fall { from { clip-path: inset(0 0 0 11%); } to { clip-path: inset(0 0 0 100%); } }
+@keyframes rc-scale-settle {
+  0% { transform: rotate(-72deg); }
+  68% { transform: rotate(3deg); }
+  85% { transform: rotate(-1deg); }
+  100% { transform: rotate(0deg); }
+}
+@keyframes rc-dial-finish { to { opacity: 0; } }
+.rc-candle-reveal { display: none; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; transform-origin: 50% 45%; }
+@media screen and (prefers-reduced-motion: no-preference) {
+  .rc-depth img[data-candle-base] { visibility: hidden; }
+  .rc-candle-reveal { display: block; }
+  .rc-wick-light { transform: scale(0); }
+  .rc-cellar-art { filter: brightness(.74) saturate(.8); }
+  .rc-candle-reveal[data-running] .rc-wick-light { animation: rc-wick-catch 720ms ease-out 360ms both; }
+  .rc-candle-reveal[data-running] .rc-cellar-art { animation: rc-cellar-warm 800ms ease-out 440ms both; }
+}
+@keyframes rc-wick-catch {
+  0%, 10% { transform: scale(0); }
+  28% { transform: scale(.25); }
+  39% { transform: scale(.18); }
+  100% { transform: scale(1); }
+}
+@keyframes rc-cellar-warm { to { filter: none; } }
+.rc-price-reveal { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; transform-origin: 50% 45%; }
+.rc-price-digit { transform-box: fill-box; transform: translateY(var(--drum-step)); }
+.rc-price-glint { opacity: 0; }
+.rc-price-reveal[data-running] .rc-price-digit { animation: rc-price-roll 230ms ease-out 620ms both; }
+.rc-price-reveal[data-running] .rc-price-glint { animation: rc-price-shine 380ms ease-out 740ms both; }
+@keyframes rc-price-roll { from { transform: translateY(var(--drum-step)); } to { transform: translateY(0); } }
+@keyframes rc-price-shine {
+  0% { opacity: 0; transform: translateX(-145px); }
+  20%, 80% { opacity: .85; }
+  100% { opacity: 0; transform: translateX(145px); }
+}
+@media print, (prefers-reduced-motion: reduce) { .rc-price-reveal { display: none; } }
+@keyframes rc-coin-drop {
+  from { translate: 0 var(--drop-start, 0%); scale: 1 1; }
+  55% { scale: .85 1; }
+  to { translate: 0 var(--drop-travel); scale: .16 1; }
+}
+@keyframes rc-ring-swing {
+  0%, 100% { rotate: 0deg; }
+  15% { rotate: 9deg; }
+  36% { rotate: -6deg; }
+  57% { rotate: 3deg; }
+  78% { rotate: -1.5deg; }
 }
 .rc-plate img.rc-frame {
   position: absolute; inset: 0;

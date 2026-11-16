@@ -548,7 +548,7 @@ const DESIGNS = [
   D('cava', 'La Cava', 'asset', 3, { cash: 3, pros: 50, grow: 25, uncork: true, text: 'Vintage: worth 25 more each round held — or uncork it: discard to light a candle' }),
   D('bono', 'The Savings Bond', 'asset', 2, { cash: 2, pros: 25, grow: 25, bearProof: true, text: 'Grandmother’s gift: worth 25 more each round held, and immune to The Bear' }),
   D('plata', 'La Plata', 'asset', 3, { cash: 3, pros: 125, silver: true, text: 'Flight to safety: in a Flash Crash you lose nothing, and bank 25' }),
-  D('perp', 'The Perp', 'asset', 4, { cash: 4, pros: 75, perp: true, text: 'Leverage: sells for double — but a Bear Market played on you while it is held liquidates it' }),
+  D('perp', 'Perpetuals', 'asset', 4, { cash: 4, pros: 75, perp: true, text: 'Leverage: sells for double — but a Bear Market played on you while it is held liquidates it' }),
   // Events you CALL: played from the hand for their cost, banked on the spot —
   // where the other Events fire the moment they are drawn. `played` is the flag.
   D('bull', 'Bull Run', 'event', 2, { pros: 100, played: true }),
@@ -1587,6 +1587,69 @@ const FACES = {
     "number": 2,
     "rarity": "Common",
     "face": "/TCG/rcana/octobot/face.webp",
+    "art": null
+  },
+  "gallo": {
+    "id": "el-gallo",
+    "name": "El Gallo",
+    "gloss": "The Rooster",
+    "number": 81,
+    "rarity": "Common",
+    "face": "/TCG/rcana/el-gallo/face.webp",
+    "art": null
+  },
+  "vaca": {
+    "id": "la-vaca",
+    "name": "La Vaca",
+    "gloss": "The Cow",
+    "number": 82,
+    "rarity": "Common",
+    "face": "/TCG/rcana/la-vaca/face.webp",
+    "art": null
+  },
+  "aguacate": {
+    "id": "el-aguacate",
+    "name": "El Aguacate",
+    "gloss": "The Avocado",
+    "number": 83,
+    "rarity": "Common",
+    "face": "/TCG/rcana/el-aguacate/face.webp",
+    "art": null
+  },
+  "cava": {
+    "id": "la-cava",
+    "name": "La Cava",
+    "gloss": "The Cellar",
+    "number": 3,
+    "rarity": "Common",
+    "face": "/TCG/rcana/la-cava/face.webp",
+    "art": null
+  },
+  "plata": {
+    "id": "la-plata",
+    "name": "La Plata",
+    "gloss": "The Silver",
+    "number": 85,
+    "rarity": "Common",
+    "face": "/TCG/rcana/la-plata/face.webp",
+    "art": null
+  },
+  "bono": {
+    "id": "savings-bond",
+    "name": "The Savings Bond",
+    "gloss": null,
+    "number": 84,
+    "rarity": "Common",
+    "face": "/TCG/rcana/savings-bond/face.webp",
+    "art": null
+  },
+  "perp": {
+    "id": "the-perp",
+    "name": "Perpetuals",
+    "gloss": null,
+    "number": 86,
+    "rarity": "Common",
+    "face": "/TCG/rcana/the-perp/face.webp",
     "art": null
   }
 };

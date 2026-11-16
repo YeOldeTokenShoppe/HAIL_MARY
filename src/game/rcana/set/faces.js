@@ -618,4 +618,105 @@ export const FACES = [
     flavor: "I do not pray. I execute.",
     printed: {},
   },
+  {
+    id: "el-gallo",
+    design: "gallo", // prints as "El Gallo" — the design's name
+    gloss: "The Rooster",
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 81,
+    rarity: "Common",
+    // An Asset's line says what it sells for. The boxes print value (75)
+    // and cost (2); the text carries the cash option and the fight.
+    ability: "Sell for 2 coins, or bank 75 Prosperity.\nEach turn, roll: a 6 collects 2; a 1 kills him.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "He crows every morning. One of them is his last.",
+    printed: {},
+  },
+  {
+    id: "la-vaca",
+    design: "vaca", // prints as "La Vaca" — the design's name
+    gloss: "The Cow",
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 82,
+    rarity: "Common",
+    // An Asset's line says what it sells for. The boxes print value (75)
+    // and cost (3); the text carries the meat price and the milk.
+    ability: "Sell for 6 coins, or bank 75 Prosperity.\nMilk: collect 1 Liquidity each turn.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "Milk her every morning, or sell her once.",
+    printed: {},
+  },
+  {
+    id: "el-aguacate",
+    design: "aguacate", // prints as "El Aguacate" — the design's name
+    gloss: "The Avocado",
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 83,
+    rarity: "Common",
+    // An Asset's line says what it sells for. The boxes print value (50)
+    // and cost (3); the text carries the cash option and the ripening —
+    // 50 green, 150 on the second round held, then 50 less each round.
+    ability: "Sell for 2 coins, or bank 50 Prosperity.\nRipe on round two: 150. Then 50 less a round.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "There is one perfect day. It is never today.",
+    printed: {},
+  },
+  {
+    id: "la-cava",
+    design: "cava", // prints as "La Cava" — the design's name
+    gloss: "The Cellar",
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 3,
+    rarity: "Common",
+    // An Asset's line says what it sells for. The boxes print value (50)
+    // and cost (3); the text carries the cash option, the vintage's growth
+    // and the uncorking (discard it to light a candle).
+    ability: "Sell for 3 coins, or bank 50 Prosperity.\nWorth 25 more a round. Uncork: light a candle.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "It gets better every year you do not open it.",
+    printed: {},
+  },
+  {
+    id: "la-plata",
+    design: "plata", // prints as "La Plata" — the design's name
+    gloss: "The Silver",
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 85,
+    rarity: "Common",
+    // An Asset's line says what it sells for. The boxes print value (125)
+    // and cost (3); the text carries the cash option and the flight to
+    // safety.
+    ability: "Sell for 3 coins, or bank 125 Prosperity.\nIn a Flash Crash you lose nothing and bank 25.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "When everything else falls, it only gets heavier.",
+    printed: {},
+  },
+  {
+    id: "savings-bond",
+    design: "bono", // prints as "The Savings Bond" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 84,
+    rarity: "Common",
+    // An Asset's line says what it sells for. The boxes print value (25)
+    // and cost (2); the text carries the cash option, the growth and the
+    // immunity to The Bear.
+    ability: "Sell for 2 coins, or bank 25 Prosperity,\n+25 each round held. The Bear cannot touch it.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "She bought it the day you were born.",
+    printed: {},
+  },
+  {
+    id: "the-perp",
+    design: "perp", // prints as "Perpetuals" — the design's name (was The Perp)
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 86,
+    rarity: "Common",
+    // An Asset's line says what it sells for. The boxes print value (75)
+    // and cost (4); the text carries the cash option, the leverage and the
+    // liquidation (a Bear Market played on its holder discards it).
+    ability: "Sell for 4 coins, or bank 75 Prosperity.\nLeverage: sells double; the Bear liquidates it.",
+    // An Asset narrates, so the flavor follows the rule unquoted.
+    flavor: "The ride never stops. The rider sometimes does.",
+    printed: {},
+  },
 ];

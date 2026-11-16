@@ -32,7 +32,7 @@ export const RESERVED_NUMBERS = {
   aguacate: 83, // El Aguacate — unfaced
   bono: 84, // The Savings Bond — unfaced
   plata: 85, // La Plata — unfaced
-  perp: 86, // The Perp — unfaced
+  perp: 86, // Perpetuals — unfaced (was The Perp, which read as a mugshot over a figure; renamed 2026-11-15)
   cava: 3, // La Cava — unfaced (took El Ángel's number when the Angel and Shady Lady were cut, 2026-11-15)
   catedral: 4, // La Catedral — unfaced (took La Tramposa's number)
   jardin: 44,

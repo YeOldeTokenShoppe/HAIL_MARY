@@ -49,6 +49,13 @@ import animaSola from "./anima-sola.js";
 import enigmaMachine from "./enigma-machine.js";
 import byzantineGeneral from "./byzantine-general.js";
 import octobot from "./octobot.js";
+import elGallo from "./el-gallo.js";
+import laVaca from "./la-vaca.js";
+import elAguacate from "./el-aguacate.js";
+import laCava from "./la-cava.js";
+import laPlata from "./la-plata.js";
+import savingsBond from "./savings-bond.js";
+import thePerp from "./the-perp.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -98,4 +105,11 @@ export const RCANA_ART = {
   "enigma-machine": enigmaMachine,
   "byzantine-general": byzantineGeneral,
   "octobot": octobot,
+  "el-gallo": elGallo,
+  "la-vaca": laVaca,
+  "el-aguacate": elAguacate,
+  "la-cava": laCava,
+  "la-plata": laPlata,
+  "savings-bond": savingsBond,
+  "the-perp": thePerp,
 };

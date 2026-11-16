@@ -65,7 +65,7 @@ export const DESIGNS = [
   D('cava', 'La Cava', 'asset', 3, { cash: 3, pros: 50, grow: 25, uncork: true, text: 'Vintage: worth 25 more each round held — or uncork it: discard to light a candle' }),
   D('bono', 'The Savings Bond', 'asset', 2, { cash: 2, pros: 25, grow: 25, bearProof: true, text: 'Grandmother’s gift: worth 25 more each round held, and immune to The Bear' }),
   D('plata', 'La Plata', 'asset', 3, { cash: 3, pros: 125, silver: true, text: 'Flight to safety: in a Flash Crash you lose nothing, and bank 25' }),
-  D('perp', 'The Perp', 'asset', 4, { cash: 4, pros: 75, perp: true, text: 'Leverage: sells for double — but a Bear Market played on you while it is held liquidates it' }),
+  D('perp', 'Perpetuals', 'asset', 4, { cash: 4, pros: 75, perp: true, text: 'Leverage: sells for double — but a Bear Market played on you while it is held liquidates it' }),
   // Events you CALL: played from the hand for their cost, banked on the spot —
   // where the other Events fire the moment they are drawn. `played` is the flag.
   D('bull', 'Bull Run', 'event', 2, { pros: 100, played: true }),
