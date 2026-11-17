@@ -1,6 +1,7 @@
 "use client";
 
 // /rcana-print?id=<face id>[&scale=1][&live=1][&cred=angel-lateral|angel|angel-plain|angel-jaunty|angel-soft-rays|heart|oval|ribbon]
+// /rcana-print?id=<face id>&frame=3[&metal=flat|gold|mirror|rainbow][&live=1]   the code-drawn frame (RcanaCard3)
 // /rcana-print?template=artifact[&subtype=remedy|grace|relic]
 // The template has an empty art window, number, name, rules and cost, ready
 // for export; its Artifact header and usage badge are the real components.
@@ -15,6 +16,7 @@
 import React, { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import RcanaCard from "@/components/RcanaCard";
+import RcanaCard3, { RCANA3_METALS } from "@/components/RcanaCard3";
 import RcanaFlipCard from "@/components/RcanaFlipCard";
 import { RCANA_SET, RCANA_ASPECT, toRcanaCard } from "@/game/rcana/cardFace";
 
@@ -77,6 +79,24 @@ function PrintCard() {
     return <pre style={{ color: "#f66", padding: 16 }}>no face "{id}" — ids: {RCANA_SET.map((c) => c.id).join(", ")}</pre>;
   }
   const card = toRcanaCard(source, { templateOnly });
+  // ?frame=3: the code-drawn frame. One plane, so no depth, but in a live embed
+  // it leans under the pointer and the mirror metal shimmers.
+  if (params.get("frame") === "3" && !templateOnly) {
+    const metal = RCANA3_METALS.includes(params.get("metal")) ? params.get("metal") : "flat";
+    const s3 = live ? fitScale : scale; // the same size as the still picture it replaces in a lightbox
+    return (
+      <main
+        data-print-ready
+        style={live
+          ? { margin: 0, padding: 0, background: "transparent", width: "100vw", height: "100dvh", display: "grid", placeItems: "center", overflow: "hidden" }
+          : { margin: 0, padding: 0, background: "transparent", display: "inline-block", width: 744 * scale }}
+      >
+        {live
+          ? <RcanaFlipCard Front={RcanaCard3} backRadius="4.7%" backFoil={metal === "mirror"} perspective={2000} data={card} scale={s3} metal={metal} interactive />
+          : <RcanaCard3 data={card} scale={s3} metal={metal} />}
+      </main>
+    );
+  }
   if (live) {
     return (
       <main

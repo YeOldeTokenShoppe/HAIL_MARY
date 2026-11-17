@@ -7,6 +7,8 @@
 //   npm run rcana:faces              # all faces
 //   npm run rcana:faces -- el-diablito other-id
 //   npm run rcana:faces -- --base http://localhost:3001 --width 1024
+//   npm run rcana:faces -- --frame 3            # the code-drawn frame, mirror gold → face3.webp
+//   npm run rcana:faces -- --frame 3 --metal rainbow el-gato
 //
 // Then `npm run pt2:build` so the table picks the new images up.
 //
@@ -22,7 +24,12 @@ const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 && args[i + 1] ? args[i + 1] : d; };
 const BASE = opt("base", "http://localhost:3000");
 const WIDTH = +opt("width", 1024); // output width in px; the face is 1027 wide at source
-const ids = args.filter((a, i) => !a.startsWith("--") && args[i - 1] !== "--base" && args[i - 1] !== "--width");
+const FRAME = opt("frame", "");   // "3" = the code-drawn frame (RcanaCard3), written beside the old face as face3.webp
+const METAL = opt("metal", FRAME === "3" ? "mirror" : "");   // with --frame 3: flat | gold | mirror (the default) | rainbow
+const VALUE_FLAGS = ["--base", "--width", "--frame", "--metal"];
+const ids = args.filter((a, i) => !a.startsWith("--") && !VALUE_FLAGS.includes(args[i - 1]));
+const OUT = FRAME ? `face${FRAME}` : "face";
+const QUERY = (FRAME ? `&frame=${encodeURIComponent(FRAME)}` : "") + (METAL ? `&metal=${encodeURIComponent(METAL)}` : "");
 
 let chromium;
 try { ({ chromium } = await import("playwright")); } catch {
@@ -55,7 +62,7 @@ try {
   // Warm-up: next dev compiles a route's client bundle on its first request,
   // which in this app can take a minute. Pay that once, with a long timeout,
   // before the per-card loop runs on a short one.
-  const first = `${BASE}/rcana-print?id=${encodeURIComponent(targets[0].id)}`;
+  const first = `${BASE}/rcana-print?id=${encodeURIComponent(targets[0].id)}${QUERY}`;
   await page.goto(first, { waitUntil: "domcontentloaded", timeout: 180000 });
   try {
     await page.locator(".rc-stage").first().waitFor({ state: "visible", timeout: 180000 });
@@ -65,7 +72,7 @@ try {
   }
 
   for (const c of targets) {
-    const url = `${BASE}/rcana-print?id=${encodeURIComponent(c.id)}`;
+    const url = `${BASE}/rcana-print?id=${encodeURIComponent(c.id)}${QUERY}`;
     await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
     const stage = page.locator(".rc-stage").first();
     try {
@@ -84,11 +91,11 @@ try {
     fs.mkdirSync(dir, { recursive: true });
     const png = await stage.screenshot({ omitBackground: true, type: "png" });
     if (sharp) {
-      await sharp(png).webp({ quality: 88, alphaQuality: 90 }).toFile(path.join(dir, "face.webp"));
-      console.log(`✓ ${c.id} → public/TCG/rcana/${c.id}/face.webp`);
+      await sharp(png).webp({ quality: 88, alphaQuality: 90 }).toFile(path.join(dir, `${OUT}.webp`));
+      console.log(`✓ ${c.id} → public/TCG/rcana/${c.id}/${OUT}.webp`);
     } else {
-      fs.writeFileSync(path.join(dir, "face.png"), png);
-      console.log(`✓ ${c.id} → face.png (sharp unavailable; pt2-build looks for face.webp)`);
+      fs.writeFileSync(path.join(dir, `${OUT}.png`), png);
+      console.log(`✓ ${c.id} → ${OUT}.png (sharp unavailable; pt2-build looks for ${OUT}.webp)`);
     }
   }
 } finally {

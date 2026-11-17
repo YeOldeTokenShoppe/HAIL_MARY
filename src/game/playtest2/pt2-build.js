@@ -6,6 +6,11 @@
 // and writes pt2-table.html beside this file plus public/playtest2/table.html.
 //
 //   npm run pt2:build
+//   npm run pt2:build -- --old-frame   keep the painted frame even where a face3.webp exists
+//   npm run pt2:build -- --metal gold     the enlarged card's metal (default mirror, which shimmers on tilt)
+//
+// A card whose code-drawn face has been rendered (npm run rcana:faces -- --frame 3
+// writes face3.webp beside face.webp) is shown in that frame; the rest keep the old one.
 //
 // Re-run after editing the engine, the table source, designs.js, faces.js, an art
 // file, or after rendering faces (npm run rcana:faces). rcana-lint warns when stale.
@@ -34,10 +39,16 @@ const { RCANA_SET, RCANA_ART, TYPE_CLASS } = await import(join(root, 'src/game/r
 const { DESIGNS: cardDesigns } = await import(join(root, 'src/game/rcana/set/designs.js'));
 const { getEventSubtype } = await import(join(root, 'src/game/rcana/eventTemplate.js'));
 const eventSubtypes = Object.fromEntries(cardDesigns.map((c) => [c.key, getEventSubtype(c)]).filter(([, subtype]) => subtype));
+const oldFrame = process.argv.includes('--old-frame');
+// --metal gold|mirror|rainbow: the metal the enlarged, live card wears (match what the faces were rendered with).
+const metalAt = process.argv.indexOf('--metal');
+const frameMetal = metalAt >= 0 && ['flat', 'gold', 'mirror', 'rainbow'].includes(process.argv[metalAt + 1]) ? process.argv[metalAt + 1] : 'mirror';
 const faces = {};
 for (const c of RCANA_SET) {
   const art = RCANA_ART[c.id] || {};
-  const facePath = `/TCG/rcana/${c.id}/face.webp`;
+  const face3Path = `/TCG/rcana/${c.id}/face3.webp`;
+  const frame3 = !oldFrame && existsSync(join(root, 'public', face3Path));
+  const facePath = frame3 ? face3Path : `/TCG/rcana/${c.id}/face.webp`;
   const subject = (art.layers || []).find((l) => l.id === 'subject')?.src || null;
   faces[c.designKey] = {
     id: c.id,
@@ -46,6 +57,8 @@ for (const c of RCANA_SET) {
     number: c.number,
     rarity: c.rarity,
     face: existsSync(join(root, 'public', facePath)) ? facePath : null,
+    frame: frame3 ? 3 : 1,
+    metal: frame3 ? frameMetal : null,
     art: subject,
   };
 }
@@ -63,4 +76,5 @@ writeFileSync(join(here, 'pt2-table.html'), page);
 const pub = join(root, 'public', 'playtest2'); mkdirSync(pub, { recursive: true });
 writeFileSync(join(pub, 'table.html'), '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n</head>\n<body style="margin:0">\n' + page + '\n</body>\n</html>\n');
 const printed = Object.values(faces).filter((f) => f.face).length;
-console.log(`pt2-table.html and public/playtest2/table.html written — ${Object.keys(faces).length} faces mapped, ${printed} with a rendered image`);
+const inFrame3 = Object.values(faces).filter((f) => f.frame === 3).length;
+console.log(`pt2-table.html and public/playtest2/table.html written — ${Object.keys(faces).length} faces mapped, ${printed} with a rendered image, ${inFrame3} in the code-drawn frame`);

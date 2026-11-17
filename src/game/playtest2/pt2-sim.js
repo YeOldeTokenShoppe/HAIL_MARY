@@ -8,6 +8,7 @@
 // each adding a winning face to the once-per-game Hail Mary, from 1/8 to 4/8 — success clears your hazards and banks 200.
 //   node pt-sim.js --games 2000 --players 3 --bots greedy,greedy,random
 //   node pt-sim.js --verbose --seed 7 --players 3
+//   node pt-sim.js --starters monje,diablito,gato     (opening Trader per seat; unset seats pick a junior at random)
 export function makeRng(seed) { let s = seed >>> 0 || 1; return () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
 // ── The set's designs live in src/game/rcana/set/designs.js — the one source of truth ──
@@ -43,6 +44,17 @@ export const RECIPES = {
 export const STARTER = RECIPES.devotion;
 export const HAIL_DIE_SIDES = 8;
 export const ODDS = [1, 2, 3, 4, 5]; // winning faces, by recorded deeds (cap 3); the fifth rung is only reached by The Fountain
+// The starting Trader (2026-11-16): before the deal, every player chooses one Trader from their deck
+// and seats them, free. Only a junior may open at the desk — cost STARTER_MAX_COST or less; the
+// stars are played from the hand at their price. Set it to null to let any Trader open.
+export const STARTER_MAX_COST = 2;
+export function starterChoices(recipe) {
+  const traders = [...new Set((RECIPES[recipe] || []).map(([k]) => k))].map((k) => byKey[k]).filter((d) => d && d.type === 'trader');
+  const juniors = STARTER_MAX_COST == null ? traders : traders.filter((d) => d.cost <= STARTER_MAX_COST);
+  if (juniors.length) return juniors;
+  const cheapest = Math.min(...traders.map((d) => d.cost)); // a deck with no junior opens with its cheapest Trader
+  return traders.filter((d) => d.cost === cheapest);
+}
 
 export class Game {
   constructor({ players, seed = 1, verbose = false, winAt = 1000, maxTurns = 300 }) {
@@ -55,17 +67,18 @@ export class Game {
     // draw() is async, but while dealing no Event fires, so each call mutates
     // before its first await and the hands are full when the constructor returns.
     this.turnNo = 0; this.over = false; this.winner = null;
+    // The starting Trader: the player's choice (cfg.starter) or, for a bot, one of its deck's
+    // juniors at random. They leave the deck for the desk before the deal, free, so the game is
+    // played from 39 cards and nobody begins with an empty seat. (This replaces the morning's
+    // opening rule, the redeal of a hand with no Trader: with the seat filled it has nothing to do.)
+    players.forEach((cfg, i) => {
+      const p = this.players[i]; const choices = starterChoices(p.recipe); if (!choices.length) return;
+      const key = choices.some((d) => d.key === cfg.starter) ? cfg.starter : choices[Math.floor(this.rng() * choices.length)].key;
+      const t = p.deck.find((c) => c.key === key); p.deck.splice(p.deck.indexOf(t), 1);
+      t.credNow = t.cred; p.trader = t; p.starter = t.key;
+      this.log(`${p.name} opens with ${t.name} at the desk (LIQ ${t.liq} · CRED ${t.cred} · EQ ${t.eq || 0})`);
+    });
     for (const p of this.players) for (let i = 0; i < 5; i++) this.draw(p, true);
-    // The opening rule (2026-11-16): an opening five must hold a Trader. A hand without one
-    // goes back into the deck and is dealt again, so nobody starts the game unable to fill the seat.
-    for (const p of this.players) {
-      let redeals = 0;
-      while (!p.hand.some((c) => c.type === 'trader') && p.deck.some((c) => c.type === 'trader') && redeals < 20) {
-        p.deck.push(...p.hand.splice(0)); this.shuffle(p.deck); for (let i = 0; i < 5; i++) this.draw(p, true); redeals++;
-      }
-      p.stats.redeals = redeals;
-      if (redeals) this.log(`${p.name} was dealt no Trader — the hand goes back and five more are dealt${redeals > 1 ? ` (${redeals} times)` : ''}`);
-    }
     this.dealing = false;
   }
   shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(this.rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -215,6 +228,14 @@ export class Game {
     this.releaseTrap(victim, h);
     victim.hazards.splice(victim.hazards.indexOf(h), 1); h.owner.discard.push(h); victim.stats.hazCleared++;
     this.log(`${why}: ${h.name} off ${victim.name}`);
+  }
+  // La Investigadora's open book: the card her player can see, and the once-a-turn burial.
+  topCard(p) { return this.is(p, 'investigadora') ? p.deck[0] || null : null; }
+  canBury(p) { return this.is(p, 'investigadora') && this.active === p && !p.buriedThisTurn && p.deck.length > 1; }
+  bury(p) {
+    if (!this.canBury(p)) return false;
+    const top = p.deck.shift(); p.deck.push(top); p.buriedThisTurn = true; p.stats.buries = (p.stats.buries || 0) + 1;
+    this.log(`DUE DILIGENCE — ${p.name} reads the tape and sends ${top.name} to the bottom`); return true;
   }
   spend(p, n) { if (p.liq < n) return false; p.liq -= n; return true; }
   // Income, not refunds: under a LIQUIDITY TRAP the coins pile on the card instead.
@@ -384,10 +405,16 @@ export class Game {
     }
   }
   async turn(p) {
-    p.peekedThisTurn = false; p.stats.turns++; if (p.hazards.length) p.stats.hazTurns++;
+    p.peekedThisTurn = false; p.buriedThisTurn = false; p.stats.turns++; if (p.hazards.length) p.stats.hazTurns++;
     for (const k of Object.keys(this.fx)) if (this.fx[k].owner === p.idx) { delete this.fx[k]; this.log(`${byKey[k].name} blows over`); }
     // Compound Interest belongs to the active, enabled Trader. Resolve it
     // through bank() so Calamities and the victory check still apply.
+    // CLEAN SWEEP (2026-11-16): the cat no longer swats only on arrival. While he sits, each turn
+    // starts with a roll — 4+ and he knocks one Calamity off the table (his pick, not yours). It gives
+    // him something to do when he opens the game at a clean desk. A Quantum Hack on the seat stops him.
+    if (this.is(p, 'gato') && p.hazards.length) { const r = 1 + Math.floor(this.rng() * 6);
+      if (r >= 4) this.clearHazard(p, p.hazards[Math.floor(this.rng() * p.hazards.length)], p, `EL GATO rolls ${r} and knocks it off the table`);
+      else this.log(`EL GATO rolls ${r} — he only looks at it`); }
     if (this.is(p, 'unicornio') && p.pros >= 100) {
       this.bank(p, 25, 'Compound Interest');
       if (this.over) {
@@ -447,14 +474,13 @@ export class Game {
     if (this.hasHaz(p, 'taxman') && p.liq > 0) { p.liq -= 1; this.log(`${p.name} pays 1 to the TAX COLLECTOR`); }
     const yield2 = p.invest.reduce((s2, a2) => s2 + (a2.income || 0), 0);
     if (yield2) { this.collect(p, yield2); this.log(`${p.name} collects ${yield2} from investments`); }
+    // DUE DILIGENCE is an open book (2026-11-16): while La Investigadora sits, the top card of her
+    // player's deck is face up to them, and once on their turn they may bury it (bury(), below).
+    // Nobody is asked anything: a human uses the Bury button at the table, before or after the draw;
+    // a bot decides here, before it draws. An empty deck is reshuffled first so there is a card to read.
+    if (this.is(p, 'investigadora') && !p.deck.length && p.discard.length) { p.deck = this.shuffle(p.discard.splice(0)); this.log(`${p.name} reshuffles`); }
     if (p.policy.beforeDraw) await p.policy.beforeDraw(this, p);
-    // DUE DILIGENCE: La Investigadora reads the top card before the draw and may send it to the bottom.
-    if (this.is(p, 'investigadora') && p.policy.dueDiligence) {
-      if (!p.deck.length && p.discard.length) { p.deck = this.shuffle(p.discard.splice(0)); this.log(`${p.name} reshuffles`); }
-      const top = p.deck[0];
-      if (top) { if (await p.policy.dueDiligence(this, p, top)) { p.deck.shift(); p.deck.push(top); this.log(`DUE DILIGENCE — ${p.name} reads the tape and sends ${top.name} to the bottom`); }
-        else this.log(`DUE DILIGENCE — ${p.name} reads the tape${p.policy.human ? ` (${top.name})` : ''} and leaves it`); }
-    }
+    if (this.canBury(p) && p.policy.dueDiligence && await p.policy.dueDiligence(this, p, p.deck[0])) this.bury(p);
     await this.draw(p);
     const action = await p.policy.main(this, p) || { t: 'pass' };
     const before = this.hooks?.beforeAction?.();
@@ -467,7 +493,7 @@ export class Game {
     while (!this.over && this.turnNo < this.maxTurns) { this.turnNo++; for (const p of this.players) { if (this.over) break; this.active = p; if (this.hooks && this.hooks.render) await this.hooks.render(); await this.turn(p); } }
     if (this.verbose) { this.lines.forEach((l) => console.log(l)); console.log(`END turn ${this.turnNo}: ${this.players.map((q) => `${q.name} ${q.pros}P/${q.liq}L/${q.deeds}d`).join(' · ')}`); }
     return { winner: this.winner ? this.winner.name : null, winnerIdx: this.winner ? this.winner.idx : -1, turns: this.turnNo,
-      players: this.players.map((q) => ({ name: q.name, recipe: q.recipe, trader: q.trader ? q.trader.key : null, pros: q.pros, ...q.stats })) };
+      players: this.players.map((q) => ({ name: q.name, recipe: q.recipe, trader: q.trader ? q.trader.key : null, starter: q.starter || null, pros: q.pros, ...q.stats })) };
   }
 }
 
@@ -520,7 +546,7 @@ export class GreedyBot {
     if (a.t === 'play' && a.c.type === 'artifact') s = 35;
     if (a.t === 'play' && a.c.type === 'location') s = p.location ? 0 : (p.liq >= a.c.cost + 2 ? 58 : 30); // never tear a standing place down for another
     if (a.t === 'play' && a.c.type === 'grace') s = !p.hailUsed ? 57 - p.deeds * 4 : 2;
-    if (a.t === 'play' && a.c.type === 'trader') s = !p.trader ? 72 + a.c.liq * 3 : (p.trader.credNow <= 4 && (a.c.credNow ?? a.c.cred) > p.trader.credNow ? 46 : a.c.liq > p.trader.liq ? 30 : 0);
+    if (a.t === 'play' && a.c.type === 'trader') s = !p.trader ? 72 + a.c.liq * 3 : (p.trader.credNow <= 4 && (a.c.credNow ?? a.c.cred) > p.trader.credNow ? 46 : a.c.liq > p.trader.liq ? 75 : 0); // the bot switches to a better-paid Trader in hand: the stars no longer open at the desk
     if (a.t === 'play' && a.c.key === 'escandalo' && a.choice && !a.choice.target.trader) s = 5;
     if (a.t === 'play' && a.choice && a.choice.polish) s = p.trader && p.trader.credNow <= p.trader.cred - 5 ? 42 : 6;
     if (a.t === 'payclear') s = (p.liq >= 5 ? 66 : 20) + (a.h.key === 'trap' ? (a.h.pile || 0) * 8 : 0);
@@ -539,24 +565,26 @@ export class GreedyBot {
 // ── CLI ──
 const ARGV = typeof process !== 'undefined' && process.argv ? process.argv.slice(2) : [];
 const args = Object.fromEntries(ARGV.map((a, i, arr) => (a.startsWith('--') ? [a.slice(2), arr[i + 1] && !arr[i + 1].startsWith('--') ? arr[i + 1] : true] : [])).filter((x) => x.length));
-export function playOne({ seed = 1, nPlayers = 3, bots = null, decks = null, verbose = false, rotate = 0 }) {
+export function playOne({ seed = 1, nPlayers = 3, bots = null, decks = null, starters = null, verbose = false, rotate = 0 }) {
   const kinds = (bots || 'greedy,greedy,greedy,greedy'.split(',').slice(0, nPlayers).join(',')).split(',').slice(0, nPlayers);
   const recs = (decks || 'devotion,degen,devotion,degen').split(',');
-  const players = kinds.map((k, i) => ({ name: `${k.toUpperCase()} ${'ABCD'[i]}`, recipe: recs[i % recs.length], policy: k === 'random' ? new RandomBot(makeRng(seed * 31 + i)) : new GreedyBot() }));
+  const sts = starters ? starters.split(',') : [];
+  const players = kinds.map((k, i) => ({ name: `${k.toUpperCase()} ${'ABCD'[i]}`, recipe: recs[i % recs.length], starter: sts[i] || null, policy: k === 'random' ? new RandomBot(makeRng(seed * 31 + i)) : new GreedyBot() }));
   for (let r = 0; r < rotate; r++) players.push(players.shift());
   return new Game({ players, seed, verbose });
 }
 if (typeof process !== 'undefined' && process.argv[1] && process.argv[1].endsWith('pt2-sim.js')) {
   const games = +(args.games || 1000); const seed = +(args.seed || 1); const nPlayers = +(args.players || 3);
-  if (args.verbose) { await playOne({ seed, nPlayers, bots: args.bots, decks: args.decks, verbose: true }).run(); process.exit(0); }
-  const res = { wins: {}, recipeWins: {}, recipeGames: {}, seatWins: [0, 0, 0, 0], turns: [], endTrader: {}, s: {}, noWin: 0 };
+  if (args.verbose) { await playOne({ seed, nPlayers, bots: args.bots, decks: args.decks, starters: args.starters, verbose: true }).run(); process.exit(0); }
+  const res = { wins: {}, recipeWins: {}, recipeGames: {}, seatWins: [0, 0, 0, 0], turns: [], endTrader: {}, startTrader: {}, s: {}, noWin: 0 };
   for (let i = 0; i < games; i++) {
-    const r = await playOne({ seed: seed + i, nPlayers, bots: args.bots, decks: args.decks, rotate: i % nPlayers }).run();
+    const r = await playOne({ seed: seed + i, nPlayers, bots: args.bots, decks: args.decks, starters: args.starters, rotate: i % nPlayers }).run();
     for (const p of r.players) res.recipeGames[p.recipe] = (res.recipeGames[p.recipe] || 0) + 1;
     if (!r.winner) { res.noWin++; continue; }
     res.wins[r.winner.replace(/ [A-D]$/, '')] = (res.wins[r.winner.replace(/ [A-D]$/, '')] || 0) + 1;
     const wp = r.players.find((p) => p.name === r.winner); if (wp) res.recipeWins[wp.recipe] = (res.recipeWins[wp.recipe] || 0) + 1;
     res.seatWins[(r.winnerIdx + nPlayers - (i % nPlayers)) % nPlayers]++; res.turns.push(r.turns);
+    for (const p of r.players) { const O = res.startTrader[p.starter || 'none'] = res.startTrader[p.starter || 'none'] || { g: 0, w: 0 }; O.g++; if (r.winner === p.name) O.w++; }
     for (const p of r.players) { const T = res.endTrader[p.trader || 'none'] = res.endTrader[p.trader || 'none'] || { g: 0, w: 0 }; T.g++; if (r.winner === p.name) T.w++;
       for (const k of ['hires', 'disgraces', 'sells', 'sellCash', 'sellPros', 'hazPlayed', 'hazCleared', 'remedyRival', 'candles', 'hail', 'hailWon', 'turns', 'hazTurns']) res.s[k] = (res.s[k] || 0) + p[k]; }
   }
@@ -568,5 +596,6 @@ if (typeof process !== 'undefined' && process.argv[1] && process.argv[1].endsWit
   const s = res.s; const pg = (k) => (s[k] / games).toFixed(2);
   console.log(`per game (all players): hires ${pg('hires')} disgraces ${pg('disgraces')} sells ${pg('sells')} (cash ${pg('sellCash')} / pros ${pg('sellPros')}) hazards ${pg('hazPlayed')} cleared ${pg('hazCleared')} remedyRival ${pg('remedyRival')} candles ${pg('candles')} hail ${pg('hail')} answered ${pg('hailWon')}`);
   console.log(`hazard-burdened turns: ${Math.round(s.hazTurns / Math.max(1, s.turns) * 100)}% of all turns`);
+  console.log('opening Trader (win rate):', Object.entries(res.startTrader).map(([k, v]) => `${k} ${v.g} seats, ${Math.round(v.w / v.g * 100)}% win`).join(' | '));
   console.log('trader at the desk when the game ended (win rate):', Object.entries(res.endTrader).map(([k, v]) => `${k} ${v.g} seats, ${Math.round(v.w / v.g * 100)}% win`).join(' | '));
 }

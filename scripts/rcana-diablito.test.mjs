@@ -79,6 +79,7 @@ test('playing a Calamity no longer grants the replaced rebate', async () => {
   const hazard = card('bear');
   player.hand.push(hazard);
   player.liq = 5;
+  game.players[1].trader = null; // the rival's opening Trader could block the Calamity with Equanimity; this test is about the rebate
   await game.playCard(player, hazard, { target: game.players[1] });
   assert.equal(player.liq, 5 - hazard.cost);
   assert.equal(game.players[1].hazards[0], hazard);

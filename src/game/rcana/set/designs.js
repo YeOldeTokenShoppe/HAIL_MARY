@@ -33,11 +33,11 @@ export const DESIGNS = [
   // Calamity played on you fails on a die roll of eq or lower). Three things
   // a real trader should hold onto; printed as three "-ity" words.
   D('unicornio', 'El Unicornio', 'trader', 3, { liq: 3, cred: 20, eq: 1, abilityName: 'Compound Interest', text: 'At turn start, if you have at least 100 banked Prosperity, bank 25 more.' }),
-  D('gato', 'El Gato', 'trader', 2, { liq: 2, cred: 16, eq: 1, abilityName: 'Clean Sweep', text: 'When seated, immediately knock one Calamity off your table, free' }),
+  D('gato', 'El Gato', 'trader', 2, { liq: 2, cred: 16, eq: 1, abilityName: 'Clean Sweep', text: 'When seated, and at the start of each turn on a roll of 4+, knock one Calamity off your table, free' }),
   // The investigator: she reads the tape before the market does. Before her
   // turn's draw she peeks at the top card and may send it to the bottom —
   // the one Trader who can dodge the weather instead of weathering it.
-  D('investigadora', 'La Investigadora', 'trader', 3, { liq: 3, cred: 14, eq: 1, abilityName: 'Due Diligence', text: 'Before you draw, look at the top card of your deck; you may put it on the bottom' }),
+  D('investigadora', 'La Investigadora', 'trader', 3, { liq: 3, cred: 14, eq: 1, abilityName: 'Due Diligence', text: 'The top card of your deck is face up to you. Once on your turn, you may put it on the bottom' }),
   D('monje', 'El Monje', 'trader', 1, { liq: 1, cred: 22, eq: 2, abilityName: 'Vow of Prosperity', text: 'When you light a candle, bank 25 Prosperity' }),
   D('diablito', 'El Diablito', 'trader', 2, { liq: 2, cred: 10, eq: 0, abilityName: 'Devil’s Wager', text: 'At the start of your turn, flip a coin: heads, collect 1 Liquidity; tails, El Diablito loses 1 CRED' }),
   D('celebridad', 'The Influencer', 'trader', 3, { liq: 3, cred: 8, eq: 0, abilityName: 'Star Power', text: 'The influencer: pay 1 when banking from a card, +25 Prosperity', printName: 'La Influencer' }),

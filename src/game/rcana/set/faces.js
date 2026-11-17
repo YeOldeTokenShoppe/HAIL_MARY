@@ -169,7 +169,7 @@ export const FACES = [
     rarity: "Uncommon",
     // halo/hydro come from the design (cred 16 / liq 2). The trigger and
     // the outcome on their own lines.
-    ability: "When seated, knock one Calamity\noff your table, free.",
+    ability: "When seated, and each turn on a\nroll of 4+, knock one Calamity\noff your table.",
     // A Trader speaks, so the line prints as a quotation.
     flavor: "If it's on the table, it's fair game.",
     printed: {},

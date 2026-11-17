@@ -12,6 +12,8 @@ import { ROGUES } from "@/game/terminal-traders/rogues";
 import { LOTERIA_CARDS, toLoteriaCard } from "@/game/terminal-traders/loteria";
 import RcanaBench from "@/components/RcanaBench";
 import RcanaCard from "@/components/RcanaCard";
+import RcanaCard3, { RCANA3_METALS } from "@/components/RcanaCard3";
+import RcanaFlipCard from "@/components/RcanaFlipCard";
 import RcanaViewer from "@/components/RcanaViewer";
 import { RCANA_SET, UNPRINTED, TYPE_CLASS, toRcanaCard } from "@/game/rcana/cardFace";
 import { RCANA_SET_SIZE } from "@/game/rcana/set/index.js";
@@ -157,6 +159,24 @@ export default function CardTemplatePage() {
   // The card held up in the viewer (null = none). Mirrored to ?card= so a
   // tester can be sent straight to one card.
   const [viewerId, setViewerId] = useState(null);
+  // The binder's frame: "1" the painted frame, "3" the code-drawn one (RcanaCard3),
+  // with its metal — flat gold, polished gold or rainbow foil.
+  const [rcanaFrame, setRcanaFrame] = useState("1");
+  const [rcanaMetal, setRcanaMetal] = useState("mirror");
+  const [frame3Id, setFrame3Id] = useState(null);
+  const [frame3Scale, setFrame3Scale] = useState(0.8);
+  const frame3Index = RCANA_VIEW_ORDER.findIndex((c) => c.id === frame3Id);
+  const frame3Card = frame3Index >= 0 ? RCANA_VIEW_ORDER[frame3Index] : null;
+  useEffect(() => {
+    if (!frame3Id) return undefined;
+    const fit = () => setFrame3Scale(Math.max(0.3, Math.min((window.innerHeight * 0.86) / 1032, (window.innerWidth * 0.9) / 744)));
+    const step = (d) => setFrame3Id(RCANA_VIEW_ORDER[(frame3Index + d + RCANA_VIEW_ORDER.length) % RCANA_VIEW_ORDER.length].id);
+    const onKey = (e) => { if (e.key === "Escape") setFrame3Id(null); else if (e.key === "ArrowRight") step(1); else if (e.key === "ArrowLeft") step(-1); };
+    fit();
+    window.addEventListener("resize", fit);
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("resize", fit); window.removeEventListener("keydown", onKey); };
+  }, [frame3Id, frame3Index]);
   // The card the R-cana bench opens on; a binder slot sets it before switching.
   const [rcanaCardId, setRcanaCardId] = useState(null);
   // null = follow the card's rarity; a frame id pins an override for preview.
@@ -425,6 +445,24 @@ export default function CardTemplatePage() {
 
       {view === "rcana-collection" && (
         <section className="ct-collection">
+          <div className="ct-frame-bar">
+            <span>Frame</span>
+            <div className="ct-view-toggle" role="radiogroup" aria-label="Card frame">
+              {[{ id: "1", label: "Painted" }, { id: "3", label: "Code-drawn" }].map((f) => (
+                <button key={f.id} role="radio" aria-checked={rcanaFrame === f.id} className={rcanaFrame === f.id ? "is-active" : ""} onClick={() => setRcanaFrame(f.id)}>{f.label}</button>
+              ))}
+            </div>
+            {rcanaFrame === "3" && (
+              <>
+                <span>Metal</span>
+                <div className="ct-view-toggle" role="radiogroup" aria-label="Frame metal">
+                  {RCANA3_METALS.map((m) => (
+                    <button key={m} role="radio" aria-checked={rcanaMetal === m} className={rcanaMetal === m ? "is-active" : ""} onClick={() => setRcanaMetal(m)}>{m}</button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
           {RCANA_COLLECTION.map((group) => (
             <div className="ct-binder-group" key={group.title}>
               <p className="ct-binder-title">
@@ -436,13 +474,15 @@ export default function CardTemplatePage() {
                   <button
                     key={slot.id}
                     className={`ct-slot ct-slot--${String(slot.rarity).toLowerCase()}${slot.card ? "" : " is-empty"}`}
-                    onClick={slot.card ? () => setViewerId(slot.id) : undefined}
+                    onClick={slot.card ? () => (rcanaFrame === "3" ? setFrame3Id(slot.id) : setViewerId(slot.id)) : undefined}
                     disabled={!slot.card}
                     title={slot.card ? `${slot.name} — pick it up` : `${slot.name} — art pending`}
                   >
                     <span className="ct-slot-art">
                       {slot.card ? (
-                        <RcanaCard data={slot.card} scale={THUMB_SCALE} interactive={false} depth={0} showFx={false} />
+                        rcanaFrame === "3"
+                          ? <RcanaCard3 data={slot.card} scale={THUMB_SCALE} metal={rcanaMetal} />
+                          : <RcanaCard data={slot.card} scale={THUMB_SCALE} interactive={false} depth={0} showFx={false} />
                       ) : (
                         <span className="ct-slot-pending" aria-hidden>+</span>
                       )}
@@ -459,6 +499,15 @@ export default function CardTemplatePage() {
       )}
 
       {view === "rcana" && <RcanaBench initialCardId={rcanaCardId} />}
+
+      {frame3Card && (
+        <div className="ct-frame3-viewer" role="dialog" aria-label={frame3Card.name} onClick={() => setFrame3Id(null)}>
+          <div onClick={(e) => e.stopPropagation()}>
+            <RcanaFlipCard key={frame3Card.id} Front={RcanaCard3} backRadius="4.7%" backFoil={rcanaMetal === "mirror"} data={frame3Card.card} scale={frame3Scale} metal={rcanaMetal} interactive />
+          </div>
+          <p>{frame3Card.name} · {rcanaMetal} · move the mouse to tilt · click to turn it over · ← → to browse · Esc to close</p>
+        </div>
+      )}
 
       <RcanaViewer
         cards={RCANA_VIEW_ORDER}
@@ -1052,6 +1101,22 @@ const PAGE_STYLES = `
     gap: 34px;
   }
 
+  .ct-frame-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+    margin: 0 0 22px;
+  }
+  .ct-frame-bar > span {
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.7;
+  }
+  .ct-frame-bar .ct-view-toggle button { text-transform: capitalize; }
+  .ct-frame3-viewer {
+    position: fixed; inset: 0; z-index: 60;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    background: rgba(6, 4, 14, 0.88); backdrop-filter: blur(6px);
+  }
+  .ct-frame3-viewer > p {
+    margin: 0; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #cfc6e8;
+  }
   .ct-binder-title {
     display: flex;
     align-items: baseline;

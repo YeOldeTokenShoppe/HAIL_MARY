@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 710" width="512" height="710">
+<!-- R-cana frame 3 (the dark-enamel frame mocked up 2026-11-16) — METAL MASK: Asset · badges (the price coin, the plate rim, the income drop).
+     White = metal, transparent = everything else. Card box 512 x 710 (the 1027:1424 card aspect), so it scales to any size.
+     Use as a CSS mask over a foil layer:  mask-image: url(/TCG/frames/rcana-frame3-asset-badges.svg); mask-size: 100% 100%;
+     Numerals, the coloured plate, the die and the art are deliberately NOT in the mask. -->
+<defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="710">
+<rect width="512" height="710" fill="#000"/>
+<g transform="translate(2,2)"><circle cx="50" cy="50" r="45" fill="#fff"/></g>
+<g transform="translate(358,0)"><polygon points="12,20 142,20 142,92 42,92 12,64" fill="#fff"/><polygon points="16,24 138,24 138,88 44,88 16,62" fill="#000"/></g>
+<g transform="translate(12,596) scale(0.78,0.784)"><path d="M50 6 C50 6 16 46 16 72 A34 34 0 0 0 84 72 C84 46 50 6 50 6 Z" fill="#fff"/></g>
+</mask></defs>
+<rect width="512" height="710" fill="#fff" mask="url(#m)"/>
+</svg>

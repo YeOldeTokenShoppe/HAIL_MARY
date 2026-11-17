@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 710" width="512" height="710">
+<!-- R-cana frame 3 (the dark-enamel frame mocked up 2026-11-16) — METAL MASK: Trader · badges (the Liquidity drop, the plate rim, the halo).
+     White = metal, transparent = everything else. Card box 512 x 710 (the 1027:1424 card aspect), so it scales to any size.
+     Use as a CSS mask over a foil layer:  mask-image: url(/TCG/frames/rcana-frame3-trader-badges.svg); mask-size: 100% 100%;
+     Numerals, the coloured plate, the die and the art are deliberately NOT in the mask. -->
+<defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="710">
+<rect width="512" height="710" fill="#000"/>
+<g transform="translate(4,0) scale(0.96,0.957)"><path d="M50 6 C50 6 16 46 16 72 A34 34 0 0 0 84 72 C84 46 50 6 50 6 Z" fill="#fff"/></g>
+<g transform="translate(388,0)"><polygon points="12,20 112,20 112,92 42,92 12,64" fill="#fff"/><polygon points="16,24 108,24 108,88 44,88 16,62" fill="#000"/><ellipse cx="66" cy="20" rx="30" ry="8" fill="none" stroke="#fff" stroke-width="5"/></g>
+</mask></defs>
+<rect width="512" height="710" fill="#fff" mask="url(#m)"/>
+</svg>
