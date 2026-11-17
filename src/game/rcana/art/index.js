@@ -56,6 +56,7 @@ import laCava from "./la-cava.js";
 import laPlata from "./la-plata.js";
 import savingsBond from "./savings-bond.js";
 import thePerp from "./the-perp.js";
+import elTatuaje from "./el-tatuaje.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -112,4 +113,5 @@ export const RCANA_ART = {
   "la-plata": laPlata,
   "savings-bond": savingsBond,
   "the-perp": thePerp,
+  "el-tatuaje": elTatuaje,
 };

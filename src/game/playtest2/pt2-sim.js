@@ -31,18 +31,19 @@ export const RECIPES = {
     ['heart', 1], ['halo', 1], ['rosary', 1], ['grail', 1], ['dashboard', 1], ['tattoo', 1], ['geometry', 1],
     ['cherub', 1], ['fountain', 1], ['limpia', 1], ['anima', 1], ['lagrimas', 1]],
   degen: [['diablito', 2], ['unicornio', 2], ['prospector', 1], ['abuela', 1], ['bot', 1],
-    ['meme', 1], ['tech', 2], ['gallo', 1], ['aguacate', 1], ['perp', 1], ['bluechip', 1], ['jardin', 1], ['ponzi', 1], ['catacumbas', 1],
+    ['meme', 1], ['tech', 1], ['gallo', 1], ['aguacate', 1], ['perp', 1], ['bluechip', 1], ['jardin', 1], ['ponzi', 1], ['catacumbas', 1],
     ['unlock', 1],
     ['ballena', 1], ['rueda', 1], ['moralhazard', 1], ['mardigras', 1], ['godcandle', 1], ['techwreck', 1],
     ['fuego', 1],
     ['illuminati', 1],
-    ['bear', 1], ['rug', 1], ['escandalo', 1], ['fall', 1], ['infierno', 1], ['trap', 1],
+    ['bear', 1], ['rug', 1], ['escandalo', 1], ['fall', 1], ['infierno', 1], ['trap', 1], ['virtue', 1],
     ['tortilla', 1],
     ['heart', 1], ['skull', 1], ['enigma', 1], ['rideordie', 1], ['lottery', 1], ['motherboard', 1],
     ['ofrenda', 1]],
 };
 export const STARTER = RECIPES.devotion;
 export const HAIL_DIE_SIDES = 8;
+export const MARDI_GRAS_DIE_SIDES = 8;
 export const ODDS = [1, 2, 3, 4, 5]; // winning faces, by recorded deeds (cap 3); the fifth rung is only reached by The Fountain
 // The starting Trader (2026-11-16): before the deal, every player chooses one Trader from their deck
 // and seats them, free. Only a junior may open at the desk — cost STARTER_MAX_COST or less; the
@@ -62,7 +63,7 @@ export class Game {
     this.fx = {}; this.dealing = true;
     this.players = players.map((cfg, idx) => ({ idx, name: cfg.name, policy: cfg.policy, trader: null, recipe: cfg.recipe || 'devotion',
       deck: this.shuffle(RECIPES[cfg.recipe || 'devotion'].flatMap(([k, n]) => Array.from({ length: n }, () => ({ ...byKey[k] })))),
-      hand: [], discard: [], invest: [], seeds: [], artifacts: [], location: null, hazards: [], liq: 5, pros: 0, deeds: 0, hailUsed: false,
+      hand: [], discard: [], invest: [], seeds: [], artifacts: [], location: null, hazards: [], penance: null, liq: 5, pros: 0, deeds: 0, hailUsed: false,
       stats: { plays: 0, hires: 0, disgraces: 0, sells: 0, sellCash: 0, sellPros: 0, hazPlayed: 0, hazCleared: 0, remedyRival: 0, candles: 0, hail: 0, hailWon: 0, passes: 0, discards: 0, turns: 0, hazTurns: 0 } }));
     // draw() is async, but while dealing no Event fires, so each call mutates
     // before its first await and the hands are full when the constructor returns.
@@ -146,12 +147,15 @@ export class Game {
     const eventResult = {};
     if (c.key === 'mardigras') {
       eventResult.rolls = this.players.map(player => {
-        const roll = 1 + Math.floor(this.rng() * 6);
+        const roll = 1 + Math.floor(this.rng() * MARDI_GRAS_DIE_SIDES);
         const collected = this.collect(player, roll);
-        return { player, roll, collected };
+        // Ash Wednesday: half the roll comes back out of the Trader's Credibility at the player's next turn start.
+        const penance = Math.floor(roll / 2);
+        player.penance = penance ? { n: penance, card: c } : null;
+        return { player, roll, collected, penance };
       });
-      this.log('MARDI GRAS — ' + eventResult.rolls.map(({player, roll, collected}) =>
-        `${player.name} rolled ${roll}: ${collected ? '+' + collected + ' Liquidity' : roll + ' to Liquidity Trap'}`).join(' · '));
+      this.log('MARDI GRAS — ' + eventResult.rolls.map(({player, roll, collected, penance}) =>
+        `${player.name} rolled ${roll}: ${collected ? '+' + collected + ' Liquidity' : roll + ' to Liquidity Trap'}${penance ? `, repents ${penance} next turn` : ''}`).join(' · '));
     }
     if (c.key === 'illuminati') {
       const transfers = eventResult.transfers = [];
@@ -435,6 +439,13 @@ export class Game {
       if (roll < 6) this.log(`${p.name} scratches THE LOTTERY TICKET — the die shows ${roll}: not this time`);
       else if (this.bank(p, 150, 'THE LOTTERY TICKET — the die shows 6: a WINNER')) { p.artifacts.splice(p.artifacts.indexOf(ticket), 1); p.discard.push(ticket); }
       else this.log(`${p.name} scratches THE LOTTERY TICKET — a 6! but the BEAR MARKET caps the prize; the Ticket is held`);
+      if (this.over) { if (this.hooks && this.hooks.render) await this.hooks.render(); return; }
+    }
+    // ASH WEDNESDAY: the morning after Mardi Gras — the party's half, out of the seated Trader's Credibility.
+    if (p.penance) {
+      const { n } = p.penance; p.penance = null;
+      if (p.trader) await this.credDamage(p, n, 'the morning after MARDI GRAS');
+      else this.log(`${p.name} has nobody at the desk — the hangover finds no one to repent`);
       if (this.over) { if (this.hooks && this.hooks.render) await this.hooks.render(); return; }
     }
     if (this.is(p, 'diablito')) {

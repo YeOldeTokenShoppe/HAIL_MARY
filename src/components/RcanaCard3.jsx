@@ -11,7 +11,8 @@
 //
 // Layout, in a 512 x 710 box (the 1027:1424 card aspect), scaled to fit:
 //   top left      what the card costs — a DROP on a Trader (Liquidity: the cost is
-//                 also what they earn each turn), a COIN on everything else
+//                 also what they earn each turn), a COIN on everything else;
+//                 no badge at all on a card that is free or fires when drawn
 //   top right     the plate, the card's headline number — Credibility under a
 //                 halo on a Trader, the sale price on an Asset, the payout on a
 //                 called Event; in the card type's colour
@@ -89,7 +90,8 @@ export function rcana3Model(data) {
     model.corner = { shape: "die", value: trinity.eq, label: `Equanimity ${trinity.eq}: a Calamity played on you fails on a d8 roll of ${trinity.eq} or lower` };
   } else {
     const cost = Number(data.cost) || 0;
-    if (!firesOnDraw) model.topLeft = { shape: "coin", value: cost * MONEY_UNIT, label: `Price: $${cost * MONEY_UNIT}M to play` };
+    // No coin means nothing to pay: a card that fires when drawn, or one that is free to play.
+    if (!firesOnDraw && cost > 0) model.topLeft = { shape: "coin", value: cost * MONEY_UNIT, label: `Price: $${cost * MONEY_UNIT}M to play` };
     const value = cls === "Asset" ? (design.perp ? design.pros * 2 : design.pros) : design.type === "event" && design.played ? design.pros : null;
     if (value) model.plate = { value, halo: false, label: cls === "Asset" ? `Sells for $${value}M` : `Pays $${value}M` };
     if (!model.text && value) model.text = cls === "Asset" ? `Sell it for $${value}M.` : `Collect $${value}M.`;
@@ -170,12 +172,15 @@ function haloLight(app, slide, live) {
   const rest = app.rest ?? 0.3, peak = app.strength ?? 1;
   const ease = live ? "opacity var(--ease, 500ms) ease-out, transform var(--ease, 500ms) ease-out" : undefined;
   const disc = (R) => ({ position: "absolute", margin: 0, left: cx - R, top: cy - R * tall, width: R * 2, height: R * 2 * tall, borderRadius: "50%", pointerEvents: "none", mixBlendMode: "screen", transform: slide, transition: ease });
-  const fade = "radial-gradient(closest-side, #000 26%, rgba(0,0,0,.55) 60%, transparent 100%)";
+  // `hollow`: light only the aureole around her, leaving her figure as painted.
+  const fade = app.hollow
+    ? "radial-gradient(closest-side, transparent 38%, #000 62%, rgba(0,0,0,.6) 82%, transparent 100%)"
+    : "radial-gradient(closest-side, #000 26%, rgba(0,0,0,.55) 60%, transparent 100%)";
   const ring = "radial-gradient(circle, transparent 50%, #000 62%, #000 86%, transparent 97%)";
   const rays = app.rays === false ? "" : `repeating-conic-gradient(from calc(var(--ry, 0deg) * 5 - var(--rx, 0deg) * 5), transparent 0deg, ${app.color} 2.5deg, transparent 5deg, transparent 15deg), `;
-  const glow = (
+  const glow = app.glow === false ? null : (
     <div aria-hidden="true" style={{ ...disc(r * (app.spread ?? 3.4) * 0.7), opacity: `calc(${rest * peak} + var(--lit, 0) * ${(1 - rest) * peak})`, WebkitMaskImage: fade, maskImage: fade,
-      backgroundImage: `${rays}radial-gradient(closest-side, ${app.color} 0%, ${app.color}99 37%, transparent 88%)` }} />
+      backgroundImage: `${rays}radial-gradient(closest-side, ${app.color} 0%, ${app.color}${app.hollow ? "" : "99"} ${app.hollow ? 80 : 37}%, transparent ${app.hollow ? 100 : 88}%)` }} />
   );
   const glint = app.glint === false ? null : (
     <div aria-hidden="true" style={{ ...disc(r * 1.35), opacity: "calc(.1 + var(--lit, 0) * .9)", WebkitMaskImage: ring, maskImage: ring,
@@ -289,9 +294,14 @@ export default function RcanaCard3({ data, scale = 1, metal = "flat", interactiv
                     <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none",
                       transform: `${slide} scale(${layer.scale ?? 1})`, transition: interactive ? "transform var(--ease, 500ms) ease-out, opacity var(--ease, 500ms) ease-out" : undefined,
                       WebkitMaskImage: `url("${apparition.mask}")`, maskImage: `url("${apparition.mask}")`, WebkitMaskSize: "100% 100%", maskSize: "100% 100%",
-                      opacity: "calc(.12 + var(--lit, 0) * .88)",
-                      filter: "drop-shadow(0 0 2px #ff7a1a) drop-shadow(0 0 7px rgba(255, 80, 0, .85))",
-                      backgroundImage: `radial-gradient(circle at ${apparition.cx}% ${apparition.cy}%, #ffe45c 0px, #ff8a1a calc(60px + var(--lit, 0) * 40px), #ff4400 calc(95px + var(--lit, 0) * 50px), #d92a00 190px)` }} />
+                      opacity: `calc(${apparition.maskLight ? 0.05 : 0.12} + var(--lit, 0) * ${apparition.maskLight ? (apparition.strength ?? 1) - 0.05 : 0.88})`,
+                      ...(apparition.maskLight
+                        // Light: the masked shape brightens in its own colour, with rays turning inside it.
+                        ? { mixBlendMode: "screen", filter: `drop-shadow(0 0 5px ${apparition.color})`,
+                            backgroundImage: `repeating-conic-gradient(from calc(var(--ry, 0deg) * 5 - var(--rx, 0deg) * 5) at ${apparition.cx}% ${apparition.cy}%, transparent 0deg, rgba(255,244,190,.5) 3deg, transparent 6deg, transparent 15deg), radial-gradient(circle at ${apparition.cx}% ${apparition.cy}%, #ffe9a0 0px, ${apparition.color} 45px, ${apparition.color} 200px)` }
+                        // Embers: the masked shape burns from hot yellow at her out to deep red.
+                        : { filter: "drop-shadow(0 0 2px #ff7a1a) drop-shadow(0 0 7px rgba(255, 80, 0, .85))",
+                            backgroundImage: `radial-gradient(circle at ${apparition.cx}% ${apparition.cy}%, #ffe45c 0px, #ff8a1a calc(60px + var(--lit, 0) * 40px), #ff4400 calc(95px + var(--lit, 0) * 50px), #d92a00 190px)` }) }} />
                   )}
                 </React.Fragment>
               );

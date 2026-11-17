@@ -180,8 +180,10 @@ export const DESIGNS = [
   // helps depends on the table, so it prints as an Ambiguity, not an Opportunity.
 
   D('moralhazard', 'Moral Hazard', 'event', 0, { subtype: 'Ambiguity', text: 'The bailout: the poorest player collects 5; the richest loses 2' }),
-  // Fat Tuesday: the throws. Everyone catches something; the die says how much.
-  D('mardigras', 'Mardi Gras', 'event', 0, { text: 'Let the good times roll: every player rolls the die and collects that much Liquidity' }),
+  // Fat Tuesday, then Ash Wednesday: everyone catches something, and pays for
+  // it the morning after — half the roll, in Credibility. An Ambiguity: the
+  // bigger the party, the bigger the penance.
+  D('mardigras', 'Mardi Gras', 'event', 0, { subtype: 'Ambiguity', text: 'Party now, repent later: every player rolls the die and collects that much; at their next turn start, their Trader loses half of it in Credibility' }),
 
   // Locations (type 'location'): places you build, not things you hold. One
   // stands per player (a new one replaces the old), no Relic slot, never sold;

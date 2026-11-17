@@ -35,12 +35,15 @@ test('interest pays once each turn before income and drawing', async () => {
   assert.equal(game.lines.filter(line => line.includes('(Compound Interest)')).length, 2);
 });
 
-test('benching or playing El Unicornio does not grant an immediate payout', async () => {
+test('seating El Unicornio over another Trader does not grant an immediate payout', async () => {
+  // The bench is gone (2026-11-16): a Trader played from the hand replaces the one at the desk.
   const { game, player } = setup({ trader: 'monje' });
-  player.bench.push({ ...card('unicornio'), credNow: 20 });
   await game.turn(player);
   assert.equal(player.pros, 100);
-  await game.act(player, { t: 'swap', i: 0 });
+  const star = card('unicornio');
+  player.hand.push(star); player.liq = star.cost;
+  await game.playCard(player, star);
+  assert.equal(player.trader.key, 'unicornio');
   assert.equal(player.pros, 100);
   await game.turn(player);
   assert.equal(player.pros, 125);

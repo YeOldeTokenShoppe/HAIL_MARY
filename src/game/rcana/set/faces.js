@@ -415,10 +415,10 @@ export const FACES = [
     // PROVISIONAL number and rarity.
     number: 41,
     rarity: "Uncommon",
-    // The throws; the design's line is a simulator's.
-    ability: "Every player rolls the die\nand collects that much Liquidity.",
+    // The throws, then Ash Wednesday; the design's line is a simulator's.
+    ability: "Everyone rolls and collects that much.\nNext turn their Trader repents half, in CRED.",
     // An Event narrates; the line follows the rule.
-    flavor: "Everybody catches something. The die says how much.",
+    flavor: "Party now. Repent later.",
     printed: {},
   },
   {
@@ -431,7 +431,7 @@ export const FACES = [
     // The refresh; the design's line is a simulator's.
     ability: "Discard up to 2 cards,\nthen draw that many plus one.",
     // A Remedy narrates; the line follows the rule.
-    flavor: "Sweet, cold, and gone too soon.",
+    flavor: "Time for something refreshing.",
     printed: {},
   },
   {
@@ -717,6 +717,19 @@ export const FACES = [
     ability: "Sell for 4 coins, or bank 75 Prosperity.\nLeverage: sells double; the Bear liquidates it.",
     // An Asset narrates, so the flavor follows the rule unquoted.
     flavor: "The ride never stops. The rider sometimes does.",
+    printed: {},
+  },
+  {
+    id: "el-tatuaje",
+    design: "tattoo", // prints as "El Tatuaje" — the design's printName
+    gloss: "The Tattoo",
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 73,
+    rarity: "Common",
+    // A Relic equips; the printed line is the design's upkeep heal.
+    ability: "Inked devotion: at the start of your turn,\nyour seated Trader regains 1 Credibility.",
+    // A Relic narrates; the line follows the rule.
+    flavor: "It does not wash off. Neither does she.",
     printed: {},
   },
 ];
