@@ -74,6 +74,7 @@ export function rcana3Model(data) {
   const trinity = cls === "Trader" ? TRINITY[key] : null;
   const firesOnDraw = design.type === "event" && !design.played;
   const model = {
+    id: data.id,
     cls,
     color: cls === "Trader" ? CLASS_COLOR.Trader : data.keywordColor || CLASS_COLOR[cls] || CLASS_COLOR.Artifact,
     name: data.name || "",
@@ -127,6 +128,32 @@ function RulesText({ text }) {
   });
 }
 
+// The Virtual Mary has circuit traces; the rest of the set uses flowing scrolls.
+function filigreeMarkup(model, metalColor) {
+  const corner = model.id === "virtual-mary" ? `
+    <g fill="none" stroke="${metalColor}" stroke-linejoin="round" stroke-linecap="round">
+      <path stroke-width="1.45" d="M2 40 V18 L17 3 H28 L32 7 H38
+        C45 7 47 2 43 1 C39 0 37 4 40 7 C47 14 54 5 61 4 Q65 3 69 4
+        M2 30 L7 25 C12 20 19 23 17 28 C15 32 10 31 11 27
+        M7 25 C1 36 11 42 6 51 L3 55 V59"/>
+      <path stroke-width=".9" d="M2 11 V7 L7 2 H12 M21 12 H27 L31 16 H36"/>
+      <circle cx="37.5" cy="16" r="1.5" stroke-width="1"/>
+    </g>
+    <path fill="${metalColor}" d="M15 9 Q15.5 14.5 20 15 Q15.5 16 15 21 Q14 16 10 15 Q14 14 15 9Z
+      M62 4 Q67 0 74 2 Q70 6 62 4Z M3 57 L5 60 L3 63 L1 60Z"/>` : `
+    <path d="M72 1 C54 1 46 10 35 8 C26 6 27 0 32 1 C37 2 35 6 32 5 M48 4 C30 15 16 4 8 18 C1 30 12 38 16 30 C18 24 10 22 10 27 M8 18 C0 29 6 46 1 58" fill="none" stroke="${metalColor}" stroke-width="1.35" stroke-linecap="round"/>
+    <path d="M4 14 Q4 6 17 3 Q13 11 4 14 Z M22 18 L24 22 L22 26 L20 22 Z" fill="${metalColor}"/>`;
+  const at = (transform) => `<g transform="${transform}">${corner}</g>`;
+  // Small diamond links sit on the side rails, clear of every badge.
+  const link = '<path d="M0 -16 Q0 -7 -3 0 Q0 7 0 16 Q0 7 3 0 Q0 -7 0 -16 Z"/>';
+  return [
+    model.topLeft ? "" : at("translate(19 19)"),
+    model.plate ? "" : at("translate(493 19) scale(-1 1)"),
+    model.corner ? "" : at("translate(13 697) scale(.85 -.85)"),
+    `<g fill="${metalColor}"><g transform="translate(10 241)">${link}</g><g transform="translate(502 241)">${link}</g></g>`,
+  ].join("");
+}
+
 // The metal, as one mask: every gold part of the frame, white on black. A foil
 // shows through it. Written as markup so the same shapes serve the inline SVG
 // <mask> (the still foils) and a CSS mask image (the mirror, which is a div so
@@ -142,6 +169,7 @@ function metalMaskMarkup(model) {
     `<rect x="15" y="15" width="482" height="472" rx="11" fill="none" stroke="#fff" stroke-width="2"/>`,
     `<rect x="28" y="440" width="456" height="154" rx="12" fill="#000"/>`,
     `<rect x="29" y="441" width="454" height="152" rx="11" fill="none" stroke="#fff" stroke-width="2"/>`,
+    filigreeMarkup(model, "#fff"),
     model.topLeft?.shape === "drop" ? drop(TL_DROP) : "",
     model.topLeft?.shape === "coin" ? `<g transform="translate(${TL.x},${TL.y})"><circle cx="50" cy="50" r="49" fill="#000"/><circle cx="50" cy="50" r="45" fill="#fff"/></g>` : "",
     plate ? `<g transform="translate(${plate.x},0)"><polygon points="${shapes.hull}" fill="#000"/><polygon points="${shapes.rim}" fill="#fff"/><polygon points="${shapes.field}" fill="#000"/>${model.plate.halo ? `<ellipse cx="${plate.cx}" cy="20" rx="30" ry="8" fill="none" stroke="#000" stroke-width="10"/><ellipse cx="${plate.cx}" cy="20" rx="30" ry="8" fill="none" stroke="#fff" stroke-width="5"/>` : ""}</g>` : "",
@@ -294,7 +322,9 @@ export default function RcanaCard3({ data, scale = 1, metal = "flat", interactiv
                     <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none",
                       transform: `${slide} scale(${layer.scale ?? 1})`, transition: interactive ? "transform var(--ease, 500ms) ease-out, opacity var(--ease, 500ms) ease-out" : undefined,
                       WebkitMaskImage: `url("${apparition.mask}")`, maskImage: `url("${apparition.mask}")`, WebkitMaskSize: "100% 100%", maskSize: "100% 100%",
-                      opacity: `calc(${apparition.maskLight ? 0.05 : 0.12} + var(--lit, 0) * ${apparition.maskLight ? (apparition.strength ?? 1) - 0.05 : 0.88})`,
+                      opacity: apparition.maskLight
+                        ? `calc(${(apparition.rest ?? 0.05) * (apparition.strength ?? 1)} + var(--lit, 0) * ${(1 - (apparition.rest ?? 0.05)) * (apparition.strength ?? 1)})`
+                        : "calc(.12 + var(--lit, 0) * .88)",
                       ...(apparition.maskLight
                         // Light: the masked shape brightens in its own colour, with rays turning inside it.
                         ? { mixBlendMode: "screen", filter: `drop-shadow(0 0 5px ${apparition.color})`,
@@ -309,6 +339,9 @@ export default function RcanaCard3({ data, scale = 1, metal = "flat", interactiv
           </div>
         </div>
         <div style={{ ...abs, left: 14, top: 14, width: 480, height: 470, border: `2px solid ${GOLD}`, borderRadius: 12 }} />
+
+        <svg aria-hidden="true" viewBox={`0 0 ${W} ${H}`} style={{ ...abs, inset: 0, width: W, height: H, pointerEvents: "none" }}
+          dangerouslySetInnerHTML={{ __html: filigreeMarkup(m, GILT) }} />
 
         {/* Top left: what it costs. */}
         {m.topLeft?.shape === "drop" && (

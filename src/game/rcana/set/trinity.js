@@ -22,13 +22,25 @@ export const TRINITY = {
   bot:           { liq: 4, cred: 0, eq: 3 }, // the grinder: no halo, the best income in the set
 };
 
-// Rules text that changed with the Playtest 3 rules (one d8, one money), for
-// the cards whose printed line would otherwise be wrong on the new frame.
+// Rules text that changed with the Playtest 3 rules (one d8, one money, two-state
+// Credibility), for the cards whose printed line would otherwise be wrong on the
+// new frame and at the Playtest 3 table. Keyed by design key; any card type.
 export const TRINITY_TEXT = {
   gato: "When seated, and each turn on a roll of 5+, knock one Calamity off your table.",
   diablito: "At the start of your turn, flip a coin: heads, collect $30M.",
   investigadora: "The top card of your deck is face up to you. Once on your turn, you may put it on the bottom.",
   abuela: "Your gambles pay out on a roll one lower.",
+  // Not Traders, but their printed rule changed too: Credibility is two states now, and every roll is a d8.
+  escandalo: "A strike when it lands. While it stays, the Trader cannot return to good standing.",
+  publicista: "Clear a Scandal — or polish: your seated Trader returns to good standing.",
+  shroud: "When your seated Trader would be discredited, discard the Shroud instead: they stay, in scandal.",
+  tattoo: "Inked devotion: at the start of your turn, your seated Trader returns to good standing.",
+  anima: "Light a candle. The most recently discarded Trader returns, in scandal, to your seat or your hand.",
+  confession: "Light a candle. Your seated Trader returns to good standing, even under a Scandal.",
+  meme: "On sale, roll: 6+ moons for $125M, else zero. Or take the safe $40M.",
+  oil: "On sale, roll: 4+ gushes for $175M, else $25M. Or take the safe $30M.",
+  gallo: "Each turn, roll: an 8 collects $20M; a 1 kills him.",
+  lottery: "At the start of each turn, roll: an 8 wins $150M, and the Ticket is spent.",
 };
 
 // $M per point of Liquidity or Credibility, and per coin of an old cost.

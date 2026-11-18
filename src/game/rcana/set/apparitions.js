@@ -35,8 +35,8 @@ export const APPARITIONS = {
   // `mask` lights her own scorched rays: an image the size of the layer, opaque where the rays are.
   "tortilla": { layer: "subject", over: true, cx: 48.8, cy: 33, r: 6.5, spread: 3.2, rays: false, glint: false, rest: 0.1, strength: 0.3, color: "#ffb04a", mask: "/TCG/rcana/tortilla/rays-mask.webp?v=1" },
   "fire-horse": { layer: "subject", cx: 54.5, cy: 15.8, r: 7.5, color: "#ffdc78" },
-  // El Tatuaje: the fresh ink glows — the light is masked to the tattoo's own painted aureole.
-  "el-tatuaje": { layer: "subject", over: true, cx: 55.6, cy: 39.6, r: 6.6, glow: false, glint: false, strength: 0.6, color: "#ffc02e", mask: "/TCG/rcana/el-tatuaje/aureole-mask.png?v=1", maskLight: true },
+  // El Tatuaje: the fresh ink glows — the light is masked to the tattoo's own gold lines (her crown, hair and circuit traces).
+  "el-tatuaje": { layer: "subject", over: true, cx: 60.8, cy: 46.3, r: 4, glow: false, glint: false, rest: 0.3, strength: 0.95, color: "#ffd24a", mask: "/TCG/rcana/el-tatuaje/ink-mask.png?v=2", maskLight: true },
   "holy-roller": { layer: "subject", cx: 40, cy: 17, r: 8.5, color: "#ffdc78" },
   "ride-or-die": { layer: "subject", cx: 56.5, cy: 15, r: 10, color: "#ffe08a" }, // The Lowrider: her aureole over the car
   "mardi-gras": { layer: "subject", cx: 49.5, cy: 18.6, r: 7, color: "#ffdc78" },

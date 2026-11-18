@@ -732,4 +732,17 @@ export const FACES = [
     flavor: "It does not wash off. Neither does she.",
     printed: {},
   },
+  {
+    id: "short-squeeze",
+    design: "squeeze", // prints as "Short Squeeze" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 9,
+    rarity: "Common",
+    // A played Event: the boxes print value (100) and cost (3); the text
+    // carries the per-Calamity bonus and the immunity to The Bear's cap.
+    ability: "Bank 100 Prosperity, +50 for each\nCalamity on you. The Bear cannot cap it.",
+    // An Event narrates; the line follows the rule.
+    flavor: "Every exit was bought. The only way left is up.",
+    printed: {},
+  },
 ];

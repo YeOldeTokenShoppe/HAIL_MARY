@@ -161,3 +161,23 @@ Playtest 2 for comparison (two players): 49% / 51%, 15.9 rounds, going first win
     node src/game/playtest3/pt3-sim.js --verbose --seed 7
 
 `RULES` and `PT3` at the top of the file hold the defaults.
+
+## The table (2026-11-17)
+
+Playtest 3 is playable at `/playtest3`, against EL BOT.
+
+- `pt3-table.src.html` is a fork of the Playtest 2 table, converted to one money: every amount on
+  screen is cash in $M (`usd()` for $M, `coins()` for the old coin counts the engine still uses for
+  costs and incomes). Edits to the Playtest 2 table no longer reach this one.
+- `npm run pt3:build` (pt3-build.js) inlines pt3-sim.js, designs.js and trinity.js and writes
+  pt3-table.html and public/playtest3/table.html. Re-run it after editing any of them.
+- The scoreboard shows Cash and the distance to $1 billion. The Trader seat shows the trinity:
+  Liquidity a turn, the Credibility bonus with the state (good standing / in scandal), Equanimity on the d8.
+- The earned halo: every card in hand offers "Offer it to EL BOT as a gift"; when the bot offers
+  you one, you are asked whether to accept.
+- The engine's log lines are in $M (`Game.m()`).
+- Card text whose rule changed (two-state Credibility, the d8) lives in `TRINITY_TEXT`
+  (src/game/rcana/set/trinity.js), read by both the table and the code-drawn card face.
+
+Checked by playing a whole game through the page with a random clicker: 14 rounds, no script
+errors, a gift accepted and a halo earned, both Traders put in scandal by the Fall, the bot won at $1,020M.

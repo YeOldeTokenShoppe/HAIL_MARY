@@ -44,7 +44,7 @@ export const RESERVED_NUMBERS = {
   bull: 11,
   moon: 49,
   inherit: 8, // The Inheritance — unfaced
-  squeeze: 9, // Short Squeeze — unfaced
+  squeeze: 9,
   unlock: 10, // Token Unlock — unfaced
   moneda: 50, // The Airdrop — unfaced
   crash: 38,
