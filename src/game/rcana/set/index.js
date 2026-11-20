@@ -2,7 +2,7 @@
 // This is what the bench, the binder and the table read. Nothing here is
 // authored by hand — add a card by adding a design (if new), a face entry,
 // and an art file; see README.md.
-import { DESIGNS, designByKey } from "./designs.js";
+import { DESIGNS, designByKey, EDITION, titleOf, loteriaTitleOf } from "./designs.js";
 import { FACES } from "./faces.js";
 import { ARTIFACT_SUBTYPES } from "../artifactTemplate.js";
 import { getEventSubtype } from "../eventTemplate.js";
@@ -56,10 +56,13 @@ export function buildFace(face) {
     // Subtypes appear beside the class in the swept header.
     subClass: face.subClass ?? getEventSubtype(design) ?? ARTIFACT_SUBTYPES[design.type] ?? null,
     cost: design.cost,
-    name: face.name || design.printName || design.name,
-    // The Spanish title in English, for on-screen captions only: the viewer,
-    // the binder label and the table's enlarged view. Never printed.
-    gloss: face.gloss ?? null,
+    // The printed title, by EDITION (designs.js): English now; the lotería
+    // title is kept beside it for the future Lotería edition.
+    name: EDITION === "loteria" ? face.name || loteriaTitleOf(design) : titleOf(design),
+    loteriaName: face.name || loteriaTitleOf(design),
+    // A lotería title's English, for on-screen captions. The English edition
+    // prints its title in English already, so there is nothing to gloss.
+    gloss: EDITION === "loteria" ? face.gloss ?? null : null,
     rarity: face.rarity || "Common",
     // The two printed boxes, by type (POINT_TYPES): the drop is always
     // Liquidity; the halo is standing — Grace on a Trader, Prosperity on an

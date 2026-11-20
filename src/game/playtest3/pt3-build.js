@@ -31,7 +31,7 @@ const designs = readFileSync(join(root, 'src/game/rcana/set/designs.js'), 'utf8'
 let engine = readFileSync(join(here, 'pt3-sim.js'), 'utf8');
 engine = engine.slice(0, engine.indexOf('// ── CLI ──'));
 engine = engine.replace(/^#!.*\n/, '').replace(/^export /gm, '');
-const importLine = /^import \{ DESIGNS \} from '\.\.\/rcana\/set\/designs\.js';\n/m;
+const importLine = /^import \{ DESIGNS, titleOf \} from '\.\.\/rcana\/set\/designs\.js';\n/m;
 if (!importLine.test(engine)) throw new Error('pt3-sim.js no longer imports DESIGNS from the set; update pt3-build.js');
 engine = engine.replace(importLine, () => designs + '\n');
 // The trinity is a second import; inline it the same way.

@@ -16,6 +16,7 @@ import RcanaCard3, { RCANA3_METALS } from "@/components/RcanaCard3";
 import RcanaFlipCard from "@/components/RcanaFlipCard";
 import RcanaViewer from "@/components/RcanaViewer";
 import { RCANA_SET, UNPRINTED, TYPE_CLASS, toRcanaCard } from "@/game/rcana/cardFace";
+import { titleOf } from "@/game/rcana/set/designs.js";
 import { RCANA_SET_SIZE } from "@/game/rcana/set/index.js";
 
 // Every card renders straight from the engine through the game's own converter,
@@ -110,7 +111,7 @@ const RCANA_COLLECTION = RCANA_CLASS_ORDER.map((cls) => {
     .sort((a, b) => (a.number ?? 999) - (b.number ?? 999))
     .map((face) => ({ id: face.id, name: face.name, gloss: face.gloss ?? null, rarity: face.rarity, number: face.number, card: toRcanaCard(face) }));
   const pending = UNPRINTED.filter((d) => TYPE_CLASS[d.type] === cls)
-    .map((d) => ({ id: `design-${d.key}`, name: d.printName || d.name, rarity: d.type, card: null }));
+    .map((d) => ({ id: `design-${d.key}`, name: titleOf(d), rarity: d.type, card: null }));
   return { title: `${cls}s`, cards: [...printed, ...pending], wired: printed.length };
 });
 const RCANA_PRINTED = RCANA_SET.length;

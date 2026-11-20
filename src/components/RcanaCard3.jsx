@@ -272,7 +272,7 @@ export default function RcanaCard3({ data, scale = 1, metal = "flat", interactiv
   const apparition = APPARITIONS[data.id] || null;
   const plate = m.plate ? plateBox(m.plate.value) : null;
   const shapes = plate ? plateShapes(plate.w) : null;
-  const nameSize = m.name.length <= 9 ? 54 : m.name.length <= 13 ? 44 : m.name.length <= 17 ? 36 : 30;
+  const nameSize = m.name.length <= 9 ? 54 : m.name.length <= 13 ? 44 : m.name.length <= 17 ? 36 : m.name.length <= 19 ? 34 : 30;
   // Rules and flavor are set in spaced capitals, so they run wide: size by length to hold three or four lines.
   const textSize = m.text.length <= 60 ? 17 : m.text.length <= 100 ? 14 : 12.5;
   const giltText = metal === "rainbow" ? { color: "transparent", backgroundImage: RAINBOW_TEXT, WebkitBackgroundClip: "text", backgroundClip: "text" }

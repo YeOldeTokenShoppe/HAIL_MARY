@@ -58,6 +58,8 @@ import savingsBond from "./savings-bond.js";
 import thePerp from "./the-perp.js";
 import elTatuaje from "./el-tatuaje.js";
 import shortSqueeze from "./short-squeeze.js";
+import godCandle from "./god-candle.js";
+import lotteryTicket from "./lottery-ticket.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -116,4 +118,6 @@ export const RCANA_ART = {
   "the-perp": thePerp,
   "el-tatuaje": elTatuaje,
   "short-squeeze": shortSqueeze,
+  "god-candle": godCandle,
+  "lottery-ticket": lotteryTicket,
 };

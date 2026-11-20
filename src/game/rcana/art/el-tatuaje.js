@@ -29,5 +29,12 @@ export default {
     // The ink caps on the tray — nearest the window but still BEHIND the
     // plate (z < 44), so the frame clips the tray at its left edge.
     { id: "prop", z: 24, scale: 1 },
+
+    // Rain on the glass: a static sheet of drops, cut to the pane inside the
+    // prop's window frame and riding one step ahead of it, so the drops sit
+    // over the sign and the tray but never on the woodwork. Each drop's
+    // refraction is baked from the three layers above — re-bake after an art
+    // change: python3 scripts/rcana-rain-sheet.py public/TCG/rcana/el-tatuaje
+    { id: "rain", z: 25, scale: 1 },
   ],
 };

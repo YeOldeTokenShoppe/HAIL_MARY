@@ -1893,6 +1893,38 @@ const DESIGNS = [
 
 const DESIGN_TYPES = ["trader", "asset", "event", "hazard", "remedy", "artifact", "grace", "location"];
 const designByKey = Object.fromEntries(DESIGNS.map((d) => [d.key, d]));
+
+// ── EDITION (2026-11-19) ─────────────────────────────────────────────────────
+// The set prints in English. The lotería titles ("El Gato", `printName`) are
+// kept in this file, untouched, for a future Lotería edition: set EDITION to
+// "loteria" and every title goes back to Spanish.
+//
+// ENGLISH_TITLES is the printed title of each design whose lotería title was
+// Spanish, where it differs from the design's own `name`. To rename a card
+// (a Trader to their character's name, say), change its line here: the card
+// face, the binder and the Playtest 3 table all read it.
+const EDITION = "english";
+const ENGLISH_TITLES = {
+  // Traders. Three go by their character's name: Connor (the little devil), Saint GR80 (the monk), Virgil (the cat).
+  diablito: "Connor", monje: "Saint GR80", abuela: "The Grandmother", unicornio: "The Unicorn",
+  gato: "Virgil", investigadora: "The Investigator", prospector: "The Prospector",
+  general: "The General", bot: "The Octobot",
+  // Assets
+  gallo: "The Rooster", vaca: "The Cow", aguacate: "The Avocado", cava: "The Cellar", plata: "The Silver",
+  // Artifacts, Graces and Events
+  tortilla: "The Miracle Tortilla", rosary: "The Rosary", enigma: "The Enigma", horchata: "Horchata",
+  map: "The Treasure Map", anima: "The Lonely Soul", fuego: "Our Lady on Fire",
+  // Not yet printed
+  infierno: "The Inferno", ofrenda: "The Offering", limpia: "The Cleansing", lagrimas: "The Tears",
+};
+const loteriaTitleOf = (d) => d.printName || d.name;
+const titleOf = (d) => (EDITION === "loteria" ? loteriaTitleOf(d) : ENGLISH_TITLES[d.key] || d.name);
+
+// The six that are cards of the traditional lotería deck itself (El Gallo, El
+// Diablito, La Rosa, La Calavera, La Campana, El Corazón), not only lotería in
+// style. Reserved for the Lotería edition: still in this set until each is
+// replaced or cut. Nothing reads this list yet; it is the record of the decision.
+const LOTERIA_RESERVED = ["gallo", "diablito", "rose", "skull", "bell", "heart"];
 const GOD_CANDLE_BONUS = 100; // flat Prosperity bonus per sale while The God Candle burns
 // The game calls every card what the CARD calls itself: a design's printed
 // name (the lotería La Máquina over the engine's Enigma Machine) becomes its
@@ -2458,8 +2490,8 @@ class GreedyBot {
 const FACES = {
   "diablito": {
     "id": "el-diablito",
-    "name": "El Diablito",
-    "gloss": "The Little Devil",
+    "name": "Connor",
+    "gloss": null,
     "number": 7,
     "rarity": "Mythic",
     "face": "/TCG/rcana/el-diablito/face3.webp",
@@ -2480,8 +2512,8 @@ const FACES = {
   },
   "monje": {
     "id": "el-monje",
-    "name": "El Monje",
-    "gloss": "The Monk",
+    "name": "Saint GR80",
+    "gloss": null,
     "number": 12,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/el-monje/face3.webp",
@@ -2513,8 +2545,8 @@ const FACES = {
   },
   "abuela": {
     "id": "abuela",
-    "name": "La Abuela",
-    "gloss": "The Grandmother",
+    "name": "The Grandmother",
+    "gloss": null,
     "number": 15,
     "rarity": "Rare",
     "face": "/TCG/rcana/abuela/face3.webp",
@@ -2524,7 +2556,7 @@ const FACES = {
   },
   "tortilla": {
     "id": "tortilla",
-    "name": "La Tortilla",
+    "name": "The Miracle Tortilla",
     "gloss": null,
     "number": 16,
     "rarity": "Rare",
@@ -2535,8 +2567,8 @@ const FACES = {
   },
   "bell": {
     "id": "la-campana",
-    "name": "La Campana",
-    "gloss": "The Bell",
+    "name": "The Bell",
+    "gloss": null,
     "number": 17,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/la-campana/face3.webp",
@@ -2546,8 +2578,8 @@ const FACES = {
   },
   "rosary": {
     "id": "rosario",
-    "name": "El Rosario",
-    "gloss": "The Rosary",
+    "name": "The Rosary",
+    "gloss": null,
     "number": 18,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/rosario/face3.webp",
@@ -2557,8 +2589,8 @@ const FACES = {
   },
   "skull": {
     "id": "la-calavera",
-    "name": "La Calavera",
-    "gloss": "The Skull",
+    "name": "The Skull",
+    "gloss": null,
     "number": 19,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/la-calavera/face3.webp",
@@ -2568,8 +2600,8 @@ const FACES = {
   },
   "unicornio": {
     "id": "el-unicornio",
-    "name": "El Unicornio",
-    "gloss": "The Unicorn",
+    "name": "The Unicorn",
+    "gloss": null,
     "number": 20,
     "rarity": "Rare",
     "face": "/TCG/rcana/el-unicornio/face3.webp",
@@ -2579,8 +2611,8 @@ const FACES = {
   },
   "gato": {
     "id": "el-gato",
-    "name": "El Gato",
-    "gloss": "The Cat",
+    "name": "Virgil",
+    "gloss": null,
     "number": 21,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/el-gato/face3.webp",
@@ -2601,8 +2633,8 @@ const FACES = {
   },
   "rose": {
     "id": "la-rosa",
-    "name": "La Rosa",
-    "gloss": "The Rose",
+    "name": "The Rose",
+    "gloss": null,
     "number": 23,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/la-rosa/face3.webp",
@@ -2623,8 +2655,8 @@ const FACES = {
   },
   "fountain": {
     "id": "la-fuente",
-    "name": "La Fuente",
-    "gloss": "The Fountain",
+    "name": "The Fountain",
+    "gloss": null,
     "number": 25,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/la-fuente/face3.webp",
@@ -2634,8 +2666,8 @@ const FACES = {
   },
   "investigadora": {
     "id": "la-investigadora",
-    "name": "La Investigadora",
-    "gloss": "The Investigator",
+    "name": "The Investigator",
+    "gloss": null,
     "number": 26,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/la-investigadora/face3.webp",
@@ -2645,8 +2677,8 @@ const FACES = {
   },
   "prospector": {
     "id": "el-gambusino",
-    "name": "El Gambusino",
-    "gloss": "The Prospector",
+    "name": "The Prospector",
+    "gloss": null,
     "number": 27,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/el-gambusino/face3.webp",
@@ -2667,8 +2699,8 @@ const FACES = {
   },
   "celebridad": {
     "id": "the-celebrity",
-    "name": "La Influencer",
-    "gloss": "The Influencer",
+    "name": "The Influencer",
+    "gloss": null,
     "number": 29,
     "rarity": "Uncommon",
     "face": "/TCG/rcana/the-celebrity/face3.webp",
@@ -2711,7 +2743,7 @@ const FACES = {
   },
   "map": {
     "id": "treasure-map",
-    "name": "El Mapa",
+    "name": "The Treasure Map",
     "gloss": null,
     "number": 33,
     "rarity": "Uncommon",
@@ -2810,8 +2842,8 @@ const FACES = {
   },
   "horchata": {
     "id": "la-horchata",
-    "name": "La Horchata",
-    "gloss": "The Rice Drink",
+    "name": "Horchata",
+    "gloss": null,
     "number": 42,
     "rarity": "Common",
     "face": "/TCG/rcana/la-horchata/face3.webp",
@@ -2920,8 +2952,8 @@ const FACES = {
   },
   "fuego": {
     "id": "fire-horse",
-    "name": "Nuestra Señora del Fuego",
-    "gloss": "Our Lady on Fire",
+    "name": "Our Lady on Fire",
+    "gloss": null,
     "number": 53,
     "rarity": "Common",
     "face": "/TCG/rcana/fire-horse/face3.webp",
@@ -2931,8 +2963,8 @@ const FACES = {
   },
   "anima": {
     "id": "anima-sola",
-    "name": "Ánima Sola",
-    "gloss": "The Lonely Soul",
+    "name": "The Lonely Soul",
+    "gloss": null,
     "number": 79,
     "rarity": "Common",
     "face": "/TCG/rcana/anima-sola/face3.webp",
@@ -2942,8 +2974,8 @@ const FACES = {
   },
   "enigma": {
     "id": "enigma-machine",
-    "name": "El Enigma",
-    "gloss": "The Enigma",
+    "name": "The Enigma",
+    "gloss": null,
     "number": 69,
     "rarity": "Common",
     "face": "/TCG/rcana/enigma-machine/face3.webp",
@@ -2953,8 +2985,8 @@ const FACES = {
   },
   "general": {
     "id": "byzantine-general",
-    "name": "El General",
-    "gloss": "The General",
+    "name": "The General",
+    "gloss": null,
     "number": 1,
     "rarity": "Common",
     "face": "/TCG/rcana/byzantine-general/face3.webp",
@@ -2964,8 +2996,8 @@ const FACES = {
   },
   "bot": {
     "id": "octobot",
-    "name": "El Octobot",
-    "gloss": "The Octobot",
+    "name": "The Octobot",
+    "gloss": null,
     "number": 2,
     "rarity": "Common",
     "face": "/TCG/rcana/octobot/face3.webp",
@@ -2975,8 +3007,8 @@ const FACES = {
   },
   "gallo": {
     "id": "el-gallo",
-    "name": "El Gallo",
-    "gloss": "The Rooster",
+    "name": "The Rooster",
+    "gloss": null,
     "number": 81,
     "rarity": "Common",
     "face": "/TCG/rcana/el-gallo/face3.webp",
@@ -2986,8 +3018,8 @@ const FACES = {
   },
   "vaca": {
     "id": "la-vaca",
-    "name": "La Vaca",
-    "gloss": "The Cow",
+    "name": "The Cow",
+    "gloss": null,
     "number": 82,
     "rarity": "Common",
     "face": "/TCG/rcana/la-vaca/face3.webp",
@@ -2997,8 +3029,8 @@ const FACES = {
   },
   "aguacate": {
     "id": "el-aguacate",
-    "name": "El Aguacate",
-    "gloss": "The Avocado",
+    "name": "The Avocado",
+    "gloss": null,
     "number": 83,
     "rarity": "Common",
     "face": "/TCG/rcana/el-aguacate/face3.webp",
@@ -3008,8 +3040,8 @@ const FACES = {
   },
   "cava": {
     "id": "la-cava",
-    "name": "La Cava",
-    "gloss": "The Cellar",
+    "name": "The Cellar",
+    "gloss": null,
     "number": 3,
     "rarity": "Common",
     "face": "/TCG/rcana/la-cava/face3.webp",
@@ -3019,8 +3051,8 @@ const FACES = {
   },
   "plata": {
     "id": "la-plata",
-    "name": "La Plata",
-    "gloss": "The Silver",
+    "name": "The Silver",
+    "gloss": null,
     "number": 85,
     "rarity": "Common",
     "face": "/TCG/rcana/la-plata/face3.webp",
@@ -3052,8 +3084,8 @@ const FACES = {
   },
   "tattoo": {
     "id": "el-tatuaje",
-    "name": "El Tatuaje",
-    "gloss": "The Tattoo",
+    "name": "The Tattoo",
+    "gloss": null,
     "number": 73,
     "rarity": "Common",
     "face": "/TCG/rcana/el-tatuaje/face3.webp",
@@ -3068,6 +3100,17 @@ const FACES = {
     "number": 9,
     "rarity": "Common",
     "face": "/TCG/rcana/short-squeeze/face3.webp",
+    "frame": 3,
+    "metal": "mirror",
+    "art": null
+  },
+  "godcandle": {
+    "id": "god-candle",
+    "name": "The God Candle",
+    "gloss": null,
+    "number": 57,
+    "rarity": "Rare",
+    "face": "/TCG/rcana/god-candle/face3.webp",
     "frame": 3,
     "metal": "mirror",
     "art": null

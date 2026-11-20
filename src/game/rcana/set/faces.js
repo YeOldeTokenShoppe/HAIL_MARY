@@ -745,4 +745,30 @@ export const FACES = [
     flavor: "Every exit was bought. The only way left is up.",
     printed: {},
   },
+  {
+    id: "god-candle",
+    design: "godcandle", // prints as "The God Candle" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (a windfall, so Rare for now).
+    number: 57,
+    rarity: "Rare",
+    // An on-draw Opportunity: it resolves as drawn, then leaves its bonus on
+    // the table until the drawer's next turn.
+    ability: "Until your next turn,\nevery Prosperity sale pays 100 more.",
+    // An Event narrates; the line follows the rule.
+    flavor: "One wick, and the whole sky bought in.",
+    printed: {},
+  },
+  {
+    id: "lottery-ticket",
+    design: "lottery", // prints as "The Lottery Ticket" — the design's name ("El Boleto" in the Lotería edition)
+    gloss: "The Ticket",
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 71,
+    rarity: "Common",
+    // A Relic equips; the printed line is the design's per-turn scratch.
+    ability: "Scratch at the start of each turn: roll.\nA 6 wins 150 Prosperity, and the Ticket is spent.",
+    // A Relic narrates; the line follows the rule.
+    flavor: "Somebody has to win. Nobody said when.",
+    printed: {},
+  },
 ];

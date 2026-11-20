@@ -21,13 +21,13 @@ export function makeRng(seed) { let s = seed >>> 0 || 1; return () => { s |= 0; 
 
 // ── The set's designs live in src/game/rcana/set/designs.js — the one source of truth ──
 // pt2-build.js inlines that file here for the browser table; Node imports it directly.
-import { DESIGNS } from '../rcana/set/designs.js';
+import { DESIGNS, titleOf } from '../rcana/set/designs.js';
 import { TRINITY } from '../rcana/set/trinity.js';
 const GOD_CANDLE_BONUS = 100; // flat Prosperity bonus per sale while The God Candle burns
 // The game calls every card what the CARD calls itself: a design's printed
 // name (the lotería La Máquina over the engine's Enigma Machine) becomes its
 // name here, so the table, the gallery and the log all match the print.
-for (const d of DESIGNS) if (d.printName) d.name = d.printName;
+for (const d of DESIGNS) d.name = titleOf(d); // the printed title, by EDITION (designs.js)
 // Playtest 3's own card values, layered over the shared set so designs.js (and Playtest 2) stay as they are.
 export const PT3 = {
   // THE TRINITY, as three printed numbers (2026-11-16): Liquidity (liq, and cost = liq), Credibility (halo:
@@ -38,6 +38,8 @@ export const PT3 = {
 // No halo and no composure: the devil lives on his wager, which is a plain money bet now — heads collect 3.
 Object.assign(PT3.diablito, { wager: 3, wagerLoss: 0, text: 'At the start of your turn, flip a coin: heads, collect 3 Liquidity' });
 export const byKey = Object.fromEntries(DESIGNS.map((d) => [d.key, { ...d, ...(PT3[d.key] || {}) }]));
+// A card's printed title, for the log: N('gato') is its name, U('gato') the same in capitals.
+const N = (key) => byKey[key].name; const U = (key) => N(key).toUpperCase();
 // CREDIBILITY IS A STATE, NOT A COUNT (2026-11-16). A Trader is IN GOOD STANDING or IN SCANDAL.
 //   · in good standing they earn +1 income (the old full-Credibility bonus)
 //   · a strike (any Calamity landing on you, Fall From Grace) puts them in scandal
@@ -182,12 +184,12 @@ export class Game {
     if (c.key === 'fall') for (const q of this.players) if (q.trader) await this.credDamage(q, 1, 'the FALL FROM GRACE');
     if (c.key === 'feast') { this.log('THE FEAST OF PERPETUAL PROFIT — every player lights a candle'); for (const q of this.players) await this.lightCandle(q, 'the Feast'); }
     if (c.key === 'holyroller') { for (const q of this.players) { this.collect(q, 1); await this.draw(q, true); } this.log(`THE HOLY ROLLER rolls through — every player draws a card and collects ${this.m(1)}`); }
-    if (c.key === 'fuego') { this.log('NUESTRA SEÑORA DEL FUEGO rides through the market'); for (const q of this.players) { this.bank(q, 75, 'Nuestra Señora del Fuego'); if (this.over) break; } }
+    if (c.key === 'fuego') { this.log(`${U('fuego')} rides through the market`); for (const q of this.players) { this.bank(q, 75, N('fuego')); if (this.over) break; } }
     if (c.key === 'virtual') { for (const q of this.players) { const n = q.hand.length; q.deck.push(...q.hand.splice(0)); q.deck = this.shuffle(q.deck); for (let i = 0; i < n; i++) await this.draw(q, true); this.log(`THE VIRTUAL MARY flickers — ${q.name} shuffles ${n} back and draws ${n}`); } }
     if (c.key === 'techwreck') { let hit = 0; for (const q of this.players) for (const a of [...q.invest]) if (a.tech) { q.invest.splice(q.invest.indexOf(a), 1); q.discard.push(a); this.collect(q, 1); hit++; this.log(`${q.name}'s ${a.name.toUpperCase()} is wrecked — scrapped for ${this.m(1)}`); } for (const q of this.players) if (q.location && q.location.tech) { this.log(`${q.name}'s ${q.location.name.toUpperCase()} burns down`); q.discard.push(q.location); q.location = null; hit++; }
       if (!hit) this.log('TECH WRECK — no tech on the table; the bubble bursts over nobody'); }
     if (c.key === 'crash') for (const q of this.players) {
-      if (q.invest.some((a) => a.silver)) { this.log(`${q.name} holds LA PLATA — flight to safety`); this.bank(q, 25, 'La Plata'); continue; }
+      if (q.invest.some((a) => a.silver)) { this.log(`${q.name} holds ${U('plata')} — flight to safety`); this.bank(q, 25, N('plata')); continue; }
       if (q.liq >= 8) { const lost = Math.floor(q.liq * this.rules.crash); q.liq -= lost; this.log(`${q.name} loses ${this.m(lost)} in the crash`); } }
     if (c.key === 'ballena') {
       const worth = (q) => q.invest.reduce((s2, a2) => s2 + this.prosOf(a2), 0);
@@ -257,11 +259,11 @@ export class Game {
     if (p.deeds >= 3) return false;
     p.deeds += 1; p.stats.candles++;
     if (this.rules.candleHalo && p.deeds === 1) this.earnHalo(p, 'candle');
-    if (this.is(p, 'monje')) this.bank(p, p.trader.vow ?? 25, 'El Monje');
+    if (this.is(p, 'monje')) this.bank(p, p.trader.vow ?? 25, N('monje'));
     this.restoreStanding(p, 'the candlelight');
     if (p.artifacts.some((a) => a.key === 'rosary')) await this.draw(p);
     this.log(`🕯 ${p.name} lights a candle (${why}) → ${p.deeds} of 3`);
-    for (const q of this.players) if (q.location && q.location.key === 'catedral') { this.log(`a green candle in LA CATEDRAL — ${q.name} banks 25`); this.bank(q, 25, 'La Catedral'); }
+    for (const q of this.players) if (q.location && q.location.key === 'catedral') { this.log(`a green candle in ${U('catedral')}`); this.bank(q, 25, N('catedral')); }
     return true;
   }
   // A gift cuts both ways: the taker gets a card, the giver gets a halo. These two estimates let a bot weigh one
@@ -414,7 +416,7 @@ export class Game {
         p.stats.hires++;
         this.log(`${p.name} seats ${c.name} at the desk (earns ${this.m(c.liq)} a turn · ${standing(c)} · EQ ${c.eq || 0})`);
         if (c.key === 'gato' && p.hazards.length && this.abilityOn(p)) {
-          this.clearHazard(p, choice.hazard || p.hazards[0], p, 'EL GATO knocks it off the table');
+          this.clearHazard(p, choice.hazard || p.hazards[0], p, `${U('gato')} knocks it off the table`);
         }
         break; }
       case 'grace': {
@@ -430,7 +432,7 @@ export class Game {
         await this.lightCandle(p, c.name);
         if (c.key === 'cherub') await this.draw(p);
         if (c.key === 'limpia' && p.hazards.length) this.clearHazard(p, choice.hazard || p.hazards[0], p, 'LA LIMPIA sweeps it away');
-        if (c.key === 'anima') { const back = [...p.discard].reverse().find((x) => x.type === 'trader'); if (back) { p.discard.splice(p.discard.indexOf(back), 1); back.credNow = 1; if (p.trader) p.hand.push(back); else p.trader = back; this.log(`ÁNIMA SOLA — ${back.name} returns from purgatory to ${p.name}'s ${p.trader === back ? 'desk' : 'hand'}, in scandal`); } else this.log('ÁNIMA SOLA — nobody to bring back'); }
+        if (c.key === 'anima') { const back = [...p.discard].reverse().find((x) => x.type === 'trader'); if (back) { p.discard.splice(p.discard.indexOf(back), 1); back.credNow = 1; if (p.trader) p.hand.push(back); else p.trader = back; this.log(`${U('anima')} — ${back.name} returns from purgatory to ${p.name}'s ${p.trader === back ? 'desk' : 'hand'}, in scandal`); } else this.log(`${U('anima')} — nobody to bring back`); }
         if (c.key === 'confession') this.restoreStanding(p, 'THE CONFESSION absolves', true);
         break; }
     }
@@ -456,7 +458,7 @@ export class Game {
     await this.mapDraw(p);
     return true;
   }
-  async mapDraw(p) { if (p.artifacts.some((a) => a.key === 'map')) { await this.draw(p); this.log(`${p.name} follows EL MAPA and draws a card`); } }
+  async mapDraw(p) { if (p.artifacts.some((a) => a.key === 'map')) { await this.draw(p); this.log(`${p.name} follows ${U('map')} and draws a card`); } }
   payClear(p, h) { if (!this.spend(p, 3)) return false; this.clearHazard(p, h, p, `${p.name} pays 3`); return true; }
   // The Dashboard Figure: when a die fails you, she may be spent for one more
   // roll. The policy decides (a human is asked); returns true when she was spent.
@@ -504,7 +506,7 @@ export class Game {
     switch (a.t) {
       case 'play': return this.playCard(p, a.c, a.choice || {});
       case 'sell': return this.sell(p, a.a, a.pros);
-      case 'uncork': { const w = a.a; p.invest.splice(p.invest.indexOf(w), 1); p.discard.push(w); this.log(`${p.name} uncorks ${w.name}`); await this.lightCandle(p, 'La Cava'); return true; }
+      case 'uncork': { const w = a.a; p.invest.splice(p.invest.indexOf(w), 1); p.discard.push(w); this.log(`${p.name} uncorks ${w.name}`); await this.lightCandle(p, N('cava')); return true; }
       case 'gift': { // give a card from your hand to your rival; if they take it, your Trader earns a halo
         const to = a.target || [...this.rivals(p)].sort((x, y) => this.netWorth(x) - this.netWorth(y))[0];
         const blind = !a.c; const c = a.c || p.hand[Math.floor(this.rng() * p.hand.length)]; // giftBlind: the rival draws one at random, and cannot refuse
@@ -526,8 +528,8 @@ export class Game {
     // starts with a roll — 4+ and he knocks one Calamity off the table (his pick, not yours). It gives
     // him something to do when he opens the game at a clean desk. A Quantum Hack on the seat stops him.
     if (this.is(p, 'gato') && p.hazards.length) { const r = this.roll();
-      if (r >= 4 + this.d8()) this.clearHazard(p, p.hazards[Math.floor(this.rng() * p.hazards.length)], p, `EL GATO rolls ${r} and knocks it off the table`);
-      else this.log(`EL GATO rolls ${r} — he only looks at it`); }
+      if (r >= 4 + this.d8()) this.clearHazard(p, p.hazards[Math.floor(this.rng() * p.hazards.length)], p, `${U('gato')} rolls ${r} and knocks it off the table`);
+      else this.log(`${U('gato')} rolls ${r} — he only looks at it`); }
     if (this.is(p, 'unicornio') && p.pros >= 100) {
       this.bank(p, 25, 'Compound Interest');
       if (this.over) {
@@ -537,9 +539,9 @@ export class Game {
     }
     if (p.artifacts.some((a) => a.key === 'tattoo')) this.restoreStanding(p, 'THE TATTOO');
     for (const g of [...p.invest]) if (g.rooster) { const r = this.roll();
-      if (r === this.rules.die) { this.collect(p, 2); this.log(`EL GALLO wins the fight — ${p.name} collects ${this.m(2)}`); }
-      else if (r === 1) { p.invest.splice(p.invest.indexOf(g), 1); p.discard.push(g); this.log(`EL GALLO rolls a 1 — he is dead, and ${p.name} gets nothing`); }
-      else this.log(`EL GALLO rolls ${r} — he lives to fight again`); }
+      if (r === this.rules.die) { this.collect(p, 2); this.log(`${U('gallo')} wins the fight — ${p.name} collects ${this.m(2)}`); }
+      else if (r === 1) { p.invest.splice(p.invest.indexOf(g), 1); p.discard.push(g); this.log(`${U('gallo')} rolls a 1 — he is dead, and ${p.name} gets nothing`); }
+      else this.log(`${U('gallo')} rolls ${r} — he lives to fight again`); }
     const ticket = p.artifacts.find((a) => a.key === 'lottery');
     if (ticket) {
       const roll = this.roll();
@@ -555,22 +557,22 @@ export class Game {
       } else {
         if (p.trader.wagerLoss != null) { const lost = Math.min(p.liq, p.trader.wagerLoss); p.liq -= lost; this.log(`DEVIL'S WAGER — tails: ${p.name} pays ${this.m(lost)}`); }
         // tails costs him his good standing, never his seat: the devil cannot fall twice
-        else if (p.trader.credNow == null || p.trader.credNow >= p.trader.cred) { p.trader.credNow = 1; this.log(`DEVIL'S WAGER — tails: El Diablito is in scandal`); }
+        else if (p.trader.credNow == null || p.trader.credNow >= p.trader.cred) { p.trader.credNow = 1; this.log(`DEVIL'S WAGER — tails: ${N('diablito')} is in scandal`); }
         else this.log(`DEVIL'S WAGER — tails: nothing left to lose`);
       }
     }
     // EL NACIMIENTO: a figure a turn; the third brings the Niño, and the scene is packed away.
     if (p.location && p.location.key === 'nacimiento') {
       const nac = p.location; nac.figures = (nac.figures || 0) + 1;
-      if (nac.figures < 3) this.log(`${p.name} places a figure in EL NACIMIENTO (${nac.figures} of 3)`);
-      else { this.log(`midnight at EL NACIMIENTO — the Niño arrives for ${p.name}`); await this.lightCandle(p, 'El Nacimiento'); this.bank(p, 75, 'El Nacimiento'); nac.figures = 0; p.location = null; p.discard.push(nac); this.log(`${p.name} packs the Nativity away`);
+      if (nac.figures < 3) this.log(`${p.name} places a figure in ${U('nacimiento')} (${nac.figures} of 3)`);
+      else { this.log(`midnight at ${U('nacimiento')} — the Niño arrives for ${p.name}`); await this.lightCandle(p, N('nacimiento')); this.bank(p, 75, N('nacimiento')); nac.figures = 0; p.location = null; p.discard.push(nac); this.log(`${p.name} packs the Nativity away`);
         if (this.over) { if (this.hooks && this.hooks.render) await this.hooks.render(); return; } }
     }
     // LAS CATACUMBAS: bury the seated Trader with honors — 5 Prosperity per point of Credibility they have left.
     if (p.location && p.location.key === 'catacumbas' && p.trader && p.policy.buryTrader && await p.policy.buryTrader(this, p)) {
       const t = p.trader; const honors = (t.credNow ?? t.cred) >= t.cred ? 75 : 25; // in good standing, or in scandal
-      this.log(`⚰ ${p.name} buries ${t.name} in LAS CATACUMBAS with honors`); p.trader = null; p.discard.push(t); p.stats.buried = (p.stats.buried || 0) + 1;
-      this.bank(p, honors, 'Las Catacumbas');
+      this.log(`⚰ ${p.name} buries ${t.name} in ${U('catacumbas')} with honors`); p.trader = null; p.discard.push(t); p.stats.buried = (p.stats.buried || 0) + 1;
+      this.bank(p, honors, N('catacumbas'));
       if (this.over) { if (this.hooks && this.hooks.render) await this.hooks.render(); return; }
     }
     // SEED ROUND: a planted Event blooms after its rounds; a Bear Market holds the harvest until it is cleared.

@@ -194,3 +194,35 @@ export const DESIGNS = [
 
 export const DESIGN_TYPES = ["trader", "asset", "event", "hazard", "remedy", "artifact", "grace", "location"];
 export const designByKey = Object.fromEntries(DESIGNS.map((d) => [d.key, d]));
+
+// ── EDITION (2026-11-19) ─────────────────────────────────────────────────────
+// The set prints in English. The lotería titles ("El Gato", `printName`) are
+// kept in this file, untouched, for a future Lotería edition: set EDITION to
+// "loteria" and every title goes back to Spanish.
+//
+// ENGLISH_TITLES is the printed title of each design whose lotería title was
+// Spanish, where it differs from the design's own `name`. To rename a card
+// (a Trader to their character's name, say), change its line here: the card
+// face, the binder and the Playtest 3 table all read it.
+export const EDITION = "english";
+export const ENGLISH_TITLES = {
+  // Traders. Five go by their character's name: Connor (the little devil), Saint GR80 (the monk), Virgil (the cat), Eugene (the unicorn), Marisol (the investigator).
+  diablito: "Connor", monje: "Saint GR80", abuela: "The Gambler", unicornio: "Eugene",
+  gato: "Virgil", investigadora: "Marisol", prospector: "The Prospector",
+  general: "Byzantine General", bot: "The Octobot",
+  // Assets
+  gallo: "The Rooster", vaca: "The Cow", aguacate: "The Avocado", cava: "The Cellar", plata: "The Silver",
+  // Artifacts, Graces and Events
+  tortilla: "The Miracle Tortilla", rosary: "The Rosary", enigma: "The Enigma Machine", horchata: "Horchata",
+  map: "The Treasure Map", anima: "The Lonely Soul", fuego: "The Fire Horse",
+  // Not yet printed
+  infierno: "The Inferno", ofrenda: "The Offering", limpia: "The Cleansing", lagrimas: "The Tears",
+};
+export const loteriaTitleOf = (d) => d.printName || d.name;
+export const titleOf = (d) => (EDITION === "loteria" ? loteriaTitleOf(d) : ENGLISH_TITLES[d.key] || d.name);
+
+// The six that are cards of the traditional lotería deck itself (El Gallo, El
+// Diablito, La Rosa, La Calavera, La Campana, El Corazón), not only lotería in
+// style. Reserved for the Lotería edition: still in this set until each is
+// replaced or cut. Nothing reads this list yet; it is the record of the decision.
+export const LOTERIA_RESERVED = ["gallo", "diablito", "rose", "skull", "bell", "heart"];

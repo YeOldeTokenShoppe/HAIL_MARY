@@ -57,7 +57,7 @@ export const RESERVED_NUMBERS = {
   ballena: 24,
   illuminati: 28,
   rueda: 56, // The Wheel — unfaced
-  godcandle: 57, // The God Candle — unfaced
+  godcandle: 57,
   moralhazard: 59, // Moral Hazard — unfaced
   mardigras: 41,
   // Hazards
@@ -87,7 +87,7 @@ export const RESERVED_NUMBERS = {
   skull: 19,
   shroud: 70, // El Sudario — unfaced
   rideordie: 35,
-  lottery: 71, // El Boleto — unfaced
+  lottery: 71, // El Boleto
   geometry: 72, // La Geometría — unfaced
   tattoo: 73, // El Tatuaje — unfaced
   dashboard: 74, // La Virgencita — unfaced

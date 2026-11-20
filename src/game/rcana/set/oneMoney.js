@@ -29,6 +29,7 @@ export function oneMoney(text, cardClass) {
   t = t
     .replace(/\bBank (\d+)(?: Prosperity)?/g, (_, n) => `Collect ${m(n)}`)
     .replace(/\bbank (\d+)(?: Prosperity)?/g, (_, n) => `collect ${m(n)}`)
+    .replace(/\bbanks\b/g, "collects")
     .replace(/(\d+)\+ banked Prosperity/g, (_, n) => `${m(n)} or more`)
     .replace(/(\d+) Prosperity/g, (_, n) => m(n))
     .replace(/(\d+) or more Liquidity/g, (_, n) => `${coins(n)} or more`)
