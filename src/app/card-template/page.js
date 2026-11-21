@@ -12,7 +12,7 @@ import { ROGUES } from "@/game/terminal-traders/rogues";
 import { LOTERIA_CARDS, toLoteriaCard } from "@/game/terminal-traders/loteria";
 import RcanaBench from "@/components/RcanaBench";
 import RcanaCard from "@/components/RcanaCard";
-import RcanaCard3, { RCANA3_METALS } from "@/components/RcanaCard3";
+import RcanaCard3, { RCANA3_METALS, rcana3MetalFor } from "@/components/RcanaCard3";
 import RcanaFlipCard from "@/components/RcanaFlipCard";
 import RcanaViewer from "@/components/RcanaViewer";
 import { RCANA_SET, UNPRINTED, TYPE_CLASS, toRcanaCard } from "@/game/rcana/cardFace";
@@ -161,9 +161,13 @@ export default function CardTemplatePage() {
   // tester can be sent straight to one card.
   const [viewerId, setViewerId] = useState(null);
   // The binder's frame: "1" the painted frame, "3" the code-drawn one (RcanaCard3),
-  // with its metal — flat gold, polished gold or rainbow foil.
-  const [rcanaFrame, setRcanaFrame] = useState("1");
-  const [rcanaMetal, setRcanaMetal] = useState("mirror");
+  // with its metal — flat gold, polished gold or rainbow foil. Code-drawn is the
+  // default since 2026-11-20: it is the frame the Playtest 3 table prints.
+  const [rcanaFrame, setRcanaFrame] = useState("3");
+  // null = "Card": each card's own metal (an art file's metalFrame), mirror
+  // where it names none; a named metal pins every card to it.
+  const [rcanaMetal, setRcanaMetal] = useState(null);
+  const metalFor = (card) => rcana3MetalFor(card, rcanaMetal, "mirror");
   const [frame3Id, setFrame3Id] = useState(null);
   const [frame3Scale, setFrame3Scale] = useState(0.8);
   const frame3Index = RCANA_VIEW_ORDER.findIndex((c) => c.id === frame3Id);
@@ -270,15 +274,18 @@ export default function CardTemplatePage() {
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     if (q.get("tools") === "1") setTools(true);
+    // ?card= opens that card in whichever viewer the binder's frame uses.
     const c = q.get("card");
-    if (c && RCANA_VIEW_ORDER.some((x) => x.id === c)) setViewerId(c);
+    if (c && RCANA_VIEW_ORDER.some((x) => x.id === c)) (rcanaFrame === "3" ? setFrame3Id : setViewerId)(c);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only; the frame's initial value is what counts
   }, []);
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
-    if (viewerId) q.set("card", viewerId); else q.delete("card");
+    const open = frame3Id || viewerId;
+    if (open) q.set("card", open); else q.delete("card");
     const qs = q.toString();
     window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
-  }, [viewerId]);
+  }, [viewerId, frame3Id]);
 
   useEffect(() => {
     const adjust = () => {
@@ -457,8 +464,8 @@ export default function CardTemplatePage() {
               <>
                 <span>Metal</span>
                 <div className="ct-view-toggle" role="radiogroup" aria-label="Frame metal">
-                  {RCANA3_METALS.map((m) => (
-                    <button key={m} role="radio" aria-checked={rcanaMetal === m} className={rcanaMetal === m ? "is-active" : ""} onClick={() => setRcanaMetal(m)}>{m}</button>
+                  {[null, ...RCANA3_METALS].map((m) => (
+                    <button key={m ?? "card"} role="radio" aria-checked={rcanaMetal === m} className={rcanaMetal === m ? "is-active" : ""} onClick={() => setRcanaMetal(m)} title={m ? undefined : "Each card's own metal"}>{m ?? "card"}</button>
                   ))}
                 </div>
               </>
@@ -482,7 +489,7 @@ export default function CardTemplatePage() {
                     <span className="ct-slot-art">
                       {slot.card ? (
                         rcanaFrame === "3"
-                          ? <RcanaCard3 data={slot.card} scale={THUMB_SCALE} metal={rcanaMetal} />
+                          ? <RcanaCard3 data={slot.card} scale={THUMB_SCALE} metal={metalFor(slot.card)} />
                           : <RcanaCard data={slot.card} scale={THUMB_SCALE} interactive={false} depth={0} showFx={false} />
                       ) : (
                         <span className="ct-slot-pending" aria-hidden>+</span>
@@ -504,9 +511,9 @@ export default function CardTemplatePage() {
       {frame3Card && (
         <div className="ct-frame3-viewer" role="dialog" aria-label={frame3Card.name} onClick={() => setFrame3Id(null)}>
           <div onClick={(e) => e.stopPropagation()}>
-            <RcanaFlipCard key={frame3Card.id} Front={RcanaCard3} backRadius="4.7%" backFoil={rcanaMetal === "mirror"} data={frame3Card.card} scale={frame3Scale} metal={rcanaMetal} interactive />
+            <RcanaFlipCard key={frame3Card.id} Front={RcanaCard3} backRadius="4.7%" backFoil={metalFor(frame3Card.card) === "mirror"} data={frame3Card.card} scale={frame3Scale} metal={metalFor(frame3Card.card)} interactive />
           </div>
-          <p>{frame3Card.name} · {rcanaMetal} · move the mouse to tilt · click to turn it over · ← → to browse · Esc to close</p>
+          <p>{frame3Card.name} · {metalFor(frame3Card.card)} · move the mouse to tilt · click to turn it over · ← → to browse · Esc to close</p>
         </div>
       )}
 

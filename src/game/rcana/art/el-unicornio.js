@@ -11,10 +11,8 @@ import { ART_PLANES } from "../artSpec.js";
 export default {
   // No `frame`: the plate follows the card's type.
 
-  // The Terminal Traders rainbow border over the Lotería frame, by default
-  // (RCANA_METAL_FRAMES id). The bench's Metal frame select starts here and
-  // can still override it; the print route takes it as is.
-  metalFrame: "rainbow",
+  // No `metalFrame`: Eugene printed in rainbow until 2026-11-20; he now takes
+  // the set's default metal like the rest of the Traders.
 
   // The club's purple dark — with no scene layer this is the whole field
   // behind the subject, not just a sliver on tilt.

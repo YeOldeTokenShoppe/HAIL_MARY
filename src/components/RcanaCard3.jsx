@@ -10,8 +10,8 @@
 // The only pictures are the card's own art layers and the RL80 seal.
 //
 // Layout, in a 512 x 710 box (the 1027:1424 card aspect), scaled to fit:
-//   top left      what the card costs — a DROP on a Trader (Liquidity: the cost is
-//                 also what they earn each turn), a COIN on everything else;
+//   top left      what the card costs — a COIN on every card (on a Trader it is their
+//                 Money: the cost is also what they make each turn);
 //                 no badge at all on a card that is free or fires when drawn
 //   top right     the plate, the card's headline number — Credibility under a
 //                 halo on a Trader, the sale price on an Asset, the payout on a
@@ -21,18 +21,53 @@
 //   bottom right  the RL80 seal over the collector number
 //
 // Trader numbers come from src/game/rcana/set/trinity.js (the Playtest 3
-// trinity). Money on non-Trader cards is printed in $M: an old cost of 3 is 30.
+// trinity). All money is printed in $M: an old cost of 3 is 30, and a Trader's
+// Liquidity 2 is 20. Equanimity is a d8 target and stays a single digit.
 //
 // It keeps RcanaCard's outer class names (.rc-stage, .rc-card[data-ready]) so
 // scripts/rcana-render-faces.mjs can screenshot it unchanged.
 import React, { useEffect, useId, useRef, useState } from "react";
 import { designByKey } from "@/game/rcana/set/designs.js";
-import { TRINITY, TRINITY_TEXT, MONEY_UNIT } from "@/game/rcana/set/trinity.js";
+import { TRINITY, TRINITY_TEXT, MONEY_UNIT, ATTRS } from "@/game/rcana/set/trinity.js";
 import { oneMoney } from "@/game/rcana/set/oneMoney.js";
 import { APPARITIONS } from "@/game/rcana/set/apparitions.js";
 import { RCANA_SET } from "@/game/rcana/cardFace";
 
 export const RCANA3_METALS = ["flat", "gold", "mirror", "rainbow"];
+// The metals an art file's `metalFrame` carries into this frame. Only rainbow:
+// the painted frame's "gold" is a border laid over a lotería frame, and this
+// frame is gold already, so it means nothing here.
+export const RCANA3_CARD_METALS = ["rainbow"];
+// The metal a card is drawn in: the caller's choice if it made one, else the
+// card's own (the Lowrider and the Fire Horse ship rainbow), else the fallback.
+// So a binder or print route can pass null to mean "whatever the card says".
+export const rcana3MetalFor = (data, chosen, fallback = "flat") =>
+  (RCANA3_METALS.includes(chosen) ? chosen : null)
+  ?? (RCANA3_CARD_METALS.includes(data?.metalFrame) ? data.metalFrame : null)
+  ?? fallback;
+
+// THE TRINITY TRIANGLE (2026-11-20). A Trader's three attributes as one figure: Ethos at the top, Pathos
+// bottom left, Logos bottom right, the numerals on the corners. The filled shape reaches toward each
+// corner by that attribute (1-4), so a Trader's lean shows before a number is read. Drawn for parchment.
+function Trinity({ at, color, style }) {
+  const V = { ethos: [65, 34], pathos: [24, 104], logos: [106, 104] }; const C = [65, 80.7];
+  const reach = (k) => { const t = Math.min(1, at[k] / 4); return [C[0] + (V[k][0] - C[0]) * t, C[1] + (V[k][1] - C[1]) * t]; };
+  const P = (list) => list.map((p) => p.join(",")).join(" ");
+  const name = { fontFamily: CAPS, fontSize: 10.5, letterSpacing: "0.16em", fill: "#4a3520", textAnchor: "middle" };
+  const keys = ["ethos", "pathos", "logos"];
+  return (
+    <svg role="img" aria-label={`Ethos ${at.ethos}, Pathos ${at.pathos}, Logos ${at.logos}`} viewBox="0 0 130 130" style={style}>
+      <polygon points={P(keys.map((k) => V[k]))} fill="#ecdba6" stroke="#b9892f" strokeWidth="2" strokeLinejoin="round" />
+      {keys.map((k) => <line key={k} x1={C[0]} y1={C[1]} x2={V[k][0]} y2={V[k][1]} stroke="#b9892f" strokeWidth="1" strokeOpacity=".55" />)}
+      <polygon points={P(keys.map(reach))} fill={color} fillOpacity=".8" stroke={INK} strokeWidth="1.5" strokeLinejoin="round" />
+      {keys.map((k) => (
+        <g key={k}><circle cx={V[k][0]} cy={V[k][1]} r="13" fill={INK} stroke="#b9892f" strokeWidth="2" />
+          <text x={V[k][0]} y={V[k][1] + 6.5} style={{ fontFamily: NUM, fontSize: 18, fill: GILT, textAnchor: "middle" }}>{at[k]}</text></g>
+      ))}
+      <text x={V.ethos[0]} y="15" style={name}>ETHOS</text><text x={V.pathos[0] + 4} y="128" style={name}>PATHOS</text><text x={V.logos[0] - 2} y="128" style={name}>LOGOS</text>
+    </svg>
+  );
+}
 
 const W = 512;
 const H = 710;
@@ -83,12 +118,15 @@ export function rcana3Model(data) {
     text: TRINITY_TEXT[key] || oneMoney(data.ability, cls),
     flavor: data.flavor ? (data.flavorQuoted ? `“${data.flavor}”` : data.flavor) : null,
     collector: data.collector ? `${data.collector.number} / ${data.collector.of}` : null,
-    topLeft: null, plate: null, corner: null,
+    apparition: !!design.apparition, // one of the ten cards with Our Lady's image: an eight-pointed star by the type line
+    topLeft: null, plate: null, corner: null, attrs: null,
   };
   if (trinity) {
-    model.topLeft = { shape: "drop", value: trinity.liq, label: `Liquidity ${trinity.liq}: costs ${trinity.liq} to play, earns ${trinity.liq} a turn` };
-    model.plate = { value: trinity.cred, halo: true, label: `Credibility ${trinity.cred}: earns ${trinity.cred} more while in good standing` };
-    model.corner = { shape: "die", value: trinity.eq, label: `Equanimity ${trinity.eq}: a Calamity played on you fails on a d8 roll of ${trinity.eq} or lower` };
+    // MONEY in the coin, like every other card's price: what the Trader costs to play and makes each turn.
+    // Their character is the trinity triangle in the text box (ATTRS in trinity.js), not badges in the corners.
+    const liqM = trinity.liq * MONEY_UNIT;
+    model.topLeft = { shape: "coin", value: liqM, label: `Money: costs $${liqM}M to play, makes $${liqM}M a turn` };
+    model.attrs = ATTRS[key] || null;
   } else {
     const cost = Number(data.cost) || 0;
     // No coin means nothing to pay: a card that fires when drawn, or one that is free to play.
@@ -101,6 +139,8 @@ export function rcana3Model(data) {
   return model;
 }
 
+// The numeral in the top-left drop: two digits ($M) sit smaller and a touch higher than one.
+const dropNum = (value) => (String(value).length > 1 ? { size: 40, y: 91 } : { size: 50, y: 94 });
 const plateBox = (value) => { const w = String(value).length === 1 ? 120 : String(value).length === 2 ? 150 : 178; return { w, x: W - 4 - w, cx: (w + 12) / 2 }; };
 const pts = (list) => list.map((p) => p.join(",")).join(" ");
 const plateShapes = (w) => ({
@@ -226,7 +266,8 @@ const MIRROR_TEXT = "repeating-linear-gradient(115deg, #b97a00 0%, #ffd84a 14%, 
 // written straight to CSS variables on the stage, never through React state, so
 // following the pointer costs no re-render. Every metal tilts; the "mirror"
 // metal also moves — its bands slide and a glare follows the pointer.
-export default function RcanaCard3({ data, scale = 1, metal = "flat", interactive = false, className = "", style }) {
+export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, interactive = false, className = "", style }) {
+  const metal = rcana3MetalFor(data, metalProp, "flat");
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const [ready, setReady] = useState(false);
   const stageRef = useRef(null);
@@ -266,6 +307,8 @@ export default function RcanaCard3({ data, scale = 1, metal = "flat", interactiv
 
   if (!data) return null;
   const m = rcana3Model(data);
+  // With a triangle in the text box, the rules sit in a narrower column to its right.
+  const tri = !!m.attrs; const tx = tri ? 162 : 50, tw = tri ? 304 : 412;
   const cw = 744 * scale;
   const foil = FOILS[metal] || null;
   const mirror = metal === "mirror";
@@ -274,7 +317,7 @@ export default function RcanaCard3({ data, scale = 1, metal = "flat", interactiv
   const shapes = plate ? plateShapes(plate.w) : null;
   const nameSize = m.name.length <= 9 ? 54 : m.name.length <= 13 ? 44 : m.name.length <= 17 ? 36 : m.name.length <= 19 ? 34 : 30;
   // Rules and flavor are set in spaced capitals, so they run wide: size by length to hold three or four lines.
-  const textSize = m.text.length <= 60 ? 17 : m.text.length <= 100 ? 14 : 12.5;
+  const textSize = (m.text.length <= 60 ? 17 : m.text.length <= 100 ? 14 : 12.5) * (tri ? 0.9 : 1);
   const giltText = metal === "rainbow" ? { color: "transparent", backgroundImage: RAINBOW_TEXT, WebkitBackgroundClip: "text", backgroundClip: "text" }
     : mirror ? { color: "transparent", backgroundImage: MIRROR_TEXT, backgroundSize: "260% 100%", backgroundPosition: "calc(50% + (50% - var(--mx, 50%)) * 1.6) 50%", WebkitBackgroundClip: "text", backgroundClip: "text" }
     : { color: GILT };
@@ -348,7 +391,7 @@ export default function RcanaCard3({ data, scale = 1, metal = "flat", interactiv
           <svg role="img" aria-label={m.topLeft.label} viewBox="0 0 100 116" style={{ ...abs, left: TL_DROP.x, top: TL_DROP.y, width: 96, height: 111 }}>
             <path d={DROP_OUTER} fill={INK} stroke={INK} strokeWidth="9" strokeLinejoin="round" />
             <path d={DROP_OUTER} fill={GOLD_LO} /><path d={DROP_INNER} fill={GOLD_HI} />
-            <text x="50" y="94" style={num(50)}>{m.topLeft.value}</text>
+            <text x="50" y={dropNum(m.topLeft.value).y} style={num(dropNum(m.topLeft.value).size)}>{m.topLeft.value}</text>
           </svg>
         )}
         {m.topLeft?.shape === "coin" && (
@@ -371,20 +414,21 @@ export default function RcanaCard3({ data, scale = 1, metal = "flat", interactiv
         {/* The text box: a framed parchment plate, the ability or timing as a tab on its top edge. */}
         <div style={{ ...abs, left: 28, top: 440, width: 456, height: 154, boxSizing: "border-box", border: `2px solid ${GOLD}`, borderRadius: 12, background: PARCHMENT }} />
         <div style={{ ...abs, left: 35, top: 447, width: 442, height: 140, boxSizing: "border-box", border: "1px solid #b9892f", borderRadius: 7 }} />
-        <div style={{ ...abs, left: 50, top: 462, width: 412, height: m.flavor ? 74 : 118, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ ...abs, left: tx, top: 462, width: tw, height: m.flavor ? 74 : 118, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <p style={{ margin: 0, textAlign: "center", fontFamily: BODY, fontSize: textSize, lineHeight: 1.45, letterSpacing: "0.14em", textTransform: "uppercase", color: "#24160a" }}><RulesText text={m.text} /></p>
         </div>
         {m.flavor && (
           <>
-            <svg aria-hidden="true" viewBox="0 0 160 12" style={{ ...abs, left: 176, top: 538, width: 160, height: 12 }}>
+            <svg aria-hidden="true" viewBox="0 0 160 12" style={{ ...abs, left: tx + tw / 2 - 80, top: 538, width: 160, height: 12 }}>
               <line x1="0" y1="6" x2="62" y2="6" stroke="#b9892f" strokeWidth="1.5" /><line x1="98" y1="6" x2="160" y2="6" stroke="#b9892f" strokeWidth="1.5" />
               <polygon points="80,1 86,6 80,11 74,6" fill={m.color} /><polygon points="68,3.5 71,6 68,8.5 65,6" fill="#b9892f" /><polygon points="92,3.5 95,6 92,8.5 89,6" fill="#b9892f" />
             </svg>
-            <p style={{ ...abs, left: 50, top: 554, width: 412, textAlign: "center", fontFamily: BODY, fontSize: m.flavor.length > 48 ? 10 : 11.5, fontStyle: "italic", lineHeight: 1.3, letterSpacing: "0.14em", textTransform: "uppercase", color: "#4a3520" }}>{m.flavor}</p>
+            <p style={{ ...abs, left: tx, top: 554, width: tw, textAlign: "center", fontFamily: BODY, fontSize: m.flavor.length > (tri ? 40 : 48) ? 10 : 11.5, fontStyle: "italic", lineHeight: 1.3, letterSpacing: "0.14em", textTransform: "uppercase", color: "#4a3520" }}>{m.flavor}</p>
           </>
         )}
 
-        {/* Bottom left: a Trader's d8, or what an Asset pays each turn. */}
+        {tri && <><Trinity at={m.attrs} color={m.color} style={{ ...abs, left: 36, top: 449, width: 124, height: 124 }} /><div style={{ ...abs, left: 156, top: 458, width: 1, height: 118, background: "#b9892f", opacity: 0.6 }} /></>}
+        {/* Bottom left: what an Asset pays each turn. (The d8 was a Trader's Equanimity until 2026-11-20.) */}
         {m.corner?.shape === "die" && (
           <svg role="img" aria-label={m.corner.label} viewBox="0 0 100 100" style={{ ...abs, left: BL_DIE.x, top: BL_DIE.y, width: 90, height: 90 }}>
             <polygon points={D8_HULL} fill={INK} stroke={INK} strokeWidth="8" strokeLinejoin="round" />
@@ -428,7 +472,7 @@ export default function RcanaCard3({ data, scale = 1, metal = "flat", interactiv
             {/* The numerals the foil covered go back on top, in ink. */}
             {m.topLeft?.shape === "drop" && (
               <g transform={`translate(${TL_DROP.x},${TL_DROP.y}) scale(${TL_DROP.sx},${TL_DROP.sy})`}>
-                <path d={DROP_INNER} fill="none" stroke="#3a1c00" strokeOpacity="0.45" strokeWidth="1.6" /><text x="50" y="94" style={num(50)}>{m.topLeft.value}</text>
+                <path d={DROP_INNER} fill="none" stroke="#3a1c00" strokeOpacity="0.45" strokeWidth="1.6" /><text x="50" y={dropNum(m.topLeft.value).y} style={num(dropNum(m.topLeft.value).size)}>{m.topLeft.value}</text>
               </g>
             )}
             {m.topLeft?.shape === "coin" && (
@@ -452,6 +496,11 @@ export default function RcanaCard3({ data, scale = 1, metal = "flat", interactiv
 
         {/* The name band. */}
         <p style={{ ...abs, left: 0, top: 602, width: W, textAlign: "center", fontFamily: CAPS, fontSize: 15, letterSpacing: "0.34em", lineHeight: 1, textTransform: "uppercase", ...giltText }}>{m.typeLabel}</p>
+        {m.apparition && (
+          <svg role="img" aria-label="Apparition: revealing this card grants a Miracle" viewBox="-10 -10 20 20" style={{ ...abs, left: W / 2 - String(m.typeLabel).length * 5.6 - 20, top: 600, width: 15, height: 15 }}>
+            <polygon fill={GILT} stroke={INK} strokeWidth="0.8" points={Array.from({ length: 16 }, (_, k) => { const r = k % 2 ? 4 : 9.4; const a = (k * Math.PI) / 8 - Math.PI / 2; return `${(r * Math.cos(a)).toFixed(2)},${(r * Math.sin(a)).toFixed(2)}`; }).join(" ")} />
+          </svg>
+        )}
         <div style={{ ...abs, left: 96, top: 618, width: 320, height: 58, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <p style={{ margin: 0, whiteSpace: "nowrap", fontFamily: NAME, fontWeight: 800, fontSize: nameSize, lineHeight: 1, ...giltText }}>{m.name}</p>
         </div>

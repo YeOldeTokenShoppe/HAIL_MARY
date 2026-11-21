@@ -1466,7 +1466,7 @@ function handPlayReason(c) {
   switch (c.type) {
     case 'hazard': return 'Every rival already has this Calamity.';
     case 'remedy': {
-      const target = byKey[c.clears]?.name;
+      const target = [].concat(c.clears || []).map((k) => byKey[k]?.name).filter(Boolean).join(' or ');
       const clear = target ? `There is no ${target} on the table to clear.` : 'There is no matching Calamity on the table to clear.';
       return c.key === 'publicista' ? clear + ' Polishing also requires a seated Trader with missing Credibility.' : clear;
     }

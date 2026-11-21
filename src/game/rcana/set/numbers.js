@@ -73,11 +73,11 @@ export const RESERVED_NUMBERS = {
   // Remedies
   bell: 17,
   catacumbas: 62, // Las Catacumbas — unfaced (was Quantum Resistance)
-  keys: 63, // Las Llaves — unfaced
+  keys: 63, // The Keys — a Relic since 2026-11-20
   tortilla: 16,
   publicista: 64, // El Comunicado — unfaced
   horchata: 42,
-  burro: 65, // El Burro — unfaced
+  stimulus: 65, // The Stimulus — unfaced (took The Burro's number, 2026-11-20)
   // Relics
   heart: 66, // El Corazón — unfaced
   halo: 67, // La Aureola — unfaced
@@ -91,6 +91,7 @@ export const RESERVED_NUMBERS = {
   geometry: 72, // La Geometría — unfaced
   tattoo: 73, // El Tatuaje — unfaced
   dashboard: 74, // La Virgencita — unfaced
+  audit: 87, // The Audit (added 2026-11-20; the set is 87)
   motherboard: 5, // La Placa Madre — unfaced (a Relic since 2026-11-12)
   // Graces
   ofrenda: 75, // La Ofrenda — unfaced

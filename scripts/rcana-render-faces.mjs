@@ -25,11 +25,15 @@ const opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 && args[
 const BASE = opt("base", "http://localhost:3000");
 const WIDTH = +opt("width", 1024); // output width in px; the face is 1027 wide at source
 const FRAME = opt("frame", "");   // "3" = the code-drawn frame (RcanaCard3), written beside the old face as face3.webp
-const METAL = opt("metal", FRAME === "3" ? "mirror" : "");   // with --frame 3: flat | gold | mirror (the default) | rainbow
+const METAL = opt("metal", "");   // with --frame 3: flat | gold | mirror | rainbow; unset = each card's own metalFrame, mirror where it names none
 const VALUE_FLAGS = ["--base", "--width", "--frame", "--metal"];
 const ids = args.filter((a, i) => !a.startsWith("--") && !VALUE_FLAGS.includes(args[i - 1]));
 const OUT = FRAME ? `face${FRAME}` : "face";
-const QUERY = (FRAME ? `&frame=${encodeURIComponent(FRAME)}` : "") + (METAL ? `&metal=${encodeURIComponent(METAL)}` : "");
+const RCANA3_METALS = ["flat", "gold", "mirror", "rainbow"];
+const queryFor = (art) => {
+  const metal = FRAME === "3" ? (METAL || (art?.metalFrame === "rainbow" ? "rainbow" : "mirror")) : METAL;   // only rainbow crosses frames (RCANA3_CARD_METALS)
+  return (FRAME ? `&frame=${encodeURIComponent(FRAME)}` : "") + (metal ? `&metal=${encodeURIComponent(metal)}` : "");
+};
 
 let chromium;
 try { ({ chromium } = await import("playwright")); } catch {
@@ -39,7 +43,7 @@ try { ({ chromium } = await import("playwright")); } catch {
 let sharp = null;
 try { sharp = (await import("sharp")).default; } catch { /* fall back to png */ }
 
-const { RCANA_SET } = await import(path.join(root, "src/game/rcana/cardFace.js"));
+const { RCANA_SET, RCANA_ART } = await import(path.join(root, "src/game/rcana/cardFace.js"));
 const targets = ids.length ? RCANA_SET.filter((c) => ids.includes(c.id)) : RCANA_SET;
 if (!targets.length) { console.error("no matching faces:", ids.join(", ")); process.exit(1); }
 
@@ -62,7 +66,7 @@ try {
   // Warm-up: next dev compiles a route's client bundle on its first request,
   // which in this app can take a minute. Pay that once, with a long timeout,
   // before the per-card loop runs on a short one.
-  const first = `${BASE}/rcana-print?id=${encodeURIComponent(targets[0].id)}${QUERY}`;
+  const first = `${BASE}/rcana-print?id=${encodeURIComponent(targets[0].id)}${queryFor(RCANA_ART[targets[0].id])}`;
   await page.goto(first, { waitUntil: "domcontentloaded", timeout: 180000 });
   try {
     await page.locator(".rc-stage").first().waitFor({ state: "visible", timeout: 180000 });
@@ -72,7 +76,7 @@ try {
   }
 
   for (const c of targets) {
-    const url = `${BASE}/rcana-print?id=${encodeURIComponent(c.id)}${QUERY}`;
+    const url = `${BASE}/rcana-print?id=${encodeURIComponent(c.id)}${queryFor(RCANA_ART[c.id])}`;
     await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
     const stage = page.locator(".rc-stage").first();
     try {

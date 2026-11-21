@@ -155,9 +155,9 @@ export const FACES = [
     rarity: "Rare",
     // halo/hydro come from the design (cred 20 / liq 3). Shorter than the
     // simulator's line; the trigger and the payout on their own lines.
-    ability: "At turn start, with 100+ banked Prosperity,\nbank 25 more.",
+    ability: "In good standing, each unsold Asset counts\ntoward your billion at sale price plus $50M.",
     // A Trader speaks, so the line prints as a quotation.
-    flavor: "I don't chase the market. It compounds while I dance.",
+    flavor: "I don't sell. I tell.",
     printed: {},
   },
   {
@@ -394,7 +394,7 @@ export const FACES = [
     number: 39,
     rarity: "Uncommon",
     // A Calamity narrates (the line follows the rule).
-    ability: "Until cleared, the target\ncannot sell Assets.",
+    ability: "Your rival discards the Asset\nthey bought most recently.",
     flavor: "Nobody checks who is holding the other end.",
     printed: {},
   },
@@ -405,7 +405,7 @@ export const FACES = [
     number: 40,
     rarity: "Uncommon",
     // A Calamity narrates (the line follows the rule).
-    ability: "Until cleared, the target's\nTrader ability is switched off.",
+    ability: "Take $40M from your rival.",
     flavor: "The lock held. The math did not.",
     printed: {},
   },
@@ -493,9 +493,8 @@ export const FACES = [
     // PROVISIONAL number and rarity.
     number: 47,
     rarity: "Uncommon",
-    // A Calamity narrates (the line follows the rule). The design: the target
-    // cannot play Opportunity Events until cleared.
-    ability: "Until cleared, the target\ncannot play Opportunities.",
+    // A Calamity narrates (the line follows the rule). A one-time hit since 2026-11-20.
+    ability: "Your rival loses $75M.",
     flavor: "The sign says closed. The money says gone.",
     printed: {},
   },
@@ -612,8 +611,8 @@ export const FACES = [
     // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
     number: 2,
     rarity: "Common",
-    // The design's line is already a card's length; printed as is.
-    ability: "Scandal cannot touch it. It cannot pray:\nwhile it sits, your Graces go unheard.",
+    // Eight Arms (2026-11-20): a second action, a sale; and still no prayers.
+    ability: "After your main action, you may also\nbuy or sell one Asset. It cannot pray.",
     // A Trader speaks; the quotation follows the rules and flourish.
     flavor: "I do not pray. I execute.",
     printed: {},
@@ -769,6 +768,31 @@ export const FACES = [
     ability: "Scratch at the start of each turn: roll.\nA 6 wins 150 Prosperity, and the Ticket is spent.",
     // A Relic narrates; the line follows the rule.
     flavor: "Somebody has to win. Nobody said when.",
+    printed: {},
+  },
+  {
+    id: "the-keys",
+    design: "keys", // prints as "The Keys" — the design's name ("Las Llaves" in the Lotería edition)
+    gloss: "The Keys",
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon, beside La Campana).
+    number: 63,
+    rarity: "Uncommon",
+    // A Relic since 2026-11-20: self-custody, so the two frauds that take cash cannot be played on you.
+    ability: "Quantum Hack and Exit Scam\ncannot be played on you.",
+    // A Relic narrates; the line follows the rule. The proverb, answered.
+    flavor: "Not your keys, not your coins. These are yours.",
+    printed: {},
+  },
+  {
+    id: "the-audit",
+    design: "audit", // prints as "The Audit" — the design's name (a market name, no lotería title)
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon, beside The Keys among the protections).
+    number: 87,
+    rarity: "Uncommon",
+    // A Relic equips; a protection: the one Calamity it wards cannot be played on you.
+    ability: "Rug Pull cannot be played on you.",
+    // A Relic narrates; the line follows the rule.
+    flavor: "She read the fine print. There was no rug.",
     printed: {},
   },
 ];

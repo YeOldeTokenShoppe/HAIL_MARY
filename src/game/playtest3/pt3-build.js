@@ -36,7 +36,7 @@ if (!importLine.test(engine)) throw new Error('pt3-sim.js no longer imports DESI
 engine = engine.replace(importLine, () => designs + '\n');
 // The trinity is a second import; inline it the same way.
 const trinity = readFileSync(join(root, 'src/game/rcana/set/trinity.js'), 'utf8').replace(/^export /gm, '').trim();
-const trinityLine = /^import \{ TRINITY \} from '\.\.\/rcana\/set\/trinity\.js';\n/m;
+const trinityLine = /^import \{ TRINITY, ATTRS, ETHOS_UNIT \} from '\.\.\/rcana\/set\/trinity\.js';\n/m;
 if (!trinityLine.test(engine)) throw new Error('pt3-sim.js no longer imports TRINITY from the set; update pt3-build.js');
 engine = engine.replace(trinityLine, () => trinity + '\n');
 
@@ -48,7 +48,9 @@ const eventSubtypes = Object.fromEntries(cardDesigns.map((c) => [c.key, getEvent
 const oldFrame = process.argv.includes('--old-frame');
 // --metal gold|mirror|rainbow: the metal the enlarged, live card wears (match what the faces were rendered with).
 const metalAt = process.argv.indexOf('--metal');
-const frameMetal = metalAt >= 0 && ['flat', 'gold', 'mirror', 'rainbow'].includes(process.argv[metalAt + 1]) ? process.argv[metalAt + 1] : 'mirror';
+const RCANA3_METALS = ['flat', 'gold', 'mirror', 'rainbow'];
+// --metal pins every card; otherwise each card's own metalFrame (rainbow on the Lowrider, the Fire Horse…), mirror where it names none.
+const pinnedMetal = metalAt >= 0 && RCANA3_METALS.includes(process.argv[metalAt + 1]) ? process.argv[metalAt + 1] : null;
 const faces = {};
 for (const c of RCANA_SET) {
   const art = RCANA_ART[c.id] || {};
@@ -64,7 +66,7 @@ for (const c of RCANA_SET) {
     rarity: c.rarity,
     face: existsSync(join(root, 'public', facePath)) ? facePath : null,
     frame: frame3 ? 3 : 1,
-    metal: frame3 ? frameMetal : null,
+    metal: frame3 ? pinnedMetal || (art.metalFrame === 'rainbow' ? 'rainbow' : 'mirror') : null,   // only rainbow crosses frames (RCANA3_CARD_METALS)
     art: subject,
   };
 }

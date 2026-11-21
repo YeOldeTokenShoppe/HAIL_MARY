@@ -105,7 +105,157 @@ With only Scandal and the Fall dealing strikes, a discredit was a non-event: onc
 | `--fuse`: a Scandal left on you for a full round is a second strike | 1.25 | 0.13 | 0.11 | 85% | 51% / 49% | 12.1 |
 | **The rule: any Calamity that lands on you is a strike** | 2.33 | 0.32 | 0.32 | 75% | 52% / 48% | 12.5 |
 
+## Calamities: hits and conditions (2026-11-20)
+
+A Calamity is one of two kinds, decided by what the real thing is.
+
+- **A condition** sits on the rival until cleared: Bear Market, Tax Collector, Liquidity Trap (market); Scandal, The Inferno, The Virtue Signal (standing).
+- **A hit** happens once and is over. The three frauds are hits (`hit: true` in designs.js): they resolve and are discarded, so there is nothing to clear.
+  - **Rug Pull** ($30M): the rival discards the Asset they bought most recently. Not playable on a rival with no Assets.
+  - **Quantum Hack** ($20M): take $40M from the rival.
+  - **Exit Scam** ($30M): the rival loses $75M.
+- The market shocks that fire when drawn (Flash Crash, Tech Wreck, Fall From Grace) are unchanged.
+- A hit that lands is still a strike. Sacred Heart and Equanimity work against hits as before.
+
+**You prevent a hit and you cure a condition.**
+
+| Protection (Relic) | Rule |
+|---|---|
+| The Keys | Quantum Hack and Exit Scam cannot be played on you |
+| The Audit (new, no. 87) | Rug Pull cannot be played on you |
+| The Halo | Calamities are not strikes against your seated Trader (it used to stop the old Quantum Hack) |
+| Sacred Heart | unchanged: discard it to cancel any one Calamity as it lands |
+
+| Remedy | Clears |
+|---|---|
+| The Stimulus (new, in The Burro's place, no. 65) | Bear Market, Tax Collector or Liquidity Trap |
+| The Bell | Bear Market |
+| The Press Release | Scandal |
+| The Miracle Tortilla | any condition |
+
+The Confession lifts The Inferno, and is the one Grace The Inferno cannot stop. The Burro left the set (kept in designs.js as a comment, for the Lotería edition). Devotion plays The Audit where it played The Burro.
+
+Sim, 4,000 two-player games a row. The starter decks hold only Rug Pull of the three frauds, so the others were tried in Degen in place of a Tech Stock:
+
+| | Devotion / Degen | Rounds |
+|---|---:|---:|
+| The starter decks as they are | 50.1% / 49.9% | 12.3 |
+| Degen with Quantum Hack at $40M | 48.3% / 51.7% | 12.4 |
+| ...at $60M | 44.8% / 55.2% | 12.4 |
+| Degen with Exit Scam at $75M | 49.3% / 50.7% | 12.4 |
+| ...at $100M | 47.5% / 52.5% | 12.5 |
+| Degen with both (Tech Stock and Moral Hazard out) | 46.8% / 53.2% | 12.5 |
+
+At $40M and $75M each fraud is worth about a point and a half to the deck that holds it. Quantum Hack at $60M is too much. Before this change the decks stood at 53% / 47%.
+
+## The general shuffle: a third mode (2026-11-20)
+
+A test of playing with no starter decks. Every card in the set, one copy each, in **one deck that both players draw from**, with one shared discard pile. Each player still opens with a junior Trader of their choice (six on offer; a Trader one player takes is gone for the other), so the shared deck is 85 cards. At the table it is the third player mode; in the sim, `--decks shuffle,shuffle`.
+
+4,000 games (3,000 for the card counts), greedy bots:
+
+| | |
+|---|---:|
+| The player who goes first wins | 48.4% |
+| Rounds | 12.4 |
+| Cards left in the deck at the end | 43 of 85 |
+| Calamities played a game | 1.5 |
+| A condition (Bear Market, Scandal...) is played | in 26 to 30% of games, each |
+| A fraud is played | Quantum Hack 9%, Rug Pull 7%, Exit Scam 4% |
+| A Remedy is played | Miracle Tortilla 11%, The Stimulus 6%, The Bell 4%, The Press Release 4% |
+| ...and is still in a hand at the end | 17 to 20% |
+| A protection is played | The Keys, The Audit, Sacred Heart 3%; The Halo 0% |
+
+- The game is the same length and as fair to the second player as the starter decks.
+- Only half the deck is seen in a game, so with one copy each a card and its answer rarely meet: a one-target Remedy is played in about one game in twenty and is a dead card four times as often.
+- The bot's own habits are in these numbers: it rates a condition above a fraud and almost never equips a protection, so the fraud and protection rows say more about the bot than the cards.
+- Cards written for a deck of your own read differently here: Marisol sees the top of the shared deck, The Lonely Soul returns the last Trader anyone discarded.
+
+## Logos, Ethos, Pathos: a trial (2026-11-20)
+
+The rule since the evening of 2026-11-20, at the table too (`--noattrs` is the old three numbers). Money is kept apart: it is the Trader's Liquidity number, what they cost and make. Their character is three attributes that **always sum to eight**, each 1 to 4, no two Traders alike (`ATTRS` in ../rcana/set/trinity.js).
+
+- **Logos** (reason): when you draw for your turn, look at that many cards from the top of the deck and keep one; the rest stay on top. A Trader in scandal draws blind.
+- **Ethos** (character): what good standing pays, $5M a point. It takes over from Credibility.
+- **Pathos** (feeling, heart): a Calamity played on you fails on a d8 roll of this or lower. It takes over from Equanimity.
+
+| Trader | Logos | Ethos | Pathos |
+|---|---:|---:|---:|
+| Marisol | 4 | 3 | 1 |
+| The Octobot | 4 | 1 | 3 |
+| The Influencer | 3 | 4 | 1 |
+| Eugene | 3 | 3 | 2 |
+| Byzantine General | 3 | 2 | 3 |
+| Connor | 3 | 1 | 4 |
+| The Prospector | 2 | 3 | 3 |
+| Virgil | 2 | 2 | 4 |
+| Saint GR80 | 1 | 4 | 3 |
+| The Gambler | 1 | 3 | 4 |
+
+3,000 to 4,000 two-player games a row, greedy bots:
+
+| | Devotion / Degen | Rounds |
+|---|---:|---:|
+| The old three numbers | 50.0% / 50.0% | 12.3 |
+| Only Logos new | 52.0% / 48.0% | 12.1 |
+| Only Ethos new | 44.6% / 55.4% | 11.9 |
+| Only Pathos new | 47.7% / 52.3% | 11.8 |
+| All three | 42% / 58% | 11.3 |
+| ...with Saint GR80 at Money 20 | 46.0% / 54.0% | 11.2 |
+| ...and Connor's wager paying $10M | 50.0% / 50.0% | 11.4 |
+
+- **Logos is used.** A bot with Logos 2 or more looks about 14 times a game and takes a card other than the top one about 10 of them. By itself it barely moves the balance.
+- **Equal sums undo the old compensation.** Connor and The Octobot had no Credibility and Saint GR80 had the lowest income; each was balanced by the others. With everyone at eight, Connor opens at 62% and Saint GR80 at 39%.
+- **Money is not a lever while a Trader's cost equals their income**: the cost is paid once, the income every turn. Putting Saint GR80 at Money 20 and cutting Connor's wager to $10M brings the decks back to even, with the openers between 46% and 57%.
+- **What was adopted:** Saint GR80 at Money 20, and Connor's wager at $20M. Marisol's ability changed with it: the cards she looks at and does not draw go to the bottom of the deck (she no longer has a face-up top card to bury). With those, 6,000 games: Devotion 51% / Degen 49%, 11.2 rounds, going first wins 49.4%, openers from 46% (Virgil) to 59% (Saint GR80, still the strongest opener).
+- **Saint GR80 at Money 15** (later the same evening). At Money 20 he opened at 59%. The cause is Ethos 4, worth $20M a turn: with a 4 / 2 / 2 spread he opens at 48%, and taking his Vow away altogether only brings him to 54%. At Money 15: Devotion 49.5%, Saint GR80 52%, every opener between 47% and 52% (6,000 games).
+- **Ethos is the strongest attribute, by design** (2026-11-20): character is the project's message, so a Trader with high Ethos is balanced through their Money (Saint GR80's 15), never by making Ethos pay less. It only pays in good standing, so it is also the easiest thing to lose.
+- **The Traders who do not open** (6,000 games; each swapped for a junior to see what they are worth to their deck): The Influencer +2.5 points to Devotion, and whoever seats her wins 50%; Marisol +3.6, 56%; the two Eugenes +7.9 between them, 57%; The Octobot +0.2, and whoever seats it wins 38% (it is played in 15% of games). The Influencer's Ethos 4 at Money 30 is not a problem. Eugene is strong through Compound Interest, whose condition is always met in one money; The Octobot is not worth its $40M.
+- **Eugene and The Octobot, tried** (5,000 games a row; nothing adopted yet). The bot was first taught to count a Trader's paying ability as income, so it no longer trades Eugene away for less; that alone puts the decks at Devotion 47% / Degen 53%.
+  - Eugene, whoever seats him wins: as he is 59%; Compound Interest only in good standing 55% (decks 49 / 51); only above $500M 52%; $15M a turn 49%; only while richer than the rival 44%.
+  - The Octobot, whoever seats it wins: as it is 38%; Money 30 34%; costs $30M and makes $40M 43%; able to pray 38%; no strike can touch it 38%; no strikes and the cheaper price 45%. No small change makes it worth seating. Swapped for a junior, its deck does not notice, so most of that 38% is who seats it: the player who has not found Eugene.
+  - The knobs are on the designs (`ciMin`, `ciPay`, `ciLead`, `ciGood` for Compound Interest; `prays`, `ironclad` for The Octobot) and change nothing until set.
+- **The Octobot: Eight Arms** (adopted 2026-11-20, replacing No Soul; it still cannot pray, and a Scandal can now touch it). After its main action it may also sell one Asset. 6,000 games a row:
+  - Most of the Octobot's 38% is the deck it is seated in: Degen without Eugene wins 42% whatever else it holds.
+  - With selling only, a bot uses the second action 0.5 to 0.7 times per seating and the deck gains about half a point. The bots are short of Assets to sell, not of actions.
+  - With "buy or sell one Asset" (`armsBuy` on the design, off) it is used 1.6 to 1.8 times, whoever seats it wins 43%, and it is worth about 2.3 points over a junior to a Degen with no Eugene: The Influencer's level.
+- **Adopted, later on 2026-11-20:** Eight Arms is "buy or sell one Asset", and Compound Interest pays only in good standing (its always-true $100M condition is gone).
+- **At the table** the Logos look is a prompt: the top cards are shown and you tap the one to draw. The card frame prints a Trader's Money in the coin and the three attributes as a triangle in the text box.
+- Calamities are played less (0.9 a game, from 1.3): the bots are put off by Pathos, which now averages nearly 3 where Equanimity averaged under 2.
+
+## Eugene: The Narrative (2026-11-20)
+
+Compound Interest was an arbitrary fit for a unicorn. **The Narrative:** while Eugene is seated and in good standing, each of his player's unsold Assets counts toward the billion at its sale price plus $50M. Everyone else has to sell to score; he only has to be believed, and one strike ends the story. (A unicorn is a company worth a billion on paper.) The scoreboard shows the paper beside the cash.
+
+6,000 games a row:
+
+| Eugene | Devotion / Degen | Whoever seats him wins | Games won on paper |
+|---|---:|---:|---:|
+| Compound Interest in good standing (before) | 47% / 53% | 58% | – |
+| No ability at all | 57% / 43% | 38% | – |
+| The Narrative, Assets at their sale price | 56% / 44% | 39% | 11% |
+| ...plus $25M each | 53% / 47% | 44% | 15% |
+| **...plus $50M each (adopted)** | 51% / 49% | 49% | 17% |
+| ...plus $75M each | 49% / 51% | 53% | 20% |
+
+- Degen had been leaning on Compound Interest: without it the deck wins 43%.
+- Counting Assets at their plain sale price is worth almost nothing to a bot. It saves the selling action, about one or two a game by the time he is seated, and a strike takes it away.
+- At plus $50M the decks are level and the openers run from 45% (The Gambler) to 53% (Saint GR80). A person may get more from it than the bots do, by buying cheap Assets for the premium; the answer to that is a Calamity held for the right moment.
+
+## Apparitions and Miracles (2026-11-20)
+
+Ten cards carry Our Lady's image (`apparition: true` in designs.js): The Holy Roller, The Fire Horse, The Virtual Mary, Mardi Gras, The Rose, The Fountain, The Miracle Tortilla, The Tattoo, The Lowrider and the Dashboard Figure.
+
+- **Whoever reveals one witnesses an apparition and takes a Miracle** (an eight-pointed star), three at most: the player who draws an apparition Event, or who plays any other apparition card from their hand.
+- **A Miracle is spent to roll one of your own dice again**, when it has failed you: a gamble, the Hail Mary, your Trader's Pathos against a Calamity, The Rooster's 1.
+- The Dashboard Figure was that reroll, once, as a Relic. Now it is the tenth apparition: equipping it is the apparition, and it takes no Relic slot.
+- At the table: stars beside each player's Cash, a notice when someone witnesses one, a prompt when a roll of yours fails. On the card: a small star by the type line.
+
+4,000 games, greedy bots: Devotion witnesses 0.30 apparitions a game and spends 0.12 Miracles; Degen 1.27 and 0.21 (its apparitions are Events, which reveal themselves; Devotion's are Relics and Graces, which the bots seldom play). 0.6 Miracles a player are still held at the end. The balance does not move (Devotion 46.4% with, 47.0% without). There are more Miracles than failed rolls to spend them on.
+
 ## Results
+
+*(The table below was measured before the 2026-11-20 change above.)*
 
 Greedy bots, juniors opening at random, 6,000 two-player games, with the trinity spread, two-state Credibility, every landed Calamity a strike, and one d8. (On the old dice the same run gives 53% / 47% and 12.5 rounds: the d8 changes nothing measurable.)
 

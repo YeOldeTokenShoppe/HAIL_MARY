@@ -28,7 +28,11 @@ export function getEventSubtype(card) {
 export function getEventTemplate(card) {
   if ((card.cardClass || card.class) !== "Event") return null;
   // Timing comes from the engine, never from the printed subtype.
-  const usage = card.type === "hazard" ? {
+  const usage = card.type === "hazard" && card.hit ? {
+    usage: "on-play",
+    label: "On play",
+    description: "Play on a rival. Resolve its effect, then discard this card.",
+  } : card.type === "hazard" ? {
     usage: "until-cleared",
     label: "Until cleared",
     description: "Play on a rival. This card stays attached until cleared.",

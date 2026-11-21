@@ -32,7 +32,7 @@ export const DESIGNS = [
   // zero the Trader is discredited) and EQUANIMITY (eq — composure: a
   // Calamity played on you fails on a die roll of eq or lower). Three things
   // a real trader should hold onto; printed as three "-ity" words.
-  D('unicornio', 'El Unicornio', 'trader', 3, { liq: 3, cred: 20, eq: 1, abilityName: 'Compound Interest', text: 'At turn start, if you have at least 100 banked Prosperity, bank 25 more.' }),
+  D('unicornio', 'El Unicornio', 'trader', 3, { liq: 3, cred: 20, eq: 1, abilityName: 'The Narrative', narrative: true, premium: 50, text: 'In good standing, each unsold Asset counts toward your billion at its sale price plus $50M' }), // 2026-11-20: Compound Interest was arbitrary; a unicorn is worth a billion on paper, for as long as the story is believed
   D('gato', 'El Gato', 'trader', 2, { liq: 2, cred: 16, eq: 1, abilityName: 'Clean Sweep', text: 'When seated, and at the start of each turn on a roll of 4+, knock one Calamity off your table, free' }),
   // The investigator: she reads the tape before the market does. Before her
   // turn's draw she peeks at the top card and may send it to the bottom —
@@ -46,7 +46,7 @@ export const DESIGNS = [
   // The Byzantine Generals: a Calamity has to reach consensus before it lands.
   D('general', 'Byzantine General', 'trader', 2, { liq: 2, cred: 14, eq: 3, abilityName: 'Fault Tolerance', text: 'When a Calamity fails against your Equanimity, collect 1 Liquidity', printName: 'El General' }),
   // The trading bot: fat income, no soul. Scandal has nothing to grip; the shrine hears nothing.
-  D('bot', 'The Bot', 'trader', 3, { liq: 3, cred: 6, eq: 3, abilityName: 'No Soul', text: 'Scandal cannot touch it. It cannot pray: while it sits, your Graces go unheard', printName: 'El Octobot' }),
+  D('bot', 'The Bot', 'trader', 3, { liq: 3, cred: 6, eq: 3, abilityName: 'Eight Arms, No Soul', armsBuy: true, text: 'After your main action, you may also buy or sell one Asset. It cannot pray: while it sits, your Graces go unheard', printName: 'El Octobot' }),
   D('tech', 'Tech Stock', 'asset', 3, { cash: 5, pros: 100, tech: true }),
   // The degen asset, and the only gamble: sell safe for cash, or roll the die for
   // Prosperity. (Was two cards — Meme Coin's body with Shitcoin's upside.)
@@ -58,7 +58,7 @@ export const DESIGNS = [
   D('stablecoin', 'Stablecoin', 'asset', 2, { cash: 3, pros: 50, income: 1, text: 'While held: collect 1 Liquidity at the start of your turn' }),
   D('bluechip', 'Blue Chip', 'asset', 6, { cash: 10, pros: 250 }),
   D('grail', 'The Holy Grail', 'asset', 3, { cash: 5, pros: 100, gem: 250, text: 'Gem mint: sells for 100 — or 250 while you hold three lit candles' }),
-  D('rideordie', 'The Lowrider', 'asset', 3, { cash: 4, pros: 100, text: 'Ride or die: while the Lowrider is in your portfolio, your Assets stay with you — the Whale and the Wheel pass you by' }),
+  D('rideordie', 'The Lowrider', 'asset', 3, { apparition: true, cash: 4, pros: 100, text: 'Ride or die: while the Lowrider is in your portfolio, your Assets stay with you — the Whale and the Wheel pass you by' }),
   D('gallo', 'El Gallo', 'asset', 2, { cash: 2, pros: 75, rooster: true, text: 'The fighting rooster: at the start of your turn, roll — a 6 collects 2; a 1, and he is dead' }),
   D('vaca', 'La Vaca', 'asset', 3, { cash: 6, pros: 75, income: 1, text: 'Milk: collect 1 at the start of your turn — or sell her for meat, 6 Liquidity' }),
   D('aguacate', 'El Aguacate', 'asset', 3, { cash: 2, pros: 50, ripe: true, text: 'Green gold: ripe on the second round, worth 150. Green before, 50 — then it rots, 50 less each round' }),
@@ -77,30 +77,44 @@ export const DESIGNS = [
   D('ponzi', 'The Ponzi', 'event', 2, { pros: 0, perRivalAsset: 25, rivalsCollect: 1, played: true, text: 'New money pays the old: bank 25 for every Asset your rivals hold — then every rival collects 1' }),
   D('unlock', 'Token Unlock', 'event', 4, { pros: 200, rivalsCollect: 1, played: true, text: 'Bank 200 — and every rival collects 1 Liquidity' }),
   D('bear', 'Bear Market', 'hazard', 2, { text: 'Bank at most 75 Prosperity from a single card' }),
-  D('hack', 'Quantum Hack', 'hazard', 2, { text: 'Trader ability disabled' }),
+  // THE THREE FRAUDS (2026-11-20). A Calamity is either a CONDITION — it sits on the rival until cleared
+  // (Bear Market, Tax Collector, Liquidity Trap, Scandal, The Inferno) — or a HIT (`hit: true`): a fraud that
+  // happens once and is over. A hit is played on a rival, resolves and is discarded; there is nothing to
+  // clear, so it can only be prevented (Sacred Heart, Equanimity, the Relics that ward it). `steal` and
+  // `loss` are in $M. Playtest 2's engine does not read `hit` and still plays these three the old way.
+  D('hack', 'Quantum Hack', 'hazard', 2, { hit: true, steal: 40, text: 'Take $40M from your rival' }),
   // Performative piety: the candles are lit, and count for nothing.
   D('virtue', 'The Virtue Signal', 'hazard', 2, { text: 'Performative piety: their candles add no winning faces to the Hail Mary until cleared' }),
   // Hellfire: a spiritual lock, not damage. Prayers do not leave hell. (Keeps
   // its Spanish name in the English row by the user's choice, like the apparitions.)
   D('infierno', 'El Infierno', 'hazard', 3, { text: 'Hellfire: they cannot attempt the Hail Mary or offer a Grace until cleared' }),
-  D('rug', 'Rug Pull', 'hazard', 3, { text: 'Cannot sell Assets' }),
+  D('rug', 'Rug Pull', 'hazard', 3, { hit: true, text: 'Your rival discards the Asset they bought most recently' }),
   D('taxman', 'Tax Collector', 'hazard', 2, { text: 'Pay 1 to the bank at the start of each turn' }),
   D('trap', 'Liquidity Trap', 'hazard', 3, { text: 'Trapped: every Liquidity they collect goes under this card instead. Clear it, and the pile is theirs' }),
   D('escandalo', 'Scandal', 'hazard', 2, { text: 'Scandal: the seated Trader loses 5 Credibility when it breaks, 2 more each turn' }),
-  D('scam', 'Exit Scam', 'hazard', 3, { text: 'The target cannot play Opportunity Events until cleared' }),
+  D('scam', 'Exit Scam', 'hazard', 3, { hit: true, loss: 75, text: 'Your rival loses $75M' }),
   D('bell', 'The Bell', 'remedy', 1, { clears: 'bear', printName: 'La Campana' }),
-  D('keys', 'The Keys', 'remedy', 1, { clears: 'rug', printName: 'Las Llaves' }),
-  D('tortilla', 'Miracle Tortilla', 'remedy', 2, { clears: 'any', printName: 'La Tortilla' }),
+  // Not your keys, not your coins: the Keys answer the two Calamities that lock you out of
+  // what is yours — the exchange that shuts (Exit Scam) and the lock that is broken (Quantum Hack).
+  // `clears` may be one design key, a list of them, or 'any'. (They cleared Rug Pull until 2026-11-20.)
+  // `clears` on a Remedy may be one design key, a list of them, or 'any'.
+  // The market cure (2026-11-20, in The Burro's place): one Remedy for the three market conditions.
+  D('stimulus', 'The Stimulus', 'remedy', 2, { clears: ['bear', 'taxman', 'trap'], text: 'Clear a Bear Market, a Tax Collector or a Liquidity Trap' }),
+  D('tortilla', 'Miracle Tortilla', 'remedy', 2, { apparition: true, clears: 'any', printName: 'La Tortilla' }),
   // The thing the publicist hands you, not the man: the Remedies row is objects.
   D('publicista', 'The Press Release', 'remedy', 1, { clears: 'escandalo', savingGrace: 2, text: 'Clear a Scandal — or polish: your seated Trader regains 5 Credibility', printName: 'El Comunicado' }),
   // The refreshment: a Remedy that clears nothing. It replaces itself (the +1),
   // so it is never a dead card — the snack-item shape. The one-shot cousin of
   // the Enigma Machine's old cycle, which now decodes the deck instead.
   D('horchata', 'Horchata', 'remedy', 0, { refresh: 2, text: 'Refresh: discard up to 2 cards, then draw that many plus one', printName: 'La Horchata' }),
-  // Stubborn: the Calamity comes off, and goes back where it came from.
-  D('burro', 'The Burro', 'remedy', 2, { clears: 'any', bounce: true, text: 'Stubborn: clear one Calamity — and kick it back onto the rival who played it', printName: 'El Burro' }),
+  // RESERVED FOR THE LOTERÍA EDITION (out of this set since 2026-11-20; The Stimulus has its number, 65):
+  // D('burro', 'The Burro', 'remedy', 2, { clears: 'any', bounce: true, text: 'Stubborn: clear one Calamity — and kick it back onto the rival who played it', printName: 'El Burro' }),
   D('heart', 'Sacred Heart', 'artifact', 2, { text: 'A shield, not a cure: discard to cancel a Calamity as it lands', printName: 'El Corazón' }),
-  D('halo', 'The Halo', 'artifact', 3, { text: 'Any Trader seated at your desk cannot be disabled', printName: 'La Aureola' }),
+  // THE PROTECTIONS, by what they guard: The Halo your standing, The Keys your cash, The Audit your Assets,
+  // the Sacred Heart anything, once. `wards` lists the Calamities that cannot be played on whoever has the Relic equipped.
+  D('halo', 'The Halo', 'artifact', 3, { noStrikes: true, text: 'Calamities are not strikes against your seated Trader', printName: 'La Aureola' }),
+  // Not your keys, not your coins: self-custody. (A Remedy until 2026-11-20; it cleared Rug Pull.)
+  D('keys', 'The Keys', 'artifact', 2, { wards: ['hack', 'scam'], text: 'Quantum Hack and Exit Scam cannot be played on you', printName: 'Las Llaves' }),
   D('rosary', 'The Rosary Beads', 'artifact', 2, { text: 'When you light a candle, draw a card', printName: 'El Rosario' }),
   // Intercepted traffic: the market's message is decoded before it is sent.
   D('enigma', 'Enigma Machine', 'artifact', 2, { text: 'Intercept: when an Event fires on your draw, discard the Machine — the Event is cancelled for everyone', printName: 'El Enigma' }),
@@ -121,8 +135,10 @@ export const DESIGNS = [
   // The board that holds it all: the one card that touches the two-slot limit.
   D('motherboard', 'The Motherboard', 'artifact', 2, { slots: true, text: 'Expansion slots: the board takes no Relic slot, and you may hold a third Relic', printName: 'La Placa Madre' }),
   D('map', 'Treasure Map', 'artifact', 2, { text: 'X marks the spot: whenever you sell an Asset, draw a card', printName: 'El Mapa' }),
-  D('tattoo', 'The Tattoo', 'artifact', 2, { text: 'Inked devotion: at the start of your turn, your seated Trader regains 1 Credibility', printName: 'El Tatuaje' }),
-  D('dashboard', 'Dashboard Figure', 'artifact', 2, { text: 'Our Lady of the Dashboard: when a die fails you — a gamble that busts, an unanswered Hail Mary — discard her and roll again', printName: 'La Virgencita' }),
+  D('tattoo', 'The Tattoo', 'artifact', 2, { apparition: true, text: 'Inked devotion: at the start of your turn, your seated Trader regains 1 Credibility', printName: 'El Tatuaje' }),
+  // Due diligence, done beforehand: prevention, not cure.
+  D('audit', 'The Audit', 'artifact', 2, { wards: ['rug'], text: 'Rug Pull cannot be played on you' }),
+  D('dashboard', 'Dashboard Figure', 'artifact', 2, { apparition: true, noSlot: true, text: 'Our Lady of the Dashboard: an apparition for the road. She takes no Relic slot', printName: 'La Virgencita' }),
   D('ofrenda', 'La Ofrenda', 'grace', 0, { savingGrace: 2, text: 'Offer this card to Our Lady: it goes to the shrine and lights a candle' }),
   // SAVING GRACE N (keyword): discard this from your hand when your seated
   // Trader would be discredited — they stay, with N Credibility. Printed as a line
@@ -137,9 +153,9 @@ export const DESIGNS = [
   D('anima', 'Ánima Sola', 'grace', 1, { text: 'To the shrine: light a candle, and return the most recently discarded Trader with 5 Credibility to your empty seat or to your hand' }),
   // Her tears fall for the fallen: a plain candle, and the strongest rescue in the hand.
   D('lagrimas', 'Las Lágrimas', 'grace', 1, { savingGrace: 4, text: 'To the shrine: light a candle' }),
-  D('confession', 'The Confession', 'grace', 1, { savingGrace: 3, text: 'To the shrine: light a candle, and your seated Trader’s Credibility is restored in full', printName: 'La Confesión' }),
-  D('fountain', 'The Fountain', 'grace', 2, { text: 'Toss in 2 Liquidity: your Hail Mary odds rise one step, even past the shrine’s three', printName: 'La Fuente' }),
-  D('rose', 'The Rose', 'grace', 0, { pros: 50, cash: 2, text: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise', printName: 'La Rosa' }),
+  D('confession', 'The Confession', 'grace', 1, { savingGrace: 3, text: 'To the shrine: light a candle, and your seated Trader’s Credibility is restored in full. The Inferno cannot stop it, and it lifts The Inferno', printName: 'La Confesión' }),
+  D('fountain', 'The Fountain', 'grace', 2, { apparition: true, text: 'Toss in 2 Liquidity: your Hail Mary odds rise one step, even past the shrine’s three', printName: 'La Fuente' }),
+  D('rose', 'The Rose', 'grace', 0, { apparition: true, pros: 50, cash: 2, text: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise', printName: 'La Rosa' }),
   // Locations — places you build. One stands per player, takes no Relic slot, is never sold.
   D('nacimiento', 'The Nativity Scene', 'location', 2, { text: 'Build it: place a figure at the start of each turn. At the third, the Niño arrives at midnight — light a candle and bank 75, then pack it away', printName: 'El Nacimiento' }),
   D('catedral', 'The Chart Cathedral', 'location', 2, { text: 'Green candles: whenever any player lights a candle, bank 25', printName: 'La Catedral' }),
@@ -163,9 +179,9 @@ export const DESIGNS = [
   D('fall', 'Fall From Grace', 'event', 0, { subtype: 'Calamity', text: 'The fall: every seated Trader loses 4 Credibility' }),
   // Apparitions: Our Lady appears to the whole table, unbidden. Each is an
   // on-draw Event named for her; the names are hers, so the Spanish one stays.
-  D('holyroller', 'The Holy Roller', 'event', 0, { text: 'She rolls through: every player draws a card and collects 1 Liquidity' }),
-  D('fuego', 'Nuestra Señora del Fuego', 'event', 0, { text: 'She rides the fire horse through the market: every player banks 75 Prosperity' }),
-  D('virtual', 'The Virtual Mary', 'event', 0, { subtype: 'Ambiguity', text: 'She flickers on every screen: every player shuffles their hand into their deck and draws that many' }),
+  D('holyroller', 'The Holy Roller', 'event', 0, { apparition: true, text: 'She rolls through: every player draws a card and collects 1 Liquidity' }),
+  D('fuego', 'Nuestra Señora del Fuego', 'event', 0, { apparition: true, text: 'She rides the fire horse through the market: every player banks 75 Prosperity' }),
+  D('virtual', 'The Virtual Mary', 'event', 0, { apparition: true, subtype: 'Ambiguity', text: 'She flickers on every screen: every player shuffles their hand into their deck and draws that many' }),
   // The feast day of the shrine's own saint: the whole table lights a candle.
   D('feast', 'The Feast of Perpetual Profit', 'event', 0, { text: 'Feast day: every player lights a candle' }),
   D('techwreck', 'Tech Wreck', 'event', 0, { subtype: 'Calamity', text: 'The bubble bursts: every Tech Stock on the table is wrecked — scrapped for 1 Liquidity' }),
@@ -183,7 +199,7 @@ export const DESIGNS = [
   // Fat Tuesday, then Ash Wednesday: everyone catches something, and pays for
   // it the morning after — half the roll, in Credibility. An Ambiguity: the
   // bigger the party, the bigger the penance.
-  D('mardigras', 'Mardi Gras', 'event', 0, { subtype: 'Ambiguity', text: 'Party now, repent later: every player rolls the die and collects that much; at their next turn start, their Trader loses half of it in Credibility' }),
+  D('mardigras', 'Mardi Gras', 'event', 0, { apparition: true, subtype: 'Ambiguity', text: 'Party now, repent later: every player rolls the die and collects that much; at their next turn start, their Trader loses half of it in Credibility' }),
 
   // Locations (type 'location'): places you build, not things you hold. One
   // stands per player (a new one replaces the old), no Relic slot, never sold;
@@ -194,6 +210,15 @@ export const DESIGNS = [
 
 export const DESIGN_TYPES = ["trader", "asset", "event", "hazard", "remedy", "artifact", "grace", "location"];
 export const designByKey = Object.fromEntries(DESIGNS.map((d) => [d.key, d]));
+
+// ── APPARITIONS AND MIRACLES (2026-11-20) ────────────────────────────────────
+// Ten cards carry Our Lady's image (`apparition: true`): The Holy Roller, The Fire Horse, The Virtual Mary,
+// Mardi Gras, The Rose, The Fountain, The Miracle Tortilla, The Tattoo, The Lowrider and the Dashboard Figure.
+// Whoever REVEALS one witnesses an apparition and takes a MIRACLE (an eight-pointed star; three at most):
+// the player who draws an apparition Event, or who plays any other apparition card from their hand.
+// A Miracle is spent to roll any one die of your own again. (The Dashboard Figure used to be that reroll,
+// once, as a Relic; now it is the tenth apparition.) The art's lit halos are keyed by face id in apparitions.js.
+export const APPARITION_KEYS = ["holyroller", "fuego", "virtual", "mardigras", "rose", "fountain", "tortilla", "tattoo", "rideordie", "dashboard"];
 
 // ── EDITION (2026-11-19) ─────────────────────────────────────────────────────
 // The set prints in English. The lotería titles ("El Gato", `printName`) are
@@ -221,8 +246,10 @@ export const ENGLISH_TITLES = {
 export const loteriaTitleOf = (d) => d.printName || d.name;
 export const titleOf = (d) => (EDITION === "loteria" ? loteriaTitleOf(d) : ENGLISH_TITLES[d.key] || d.name);
 
-// The six that are cards of the traditional lotería deck itself (El Gallo, El
-// Diablito, La Rosa, La Calavera, La Campana, El Corazón), not only lotería in
+// The four that are cards of the traditional lotería deck itself (El Gallo, El
+// Diablito, La Rosa, La Calavera), not only lotería in
 // style. Reserved for the Lotería edition: still in this set until each is
 // replaced or cut. Nothing reads this list yet; it is the record of the decision.
-export const LOTERIA_RESERVED = ["gallo", "diablito", "rose", "skull", "bell", "heart"];
+// (The Sacred Heart and The Bell were on this list; on 2026-11-20 both were kept in this set for good.
+// The Burro, not a traditional lotería card but made for that edition, left the set the same day.)
+export const LOTERIA_RESERVED = ["gallo", "diablito", "rose", "skull"];

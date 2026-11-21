@@ -55,9 +55,14 @@ injects `designs.js` and the faces into `pt2-table.src.html` and writes
    `blend`, `clip`, `clear: ["numberTab"]` if the sheet crosses the tab, and
    `reflection`. Register the file in `art/index.js` — one import, one key.
    A `metalFrame: "rainbow"` (any `RCANA_METAL_FRAMES` id) lays that
-   Terminal Traders border over the frame by default — on the bench, in the
+   Terminal Traders border over the painted frame by default — on the bench, in the
    print route and so on the table; the bench's **Metal frame** select
-   starts on it and can still override.
+   starts on it and can still override. In the code-drawn frame (RcanaCard3)
+   `"rainbow"` is likewise the card's default metal (`rcana3MetalFor`): the
+   binder's **Metal** control starts on **card**, `rcana:faces --frame 3` and
+   `pt3:build` print it, and a chosen metal (`--metal`, `?metal=`, a binder
+   button) still overrides. Only rainbow crosses frames; the painted `"gold"`
+   border means nothing on a frame that is already gold.
 
 5. **Face** — add an entry to `faces.js`: `id`, `design` (the engine key,
    e.g. `"bull"` — never the name), `number` (unique), `rarity`, `ability`

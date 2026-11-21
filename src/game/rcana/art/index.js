@@ -60,6 +60,8 @@ import elTatuaje from "./el-tatuaje.js";
 import shortSqueeze from "./short-squeeze.js";
 import godCandle from "./god-candle.js";
 import lotteryTicket from "./lottery-ticket.js";
+import theKeys from "./the-keys.js";
+import theAudit from "./the-audit.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -120,4 +122,6 @@ export const RCANA_ART = {
   "short-squeeze": shortSqueeze,
   "god-candle": godCandle,
   "lottery-ticket": lotteryTicket,
+  "the-keys": theKeys,
+  "the-audit": theAudit,
 };

@@ -78,6 +78,8 @@ export function buildFace(face) {
     plate: face.plate ?? (design.type === "trader" ? "boxed" : design.type === "asset" || (design.type === "event" && design.played) ? "valued" : "sealed"),
     // The trinity's third stat, Traders only: composure against Calamities.
     eq: design.type === "trader" ? design.eq ?? 0 : null,
+    // A Calamity that is a one-time hit, not a condition: its badge reads "On play", not "Until cleared".
+    hit: !!design.hit,
     halo: face.halo ?? (design.type === "trader" ? design.cred : design.pros) ?? null,
     // A fired Event is never played, so it has no cost to print: a dash, not a
     // zero (a zero means "free to play", as on La Ofrenda).

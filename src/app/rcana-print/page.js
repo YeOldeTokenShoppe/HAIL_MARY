@@ -16,7 +16,7 @@
 import React, { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import RcanaCard from "@/components/RcanaCard";
-import RcanaCard3, { RCANA3_METALS } from "@/components/RcanaCard3";
+import RcanaCard3, { rcana3MetalFor } from "@/components/RcanaCard3";
 import RcanaFlipCard from "@/components/RcanaFlipCard";
 import { RCANA_SET, RCANA_ASPECT, toRcanaCard } from "@/game/rcana/cardFace";
 
@@ -82,7 +82,8 @@ function PrintCard() {
   // ?frame=3: the code-drawn frame. One plane, so no depth, but in a live embed
   // it leans under the pointer and the mirror metal shimmers.
   if (params.get("frame") === "3" && !templateOnly) {
-    const metal = RCANA3_METALS.includes(params.get("metal")) ? params.get("metal") : "flat";
+    // ?metal= pins a metal; otherwise the card's own (an art file's metalFrame), flat where it names none.
+    const metal = rcana3MetalFor(card, params.get("metal"), "flat");
     const s3 = live ? fitScale : scale; // the same size as the still picture it replaces in a lightbox
     return (
       <main

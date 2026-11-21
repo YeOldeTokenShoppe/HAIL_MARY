@@ -27,7 +27,7 @@ export const RECIPES = {
     ['tech', 1], ['vaca', 1], ['cava', 1], ['plata', 1], ['nacimiento', 1], ['moon', 1], ['catedral', 1], ['bluechip', 1], ['semilla', 1], ['investigadora', 1],
     ['bull', 2], ['squeeze', 2],
     ['bear', 1], ['rug', 1],
-    ['bell', 1], ['tortilla', 2], ['publicista', 1], ['horchata', 1], ['burro', 1], ['ofrenda', 1],
+    ['bell', 1], ['tortilla', 2], ['publicista', 1], ['horchata', 1], ['stimulus', 1], ['ofrenda', 1],
     ['heart', 1], ['halo', 1], ['rosary', 1], ['grail', 1], ['dashboard', 1], ['tattoo', 1], ['geometry', 1],
     ['cherub', 1], ['fountain', 1], ['limpia', 1], ['anima', 1], ['lagrimas', 1]],
   degen: [['diablito', 2], ['unicornio', 2], ['prospector', 1], ['abuela', 1], ['bot', 1],
@@ -57,6 +57,8 @@ export function starterChoices(recipe) {
   return traders.filter((d) => d.cost === cheapest);
 }
 
+// A Remedy's `clears` is one Calamity's key, a list of keys, or 'any' (designs.js).
+const clearsHaz = (c, h) => c.clears === 'any' || (Array.isArray(c.clears) ? c.clears.includes(h.key) : h.key === c.clears);
 export class Game {
   constructor({ players, seed = 1, verbose = false, winAt = 1000, maxTurns = 300 }) {
     this.rng = makeRng(seed); this.verbose = verbose; this.lines = []; this.winAt = winAt; this.maxTurns = maxTurns;
@@ -289,7 +291,7 @@ export class Game {
           p.discard.push(c); const drawn = []; for (let i = 0; i <= picked.length; i++) { const d = await this.draw(p, true); if (d) drawn.push(d); }
           this.log(`${p.name} drinks ${c.name.toUpperCase()} — lets go of ${picked.length} and draws ${drawn.length}`); break; }
         if (choice.polish) { if (p.trader) { p.trader.credNow = Math.min(p.trader.cred, (p.trader.credNow == null ? p.trader.cred : p.trader.credNow) + 5); this.log(`THE PRESS RELEASE polishes ${p.trader.name} → ${p.trader.credNow}/${p.trader.cred} Grace`); } p.discard.push(c); break; }
-        const t = choice.target || p; const h = choice.hazard || t.hazards.find((x) => c.clears === 'any' || x.key === c.clears);
+        const t = choice.target || p; const h = choice.hazard || t.hazards.find((x) => clearsHaz(c, x));
         if (!h) { p.liq += cost; p.hand.push(c); p.stats.plays--; return false; }
         const back = c.bounce && h.owner !== t && !this.hasHaz(h.owner, h.key) ? h.owner : null;
         if (back) { this.releaseTrap(t, h); t.hazards.splice(t.hazards.indexOf(h), 1); t.stats.hazCleared++; back.hazards.push(h); this.log(`${p.name} plays ${c.name}: ${h.name} off ${t.name} — kicked back onto ${back.name}`); }
@@ -388,7 +390,7 @@ export class Game {
       if (c.type === 'asset' || c.type === 'artifact' || c.type === 'location' || c.type === 'trader') A.push({ t: 'play', c });
       else if (c.type === 'event' && c.played) { if (this.hasHaz(p, 'scam')) continue; if (!c.choice) { if (c.bearProof || c.bloom || !(this.hasHaz(p, 'bear') && this.eventPayout(p, c) > 75)) A.push({ t: 'play', c }); } else { A.push({ t: 'play', c, choice: { cash: true } }); if (!(this.hasHaz(p, 'bear') && c.pros > 75)) A.push({ t: 'play', c, choice: {} }); } }
       else if (c.type === 'hazard') { for (const r of this.rivals(p)) if (!this.hasHaz(r, c.key)) A.push({ t: 'play', c, choice: { target: r } }); }
-      else if (c.type === 'remedy') { for (const q of this.players) for (const h of q.hazards) if (c.clears === 'any' || h.key === c.clears) A.push({ t: 'play', c, choice: { target: q, hazard: h } }); if (c.key === 'publicista' && p.trader && p.trader.credNow != null && p.trader.credNow < p.trader.cred) A.push({ t: 'play', c, choice: { polish: true } }); if (c.refresh) A.push({ t: 'play', c, choice: { refresh: true } }); }
+      else if (c.type === 'remedy') { for (const q of this.players) for (const h of q.hazards) if (clearsHaz(c, h)) A.push({ t: 'play', c, choice: { target: q, hazard: h } }); if (c.key === 'publicista' && p.trader && p.trader.credNow != null && p.trader.credNow < p.trader.cred) A.push({ t: 'play', c, choice: { polish: true } }); if (c.refresh) A.push({ t: 'play', c, choice: { refresh: true } }); }
       else if (c.type === 'grace') { if (this.is(p, 'bot') || this.hasHaz(p, 'infierno')) continue; if (c.key === 'fountain') { if (!p.hailUsed) A.push({ t: 'play', c }); } else if (p.deeds < 3) { if (c.key === 'rose') { for (const r of this.rivals(p)) A.push({ t: 'play', c, choice: { target: r } }); } else A.push({ t: 'play', c }); } }
     }
     for (const a of p.invest) if (a.uncork && p.deeds < 3 && !this.is(p, 'bot')) A.push({ t: 'uncork', a });
