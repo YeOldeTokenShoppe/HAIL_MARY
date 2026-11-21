@@ -200,6 +200,10 @@ export const DESIGNS = [
   // it the morning after — half the roll, in Credibility. An Ambiguity: the
   // bigger the party, the bigger the penance.
   D('mardigras', 'Mardi Gras', 'event', 0, { apparition: true, subtype: 'Ambiguity', text: 'Party now, repent later: every player rolls the die and collects that much; at their next turn start, their Trader loses half of it in Credibility' }),
+  // The Singular80 (2026-11-20): the point past which nothing slows down. On the draw it changes the
+  // game for good: every player takes two main actions a turn from then on. An Ambiguity: it helps
+  // whoever has more to do with a turn. Its art is a live 3D scene (art/the-singular80.js).
+  D('singular', 'The Singular80', 'event', 0, { subtype: 'Ambiguity', text: 'Time folds: from now on, every player takes two main actions each turn' }),
 
   // Locations (type 'location'): places you build, not things you hold. One
   // stands per player (a new one replaces the old), no Relic slot, never sold;

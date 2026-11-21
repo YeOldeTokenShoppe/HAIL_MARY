@@ -221,6 +221,8 @@ export class Game {
     this.log(`✦ EVENT — ${c.name} (drawn by ${p.name}): ${c.text}`);
     for (const q of this.players) for (const a of [...q.invest]) if (a.key === 'jardin') { q.invest.splice(q.invest.indexOf(a), 1); q.discard.push(a); this.log(`${q.name}'s YIELD FARM is wiped by the weather`); }
     if (c.key === 'godcandle') this.fx[c.key] = { owner: p.idx };
+    // THE SINGULAR80 (2026-11-20): from here to the end of the game, every player takes two main actions a turn (turn(), below).
+    if (c.key === 'singular') { if (this.accelerated) this.log('THE SINGULAR80 — time has already folded; nothing more happens'); else { this.accelerated = true; this.log('THE SINGULAR80 — time folds: from now on, every player takes two main actions each turn'); } }
     if (c.key === 'fall') for (const q of this.players) if (q.trader) await this.strike(q, 'the FALL FROM GRACE');
     if (c.key === 'feast') { this.log('THE FEAST OF PERPETUAL PROFIT — every player lights a candle'); for (const q of this.players) await this.lightCandle(q, 'the Feast'); }
     if (c.key === 'holyroller') { for (const q of this.players) { this.collect(q, 1); await this.draw(q, true); } this.log(`THE HOLY ROLLER rolls through — every player draws a card and collects ${this.m(1)}`); }
@@ -677,10 +679,17 @@ export class Game {
     if (p.policy.beforeDraw) await p.policy.beforeDraw(this, p);
     if (this.canBury(p) && p.policy.dueDiligence && await p.policy.dueDiligence(this, p, p.deck[0])) this.bury(p);
     await this.turnDraw(p);
-    const action = await p.policy.main(this, p) || { t: 'pass' };
-    const before = this.hooks?.beforeAction?.();
-    const result = await this.act(p, action);
-    await this.hooks?.onAction?.(p, action, before, result);
+    // One main action; two once THE SINGULAR80 has fired (this.accelerated). The second is a full main action, and is skipped when there is nothing to do with it.
+    for (let n = 0; n < (this.accelerated ? 2 : 1) && !this.over; n++) {
+      this.secondAction = n > 0;
+      if (n > 0 && !this.legalActions(p).some((a) => a.t !== 'pass')) break;
+      const action = await p.policy.main(this, p) || { t: 'pass' };
+      const before = this.hooks?.beforeAction?.();
+      const result = await this.act(p, action);
+      if (n > 0 && action.t !== 'pass') p.stats.secondActions = (p.stats.secondActions || 0) + 1;
+      await this.hooks?.onAction?.(p, action, before, result);
+    }
+    this.secondAction = false;
     // EIGHT ARMS (The Octobot, 2026-11-20): after its main action it may also buy or sell one Asset (armsBuy on the design; without it, sell only).
     if (!this.over && this.is(p, 'bot') && p.trader.arms !== false) {
       this.armsOnly = true;

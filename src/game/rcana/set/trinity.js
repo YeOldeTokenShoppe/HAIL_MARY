@@ -25,9 +25,9 @@ export const TRINITY = {
 // ── LOGOS · ETHOS · PATHOS (2026-11-20: `attrs` in the Playtest 3 rules, on by default) ──
 // Money is kept apart (it is `liq` above: what a Trader costs and makes), and a Trader's character is
 // three attributes that always sum to EIGHT, each 1 to 4, no two Traders alike:
-//   logos   REASON   insight: when you draw for your turn, look at this many cards and keep one
-//   ethos   CHARACTER  reputation: what good standing pays, $5M a point
-//   pathos  FEELING  heart and nerve: a Calamity played on you fails on a d8 roll of this or lower
+//   logos   INSIGHT    when you draw for your turn, look at this many cards and keep one
+//   ethos   CHARACTER  what good standing pays, $5M a point
+//   pathos  NERVE      a Calamity played on you fails on a d8 roll of this or lower
 export const ATTRS = {
   investigadora: { logos: 4, ethos: 3, pathos: 1 }, // Marisol: she reads everything
   bot:           { logos: 4, ethos: 1, pathos: 3 }, // The Octobot: all calculation, no name to lose

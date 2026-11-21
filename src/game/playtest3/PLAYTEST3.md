@@ -331,3 +331,15 @@ Playtest 3 is playable at `/playtest3`, against EL BOT.
 
 Checked by playing a whole game through the page with a random clicker: 14 rounds, no script
 errors, a gift accepted and a halo earned, both Traders put in scandal by the Fall, the bot won at $1,020M.
+
+## The Singular80 (2026-11-20)
+
+Card 88, an on-draw Event (Ambiguity). When it is drawn, time folds: from then on every player takes
+two main actions each turn, for the rest of the game, starting with the player who drew it. A second
+copy of the effect does nothing. The Octobot's Eight Arms still adds its one Asset on top of both.
+The Enigma Machine can intercept it like any other Event.
+
+- Engine: `this.accelerated` (set in `event()`), the two-action loop in `turn()`, `this.secondAction`
+  for the table's prompt, `stats.secondActions`.
+- It is in the General shuffle only. The starter decks do not hold it.
+- Art: a live 3D scene (`src/game/rcana/live3d/singularity.js`), the second after Sacred Geometry.

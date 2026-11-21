@@ -28,10 +28,11 @@
 // scripts/rcana-render-faces.mjs can screenshot it unchanged.
 import React, { useEffect, useId, useRef, useState } from "react";
 import { designByKey } from "@/game/rcana/set/designs.js";
-import { TRINITY, TRINITY_TEXT, MONEY_UNIT, ATTRS } from "@/game/rcana/set/trinity.js";
+import { TRINITY, TRINITY_TEXT, MONEY_UNIT, ATTRS, ETHOS_UNIT } from "@/game/rcana/set/trinity.js";
 import { oneMoney } from "@/game/rcana/set/oneMoney.js";
 import { APPARITIONS } from "@/game/rcana/set/apparitions.js";
 import { RCANA_SET } from "@/game/rcana/cardFace";
+import RcanaLive3D from "./RcanaLive3D";
 
 export const RCANA3_METALS = ["flat", "gold", "mirror", "rainbow"];
 // The metals an art file's `metalFrame` carries into this frame. Only rainbow:
@@ -49,23 +50,47 @@ export const rcana3MetalFor = (data, chosen, fallback = "flat") =>
 // THE TRINITY TRIANGLE (2026-11-20). A Trader's three attributes as one figure: Ethos at the top, Pathos
 // bottom left, Logos bottom right, the numerals on the corners. The filled shape reaches toward each
 // corner by that attribute (1-4), so a Trader's lean shows before a number is read. Drawn for parchment.
-function Trinity({ at, color, style }) {
+// What each attribute means, in plain words, for the corner's tooltip. ONE GLOSSARY everywhere (card, table,
+// rules): Logos is insight, Ethos is character, Pathos is nerve.
+export const attrTip = (k, n) => ({
+  logos: ["Insight", n > 1 ? `When you draw for your turn, look at ${n} cards and keep one.` : "You draw the top card of the deck, unseen."],
+  ethos: ["Character", `In good standing, you make $${n * ETHOS_UNIT}M more each turn.`],
+  pathos: ["Nerve", `A Calamity played on you fails on a d8 roll of ${n} or lower.`],
+}[k]);
+// Hover, focus or tap a corner: its circle inverts (gold with an ink numeral) and `tipBox`, a rectangle in
+// card units beside the triangle, shows what that attribute is and does. A still render shows neither.
+function Trinity({ at, color, style, tipBox }) {
+  const [tip, setTip] = useState(null);
   const V = { ethos: [65, 34], pathos: [24, 104], logos: [106, 104] }; const C = [65, 80.7];
   const reach = (k) => { const t = Math.min(1, at[k] / 4); return [C[0] + (V[k][0] - C[0]) * t, C[1] + (V[k][1] - C[1]) * t]; };
   const P = (list) => list.map((p) => p.join(",")).join(" ");
   const name = { fontFamily: CAPS, fontSize: 10.5, letterSpacing: "0.16em", fill: "#4a3520", textAnchor: "middle" };
   const keys = ["ethos", "pathos", "logos"];
+  const label = (k) => k[0].toUpperCase() + k.slice(1);
   return (
-    <svg role="img" aria-label={`Ethos ${at.ethos}, Pathos ${at.pathos}, Logos ${at.logos}`} viewBox="0 0 130 130" style={style}>
-      <polygon points={P(keys.map((k) => V[k]))} fill="#ecdba6" stroke="#b9892f" strokeWidth="2" strokeLinejoin="round" />
-      {keys.map((k) => <line key={k} x1={C[0]} y1={C[1]} x2={V[k][0]} y2={V[k][1]} stroke="#b9892f" strokeWidth="1" strokeOpacity=".55" />)}
-      <polygon points={P(keys.map(reach))} fill={color} fillOpacity=".8" stroke={INK} strokeWidth="1.5" strokeLinejoin="round" />
-      {keys.map((k) => (
-        <g key={k}><circle cx={V[k][0]} cy={V[k][1]} r="13" fill={INK} stroke="#b9892f" strokeWidth="2" />
-          <text x={V[k][0]} y={V[k][1] + 6.5} style={{ fontFamily: NUM, fontSize: 18, fill: GILT, textAnchor: "middle" }}>{at[k]}</text></g>
-      ))}
-      <text x={V.ethos[0]} y="15" style={name}>ETHOS</text><text x={V.pathos[0] + 4} y="128" style={name}>PATHOS</text><text x={V.logos[0] - 2} y="128" style={name}>LOGOS</text>
-    </svg>
+    <>
+      <svg role="group" aria-label={`Ethos ${at.ethos}, Pathos ${at.pathos}, Logos ${at.logos}`} viewBox="0 0 130 130" style={style}>
+        <polygon points={P(keys.map((k) => V[k]))} fill="#ecdba6" stroke="#b9892f" strokeWidth="2" strokeLinejoin="round" />
+        {keys.map((k) => <line key={k} x1={C[0]} y1={C[1]} x2={V[k][0]} y2={V[k][1]} stroke="#b9892f" strokeWidth="1" strokeOpacity=".55" />)}
+        <polygon points={P(keys.map(reach))} fill={color} fillOpacity=".8" stroke={INK} strokeWidth="1.5" strokeLinejoin="round" />
+        {keys.map((k) => { const on = tip === k; return (
+          <g key={k} role="button" tabIndex={0} aria-label={`${label(k)} ${at[k]}: ${attrTip(k, at[k]).join(". ")}`} style={{ cursor: "help", outline: "none" }}
+            onMouseEnter={() => setTip(k)} onMouseLeave={() => setTip(null)} onFocus={() => setTip(k)} onBlur={() => setTip(null)}
+            onClick={(e) => { e.stopPropagation(); setTip(on ? null : k); }} onPointerDown={(e) => e.stopPropagation()}>
+            <circle cx={V[k][0]} cy={V[k][1]} r="18" fill="transparent" />
+            <circle cx={V[k][0]} cy={V[k][1]} r="13" fill={on ? GILT : INK} stroke={on ? INK : "#b9892f"} strokeWidth="2" style={{ transition: "fill 120ms, stroke 120ms" }} />
+            <text x={V[k][0]} y={V[k][1] + 6.5} style={{ fontFamily: NUM, fontSize: 18, fill: on ? INK : GILT, textAnchor: "middle", transition: "fill 120ms", pointerEvents: "none" }}>{at[k]}</text>
+          </g>
+        ); })}
+        <text x={V.ethos[0]} y="15" style={name}>ETHOS</text><text x={V.pathos[0] + 4} y="128" style={name}>PATHOS</text><text x={V.logos[0] - 2} y="128" style={name}>LOGOS</text>
+      </svg>
+      {tip && tipBox && (
+        <div role="tooltip" style={{ position: "absolute", margin: 0, ...tipBox, boxSizing: "border-box", padding: "10px 14px", borderRadius: 8, background: INK, border: `1.5px solid ${GOLD}`, display: "flex", flexDirection: "column", justifyContent: "center", gap: 6, textAlign: "center", pointerEvents: "none" }}>
+          <p style={{ margin: 0, fontFamily: CAPS, fontSize: 19, letterSpacing: "0.14em", lineHeight: 1, color: GILT, textTransform: "uppercase" }}>{label(tip)} {at[tip]} · {attrTip(tip, at[tip])[0]}</p>
+          <p style={{ margin: 0, fontFamily: BODY, fontSize: 14.5, lineHeight: 1.35, color: "#f6e7b8" }}>{attrTip(tip, at[tip])[1]}</p>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -270,6 +295,10 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
   const metal = rcana3MetalFor(data, metalProp, "flat");
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const [ready, setReady] = useState(false);
+  // LIVE 3D ART (data.live3d): mounted the first time the card is interactive, the one live card; paused
+  // (not torn down) while it is turned over. A still card never opens a 3D canvas: it shows the poster layer.
+  const [wasLive, setWasLive] = useState(false);
+  useEffect(() => { if (interactive && data?.live3d) setWasLive(true); }, [interactive, data?.live3d]);
   const stageRef = useRef(null);
   const lean = (e) => {
     const el = stageRef.current;
@@ -380,6 +409,7 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
               );
             })}
           </div>
+          {wasLive && data.live3d && <RcanaLive3D key={data.id} kind={data.live3d} paused={!interactive} style={{ position: "absolute", left: 0, top: 0, width: 480, height: 470 }} />}
         </div>
         <div style={{ ...abs, left: 14, top: 14, width: 480, height: 470, border: `2px solid ${GOLD}`, borderRadius: 12 }} />
 
@@ -427,7 +457,7 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
           </>
         )}
 
-        {tri && <><Trinity at={m.attrs} color={m.color} style={{ ...abs, left: 36, top: 449, width: 124, height: 124 }} /><div style={{ ...abs, left: 156, top: 458, width: 1, height: 118, background: "#b9892f", opacity: 0.6 }} /></>}
+        {tri && <><Trinity at={m.attrs} color={m.color} style={{ ...abs, left: 36, top: 449, width: 124, height: 124 }} tipBox={{ left: 162, top: 452, width: 308, height: 130 }} /><div style={{ ...abs, left: 156, top: 458, width: 1, height: 118, background: "#b9892f", opacity: 0.6 }} /></>}
         {/* Bottom left: what an Asset pays each turn. (The d8 was a Trader's Equanimity until 2026-11-20.) */}
         {m.corner?.shape === "die" && (
           <svg role="img" aria-label={m.corner.label} viewBox="0 0 100 100" style={{ ...abs, left: BL_DIE.x, top: BL_DIE.y, width: 90, height: 90 }}>
@@ -446,7 +476,7 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
 
         {/* The metal: polished gold or rainbow foil through the mask, over the flat gold beneath. */}
         {foil && (
-          <svg aria-hidden="true" viewBox={`0 0 ${W} ${H}`} style={{ ...abs, left: 0, top: 0, width: W, height: H }}>
+          <svg aria-hidden="true" viewBox={`0 0 ${W} ${H}`} style={{ ...abs, left: 0, top: 0, width: W, height: H, pointerEvents: "none" }}>
             <defs>
               <linearGradient id={`${uid}-foil`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={foil.x2} y2={foil.y2} spreadMethod="repeat">
                 {foil.stops.map(([offset, color]) => <stop key={offset} offset={offset} stopColor={color} />)}
@@ -462,13 +492,13 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
         )}
         {/* The mirror: polished gold whose bands slide against the lean, under a glare that follows the pointer. */}
         {mirror && (
-          <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: W, height: H, WebkitMaskImage: metalMaskUrl(m), maskImage: metalMaskUrl(m), WebkitMaskSize: "100% 100%", maskSize: "100% 100%", WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat" }}>
+          <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: W, height: H, pointerEvents: "none", WebkitMaskImage: metalMaskUrl(m), maskImage: metalMaskUrl(m), WebkitMaskSize: "100% 100%", maskSize: "100% 100%", WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat" }}>
             <div style={{ ...abs, inset: 0, backgroundImage: "repeating-linear-gradient(calc(118deg + var(--ry, 0deg) * 1.6), #a06a00 0%, #d39a00 7%, #f2b705 13%, #fff6c4 19%, #ffd84a 25%, #c58600 36%, #a87000 44%, #ffe58a 55%, #fffbe0 59%, #f2b705 68%, #a06a00 100%)", backgroundSize: "320% 320%", backgroundPosition: "calc(50% + (50% - var(--mx, 50%)) * 1.5) calc(50% + (50% - var(--my, 50%)) * 1.5)", transition: "background-position var(--ease, 500ms) ease-out" }} />
             <div style={{ ...abs, inset: 0, mixBlendMode: "screen", backgroundImage: "radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,.95) 0%, rgba(255,246,196,.5) 16%, rgba(255,255,255,0) 42%)" }} />
           </div>
         )}
         {(foil || mirror) && (
-          <svg aria-hidden="true" viewBox={`0 0 ${W} ${H}`} style={{ ...abs, left: 0, top: 0, width: W, height: H }}>
+          <svg aria-hidden="true" viewBox={`0 0 ${W} ${H}`} style={{ ...abs, left: 0, top: 0, width: W, height: H, pointerEvents: "none" }}>
             {/* The numerals the foil covered go back on top, in ink. */}
             {m.topLeft?.shape === "drop" && (
               <g transform={`translate(${TL_DROP.x},${TL_DROP.y}) scale(${TL_DROP.sx},${TL_DROP.sy})`}>
@@ -490,7 +520,7 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
         )}
 
         {/* The tab sits over the foil, so its lettering is never glazed. */}
-        <div style={{ ...abs, left: 0, top: 423, width: W, display: "flex", justifyContent: "center" }}>
+        <div style={{ ...abs, left: 0, top: 423, width: W, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
           <p style={{ margin: 0, height: 34, boxSizing: "border-box", padding: "0 22px", border: `2px solid ${GOLD}`, borderRadius: 8, background: m.color, color: "#ffe9a6", fontFamily: CAPS, fontSize: 21, lineHeight: "30px", letterSpacing: "0.14em", textTransform: "uppercase", whiteSpace: "nowrap" }}>{m.tab}</p>
         </div>
 

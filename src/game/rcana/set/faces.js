@@ -795,4 +795,30 @@ export const FACES = [
     flavor: "She read the fine print. There was no rug.",
     printed: {},
   },
+  {
+    id: "sacred-geometry",
+    design: "geometry", // prints as "Sacred Geometry" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL. The first card with LIVE 3D art
+    // (art/sacred-geometry.js: live3d).
+    number: 72,
+    rarity: "Rare",
+    // A Relic equips; the printed line is the design's bonus on called Events.
+    ability: "Everything aligns:\nyour called Events bank 25 more.",
+    // A Relic narrates; the line follows the rule.
+    flavor: "Look long enough and the lines agree.",
+    printed: {},
+  },
+  {
+    id: "the-singular80",
+    design: "singular", // prints as "The Singular80" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (it changes the whole game, and there is one).
+    // The second card with LIVE 3D art (art/the-singular80.js: live3d).
+    number: 88,
+    rarity: "Rare",
+    // An on-draw Ambiguity: it resolves as drawn and never ends.
+    ability: "From now on, every player takes\ntwo main actions each turn.",
+    // An Event narrates; the line follows the rule. DRAFT.
+    flavor: "After this, there is no later.",
+    printed: {},
+  },
 ];

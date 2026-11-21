@@ -166,6 +166,14 @@ button:disabled{opacity:.4;cursor:default}
 .decklists li button b{min-width:1.6rem;color:var(--gold);font-weight:600}
 .decklists li button small{margin-left:auto;color:var(--muted);white-space:nowrap}
 @media (max-width:640px){.decklists{grid-template-columns:minmax(0,1fr)}}
+.anatomy{max-width:46rem;margin:1rem auto 0;text-align:left}
+.anatomy summary{text-align:center}
+.anatomy #anatomy{display:grid;grid-template-columns:minmax(9rem,13rem) minmax(0,1fr);gap:.4rem 1.4rem;align-items:start;margin-top:.8rem}
+.anatomy svg{width:100%;height:auto;grid-row:span 2;font-family:var(--body)}
+.anatomy ol{margin:0;padding-left:1.3rem;display:grid;gap:.45rem;line-height:1.35}
+.anatomy ol li::marker{color:var(--rose);font-weight:700}
+.anatomy p{margin:0;color:var(--muted);font-size:.9rem;max-width:none}
+@media (max-width:640px){.anatomy #anatomy{grid-template-columns:minmax(0,1fr)}.anatomy svg{max-width:13rem;margin:0 auto;grid-row:auto}}
 .copychips{font-size:.68rem;color:var(--muted);margin-top:4px;max-width:var(--cw)}
 .coinrow{display:inline-flex;align-items:center;vertical-align:middle;min-width:2px;padding:.12rem 0}
 .coin{
@@ -749,6 +757,7 @@ body:has(.awaiting-deal) #gameBar h1{margin-right:auto;font-size:clamp(.95rem,1.
     <h3 id="starterHeading">Starting Trader</h3>
     <p class="starter-note">Seat one Trader for free. Traders who cost $30M or more can join later from your hand.</p>
     <div class="starter-pick" id="starterPick" role="group" aria-labelledby="starterHeading"></div>
+    <details class="note anatomy"><summary>How to read a Trader card</summary><div id="anatomy"></div></details>
   </section>
   <section id="sharedEffects" aria-label="Events affecting everyone" hidden></section>
   <section class="rivals" id="rivals"></section>
@@ -808,12 +817,13 @@ body:has(.awaiting-deal) #gameBar h1{margin-right:auto;font-size:clamp(.95rem,1.
       <li><strong>Finish your turn.</strong> If you have more than seven cards in hand, choose cards to discard until you have seven.</li>
     </ol>
     <p><strong>Winning.</strong> The round is always played out. When it ends, anyone holding $1 billion or more wins; if both players are there, the richer one takes it.</p>
-    <details><summary>Traders: Money and the trinity</summary><p>A Trader’s <strong>Money</strong> (the coin) is what they cost to play and what they make you each turn. Their character is three attributes that always add up to eight. <strong>Logos</strong> is insight: when you draw for your turn, you look at that many cards from the top of the deck and draw one of them; the others stay on top. <strong>Ethos</strong> is reputation: while your Trader is in good standing they make $5M more each turn for every point. <strong>Pathos</strong> is heart: when a rival plays a Calamity on you, roll the d8; on your Trader’s Pathos or lower, the Calamity fails.</p>
+    <details><summary>Traders: Money and the trinity</summary><p>A Trader’s <strong>Money</strong> (the coin) is what they cost to play and what they make you each turn. Their character is three attributes that always add up to eight. <strong>Logos</strong> is insight: when you draw for your turn, you look at that many cards from the top of the deck and draw one of them; the others stay on top. <strong>Ethos</strong> is character: while your Trader is in good standing they make $5M more each turn for every point. <strong>Pathos</strong> is nerve: when a rival plays a Calamity on you, roll the d8; on your Trader’s Pathos or lower, the Calamity fails.</p>
     <p><strong>Credibility has two states.</strong> A Trader is in good standing or in scandal. Any Calamity that lands on you is a strike: the first puts your Trader in scandal, which stops their Ethos bonus and makes them draw blind; a second, while still in scandal, <strong>discredits</strong> them and they leave the desk, unless a card with <strong>Saving Face</strong> is spent from your hand or the Shroud is on the table. Lighting a candle returns a Trader to good standing, but not while a Scandal sits on your desk.</p>
     <p><strong>The earned halo.</strong> Once per Trader you can earn a halo, worth $10M more a turn in good standing. Offer a card from your hand to your rival as a gift, as your main action: if they accept, the halo is yours. They may refuse. Clearing a Calamity from your rival’s desk earns it too.</p></details>
     <details><summary>Assets and your portfolio</summary><p>An Asset you buy goes into your portfolio. Starting on your next turn, you can use your main action to sell it for cash. Inspect the holding to see what it sells for today: some grow each round, The Avocado ripens and then rots, The Holy Grail is worth more while three candles burn, and a gamble lets you roll the d8 for its full price or take a smaller safe price. Rug Pull blocks sales until cleared. A Bear Market caps what one card can pay at $75M, and liquidates a leveraged Perp. The Lowrider keeps your portfolio out of the Whale’s and the Wheel’s reach.</p></details>
     <details><summary>Events, Calamities, Remedies and Relics</summary><p>Some Events fire when drawn. Others stay in your hand until you play them: most pay out at once, a Seed Round is planted and blooms four rounds later, The Ponzi pays from your rivals’ holdings. Calamities come in two kinds. A <strong>condition</strong> (Bear Market, Tax Collector, Liquidity Trap, Scandal, The Inferno) sits on a rival’s desk until cleared: use a matching Remedy, a Miracle Tortilla, or pay $30M to clear one from your own desk. A <strong>fraud</strong> (Rug Pull, Quantum Hack, Exit Scam) hits once and is gone, so it cannot be cleared, only prevented: The Keys keep Quantum Hack and Exit Scam off you, and The Audit keeps Rug Pull off you. Against either kind, a Sacred Heart can cancel one as it lands and Pathos can make it fail. The Halo stops Calamities from being strikes against your Trader.</p><p>Relics give ongoing effects. You hold two at a time, three with the Motherboard, which takes no slot itself. Graces are offerings at the shrine: each lights a candle.</p></details>
     <details><summary>Locations</summary><p>A Location is a place you build: one stands per player, it takes no Relic slot, and it is never sold. Building a second tears the first down. The Nativity Scene gains a figure each turn and pays on the third; The Catacombs turn a Trader into cash; The Chart Cathedral pays $25M whenever anyone lights a candle.</p></details>
+    <details><summary>The Singular80</summary><p>One Event changes the game for good. When The Singular80 is drawn, time folds: from then on, every player takes <strong>two</strong> main actions each turn, starting with the player who drew it. It stays in effect until the game ends. The Octobot’s Eight Arms still adds one Asset bought or sold on top. It is in the General shuffle only, not in the starter decks.</p></details>
     <details><summary>Apparitions and Miracles</summary><p>Ten cards carry Our Lady’s image: The Holy Roller, The Fire Horse, The Virtual Mary, Mardi Gras, The Rose, The Fountain, The Miracle Tortilla, The Tattoo, The Lowrider and the Dashboard Figure. When you reveal one, by drawing an apparition Event or by playing any of the others from your hand, you witness an apparition and take a <strong>Miracle</strong> (✦). You may hold three. When a die of yours fails you (a gamble, the Hail Mary, your Trader’s Pathos, The Rooster), you may spend a Miracle to roll it again.</p></details>
     <details><summary>Candles and the Hail Mary</summary><p>Candles are lit by Graces, the Feast, the Nativity and The Cellar, up to three. Once per game, you may spend your main action to attempt a Hail Mary. With zero, one, two, or three lit candles, the odds are 1, 2, 3, or 4 winning faces on the d8; The Fountain adds one winning face per use, up to 5 in 8, and a Virtue Signal on you counts your candles as none. Your desk shows the odds after card effects. An answered prayer clears your Calamities and pays $200M. A miss spends the attempt, unless the Dashboard Figure rolls again.</p></details>
   </article>
@@ -1932,6 +1942,10 @@ const DESIGNS = [
   // it the morning after — half the roll, in Credibility. An Ambiguity: the
   // bigger the party, the bigger the penance.
   D('mardigras', 'Mardi Gras', 'event', 0, { apparition: true, subtype: 'Ambiguity', text: 'Party now, repent later: every player rolls the die and collects that much; at their next turn start, their Trader loses half of it in Credibility' }),
+  // The Singular80 (2026-11-20): the point past which nothing slows down. On the draw it changes the
+  // game for good: every player takes two main actions a turn from then on. An Ambiguity: it helps
+  // whoever has more to do with a turn. Its art is a live 3D scene (art/the-singular80.js).
+  D('singular', 'The Singular80', 'event', 0, { subtype: 'Ambiguity', text: 'Time folds: from now on, every player takes two main actions each turn' }),
 
   // Locations (type 'location'): places you build, not things you hold. One
   // stands per player (a new one replaces the old), no Relic slot, never sold;
@@ -2012,9 +2026,9 @@ const TRINITY = {
 // ── LOGOS · ETHOS · PATHOS (2026-11-20: `attrs` in the Playtest 3 rules, on by default) ──
 // Money is kept apart (it is `liq` above: what a Trader costs and makes), and a Trader's character is
 // three attributes that always sum to EIGHT, each 1 to 4, no two Traders alike:
-//   logos   REASON   insight: when you draw for your turn, look at this many cards and keep one
-//   ethos   CHARACTER  reputation: what good standing pays, $5M a point
-//   pathos  FEELING  heart and nerve: a Calamity played on you fails on a d8 roll of this or lower
+//   logos   INSIGHT    when you draw for your turn, look at this many cards and keep one
+//   ethos   CHARACTER  what good standing pays, $5M a point
+//   pathos  NERVE      a Calamity played on you fails on a d8 roll of this or lower
 const ATTRS = {
   investigadora: { logos: 4, ethos: 3, pathos: 1 }, // Marisol: she reads everything
   bot:           { logos: 4, ethos: 1, pathos: 3 }, // The Octobot: all calculation, no name to lose
@@ -2253,6 +2267,8 @@ class Game {
     this.log(`✦ EVENT — ${c.name} (drawn by ${p.name}): ${c.text}`);
     for (const q of this.players) for (const a of [...q.invest]) if (a.key === 'jardin') { q.invest.splice(q.invest.indexOf(a), 1); q.discard.push(a); this.log(`${q.name}'s YIELD FARM is wiped by the weather`); }
     if (c.key === 'godcandle') this.fx[c.key] = { owner: p.idx };
+    // THE SINGULAR80 (2026-11-20): from here to the end of the game, every player takes two main actions a turn (turn(), below).
+    if (c.key === 'singular') { if (this.accelerated) this.log('THE SINGULAR80 — time has already folded; nothing more happens'); else { this.accelerated = true; this.log('THE SINGULAR80 — time folds: from now on, every player takes two main actions each turn'); } }
     if (c.key === 'fall') for (const q of this.players) if (q.trader) await this.strike(q, 'the FALL FROM GRACE');
     if (c.key === 'feast') { this.log('THE FEAST OF PERPETUAL PROFIT — every player lights a candle'); for (const q of this.players) await this.lightCandle(q, 'the Feast'); }
     if (c.key === 'holyroller') { for (const q of this.players) { this.collect(q, 1); await this.draw(q, true); } this.log(`THE HOLY ROLLER rolls through — every player draws a card and collects ${this.m(1)}`); }
@@ -2709,10 +2725,17 @@ class Game {
     if (p.policy.beforeDraw) await p.policy.beforeDraw(this, p);
     if (this.canBury(p) && p.policy.dueDiligence && await p.policy.dueDiligence(this, p, p.deck[0])) this.bury(p);
     await this.turnDraw(p);
-    const action = await p.policy.main(this, p) || { t: 'pass' };
-    const before = this.hooks?.beforeAction?.();
-    const result = await this.act(p, action);
-    await this.hooks?.onAction?.(p, action, before, result);
+    // One main action; two once THE SINGULAR80 has fired (this.accelerated). The second is a full main action, and is skipped when there is nothing to do with it.
+    for (let n = 0; n < (this.accelerated ? 2 : 1) && !this.over; n++) {
+      this.secondAction = n > 0;
+      if (n > 0 && !this.legalActions(p).some((a) => a.t !== 'pass')) break;
+      const action = await p.policy.main(this, p) || { t: 'pass' };
+      const before = this.hooks?.beforeAction?.();
+      const result = await this.act(p, action);
+      if (n > 0 && action.t !== 'pass') p.stats.secondActions = (p.stats.secondActions || 0) + 1;
+      await this.hooks?.onAction?.(p, action, before, result);
+    }
+    this.secondAction = false;
     // EIGHT ARMS (The Octobot, 2026-11-20): after its main action it may also buy or sell one Asset (armsBuy on the design; without it, sell only).
     if (!this.over && this.is(p, 'bot') && p.trader.arms !== false) {
       this.armsOnly = true;
@@ -3507,10 +3530,32 @@ const FACES = {
     "frame": 3,
     "metal": "mirror",
     "art": null
+  },
+  "geometry": {
+    "id": "sacred-geometry",
+    "name": "Sacred Geometry",
+    "gloss": null,
+    "number": 72,
+    "rarity": "Rare",
+    "face": "/TCG/rcana/sacred-geometry/face3.webp",
+    "frame": 3,
+    "metal": "mirror",
+    "art": null
+  },
+  "singular": {
+    "id": "the-singular80",
+    "name": "The Singular80",
+    "gloss": null,
+    "number": 88,
+    "rarity": "Rare",
+    "face": "/TCG/rcana/the-singular80/face3.webp",
+    "frame": 3,
+    "metal": "mirror",
+    "art": null
   }
 };
 const TYPE_CLASS = {"trader":"Trader","asset":"Asset","event":"Event","hazard":"Event","remedy":"Artifact","artifact":"Artifact","grace":"Artifact","location":"Artifact"};
-const EVENT_SUBTYPES = {"bull":"Opportunity","moon":"Opportunity","inherit":"Opportunity","squeeze":"Opportunity","ponzi":"Opportunity","unlock":"Opportunity","bear":"Calamity","hack":"Calamity","virtue":"Calamity","infierno":"Calamity","rug":"Calamity","taxman":"Calamity","trap":"Calamity","escandalo":"Calamity","scam":"Calamity","moneda":"Opportunity","semilla":"Opportunity","crash":"Calamity","fall":"Calamity","holyroller":"Opportunity","fuego":"Opportunity","virtual":"Ambiguity","feast":"Opportunity","techwreck":"Calamity","ballena":"Ambiguity","illuminati":"Opportunity","rueda":"Ambiguity","godcandle":"Opportunity","moralhazard":"Ambiguity","mardigras":"Ambiguity"};
+const EVENT_SUBTYPES = {"bull":"Opportunity","moon":"Opportunity","inherit":"Opportunity","squeeze":"Opportunity","ponzi":"Opportunity","unlock":"Opportunity","bear":"Calamity","hack":"Calamity","virtue":"Calamity","infierno":"Calamity","rug":"Calamity","taxman":"Calamity","trap":"Calamity","escandalo":"Calamity","scam":"Calamity","moneda":"Opportunity","semilla":"Opportunity","crash":"Calamity","fall":"Calamity","holyroller":"Opportunity","fuego":"Opportunity","virtual":"Ambiguity","feast":"Opportunity","techwreck":"Calamity","ballena":"Ambiguity","illuminati":"Opportunity","rueda":"Ambiguity","godcandle":"Opportunity","moralhazard":"Ambiguity","mardigras":"Ambiguity","singular":"Ambiguity"};
 
 const $ = (id) => document.getElementById(id);
 new ResizeObserver(() => {
@@ -3586,7 +3631,7 @@ function playSound(kind) {
   return source;
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const FX = { unicornio: 'Compound Interest: at turn start, if you have at least 100 banked Prosperity, bank 25 more', gato: 'Clean Sweep: when seated, and at the start of each turn on a roll of 4+, knock one Calamity off your table, free', monje: 'When you light a candle, bank $25M', diablito: 'Devil’s Wager: at turn start, flip a coin — heads gains $10M; tails loses 1 CRED', celebridad: 'The influencer: pay 1 when banking from a card, +$25M', abuela: 'The gambler: your gambles moon on 4+ instead of 5+', prospector: 'Assets you buy cost 1 less', bluechip: 'Sell later: $100M or $250M', halving: 'Fires when drawn: until the drawer’s next turn, turn income is 1', crash: 'Fires when drawn: everyone holding 8+ Liquidity loses half', investigadora: 'Due Diligence: the top card of your deck is face up to you — once on your turn, you may put it on the bottom', lagrimas: 'To the shrine: light a candle — her tears fall for the fallen', infierno: 'Hellfire: they cannot attempt the Hail Mary or offer a Grace until cleared', ponzi: 'New money pays the old: bank 25 for every Asset your rivals hold — then every rival collects 1', catedral: 'Green candles: whenever any player lights a candle, bank 25', feast: 'Fires when drawn: feast day — every player lights a candle', general: 'Fault Tolerance: when a Calamity fails against your Equanimity, collect $10M', bot: 'No Soul: Scandal cannot touch it. It cannot pray — while it sits, your Graces go unheard', motherboard: 'Expansion slots: the board takes no Relic slot, and you may hold a third Relic', virtue: 'Performative piety: their candles add no winning faces to the Hail Mary until cleared', geometry: 'Everything aligns: your called Events (Bull Run, Full Moon, Short Squeeze, Token Unlock) bank 25 more', limpia: 'To the shrine: light a candle, and the egg sweeps one Calamity off you', anima: 'To the shrine: light a candle, and return the most recently discarded Trader with 5 Credibility to your empty seat or to your hand', holyroller: 'Fires when drawn: she rolls through — every player draws a card and collects $10M', fuego: 'Fires when drawn: she rides the fire horse through the market — every player banks $75M', virtual: 'Fires when drawn: she flickers on every screen — every player shuffles their hand into their deck and draws that many', fall: 'Fires when drawn: the fall — every seated Trader loses 4 Credibility', techwreck: 'Fires when drawn: the bubble bursts — every Tech Stock on the table is wrecked, scrapped for $10M', airdrop: 'Fires when drawn: every player draws a card', tech: 'Sell later: $50M or $100M', meme: 'Sell for $40M — or roll the die for Prosperity: 5+ moons for 125, else zero', moon: 'Invest 4 → bank $150M', squeeze: 'Invest 3 → bank 100, plus 50 for each Calamity on you — Bear Market cannot cap it', unlock: 'Invest 4 → bank 200, and every rival collects $10M', bull: 'Invest 2 → bank $100M', inherit: 'Take $30M, or bank $50M', bear: 'Rival banks at most 75 from a single card', taxman: 'They pay 1 to the bank at the start of each turn', escandalo: 'Scandal: their seated Trader loses 5 Credibility when it breaks, 2 more each turn', bell: 'Clears Bear Market', catacumbas: 'Buried with honors: at the start of your turn you may bury your seated Trader — bank $5M per point of Credibility they have left', tortilla: 'Clears any one Calamity', publicista: 'Clear a Scandal — or polish: your seated Trader regains 5 Credibility', heart: 'A shield, not a cure: while equipped, discard it to cancel a Calamity AS it lands — it cannot clear one already on you', rosary: 'Draw a card when you light a candle', grail: 'Gem mint: sells for 125 — or 250 while you hold three lit candles', enigma: 'Intercept: when an Event fires on your draw, discard the Machine — the Event is cancelled for everyone', horchata: 'Refresh: discard up to 2 cards, then draw that many plus one', fountain: 'Toss in $20M: your Hail Mary odds rise one step, even past the shrine’s three', shroud: 'When your seated Trader would be discredited, the Shroud is spent instead: they stay, with 5 Credibility', rideordie: 'Ride or die: while the Lowrider is in your portfolio, your Assets stay with you — the Whale and the Wheel pass you by', lottery: 'Scratch it at the start of each turn: roll the die — a 6 wins $150M, and the Ticket is spent', tattoo: 'Inked devotion: at the start of your turn, your seated Trader regains 1 Credibility', nacimiento: 'Build it: a figure at the start of each turn; at the third the Niño arrives at midnight — light a candle and bank 75, then it is packed away', realestate: 'Sell later: $80M or $150M — Bear Market cannot cap it', stablecoin: 'While held: collect $10M at the start of your turn', confession: 'To the shrine: light a candle, and your seated Trader’s Credibility is restored in full', ofrenda: 'Offer it to Our Lady: it goes to the shrine and lights a candle (max 3)', moneda: 'Fires when drawn: every player collects $20M', map: 'X marks the spot: whenever you sell an Asset, draw a card', mine: 'Sell later: $40M, or Prosperity that grows 25 each round held (from 75)', oil: 'Sell for Prosperity: a die decides — 3+ gushes for 175, else it runs dry for 25', cava: 'Vintage: worth 25 more each round held — or uncork it: discard to light a candle', gallo: 'The fighting rooster: at the start of your turn, roll — a 6 collects 2; a 1, and he is dead', vaca: 'Milk: collect 1 at the start of your turn — or sell her for meat, $60M', aguacate: 'Green gold: ripe on the second round, worth 150. Green before, 50 — then it rots, 50 less each round', bono: 'Grandmother’s gift: worth 25 more each round held, and immune to The Bear', plata: 'Flight to safety: in a Flash Crash you lose nothing, and bank 25', perp: 'Leverage: sells for double — but a Bear Market played on you while it is held liquidates it', semilla: 'Plant it: four rounds on, it blooms — bank 150 (a Bear Market holds the harvest until cleared)', ballena: 'Fires when drawn: the richest portfolio’s best Asset moves to the poorest player', rueda: 'Fires when drawn: every portfolio rotates one seat', godcandle: 'Fires when drawn: every Prosperity sale pays 100 more until the drawer’s next turn', skull: 'Exit liquidity: whenever a rival sells an Asset, collect $10M', illuminati: 'Fires when drawn: the drawer is initiated — each rival passes them one random card', moralhazard: 'Fires when drawn: the bailout — the poorest player collects 5; the richest loses 2', mardigras: 'Fires when drawn: party now, repent later — every player rolls the die and collects that much; at their next turn start, their Trader loses half of it in Credibility', rose: 'Offer it to a rival: if they accept, they keep it (worth $50M) and you light a candle — your Hail Mary odds rise' };
+const FX = { unicornio: 'Compound Interest: at turn start, if you have at least 100 banked Prosperity, bank 25 more', gato: 'Clean Sweep: when seated, and at the start of each turn on a roll of 4+, knock one Calamity off your table, free', monje: 'When you light a candle, bank $25M', diablito: 'Devil’s Wager: at turn start, flip a coin — heads gains $10M; tails loses 1 CRED', celebridad: 'The influencer: pay 1 when banking from a card, +$25M', abuela: 'The gambler: your gambles moon on 4+ instead of 5+', prospector: 'Assets you buy cost 1 less', bluechip: 'Sell later: $100M or $250M', halving: 'Fires when drawn: until the drawer’s next turn, turn income is 1', crash: 'Fires when drawn: everyone holding 8+ Liquidity loses half', investigadora: 'Due Diligence: the top card of your deck is face up to you — once on your turn, you may put it on the bottom', lagrimas: 'To the shrine: light a candle — her tears fall for the fallen', infierno: 'Hellfire: they cannot attempt the Hail Mary or offer a Grace until cleared', ponzi: 'New money pays the old: bank 25 for every Asset your rivals hold — then every rival collects 1', catedral: 'Green candles: whenever any player lights a candle, bank 25', feast: 'Fires when drawn: feast day — every player lights a candle', general: 'Fault Tolerance: when a Calamity fails against your Equanimity, collect $10M', bot: 'No Soul: Scandal cannot touch it. It cannot pray — while it sits, your Graces go unheard', motherboard: 'Expansion slots: the board takes no Relic slot, and you may hold a third Relic', virtue: 'Performative piety: their candles add no winning faces to the Hail Mary until cleared', geometry: 'Everything aligns: your called Events (Bull Run, Full Moon, Short Squeeze, Token Unlock) bank 25 more', limpia: 'To the shrine: light a candle, and the egg sweeps one Calamity off you', anima: 'To the shrine: light a candle, and return the most recently discarded Trader with 5 Credibility to your empty seat or to your hand', holyroller: 'Fires when drawn: she rolls through — every player draws a card and collects $10M', fuego: 'Fires when drawn: she rides the fire horse through the market — every player banks $75M', virtual: 'Fires when drawn: she flickers on every screen — every player shuffles their hand into their deck and draws that many', fall: 'Fires when drawn: the fall — every seated Trader loses 4 Credibility', techwreck: 'Fires when drawn: the bubble bursts — every Tech Stock on the table is wrecked, scrapped for $10M', airdrop: 'Fires when drawn: every player draws a card', tech: 'Sell later: $50M or $100M', meme: 'Sell for $40M — or roll the die for Prosperity: 5+ moons for 125, else zero', moon: 'Invest 4 → bank $150M', squeeze: 'Invest 3 → bank 100, plus 50 for each Calamity on you — Bear Market cannot cap it', unlock: 'Invest 4 → bank 200, and every rival collects $10M', bull: 'Invest 2 → bank $100M', inherit: 'Take $30M, or bank $50M', bear: 'Rival banks at most 75 from a single card', taxman: 'They pay 1 to the bank at the start of each turn', escandalo: 'Scandal: their seated Trader loses 5 Credibility when it breaks, 2 more each turn', bell: 'Clears Bear Market', catacumbas: 'Buried with honors: at the start of your turn you may bury your seated Trader — bank $5M per point of Credibility they have left', tortilla: 'Clears any one Calamity', publicista: 'Clear a Scandal — or polish: your seated Trader regains 5 Credibility', heart: 'A shield, not a cure: while equipped, discard it to cancel a Calamity AS it lands — it cannot clear one already on you', rosary: 'Draw a card when you light a candle', grail: 'Gem mint: sells for 125 — or 250 while you hold three lit candles', enigma: 'Intercept: when an Event fires on your draw, discard the Machine — the Event is cancelled for everyone', horchata: 'Refresh: discard up to 2 cards, then draw that many plus one', fountain: 'Toss in $20M: your Hail Mary odds rise one step, even past the shrine’s three', shroud: 'When your seated Trader would be discredited, the Shroud is spent instead: they stay, with 5 Credibility', rideordie: 'Ride or die: while the Lowrider is in your portfolio, your Assets stay with you — the Whale and the Wheel pass you by', lottery: 'Scratch it at the start of each turn: roll the die — a 6 wins $150M, and the Ticket is spent', tattoo: 'Inked devotion: at the start of your turn, your seated Trader regains 1 Credibility', nacimiento: 'Build it: a figure at the start of each turn; at the third the Niño arrives at midnight — light a candle and bank 75, then it is packed away', realestate: 'Sell later: $80M or $150M — Bear Market cannot cap it', stablecoin: 'While held: collect $10M at the start of your turn', confession: 'To the shrine: light a candle, and your seated Trader’s Credibility is restored in full', ofrenda: 'Offer it to Our Lady: it goes to the shrine and lights a candle (max 3)', moneda: 'Fires when drawn: every player collects $20M', map: 'X marks the spot: whenever you sell an Asset, draw a card', mine: 'Sell later: $40M, or Prosperity that grows 25 each round held (from 75)', oil: 'Sell for Prosperity: a die decides — 3+ gushes for 175, else it runs dry for 25', cava: 'Vintage: worth 25 more each round held — or uncork it: discard to light a candle', gallo: 'The fighting rooster: at the start of your turn, roll — a 6 collects 2; a 1, and he is dead', vaca: 'Milk: collect 1 at the start of your turn — or sell her for meat, $60M', aguacate: 'Green gold: ripe on the second round, worth 150. Green before, 50 — then it rots, 50 less each round', bono: 'Grandmother’s gift: worth 25 more each round held, and immune to The Bear', plata: 'Flight to safety: in a Flash Crash you lose nothing, and bank 25', perp: 'Leverage: sells for double — but a Bear Market played on you while it is held liquidates it', semilla: 'Plant it: four rounds on, it blooms — bank 150 (a Bear Market holds the harvest until cleared)', ballena: 'Fires when drawn: the richest portfolio’s best Asset moves to the poorest player', rueda: 'Fires when drawn: every portfolio rotates one seat', singular: 'Fires when drawn: from now on, every player takes two main actions each turn', godcandle: 'Fires when drawn: every Prosperity sale pays 100 more until the drawer’s next turn', skull: 'Exit liquidity: whenever a rival sells an Asset, collect $10M', illuminati: 'Fires when drawn: the drawer is initiated — each rival passes them one random card', moralhazard: 'Fires when drawn: the bailout — the poorest player collects 5; the richest loses 2', mardigras: 'Fires when drawn: party now, repent later — every player rolls the die and collects that much; at their next turn start, their Trader loses half of it in Credibility', rose: 'Offer it to a rival: if they accept, they keep it (worth $50M) and you light a candle — your Hail Mary odds rise' };
 
 let S = null;
 const toast = (t) => { const el = $('toast'); el.innerHTML = `<span>${esc(t)}</span><button class="tx" aria-label="dismiss">\u00d7</button>`; el.querySelector('.tx').onclick = () => el.classList.remove('show'); el.classList.add('show'); };
@@ -3597,6 +3642,36 @@ const headline = (raw) => { const l = raw.replace(/^\[T\d+\] /, '');
 const cap = (s) => s ? s[0].toUpperCase() + s.slice(1) : '';
 // A Trader's three attributes, for a caption: "Logos 2 · Ethos 2 · Pathos 4".
 const attrLine = (d) => { const A = ATTRS[d.key]; return A ? `Logos ${A.logos} · Ethos ${A.ethos} · Pathos ${A.pathos}` : ''; };
+// The same three, one to a line with a plain word beside each, for the starting-Trader picker.
+const ATTR_GLOSS = { logos: 'insight', ethos: 'character', pathos: 'nerve' }; // the one glossary, as on the card's tooltips
+const attrMeaning = (k, n) => ({ logos: n > 1 ? `When you draw for your turn, look at ${n} cards and keep one.` : 'You draw the top card of the deck, unseen.', ethos: `In good standing, you make ${usd(n * ETHOS_UNIT)} more each turn.`, pathos: `A Calamity played on you fails on a d8 roll of ${n} or lower.` }[k]);
+const attrLines = (d) => { const A = ATTRS[d.key]; return A ? ['logos', 'ethos', 'pathos'].map((k) => `<small title="${esc(attrMeaning(k, A[k]))}">${cap(k)} ${A[k]} · ${ATTR_GLOSS[k]}</small>`).join('') : ''; };
+// HOW TO READ A TRADER CARD: a small labelled diagram of the chosen Trader, on the opening table.
+function anatomyHTML(d) {
+  const A = ATTRS[d.key]; if (!A) return '';
+  const V = { ethos: [42, 176], pathos: [24, 207], logos: [60, 207] };
+  const dot = (n, x, y) => `<g><circle cx="${x}" cy="${y}" r="8.5" fill="#e4567b" stroke="#1b1430" stroke-width="1.5"/><text x="${x}" y="${y + 4}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">${n}</text></g>`;
+  const corner = (k) => `<circle cx="${V[k][0]}" cy="${V[k][1]}" r="8" fill="#1b1430" stroke="#b9892f"/><text x="${V[k][0]}" y="${V[k][1] + 4}" text-anchor="middle" font-size="10" fill="#ffd84a" font-weight="700">${A[k]}</text>`;
+  return `<svg viewBox="0 0 200 277" role="img" aria-label="A Trader card, labelled">
+    <rect x="1" y="1" width="198" height="275" rx="10" fill="#f2b705"/><rect x="4" y="4" width="192" height="269" rx="8" fill="#1b1430"/>
+    <rect x="8" y="8" width="184" height="180" rx="5" fill="#3a2a66"/><text x="100" y="92" text-anchor="middle" font-size="11" fill="#a899c9">the art</text>
+    <circle cx="22" cy="22" r="19" fill="#1b1430"/><circle cx="22" cy="22" r="17" fill="#ffc928"/><text x="22" y="28" text-anchor="middle" font-size="16" font-weight="800" fill="#1b1430">${d.liq * RATE}</text>
+    <rect x="11" y="163" width="178" height="62" rx="5" fill="#f6e7b8" stroke="#f2b705" stroke-width="1.5"/>
+    <rect x="46" y="156" width="108" height="14" rx="3" fill="#9c1c1c" stroke="#f2b705"/><text x="100" y="166" text-anchor="middle" font-size="7" fill="#ffe9a6" letter-spacing=".6">${esc((d.abilityName || 'ABILITY').toUpperCase())}</text>
+    <polygon points="${V.ethos.join(',')} ${V.pathos.join(',')} ${V.logos.join(',')}" fill="#ecdba6" stroke="#b9892f"/>${corner('ethos')}${corner('pathos')}${corner('logos')}
+    <g stroke="#b9a070" stroke-width="2.5" stroke-linecap="round"><line x1="84" y1="183" x2="178" y2="183"/><line x1="84" y1="192" x2="172" y2="192"/><line x1="84" y1="201" x2="160" y2="201"/></g>
+    <text x="100" y="251" text-anchor="middle" font-size="15" font-weight="800" fill="#ffd84a">${esc(d.name)}</text><text x="100" y="236" text-anchor="middle" font-size="6.5" fill="#ffd84a" letter-spacing="2">TRADER</text>
+    ${dot(1, 46, 16)}${dot(2, 26, 168)}${dot(3, 10, 222)}${dot(4, 74, 222)}${dot(5, 160, 152)}
+  </svg>
+  <ol>
+    <li><b>Money ${coins(d.liq)}.</b> What ${esc(d.name)} costs to play from your hand, and what they make you each turn. Your starting Trader is free.</li>
+    <li><b>Ethos ${A.ethos} · character.</b> ${attrMeaning('ethos', A.ethos)} A strike ends good standing.</li>
+    <li><b>Pathos ${A.pathos} · nerve.</b> ${attrMeaning('pathos', A.pathos)}</li>
+    <li><b>Logos ${A.logos} · insight.</b> ${attrMeaning('logos', A.logos)}</li>
+    <li><b>${esc(d.abilityName || 'Ability')}.</b> ${esc(fxText(d).replace(/\.$/, ''))}.</li>
+  </ol>
+  <p>The three attributes always add up to eight. The red shape leans toward a Trader’s strongest. On the full card, point at a corner for a reminder.</p>`;
+}
 const deckName = (r) => r === 'shuffle' ? 'General shuffle' : cap(r);
 
 class HumanPolicy {
@@ -3765,6 +3840,7 @@ for (const button of document.querySelectorAll('[data-rules]')) {
 // the cards on the opening table are the same choice, shown.
 function showStarters() {
   const chosen = $('meStarter').value;
+  if (byKey[chosen]) $('anatomy').innerHTML = anatomyHTML(byKey[chosen]);
   $('starterHeading').textContent = deckName($('meDeck').value) + ' starting Traders';
   $('starterPick').replaceChildren(...starterChoices($('meDeck').value).map(d => {
     const face = FACES[d.key];
@@ -3772,7 +3848,7 @@ function showStarters() {
     button.type = 'button'; button.className = 'starter';
     button.setAttribute('aria-pressed', String(d.key === chosen));
     button.innerHTML = `${face?.face ? `<img src="${esc(face.face)}" alt="">` : ''}<strong>${esc(d.name)}</strong>
-      <small>Money ${coins(d.liq)}</small><small>${attrLine(d)}</small><small>${esc(d.abilityName || '')}</small>${face?.face ? '<small class="view">View card</small>' : ''}`;
+      <small>Money ${coins(d.liq)}</small>${attrLines(d)}<small>${esc(d.abilityName || '')}</small>${face?.face ? '<small class="view">View card</small>' : ''}`;
     button.onclick = (e) => {
       if (e.target.closest('.view')) return showFace(face, d);
       $('meStarter').value = d.key; $('meStarter').dispatchEvent(new Event('change'));
@@ -4447,6 +4523,7 @@ function renderSharedEffects(game, me) {
         text:key === 'godcandle' ? `Sell an Asset to earn +${usd(game.saleBonus())} on the sale.` : card.text,
         duration:`Until the start of ${owner === me ? 'your' : owner.name + '’s'} next turn.`});
     }
+    if (game.accelerated) effects.push({card:byKey.singular, scope:'In effect for everyone', text:'Every player takes two main actions each turn.', duration:'For the rest of the game.'});
   }
   renderEffectList($('sharedEffects'), effects);
 }
@@ -4693,7 +4770,7 @@ function render() {
   }
   const drawPrompt = S.hasDrawn ? 'Your turn · draw from your deck' :
     `You started with ${coins(S.startingLiquidity)} and collected ${coins(me.liq - S.startingLiquidity)}. Draw a card.`;
-  const turnNote = S.drawResolve ? drawPrompt : mine ? (g.armsOnly ? 'Eight Arms · you may also buy or sell one Asset, or pass' : 'Your turn · choose one main action') : S.running ? (g.active && g.active !== me ? 'Turn over · ' + g.active.name + ' is playing…' : '') : '';
+  const turnNote = S.drawResolve ? drawPrompt : mine ? (g.armsOnly ? 'Eight Arms · you may also buy or sell one Asset, or pass' : g.secondAction ? 'The Singular80 · choose a second main action, or pass' : g.accelerated ? 'Your turn · choose the first of two main actions' : 'Your turn · choose one main action') : S.running ? (g.active && g.active !== me ? 'Turn over · ' + g.active.name + ' is playing…' : '') : '';
   if ($('turnNote').textContent !== turnNote) $('turnNote').textContent = turnNote;
   const hailAct = A.find((x) => x.t === 'hail');
   $('hailBtn').disabled = !mine || !hailAct;

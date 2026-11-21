@@ -61,7 +61,9 @@ import shortSqueeze from "./short-squeeze.js";
 import godCandle from "./god-candle.js";
 import lotteryTicket from "./lottery-ticket.js";
 import theKeys from "./the-keys.js";
+import sacredGeometry from "./sacred-geometry.js";
 import theAudit from "./the-audit.js";
+import theSingular80 from "./the-singular80.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -123,5 +125,7 @@ export const RCANA_ART = {
   "god-candle": godCandle,
   "lottery-ticket": lotteryTicket,
   "the-keys": theKeys,
+  "sacred-geometry": sacredGeometry,
   "the-audit": theAudit,
+  "the-singular80": theSingular80,
 };

@@ -88,10 +88,11 @@ export const RESERVED_NUMBERS = {
   shroud: 70, // El Sudario — unfaced
   rideordie: 35,
   lottery: 71, // El Boleto
-  geometry: 72, // La Geometría — unfaced
+  geometry: 72, // Sacred Geometry
   tattoo: 73, // El Tatuaje — unfaced
   dashboard: 74, // La Virgencita — unfaced
-  audit: 87, // The Audit (added 2026-11-20; the set is 87)
+  audit: 87, // The Audit (added 2026-11-20)
+  singular: 88, // The Singular80 (added 2026-11-20; the set is 88) — an Event, numbered at the end
   motherboard: 5, // La Placa Madre — unfaced (a Relic since 2026-11-12)
   // Graces
   ofrenda: 75, // La Ofrenda — unfaced

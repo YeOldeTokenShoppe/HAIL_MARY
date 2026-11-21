@@ -501,6 +501,8 @@ export function toRcanaCard(card, overrides = {}) {
     // An opaque floor. Art layers carry real transparency, so without this
     // the page shows through wherever the art does not paint.
     backdrop: art.backdrop ?? null,
+    // A live 3D scene for the art window (a key of SCENES in RcanaLive3D.jsx); the layers are its poster.
+    live3d: art.live3d ?? null,
 
     // An art file may pin a frame; otherwise the plate follows the type.
     plate: card.plate || "boxed",
