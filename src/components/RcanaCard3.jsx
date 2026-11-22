@@ -353,6 +353,16 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
   };
   // A drag that turned the card is not a tap: it must not also flip the card over.
   const swallowDragClick = (e) => { const d = drag.current; drag.current = null; if (d && d.moved) { e.stopPropagation(); e.preventDefault(); } };
+  // A finger on the live card turns the card; it must not scroll the page under it. touch-action: none on
+  // the stage says so, but WebKit loses that inside the flip card's 3D-transformed faces, so the touch
+  // moves are also refused outright (a non-passive listener; React's own touch handlers are passive).
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!interactive || !el) return;
+    const hold = (ev) => { if (ev.cancelable) ev.preventDefault(); };
+    el.addEventListener("touchmove", hold, { passive: false });
+    return () => el.removeEventListener("touchmove", hold);
+  }, [interactive]);
   // THE DEVICE'S OWN TILT (phones and tablets): tipping the device leans the card, about its resting hold,
   // which drifts slowly to wherever the device is being held. A drag overrides it while it lasts. Browsers
   // that ask permission for motion (iOS Safari) are asked on the first touch of a live card; a refusal, or

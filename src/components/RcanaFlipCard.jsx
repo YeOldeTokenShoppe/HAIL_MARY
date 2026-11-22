@@ -84,7 +84,7 @@ export default function RcanaFlipCard({
   };
 
   return (
-    <div className={`rcf${className ? ` ${className}` : ""}`} style={{ "--rcf-p": `${perspective}px`, ...(backRadius ? { "--rcf-r": backRadius } : null) }}>
+    <div className={`rcf${className ? ` ${className}` : ""}`} style={{ touchAction: interactive && !flipped ? "none" : undefined, "--rcf-p": `${perspective}px`, ...(backRadius ? { "--rcf-r": backRadius } : null) }}>
       <div
         className="rcf-flipper"
         data-flipped={flipped || undefined}
