@@ -852,7 +852,7 @@ export const FACES = [
     // The design's line is a simulator's; the face keeps the odds and the stake.
     ability: "Stake $20M, name your odds: 3+ pays $30M,\n5+ pays $50M, an 8 pays $200M. A miss loses it.",
     // A Location narrates; the line follows the rule.
-    flavor: "Everybody is certain. Somebody gets wet.",
+    flavor: "Everybody is certain. One ticket cashes.",
     printed: {},
   },
   {

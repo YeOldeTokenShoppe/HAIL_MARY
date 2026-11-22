@@ -24,7 +24,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
 const TAU = Math.PI * 2;
 const RIBBONS = 8, ALONG = 13, ACROSS = 5, NODES = RIBBONS * ALONG * ACROSS;
-const HOLD = [9, 12, 9], TURN = 3.5;          // seconds as lotus, knot, rose; and for each change between them
+const HOLD = [2.5, 2.5, 2.5], TURN = 1.6;         // seconds as lotus, knot, rose; and for each change between them
 const FIRST = 1;                              // the form it opens on, and the one on the poster: 0 lotus, 1 knot, 2 rose. The others follow in that order
 const at = (ribbon, a, c) => ((((ribbon % RIBBONS) + RIBBONS) % RIBBONS) * ALONG + a) * ACROSS + c;
 const ease = (v) => { const x = Math.min(1, Math.max(0, v)); return x * x * (3 - 2 * x); };

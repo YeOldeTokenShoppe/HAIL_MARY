@@ -283,8 +283,13 @@ function haloLight(app, slide, live) {
   return app.over ? { glow: null, glint: <>{glow}{glint}</> } : { glow, glint };
 }
 
-// How far the card leans under the pointer, in degrees.
-const MAX_TILT = 13;
+// How far the card leans, in degrees: under a mouse it follows the pointer's place on the card; under a
+// finger or a pen it is DRAGGED, and turns much further, because a finger covers the card it is turning
+// and there is no hover to explore with. A phone or tablet that reports its own tilt turns the card too.
+const MAX_TILT = 18;        // mouse: the pointer at the card's edge
+const MAX_TILT_TOUCH = 34;  // finger or pen: a full drag
+const MAX_TILT_GYRO = 26;   // the device itself, tipped about 25 degrees
+const clamp1 = (v) => Math.max(-1, Math.min(1, v));
 const MIRROR_TEXT = "repeating-linear-gradient(115deg, #b97a00 0%, #ffd84a 14%, #fff6c4 22%, #ffd84a 30%, #b97a00 46%, #ffe58a 60%, #b97a00 76%)";
 
 // `interactive` lets the card lean under the pointer (or a finger). The lean is
@@ -300,27 +305,82 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
   const [wasLive, setWasLive] = useState(false);
   useEffect(() => { if (interactive && data?.live3d) setWasLive(true); }, [interactive, data?.live3d]);
   const stageRef = useRef(null);
+  // One place sets the pose: nx, ny run -1..1 (left..right, top..bottom) and `max` is the lean at 1.
+  const pose = (nx, ny, max, ease) => {
+    const el = stageRef.current;
+    if (!el) return;
+    el.style.setProperty("--mx", `${(50 + nx * 50).toFixed(1)}%`);
+    el.style.setProperty("--my", `${(50 + ny * 50).toFixed(1)}%`);
+    el.style.setProperty("--rx", `${(-ny * max).toFixed(2)}deg`);
+    el.style.setProperty("--ry", `${(nx * max).toFixed(2)}deg`);
+    el.style.setProperty("--tx", nx.toFixed(3));
+    el.style.setProperty("--ty", ny.toFixed(3));
+    el.style.setProperty("--lit", Math.min(1, Math.hypot(nx, ny) * 1.2).toFixed(3));
+    el.style.setProperty("--ease", ease);
+  };
+  const drag = useRef(null);   // a finger or pen turning the card: { id, x, y, nx, ny, moved }
+  const resting = useRef({ nx: 0, ny: 0 }); // where a drag leaves off, so the next one picks up from there
+  const gyro = useRef(false);  // the device's own tilt is steering
   const lean = (e) => {
     const el = stageRef.current;
     if (!el) return;
     const box = el.getBoundingClientRect();
-    const px = Math.min(1, Math.max(0, (e.clientX - box.left) / box.width));
-    const py = Math.min(1, Math.max(0, (e.clientY - box.top) / box.height));
-    el.style.setProperty("--mx", `${(px * 100).toFixed(1)}%`);
-    el.style.setProperty("--my", `${(py * 100).toFixed(1)}%`);
-    el.style.setProperty("--rx", `${((0.5 - py) * 2 * MAX_TILT).toFixed(2)}deg`);
-    el.style.setProperty("--ry", `${((px - 0.5) * 2 * MAX_TILT).toFixed(2)}deg`);
-    el.style.setProperty("--tx", ((px - 0.5) * 2).toFixed(3));
-    el.style.setProperty("--ty", ((py - 0.5) * 2).toFixed(3));
-    el.style.setProperty("--lit", Math.min(1, Math.hypot(px - 0.5, py - 0.5) * 2.4).toFixed(3));
-    el.style.setProperty("--ease", "60ms");
+    if (e.pointerType === "mouse") { // the pointer's place on the card
+      pose(clamp1(((e.clientX - box.left) / box.width - 0.5) * 2), clamp1(((e.clientY - box.top) / box.height - 0.5) * 2), MAX_TILT, "60ms");
+      return;
+    }
+    if (e.type === "pointerdown") { // a finger or pen: start a drag, and keep it even when it leaves the card
+      drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, nx: resting.current.nx, ny: resting.current.ny, moved: false };
+      try { el.setPointerCapture(e.pointerId); } catch {}
+      return;
+    }
+    const d = drag.current;
+    if (!d || d.id !== e.pointerId) return;
+    const dx = e.clientX - d.x, dy = e.clientY - d.y;
+    if (Math.hypot(dx, dy) > 8) d.moved = true;
+    resting.current = { nx: clamp1(d.nx + dx / (box.width * 0.5)), ny: clamp1(d.ny + dy / (box.height * 0.5)) }; // half the card's width is a full turn
+    pose(resting.current.nx, resting.current.ny, MAX_TILT_TOUCH, "50ms");
   };
-  const settle = () => {
+  const settle = (e) => {
     const el = stageRef.current;
     if (!el) return;
-    el.style.setProperty("--ease", "500ms");
+    if (e && e.pointerType !== "mouse" && e.type === "pointerleave" && drag.current) return; // a captured drag is still going
+    drag.current = drag.current && e && e.type === "pointerup" ? { ...drag.current, id: null } : null;
+    if (gyro.current) return; // the device's tilt takes it from here
+    resting.current = { nx: 0, ny: 0 };
+    el.style.setProperty("--ease", "700ms");
     for (const v of ["--mx", "--my", "--rx", "--ry", "--tx", "--ty", "--lit"]) el.style.removeProperty(v);
   };
+  // A drag that turned the card is not a tap: it must not also flip the card over.
+  const swallowDragClick = (e) => { const d = drag.current; drag.current = null; if (d && d.moved) { e.stopPropagation(); e.preventDefault(); } };
+  // THE DEVICE'S OWN TILT (phones and tablets): tipping the device leans the card, about its resting hold,
+  // which drifts slowly to wherever the device is being held. A drag overrides it while it lasts. Browsers
+  // that ask permission for motion (iOS Safari) are asked on the first touch of a live card; a refusal, or
+  // a device with no sensor, simply leaves the drag.
+  useEffect(() => {
+    if (!interactive || typeof window === "undefined" || !("DeviceOrientationEvent" in window)) return;
+    if (!window.matchMedia || !window.matchMedia("(pointer: coarse)").matches) return;
+    let base = null, live = true;
+    const onTilt = (ev) => {
+      if (ev.gamma == null || ev.beta == null) return;
+      const turned = ((window.screen?.orientation?.angle ?? window.orientation ?? 0) + 360) % 360; // landscape swaps the axes
+      const lr = turned === 90 ? ev.beta : turned === 270 ? -ev.beta : ev.gamma, fb = turned === 90 ? -ev.gamma : turned === 270 ? ev.gamma : ev.beta;
+      if (!base) base = { lr, fb };
+      base.lr += (lr - base.lr) * 0.015; base.fb += (fb - base.fb) * 0.015;
+      gyro.current = true;
+      if (drag.current && drag.current.id != null) return;
+      pose(clamp1((lr - base.lr) / 25), clamp1((fb - base.fb) / 25), MAX_TILT_GYRO, "140ms");
+    };
+    const listen = () => { if (live) window.addEventListener("deviceorientation", onTilt); };
+    const DOE = window.DeviceOrientationEvent;
+    let ask = null;
+    if (typeof DOE.requestPermission === "function") {
+      ask = () => { stageRef.current?.removeEventListener("pointerdown", ask); DOE.requestPermission().then((state) => { if (state === "granted") listen(); }).catch(() => {}); };
+      stageRef.current?.addEventListener("pointerdown", ask);
+    } else listen();
+    const el = stageRef.current;
+    return () => { live = false; gyro.current = false; window.removeEventListener("deviceorientation", onTilt); if (ask) el?.removeEventListener("pointerdown", ask); };
+  }, [interactive]);
   const layers = data?.artLayers || [];
   const sources = layers.map((l) => l.src).filter(Boolean).join("|");
 
@@ -361,8 +421,9 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
       onPointerMove={interactive ? lean : undefined}
       onPointerDown={interactive ? lean : undefined}
       onPointerLeave={interactive ? settle : undefined}
-      onPointerUp={interactive ? (e) => { if (e.pointerType !== "mouse") settle(); } : undefined}
+      onPointerUp={interactive ? (e) => { if (e.pointerType !== "mouse") settle(e); } : undefined}
       onPointerCancel={interactive ? settle : undefined}
+      onClickCapture={interactive ? swallowDragClick : undefined}
     >
       <div style={{ position: "absolute", inset: 0, transform: interactive ? "rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))" : undefined, transition: "transform var(--ease, 500ms) ease-out", willChange: interactive ? "transform" : undefined }}>
       <style>{`@import url("https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Grenze+Gotisch:wght@800&family=Spectral:ital,wght@0,400;0,700;1,400&display=swap");
