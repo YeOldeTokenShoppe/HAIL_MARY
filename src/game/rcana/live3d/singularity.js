@@ -1,125 +1,172 @@
-// The Singular80 — the card's art as a LIVE 3D object (2026-11-20).
+// The Singular80 — the card's art as a LIVE 3D object (2026-11-21, second version).
 //
-// Michelle's "Stable Singularity" piece (a black sphere, a hot rim, and an accretion disc of thousands of
-// instanced streaks, drifting between three states: stable, turbulent, collapsing), adapted to sit in a
-// card's art window, by the same rules as sacredGeometry.js:
-//   · no page chrome, no orbit controls, no gsap: the states ease by themselves, and the CARD's tilt
-//     swings the camera round and over the disc (opts.getTilt)
-//   · the hole sits a little above centre, clear of the card's text box
-//   · one render pass, no post-processing; a small machine gets half the streaks (opts.bloom === false
-//     is how RcanaLive3D says "small machine")
-//   · it pauses when hidden and disposes everything on unmount
-//   · opts.still = seconds renders that one moment, in the stable state: the card's poster
+// A black hole that belongs to this card and no other. Written fresh for it; the first version was an
+// adaptation of a "Stable Singularity" pen, and nothing of that pen's disc, shader or states remains.
+//   · 80: the disc is made of code rain in terminal green: 8s and 0s six times in ten, and fourteen other
+//     marks (a few digits, signs and angular strokes of this file's own), each upright to the viewer and
+//     changing now and then. (The digits and the green are after a fourth pen Michelle
+//     supplied, a strange attractor written in code; the glyphs here are drawn by this file's own shader.)
+//   · EIGHT: the disc is a density wave of eight spiral arms. The digits orbit at their own speeds
+//     (fast inside, slow outside) and light up as they pass through the arms, so the arms hold their
+//     shape while everything moves through them. An eight-pointed flare sits on the rim: the Miracle
+//     star's shape.
+//   · TWO: a second, fainter disc turns a beat behind the first, on a plane leaned a few degrees off
+//     it: a double exposure. The card's rule is "two main actions each turn"; this is that, drawn.
+//     The gap between the two breathes, and now and then they fold together for a moment.
+//   · the colour: nearly white at the rim, bright green, dark green at the edge; the flare is pale green.
+// By the same rules as sacredGeometry.js: no page chrome, no controls, the CARD's tilt swings the camera
+// (opts.getTilt); one render pass, no post-processing; a small machine gets half the digits
+// (opts.bloom === false is how RcanaLive3D says "small machine"); it pauses when hidden and disposes
+// everything on unmount; opts.still = seconds renders that one moment, for the card's poster.
 import * as THREE from "three";
 
-const NOISE = `
-  vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-  vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-  vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
-  vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
-  float snoise(vec3 v) {
-    const vec2 C = vec2(1.0/6.0, 1.0/3.0); const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
-    vec3 i = floor(v + dot(v, C.yyy)); vec3 x0 = v - i + dot(i, C.xxx);
-    vec3 g = step(x0.yzx, x0.xyz); vec3 l = 1.0 - g; vec3 i1 = min(g.xyz, l.zxy); vec3 i2 = max(g.xyz, l.zxy);
-    vec3 x1 = x0 - i1 + C.xxx; vec3 x2 = x0 - i2 + C.yyy; vec3 x3 = x0 - D.yyy;
-    i = mod289(i);
-    vec4 p = permute(permute(permute(i.z + vec4(0.0, i1.z, i2.z, 1.0)) + i.y + vec4(0.0, i1.y, i2.y, 1.0)) + i.x + vec4(0.0, i1.x, i2.x, 1.0));
-    float n_ = 0.142857142857; vec3 ns = n_ * D.wyz - D.xzx;
-    vec4 j = p - 49.0 * floor(p * ns.z * ns.z); vec4 x_ = floor(j * ns.z); vec4 y_ = floor(j - 7.0 * x_);
-    vec4 x = x_ * ns.x + ns.yyyy; vec4 y = y_ * ns.x + ns.yyyy; vec4 h = 1.0 - abs(x) - abs(y);
-    vec4 b0 = vec4(x.xy, y.xy); vec4 b1 = vec4(x.zw, y.zw);
-    vec4 s0 = floor(b0)*2.0 + 1.0; vec4 s1 = floor(b1)*2.0 + 1.0; vec4 sh = -step(h, vec4(0.0));
-    vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy; vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
-    vec3 p0 = vec3(a0.xy,h.x); vec3 p1 = vec3(a0.zw,h.y); vec3 p2 = vec3(a1.xy,h.z); vec3 p3 = vec3(a1.zw,h.w);
-    vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
-    p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
-    vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0); m = m * m;
-    return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
-  }`;
-
-// The three states the piece drifts between, ten seconds each: stable, turbulent, collapsing.
-const STATES = [
-  { morph: 0.1, compress: 1.0, intensity: 1.0, spin: 0.4, camY: 25, dist: 85, orbit: 1.0 },
-  { morph: 4.5, compress: 1.15, intensity: 1.4, spin: 1.5, camY: 45, dist: 95, orbit: 1.8 },
-  { morph: 0.8, compress: 0.38, intensity: 3.5, spin: 5.0, camY: 12, dist: 55, orbit: 4.5 },
-];
-const HOLD = 10; // seconds in a state
+const ARMS = 8;
+const R_IN = 5, R_OUT = 46;      // the disc, in units of the hole's radius 4
+const PATTERN = 0.11;            // how fast the eight arms turn, rad/s
+const WIND = 9;                  // how tightly they wind
 
 const seeded = (seed) => () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+
+const DISC_VERT = `
+  attribute vec4 aOrbit;   // radius, starting angle, height, seed
+  uniform float uTime, uLag, uLean, uGrow, uArms, uWind, uPattern;
+  varying vec3 vColor; varying float vAlpha, vGlyph; varying vec2 vUv;
+  void main() {
+    float r = aOrbit.x * uGrow, seed = aOrbit.w;
+    float t = uTime - uLag;                                   // the echo lives a beat in the past
+    float ang = aOrbit.y + t * (2.1 / sqrt(aOrbit.x));        // each streak at its own speed
+    // The density wave: eight arms, wound, turning slowly; a streak is lit while it is inside one.
+    float wave = cos(uArms * (ang - t * uPattern) + uWind * log(aOrbit.x));
+    float arm = pow(0.5 + 0.5 * wave, 3.4);
+    float lit = 0.03 + 0.97 * arm;
+    vec3 c = vec3(cos(ang) * r, aOrbit.z + sin(ang * 3.0 + seed * 40.0 + t * 0.6) * 0.12 * sqrt(r), sin(ang) * r);
+    vec3 tangent = vec3(-sin(ang), 0.0, cos(ang));
+    // The echo's plane leans off the first disc's, about the x axis.
+    float cl = cos(uLean), sl = sin(uLean); mat3 lean = mat3(1.0, 0.0, 0.0, 0.0, cl, sl, 0.0, -sl, cl);
+    c = lean * c; tangent = lean * tangent;
+    vec3 toEye = normalize(cameraPosition - c);
+    // Each one is a digit, upright to the viewer wherever it is on the disc: bigger inside an arm.
+    vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]), up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+    float tall = (0.95 + 0.85 * arm) * (0.75 + 0.5 * seed);
+    vec3 world = c + right * position.x * tall * 0.6 + up * position.y * tall;
+    // Which mark it is, and it changes its mind every so often: an 8 or a 0 six times in ten (they are the
+    // card's name), otherwise one of fourteen code-rain marks.
+    float tick = floor(t * (0.5 + 1.6 * seed) + seed * 37.0);
+    float pick = fract(sin(seed * 913.7 + tick * 78.233) * 43758.5453), other = fract(sin(seed * 271.3 + tick * 12.9898) * 24634.6345);
+    vGlyph = pick < 0.34 ? 0.0 : pick < 0.6 ? 1.0 : 2.0 + floor(other * 14.0);
+    // Terminal green by radius: nearly white at the rim, bright green, then dark green at the edge.
+    float k = (r - ${R_IN.toFixed(1)}) / ${(R_OUT - R_IN).toFixed(1)};
+    vec3 col = mix(vec3(0.78, 1.0, 0.82), vec3(0.22, 1.0, 0.38), smoothstep(0.0, 0.14, k));
+    col = mix(col, vec3(0.0, 0.86, 0.22), smoothstep(0.14, 0.42, k));
+    col = mix(col, vec3(0.0, 0.42, 0.10), smoothstep(0.5, 0.95, k));
+    float doppler = dot(tangent, toEye);                      // the side turning toward you is brighter
+    vColor = col * (0.75 + 0.3 * doppler) * (0.45 + 0.85 * lit) * (1.0 + 0.5 * smoothstep(0.2, 0.0, k));
+    vAlpha = lit * smoothstep(${(R_IN - 1.1).toFixed(1)}, ${(R_IN + 0.6).toFixed(1)}, r) * (1.0 - smoothstep(0.80, 1.0, k));
+    vUv = position.xy;
+    gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
+  }`;
+const DISC_FRAG = `
+  // Each mark's fifteen dots as one number: 8, 0, 1, 7, z, te, ni, ko, yo, e, to, ri, ki, plus, colon, ha.
+  float glyphBits(float g) { if (g < 0.5) return 31727.0; if (g < 1.5) return 31599.0; if (g < 2.5) return 29850.0; if (g < 3.5) return 9383.0; if (g < 4.5) return 29351.0; if (g < 5.5) return 5575.0; if (g < 6.5) return 28728.0; if (g < 7.5) return 31015.0; if (g < 8.5) return 31207.0; if (g < 9.5) return 29847.0; if (g < 10.5) return 4809.0; if (g < 11.5) return 10541.0; if (g < 12.5) return 11962.0; if (g < 13.5) return 1488.0; if (g < 14.5) return 1040.0; return 23378.0; }
+  uniform float uAlpha; uniform vec3 uTint;
+  varying vec3 vColor; varying float vAlpha, vGlyph; varying vec2 vUv;
+  void main() {
+    // The mark, on a grid three dots wide and five tall.
+    vec2 g = (vUv + 0.5) * vec2(3.0, 5.0); vec2 cell = floor(g), sub = fract(g);
+    float on = mod(floor(glyphBits(vGlyph) / exp2(cell.x + 3.0 * (4.0 - cell.y))), 2.0); // dot (x, row from the top) is bit x + 3 * row
+    float dot_ = step(0.12, sub.x) * step(sub.x, 0.88) * step(0.12, sub.y) * step(sub.y, 0.88);
+    if (on * dot_ < 0.5) discard;
+    gl_FragColor = vec4(vColor * uTint, vAlpha * uAlpha);
+  }`;
+
+// The eight-pointed flare: four long rays and four short, on a quad that always faces the camera. The
+// hole itself is cut out of it, so the rays stand on the rim.
+const FLARE_VERT = `
+  varying vec2 vP;
+  void main() {
+    vP = position.xy;
+    vec4 mv = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+    mv.xy += position.xy;
+    gl_Position = projectionMatrix * mv;
+  }`;
+const FLARE_FRAG = `
+  uniform float uTime, uPower, uSpin;
+  varying vec2 vP;
+  float ray(vec2 p, float a, float reach, float thin) {
+    float c = cos(a), s = sin(a); vec2 q = vec2(c * p.x + s * p.y, -s * p.x + c * p.y);
+    return exp(-abs(q.y) * thin) * exp(-abs(q.x) / reach);
+  }
+  void main() {
+    float r = length(vP);
+    float f = 0.0;
+    for (int i = 0; i < 4; i++) {
+      float a = uSpin + float(i) * 0.7853982;
+      f += ray(vP, a, (mod(float(i), 2.0) < 0.5) ? 8.0 : 5.0, 3.2);
+    }
+    float glow = exp(-max(r - 4.0, 0.0) * 0.55);
+    float hole = smoothstep(4.02, 4.30, r);                   // nothing in front of the hole
+    float edge = 1.0 - smoothstep(20.0, 26.0, r);
+    vec3 col = vec3(0.55, 1.0, 0.62) * (f * 1.5 + glow * 0.55) * uPower * (0.92 + 0.08 * sin(uTime * 1.7));
+    gl_FragColor = vec4(col * hole * edge, 1.0);
+  }`;
 
 export function mount(canvas, opts = {}) {
   const { getTilt = () => ({ x: 0, y: 0 }), still = null, bloom = true, maxPixelRatio = 1.5 } = opts;
   const rand = seeded(88);
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance", preserveDrawingBuffer: still != null });
-  renderer.setClearColor(0x010103, 1);
+  renderer.setClearColor(0x000201, 1);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.6;
+  renderer.toneMappingExposure = 1.0;
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 1000);
-  const TARGET = new THREE.Vector3(0, -7, 0); // looking a little below the hole lifts it in the window, clear of the text box
+  const TARGET = new THREE.Vector3(0, -8, 0); // looking a little below the hole lifts it in the window, clear of the text box
   const disposables = []; const keep = (x) => { disposables.push(x); return x; };
 
-  scene.add(new THREE.Mesh(keep(new THREE.SphereGeometry(4, 48, 48)), keep(new THREE.MeshBasicMaterial({ color: 0x000000 }))));
-  const auraMat = keep(new THREE.ShaderMaterial({
-    uniforms: { uIntensity: { value: 1.0 } },
-    vertexShader: `varying vec3 vNormal; varying vec3 vView; void main() { vNormal = normalize(normalMatrix * normal); vView = normalize(-(modelViewMatrix * vec4(position, 1.0)).xyz); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `uniform float uIntensity; varying vec3 vNormal; varying vec3 vView; void main() { float rim = pow(1.0 - max(dot(vNormal, vView), 0.0), 4.0); gl_FragColor = vec4(vec3(1.0, 0.45, 0.1) * rim * uIntensity * 5.0, 1.0); }`,
-    side: THREE.BackSide, transparent: true, blending: THREE.AdditiveBlending,
-  }));
-  scene.add(new THREE.Mesh(keep(new THREE.SphereGeometry(4.25, 48, 48)), auraMat));
+  // The hole: black, and it hides whatever passes behind it.
+  const hole = new THREE.Mesh(keep(new THREE.SphereGeometry(4, 48, 48)), keep(new THREE.MeshBasicMaterial({ color: 0x000000 })));
+  hole.renderOrder = 0; scene.add(hole);
 
-  const count = bloom ? 5000 : 2500; // `bloom: false` is RcanaLive3D's word for a small machine
-  const streak = keep(new THREE.CylinderGeometry(0.01, 0.12, 2.2, 3)); streak.rotateX(Math.PI / 2);
-  const disk = keep(new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uMorph: { value: 0.1 }, uCompression: { value: 1.0 }, uIntensity: { value: 1.0 }, uPhase: { value: 0 } },
-    vertexShader: `${NOISE}
-      uniform float uTime; uniform float uMorph; uniform float uCompression; uniform float uIntensity; uniform float uPhase;
-      varying vec3 vColor; varying float vOpacity;
-      void main() {
-        vec4 instPos = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-        float rOriginal = length(instPos.xz); float r = rOriginal * uCompression;
-        float initialAngle = atan(instPos.z, instPos.x);
-        // uPhase is the orbit, integrated on the CPU, so a change of speed never makes the disc jump.
-        float currentAngle = initialAngle + uPhase * (1.5 / sqrt(rOriginal));
-        vec3 world = vec3(cos(currentAngle) * r, instPos.y, sin(currentAngle) * r);
-        world.y += snoise(vec3(world.x * 0.08, world.z * 0.08, uTime * 0.3)) * uMorph * 4.0;
-        vec3 viewDir = normalize(cameraPosition - world); vec3 orbitDir = normalize(vec3(-sin(currentAngle), 0.0, cos(currentAngle)));
-        float doppler = dot(orbitDir, viewDir);
-        vec3 color = mix(vec3(0.1, 0.35, 1.0), vec3(1.0, 0.45, 0.1), smoothstep(45.0, 12.0, r)); color = mix(color, vec3(1.0, 0.95, 0.9), smoothstep(10.0, 4.0, r));
-        vColor = color * (1.3 + doppler * 0.7) * uIntensity;
-        vOpacity = (smoothstep(3.8, 5.5, r) * (1.0 - smoothstep(38.0, 48.0, r))) * 0.8;
-        float d = currentAngle - initialAngle; float c = cos(d); float s = sin(d);
-        mat3 rotY = mat3(c, 0, s, 0, 1, 0, -s, 0, c);
-        gl_Position = projectionMatrix * viewMatrix * vec4(world + rotY * (instanceMatrix * vec4(position, 0.0)).xyz, 1.0);
-      }`,
-    fragmentShader: `varying vec3 vColor; varying float vOpacity; void main() { gl_FragColor = vec4(vColor, vOpacity); }`,
-    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
-  }));
-  const mesh = new THREE.InstancedMesh(streak, disk, count); mesh.frustumCulled = false;
-  const dummy = new THREE.Object3D();
+  // The digits: one quad, drawn `count` times, each with its own orbit.
+  const count = bloom ? 3600 : 1800; // `bloom: false` is RcanaLive3D's word for a small machine
+  const geo = keep(new THREE.InstancedBufferGeometry());
+  geo.setAttribute("position", new THREE.Float32BufferAttribute([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0], 3));
+  geo.setIndex([0, 1, 2, 0, 2, 3]);
+  const orbit = new Float32Array(count * 4);
   for (let i = 0; i < count; i++) {
-    const r = 5 + Math.pow(rand(), 1.3) * 40, a = rand() * Math.PI * 2;
-    dummy.position.set(Math.cos(a) * r, (rand() - 0.5) * (8 / r), Math.sin(a) * r);
-    dummy.lookAt(dummy.position.x + Math.sin(a), dummy.position.y, dummy.position.z - Math.cos(a));
-    dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix);
+    const r = R_IN + Math.pow(rand(), 1.25) * (R_OUT - R_IN);
+    orbit.set([r, rand() * Math.PI * 2, (rand() - 0.5) * (7 / r), rand()], i * 4);
   }
-  scene.add(mesh);
+  geo.setAttribute("aOrbit", new THREE.InstancedBufferAttribute(orbit, 4));
+  geo.instanceCount = count;
+  const discMat = (over) => keep(new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uLag: { value: 0 }, uLean: { value: 0 }, uGrow: { value: 1 }, uAlpha: { value: 0.9 }, uTint: { value: new THREE.Color(1, 1, 1) },
+      uArms: { value: ARMS }, uWind: { value: WIND }, uPattern: { value: PATTERN }, ...over },
+    vertexShader: DISC_VERT, fragmentShader: DISC_FRAG, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+  }));
+  const first = discMat({});
+  // The echo: the same disc a beat behind, fainter, a touch wider, cooler, on a leaned plane.
+  const echo = discMat({ uAlpha: { value: 0.2 }, uGrow: { value: 1.07 }, uLean: { value: 0.16 }, uTint: { value: new THREE.Color(0.8, 1.0, 0.85) } });
+  for (const m of [echo, first]) { const mesh = new THREE.Mesh(geo, m); mesh.frustumCulled = false; mesh.renderOrder = 1; scene.add(mesh); }
 
-  // The piece's state, eased toward whichever of the three it is in.
-  const cur = { ...STATES[0] }; let azimuth = Math.PI / 4, phase = 0, last = null;
+  const flareMat = keep(new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uPower: { value: 1 }, uSpin: { value: 0 } },
+    vertexShader: FLARE_VERT, fragmentShader: FLARE_FRAG, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false,
+  }));
+  const flare = new THREE.Mesh(keep(new THREE.PlaneGeometry(52, 52)), flareMat); flare.frustumCulled = false; flare.renderOrder = 2; scene.add(flare);
+
   const tilt = { x: 0, y: 0 };
-  function frame(time, fixed = false) {
-    const dt = last == null || fixed ? 0 : Math.min(0.1, Math.max(0, time - last)); last = time;
-    const want = fixed ? STATES[0] : STATES[Math.floor(time / HOLD) % STATES.length];
-    const k = fixed ? 1 : 1 - Math.exp(-dt * 0.9); // about four seconds to settle into a new state
-    for (const key of Object.keys(cur)) cur[key] += (want[key] - cur[key]) * k;
-    phase = fixed ? time : phase + dt * cur.orbit; azimuth += dt * cur.spin * 0.105; // autoRotateSpeed 1 is about 0.105 rad/s
-    disk.uniforms.uTime.value = time; disk.uniforms.uPhase.value = phase; disk.uniforms.uMorph.value = cur.morph; disk.uniforms.uCompression.value = cur.compress; disk.uniforms.uIntensity.value = cur.intensity; auraMat.uniforms.uIntensity.value = cur.intensity;
+  function frame(time) {
+    // The gap between the two discs breathes; every 16 seconds they fold into one for a moment.
+    const fold = Math.pow(Math.max(0, Math.cos(((time % 16) / 16 - 0.5) * Math.PI * 2) * -1), 6); // 1 at the fold, 0 otherwise
+    const lag = (1.5 + 0.5 * Math.sin(time * 0.37)) * (1 - fold);
+    first.uniforms.uTime.value = time; echo.uniforms.uTime.value = time; echo.uniforms.uLag.value = lag;
+    echo.uniforms.uLean.value = 0.16 * (1 - fold); echo.uniforms.uGrow.value = 1 + 0.07 * (1 - fold);
+    flareMat.uniforms.uTime.value = time; flareMat.uniforms.uSpin.value = time * 0.05; flareMat.uniforms.uPower.value = 1 + 1.4 * fold;
     // The card's lean: left/right swings the camera round the disc, up/down lifts it over or drops it level.
     const t = getTilt() || { x: 0, y: 0 }; tilt.x += (t.x - tilt.x) * 0.1; tilt.y += (t.y - tilt.y) * 0.1;
-    const az = azimuth + tilt.x * 0.7; const flat = cur.dist * 1.06;
-    camera.position.set(Math.cos(az) * flat, cur.camY - tilt.y * 18, Math.sin(az) * flat);
+    const az = Math.PI / 4 + time * 0.03 + tilt.x * 0.7;
+    camera.position.set(Math.cos(az) * 100, 56 - tilt.y * 24, Math.sin(az) * 100);
     camera.lookAt(TARGET);
     renderer.render(scene, camera);
   }
@@ -135,10 +182,10 @@ export function mount(canvas, opts = {}) {
   const loop = () => { if (!running) return; frame(held + now() - t0); raf = requestAnimationFrame(loop); };
   const api = {
     resize,
-    start() { if (running || still != null) return; running = true; t0 = now(); last = null; raf = requestAnimationFrame(loop); },
+    start() { if (running || still != null) return; running = true; t0 = now(); raf = requestAnimationFrame(loop); },
     stop() { if (!running) return; running = false; held += now() - t0; cancelAnimationFrame(raf); },
-    renderStill(seconds) { frame(seconds, true); },
-    dispose() { api.stop(); for (const d of disposables) d.dispose?.(); mesh.dispose?.(); renderer.dispose(); },
+    renderStill(seconds) { tilt.x = 0; tilt.y = 0; frame(seconds); },
+    dispose() { api.stop(); for (const d of disposables) d.dispose?.(); renderer.dispose(); },
   };
   return api;
 }

@@ -528,6 +528,7 @@ export function toRcanaCard(card, overrides = {}) {
       id: l.id || `layer-${i}`,
       src: l.src || artPath(card.id, l.id || `layer-${i}`),
       swingOrigin: l.swingOrigin,
+      flicker: l.flicker, // a flame: { x, y } its base in % of the layer, optional period in seconds (RcanaCard3)
       clapperRestAngle: l.clapperRestAngle,
       clapperOrigin: l.clapperOrigin,
       swingSound: l.swingSound,

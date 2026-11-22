@@ -6,6 +6,12 @@
 import { ART_PLANES } from "../artSpec.js";
 
 export default {
+  // Rainbow foil by default (2026-11-21), like the other apparitions: the
+  // code-drawn frame prints this card in rainbow metal, and the painted frame
+  // lays the Terminal Traders rainbow border over it. The binder's and bench's
+  // metal controls can still override.
+  metalFrame: "rainbow",
+
   // No `frame`: the plate follows the card's type.
 
   // The niche's deep green, for the sliver past the scene's edge on tilt.

@@ -9,6 +9,8 @@ const USAGES = {
   shrine: { label: "To shrine", description: "Offer this card to the shrine." },
   offer: { label: "Offer", description: "Offer this card to another player." },
   spend: { label: "Spend", description: "Resolve the effect; this card leaves your hand." },
+  // Locations (first printed 2026-11-21, The Prediction Market): one stands per player; building another tears the old one down.
+  build: { label: "Build", description: "Place this card in front of you. One Location stands at a time; a new one replaces it." },
 };
 
 export function getArtifactTemplate(card) {

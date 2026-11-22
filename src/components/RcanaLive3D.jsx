@@ -17,6 +17,7 @@ import React, { useEffect, useRef, useState } from "react";
 const SCENES = {
   "sacred-geometry": () => import("@/game/rcana/live3d/sacredGeometry.js"),
   singularity: () => import("@/game/rcana/live3d/singularity.js"),
+  "sacred-lattice": () => import("@/game/rcana/live3d/sacredLattice.js"),
 };
 export const RCANA_LIVE3D_KINDS = Object.keys(SCENES);
 

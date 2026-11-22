@@ -109,7 +109,7 @@ With only Scandal and the Fall dealing strikes, a discredit was a non-event: onc
 
 A Calamity is one of two kinds, decided by what the real thing is.
 
-- **A condition** sits on the rival until cleared: Bear Market, Tax Collector, Liquidity Trap (market); Scandal, The Inferno, The Virtue Signal (standing).
+- **A condition** sits on the rival until cleared: Bear Market, Tax Collector, Liquidity Trap (market); Scandal, The Inferno (standing). (The Virtue Signal was a third until it left the set on 2026-11-21.)
 - **A hit** happens once and is over. The three frauds are hits (`hit: true` in designs.js): they resolve and are discarded, so there is nothing to clear.
   - **Rug Pull** ($30M): the rival discards the Asset they bought most recently. Not playable on a rival with no Assets.
   - **Quantum Hack** ($20M): take $40M from the rival.
@@ -244,10 +244,10 @@ Compound Interest was an arbitrary fit for a unicorn. **The Narrative:** while E
 
 ## Apparitions and Miracles (2026-11-20)
 
-Ten cards carry Our Lady's image (`apparition: true` in designs.js): The Holy Roller, The Fire Horse, The Virtual Mary, Mardi Gras, The Rose, The Fountain, The Miracle Tortilla, The Tattoo, The Lowrider and the Dashboard Figure.
+Ten cards carry Our Lady's image (`apparition: true` in designs.js): The Holy Roller, The Fire Horse, The Virtual Mary, Mardi Gras, The Rose, The Fountain, The Miracle Tortilla, The Tattoo, Ride or Die and the Dashboard Figure.
 
 - **Whoever reveals one witnesses an apparition and takes a Miracle** (an eight-pointed star), three at most: the player who draws an apparition Event, or who plays any other apparition card from their hand.
-- **A Miracle is spent to roll one of your own dice again**, when it has failed you: a gamble, the Hail Mary, your Trader's Pathos against a Calamity, The Rooster's 1.
+- **A Miracle is spent to roll one of your own dice again**, when it has failed you: a gamble, the Hail Mary, your Trader's Pathos against a Calamity. (The Rooster's 1 was a fourth, until The Rooster left the set on 2026-11-21.)
 - The Dashboard Figure was that reroll, once, as a Relic. Now it is the tenth apparition: equipping it is the apparition, and it takes no Relic slot.
 - At the table: stars beside each player's Cash, a notice when someone witnesses one, a prompt when a roll of yours fails. On the card: a small star by the type line.
 
@@ -343,3 +343,136 @@ The Enigma Machine can intercept it like any other Event.
   for the table's prompt, `stats.secondActions`.
 - It is in the General shuffle only. The starter decks do not hold it.
 - Art: a live 3D scene (`src/game/rcana/live3d/singularity.js`), the second after Sacred Geometry.
+
+## Cult of Personal80 (2026-11-21)
+
+Card 81, a Relic, cost $20M, in The Rooster's old slot (The Rooster is a card of the traditional lotería
+deck and is reserved for that edition). The faithful do not read the news:
+
+- While it is equipped, the seated Trader collects $10M more each turn (the faithful pay in), and is paid
+  their good-standing income (Ethos) even in scandal.
+- No other Trader can be played over them while it is equipped.
+- If they are discredited, the Cult is discarded with them.
+
+It does not stop a strike (that is The Halo) and it does not return anyone to good standing: abilities
+that need good standing still need it. Engine: `cult` on the design, `cultBound(p)`, the `faithful`
+branch of turn income, `flock` on the design, `stats.cultPaid`. It took The Rooster's place in the Degen deck.
+
+The sims cannot judge it, or any Relic: the bots play 2 to 4 in every 100 Relics they hold (measured
+2026-11-21 over 3,000 games; only The Lottery Ticket is higher, at 15). Until the bots value Relics, a
+Relic in a starter deck plays as a dead card in simulation, and the win rates say what the deck does
+without it.
+
+## Four cards in, three out (2026-11-21)
+
+The Cow, The Avocado and La Horchata left the set (lotería in style; their designs, faces and art are
+kept for that edition). The set is 89.
+
+- **The Prediction Market** (83, Asset, $30M; Degen, in The Avocado's place). Sell for a sure $30M, or
+  name your odds and roll: 3+ pays $100M, 5+ pays $160M, an 8 pays $400M; a miss pays nothing. The Gambler
+  needs one lower. `market` on the design, `marketNeed()`, a `call` on the sell action.
+- **Diamond Hands** (82, Relic, $20M; Devotion, in The Cow's place). An Asset held three rounds or more
+  sells for $25M more (`diamondOf()`, inside `prosOf()`), and Paper Hands cannot be played on its holder.
+- **Paper Hands** (89, Calamity, $30M; General shuffle only). A condition: at the start of each turn its
+  victim sells the Asset they bought most recently at its cash price. The Stimulus and The Miracle
+  Tortilla clear it.
+- **The Whistleblower** (42, Remedy, $20M; Devotion, in La Horchata's place). Undoes the last fraud
+  played on you (`lastFraud` on the victim): the Asset returns from the discard pile, or the money comes
+  back (from the thief, for a Quantum Hack), and the rival who played it takes a strike.
+
+### Quantum Hack and Exit Scam join the Degen deck (2026-11-21)
+
+In place of Tech Wreck and Moral Hazard (both still in the General shuffle). Degen now holds all three
+frauds, so The Whistleblower in Devotion has something to answer besides a Rug Pull. In bot play this
+moves little: over 4,000 games the bots play about one fraud every three games, The Whistleblower about
+once in twenty, and the decks sit near Devotion 55 / Degen 45.
+
+### A Stablecoin for The Skull in the Degen deck (2026-11-21)
+
+Degen had lost The Rooster and The Avocado, two earning Assets, for cards the bots use less. A Stablecoin
+in The Skull's place brings the decks back to even. The Skull is still in the set and the General shuffle.
+
+### Tech Wreck moves to the Devotion deck; The Whistleblower to the General shuffle (2026-11-21)
+
+Tech Wreck (kept for its art) takes The Whistleblower's place in Devotion: Devotion holds one Tech Stock
+to Degen's two, so the wreck falls harder on its rival. Tried first in Full Moon's place, which cost
+Devotion five points: its called Events are its income. The Whistleblower was played about once in
+twenty bot games; she stays in the set and the General shuffle, like Paper Hands.
+
+### The Prediction Market becomes a Location (2026-11-21)
+
+A market is a venue, not a thing held and sold, so the card moved from Asset to Location: the first
+Location of the Degen kind (the other three are sacred places). While it stands, once on its owner's
+turn, after the draw and before the main action, they may stake $20M and name their odds: 3+ pays $30M,
+5+ pays $50M, an 8 pays $200M; a miss loses the stake. The Gambler needs one lower on the first two; the
+long shot is an 8 for everyone. A Miracle can roll a miss again. Under a Bear Market the $200M contract
+is closed. Engine: `stake` and `market` on the design, `marketOffers()`, `marketBet()` (called in
+`turn()` after `turnDraw()`), `policy.placeBet`, `stats.marketCalls / marketCall0..2 / marketWins`.
+The Asset version's sale code is gone. It still competes with The Catacombs for Degen's one Location.
+
+### The Virtue Signal is cut; the set is 88 (2026-11-21)
+
+The weakest card: it only stopped a rival's candles from helping their Hail Mary, nothing but The Miracle
+Tortilla cleared it, and it was in neither starter deck. Its design is kept as a comment. Paper Hands
+moved from 89 to its number, 60, so the set runs 1 to 88.
+
+### Saint GR80: Money $10M (2026-11-21)
+
+Down from $15M. After the day's deck changes he opened at 56% and Devotion won 52%; at $10M he opens at
+49% and the decks are even (8,000 games). His Ethos stays 4, the highest in the game: the cheapest Trader
+with the best character. Deck swaps for Degen, Eugene's premium and his own candle income were tried
+first and moved nothing.
+
+### The bots learn what a Relic is worth (2026-11-21)
+
+Until now every Relic scored a flat 35 less half its price, whatever it did, and the bots equipped 2 to 4
+of every 100 in their decks. `GreedyBot.relicWorth()` now values each one in $M over the rounds left:
+income in full (the Cult's flock, The Lottery Ticket's odds, The Skull), bonuses by what is in hand or
+portfolio (Sacred Geometry, Diamond Hands, the Map, the Rosary), protection at the odds of what it stops
+(The Halo, The Shroud, the Sacred Heart, The Keys, The Audit), and a Miracle for an apparition. A full
+desk swaps out its weakest Relic only for a clearly better one.
+
+Equipped per 100 copies in a starter deck (about half a deck is drawn in a game): Lottery Ticket 41,
+Cult 21, Tattoo 20, Sacred Geometry 9, Sacred Heart 6, Dashboard Figure 6, the rest 0 to 3. The
+protections stay rare because what they stop is rare.
+
+With Relics in play the starter decks read Devotion 47 / Degen 53 at Saint GR80's Money $10M, and
+49 / 51 at $15M: the $10M was fitted to bots that could not see Relics.
+
+Saint GR80's Money went back to $15M the same day (Devotion 49 / Degen 51 over 10,000 games).
+
+### The Talisman; The Shroud is cut; the set is 86 (2026-11-21)
+
+- **The Talisman** (63, Relic, $20M; Devotion, in The Audit's place) is The Keys and The Audit merged:
+  Rug Pull, Quantum Hack and Exit Scam cannot be played on you, and your seated Trader counts one more
+  Pathos against Calamities (`wards`, `pathos` on the design; the Pathos is added where a Calamity is
+  rolled against). The two it replaces were usually dead cards, because frauds are rare.
+- **The Shroud** is cut: the weakest of the standing protections, and in neither starter deck. The Sacred
+  Heart, The Halo, The Tattoo, the Press Release and Confession remain. Saving Face, from the hand, is
+  untouched.
+- Designs, faces and art of The Keys, The Audit and The Shroud are kept as comments.
+- Numbers: The Talisman has The Keys' 63; Perpetuals moved from 86 to The Shroud's 70; The Singular80 is
+  86, still the last card.
+
+### Cult of Personal80 is cut; the set is 85 (2026-11-21)
+
+Cut the day it was added: a card that pays a Trader for staying in scandal undercuts the game's premise,
+that character (Ethos) is what pays. Its design is kept as a comment; the engine's `cult` code is unused.
+Paper Hands takes its place in the Degen deck, its first starter deck: Devotion holds Diamond Hands,
+which turns it away, and two Miracle Tortillas, which clear it. La Plata moved from 85 to 81; The
+Singular80 is 85, still last. Devotion 50 / Degen 50 over 10,000 games.
+
+### The Mission (2026-11-21)
+
+Card 85, a Location, $20M: at the start of your turn, if you have less cash than every rival, collect
+$20M. A place from the RL80 website, and the set's samaritan: it pays only the player who is behind, so it
+shortens no game for the leader. `alms` on the design, checked at the start of `turn()`; `stats.alms`.
+In the General shuffle only: each starter deck already holds two Locations and a desk holds one. The
+Singular80 is 86, still last.
+
+### The Mine is The Mother Lode, the eleventh apparition (2026-11-21)
+
+The heap of ore in the card's art reads as Our Lady, mantle and rays: a happy accident, now the card's
+name. It is an apparition (`apparition: true`; playing it grants a Miracle) with the lit-halo finish
+(`apparitions.js`, on the scene layer). Its rule is unchanged, its key is still `mine`, and it is in
+neither starter deck. Eleven apparitions until The Rose leaves for the Lotería edition; then ten.

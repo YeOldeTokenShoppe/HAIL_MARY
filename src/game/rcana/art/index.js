@@ -63,6 +63,9 @@ import lotteryTicket from "./lottery-ticket.js";
 import theKeys from "./the-keys.js";
 import sacredGeometry from "./sacred-geometry.js";
 import theAudit from "./the-audit.js";
+import predictionMarket from "./prediction-market.js";
+import confession from "./confession.js";
+import theMission from "./the-mission.js";
 import theSingular80 from "./the-singular80.js";
 
 export const RCANA_ART = {
@@ -127,5 +130,8 @@ export const RCANA_ART = {
   "the-keys": theKeys,
   "sacred-geometry": sacredGeometry,
   "the-audit": theAudit,
+  "prediction-market": predictionMarket,
+  confession,
+  "the-mission": theMission,
   "the-singular80": theSingular80,
 };

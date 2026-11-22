@@ -293,7 +293,7 @@ export const FACES = [
   },
   {
     id: "the-mine",
-    design: "mine", // prints as "The Mine" — the design's name
+    design: "mine", // prints as "The Mother Lode" — the design's name (The Mine until 2026-11-21; the id and art folder keep the old name)
     // PROVISIONAL number and rarity. (Inherited from Gold, whose art this is.)
     number: 31,
     rarity: "Common",
@@ -301,7 +301,7 @@ export const FACES = [
     // and cost (4), so the text carries the cash option and the growth.
     ability: "Sell for 4 coins, or bank 75 Prosperity.\nEach round held: worth 25 more.",
     // An Asset narrates, so the flavor follows the rule unquoted.
-    flavor: "Nobody strikes the mother lode on the first day.",
+    flavor: "Those who diligently seek her find fortune.",
     printed: {},
   },
   {
@@ -343,13 +343,13 @@ export const FACES = [
   },
   {
     id: "ride-or-die",
-    design: "rideordie", // prints as "The Lowrider" — the design's name
+    design: "rideordie", // prints as "Ride or Die" — the design's name (The Lowrider until 2026-11-21)
     // PROVISIONAL number and rarity.
     number: 35,
     rarity: "Rare",
-    // An Asset since 2026-11-15: the boxes print value (100) and cost (3);
-    // the caption painted on the car opens the rules line.
-    ability: "Ride or die: your Assets stay with you.\nThe Whale and The Wheel pass you by.",
+    // An Asset since 2026-11-15: the boxes print value (100) and cost (3).
+    // The caption painted on the car is the card's title now, so the rules line no longer opens with it.
+    ability: "Your Assets stay with you.\nThe Whale and The Wheel pass you by.",
     flavor: "Nobody gets out of the car.",
     printed: {},
   },
@@ -421,19 +421,20 @@ export const FACES = [
     flavor: "Party now. Repent later.",
     printed: {},
   },
-  {
-    id: "la-horchata",
-    design: "horchata", // prints as "La Horchata" — the design's printName
-    gloss: "The Rice Drink",
-    // PROVISIONAL number and rarity.
-    number: 42,
-    rarity: "Common",
-    // The refresh; the design's line is a simulator's.
-    ability: "Discard up to 2 cards,\nthen draw that many plus one.",
-    // A Remedy narrates; the line follows the rule.
-    flavor: "Time for something refreshing.",
-    printed: {},
-  },
+  // La Horchata left this set on 2026-11-21 (reserved for the Lotería edition). Its face, kept for that edition:
+  // {
+  //   id: "la-horchata",
+  //   design: "horchata", // prints as "La Horchata" — the design's printName
+  //   gloss: "The Rice Drink",
+  //   // PROVISIONAL number and rarity.
+  //   number: 42,
+  //   rarity: "Common",
+  //   // The refresh; the design's line is a simulator's.
+  //   ability: "Discard up to 2 cards,\nthen draw that many plus one.",
+  //   // A Remedy narrates; the line follows the rule.
+  //   flavor: "Time for something refreshing.",
+  //   printed: {},
+  // },
   {
     id: "stablecoin",
     design: "stablecoin", // prints as "Stablecoin" — the design's name
@@ -617,49 +618,67 @@ export const FACES = [
     flavor: "I do not pray. I execute.",
     printed: {},
   },
-  {
-    id: "el-gallo",
-    design: "gallo", // prints as "El Gallo" — the design's name
-    gloss: "The Rooster",
-    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
-    number: 81,
-    rarity: "Common",
-    // An Asset's line says what it sells for. The boxes print value (75)
-    // and cost (2); the text carries the cash option and the fight.
-    ability: "Sell for 2 coins, or bank 75 Prosperity.\nEach turn, roll: a 6 collects 2; a 1 kills him.",
-    // An Asset narrates, so the flavor follows the rule unquoted.
-    flavor: "He crows every morning. One of them is his last.",
-    printed: {},
-  },
-  {
-    id: "la-vaca",
-    design: "vaca", // prints as "La Vaca" — the design's name
-    gloss: "The Cow",
-    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
-    number: 82,
-    rarity: "Common",
-    // An Asset's line says what it sells for. The boxes print value (75)
-    // and cost (3); the text carries the meat price and the milk.
-    ability: "Sell for 6 coins, or bank 75 Prosperity.\nMilk: collect 1 Liquidity each turn.",
-    // An Asset narrates, so the flavor follows the rule unquoted.
-    flavor: "Milk her every morning, or sell her once.",
-    printed: {},
-  },
-  {
-    id: "el-aguacate",
-    design: "aguacate", // prints as "El Aguacate" — the design's name
-    gloss: "The Avocado",
-    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
-    number: 83,
-    rarity: "Common",
-    // An Asset's line says what it sells for. The boxes print value (50)
-    // and cost (3); the text carries the cash option and the ripening —
-    // 50 green, 150 on the second round held, then 50 less each round.
-    ability: "Sell for 2 coins, or bank 50 Prosperity.\nRipe on round two: 150. Then 50 less a round.",
-    // An Asset narrates, so the flavor follows the rule unquoted.
-    flavor: "There is one perfect day. It is never today.",
-    printed: {},
-  },
+  // El Gallo left this set on 2026-11-21 (reserved for the Lotería edition). Its face, kept for that edition:
+  // {
+  //   id: "el-gallo",
+  //   design: "gallo", // prints as "El Gallo" — the design's name
+  //   gloss: "The Rooster",
+  //   // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+  //   number: 81,
+  //   rarity: "Common",
+  //   // An Asset's line says what it sells for. The boxes print value (75)
+  //   // and cost (2); the text carries the cash option and the fight.
+  //   ability: "Sell for 2 coins, or bank 75 Prosperity.\nEach turn, roll: a 6 collects 2; a 1 kills him.",
+  //   // An Asset narrates, so the flavor follows the rule unquoted.
+  //   flavor: "He crows every morning. One of them is his last.",
+  //   printed: {},
+  // },
+  // Cult of Personal80 was CUT on 2026-11-21 (see designs.js). Its drafted face entry, kept as a record:
+  // (design "cult"; it had no face yet: a face needs its art file
+  // (art/cult-of-personal80.js, registered in art/index.js). The entry, ready for that day:
+  // {
+  //   id: "cult-of-personal80",
+  //   design: "cult", // prints as "Cult of Personal80" — the design's name
+  //   // Number per set/numbers.js (El Gallo's, until 2026-11-21); rarity PROVISIONAL.
+  //   number: 81,
+  //   rarity: "Uncommon",
+  //   // A Relic equips; the printed lines are its rule and its price.
+  //   ability: "Your Trader collects $10M more, and good standing\npays even in scandal. No other may take the seat.",
+  //   // A Relic narrates; the line follows the rule. DRAFT.
+  //   flavor: "They read the charges. Then they bought more.",
+  //   printed: {},
+  // },
+  // La Vaca left this set on 2026-11-21 (reserved for the Lotería edition). Its face, kept for that edition:
+  // {
+  //   id: "la-vaca",
+  //   design: "vaca", // prints as "La Vaca" — the design's name
+  //   gloss: "The Cow",
+  //   // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+  //   number: 82,
+  //   rarity: "Common",
+  //   // An Asset's line says what it sells for. The boxes print value (75)
+  //   // and cost (3); the text carries the meat price and the milk.
+  //   ability: "Sell for 6 coins, or bank 75 Prosperity.\nMilk: collect 1 Liquidity each turn.",
+  //   // An Asset narrates, so the flavor follows the rule unquoted.
+  //   flavor: "Milk her every morning, or sell her once.",
+  //   printed: {},
+  // },
+  // El Aguacate left this set on 2026-11-21 (reserved for the Lotería edition). Its face, kept for that edition:
+  // {
+  //   id: "el-aguacate",
+  //   design: "aguacate", // prints as "El Aguacate" — the design's name
+  //   gloss: "The Avocado",
+  //   // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+  //   number: 83,
+  //   rarity: "Common",
+  //   // An Asset's line says what it sells for. The boxes print value (50)
+  //   // and cost (3); the text carries the cash option and the ripening —
+  //   // 50 green, 150 on the second round held, then 50 less each round.
+  //   ability: "Sell for 2 coins, or bank 50 Prosperity.\nRipe on round two: 150. Then 50 less a round.",
+  //   // An Asset narrates, so the flavor follows the rule unquoted.
+  //   flavor: "There is one perfect day. It is never today.",
+  //   printed: {},
+  // },
   {
     id: "la-cava",
     design: "cava", // prints as "La Cava" — the design's name
@@ -680,7 +699,7 @@ export const FACES = [
     design: "plata", // prints as "La Plata" — the design's name
     gloss: "The Silver",
     // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
-    number: 85,
+    number: 81,
     rarity: "Common",
     // An Asset's line says what it sells for. The boxes print value (125)
     // and cost (3); the text carries the cash option and the flight to
@@ -708,7 +727,7 @@ export const FACES = [
     id: "the-perp",
     design: "perp", // prints as "Perpetuals" — the design's name (was The Perp)
     // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
-    number: 86,
+    number: 70,
     rarity: "Common",
     // An Asset's line says what it sells for. The boxes print value (75)
     // and cost (4); the text carries the cash option, the leverage and the
@@ -770,31 +789,33 @@ export const FACES = [
     flavor: "Somebody has to win. Nobody said when.",
     printed: {},
   },
-  {
-    id: "the-keys",
-    design: "keys", // prints as "The Keys" — the design's name ("Las Llaves" in the Lotería edition)
-    gloss: "The Keys",
-    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon, beside La Campana).
-    number: 63,
-    rarity: "Uncommon",
-    // A Relic since 2026-11-20: self-custody, so the two frauds that take cash cannot be played on you.
-    ability: "Quantum Hack and Exit Scam\ncannot be played on you.",
-    // A Relic narrates; the line follows the rule. The proverb, answered.
-    flavor: "Not your keys, not your coins. These are yours.",
-    printed: {},
-  },
-  {
-    id: "the-audit",
-    design: "audit", // prints as "The Audit" — the design's name (a market name, no lotería title)
-    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon, beside The Keys among the protections).
-    number: 87,
-    rarity: "Uncommon",
-    // A Relic equips; a protection: the one Calamity it wards cannot be played on you.
-    ability: "Rug Pull cannot be played on you.",
-    // A Relic narrates; the line follows the rule.
-    flavor: "She read the fine print. There was no rug.",
-    printed: {},
-  },
+  // The Keys left this set on 2026-11-21 (merged into The Talisman). Its face, kept:
+  // {
+  //   id: "the-keys",
+  //   design: "keys", // prints as "The Keys" — the design's name ("Las Llaves" in the Lotería edition)
+  //   gloss: "The Keys",
+  //   // Number per set/numbers.js; rarity PROVISIONAL (Uncommon, beside La Campana).
+  //   number: 63,
+  //   rarity: "Uncommon",
+  //   // A Relic since 2026-11-20: self-custody, so the two frauds that take cash cannot be played on you.
+  //   ability: "Quantum Hack and Exit Scam\ncannot be played on you.",
+  //   // A Relic narrates; the line follows the rule. The proverb, answered.
+  //   flavor: "Not your keys, not your coins. These are yours.",
+  //   printed: {},
+  // },
+  // The Audit left this set on 2026-11-21 (merged into The Talisman). Its face, kept:
+  // {
+  //   id: "the-audit",
+  //   design: "audit", // prints as "The Audit" — the design's name (a market name, no lotería title)
+  //   // Number per set/numbers.js; rarity PROVISIONAL (Uncommon, beside The Keys among the protections).
+  //   number: 87,
+  //   rarity: "Uncommon",
+  //   // A Relic equips; a protection: the one Calamity it wards cannot be played on you.
+  //   ability: "Rug Pull cannot be played on you.",
+  //   // A Relic narrates; the line follows the rule.
+  //   flavor: "She read the fine print. There was no rug.",
+  //   printed: {},
+  // },
   {
     id: "sacred-geometry",
     design: "geometry", // prints as "Sacred Geometry" — the design's name
@@ -813,12 +834,51 @@ export const FACES = [
     design: "singular", // prints as "The Singular80" — the design's name
     // Number per set/numbers.js; rarity PROVISIONAL (it changes the whole game, and there is one).
     // The second card with LIVE 3D art (art/the-singular80.js: live3d).
-    number: 88,
+    number: 86,
     rarity: "Rare",
     // An on-draw Ambiguity: it resolves as drawn and never ends.
     ability: "From now on, every player takes\ntwo main actions each turn.",
     // An Event narrates; the line follows the rule. DRAFT.
     flavor: "After this, there is no later.",
+    printed: {},
+  },
+  {
+    id: "prediction-market",
+    design: "predict", // prints as "The Prediction Market" — the design's name (a market name, no lotería title)
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 83,
+    rarity: "Uncommon",
+    // The first printed Location: it builds, then offers its bet once a turn.
+    // The design's line is a simulator's; the face keeps the odds and the stake.
+    ability: "Stake $20M, name your odds: 3+ pays $30M,\n5+ pays $50M, an 8 pays $200M. A miss loses it.",
+    // A Location narrates; the line follows the rule.
+    flavor: "Everybody is certain. Somebody gets wet.",
+    printed: {},
+  },
+  {
+    id: "confession",
+    design: "confession", // prints as "Coin-Op Confession" — the design's name (The Confession until 2026-11-21)
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 80,
+    rarity: "Uncommon",
+    // A Grace goes to the shrine; the line is the candle and what it buys.
+    // The design's line is a simulator's; the face matches the Card3 line in trinity.js.
+    ability: "Light a candle: your Trader is restored,\neven under a Scandal. It lifts The Inferno.",
+    // A Grace narrates; the line follows the rule.
+    flavor: "Insert coin. Absolution while you wait.",
+    printed: {},
+  },
+  {
+    id: "the-mission",
+    design: "mission", // prints as "The Mission" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 85,
+    rarity: "Uncommon",
+    // The second printed Location: it builds, then pays alms to whoever is behind.
+    // The design's line is a simulator's; the face keeps the test and the sum.
+    ability: "Start your turn with less cash than\nevery rival, and collect $20M.",
+    // A Location narrates; the line follows the rule.
+    flavor: "Whoever has least is served first.",
     printed: {},
   },
 ];

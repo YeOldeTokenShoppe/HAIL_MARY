@@ -1,11 +1,12 @@
 // The Singular80 — the point past which nothing slows down, an on-draw Ambiguity. The second card whose
 // art is a LIVE 3D object: on the enlarged, tilting card the art window holds a running three.js scene
-// (src/game/rcana/live3d/singularity.js, mounted by src/components/RcanaLive3D.jsx), drifting between
-// stable, turbulent and collapsing, and the card's own tilt swings the view round and over the disc.
-// Everywhere a card is a picture (hands, the binder, rendered faces) it shows `scene`: one frame of that
-// same scene in its stable state, captured as the poster.
+// (src/game/rcana/live3d/singularity.js, mounted by src/components/RcanaLive3D.jsx): a black hole whose
+// disc is made of digits, 8s and 0s in terminal green, in eight spiral arms, an eight-pointed flare on its rim, and a second,
+// fainter disc turning a beat behind the first (the card's "two actions", drawn). The card's own tilt
+// swings the view round and over the disc. Everywhere a card is a picture (hands, the binder, rendered
+// faces) it shows `scene`: one frame of that same scene, captured as the poster.
 //
-// To re-shoot the poster after changing the scene, render mount(canvas, { still: 6 }) at 960 x 940
+// To re-shoot the poster after changing the scene, render mount(canvas, { still: 4 }) at 960 x 940
 // and paste it at (32, 32) on a 1024 x 1422 canvas filled with the backdrop colour.
 //
 // No paths: public/TCG/rcana/the-singular80/<id>.webp by convention (artPath).
@@ -13,7 +14,7 @@ import { ART_PLANES } from "../artSpec.js";
 
 export default {
   // The scene's own dark, for the sliver past the poster's edge on tilt.
-  backdrop: "#010103",
+  backdrop: "#000201",
 
   // The live scene for this card (a key of SCENES in RcanaLive3D.jsx).
   live3d: "singularity",

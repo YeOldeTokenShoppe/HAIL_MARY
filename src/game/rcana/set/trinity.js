@@ -10,7 +10,7 @@
 // two is $10M. Tuned on the two-player sim until every opener sat within a few
 // points of 50% (src/game/playtest3/PLAYTEST3.md).
 export const TRINITY = {
-  monje:         { liq: 1.5, cred: 2, eq: 2 }, // Money 15 (2026-11-20): at 10 he opened at 39%, at 20 at 59%. His Ethos 4 is what carries him, not his Vow
+  monje:         { liq: 1.5, cred: 2, eq: 2 }, // Money 15. Set on 2026-11-20 (at 10 he opened at 39%, at 20 at 59%). Tried at 10 on 2026-11-21 against bots that could not value Relics; once they could, 10 opened at 47% and 15 at 52%, so 15 it is. His Ethos 4 is what carries him, not his Vow
   gato:          { liq: 2, cred: 1, eq: 2 },
   general:       { liq: 2, cred: 1, eq: 3 }, // the rock
   diablito:      { liq: 2, cred: 0, eq: 0 }, // no halo, no composure: he lives on his wager
@@ -64,6 +64,8 @@ export const TRINITY_TEXT = {
   oil: "On sale, roll: 4+ gushes for $175M, else $25M. Or take the safe $30M.",
   gallo: "Each turn, roll: an 8 collects $20M; a 1 kills him.",
   lottery: "At the start of each turn, roll: an 8 wins $150M, and the Ticket is spent.",
+  // The odds are die faces, not coins: without this line oneMoney pins "3+" and "5+" as Liquidity pills.
+  predict: "Once a turn, stake $20M and name your odds: 3+ pays $30M, 5+ pays $50M, an 8 pays $200M. A miss loses the stake.",
 };
 
 // $M per point of Liquidity or Credibility, and per coin of an old cost.

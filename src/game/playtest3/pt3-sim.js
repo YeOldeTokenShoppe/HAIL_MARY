@@ -55,21 +55,22 @@ const standing = (t) => (t.credNow == null || t.credNow >= t.cred ? 'in good sta
 // (hazards, gambles, the Unicorn's compounding). Deck identity is the collectible premise.
 export const RECIPES = {
   devotion: [['monje', 2], ['gato', 1], ['celebridad', 1], ['general', 1],
-    ['tech', 1], ['vaca', 1], ['cava', 1], ['plata', 1], ['nacimiento', 1], ['moon', 1], ['catedral', 1], ['bluechip', 1], ['semilla', 1], ['investigadora', 1],
+    ['tech', 1], ['diamond', 1], ['cava', 1], ['plata', 1], ['nacimiento', 1], ['moon', 1], ['catedral', 1], ['bluechip', 1], ['semilla', 1], ['investigadora', 1],
     ['bull', 2], ['squeeze', 2],
     ['bear', 1], ['rug', 1],
-    ['bell', 1], ['tortilla', 2], ['publicista', 1], ['horchata', 1], ['ofrenda', 1],
-    ['heart', 1], ['halo', 1], ['audit', 1], ['rosary', 1], ['grail', 1], ['dashboard', 1], ['tattoo', 1], ['geometry', 1],
+    ['bell', 1], ['tortilla', 2], ['publicista', 1], ['techwreck', 1], ['ofrenda', 1],
+    ['heart', 1], ['halo', 1], ['talisman', 1], ['rosary', 1], ['grail', 1], ['dashboard', 1], ['tattoo', 1], ['geometry', 1],
     ['cherub', 1], ['fountain', 1], ['limpia', 1], ['anima', 1], ['lagrimas', 1]],
   degen: [['diablito', 2], ['unicornio', 2], ['prospector', 1], ['abuela', 1], ['bot', 1],
-    ['meme', 1], ['tech', 2], ['gallo', 1], ['aguacate', 1], ['perp', 1], ['bluechip', 1], ['jardin', 1], ['ponzi', 1], ['catacumbas', 1],
+    ['meme', 1], ['tech', 2], ['paperhands', 1], ['predict', 1], ['perp', 1], ['bluechip', 1], ['jardin', 1], ['ponzi', 1], ['catacumbas', 1],
     ['unlock', 1],
-    ['ballena', 1], ['rueda', 1], ['moralhazard', 1], ['mardigras', 1], ['godcandle', 1], ['techwreck', 1],
+    ['ballena', 1], ['rueda', 1], ['mardigras', 1], ['godcandle', 1], // Tech Wreck and Moral Hazard left this deck on 2026-11-21, for the two frauds below
     ['fuego', 1],
     ['illuminati', 1],
-    ['bear', 1], ['rug', 1], ['escandalo', 1], ['fall', 1], ['infierno', 1], ['trap', 1],
+    ['bear', 1], ['rug', 1], ['hack', 1], ['scam', 1], ['escandalo', 1], ['fall', 1], ['infierno', 1], ['trap', 1],
     ['tortilla', 1],
-    ['heart', 1], ['skull', 1], ['enigma', 1], ['rideordie', 1], ['lottery', 1], ['motherboard', 1],
+    ['heart', 1], ['stablecoin', 1], ['enigma', 1], // a Stablecoin where The Skull was (2026-11-21): the deck had lost two earning Assets that day
+    ['rideordie', 1], ['lottery', 1], ['motherboard', 1],
     ['ofrenda', 1]],
 };
 // THE GENERAL SHUFFLE (2026-11-20, a third mode for testing): no starter decks. Every card in the set, one
@@ -190,9 +191,9 @@ export class Game {
   }
   // The three frauds. Returns the line for the log.
   resolveHit(p, t, c) {
-    if (c.key === 'rug') { const a = t.invest[t.invest.length - 1]; t.invest.splice(t.invest.indexOf(a), 1); t.discard.push(a); t.stats.rugged = (t.stats.rugged || 0) + 1; return `${t.name}'s ${a.name} goes to zero and is discarded`; }
-    if (c.steal) { const n = Math.min(c.steal, t.cash); t.cash -= n; p.cash += n; return `${p.name} takes $${n}M from ${t.name}`; }
-    const n = Math.min(c.loss || 0, t.cash); t.cash -= n; return `${t.name} loses $${n}M`;
+    if (c.key === 'rug') { const a = t.invest[t.invest.length - 1]; t.invest.splice(t.invest.indexOf(a), 1); t.discard.push(a); t.stats.rugged = (t.stats.rugged || 0) + 1; t.lastFraud = { name: c.name, by: p, asset: a }; return `${t.name}'s ${a.name} goes to zero and is discarded`; }
+    if (c.steal) { const n = Math.min(c.steal, t.cash); t.cash -= n; p.cash += n; t.lastFraud = { name: c.name, by: p, amount: n, stolen: true }; return `${p.name} takes $${n}M from ${t.name}`; }
+    const n = Math.min(c.loss || 0, t.cash); t.cash -= n; t.lastFraud = { name: c.name, by: p, amount: n }; return `${t.name} loses $${n}M`;
   }
   // A strike from a Calamity. The Halo (noStrikes) turns it aside.
   async strike(t, why) {
@@ -349,7 +350,8 @@ export class Game {
         const saviours = p.hand.filter((c) => c.savingGrace);
         const pick = saviours.length ? await p.policy.useSavingGrace(this, p, saviours) : null;
         if (pick && saviours.includes(pick)) { p.hand.splice(p.hand.indexOf(pick), 1); p.discard.push(pick); p.trader.credNow = 1; p.stats.savingGrace = (p.stats.savingGrace || 0) + 1; this.log(`✝ SAVING FACE — ${p.name} gives up ${pick.name}: ${p.trader.name} stays at the desk, still in scandal`); }
-        else { this.log(`☠ ${p.trader.name} is DISCREDITED and leaves ${p.name}'s desk`); p.discard.push(p.trader); p.trader = null; p.stats.disgraces++; }
+        else { this.log(`☠ ${p.trader.name} is DISCREDITED and leaves ${p.name}'s desk`); p.discard.push(p.trader); p.trader = null; p.stats.disgraces++;
+          const cult = p.artifacts.find((x) => x.cult); if (cult) { p.artifacts.splice(p.artifacts.indexOf(cult), 1); p.discard.push(cult); this.log(`the CULT OF PERSONAL80 disbands: it goes to ${p.name}'s discard pile`); } }
       }
     }
   }
@@ -358,10 +360,32 @@ export class Game {
   saleValue(a) { return this.prosOf(a) + this.saleBonus(); }
   eventPayout(p, c) { return c.pros + (c.perHaz ? c.perHaz * p.hazards.length : 0) + (c.perRivalAsset ? c.perRivalAsset * this.rivals(p).reduce((s, q) => s + q.invest.length, 0) : 0) + (p.artifacts.some((a) => a.key === 'geometry') ? 25 : 0); }
   rideOrDie(q) { return q.invest.some((x) => x.key === 'rideordie'); }
+  // CULT OF PERSONAL80: while it is equipped and a Trader is seated, no other Trader can be played over them.
+  cultBound(p) { return !!p.trader && p.artifacts.some((a) => a.cult); }
   // Relic slots: two, three with the Motherboard — which sits outside the count.
   relicSlots(p) { return 2 + (p.artifacts.some((a) => a.slots) ? 1 : 0); }
   relicsHeld(p) { return p.artifacts.filter((a) => !a.slots && !a.noSlot); }
-  prosOf(a) {
+  // DIAMOND HANDS: an Asset its holder has kept three rounds or more is worth that much more.
+  diamondOf(a) { if (a.bornTurn == null || this.turnNo - a.bornTurn < 3) return 0; const o = this.players.find((q) => q.invest.includes(a)); const d = o && o.artifacts.find((x) => x.diamond); return d ? d.diamond : 0; }
+  // THE PREDICTION MARKET, a Location. The face contract i needs: The Gambler's are one lower, except the
+  // long shot (the top face is the top face for everyone).
+  marketNeed(p, loc, i) { const face = loc.market[i][0]; return face >= this.rules.die ? face : Math.max(2, face - (this.is(p, 'abuela') ? 1 : 0)); }
+  // The contracts open to p right now: none without the stake; under a Bear Market, none that pays over 75.
+  marketOffers(p) { const loc = p.location; if (!loc || !loc.market || p.liq < loc.stake) return []; return loc.market.map((m, i) => i).filter((i) => !(this.hasHaz(p, 'bear') && loc.market[i][1] > 75)); }
+  // One bet a turn, before the main action: stake, name the odds, roll. A Miracle can roll a miss again.
+  async marketBet(p) {
+    const offers = this.marketOffers(p); if (!offers.length || !p.policy.placeBet) return;
+    const i = await p.policy.placeBet(this, p, p.location, offers); if (i == null || !offers.includes(i)) return;
+    const loc = p.location, pay = loc.market[i][1], need = this.marketNeed(p, loc, i);
+    p.liq -= loc.stake; p.stats.marketCalls = (p.stats.marketCalls || 0) + 1; p.stats['marketCall' + i] = (p.stats['marketCall' + i] || 0) + 1;
+    let roll = this.roll();
+    if (roll < need && await this.miracle(p, { kind: 'gamble', name: loc.name, roll })) roll = this.roll();
+    if (roll >= need) { p.stats.marketWins = (p.stats.marketWins || 0) + 1; this.bank(p, pay, `${loc.name} — ${p.name} staked ${this.m(loc.stake)} on ${need >= this.rules.die ? 'an ' + need : need + '+'}, the die shows ${roll}: IT RESOLVES YES`, false); }
+    else this.log(`${loc.name} — ${p.name} staked ${this.m(loc.stake)} on ${need >= this.rules.die ? 'an ' + need : need + '+'}, the die shows ${roll}: it resolves NO, and the stake is lost`);
+    if (this.hooks && this.hooks.render) await this.hooks.render();
+  }
+  prosOf(a) { return this.baseProsOf(a) + this.diamondOf(a); }
+  baseProsOf(a) {
     if (a.gem) { const o = this.players.find((q) => q.invest.includes(a)); return o && o.deeds >= 3 ? a.gem : a.pros; }
     if (a.ripe) { const held = this.turnNo - a.bornTurn; return held < 2 ? 50 : Math.max(0, 150 - 50 * (held - 2)); }
     if (a.perp) return a.pros * 2;
@@ -434,7 +458,7 @@ export class Game {
         const heart = t.artifacts.find((a) => a.key === 'heart');
         if (heart && await t.policy.useHeart(this, t, c, p)) { t.artifacts.splice(t.artifacts.indexOf(heart), 1); t.discard.push(heart); p.discard.push(c); this.log(`${t.name} spent ${heart.name} to block ${c.name}. ${c.name} went to ${p.policy.human ? 'your' : p.name + "’s"} discard pile.`); return true; }
         // EQUANIMITY: a seated Trader's composure. The Calamity fails on a roll of eq or lower — a stat, so a Quantum Hack does not switch it off.
-        const eq = t.trader ? (t.trader.eq || 0) : 0;
+        const eq = t.trader ? (t.trader.eq || 0) + t.artifacts.reduce((n, x) => n + (x.pathos || 0), 0) : 0; // THE TALISMAN: one more Pathos
         if (eq > 0) { let roll = this.roll();
           if (roll > eq && await this.miracle(t, { kind: 'pathos', name: `${t.trader.name}'s roll against ${c.name}`, roll })) roll = this.roll();
           if (roll <= eq) { p.discard.push(c); this.log(`${t.name} blocked ${c.name}. ${t.trader.name} rolled ${roll} on a d${this.rules.die}. ${this.rules.attrs ? 'Pathos' : 'Equanimity'} ${eq} blocks on ${eq} or lower. ${c.name} went to ${p.policy.human ? 'your' : p.name + "’s"} discard pile.`); t.stats.eqSaves = (t.stats.eqSaves || 0) + 1;
@@ -456,6 +480,16 @@ export class Game {
           for (const x of picked) { p.hand.splice(p.hand.indexOf(x), 1); p.discard.push(x); }
           p.discard.push(c); const drawn = []; for (let i = 0; i <= picked.length; i++) { const d = await this.draw(p, true); if (d) drawn.push(d); }
           this.log(`${p.name} drinks ${c.name.toUpperCase()} — lets go of ${picked.length} and draws ${drawn.length}`); break; }
+        if (c.whistle) { // THE WHISTLEBLOWER: the last fraud played on you is undone, and its player takes a strike
+          const f = p.lastFraud; if (!f) { p.liq += cost; p.hand.push(c); p.stats.plays--; return false; }
+          let got = 'nothing was left to take back';
+          if (f.asset) { const k = p.discard.indexOf(f.asset); if (k >= 0) { p.discard.splice(k, 1); p.invest.push(f.asset); got = `${f.asset.name} is back in ${p.name}'s portfolio`; } }
+          else if (f.stolen) { const n = Math.min(f.amount, f.by.cash); f.by.cash -= n; p.cash += n; got = `${p.name} takes $${n}M back from ${f.by.name}`; }
+          else { p.cash += f.amount; got = `${p.name} is made whole: $${f.amount}M`; }
+          p.lastFraud = null; p.discard.push(c); p.stats.whistles = (p.stats.whistles || 0) + 1;
+          this.log(`${p.name} plays ${c.name} on ${f.name}: ${got}`);
+          await this.strike(f.by, 'THE WHISTLEBLOWER');
+          break; }
         if (choice.polish) { this.restoreStanding(p, 'THE PRESS RELEASE'); p.discard.push(c); break; }
         const t = choice.target || p; const h = choice.hazard || t.hazards.find((x) => clearsHaz(c, x));
         if (!h) { p.liq += cost; p.hand.push(c); p.stats.plays--; return false; }
@@ -507,14 +541,14 @@ export class Game {
   }
   async sell(p, a, wantPros) {
     if (this.hasHaz(p, 'rug')) return false; if (a.bornTurn === this.turnNo) return false;
-    const base = this.prosOf(a);
+    const base = this.prosOf(a), diamond = this.diamondOf(a);
     p.invest.splice(p.invest.indexOf(a), 1); p.stats.sells++;
     for (const q of this.players) if (q !== p && q.artifacts.some((x) => x.key === 'skull')) { this.collect(q, 1); this.log(`${q.name} holds THE SKULL: +${this.m(1)} from ${p.name}'s sale`); }
     if (wantPros && a.gamble) {
       let roll = this.roll(); p.stats.sellPros++;
       const need = this.gambleNeed(p, a);
       if (roll < need && await this.miracle(p, { kind: 'gamble', name: a.name, roll })) roll = this.roll();
-      if (roll >= need) { const ok = this.bank(p, a.pros + this.saleBonus(), `${a.name} — the die shows ${roll}: IT ${a.gambleOn ? 'GUSHES' : 'MOONS'}${this.saleBonus() ? ` · GOD CANDLE +${this.saleBonus()}` : ''}`); if (!ok) { p.invest.push(a); p.stats.sells--; p.stats.sellPros--; return false; } }
+      if (roll >= need) { const ok = this.bank(p, a.pros + this.saleBonus() + diamond, `${a.name} — the die shows ${roll}: IT ${a.gambleOn ? 'GUSHES' : 'MOONS'}${this.saleBonus() ? ` · GOD CANDLE +${this.saleBonus()}` : ''}`); if (!ok) { p.invest.push(a); p.stats.sells--; p.stats.sellPros--; return false; } }
       else if (a.bust) { p.discard.push(a); this.bank(p, a.bust, `${a.name} — the die shows ${roll}: it runs dry`); }
       else { p.discard.push(a); this.log(`${p.name} sells ${a.name}… the die shows ${roll}: it goes to zero`); }
       await this.mapDraw(p);
@@ -562,14 +596,16 @@ export class Game {
     const A = [];
     for (const c of p.hand) {
       const cost = this.costOf(p, c); if (p.liq < cost) continue;
+      if (c.type === 'trader' && this.cultBound(p)) continue; // CULT OF PERSONAL80: no other Trader may take the seat
       if (c.type === 'asset' || c.type === 'artifact' || c.type === 'location' || c.type === 'trader') A.push({ t: 'play', c });
       else if (c.type === 'event' && c.played) { if (this.hasHaz(p, 'scam')) continue; if (!c.choice) { if (c.bearProof || c.bloom || !(this.hasHaz(p, 'bear') && this.eventPayout(p, c) > 75)) A.push({ t: 'play', c }); } else { A.push({ t: 'play', c, choice: { cash: true } }); if (!(this.hasHaz(p, 'bear') && c.pros > 75)) A.push({ t: 'play', c, choice: {} }); } }
       else if (c.type === 'hazard') { for (const r of this.rivals(p)) if (this.canHit(r, c)) A.push({ t: 'play', c, choice: { target: r } }); }
-      else if (c.type === 'remedy') { for (const q of this.players) for (const h of q.hazards) if (clearsHaz(c, h)) A.push({ t: 'play', c, choice: { target: q, hazard: h } }); if (c.key === 'publicista' && p.trader && p.trader.credNow != null && p.trader.credNow < p.trader.cred) A.push({ t: 'play', c, choice: { polish: true } }); if (c.refresh) A.push({ t: 'play', c, choice: { refresh: true } }); }
+      else if (c.type === 'remedy') { for (const q of this.players) for (const h of q.hazards) if (clearsHaz(c, h)) A.push({ t: 'play', c, choice: { target: q, hazard: h } }); if (c.key === 'publicista' && p.trader && p.trader.credNow != null && p.trader.credNow < p.trader.cred) A.push({ t: 'play', c, choice: { polish: true } }); if (c.refresh) A.push({ t: 'play', c, choice: { refresh: true } }); if (c.whistle && p.lastFraud) A.push({ t: 'play', c, choice: { whistle: true, target: p } }); }
       else if (c.type === 'grace') { const absolves = c.key === 'confession' && this.hasHaz(p, 'infierno'); /* the one Grace The Inferno cannot stop */ if (this.soulless(p) || (this.hasHaz(p, 'infierno') && !absolves)) continue; if (c.key === 'fountain') { if (!p.hailUsed) A.push({ t: 'play', c }); } else if (p.deeds < 3 || absolves) { if (c.key === 'rose') { for (const r of this.rivals(p)) A.push({ t: 'play', c, choice: { target: r } }); } else A.push({ t: 'play', c }); } }
     }
     for (const a of p.invest) if (a.uncork && p.deeds < 3 && !this.soulless(p)) A.push({ t: 'uncork', a });
-    for (const a of p.invest) { if (this.hasHaz(p, 'rug') || a.bornTurn === this.turnNo) continue; if (a.gamble) A.push({ t: 'sell', a, pros: false }); if (a.bearProof || !(this.hasHaz(p, 'bear') && this.saleValue(a) > 75)) A.push({ t: 'sell', a, pros: true }); }
+    for (const a of p.invest) { if (this.hasHaz(p, 'rug') || a.bornTurn === this.turnNo) continue;
+      if (a.gamble) A.push({ t: 'sell', a, pros: false }); if (a.bearProof || !(this.hasHaz(p, 'bear') && this.saleValue(a) > 75)) A.push({ t: 'sell', a, pros: true }); }
     if (this.rules.earnedHalo && p.trader && !p.trader.earned) { if (this.rules.giftBlind) { if (p.hand.length) A.push({ t: 'gift', c: null }); } else for (const c of p.hand) if (c.type !== 'hazard') A.push({ t: 'gift', c }); }
     if (p.liq >= 3) for (const h of p.hazards) A.push({ t: 'payclear', h });
     if (!p.hailUsed && !this.hasHaz(p, 'infierno')) A.push({ t: 'hail' });
@@ -640,6 +676,8 @@ export class Game {
       }
     }
     // EL NACIMIENTO: a figure a turn; the third brings the Niño, and the scene is packed away.
+    // THE MISSION: alms for whoever starts the turn with less cash than every rival.
+    if (p.location && p.location.alms && this.rivals(p).every((r) => p.cash < r.cash)) { this.collect(p, p.location.alms); p.stats.alms = (p.stats.alms || 0) + 1; this.log(`${p.location.name} looks after its own — ${p.name} is behind, and collects ${this.m(p.location.alms)}`); }
     if (p.location && p.location.key === 'nacimiento') {
       const nac = p.location; nac.figures = (nac.figures || 0) + 1;
       if (nac.figures < 3) this.log(`${p.name} places a figure in ${U('nacimiento')} (${nac.figures} of 3)`);
@@ -663,12 +701,20 @@ export class Game {
     const employed = p.trader && this.abilityOn(p);
     const spotless = employed && (p.trader.credNow == null || p.trader.credNow === p.trader.cred);
     const tithe = employed && p.trader.tithe ? p.trader.tithe * p.deeds : 0; // El Monje (Playtest 3): income for every candle lit
-    const halo = spotless ? (p.trader.halo ?? 1) + (p.trader.earned ? 1 : 0) : 0; // CREDIBILITY, the printed number: what good standing pays this Trader
-    this.collect(p, employed ? p.trader.liq + halo + tithe : 1);
+    const faithful = employed && !spotless && p.artifacts.some((a) => a.cult); // CULT OF PERSONAL80: in scandal, and paid anyway
+    const halo = spotless || faithful ? (p.trader.halo ?? 1) + (p.trader.earned ? 1 : 0) : 0; // CREDIBILITY, the printed number: what good standing pays this Trader
+    const cultCard = employed && p.artifacts.find((a) => a.cult), flock = cultCard ? cultCard.flock || 0 : 0; // CULT OF PERSONAL80: the faithful pay in, every turn
+    this.collect(p, employed ? p.trader.liq + halo + tithe + flock : 1);
+    if (flock) this.log(`the faithful pay in — ${p.name} collects +${this.m(flock)} from the CULT OF PERSONAL80`);
     if (tithe) this.log(`${p.trader.name}'s candles pay ${p.name} +${this.m(tithe)}`);
-    if (halo) this.log(`${p.trader.name} is in good standing — ${p.name} collects +${this.m(halo)}`);
+    if (halo && faithful) { p.stats.cultPaid = (p.stats.cultPaid || 0) + 1; this.log(`${p.trader.name} is in scandal, and the CULT OF PERSONAL80 pays anyway — ${p.name} collects +${this.m(halo)}`); }
+    else if (halo) this.log(`${p.trader.name} is in good standing — ${p.name} collects +${this.m(halo)}`);
     if (!employed) this.log(`${p.name} is between Traders — collects only ${this.m(1)}`);
     if (this.hasHaz(p, 'taxman') && p.liq > 0) { p.liq -= 1; this.log(`${p.name} pays ${this.m(1)} to the TAX COLLECTOR`); }
+    // PAPER HANDS: the Asset bought most recently is sold at its cash price. Diamond Hands, equipped since, holds.
+    if (this.hasHaz(p, 'paperhands') && p.invest.length) {
+      if (p.artifacts.some((x) => x.diamond)) this.log(`${p.name} has DIAMOND HANDS: nothing is sold`);
+      else { const a = p.invest.pop(); this.collect(p, a.cash); p.discard.push(a); p.stats.paperSold = (p.stats.paperSold || 0) + 1; this.log(`PAPER HANDS — ${p.name} panics and sells ${a.name} for ${this.m(a.cash)}`); } }
     const yield2 = p.invest.reduce((s2, a2) => s2 + (a2.income || 0), 0);
     if (yield2) { this.collect(p, yield2); this.log(`${p.name} collects ${this.m(yield2)} from investments`); }
     // DUE DILIGENCE is an open book (2026-11-16): while La Investigadora sits, the top card of her
@@ -679,6 +725,7 @@ export class Game {
     if (p.policy.beforeDraw) await p.policy.beforeDraw(this, p);
     if (this.canBury(p) && p.policy.dueDiligence && await p.policy.dueDiligence(this, p, p.deck[0])) this.bury(p);
     await this.turnDraw(p);
+    if (!this.over) await this.marketBet(p); // THE PREDICTION MARKET
     // One main action; two once THE SINGULAR80 has fired (this.accelerated). The second is a full main action, and is skipped when there is nothing to do with it.
     for (let n = 0; n < (this.accelerated ? 2 : 1) && !this.over; n++) {
       this.secondAction = n > 0;
@@ -716,6 +763,7 @@ export class RandomBot {
   acceptRose() { return this.rng() < 0.6; }
   discardOne(g, p) { return p.hand[Math.floor(this.rng() * p.hand.length)]; }
   useMiracle() { return this.rng() < 0.5; }
+  placeBet(g, p, loc, offers) { return this.rng() < 0.5 ? offers[Math.floor(this.rng() * offers.length)] : null; }
   useSavingGrace(g, p, cards) { return this.rng() < 0.5 ? cards[Math.floor(this.rng() * cards.length)] : null; }
   buryTrader(g, p) { return p.hand.some(c => c.type === 'trader' && g.costOf(p, c) <= p.liq) && this.rng() < 0.2; }
   useEnigma() { return this.rng() < 0.5; }
@@ -730,6 +778,16 @@ export class GreedyBot {
   acceptRose() { return true; }
   // She is saved for the Hail Mary unless that prayer has already been said.
   useMiracle(g, p, w) { return true; } // a failed roll is always worth a second look
+  // The Prediction Market: take the contract that would win the game if there is one; otherwise the best
+  // average, and only with money to spare for the turn's play.
+  placeBet(g, p, loc, offers) {
+    const stake = loc.stake * g.rules.rate, P = (i) => (g.rules.die + 1 - g.marketNeed(p, loc, i)) / g.rules.die;
+    const winning = offers.filter((i) => p.cash - stake + loc.market[i][1] >= g.winAt).sort((a, b) => P(b) - P(a))[0];
+    if (winning != null) return winning;
+    if (p.liq < loc.stake + 2) return null;
+    const best = [...offers].sort((a, b) => P(b) * loc.market[b][1] - P(a) * loc.market[a][1])[0];
+    return P(best) * loc.market[best][1] > stake ? best : null;
+  }
   // Intercepts the weather that is not a plain windfall: Calamities and shake-ups.
   useEnigma(g, p, c) { return c.subtype === 'Calamity' || c.subtype === 'Ambiguity'; }
   // Always saves the Trader, with the card that leaves the most Credibility.
@@ -752,6 +810,31 @@ export class GreedyBot {
   //     weight, less half its price — spending is now paid for out of the score
   //   · selling adds nothing by itself (the Asset already counted); the bot sells to take a bonus, to get
   //     out of something about to lose value, or to raise cash for a card it cannot afford
+  // What a Relic is worth to p, in $M, over the `left` rounds the game probably has. Income is counted in
+  // full; protection at the odds of the thing it stops (per player and round, from the sims: a Scandal or a
+  // Fall about 0.08, a fraud about 0.02, any Calamity about 0.06); a card drawn at about $12M.
+  relicWorth(g, p, c, left, earns) {
+    const R = g.rules.rate, t = p.trader, pay = t ? (t.halo ?? 1) * R : 0, keep = t ? earns(t) * R : 0;
+    const inScandal = !!t && t.credNow != null && t.credNow < t.cred;
+    const miracle = c.apparition && (p.miracles || 0) < MIRACLE_MAX ? 12 : 0; // equipping an apparition is a Miracle
+    const hand = (f) => p.hand.filter(f).length;
+    let w = 0;
+    if (c.cult) w = !t ? 5 : p.hand.some((x) => x.type === 'trader' && earns(x) > earns(t) + 0.5) ? 0 : (c.flock || 0) * R * left + (inScandal ? pay * left * 0.6 : 0.08 * left * pay);
+    else if (c.key === 'skull') w = 5 * left;                                       // a rival sells about every other round
+    else if (c.key === 'lottery') w = 150 * (1 - Math.pow(1 - 1 / g.rules.die, left));
+    else if (c.key === 'geometry') w = 25 * hand((x) => x.type === 'event' && x.played) + 6 * left;
+    else if (c.diamond) w = 25 * p.invest.length * (left >= 3 ? 1 : 0.4) + 10 * hand((x) => x.type === 'asset') * (left >= 4 ? 1 : 0) + 2;
+    else if (c.key === 'rosary') w = p.deeds < 3 ? 12 * hand((x) => x.type === 'grace') + 6 : 0;
+    else if (c.key === 'map') w = 12 * (p.invest.length + hand((x) => x.type === 'asset') * 0.5);
+    else if (c.key === 'tattoo') w = inScandal && !g.hasHaz(p, 'escandalo') ? pay * left : 0.08 * left * pay * 2;
+    else if (c.noStrikes) w = t ? 0.08 * left * (pay * 2 + (inScandal ? keep * 3 : 0)) : 0;
+    else if (c.key === 'shroud') w = t ? (inScandal ? 0.08 : 0.02) * left * keep * 3 : 0;
+    else if (c.key === 'heart') w = 0.06 * left * 70;
+    else if (c.wards) w = 0.02 * left * 70 * c.wards.length * (c.wards.includes('rug') && !p.invest.length ? 0.7 : 1) + (c.pathos && t ? 0.06 * left * 70 * c.pathos / g.rules.die : 0);
+    else if (c.key === 'enigma') w = 3 * left;
+    else if (c.slots) { const waiting = p.hand.filter((x) => x.type === 'artifact' && !x.slots && !x.noSlot && x !== c); w = g.relicsHeld(p).length >= 2 && waiting.length ? Math.max(...waiting.map((x) => this.relicWorth(g, p, x, left, earns))) : 2; }
+    return w + miracle;
+  }
   score(g, p, a) {
     const R = g.rules.rate, nw = (q) => g.netWorth(q);
     const counts = g.rules.countAssets || g.narrative(p); // do this player's unsold Assets count toward the goal?
@@ -797,12 +880,17 @@ export class GreedyBot {
     if (a.t === 'play' && a.c.type === 'remedy') { const mine = a.choice.target === p; s = (mine ? 80 : 8 + (haloWorth ? haloWorth - 30 : 0)) - spend; }
     if (a.t === 'gift' && !a.c) { const avg = p.hand.reduce((t, c) => t + (c.type === 'event' ? 80 : c.type === 'asset' ? 60 : c.type === 'hazard' ? 40 : 25), 0) / p.hand.length; s = haloWorth ? haloWorth * g.rules.giftKeen - avg * 0.6 : 0; }
     else if (a.t === 'gift') { const c = a.c; const to = [...g.rivals(p)].sort((x, y) => nw(x) - nw(y))[0];
-      const dead = (c.type === 'trader' && p.trader && earns(c) <= earns(p.trader) + 0.5) || (c.type === 'remedy' && !c.refresh && !p.hazards.length) || (c.type === 'grace' && (p.deeds >= 3 || p.hailUsed || g.soulless(p))) || (c.type === 'location' && !!p.location) || (c.type === 'artifact' && g.relicsHeld(p).length >= g.relicSlots(p));
+      const dead = (c.type === 'trader' && p.trader && earns(c) <= earns(p.trader) + 0.5) || (c.type === 'remedy' && !c.refresh && !p.hazards.length && !(c.whistle && p.lastFraud)) || (c.type === 'grace' && (p.deeds >= 3 || p.hailUsed || g.soulless(p))) || (c.type === 'location' && !!p.location) || (c.type === 'artifact' && g.relicsHeld(p).length >= g.relicSlots(p));
       const keep = dead ? 0 : c.type === 'event' ? 80 : c.type === 'asset' ? 60 : 25; // what the card is worth to keep
       const taken = g.rules.giftsAlwaysTaken || g.giftValue(to, c) >= haloWorth; // a refused offer wastes the turn: do not make one
       s = haloWorth && taken ? haloWorth * g.rules.giftKeen - keep - g.giftValue(to, c) * 0.5 : 0; }
     if (a.t === 'play' && a.choice && a.choice.refresh) { const dead = p.hand.filter((c) => c !== a.c && c.type !== 'event' && c.cost > p.liq + 1).slice(0, a.c.refresh); a.choice.discards = dead; s = 28 + 10 * dead.length; }
-    if (a.t === 'play' && a.c.type === 'artifact') s = 35 - spend;
+    // A Relic is worth what it will do over the rounds left (relicWorth, below), scored like an Asset bought
+    // for what it will earn. With both slots full it must beat the weakest Relic it would push out.
+    if (a.t === 'play' && a.c.type === 'artifact') { const worth = this.relicWorth(g, p, a.c, left, earns);
+      if (!a.c.slots && !a.c.noSlot && g.relicsHeld(p).length >= g.relicSlots(p)) { const out = [...g.relicsHeld(p)].sort((x, y) => this.relicWorth(g, p, x, left, earns) - this.relicWorth(g, p, y, left, earns))[0];
+        a.choice = { ...(a.choice || {}), drop: out }; s = (worth - this.relicWorth(g, p, out, left, earns) - 15) * 0.7 - spend; }
+      else s = 25 + worth * 0.7 - price * 0.6; }
     if (a.t === 'play' && a.c.type === 'location') s = p.location ? 0 : 58 - spend; // never tear a standing place down for another
     if (a.t === 'play' && a.c.type === 'grace') s = (!p.hailUsed ? 57 - p.deeds * 4 : 2) - spend;
     if (a.t === 'play' && a.c.type === 'trader') s = !p.trader ? 72 + earns(a.c) * 3 : (p.trader.credNow < p.trader.cred && (a.c.credNow ?? a.c.cred) > p.trader.credNow ? 46 : earns(a.c) > earns(p.trader) + 0.5 && left >= 3 ? 75 : 0) - spend;

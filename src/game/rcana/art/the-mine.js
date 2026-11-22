@@ -9,8 +9,11 @@ import { ART_PLANES } from "../artSpec.js";
 
 export default {
   // No `frame`: the plate follows the card's type.
-  // The Gold metal border by default, on the bench and in print.
-  metalFrame: "gold",
+  // Rainbow foil by default (2026-11-21), like the other apparitions: the
+  // code-drawn frame prints this card in rainbow metal, and the painted frame
+  // lays the Terminal Traders rainbow border over it (it was the gold border
+  // until today). The binder's and bench's metal controls can still override.
+  metalFrame: "rainbow",
 
   // The mine's indigo, for the sliver past the scene's edge on tilt.
   backdrop: "linear-gradient(180deg,#0e1240 0%,#1c2060 55%,#0e1240 100%)",

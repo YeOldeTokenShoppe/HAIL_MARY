@@ -1,7 +1,7 @@
 // La Investigadora — the analyst with the monocle and star-chart tablet, a
-// Trader. Three planes behind the plate: the sunburst sky and golden hills,
-// the figure, and a lily stalk nearest the window. (prop1.webp, a single lily
-// drawn for the front of the frame, is still in the folder but unused.)
+// Trader. Three planes behind the plate: the scene, the figure, and the
+// ledger-terminal projection (prop) nearest the window. (prop1/prop2, the
+// lilies, were removed 2026-11-21.)
 //
 // No paths: public/TCG/rcana/la-investigadora/<id>.webp by convention (artPath).
 import { ART_PLANES } from "../artSpec.js";
@@ -19,8 +19,8 @@ export default {
     // The figure, inside the window on the subject rung.
     { id: "subject", z: ART_PLANES.subject, scale: 1 },
 
-    // The lily stalk at bottom-left. Ahead of the figure but still BEHIND
-    // the plate (z < 44), so the window clips it at the frame's edge.
-    { id: "prop2", z: 24, scale: 1 },
+    // The terminal projection — the top layer, ahead of the figure but still
+    // BEHIND the plate (z < 44), so the window clips it at the frame's edge.
+    { id: "prop", z: 24, scale: 1 },
   ],
 };

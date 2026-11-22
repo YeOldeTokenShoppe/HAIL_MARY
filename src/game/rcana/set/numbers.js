@@ -27,12 +27,10 @@ export const RESERVED_NUMBERS = {
   realestate: 32,
   stablecoin: 43,
   bluechip: 45,
-  gallo: 81, // El Gallo — unfaced (the set passed 80 on 2026-11-15)
-  vaca: 82, // La Vaca — unfaced
-  aguacate: 83, // El Aguacate — unfaced
+  plata: 81, // La Plata (was 85 until 2026-11-21; El Gallo's old number, then the Cult's for a day)
+  diamond: 82, // Diamond Hands (took La Vaca's number, 2026-11-21)
+  predict: 83, // The Prediction Market (took El Aguacate's number, 2026-11-21; the first printed Location)
   bono: 84, // The Savings Bond — unfaced
-  plata: 85, // La Plata — unfaced
-  perp: 86, // Perpetuals — unfaced (was The Perp, which read as a mugshot over a figure; renamed 2026-11-15)
   cava: 3, // La Cava — unfaced (took El Ángel's number when the Angel and Shady Lady were cut, 2026-11-15)
   catedral: 4, // La Catedral — unfaced (took La Tramposa's number)
   jardin: 44,
@@ -64,7 +62,7 @@ export const RESERVED_NUMBERS = {
   trap: 58, // Liquidity Trap — unfaced (was The World)
   bear: 13,
   hack: 40,
-  virtue: 60, // The Virtue Signal — unfaced
+  paperhands: 60, // Paper Hands (added 2026-11-21 as 89; took The Virtue Signal's number the same day, so the set is 88)
   infierno: 61, // El Infierno — unfaced
   rug: 39,
   taxman: 36,
@@ -73,10 +71,10 @@ export const RESERVED_NUMBERS = {
   // Remedies
   bell: 17,
   catacumbas: 62, // Las Catacumbas — unfaced (was Quantum Resistance)
-  keys: 63, // The Keys — a Relic since 2026-11-20
+  talisman: 63, // The Talisman (2026-11-21: The Keys and The Audit merged; it has The Keys' number)
   tortilla: 16,
   publicista: 64, // El Comunicado — unfaced
-  horchata: 42,
+  whistle: 42, // The Whistleblower (took La Horchata's number, 2026-11-21)
   stimulus: 65, // The Stimulus — unfaced (took The Burro's number, 2026-11-20)
   // Relics
   heart: 66, // El Corazón — unfaced
@@ -85,14 +83,14 @@ export const RESERVED_NUMBERS = {
   grail: 68, // The Grail — the graded card in the vault (was the El Cáliz Relic, retired 2026-11-15)
   enigma: 69, // El Enigma — unfaced
   skull: 19,
-  shroud: 70, // El Sudario — unfaced
+  perp: 70, // Perpetuals (was 86 until 2026-11-21; took The Shroud's number when the set went to 86)
   rideordie: 35,
   lottery: 71, // El Boleto
   geometry: 72, // Sacred Geometry
   tattoo: 73, // El Tatuaje — unfaced
   dashboard: 74, // La Virgencita — unfaced
-  audit: 87, // The Audit (added 2026-11-20)
-  singular: 88, // The Singular80 (added 2026-11-20; the set is 88) — an Event, numbered at the end
+  mission: 85, // The Mission (added 2026-11-21)
+  singular: 86, // The Singular80 — an Event, always numbered last (the set is 86 since The Mission, 2026-11-21)
   motherboard: 5, // La Placa Madre — unfaced (a Relic since 2026-11-12)
   // Graces
   ofrenda: 75, // La Ofrenda — unfaced
@@ -100,7 +98,7 @@ export const RESERVED_NUMBERS = {
   limpia: 77, // La Limpia — unfaced (was The Intercession)
   ponzi: 78, // The Ponzi — unfaced (was La Pirámide, before that Divine Intervention)
   anima: 79, // Ánima Sola — unfaced
-  confession: 80, // La Confesión — unfaced
+  confession: 80, // La Confesión
   fountain: 25,
   rose: 23,
   lagrimas: 6, // Las Lágrimas — unfaced (took The Neural Cathedral's number)

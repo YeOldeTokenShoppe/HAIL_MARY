@@ -143,7 +143,7 @@ export function rcana3Model(data) {
     text: TRINITY_TEXT[key] || oneMoney(data.ability, cls),
     flavor: data.flavor ? (data.flavorQuoted ? `“${data.flavor}”` : data.flavor) : null,
     collector: data.collector ? `${data.collector.number} / ${data.collector.of}` : null,
-    apparition: !!design.apparition, // one of the ten cards with Our Lady's image: an eight-pointed star by the type line
+    apparition: !!design.apparition, // one of the cards with Our Lady's image: an eight-pointed star by the type line
     topLeft: null, plate: null, corner: null, attrs: null,
   };
   if (trinity) {
@@ -365,7 +365,9 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
       onPointerCancel={interactive ? settle : undefined}
     >
       <div style={{ position: "absolute", inset: 0, transform: interactive ? "rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))" : undefined, transition: "transform var(--ease, 500ms) ease-out", willChange: interactive ? "transform" : undefined }}>
-      <style>{`@import url("https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Grenze+Gotisch:wght@800&family=Spectral:ital,wght@0,400;0,700;1,400&display=swap");`}</style>
+      <style>{`@import url("https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Grenze+Gotisch:wght@800&family=Spectral:ital,wght@0,400;0,700;1,400&display=swap");
+        @keyframes rc3-flicker { 0%, 100% { scale: 1 1; rotate: 0deg; opacity: .93; filter: brightness(1); } 13% { scale: 1.03 1.07; rotate: -1.5deg; opacity: 1; filter: brightness(1.12); } 27% { scale: .98 .95; rotate: 1deg; opacity: .86; filter: brightness(.95); } 41% { scale: 1.02 1.05; rotate: 2deg; opacity: 1; filter: brightness(1.08); } 58% { scale: .99 .97; rotate: -1deg; opacity: .9; filter: brightness(1); } 74% { scale: 1.04 1.09; rotate: .5deg; opacity: 1; filter: brightness(1.15); } 88% { scale: .98 .96; rotate: -2deg; opacity: .88; filter: brightness(.97); } }
+        @keyframes rc3-flash { 0% { background-size: 0% 0%; opacity: 0; } 10% { opacity: 1; } 55% { opacity: .85; } 100% { background-size: 280% 280%; opacity: 0; } }`}</style>
       <div
         className="rc-card rc3-card"
         data-ready={ready ? "" : undefined}
@@ -388,7 +390,11 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
                 <React.Fragment key={layer.id}>
                   {light?.glow}
                   <img src={layer.src} alt="" draggable={false} decoding="async"
-                style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", transform: `translate(calc(${layer.offset?.x || 0}% - var(--tx, 0) * ${parallax(layer)}%), calc(${layer.offset?.y || 0}% - var(--ty, 0) * ${parallax(layer)}%)) scale(${layer.scale ?? 1})`, transition: interactive ? "transform var(--ease, 500ms) ease-out" : undefined, filter: layer.filter || undefined }} />
+                style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", transform: `translate(calc(${layer.offset?.x || 0}% - var(--tx, 0) * ${parallax(layer)}%), calc(${layer.offset?.y || 0}% - var(--ty, 0) * ${parallax(layer)}%)) scale(${layer.scale ?? 1})`, transition: interactive ? "transform var(--ease, 500ms) ease-out" : undefined, filter: layer.filter || undefined,
+                  // A flame that flickers (layer.flicker: where its base is, in % of the layer): it stretches, leans and
+                  // dims a little about that point, on the live card only. `scale` and `rotate` are their own
+                  // properties, so the animation leaves the tilt's transform alone.
+                  ...(layer.flicker && interactive ? { transformOrigin: `${layer.flicker.x}% ${layer.flicker.y}%`, animation: `rc3-flicker ${layer.flicker.period || 1.9}s ease-in-out infinite` } : null) }} />
                   {light?.glint}
                   {light && apparition.mask && (
                     <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none",
@@ -404,6 +410,18 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
                         // Embers: the masked shape burns from hot yellow at her out to deep red.
                         : { filter: "drop-shadow(0 0 2px #ff7a1a) drop-shadow(0 0 7px rgba(255, 80, 0, .85))",
                             backgroundImage: `radial-gradient(circle at ${apparition.cx}% ${apparition.cy}%, #ffe45c 0px, #ff8a1a calc(60px + var(--lit, 0) * 40px), #ff4400 calc(95px + var(--lit, 0) * 50px), #d92a00 190px)` }) }} />
+                  )}
+                  {/* A flash along the masked lines (apparition.flash, its period in seconds): a ring of light that runs
+                      out from her through the mask, over and over, on the live card only. Brighter as the card tilts. */}
+                  {light && apparition.mask && apparition.flash && interactive && (
+                    <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", mixBlendMode: "screen",
+                      transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out, opacity var(--ease, 500ms) ease-out",
+                      WebkitMaskImage: `url("${apparition.mask}")`, maskImage: `url("${apparition.mask}")`, WebkitMaskSize: "100% 100%", maskSize: "100% 100%",
+                      opacity: "calc(.45 + var(--lit, 0) * .55)", filter: `drop-shadow(0 0 4px ${apparition.color})` }}>
+                      <div style={{ position: "absolute", inset: 0, backgroundRepeat: "no-repeat", backgroundPosition: `${apparition.cx}% ${apparition.cy}%`,
+                        backgroundImage: `radial-gradient(circle at ${apparition.cx}% ${apparition.cy}%, transparent 0%, transparent 7%, rgba(255,253,235,1) 10%, rgba(255,238,170,.75) 12%, transparent 16%)`,
+                        animation: `rc3-flash ${apparition.flash}s ease-out infinite` }} />
+                    </div>
                   )}
                 </React.Fragment>
               );

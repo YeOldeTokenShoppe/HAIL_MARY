@@ -803,7 +803,7 @@ body:has(.awaiting-deal) #gameBar h1{margin-right:auto;font-size:clamp(.95rem,1.
     <p>Choose Devotion or Degen, take a seat, then select <strong>Deal opening hand</strong>. Before the deal, choose your <strong>starting Trader</strong> from your deck’s juniors, the Traders who cost $20M or less. You open the game as that Trader, free. To become a costlier Trader, play them from your hand: switching costs the new Trader’s price and your main action, and the Trader you were is discarded. Each player then starts with five cards from the remaining 39 and $50M.</p>
     <h3>Your turn</h3>
     <ol>
-      <li><strong>Start of turn.</strong> Things that stand on your desk act first: The Cow milks, The Rooster rolls, a planted Seed Round blooms, The Nativity Scene gains a figure, and you may bury your Trader in The Catacombs. The table handles the automatic ones.</li>
+      <li><strong>Start of turn.</strong> Things that stand on your desk act first: a Stablecoin pays, Paper Hands sells, a planted Seed Round blooms, The Nativity Scene gains a figure, and you may bury your Trader in The Catacombs. The table handles the automatic ones.</li>
       <li><strong>Collect income.</strong> Your seated Trader makes their Money, plus $5M for each point of Ethos while in good standing. An empty or disabled seat earns $10M. Under a Liquidity Trap, everything you collect piles on the Trap instead until it is cleared.</li>
       <li><strong>Draw a card.</strong> Tap your deck. An Event marked “fires on draw” resolves immediately for everyone, then you draw a replacement. An Enigma Machine on your desk can intercept one.</li>
       <li><strong>Choose one main action.</strong> Play a card and pay its cost, sell a holding, offer a card as a gift, pay $30M to clear one of your Calamities, attempt a Hail Mary, or pass. Some holdings give you another choice, such as uncorking The Cellar for a candle. Reading a card is free.</li>
@@ -811,14 +811,16 @@ body:has(.awaiting-deal) #gameBar h1{margin-right:auto;font-size:clamp(.95rem,1.
     </ol>
     <p><strong>Winning.</strong> The round is always played out. When it ends, anyone holding $1 billion or more wins; if both players are there, the richer one takes it.</p>
     <details><summary>Traders: Money and the trinity</summary><p>A Trader’s <strong>Money</strong> (the coin) is what they cost to play and what they make you each turn. Their character is three attributes that always add up to eight. <strong>Logos</strong> is insight: when you draw for your turn, you look at that many cards from the top of the deck and draw one of them; the others stay on top. <strong>Ethos</strong> is character: while your Trader is in good standing they make $5M more each turn for every point. <strong>Pathos</strong> is nerve: when a rival plays a Calamity on you, roll the d8; on your Trader’s Pathos or lower, the Calamity fails.</p>
-    <p><strong>Credibility has two states.</strong> A Trader is in good standing or in scandal. Any Calamity that lands on you is a strike: the first puts your Trader in scandal, which stops their Ethos bonus and makes them draw blind; a second, while still in scandal, <strong>discredits</strong> them and they leave the desk, unless a card with <strong>Saving Face</strong> is spent from your hand or the Shroud is on the table. Lighting a candle returns a Trader to good standing, but not while a Scandal sits on your desk.</p>
+    <p><strong>Credibility has two states.</strong> A Trader is in good standing or in scandal. Any Calamity that lands on you is a strike: the first puts your Trader in scandal, which stops their Ethos bonus and makes them draw blind; a second, while still in scandal, <strong>discredits</strong> them and they leave the desk, unless a card with <strong>Saving Face</strong> is spent from your hand. Lighting a candle returns a Trader to good standing, but not while a Scandal sits on your desk.</p>
     <p><strong>The earned halo.</strong> Once per Trader you can earn a halo, worth $10M more a turn in good standing. Offer a card from your hand to your rival as a gift, as your main action: if they accept, the halo is yours. They may refuse. Clearing a Calamity from your rival’s desk earns it too.</p></details>
-    <details><summary>Assets and your portfolio</summary><p>An Asset you buy goes into your portfolio. Starting on your next turn, you can use your main action to sell it for cash. Inspect the holding to see what it sells for today: some grow each round, The Avocado ripens and then rots, The Holy Grail is worth more while three candles burn, and a gamble lets you roll the d8 for its full price or take a smaller safe price. Rug Pull blocks sales until cleared. A Bear Market caps what one card can pay at $75M, and liquidates a leveraged Perp. The Lowrider keeps your portfolio out of the Whale’s and the Wheel’s reach.</p></details>
-    <details><summary>Events, Calamities, Remedies and Relics</summary><p>Some Events fire when drawn. Others stay in your hand until you play them: most pay out at once, a Seed Round is planted and blooms four rounds later, The Ponzi pays from your rivals’ holdings. Calamities come in two kinds. A <strong>condition</strong> (Bear Market, Tax Collector, Liquidity Trap, Scandal, The Inferno) sits on a rival’s desk until cleared: use a matching Remedy, a Miracle Tortilla, or pay $30M to clear one from your own desk. A <strong>fraud</strong> (Rug Pull, Quantum Hack, Exit Scam) hits once and is gone, so it cannot be cleared, only prevented: The Keys keep Quantum Hack and Exit Scam off you, and The Audit keeps Rug Pull off you. Against either kind, a Sacred Heart can cancel one as it lands and Pathos can make it fail. The Halo stops Calamities from being strikes against your Trader.</p><p>Relics give ongoing effects. You hold two at a time, three with the Motherboard, which takes no slot itself. Graces are offerings at the shrine: each lights a candle.</p></details>
-    <details><summary>Locations</summary><p>A Location is a place you build: one stands per player, it takes no Relic slot, and it is never sold. Building a second tears the first down. The Nativity Scene gains a figure each turn and pays on the third; The Catacombs turn a Trader into cash; The Chart Cathedral pays $25M whenever anyone lights a candle.</p></details>
+    <details><summary>Assets and your portfolio</summary><p>An Asset you buy goes into your portfolio. Starting on your next turn, you can use your main action to sell it for cash. Inspect the holding to see what it sells for today: some grow each round, The Avocado ripens and then rots, The Holy Grail is worth more while three candles burn, and a gamble lets you roll the d8 for its full price or take a smaller safe price. Rug Pull blocks sales until cleared. A Bear Market caps what one card can pay at $75M, and liquidates a leveraged Perp. Ride or Die keeps your portfolio out of the Whale’s and the Wheel’s reach.</p></details>
+    <details><summary>Events, Calamities, Remedies and Relics</summary><p>Some Events fire when drawn. Others stay in your hand until you play them: most pay out at once, a Seed Round is planted and blooms four rounds later, The Ponzi pays from your rivals’ holdings. Calamities come in two kinds. A <strong>condition</strong> (Bear Market, Tax Collector, Liquidity Trap, Scandal, The Inferno) sits on a rival’s desk until cleared: use a matching Remedy, a Miracle Tortilla, or pay $30M to clear one from your own desk. A <strong>fraud</strong> (Rug Pull, Quantum Hack, Exit Scam) hits once and is gone, so it cannot be cleared, only prevented: The Talisman keeps all three off you (and gives your Trader one more Pathos against any Calamity). Against either kind, a Sacred Heart can cancel one as it lands and Pathos can make it fail. The Halo stops Calamities from being strikes against your Trader.</p><p>Relics give ongoing effects. You hold two at a time, three with the Motherboard, which takes no slot itself. Graces are offerings at the shrine: each lights a candle.</p></details>
+    <details><summary>Locations</summary><p>A Location is a place you build: one stands per player, it takes no Relic slot, and it is never sold. Building a second tears the first down. The Nativity Scene gains a figure each turn and pays on the third; The Catacombs turn a Trader into cash; The Chart Cathedral pays $25M whenever anyone lights a candle. <strong>The Mission</strong> looks after whoever is behind: at the start of your turn, if you have less cash than every rival, collect $20M.</p></details>
+    <details><summary>Paper Hands, Diamond Hands and The Whistleblower</summary><p><strong>Paper Hands</strong> is a Calamity that stays: at the start of each turn its victim sells the Asset they bought most recently, at its cash price. The Stimulus or The Miracle Tortilla clears it. <strong>Diamond Hands</strong> is a Relic: Paper Hands cannot be played on you, and each Asset you have held three rounds or more sells for $25M more. <strong>The Whistleblower</strong> is the answer to a fraud after it has landed: she undoes the last Rug Pull, Quantum Hack or Exit Scam played on you (the Asset comes back, or the money does), and the rival who played it takes a strike.</p></details>
+    <details><summary>The Prediction Market</summary><p>A Location: a place where you bet. While it stands, once on your turn, after you draw and before your main action, you may stake $20M and name your odds, then roll the die: 3 or higher pays $30M, 5 or higher pays $50M, an 8 pays $200M. Miss, and the stake is lost. The Gambler needs one lower on the first two. A Miracle can roll a miss again. Under a Bear Market the $200M contract is closed.</p></details>
     <details><summary>The Singular80</summary><p>One Event changes the game for good. When The Singular80 is drawn, time folds: from then on, every player takes <strong>two</strong> main actions each turn, starting with the player who drew it. It stays in effect until the game ends. The Octobot’s Eight Arms still adds one Asset bought or sold on top. It is in the General shuffle only, not in the starter decks.</p></details>
-    <details><summary>Apparitions and Miracles</summary><p>Ten cards carry Our Lady’s image: The Holy Roller, The Fire Horse, The Virtual Mary, Mardi Gras, The Rose, The Fountain, The Miracle Tortilla, The Tattoo, The Lowrider and the Dashboard Figure. When you reveal one, by drawing an apparition Event or by playing any of the others from your hand, you witness an apparition and take a <strong>Miracle</strong> (✦). You may hold three. When a die of yours fails you (a gamble, the Hail Mary, your Trader’s Pathos, The Rooster), you may spend a Miracle to roll it again.</p></details>
-    <details><summary>Candles and the Hail Mary</summary><p>Candles are lit by Graces, the Feast, the Nativity and The Cellar, up to three. Once per game, you may spend your main action to attempt a Hail Mary. With zero, one, two, or three lit candles, the odds are 1, 2, 3, or 4 winning faces on the d8; The Fountain adds one winning face per use, up to 5 in 8, and a Virtue Signal on you counts your candles as none. Your desk shows the odds after card effects. An answered prayer clears your Calamities and pays $200M. A miss spends the attempt, unless the Dashboard Figure rolls again.</p></details>
+    <details><summary>Apparitions and Miracles</summary><p>Eleven cards carry Our Lady’s image: The Holy Roller, The Fire Horse, The Virtual Mary, Mardi Gras, The Rose, The Fountain, The Miracle Tortilla, The Tattoo, Ride or Die, the Dashboard Figure and The Mother Lode. When you reveal one, by drawing an apparition Event or by playing any of the others from your hand, you witness an apparition and take a <strong>Miracle</strong> (✦). You may hold three. When a die of yours fails you (a gamble, the Hail Mary, or your Trader’s Pathos), you may spend a Miracle to roll it again.</p></details>
+    <details><summary>Candles and the Hail Mary</summary><p>Candles are lit by Graces, the Feast, the Nativity and The Cellar, up to three. Once per game, you may spend your main action to attempt a Hail Mary. With zero, one, two, or three lit candles, the odds are 1, 2, 3, or 4 winning faces on the d8; The Fountain adds one winning face per use, up to 5 in 8. Your desk shows the odds after card effects. An answered prayer clears your Calamities and pays $200M. A miss spends the attempt, unless the Dashboard Figure rolls again.</p></details>
   </article>
 </dialog>
 <div id="overlayHost"></div><div class="toast" id="toast"></div>
@@ -1793,10 +1795,14 @@ const DESIGNS = [
   D('stablecoin', 'Stablecoin', 'asset', 2, { cash: 3, pros: 50, income: 1, text: 'While held: collect 1 Liquidity at the start of your turn' }),
   D('bluechip', 'Blue Chip', 'asset', 6, { cash: 10, pros: 250 }),
   D('grail', 'The Holy Grail', 'asset', 3, { cash: 5, pros: 100, gem: 250, text: 'Gem mint: sells for 100 — or 250 while you hold three lit candles' }),
-  D('rideordie', 'The Lowrider', 'asset', 3, { apparition: true, cash: 4, pros: 100, text: 'Ride or die: while the Lowrider is in your portfolio, your Assets stay with you — the Whale and the Wheel pass you by' }),
-  D('gallo', 'El Gallo', 'asset', 2, { cash: 2, pros: 75, rooster: true, text: 'The fighting rooster: at the start of your turn, roll — a 6 collects 2; a 1, and he is dead' }),
-  D('vaca', 'La Vaca', 'asset', 3, { cash: 6, pros: 75, income: 1, text: 'Milk: collect 1 at the start of your turn — or sell her for meat, 6 Liquidity' }),
-  D('aguacate', 'El Aguacate', 'asset', 3, { cash: 2, pros: 50, ripe: true, text: 'Green gold: ripe on the second round, worth 150. Green before, 50 — then it rots, 50 less each round' }),
+  D('rideordie', 'Ride or Die', 'asset', 3, { apparition: true, cash: 4, pros: 100, text: 'While Ride or Die is in your portfolio, your Assets stay with you — the Whale and the Wheel pass you by' }), // titled The Lowrider until 2026-11-21
+  // The Rooster left this set on 2026-11-21 (a card of the traditional lotería deck, reserved for that edition).
+  // Cult of Personal80 took its number and its place in the Degen deck.
+  // D('gallo', 'El Gallo', 'asset', 2, { cash: 2, pros: 75, rooster: true, text: 'The fighting rooster: at the start of your turn, roll — a 6 collects 2; a 1, and he is dead' }),
+  // The Cow left this set on 2026-11-21 (lotería in style; kept for that edition). Diamond Hands took its number and its place in the Devotion deck.
+  // D('vaca', 'La Vaca', 'asset', 3, { cash: 6, pros: 75, income: 1, text: 'Milk: collect 1 at the start of your turn — or sell her for meat, 6 Liquidity' }),
+  // The Avocado left this set on 2026-11-21 (kept for the Lotería edition). The Prediction Market took its number and its place in the Degen deck.
+  // D('aguacate', 'El Aguacate', 'asset', 3, { cash: 2, pros: 50, ripe: true, text: 'Green gold: ripe on the second round, worth 150. Green before, 50 — then it rots, 50 less each round' }),
   D('cava', 'La Cava', 'asset', 3, { cash: 3, pros: 50, grow: 25, uncork: true, text: 'Vintage: worth 25 more each round held — or uncork it: discard to light a candle' }),
   D('bono', 'The Savings Bond', 'asset', 2, { cash: 2, pros: 25, grow: 25, bearProof: true, text: 'Grandmother’s gift: worth 25 more each round held, and immune to The Bear' }),
   D('plata', 'La Plata', 'asset', 3, { cash: 3, pros: 125, silver: true, text: 'Flight to safety: in a Flash Crash you lose nothing, and bank 25' }),
@@ -1819,11 +1825,18 @@ const DESIGNS = [
   // `loss` are in $M. Playtest 2's engine does not read `hit` and still plays these three the old way.
   D('hack', 'Quantum Hack', 'hazard', 2, { hit: true, steal: 40, text: 'Take $40M from your rival' }),
   // Performative piety: the candles are lit, and count for nothing.
-  D('virtue', 'The Virtue Signal', 'hazard', 2, { text: 'Performative piety: their candles add no winning faces to the Hail Mary until cleared' }),
+  // The Virtue Signal left the set on 2026-11-21, the weakest card in it: it only stopped a rival's candles from
+  // helping their Hail Mary, it had no cure of its own, and it was in neither starter deck. Paper Hands took
+  // its number, which brought the set to 88.
+  // D('virtue', 'The Virtue Signal', 'hazard', 2, { text: 'Performative piety: their candles add no winning faces to the Hail Mary until cleared' }),
   // Hellfire: a spiritual lock, not damage. Prayers do not leave hell. (Keeps
   // its Spanish name in the English row by the user's choice, like the apparitions.)
   D('infierno', 'El Infierno', 'hazard', 3, { text: 'Hellfire: they cannot attempt the Hail Mary or offer a Grace until cleared' }),
   D('rug', 'Rug Pull', 'hazard', 3, { hit: true, text: 'Your rival discards the Asset they bought most recently' }),
+  // Paper Hands (2026-11-21): a condition. Each turn it stays, its victim sells the Asset they bought most
+  // recently (the same Asset a Rug Pull would take) at its cash price, the lower of its two. Cleared by
+  // The Stimulus or The Miracle Tortilla; Diamond Hands turns it away.
+  D('paperhands', 'Paper Hands', 'hazard', 3, { text: 'At the start of each turn, they sell the Asset they bought most recently, for its cash price' }),
   D('taxman', 'Tax Collector', 'hazard', 2, { text: 'Pay 1 to the bank at the start of each turn' }),
   D('trap', 'Liquidity Trap', 'hazard', 3, { text: 'Trapped: every Liquidity they collect goes under this card instead. Clear it, and the pile is theirs' }),
   D('escandalo', 'Scandal', 'hazard', 2, { text: 'Scandal: the seated Trader loses 5 Credibility when it breaks, 2 more each turn' }),
@@ -1834,14 +1847,20 @@ const DESIGNS = [
   // `clears` may be one design key, a list of them, or 'any'. (They cleared Rug Pull until 2026-11-20.)
   // `clears` on a Remedy may be one design key, a list of them, or 'any'.
   // The market cure (2026-11-20, in The Burro's place): one Remedy for the three market conditions.
-  D('stimulus', 'The Stimulus', 'remedy', 2, { clears: ['bear', 'taxman', 'trap'], text: 'Clear a Bear Market, a Tax Collector or a Liquidity Trap' }),
+  D('stimulus', 'The Stimulus', 'remedy', 2, { clears: ['bear', 'taxman', 'trap', 'paperhands'], text: 'Clear a Bear Market, a Tax Collector, a Liquidity Trap or Paper Hands' }),
+  // The Whistleblower (2026-11-21): the answer to a fraud after the fact. The three frauds are hits: once
+  // one has landed there is nothing on the table to clear, so until now they could only be prevented (The
+  // Keys, The Audit). She undoes the last one played on you, and its player takes a strike. (whistle: the
+  // engine's flag; the fraud is remembered on the victim as lastFraud.)
+  D('whistle', 'The Whistleblower', 'remedy', 2, { whistle: true, text: 'Undo the last fraud played on you: take back what it cost you. The rival who played it takes a strike' }),
   D('tortilla', 'Miracle Tortilla', 'remedy', 2, { apparition: true, clears: 'any', printName: 'La Tortilla' }),
   // The thing the publicist hands you, not the man: the Remedies row is objects.
   D('publicista', 'The Press Release', 'remedy', 1, { clears: 'escandalo', savingGrace: 2, text: 'Clear a Scandal — or polish: your seated Trader regains 5 Credibility', printName: 'El Comunicado' }),
   // The refreshment: a Remedy that clears nothing. It replaces itself (the +1),
   // so it is never a dead card — the snack-item shape. The one-shot cousin of
   // the Enigma Machine's old cycle, which now decodes the deck instead.
-  D('horchata', 'Horchata', 'remedy', 0, { refresh: 2, text: 'Refresh: discard up to 2 cards, then draw that many plus one', printName: 'La Horchata' }),
+  // La Horchata left this set on 2026-11-21 (kept for the Lotería edition). The Whistleblower took its number and its place in the Devotion deck.
+  // D('horchata', 'Horchata', 'remedy', 0, { refresh: 2, text: 'Refresh: discard up to 2 cards, then draw that many plus one', printName: 'La Horchata' }),
   // RESERVED FOR THE LOTERÍA EDITION (out of this set since 2026-11-20; The Stimulus has its number, 65):
   // D('burro', 'The Burro', 'remedy', 2, { clears: 'any', bounce: true, text: 'Stubborn: clear one Calamity — and kick it back onto the rival who played it', printName: 'El Burro' }),
   D('heart', 'Sacred Heart', 'artifact', 2, { text: 'A shield, not a cure: discard to cancel a Calamity as it lands', printName: 'El Corazón' }),
@@ -1849,7 +1868,8 @@ const DESIGNS = [
   // the Sacred Heart anything, once. `wards` lists the Calamities that cannot be played on whoever has the Relic equipped.
   D('halo', 'The Halo', 'artifact', 3, { noStrikes: true, text: 'Calamities are not strikes against your seated Trader', printName: 'La Aureola' }),
   // Not your keys, not your coins: self-custody. (A Remedy until 2026-11-20; it cleared Rug Pull.)
-  D('keys', 'The Keys', 'artifact', 2, { wards: ['hack', 'scam'], text: 'Quantum Hack and Exit Scam cannot be played on you', printName: 'Las Llaves' }),
+  // The Keys left the set on 2026-11-21, merged with The Audit into The Talisman (below). Design, face and art kept.
+  // D('keys', 'The Keys', 'artifact', 2, { wards: ['hack', 'scam'], text: 'Quantum Hack and Exit Scam cannot be played on you', printName: 'Las Llaves' }),
   D('rosary', 'The Rosary Beads', 'artifact', 2, { text: 'When you light a candle, draw a card', printName: 'El Rosario' }),
   // Intercepted traffic: the market's message is decoded before it is sent.
   D('enigma', 'Enigma Machine', 'artifact', 2, { text: 'Intercept: when an Event fires on your draw, discard the Machine — the Event is cancelled for everyone', printName: 'El Enigma' }),
@@ -1857,7 +1877,19 @@ const DESIGNS = [
   // seller pays.
   D('skull', 'The Skull', 'artifact', 2, { text: 'Whenever a rival sells an Asset, collect 1 Liquidity', printName: 'La Calavera' }),
   // The relic that raises the dead: one disgrace, undone.
-  D('shroud', 'The Shroud', 'artifact', 2, { savingGrace: 5, text: 'When your seated Trader would be discredited, discard the Shroud instead: they stay, with 5 Credibility', printName: 'El Sudario' }),
+  // Cult of Personal80 (2026-11-21): the faithful do not read the news. While it is equipped, the seated
+  // Trader collects $10M more each turn (flock, in coins) and is paid for good standing even in scandal;
+  // the price is that no other Trader can be seated over them, and when they are discredited the cult
+  // goes with them. Where The Halo stops the strike, the Cult
+  // lets it land and pays anyway. (cult: the engine's flag.)
+  // Diamond Hands (2026-11-21): patience, paid. An Asset held three rounds or more sells for $25M more
+  // (diamond, in $M), and Paper Hands cannot be played on its holder.
+  D('diamond', 'Diamond Hands', 'artifact', 2, { diamond: 25, wards: ['paperhands'], text: 'Each Asset you have held three rounds or more sells for $25M more. Paper Hands cannot be played on you' }),
+  // CUT on 2026-11-21, the day it was added: a card that pays a Trader for staying in scandal works against
+  // what the game is about (Ethos, character, is the strongest attribute). Kept here as a record.
+  // D('cult', 'Cult of Personal80', 'artifact', 2, { cult: true, flock: 1, text: 'The faithful pay in: your seated Trader collects $10M more each turn, and is paid for good standing even in scandal. You cannot seat another Trader over them. If they are discredited, discard this' }),
+  // The Shroud left the set on 2026-11-21: the weakest of the cards that protect a Trader's standing, and in neither starter deck.
+  // D('shroud', 'The Shroud', 'artifact', 2, { savingGrace: 5, text: 'When your seated Trader would be discredited, discard the Shroud instead: they stay, with 5 Credibility', printName: 'El Sudario' }),
   // Loyalty through the dip: the one defence for a PORTFOLIO. The Whale and
   // The Wheel are the only effects that move Assets between players; this
   // holder's stay put. Deliberately no printName (see the row rule above).
@@ -1866,13 +1898,18 @@ const DESIGNS = [
   D('lottery', 'The Lottery Ticket', 'artifact', 1, { text: 'Scratch it at the start of each turn: roll the die — a 6 wins 150 Prosperity, and the Ticket is spent', printName: 'El Boleto' }),
   // Ink of devotion: a slow, permanent heal for whoever sits at the desk.
   // Everything aligns: the called Events (Bull Run, Full Moon…) pay a little more.
-  D('geometry', 'Sacred Geometry', 'artifact', 2, { text: 'Everything aligns: your called Events bank 25 more', printName: 'La Geometría' }),
+  D('geometry', 'Sacred Geom8ry', 'artifact', 2, { text: 'Everything aligns: your called Events bank 25 more', printName: 'La Geometría' }),
   // The board that holds it all: the one card that touches the two-slot limit.
   D('motherboard', 'The Motherboard', 'artifact', 2, { slots: true, text: 'Expansion slots: the board takes no Relic slot, and you may hold a third Relic', printName: 'La Placa Madre' }),
   D('map', 'Treasure Map', 'artifact', 2, { text: 'X marks the spot: whenever you sell an Asset, draw a card', printName: 'El Mapa' }),
   D('tattoo', 'The Tattoo', 'artifact', 2, { apparition: true, text: 'Inked devotion: at the start of your turn, your seated Trader regains 1 Credibility', printName: 'El Tatuaje' }),
   // Due diligence, done beforehand: prevention, not cure.
-  D('audit', 'The Audit', 'artifact', 2, { wards: ['rug'], text: 'Rug Pull cannot be played on you' }),
+  // The Audit left the set on 2026-11-21, merged with The Keys into The Talisman. Design, face and art kept.
+  // D('audit', 'The Audit', 'artifact', 2, { wards: ['rug'], text: 'Rug Pull cannot be played on you' }),
+  // The Talisman (2026-11-21): one protection where there were two. The Keys stopped two frauds and The Audit
+  // the third; frauds are rare, so each was usually a dead card. The Talisman stops all three, and it does
+  // something every game besides: its wearer's Trader counts one more Pathos against any Calamity (pathos).
+  D('talisman', 'The Talisman', 'artifact', 2, { wards: ['rug', 'hack', 'scam'], pathos: 1, text: 'Rug Pull, Quantum Hack and Exit Scam cannot be played on you. Your seated Trader counts one more Pathos against Calamities' }),
   D('dashboard', 'Dashboard Figure', 'artifact', 2, { apparition: true, noSlot: true, text: 'Our Lady of the Dashboard: an apparition for the road. She takes no Relic slot', printName: 'La Virgencita' }),
   D('ofrenda', 'La Ofrenda', 'grace', 0, { savingGrace: 2, text: 'Offer this card to Our Lady: it goes to the shrine and lights a candle' }),
   // SAVING GRACE N (keyword): discard this from your hand when your seated
@@ -1888,19 +1925,31 @@ const DESIGNS = [
   D('anima', 'Ánima Sola', 'grace', 1, { text: 'To the shrine: light a candle, and return the most recently discarded Trader with 5 Credibility to your empty seat or to your hand' }),
   // Her tears fall for the fallen: a plain candle, and the strongest rescue in the hand.
   D('lagrimas', 'Las Lágrimas', 'grace', 1, { savingGrace: 4, text: 'To the shrine: light a candle' }),
-  D('confession', 'The Confession', 'grace', 1, { savingGrace: 3, text: 'To the shrine: light a candle, and your seated Trader’s Credibility is restored in full. The Inferno cannot stop it, and it lifts The Inferno', printName: 'La Confesión' }),
+  // Coin-Op Confession (The Confession until 2026-11-21, when its art arrived: a coin-operated booth with a robot confessor).
+  D('confession', 'Coin-Op Confession', 'grace', 1, { savingGrace: 3, text: 'To the shrine: light a candle, and your seated Trader’s Credibility is restored in full. The Inferno cannot stop it, and it lifts The Inferno', printName: 'La Confesión' }),
   D('fountain', 'The Fountain', 'grace', 2, { apparition: true, text: 'Toss in 2 Liquidity: your Hail Mary odds rise one step, even past the shrine’s three', printName: 'La Fuente' }),
   D('rose', 'The Rose', 'grace', 0, { apparition: true, pros: 50, cash: 2, text: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise', printName: 'La Rosa' }),
   // Locations — places you build. One stands per player, takes no Relic slot, is never sold.
   D('nacimiento', 'The Nativity Scene', 'location', 2, { text: 'Build it: place a figure at the start of each turn. At the third, the Niño arrives at midnight — light a candle and bank 75, then pack it away', printName: 'El Nacimiento' }),
   D('catedral', 'The Chart Cathedral', 'location', 2, { text: 'Green candles: whenever any player lights a candle, bank 25', printName: 'La Catedral' }),
+  // The Prediction Market (2026-11-21): a place where you bet. First built as an Asset sold on a roll; a
+  // market is a venue, so the same day it became the first Location of the Degen kind. Once on its
+  // owner's turn, before the main action, they may stake `stake` coins and name their odds: market is
+  // [the face needed, what it pays in $M] for each contract. A miss loses the stake.
+  D('predict', 'The Prediction Market', 'location', 3, { stake: 2, market: [[3, 30], [5, 50], [8, 200]], text: 'Once on your turn, before your main action, you may stake $20M and name your odds: 3+ pays $30M, 5+ pays $50M, an 8 pays $200M. Miss, and the stake is lost' }),
+  // The Mission (2026-11-21): a place that looks after whoever is behind. While it stands, its owner collects
+  // alms (in coins) at the start of any turn they begin with less cash than every rival. A place from the
+  // RL80 website, and the set's samaritan.
+  D('mission', 'The Mission', 'location', 2, { alms: 2, text: 'At the start of your turn, if you have less cash than every rival, collect $20M' }),
   D('catacumbas', 'The Catacombs', 'location', 2, { text: 'Buried with honors: at the start of your turn you may bury your seated Trader — bank 5 Prosperity per point of Credibility they have left', printName: 'Las Catacumbas' }),
   D('moneda', 'The Airdrop', 'event', 0, { text: 'Free money falls from the sky: every player collects 2 Liquidity' }),
   // Yield farming: fat income until the market moves and wipes it.
   D('jardin', 'Yield Farm', 'asset', 4, { cash: 2, pros: 50, income: 2, text: 'While held: collect 2 a turn. Discard this Asset when any Event fires on draw' }),
   // Hail Mary Prospecting Co. — three claims:
   // the map leads somewhere (cards), the mine pays the longer you dig, the well is a wildcat.
-  D('mine', 'The Mine', 'asset', 4, { cash: 4, pros: 75, grow: 25, text: 'Each round held, worth 25 more Prosperity' }),
+  // The Mother Lode (The Mine until 2026-11-21): the heap of ore reads as Our Lady, mantle and rays, a happy
+  // accident in the art. Named for it, it is an apparition: playing it is witnessing her. (The key stays `mine`.)
+  D('mine', 'The Mother Lode', 'asset', 4, { apparition: true, cash: 4, pros: 75, grow: 25, text: 'Each round held, worth 25 more Prosperity' }),
   D('oil', 'Oil Field Claim', 'asset', 3, { cash: 3, pros: 175, gamble: true, gambleOn: 3, bust: 25, text: 'Sell for Prosperity: a die decides — 3+ gushes for 175, else it runs dry for 25' }),
   D('semilla', 'Seed Round', 'event', 1, { pros: 150, bloom: 4, played: true, text: 'Plant it: four rounds on, it blooms — bank 150' }),
   // Events: the market's own voice. They fire the moment they are drawn, hit the whole
@@ -1951,13 +2000,14 @@ const DESIGN_TYPES = ["trader", "asset", "event", "hazard", "remedy", "artifact"
 const designByKey = Object.fromEntries(DESIGNS.map((d) => [d.key, d]));
 
 // ── APPARITIONS AND MIRACLES (2026-11-20) ────────────────────────────────────
-// Ten cards carry Our Lady's image (`apparition: true`): The Holy Roller, The Fire Horse, The Virtual Mary,
-// Mardi Gras, The Rose, The Fountain, The Miracle Tortilla, The Tattoo, The Lowrider and the Dashboard Figure.
+// Eleven cards carry Our Lady's image (`apparition: true`): The Holy Roller, The Fire Horse, The Virtual Mary,
+// Mardi Gras, The Rose, The Fountain, The Miracle Tortilla, The Tattoo, Ride or Die, the Dashboard Figure and,
+// since 2026-11-21, The Mother Lode. (The Rose is reserved for the Lotería edition; when it leaves, ten.)
 // Whoever REVEALS one witnesses an apparition and takes a MIRACLE (an eight-pointed star; three at most):
 // the player who draws an apparition Event, or who plays any other apparition card from their hand.
 // A Miracle is spent to roll any one die of your own again. (The Dashboard Figure used to be that reroll,
 // once, as a Relic; now it is the tenth apparition.) The art's lit halos are keyed by face id in apparitions.js.
-const APPARITION_KEYS = ["holyroller", "fuego", "virtual", "mardigras", "rose", "fountain", "tortilla", "tattoo", "rideordie", "dashboard"];
+const APPARITION_KEYS = ["holyroller", "fuego", "virtual", "mardigras", "rose", "fountain", "tortilla", "tattoo", "rideordie", "dashboard", "mine"];
 
 // ── EDITION (2026-11-19) ─────────────────────────────────────────────────────
 // The set prints in English. The lotería titles ("El Gato", `printName`) are
@@ -1991,7 +2041,7 @@ const titleOf = (d) => (EDITION === "loteria" ? loteriaTitleOf(d) : ENGLISH_TITL
 // replaced or cut. Nothing reads this list yet; it is the record of the decision.
 // (The Sacred Heart and The Bell were on this list; on 2026-11-20 both were kept in this set for good.
 // The Burro, not a traditional lotería card but made for that edition, left the set the same day.)
-const LOTERIA_RESERVED = ["gallo", "diablito", "rose", "skull"];
+const LOTERIA_RESERVED = ["diablito", "rose", "skull"]; // El Gallo was the fourth; it left the set on 2026-11-21
 // R-cana — THE TRINITY: the three fixed numbers every Trader carries (2026-11-16).
 // One source for the Playtest 3 engine (src/game/playtest3/pt3-sim.js) and the
 // code-drawn card frame (src/components/RcanaCard3.jsx), keyed by design key.
@@ -2004,7 +2054,7 @@ const LOTERIA_RESERVED = ["gallo", "diablito", "rose", "skull"];
 // two is $10M. Tuned on the two-player sim until every opener sat within a few
 // points of 50% (src/game/playtest3/PLAYTEST3.md).
 const TRINITY = {
-  monje:         { liq: 1.5, cred: 2, eq: 2 }, // Money 15 (2026-11-20): at 10 he opened at 39%, at 20 at 59%. His Ethos 4 is what carries him, not his Vow
+  monje:         { liq: 1.5, cred: 2, eq: 2 }, // Money 15. Set on 2026-11-20 (at 10 he opened at 39%, at 20 at 59%). Tried at 10 on 2026-11-21 against bots that could not value Relics; once they could, 10 opened at 47% and 15 at 52%, so 15 it is. His Ethos 4 is what carries him, not his Vow
   gato:          { liq: 2, cred: 1, eq: 2 },
   general:       { liq: 2, cred: 1, eq: 3 }, // the rock
   diablito:      { liq: 2, cred: 0, eq: 0 }, // no halo, no composure: he lives on his wager
@@ -2058,6 +2108,8 @@ const TRINITY_TEXT = {
   oil: "On sale, roll: 4+ gushes for $175M, else $25M. Or take the safe $30M.",
   gallo: "Each turn, roll: an 8 collects $20M; a 1 kills him.",
   lottery: "At the start of each turn, roll: an 8 wins $150M, and the Ticket is spent.",
+  // The odds are die faces, not coins: without this line oneMoney pins "3+" and "5+" as Liquidity pills.
+  predict: "Once a turn, stake $20M and name your odds: 3+ pays $30M, 5+ pays $50M, an 8 pays $200M. A miss loses the stake.",
 };
 
 // $M per point of Liquidity or Credibility, and per coin of an old cost.
@@ -2094,21 +2146,22 @@ const standing = (t) => (t.credNow == null || t.credNow >= t.cred ? 'in good sta
 // (hazards, gambles, the Unicorn's compounding). Deck identity is the collectible premise.
 const RECIPES = {
   devotion: [['monje', 2], ['gato', 1], ['celebridad', 1], ['general', 1],
-    ['tech', 1], ['vaca', 1], ['cava', 1], ['plata', 1], ['nacimiento', 1], ['moon', 1], ['catedral', 1], ['bluechip', 1], ['semilla', 1], ['investigadora', 1],
+    ['tech', 1], ['diamond', 1], ['cava', 1], ['plata', 1], ['nacimiento', 1], ['moon', 1], ['catedral', 1], ['bluechip', 1], ['semilla', 1], ['investigadora', 1],
     ['bull', 2], ['squeeze', 2],
     ['bear', 1], ['rug', 1],
-    ['bell', 1], ['tortilla', 2], ['publicista', 1], ['horchata', 1], ['ofrenda', 1],
-    ['heart', 1], ['halo', 1], ['audit', 1], ['rosary', 1], ['grail', 1], ['dashboard', 1], ['tattoo', 1], ['geometry', 1],
+    ['bell', 1], ['tortilla', 2], ['publicista', 1], ['techwreck', 1], ['ofrenda', 1],
+    ['heart', 1], ['halo', 1], ['talisman', 1], ['rosary', 1], ['grail', 1], ['dashboard', 1], ['tattoo', 1], ['geometry', 1],
     ['cherub', 1], ['fountain', 1], ['limpia', 1], ['anima', 1], ['lagrimas', 1]],
   degen: [['diablito', 2], ['unicornio', 2], ['prospector', 1], ['abuela', 1], ['bot', 1],
-    ['meme', 1], ['tech', 2], ['gallo', 1], ['aguacate', 1], ['perp', 1], ['bluechip', 1], ['jardin', 1], ['ponzi', 1], ['catacumbas', 1],
+    ['meme', 1], ['tech', 2], ['paperhands', 1], ['predict', 1], ['perp', 1], ['bluechip', 1], ['jardin', 1], ['ponzi', 1], ['catacumbas', 1],
     ['unlock', 1],
-    ['ballena', 1], ['rueda', 1], ['moralhazard', 1], ['mardigras', 1], ['godcandle', 1], ['techwreck', 1],
+    ['ballena', 1], ['rueda', 1], ['mardigras', 1], ['godcandle', 1], // Tech Wreck and Moral Hazard left this deck on 2026-11-21, for the two frauds below
     ['fuego', 1],
     ['illuminati', 1],
-    ['bear', 1], ['rug', 1], ['escandalo', 1], ['fall', 1], ['infierno', 1], ['trap', 1],
+    ['bear', 1], ['rug', 1], ['hack', 1], ['scam', 1], ['escandalo', 1], ['fall', 1], ['infierno', 1], ['trap', 1],
     ['tortilla', 1],
-    ['heart', 1], ['skull', 1], ['enigma', 1], ['rideordie', 1], ['lottery', 1], ['motherboard', 1],
+    ['heart', 1], ['stablecoin', 1], ['enigma', 1], // a Stablecoin where The Skull was (2026-11-21): the deck had lost two earning Assets that day
+    ['rideordie', 1], ['lottery', 1], ['motherboard', 1],
     ['ofrenda', 1]],
 };
 // THE GENERAL SHUFFLE (2026-11-20, a third mode for testing): no starter decks. Every card in the set, one
@@ -2229,9 +2282,9 @@ class Game {
   }
   // The three frauds. Returns the line for the log.
   resolveHit(p, t, c) {
-    if (c.key === 'rug') { const a = t.invest[t.invest.length - 1]; t.invest.splice(t.invest.indexOf(a), 1); t.discard.push(a); t.stats.rugged = (t.stats.rugged || 0) + 1; return `${t.name}'s ${a.name} goes to zero and is discarded`; }
-    if (c.steal) { const n = Math.min(c.steal, t.cash); t.cash -= n; p.cash += n; return `${p.name} takes $${n}M from ${t.name}`; }
-    const n = Math.min(c.loss || 0, t.cash); t.cash -= n; return `${t.name} loses $${n}M`;
+    if (c.key === 'rug') { const a = t.invest[t.invest.length - 1]; t.invest.splice(t.invest.indexOf(a), 1); t.discard.push(a); t.stats.rugged = (t.stats.rugged || 0) + 1; t.lastFraud = { name: c.name, by: p, asset: a }; return `${t.name}'s ${a.name} goes to zero and is discarded`; }
+    if (c.steal) { const n = Math.min(c.steal, t.cash); t.cash -= n; p.cash += n; t.lastFraud = { name: c.name, by: p, amount: n, stolen: true }; return `${p.name} takes $${n}M from ${t.name}`; }
+    const n = Math.min(c.loss || 0, t.cash); t.cash -= n; t.lastFraud = { name: c.name, by: p, amount: n }; return `${t.name} loses $${n}M`;
   }
   // A strike from a Calamity. The Halo (noStrikes) turns it aside.
   async strike(t, why) {
@@ -2388,7 +2441,8 @@ class Game {
         const saviours = p.hand.filter((c) => c.savingGrace);
         const pick = saviours.length ? await p.policy.useSavingGrace(this, p, saviours) : null;
         if (pick && saviours.includes(pick)) { p.hand.splice(p.hand.indexOf(pick), 1); p.discard.push(pick); p.trader.credNow = 1; p.stats.savingGrace = (p.stats.savingGrace || 0) + 1; this.log(`✝ SAVING FACE — ${p.name} gives up ${pick.name}: ${p.trader.name} stays at the desk, still in scandal`); }
-        else { this.log(`☠ ${p.trader.name} is DISCREDITED and leaves ${p.name}'s desk`); p.discard.push(p.trader); p.trader = null; p.stats.disgraces++; }
+        else { this.log(`☠ ${p.trader.name} is DISCREDITED and leaves ${p.name}'s desk`); p.discard.push(p.trader); p.trader = null; p.stats.disgraces++;
+          const cult = p.artifacts.find((x) => x.cult); if (cult) { p.artifacts.splice(p.artifacts.indexOf(cult), 1); p.discard.push(cult); this.log(`the CULT OF PERSONAL80 disbands: it goes to ${p.name}'s discard pile`); } }
       }
     }
   }
@@ -2397,10 +2451,32 @@ class Game {
   saleValue(a) { return this.prosOf(a) + this.saleBonus(); }
   eventPayout(p, c) { return c.pros + (c.perHaz ? c.perHaz * p.hazards.length : 0) + (c.perRivalAsset ? c.perRivalAsset * this.rivals(p).reduce((s, q) => s + q.invest.length, 0) : 0) + (p.artifacts.some((a) => a.key === 'geometry') ? 25 : 0); }
   rideOrDie(q) { return q.invest.some((x) => x.key === 'rideordie'); }
+  // CULT OF PERSONAL80: while it is equipped and a Trader is seated, no other Trader can be played over them.
+  cultBound(p) { return !!p.trader && p.artifacts.some((a) => a.cult); }
   // Relic slots: two, three with the Motherboard — which sits outside the count.
   relicSlots(p) { return 2 + (p.artifacts.some((a) => a.slots) ? 1 : 0); }
   relicsHeld(p) { return p.artifacts.filter((a) => !a.slots && !a.noSlot); }
-  prosOf(a) {
+  // DIAMOND HANDS: an Asset its holder has kept three rounds or more is worth that much more.
+  diamondOf(a) { if (a.bornTurn == null || this.turnNo - a.bornTurn < 3) return 0; const o = this.players.find((q) => q.invest.includes(a)); const d = o && o.artifacts.find((x) => x.diamond); return d ? d.diamond : 0; }
+  // THE PREDICTION MARKET, a Location. The face contract i needs: The Gambler's are one lower, except the
+  // long shot (the top face is the top face for everyone).
+  marketNeed(p, loc, i) { const face = loc.market[i][0]; return face >= this.rules.die ? face : Math.max(2, face - (this.is(p, 'abuela') ? 1 : 0)); }
+  // The contracts open to p right now: none without the stake; under a Bear Market, none that pays over 75.
+  marketOffers(p) { const loc = p.location; if (!loc || !loc.market || p.liq < loc.stake) return []; return loc.market.map((m, i) => i).filter((i) => !(this.hasHaz(p, 'bear') && loc.market[i][1] > 75)); }
+  // One bet a turn, before the main action: stake, name the odds, roll. A Miracle can roll a miss again.
+  async marketBet(p) {
+    const offers = this.marketOffers(p); if (!offers.length || !p.policy.placeBet) return;
+    const i = await p.policy.placeBet(this, p, p.location, offers); if (i == null || !offers.includes(i)) return;
+    const loc = p.location, pay = loc.market[i][1], need = this.marketNeed(p, loc, i);
+    p.liq -= loc.stake; p.stats.marketCalls = (p.stats.marketCalls || 0) + 1; p.stats['marketCall' + i] = (p.stats['marketCall' + i] || 0) + 1;
+    let roll = this.roll();
+    if (roll < need && await this.miracle(p, { kind: 'gamble', name: loc.name, roll })) roll = this.roll();
+    if (roll >= need) { p.stats.marketWins = (p.stats.marketWins || 0) + 1; this.bank(p, pay, `${loc.name} — ${p.name} staked ${this.m(loc.stake)} on ${need >= this.rules.die ? 'an ' + need : need + '+'}, the die shows ${roll}: IT RESOLVES YES`, false); }
+    else this.log(`${loc.name} — ${p.name} staked ${this.m(loc.stake)} on ${need >= this.rules.die ? 'an ' + need : need + '+'}, the die shows ${roll}: it resolves NO, and the stake is lost`);
+    if (this.hooks && this.hooks.render) await this.hooks.render();
+  }
+  prosOf(a) { return this.baseProsOf(a) + this.diamondOf(a); }
+  baseProsOf(a) {
     if (a.gem) { const o = this.players.find((q) => q.invest.includes(a)); return o && o.deeds >= 3 ? a.gem : a.pros; }
     if (a.ripe) { const held = this.turnNo - a.bornTurn; return held < 2 ? 50 : Math.max(0, 150 - 50 * (held - 2)); }
     if (a.perp) return a.pros * 2;
@@ -2473,7 +2549,7 @@ class Game {
         const heart = t.artifacts.find((a) => a.key === 'heart');
         if (heart && await t.policy.useHeart(this, t, c, p)) { t.artifacts.splice(t.artifacts.indexOf(heart), 1); t.discard.push(heart); p.discard.push(c); this.log(`${t.name} spent ${heart.name} to block ${c.name}. ${c.name} went to ${p.policy.human ? 'your' : p.name + "’s"} discard pile.`); return true; }
         // EQUANIMITY: a seated Trader's composure. The Calamity fails on a roll of eq or lower — a stat, so a Quantum Hack does not switch it off.
-        const eq = t.trader ? (t.trader.eq || 0) : 0;
+        const eq = t.trader ? (t.trader.eq || 0) + t.artifacts.reduce((n, x) => n + (x.pathos || 0), 0) : 0; // THE TALISMAN: one more Pathos
         if (eq > 0) { let roll = this.roll();
           if (roll > eq && await this.miracle(t, { kind: 'pathos', name: `${t.trader.name}'s roll against ${c.name}`, roll })) roll = this.roll();
           if (roll <= eq) { p.discard.push(c); this.log(`${t.name} blocked ${c.name}. ${t.trader.name} rolled ${roll} on a d${this.rules.die}. ${this.rules.attrs ? 'Pathos' : 'Equanimity'} ${eq} blocks on ${eq} or lower. ${c.name} went to ${p.policy.human ? 'your' : p.name + "’s"} discard pile.`); t.stats.eqSaves = (t.stats.eqSaves || 0) + 1;
@@ -2495,6 +2571,16 @@ class Game {
           for (const x of picked) { p.hand.splice(p.hand.indexOf(x), 1); p.discard.push(x); }
           p.discard.push(c); const drawn = []; for (let i = 0; i <= picked.length; i++) { const d = await this.draw(p, true); if (d) drawn.push(d); }
           this.log(`${p.name} drinks ${c.name.toUpperCase()} — lets go of ${picked.length} and draws ${drawn.length}`); break; }
+        if (c.whistle) { // THE WHISTLEBLOWER: the last fraud played on you is undone, and its player takes a strike
+          const f = p.lastFraud; if (!f) { p.liq += cost; p.hand.push(c); p.stats.plays--; return false; }
+          let got = 'nothing was left to take back';
+          if (f.asset) { const k = p.discard.indexOf(f.asset); if (k >= 0) { p.discard.splice(k, 1); p.invest.push(f.asset); got = `${f.asset.name} is back in ${p.name}'s portfolio`; } }
+          else if (f.stolen) { const n = Math.min(f.amount, f.by.cash); f.by.cash -= n; p.cash += n; got = `${p.name} takes $${n}M back from ${f.by.name}`; }
+          else { p.cash += f.amount; got = `${p.name} is made whole: $${f.amount}M`; }
+          p.lastFraud = null; p.discard.push(c); p.stats.whistles = (p.stats.whistles || 0) + 1;
+          this.log(`${p.name} plays ${c.name} on ${f.name}: ${got}`);
+          await this.strike(f.by, 'THE WHISTLEBLOWER');
+          break; }
         if (choice.polish) { this.restoreStanding(p, 'THE PRESS RELEASE'); p.discard.push(c); break; }
         const t = choice.target || p; const h = choice.hazard || t.hazards.find((x) => clearsHaz(c, x));
         if (!h) { p.liq += cost; p.hand.push(c); p.stats.plays--; return false; }
@@ -2546,14 +2632,14 @@ class Game {
   }
   async sell(p, a, wantPros) {
     if (this.hasHaz(p, 'rug')) return false; if (a.bornTurn === this.turnNo) return false;
-    const base = this.prosOf(a);
+    const base = this.prosOf(a), diamond = this.diamondOf(a);
     p.invest.splice(p.invest.indexOf(a), 1); p.stats.sells++;
     for (const q of this.players) if (q !== p && q.artifacts.some((x) => x.key === 'skull')) { this.collect(q, 1); this.log(`${q.name} holds THE SKULL: +${this.m(1)} from ${p.name}'s sale`); }
     if (wantPros && a.gamble) {
       let roll = this.roll(); p.stats.sellPros++;
       const need = this.gambleNeed(p, a);
       if (roll < need && await this.miracle(p, { kind: 'gamble', name: a.name, roll })) roll = this.roll();
-      if (roll >= need) { const ok = this.bank(p, a.pros + this.saleBonus(), `${a.name} — the die shows ${roll}: IT ${a.gambleOn ? 'GUSHES' : 'MOONS'}${this.saleBonus() ? ` · GOD CANDLE +${this.saleBonus()}` : ''}`); if (!ok) { p.invest.push(a); p.stats.sells--; p.stats.sellPros--; return false; } }
+      if (roll >= need) { const ok = this.bank(p, a.pros + this.saleBonus() + diamond, `${a.name} — the die shows ${roll}: IT ${a.gambleOn ? 'GUSHES' : 'MOONS'}${this.saleBonus() ? ` · GOD CANDLE +${this.saleBonus()}` : ''}`); if (!ok) { p.invest.push(a); p.stats.sells--; p.stats.sellPros--; return false; } }
       else if (a.bust) { p.discard.push(a); this.bank(p, a.bust, `${a.name} — the die shows ${roll}: it runs dry`); }
       else { p.discard.push(a); this.log(`${p.name} sells ${a.name}… the die shows ${roll}: it goes to zero`); }
       await this.mapDraw(p);
@@ -2601,14 +2687,16 @@ class Game {
     const A = [];
     for (const c of p.hand) {
       const cost = this.costOf(p, c); if (p.liq < cost) continue;
+      if (c.type === 'trader' && this.cultBound(p)) continue; // CULT OF PERSONAL80: no other Trader may take the seat
       if (c.type === 'asset' || c.type === 'artifact' || c.type === 'location' || c.type === 'trader') A.push({ t: 'play', c });
       else if (c.type === 'event' && c.played) { if (this.hasHaz(p, 'scam')) continue; if (!c.choice) { if (c.bearProof || c.bloom || !(this.hasHaz(p, 'bear') && this.eventPayout(p, c) > 75)) A.push({ t: 'play', c }); } else { A.push({ t: 'play', c, choice: { cash: true } }); if (!(this.hasHaz(p, 'bear') && c.pros > 75)) A.push({ t: 'play', c, choice: {} }); } }
       else if (c.type === 'hazard') { for (const r of this.rivals(p)) if (this.canHit(r, c)) A.push({ t: 'play', c, choice: { target: r } }); }
-      else if (c.type === 'remedy') { for (const q of this.players) for (const h of q.hazards) if (clearsHaz(c, h)) A.push({ t: 'play', c, choice: { target: q, hazard: h } }); if (c.key === 'publicista' && p.trader && p.trader.credNow != null && p.trader.credNow < p.trader.cred) A.push({ t: 'play', c, choice: { polish: true } }); if (c.refresh) A.push({ t: 'play', c, choice: { refresh: true } }); }
+      else if (c.type === 'remedy') { for (const q of this.players) for (const h of q.hazards) if (clearsHaz(c, h)) A.push({ t: 'play', c, choice: { target: q, hazard: h } }); if (c.key === 'publicista' && p.trader && p.trader.credNow != null && p.trader.credNow < p.trader.cred) A.push({ t: 'play', c, choice: { polish: true } }); if (c.refresh) A.push({ t: 'play', c, choice: { refresh: true } }); if (c.whistle && p.lastFraud) A.push({ t: 'play', c, choice: { whistle: true, target: p } }); }
       else if (c.type === 'grace') { const absolves = c.key === 'confession' && this.hasHaz(p, 'infierno'); /* the one Grace The Inferno cannot stop */ if (this.soulless(p) || (this.hasHaz(p, 'infierno') && !absolves)) continue; if (c.key === 'fountain') { if (!p.hailUsed) A.push({ t: 'play', c }); } else if (p.deeds < 3 || absolves) { if (c.key === 'rose') { for (const r of this.rivals(p)) A.push({ t: 'play', c, choice: { target: r } }); } else A.push({ t: 'play', c }); } }
     }
     for (const a of p.invest) if (a.uncork && p.deeds < 3 && !this.soulless(p)) A.push({ t: 'uncork', a });
-    for (const a of p.invest) { if (this.hasHaz(p, 'rug') || a.bornTurn === this.turnNo) continue; if (a.gamble) A.push({ t: 'sell', a, pros: false }); if (a.bearProof || !(this.hasHaz(p, 'bear') && this.saleValue(a) > 75)) A.push({ t: 'sell', a, pros: true }); }
+    for (const a of p.invest) { if (this.hasHaz(p, 'rug') || a.bornTurn === this.turnNo) continue;
+      if (a.gamble) A.push({ t: 'sell', a, pros: false }); if (a.bearProof || !(this.hasHaz(p, 'bear') && this.saleValue(a) > 75)) A.push({ t: 'sell', a, pros: true }); }
     if (this.rules.earnedHalo && p.trader && !p.trader.earned) { if (this.rules.giftBlind) { if (p.hand.length) A.push({ t: 'gift', c: null }); } else for (const c of p.hand) if (c.type !== 'hazard') A.push({ t: 'gift', c }); }
     if (p.liq >= 3) for (const h of p.hazards) A.push({ t: 'payclear', h });
     if (!p.hailUsed && !this.hasHaz(p, 'infierno')) A.push({ t: 'hail' });
@@ -2679,6 +2767,8 @@ class Game {
       }
     }
     // EL NACIMIENTO: a figure a turn; the third brings the Niño, and the scene is packed away.
+    // THE MISSION: alms for whoever starts the turn with less cash than every rival.
+    if (p.location && p.location.alms && this.rivals(p).every((r) => p.cash < r.cash)) { this.collect(p, p.location.alms); p.stats.alms = (p.stats.alms || 0) + 1; this.log(`${p.location.name} looks after its own — ${p.name} is behind, and collects ${this.m(p.location.alms)}`); }
     if (p.location && p.location.key === 'nacimiento') {
       const nac = p.location; nac.figures = (nac.figures || 0) + 1;
       if (nac.figures < 3) this.log(`${p.name} places a figure in ${U('nacimiento')} (${nac.figures} of 3)`);
@@ -2702,12 +2792,20 @@ class Game {
     const employed = p.trader && this.abilityOn(p);
     const spotless = employed && (p.trader.credNow == null || p.trader.credNow === p.trader.cred);
     const tithe = employed && p.trader.tithe ? p.trader.tithe * p.deeds : 0; // El Monje (Playtest 3): income for every candle lit
-    const halo = spotless ? (p.trader.halo ?? 1) + (p.trader.earned ? 1 : 0) : 0; // CREDIBILITY, the printed number: what good standing pays this Trader
-    this.collect(p, employed ? p.trader.liq + halo + tithe : 1);
+    const faithful = employed && !spotless && p.artifacts.some((a) => a.cult); // CULT OF PERSONAL80: in scandal, and paid anyway
+    const halo = spotless || faithful ? (p.trader.halo ?? 1) + (p.trader.earned ? 1 : 0) : 0; // CREDIBILITY, the printed number: what good standing pays this Trader
+    const cultCard = employed && p.artifacts.find((a) => a.cult), flock = cultCard ? cultCard.flock || 0 : 0; // CULT OF PERSONAL80: the faithful pay in, every turn
+    this.collect(p, employed ? p.trader.liq + halo + tithe + flock : 1);
+    if (flock) this.log(`the faithful pay in — ${p.name} collects +${this.m(flock)} from the CULT OF PERSONAL80`);
     if (tithe) this.log(`${p.trader.name}'s candles pay ${p.name} +${this.m(tithe)}`);
-    if (halo) this.log(`${p.trader.name} is in good standing — ${p.name} collects +${this.m(halo)}`);
+    if (halo && faithful) { p.stats.cultPaid = (p.stats.cultPaid || 0) + 1; this.log(`${p.trader.name} is in scandal, and the CULT OF PERSONAL80 pays anyway — ${p.name} collects +${this.m(halo)}`); }
+    else if (halo) this.log(`${p.trader.name} is in good standing — ${p.name} collects +${this.m(halo)}`);
     if (!employed) this.log(`${p.name} is between Traders — collects only ${this.m(1)}`);
     if (this.hasHaz(p, 'taxman') && p.liq > 0) { p.liq -= 1; this.log(`${p.name} pays ${this.m(1)} to the TAX COLLECTOR`); }
+    // PAPER HANDS: the Asset bought most recently is sold at its cash price. Diamond Hands, equipped since, holds.
+    if (this.hasHaz(p, 'paperhands') && p.invest.length) {
+      if (p.artifacts.some((x) => x.diamond)) this.log(`${p.name} has DIAMOND HANDS: nothing is sold`);
+      else { const a = p.invest.pop(); this.collect(p, a.cash); p.discard.push(a); p.stats.paperSold = (p.stats.paperSold || 0) + 1; this.log(`PAPER HANDS — ${p.name} panics and sells ${a.name} for ${this.m(a.cash)}`); } }
     const yield2 = p.invest.reduce((s2, a2) => s2 + (a2.income || 0), 0);
     if (yield2) { this.collect(p, yield2); this.log(`${p.name} collects ${this.m(yield2)} from investments`); }
     // DUE DILIGENCE is an open book (2026-11-16): while La Investigadora sits, the top card of her
@@ -2718,6 +2816,7 @@ class Game {
     if (p.policy.beforeDraw) await p.policy.beforeDraw(this, p);
     if (this.canBury(p) && p.policy.dueDiligence && await p.policy.dueDiligence(this, p, p.deck[0])) this.bury(p);
     await this.turnDraw(p);
+    if (!this.over) await this.marketBet(p); // THE PREDICTION MARKET
     // One main action; two once THE SINGULAR80 has fired (this.accelerated). The second is a full main action, and is skipped when there is nothing to do with it.
     for (let n = 0; n < (this.accelerated ? 2 : 1) && !this.over; n++) {
       this.secondAction = n > 0;
@@ -2755,6 +2854,7 @@ class RandomBot {
   acceptRose() { return this.rng() < 0.6; }
   discardOne(g, p) { return p.hand[Math.floor(this.rng() * p.hand.length)]; }
   useMiracle() { return this.rng() < 0.5; }
+  placeBet(g, p, loc, offers) { return this.rng() < 0.5 ? offers[Math.floor(this.rng() * offers.length)] : null; }
   useSavingGrace(g, p, cards) { return this.rng() < 0.5 ? cards[Math.floor(this.rng() * cards.length)] : null; }
   buryTrader(g, p) { return p.hand.some(c => c.type === 'trader' && g.costOf(p, c) <= p.liq) && this.rng() < 0.2; }
   useEnigma() { return this.rng() < 0.5; }
@@ -2769,6 +2869,16 @@ class GreedyBot {
   acceptRose() { return true; }
   // She is saved for the Hail Mary unless that prayer has already been said.
   useMiracle(g, p, w) { return true; } // a failed roll is always worth a second look
+  // The Prediction Market: take the contract that would win the game if there is one; otherwise the best
+  // average, and only with money to spare for the turn's play.
+  placeBet(g, p, loc, offers) {
+    const stake = loc.stake * g.rules.rate, P = (i) => (g.rules.die + 1 - g.marketNeed(p, loc, i)) / g.rules.die;
+    const winning = offers.filter((i) => p.cash - stake + loc.market[i][1] >= g.winAt).sort((a, b) => P(b) - P(a))[0];
+    if (winning != null) return winning;
+    if (p.liq < loc.stake + 2) return null;
+    const best = [...offers].sort((a, b) => P(b) * loc.market[b][1] - P(a) * loc.market[a][1])[0];
+    return P(best) * loc.market[best][1] > stake ? best : null;
+  }
   // Intercepts the weather that is not a plain windfall: Calamities and shake-ups.
   useEnigma(g, p, c) { return c.subtype === 'Calamity' || c.subtype === 'Ambiguity'; }
   // Always saves the Trader, with the card that leaves the most Credibility.
@@ -2791,6 +2901,31 @@ class GreedyBot {
   //     weight, less half its price — spending is now paid for out of the score
   //   · selling adds nothing by itself (the Asset already counted); the bot sells to take a bonus, to get
   //     out of something about to lose value, or to raise cash for a card it cannot afford
+  // What a Relic is worth to p, in $M, over the `left` rounds the game probably has. Income is counted in
+  // full; protection at the odds of the thing it stops (per player and round, from the sims: a Scandal or a
+  // Fall about 0.08, a fraud about 0.02, any Calamity about 0.06); a card drawn at about $12M.
+  relicWorth(g, p, c, left, earns) {
+    const R = g.rules.rate, t = p.trader, pay = t ? (t.halo ?? 1) * R : 0, keep = t ? earns(t) * R : 0;
+    const inScandal = !!t && t.credNow != null && t.credNow < t.cred;
+    const miracle = c.apparition && (p.miracles || 0) < MIRACLE_MAX ? 12 : 0; // equipping an apparition is a Miracle
+    const hand = (f) => p.hand.filter(f).length;
+    let w = 0;
+    if (c.cult) w = !t ? 5 : p.hand.some((x) => x.type === 'trader' && earns(x) > earns(t) + 0.5) ? 0 : (c.flock || 0) * R * left + (inScandal ? pay * left * 0.6 : 0.08 * left * pay);
+    else if (c.key === 'skull') w = 5 * left;                                       // a rival sells about every other round
+    else if (c.key === 'lottery') w = 150 * (1 - Math.pow(1 - 1 / g.rules.die, left));
+    else if (c.key === 'geometry') w = 25 * hand((x) => x.type === 'event' && x.played) + 6 * left;
+    else if (c.diamond) w = 25 * p.invest.length * (left >= 3 ? 1 : 0.4) + 10 * hand((x) => x.type === 'asset') * (left >= 4 ? 1 : 0) + 2;
+    else if (c.key === 'rosary') w = p.deeds < 3 ? 12 * hand((x) => x.type === 'grace') + 6 : 0;
+    else if (c.key === 'map') w = 12 * (p.invest.length + hand((x) => x.type === 'asset') * 0.5);
+    else if (c.key === 'tattoo') w = inScandal && !g.hasHaz(p, 'escandalo') ? pay * left : 0.08 * left * pay * 2;
+    else if (c.noStrikes) w = t ? 0.08 * left * (pay * 2 + (inScandal ? keep * 3 : 0)) : 0;
+    else if (c.key === 'shroud') w = t ? (inScandal ? 0.08 : 0.02) * left * keep * 3 : 0;
+    else if (c.key === 'heart') w = 0.06 * left * 70;
+    else if (c.wards) w = 0.02 * left * 70 * c.wards.length * (c.wards.includes('rug') && !p.invest.length ? 0.7 : 1) + (c.pathos && t ? 0.06 * left * 70 * c.pathos / g.rules.die : 0);
+    else if (c.key === 'enigma') w = 3 * left;
+    else if (c.slots) { const waiting = p.hand.filter((x) => x.type === 'artifact' && !x.slots && !x.noSlot && x !== c); w = g.relicsHeld(p).length >= 2 && waiting.length ? Math.max(...waiting.map((x) => this.relicWorth(g, p, x, left, earns))) : 2; }
+    return w + miracle;
+  }
   score(g, p, a) {
     const R = g.rules.rate, nw = (q) => g.netWorth(q);
     const counts = g.rules.countAssets || g.narrative(p); // do this player's unsold Assets count toward the goal?
@@ -2836,12 +2971,17 @@ class GreedyBot {
     if (a.t === 'play' && a.c.type === 'remedy') { const mine = a.choice.target === p; s = (mine ? 80 : 8 + (haloWorth ? haloWorth - 30 : 0)) - spend; }
     if (a.t === 'gift' && !a.c) { const avg = p.hand.reduce((t, c) => t + (c.type === 'event' ? 80 : c.type === 'asset' ? 60 : c.type === 'hazard' ? 40 : 25), 0) / p.hand.length; s = haloWorth ? haloWorth * g.rules.giftKeen - avg * 0.6 : 0; }
     else if (a.t === 'gift') { const c = a.c; const to = [...g.rivals(p)].sort((x, y) => nw(x) - nw(y))[0];
-      const dead = (c.type === 'trader' && p.trader && earns(c) <= earns(p.trader) + 0.5) || (c.type === 'remedy' && !c.refresh && !p.hazards.length) || (c.type === 'grace' && (p.deeds >= 3 || p.hailUsed || g.soulless(p))) || (c.type === 'location' && !!p.location) || (c.type === 'artifact' && g.relicsHeld(p).length >= g.relicSlots(p));
+      const dead = (c.type === 'trader' && p.trader && earns(c) <= earns(p.trader) + 0.5) || (c.type === 'remedy' && !c.refresh && !p.hazards.length && !(c.whistle && p.lastFraud)) || (c.type === 'grace' && (p.deeds >= 3 || p.hailUsed || g.soulless(p))) || (c.type === 'location' && !!p.location) || (c.type === 'artifact' && g.relicsHeld(p).length >= g.relicSlots(p));
       const keep = dead ? 0 : c.type === 'event' ? 80 : c.type === 'asset' ? 60 : 25; // what the card is worth to keep
       const taken = g.rules.giftsAlwaysTaken || g.giftValue(to, c) >= haloWorth; // a refused offer wastes the turn: do not make one
       s = haloWorth && taken ? haloWorth * g.rules.giftKeen - keep - g.giftValue(to, c) * 0.5 : 0; }
     if (a.t === 'play' && a.choice && a.choice.refresh) { const dead = p.hand.filter((c) => c !== a.c && c.type !== 'event' && c.cost > p.liq + 1).slice(0, a.c.refresh); a.choice.discards = dead; s = 28 + 10 * dead.length; }
-    if (a.t === 'play' && a.c.type === 'artifact') s = 35 - spend;
+    // A Relic is worth what it will do over the rounds left (relicWorth, below), scored like an Asset bought
+    // for what it will earn. With both slots full it must beat the weakest Relic it would push out.
+    if (a.t === 'play' && a.c.type === 'artifact') { const worth = this.relicWorth(g, p, a.c, left, earns);
+      if (!a.c.slots && !a.c.noSlot && g.relicsHeld(p).length >= g.relicSlots(p)) { const out = [...g.relicsHeld(p)].sort((x, y) => this.relicWorth(g, p, x, left, earns) - this.relicWorth(g, p, y, left, earns))[0];
+        a.choice = { ...(a.choice || {}), drop: out }; s = (worth - this.relicWorth(g, p, out, left, earns) - 15) * 0.7 - spend; }
+      else s = 25 + worth * 0.7 - price * 0.6; }
     if (a.t === 'play' && a.c.type === 'location') s = p.location ? 0 : 58 - spend; // never tear a standing place down for another
     if (a.t === 'play' && a.c.type === 'grace') s = (!p.hailUsed ? 57 - p.deeds * 4 : 2) - spend;
     if (a.t === 'play' && a.c.type === 'trader') s = !p.trader ? 72 + earns(a.c) * 3 : (p.trader.credNow < p.trader.cred && (a.c.credNow ?? a.c.cred) > p.trader.credNow ? 46 : earns(a.c) > earns(p.trader) + 0.5 && left >= 3 ? 75 : 0) - spend;
@@ -3015,7 +3155,7 @@ const FACES = {
     "rarity": "Uncommon",
     "face": "/TCG/rcana/la-rosa/face3.webp",
     "frame": 3,
-    "metal": "mirror",
+    "metal": "rainbow",
     "art": null
   },
   "ballena": {
@@ -3097,13 +3237,13 @@ const FACES = {
   },
   "mine": {
     "id": "the-mine",
-    "name": "The Mine",
+    "name": "The Mother Lode",
     "gloss": null,
     "number": 31,
     "rarity": "Common",
     "face": "/TCG/rcana/the-mine/face3.webp",
     "frame": 3,
-    "metal": "mirror",
+    "metal": "rainbow",
     "art": null
   },
   "realestate": {
@@ -3141,7 +3281,7 @@ const FACES = {
   },
   "rideordie": {
     "id": "ride-or-die",
-    "name": "The Lowrider",
+    "name": "Ride or Die",
     "gloss": null,
     "number": 35,
     "rarity": "Rare",
@@ -3214,17 +3354,6 @@ const FACES = {
     "face": "/TCG/rcana/mardi-gras/face3.webp",
     "frame": 3,
     "metal": "rainbow",
-    "art": null
-  },
-  "horchata": {
-    "id": "la-horchata",
-    "name": "Horchata",
-    "gloss": null,
-    "number": 42,
-    "rarity": "Common",
-    "face": "/TCG/rcana/la-horchata/face3.webp",
-    "frame": 3,
-    "metal": "mirror",
     "art": null
   },
   "stablecoin": {
@@ -3381,39 +3510,6 @@ const FACES = {
     "metal": "mirror",
     "art": null
   },
-  "gallo": {
-    "id": "el-gallo",
-    "name": "The Rooster",
-    "gloss": null,
-    "number": 81,
-    "rarity": "Common",
-    "face": "/TCG/rcana/el-gallo/face3.webp",
-    "frame": 3,
-    "metal": "mirror",
-    "art": null
-  },
-  "vaca": {
-    "id": "la-vaca",
-    "name": "The Cow",
-    "gloss": null,
-    "number": 82,
-    "rarity": "Common",
-    "face": "/TCG/rcana/la-vaca/face3.webp",
-    "frame": 3,
-    "metal": "mirror",
-    "art": null
-  },
-  "aguacate": {
-    "id": "el-aguacate",
-    "name": "The Avocado",
-    "gloss": null,
-    "number": 83,
-    "rarity": "Common",
-    "face": "/TCG/rcana/el-aguacate/face3.webp",
-    "frame": 3,
-    "metal": "mirror",
-    "art": null
-  },
   "cava": {
     "id": "la-cava",
     "name": "The Cellar",
@@ -3429,7 +3525,7 @@ const FACES = {
     "id": "la-plata",
     "name": "The Silver",
     "gloss": null,
-    "number": 85,
+    "number": 81,
     "rarity": "Common",
     "face": "/TCG/rcana/la-plata/face3.webp",
     "frame": 3,
@@ -3451,7 +3547,7 @@ const FACES = {
     "id": "the-perp",
     "name": "Perpetuals",
     "gloss": null,
-    "number": 86,
+    "number": 70,
     "rarity": "Common",
     "face": "/TCG/rcana/the-perp/face3.webp",
     "frame": 3,
@@ -3502,31 +3598,9 @@ const FACES = {
     "metal": "mirror",
     "art": null
   },
-  "keys": {
-    "id": "the-keys",
-    "name": "The Keys",
-    "gloss": null,
-    "number": 63,
-    "rarity": "Uncommon",
-    "face": "/TCG/rcana/the-keys/face3.webp",
-    "frame": 3,
-    "metal": "mirror",
-    "art": null
-  },
-  "audit": {
-    "id": "the-audit",
-    "name": "The Audit",
-    "gloss": null,
-    "number": 87,
-    "rarity": "Uncommon",
-    "face": "/TCG/rcana/the-audit/face3.webp",
-    "frame": 3,
-    "metal": "mirror",
-    "art": null
-  },
   "geometry": {
     "id": "sacred-geometry",
-    "name": "Sacred Geometry",
+    "name": "Sacred Geom8ry",
     "gloss": null,
     "number": 72,
     "rarity": "Rare",
@@ -3539,16 +3613,49 @@ const FACES = {
     "id": "the-singular80",
     "name": "The Singular80",
     "gloss": null,
-    "number": 88,
+    "number": 86,
     "rarity": "Rare",
     "face": "/TCG/rcana/the-singular80/face3.webp",
+    "frame": 3,
+    "metal": "mirror",
+    "art": null
+  },
+  "predict": {
+    "id": "prediction-market",
+    "name": "The Prediction Market",
+    "gloss": null,
+    "number": 83,
+    "rarity": "Uncommon",
+    "face": "/TCG/rcana/prediction-market/face3.webp",
+    "frame": 3,
+    "metal": "mirror",
+    "art": null
+  },
+  "confession": {
+    "id": "confession",
+    "name": "Coin-Op Confession",
+    "gloss": null,
+    "number": 80,
+    "rarity": "Uncommon",
+    "face": "/TCG/rcana/confession/face3.webp",
+    "frame": 3,
+    "metal": "mirror",
+    "art": null
+  },
+  "mission": {
+    "id": "the-mission",
+    "name": "The Mission",
+    "gloss": null,
+    "number": 85,
+    "rarity": "Uncommon",
+    "face": "/TCG/rcana/the-mission/face3.webp",
     "frame": 3,
     "metal": "mirror",
     "art": null
   }
 };
 const TYPE_CLASS = {"trader":"Trader","asset":"Asset","event":"Event","hazard":"Event","remedy":"Artifact","artifact":"Artifact","grace":"Artifact","location":"Artifact"};
-const EVENT_SUBTYPES = {"bull":"Opportunity","moon":"Opportunity","inherit":"Opportunity","squeeze":"Opportunity","ponzi":"Opportunity","unlock":"Opportunity","bear":"Calamity","hack":"Calamity","virtue":"Calamity","infierno":"Calamity","rug":"Calamity","taxman":"Calamity","trap":"Calamity","escandalo":"Calamity","scam":"Calamity","moneda":"Opportunity","semilla":"Opportunity","crash":"Calamity","fall":"Calamity","holyroller":"Opportunity","fuego":"Opportunity","virtual":"Ambiguity","feast":"Opportunity","techwreck":"Calamity","ballena":"Ambiguity","illuminati":"Opportunity","rueda":"Ambiguity","godcandle":"Opportunity","moralhazard":"Ambiguity","mardigras":"Ambiguity","singular":"Ambiguity"};
+const EVENT_SUBTYPES = {"bull":"Opportunity","moon":"Opportunity","inherit":"Opportunity","squeeze":"Opportunity","ponzi":"Opportunity","unlock":"Opportunity","bear":"Calamity","hack":"Calamity","infierno":"Calamity","rug":"Calamity","paperhands":"Calamity","taxman":"Calamity","trap":"Calamity","escandalo":"Calamity","scam":"Calamity","moneda":"Opportunity","semilla":"Opportunity","crash":"Calamity","fall":"Calamity","holyroller":"Opportunity","fuego":"Opportunity","virtual":"Ambiguity","feast":"Opportunity","techwreck":"Calamity","ballena":"Ambiguity","illuminati":"Opportunity","rueda":"Ambiguity","godcandle":"Opportunity","moralhazard":"Ambiguity","mardigras":"Ambiguity","singular":"Ambiguity"};
 
 const $ = (id) => document.getElementById(id);
 new ResizeObserver(() => {
@@ -3624,7 +3731,7 @@ function playSound(kind) {
   return source;
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const FX = { unicornio: 'Compound Interest: at turn start, if you have at least 100 banked Prosperity, bank 25 more', gato: 'Clean Sweep: when seated, and at the start of each turn on a roll of 4+, knock one Calamity off your table, free', monje: 'When you light a candle, bank $25M', diablito: 'Devil’s Wager: at turn start, flip a coin — heads gains $10M; tails loses 1 CRED', celebridad: 'The influencer: pay 1 when banking from a card, +$25M', abuela: 'The gambler: your gambles moon on 4+ instead of 5+', prospector: 'Assets you buy cost 1 less', bluechip: 'Sell later: $100M or $250M', halving: 'Fires when drawn: until the drawer’s next turn, turn income is 1', crash: 'Fires when drawn: everyone holding 8+ Liquidity loses half', investigadora: 'Due Diligence: the top card of your deck is face up to you — once on your turn, you may put it on the bottom', lagrimas: 'To the shrine: light a candle — her tears fall for the fallen', infierno: 'Hellfire: they cannot attempt the Hail Mary or offer a Grace until cleared', ponzi: 'New money pays the old: bank 25 for every Asset your rivals hold — then every rival collects 1', catedral: 'Green candles: whenever any player lights a candle, bank 25', feast: 'Fires when drawn: feast day — every player lights a candle', general: 'Fault Tolerance: when a Calamity fails against your Equanimity, collect $10M', bot: 'No Soul: Scandal cannot touch it. It cannot pray — while it sits, your Graces go unheard', motherboard: 'Expansion slots: the board takes no Relic slot, and you may hold a third Relic', virtue: 'Performative piety: their candles add no winning faces to the Hail Mary until cleared', geometry: 'Everything aligns: your called Events (Bull Run, Full Moon, Short Squeeze, Token Unlock) bank 25 more', limpia: 'To the shrine: light a candle, and the egg sweeps one Calamity off you', anima: 'To the shrine: light a candle, and return the most recently discarded Trader with 5 Credibility to your empty seat or to your hand', holyroller: 'Fires when drawn: she rolls through — every player draws a card and collects $10M', fuego: 'Fires when drawn: she rides the fire horse through the market — every player banks $75M', virtual: 'Fires when drawn: she flickers on every screen — every player shuffles their hand into their deck and draws that many', fall: 'Fires when drawn: the fall — every seated Trader loses 4 Credibility', techwreck: 'Fires when drawn: the bubble bursts — every Tech Stock on the table is wrecked, scrapped for $10M', airdrop: 'Fires when drawn: every player draws a card', tech: 'Sell later: $50M or $100M', meme: 'Sell for $40M — or roll the die for Prosperity: 5+ moons for 125, else zero', moon: 'Invest 4 → bank $150M', squeeze: 'Invest 3 → bank 100, plus 50 for each Calamity on you — Bear Market cannot cap it', unlock: 'Invest 4 → bank 200, and every rival collects $10M', bull: 'Invest 2 → bank $100M', inherit: 'Take $30M, or bank $50M', bear: 'Rival banks at most 75 from a single card', taxman: 'They pay 1 to the bank at the start of each turn', escandalo: 'Scandal: their seated Trader loses 5 Credibility when it breaks, 2 more each turn', bell: 'Clears Bear Market', catacumbas: 'Buried with honors: at the start of your turn you may bury your seated Trader — bank $5M per point of Credibility they have left', tortilla: 'Clears any one Calamity', publicista: 'Clear a Scandal — or polish: your seated Trader regains 5 Credibility', heart: 'A shield, not a cure: while equipped, discard it to cancel a Calamity AS it lands — it cannot clear one already on you', rosary: 'Draw a card when you light a candle', grail: 'Gem mint: sells for 125 — or 250 while you hold three lit candles', enigma: 'Intercept: when an Event fires on your draw, discard the Machine — the Event is cancelled for everyone', horchata: 'Refresh: discard up to 2 cards, then draw that many plus one', fountain: 'Toss in $20M: your Hail Mary odds rise one step, even past the shrine’s three', shroud: 'When your seated Trader would be discredited, the Shroud is spent instead: they stay, with 5 Credibility', rideordie: 'Ride or die: while the Lowrider is in your portfolio, your Assets stay with you — the Whale and the Wheel pass you by', lottery: 'Scratch it at the start of each turn: roll the die — a 6 wins $150M, and the Ticket is spent', tattoo: 'Inked devotion: at the start of your turn, your seated Trader regains 1 Credibility', nacimiento: 'Build it: a figure at the start of each turn; at the third the Niño arrives at midnight — light a candle and bank 75, then it is packed away', realestate: 'Sell later: $80M or $150M — Bear Market cannot cap it', stablecoin: 'While held: collect $10M at the start of your turn', confession: 'To the shrine: light a candle, and your seated Trader’s Credibility is restored in full', ofrenda: 'Offer it to Our Lady: it goes to the shrine and lights a candle (max 3)', moneda: 'Fires when drawn: every player collects $20M', map: 'X marks the spot: whenever you sell an Asset, draw a card', mine: 'Sell later: $40M, or Prosperity that grows 25 each round held (from 75)', oil: 'Sell for Prosperity: a die decides — 3+ gushes for 175, else it runs dry for 25', cava: 'Vintage: worth 25 more each round held — or uncork it: discard to light a candle', gallo: 'The fighting rooster: at the start of your turn, roll — a 6 collects 2; a 1, and he is dead', vaca: 'Milk: collect 1 at the start of your turn — or sell her for meat, $60M', aguacate: 'Green gold: ripe on the second round, worth 150. Green before, 50 — then it rots, 50 less each round', bono: 'Grandmother’s gift: worth 25 more each round held, and immune to The Bear', plata: 'Flight to safety: in a Flash Crash you lose nothing, and bank 25', perp: 'Leverage: sells for double — but a Bear Market played on you while it is held liquidates it', semilla: 'Plant it: four rounds on, it blooms — bank 150 (a Bear Market holds the harvest until cleared)', ballena: 'Fires when drawn: the richest portfolio’s best Asset moves to the poorest player', rueda: 'Fires when drawn: every portfolio rotates one seat', singular: 'Fires when drawn: from now on, every player takes two main actions each turn', godcandle: 'Fires when drawn: every Prosperity sale pays 100 more until the drawer’s next turn', skull: 'Exit liquidity: whenever a rival sells an Asset, collect $10M', illuminati: 'Fires when drawn: the drawer is initiated — each rival passes them one random card', moralhazard: 'Fires when drawn: the bailout — the poorest player collects 5; the richest loses 2', mardigras: 'Fires when drawn: party now, repent later — every player rolls the die and collects that much; at their next turn start, their Trader loses half of it in Credibility', rose: 'Offer it to a rival: if they accept, they keep it (worth $50M) and you light a candle — your Hail Mary odds rise' };
+const FX = { unicornio: 'Compound Interest: at turn start, if you have at least 100 banked Prosperity, bank 25 more', gato: 'Clean Sweep: when seated, and at the start of each turn on a roll of 4+, knock one Calamity off your table, free', monje: 'When you light a candle, bank $25M', diablito: 'Devil’s Wager: at turn start, flip a coin — heads gains $10M; tails loses 1 CRED', celebridad: 'The influencer: pay 1 when banking from a card, +$25M', abuela: 'The gambler: your gambles moon on 4+ instead of 5+', prospector: 'Assets you buy cost 1 less', bluechip: 'Sell later: $100M or $250M', halving: 'Fires when drawn: until the drawer’s next turn, turn income is 1', crash: 'Fires when drawn: everyone holding 8+ Liquidity loses half', investigadora: 'Due Diligence: the top card of your deck is face up to you — once on your turn, you may put it on the bottom', lagrimas: 'To the shrine: light a candle — her tears fall for the fallen', infierno: 'Hellfire: they cannot attempt the Hail Mary or offer a Grace until cleared', ponzi: 'New money pays the old: bank 25 for every Asset your rivals hold — then every rival collects 1', catedral: 'Green candles: whenever any player lights a candle, bank 25', feast: 'Fires when drawn: feast day — every player lights a candle', general: 'Fault Tolerance: when a Calamity fails against your Equanimity, collect $10M', bot: 'No Soul: Scandal cannot touch it. It cannot pray — while it sits, your Graces go unheard', motherboard: 'Expansion slots: the board takes no Relic slot, and you may hold a third Relic', geometry: 'Everything aligns: your called Events (Bull Run, Full Moon, Short Squeeze, Token Unlock) bank 25 more', limpia: 'To the shrine: light a candle, and the egg sweeps one Calamity off you', anima: 'To the shrine: light a candle, and return the most recently discarded Trader with 5 Credibility to your empty seat or to your hand', holyroller: 'Fires when drawn: she rolls through — every player draws a card and collects $10M', fuego: 'Fires when drawn: she rides the fire horse through the market — every player banks $75M', virtual: 'Fires when drawn: she flickers on every screen — every player shuffles their hand into their deck and draws that many', fall: 'Fires when drawn: the fall — every seated Trader loses 4 Credibility', techwreck: 'Fires when drawn: the bubble bursts — every Tech Stock on the table is wrecked, scrapped for $10M', airdrop: 'Fires when drawn: every player draws a card', tech: 'Sell later: $50M or $100M', meme: 'Sell for $40M — or roll the die for Prosperity: 5+ moons for 125, else zero', moon: 'Invest 4 → bank $150M', squeeze: 'Invest 3 → bank 100, plus 50 for each Calamity on you — Bear Market cannot cap it', unlock: 'Invest 4 → bank 200, and every rival collects $10M', bull: 'Invest 2 → bank $100M', inherit: 'Take $30M, or bank $50M', bear: 'Rival banks at most 75 from a single card', taxman: 'They pay 1 to the bank at the start of each turn', escandalo: 'Scandal: their seated Trader loses 5 Credibility when it breaks, 2 more each turn', bell: 'Clears Bear Market', catacumbas: 'Buried with honors: at the start of your turn you may bury your seated Trader — bank $5M per point of Credibility they have left', tortilla: 'Clears any one Calamity', publicista: 'Clear a Scandal — or polish: your seated Trader regains 5 Credibility', heart: 'A shield, not a cure: while equipped, discard it to cancel a Calamity AS it lands — it cannot clear one already on you', rosary: 'Draw a card when you light a candle', grail: 'Gem mint: sells for 125 — or 250 while you hold three lit candles', enigma: 'Intercept: when an Event fires on your draw, discard the Machine — the Event is cancelled for everyone', horchata: 'Refresh: discard up to 2 cards, then draw that many plus one', fountain: 'Toss in $20M: your Hail Mary odds rise one step, even past the shrine’s three', rideordie: 'While Ride or Die is in your portfolio, your Assets stay with you — the Whale and the Wheel pass you by', lottery: 'Scratch it at the start of each turn: roll the die — a 6 wins $150M, and the Ticket is spent', tattoo: 'Inked devotion: at the start of your turn, your seated Trader regains 1 Credibility', nacimiento: 'Build it: a figure at the start of each turn; at the third the Niño arrives at midnight — light a candle and bank 75, then it is packed away', realestate: 'Sell later: $80M or $150M — Bear Market cannot cap it', stablecoin: 'While held: collect $10M at the start of your turn', confession: 'To the shrine: light a candle, and your seated Trader’s Credibility is restored in full', ofrenda: 'Offer it to Our Lady: it goes to the shrine and lights a candle (max 3)', moneda: 'Fires when drawn: every player collects $20M', map: 'X marks the spot: whenever you sell an Asset, draw a card', mine: 'Sell later: $40M, or Prosperity that grows 25 each round held (from 75)', oil: 'Sell for Prosperity: a die decides — 3+ gushes for 175, else it runs dry for 25', cava: 'Vintage: worth 25 more each round held — or uncork it: discard to light a candle', vaca: 'Milk: collect 1 at the start of your turn — or sell her for meat, $60M', aguacate: 'Green gold: ripe on the second round, worth 150. Green before, 50 — then it rots, 50 less each round', bono: 'Grandmother’s gift: worth 25 more each round held, and immune to The Bear', plata: 'Flight to safety: in a Flash Crash you lose nothing, and bank 25', perp: 'Leverage: sells for double — but a Bear Market played on you while it is held liquidates it', semilla: 'Plant it: four rounds on, it blooms — bank 150 (a Bear Market holds the harvest until cleared)', ballena: 'Fires when drawn: the richest portfolio’s best Asset moves to the poorest player', rueda: 'Fires when drawn: every portfolio rotates one seat', singular: 'Fires when drawn: from now on, every player takes two main actions each turn', godcandle: 'Fires when drawn: every Prosperity sale pays 100 more until the drawer’s next turn', skull: 'Exit liquidity: whenever a rival sells an Asset, collect $10M', illuminati: 'Fires when drawn: the drawer is initiated — each rival passes them one random card', moralhazard: 'Fires when drawn: the bailout — the poorest player collects 5; the richest loses 2', mardigras: 'Fires when drawn: party now, repent later — every player rolls the die and collects that much; at their next turn start, their Trader loses half of it in Credibility', rose: 'Offer it to a rival: if they accept, they keep it (worth $50M) and you light a candle — your Hail Mary odds rise' };
 
 let S = null;
 const toast = (t) => { const el = $('toast'); el.innerHTML = `<span>${esc(t)}</span><button class="tx" aria-label="dismiss">\u00d7</button>`; el.querySelector('.tx').onclick = () => el.classList.remove('show'); el.classList.add('show'); };
@@ -3688,6 +3795,8 @@ class HumanPolicy {
   useHeart(g, p, c, by) { return ask(`${by.name} plays ${c.name} on you`, `Discard your SACRED HEART to cancel it?`, 'Cancel it', 'Take the Calamity'); }
   useEnigma(g, p, c) { return ask(`${c.name} fires on your draw`, `${c.text}. Discard the ENIGMA MACHINE to intercept it? Nobody is affected.`, 'Intercept', 'Let it fire'); }
   useSavingGrace(g, p, cards) { return pickCardOrNot(`${p.trader.name} is about to be DISCREDITED · give up a card with SAVING FACE to keep them at the desk?`, cards, 'Let them fall'); }
+  placeBet(g, p, loc, offers) { const odds = (i) => { const n = g.marketNeed(p, loc, i); return n >= g.rules.die ? 'an ' + n : n + '+'; };
+    return askMany('The Prediction Market', `Stake ${usd(loc.stake * g.rules.rate)} and name your odds? You have ${usd(p.cash)}. A miss loses the stake.`, offers.map((i) => `Roll ${odds(i)} for ${usd(loc.market[i][1])}`), 'No bet this turn').then((k) => k == null ? null : offers[k]); }
   buryTrader(g, p) { const good = (p.trader.credNow ?? p.trader.cred) >= p.trader.cred; return ask('The Catacombs', `Bury ${p.trader.name} with honors for ${usd(good ? 75 : 25)}? They leave your desk.`, 'Bury them', 'Keep them'); }
   useMiracle(g, p, w) { return ask('✦ A Miracle', `${w.kind === 'hail' ? 'The Hail Mary' : w.name} shows ${w.roll}. Spend a Miracle to roll again? You hold ${p.miracles}.`, 'Roll again', 'Let it stand'); }
   // The offer that can be refused: a rival gives you a card. Taking it earns their Trader a halo.
@@ -3701,6 +3810,11 @@ function resolveMain(action) {
   render();
   if (resolve) resolve(action);
 }
+// ask with several answers: resolves the index of the option tapped, or null on the last button.
+function askMany(kind, q, options, noLabel) { return new Promise((res) => { const host = $('overlayHost');
+  host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">${esc(kind)}</div><div>${esc(q)}</div>${options.map((o, k) => `<button class="primary" data-k="${k}">${esc(o)}</button>`).join('')}<button id="aNo">${esc(noLabel)}</button></div></div>`;
+  host.querySelectorAll('button[data-k]').forEach((b) => { b.onclick = () => { host.innerHTML = ''; res(Number(b.dataset.k)); setTimeout(render, 30); }; });
+  host.querySelector('#aNo').onclick = () => { host.innerHTML = ''; res(null); setTimeout(render, 30); }; }); }
 function ask(kind, q, yes, no) { return new Promise((res) => { const host = $('overlayHost');
   host.innerHTML = `<div class="overlay"><div class="box"><div class="kind">${esc(kind)}</div><div>${esc(q)}</div><button class="primary" id="aYes">${esc(yes)}</button><button id="aNo">${esc(no)}</button></div></div>`;
   host.querySelector('#aYes').onclick = () => { host.innerHTML = ''; res(true); setTimeout(render, 30); };
@@ -4270,6 +4384,8 @@ function handPlayReason(c) {
   if (!S.running) return 'The game is over.';
   if (!me.hand.includes(c)) return 'This card has left your hand.';
   if (g.armsOnly && c.type !== 'asset') return 'Eight Arms lets you buy or sell one more Asset this turn, not play another kind of card.';
+  if (c.whistle && !me.lastFraud) return 'The Whistleblower undoes the last fraud played on you. No Rug Pull, Quantum Hack or Exit Scam has hit you since the last one was undone.';
+  if (c.type === 'trader' && g.cultBound(me)) return `Cult of Personal80: no other Trader may take ${me.trader.name}’s seat while the Cult is equipped.`;
   const cost = g.costOf(me, c);
   if (me.liq < cost) return `Costs ${coins(cost)}. You have ${usd(me.cash)}.`;
   if (S.drawResolve) return 'Draw from your deck before playing a card.';
