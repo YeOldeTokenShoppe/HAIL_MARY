@@ -834,7 +834,7 @@ export const FACES = [
     design: "singular", // prints as "The Singular80" — the design's name
     // Number per set/numbers.js; rarity PROVISIONAL (it changes the whole game, and there is one).
     // The second card with LIVE 3D art (art/the-singular80.js: live3d).
-    number: 86,
+    number: 87,
     rarity: "Rare",
     // An on-draw Ambiguity: it resolves as drawn and never ends.
     ability: "From now on, every player takes\ntwo main actions each turn.",
@@ -872,13 +872,100 @@ export const FACES = [
     id: "the-mission",
     design: "mission", // prints as "The Mission" — the design's name
     // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
-    number: 85,
+    number: 77,
     rarity: "Uncommon",
     // The second printed Location: it builds, then pays alms to whoever is behind.
     // The design's line is a simulator's; the face keeps the test and the sum.
     ability: "Start your turn with less cash than\nevery rival, and collect $20M.",
     // A Location narrates; the line follows the rule.
     flavor: "Whoever has least is served first.",
+    printed: {},
+  },
+  {
+    id: "nativity-scene",
+    design: "nacimiento", // prints as "The Nativity" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 30,
+    rarity: "Uncommon",
+    // The third printed Location: it builds, fills over three turns, then pays and packs away.
+    // The design's line is a simulator's; the face keeps the count and the payout.
+    ability: "A figure each turn. At the third, the Niño arrives:\nlight a candle, bank 75, then pack it away.",
+    // A Location narrates; the line follows the rule.
+    flavor: "Even the bull and the bear kneel tonight.",
+    printed: {},
+  },
+  {
+    id: "the-stimulus",
+    design: "stimulus", // prints as "The Stimulus" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 65,
+    rarity: "Uncommon",
+    // A Remedy's line names what it clears; this one clears four of the money Calamities.
+    ability: "Clear a Bear Market, a Tax Collector,\na Liquidity Trap or Paper Hands.",
+    // A Remedy narrates; the line follows the rule.
+    flavor: "Fresh off the press. The trouble is papered over.",
+    printed: {},
+  },
+  {
+    id: "diamond-hands",
+    design: "diamond", // prints as "Diamond Hands" — the design's name (a market name, no lotería title)
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 82,
+    rarity: "Uncommon",
+    // A Relic equips; the printed line is the design's bonus and its ward.
+    ability: "Assets held three rounds or more sell for $25M\nmore. Paper Hands cannot be played on you.",
+    // A Relic narrates; the line follows the rule.
+    flavor: "Hold. The pressure is what makes them.",
+    printed: {},
+  },
+  {
+    id: "paper-hands",
+    design: "paperhands", // prints as "Paper Hands" — the design's name (a market name, no lotería title)
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 60,
+    rarity: "Uncommon",
+    // A Calamity narrates (the line follows the rule).
+    ability: "Until cleared, each turn the target sells\nthe Asset they bought last, for its cash price.",
+    flavor: "They fold at the first gust.",
+    printed: {},
+  },
+  {
+    id: "the-inferno",
+    design: "infierno", // prints as "The Inferno" — ENGLISH_TITLES (the design is El Infierno)
+    gloss: "The Inferno",
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 61,
+    rarity: "Uncommon",
+    // A Calamity narrates (the line follows the rule).
+    ability: "The target cannot attempt\nthe Hail Mary or offer a Grace.",
+    flavor: "Nine circles. Good news: your guide has nine lives. Bad news: you don't.",
+    printed: {},
+  },
+  {
+    id: "back-to-the-80s",
+    design: "eighties", // prints as "Back to the 80s" — the design's name
+    // Number per set/numbers.js (88 of 88: the portal closes the set); rarity PROVISIONAL (Rare, like
+    // The Singular80 — the other card that is a door). The first FULL ART card (art/back-to-the-80s.js:
+    // fullArt), its words set on the picture.
+    number: 88,
+    rarity: "Rare",
+    // A Location builds; the line is the design's extra look on the draw.
+    ability: "At the start of your turn, look at one extra card\nfrom your deck, then choose which to draw.",
+    // A Location narrates; the line follows the rule.
+    flavor: "The future was better the first time.",
+    printed: {},
+  },
+  {
+    id: "the-ponzi",
+    design: "ponzi", // prints as "The Ponzi" — the design's name (a market name, no lotería title)
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 78,
+    rarity: "Uncommon",
+    // A played Event: the boxes print cost (2); the text carries the per-rival-Asset
+    // take and the leak to the room.
+    ability: "Bank 25 for each Asset a rival holds.\nThen each rival collects 1.",
+    // An Event narrates; the line follows the rule.
+    flavor: "Everyone gets paid, in order of arrival.",
     printed: {},
   },
 ];

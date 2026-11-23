@@ -194,6 +194,16 @@ function RulesText({ text }) {
 }
 
 // The Virtual Mary has circuit traces; the rest of the set uses flowing scrolls.
+// THE APPARITION KEYWORD: the name on the badge every apparition card wears, and the reminder beside it.
+// One place to rename it.
+export const APPARITION_KEYWORD = { name: "Radi8", gift: "One more action, and a Miracle" };
+// FULL ART (data.fullArt, from the card's art file): the picture fills the frame from top to bottom. There
+// is no text box: the rules, the flavor line and the name are set straight on the art, in white (the name in
+// gold) with a dark outline, over a shade that deepens toward the foot of the card so they always read.
+const FULL_ART_H = 678; // the window's height on a full-art card (470 on the others)
+// The gold lettering (the name, the type) may be a clipped gradient, which an outline would cover: it gets a dark edge as a shadow.
+const ON_ART_GILT = "drop-shadow(0 0 1.5px #0a0613) drop-shadow(0 0 1.5px #0a0613) drop-shadow(0 2px 4px rgba(5,3,12,.9))";
+const ON_ART = { WebkitTextStroke: "3.2px #0a0613", paintOrder: "stroke fill", textShadow: "0 1px 5px rgba(5,3,12,.9)" };
 function filigreeMarkup(model, metalColor) {
   const corner = model.id === "virtual-mary" ? `
     <g fill="none" stroke="${metalColor}" stroke-linejoin="round" stroke-linecap="round">
@@ -223,7 +233,7 @@ function filigreeMarkup(model, metalColor) {
 // shows through it. Written as markup so the same shapes serve the inline SVG
 // <mask> (the still foils) and a CSS mask image (the mirror, which is a div so
 // its gradients can follow the tilt).
-function metalMaskMarkup(model) {
+function metalMaskMarkup(model, fullArt = false) {
   const plate = model.plate ? plateBox(model.plate.value) : null;
   const shapes = plate ? plateShapes(plate.w) : null;
   const drop = (at) => `<g transform="translate(${at.x},${at.y}) scale(${at.sx},${at.sy})"><path d="${DROP_OUTER}" fill="#000" stroke="#000" stroke-width="9" stroke-linejoin="round"/><path d="${DROP_OUTER}" fill="#fff"/></g>`;
@@ -231,9 +241,11 @@ function metalMaskMarkup(model) {
     `<rect x="0" y="0" width="${W}" height="${H}" fill="#000"/>`,
     `<rect x="0" y="0" width="${W}" height="${H}" rx="24" fill="#fff"/>`,
     `<rect x="5" y="5" width="502" height="700" rx="19" fill="#000"/>`,
+    // A full-art card has one window, the height of the card, and no text box.
+    ...(fullArt ? [`<rect x="15" y="15" width="482" height="${FULL_ART_H + 2}" rx="11" fill="none" stroke="#fff" stroke-width="2"/>`] : [
     `<rect x="15" y="15" width="482" height="472" rx="11" fill="none" stroke="#fff" stroke-width="2"/>`,
     `<rect x="28" y="440" width="456" height="154" rx="12" fill="#000"/>`,
-    `<rect x="29" y="441" width="454" height="152" rx="11" fill="none" stroke="#fff" stroke-width="2"/>`,
+    `<rect x="29" y="441" width="454" height="152" rx="11" fill="none" stroke="#fff" stroke-width="2"/>`]),
     filigreeMarkup(model, "#fff"),
     model.topLeft?.shape === "drop" ? drop(TL_DROP) : "",
     model.topLeft?.shape === "coin" ? `<g transform="translate(${TL.x},${TL.y})"><circle cx="50" cy="50" r="49" fill="#000"/><circle cx="50" cy="50" r="45" fill="#fff"/></g>` : "",
@@ -242,8 +254,8 @@ function metalMaskMarkup(model) {
   ].join("");
 }
 // The same mask as a CSS image: opaque where the metal is, clear elsewhere.
-function metalMaskUrl(model) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}">${metalMaskMarkup(model)}</mask></defs><rect width="${W}" height="${H}" fill="#fff" mask="url(#m)"/></svg>`;
+function metalMaskUrl(model, fullArt = false) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}">${metalMaskMarkup(model, fullArt)}</mask></defs><rect width="${W}" height="${H}" fill="#fff" mask="url(#m)"/></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
@@ -253,6 +265,25 @@ function metalMaskUrl(model) {
 // art sits behind, so the deepest layer travels furthest. Kept inside the
 // slack the art has past the window's edge (3%, plus the scene's overscale).
 // Props in front of the window (positive z) slide the other way.
+// LIGHTNING (layer.bolts: { cx, cy, rx, ry } an ellipse in % of the layer, with optional count and color): forks
+// that leap outward from the ellipse's edge, each on its own clock. Drawn from a seeded sequence, so every
+// render of the card draws the same forks. In px of the card (the layer covers it).
+function boltPaths(spec) {
+  let seed = 88; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  const cx = (spec.cx / 100) * W, cy = (spec.cy / 100) * H, rx = (spec.rx / 100) * W, ry = (spec.ry / 100) * H, n = spec.count || 14;
+  return Array.from({ length: n }, (_, i) => {
+    const a = ((i + rnd() * 0.7) / n) * Math.PI * 2, ux = Math.cos(a), uy = Math.sin(a), px = -uy, py = ux;
+    let x = cx + rx * ux * (0.94 + rnd() * 0.1), y = cy + ry * uy * (0.94 + rnd() * 0.1);
+    const len = 58 + rnd() * 72, steps = 5; let d = `M${x.toFixed(1)} ${y.toFixed(1)}`, fork = "";
+    for (let k = 1; k <= steps; k++) {
+      const j = (rnd() - 0.5) * 22; x += (ux * len) / steps + px * j; y += (uy * len) / steps + py * j; d += ` L${x.toFixed(1)} ${y.toFixed(1)}`;
+      if (k === 2) { const t = rnd() < 0.5 ? 0.6 : -0.6, fx = ux * Math.cos(t) - uy * Math.sin(t), fy = ux * Math.sin(t) + uy * Math.cos(t), fl = len * 0.42;
+        fork = `M${x.toFixed(1)} ${y.toFixed(1)} L${(x + fx * fl * 0.5 + (rnd() - 0.5) * 9).toFixed(1)} ${(y + fy * fl * 0.5 + (rnd() - 0.5) * 9).toFixed(1)} L${(x + fx * fl).toFixed(1)} ${(y + fy * fl).toFixed(1)}`; }
+    }
+    const period = 1.7 + rnd() * 2.3;
+    return { d: `${d} ${fork}`, period, delay: -rnd() * period };
+  });
+}
 const parallax = (layer) => +(Math.min(1.1, Math.max(-1.1, -(layer.z ?? 0) / 68)) * 2.6).toFixed(2);
 
 // An apparition's lit halo (src/game/rcana/set/apparitions.js): a glow with
@@ -353,6 +384,26 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
   };
   // A drag that turned the card is not a tap: it must not also flip the card over.
   const swallowDragClick = (e) => { const d = drag.current; drag.current = null; if (d && d.moved) { e.stopPropagation(); e.preventDefault(); } };
+  // A BOBBLE (layer.bobble: { x, y } the foot of the spring, in % of the layer): a head on a spring. It is a real
+  // spring, stepped each frame and written to --bob on the stage: the head leans the way the card is tipped,
+  // overshoots, and wobbles to rest; left alone, it takes a small nod every few seconds. Live card only.
+  const bobbles = interactive && (data?.artLayers || []).some((l) => l.bobble);
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!bobbles || !el) return;
+    const calm = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let a = 0, v = 0, last = performance.now(), nextNod = last + 1200, raf = 0;
+    const step = (now) => {
+      const dt = Math.min(0.033, (now - last) / 1000); last = now;
+      const tx = parseFloat(el.style.getPropertyValue("--tx")) || 0;
+      if (!calm && now > nextNod) { v += (Math.random() < 0.5 ? -1 : 1) * (26 + Math.random() * 22); nextNod = now + 2600 + Math.random() * 3200; }
+      v += (-(a - tx * 9) * 120 - v * 3.4) * dt; a += v * dt; // stiffness 120, damping 3.4: about 1.7 swings a second, at rest in two
+      el.style.setProperty("--bob", `${a.toFixed(2)}deg`);
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => { cancelAnimationFrame(raf); el.style.removeProperty("--bob"); };
+  }, [bobbles]);
   // A finger on the live card turns the card; it must not scroll the page under it. touch-action: none on
   // the stage says so, but WebKit loses that inside the flip card's 3D-transformed faces, so the touch
   // moves are also refused outright (a non-passive listener; React's own touch handlers are passive).
@@ -412,6 +463,7 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
   const foil = FOILS[metal] || null;
   const mirror = metal === "mirror";
   const apparition = APPARITIONS[data.id] || null;
+  const fullArt = !!data.fullArt, artH = fullArt ? FULL_ART_H : 470;
   const plate = m.plate ? plateBox(m.plate.value) : null;
   const shapes = plate ? plateShapes(plate.w) : null;
   const nameSize = m.name.length <= 9 ? 54 : m.name.length <= 13 ? 44 : m.name.length <= 17 ? 36 : m.name.length <= 19 ? 34 : 30;
@@ -438,6 +490,11 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
       <div style={{ position: "absolute", inset: 0, transform: interactive ? "rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))" : undefined, transition: "transform var(--ease, 500ms) ease-out", willChange: interactive ? "transform" : undefined }}>
       <style>{`@import url("https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Grenze+Gotisch:wght@800&family=Spectral:ital,wght@0,400;0,700;1,400&display=swap");
         @keyframes rc3-flicker { 0%, 100% { scale: 1 1; rotate: 0deg; opacity: .93; filter: brightness(1); } 13% { scale: 1.03 1.07; rotate: -1.5deg; opacity: 1; filter: brightness(1.12); } 27% { scale: .98 .95; rotate: 1deg; opacity: .86; filter: brightness(.95); } 41% { scale: 1.02 1.05; rotate: 2deg; opacity: 1; filter: brightness(1.08); } 58% { scale: .99 .97; rotate: -1deg; opacity: .9; filter: brightness(1); } 74% { scale: 1.04 1.09; rotate: .5deg; opacity: 1; filter: brightness(1.15); } 88% { scale: .98 .96; rotate: -2deg; opacity: .88; filter: brightness(.97); } }
+        @keyframes rc3-glint { 0%, 100% { scale: 0; rotate: -20deg; opacity: 0; } 5% { opacity: 1; } 12% { scale: 1; rotate: 12deg; opacity: 1; } 26% { scale: 0; rotate: 40deg; opacity: 0; } }
+        @keyframes rc3-bolt { 0%, 100% { opacity: 0; } 2% { opacity: 1; } 4% { opacity: .35; } 6% { opacity: 1; } 11% { opacity: .85; } 16% { opacity: 0; } }
+        @keyframes rc3-crackle { 0%, 100% { filter: brightness(1); } 6% { filter: brightness(1.22); } 8% { filter: brightness(1); } 31% { filter: brightness(1); } 33% { filter: brightness(1.16); } 36% { filter: brightness(1.02); } 60% { filter: brightness(1); } 62% { filter: brightness(1.28); } 64% { filter: brightness(1.04); } 66% { filter: brightness(1.2); } 70% { filter: brightness(1); } }
+        @keyframes rc3-blaze { 0%, 100% { scale: 1 1; filter: brightness(1) saturate(1); } 11% { scale: 1.012 1.03; filter: brightness(1.14) saturate(1.1); } 24% { scale: .995 .985; filter: brightness(.93) saturate(1); } 39% { scale: 1.02 1.045; filter: brightness(1.2) saturate(1.15); } 53% { scale: 1 1.01; filter: brightness(.98) saturate(1); } 68% { scale: 1.015 1.035; filter: brightness(1.16) saturate(1.1); } 84% { scale: .99 .98; filter: brightness(.9) saturate(.97); } }
+        @keyframes rc3-flare { 0%, 100% { opacity: .08; } 9% { opacity: .95; } 15% { opacity: .3; } 21% { opacity: .8; } 34% { opacity: .1; } 55% { opacity: .15; } 63% { opacity: 1; } 70% { opacity: .2; } 86% { opacity: .55; } }
         @keyframes rc3-flash { 0% { background-size: 0% 0%; opacity: 0; } 10% { opacity: 1; } 55% { opacity: .85; } 100% { background-size: 280% 280%; opacity: 0; } }`}</style>
       <div
         className="rc-card rc3-card"
@@ -449,7 +506,7 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
         <div style={{ ...abs, left: 5, top: 5, width: 502, height: 700, borderRadius: 19, background: INK }} />
 
         {/* The art: the card's own layers, placed as they were authored against the whole card, seen through the window. */}
-        <div style={{ ...abs, left: 16, top: 16, width: 480, height: 470, borderRadius: 10, overflow: "hidden", background: data.backdrop && /^(url|linear|radial|conic|#|rgb|hsl)/.test(data.backdrop) ? data.backdrop : INK }}>
+        <div style={{ ...abs, left: 16, top: 16, width: 480, height: artH, borderRadius: 10, overflow: "hidden", background: data.backdrop && /^(url|linear|radial|conic|#|rgb|hsl)/.test(data.backdrop) ? data.backdrop : INK }}>
           <div style={{ ...abs, left: -16, top: -16, width: W, height: H }}>
             {layers.map((layer) => {
               if (!layer.src) return null;
@@ -465,8 +522,46 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
                   // A flame that flickers (layer.flicker: where its base is, in % of the layer): it stretches, leans and
                   // dims a little about that point, on the live card only. `scale` and `rotate` are their own
                   // properties, so the animation leaves the tilt's transform alone.
-                  ...(layer.flicker && interactive ? { transformOrigin: `${layer.flicker.x}% ${layer.flicker.y}%`, animation: `rc3-flicker ${layer.flicker.period || 1.9}s ease-in-out infinite` } : null) }} />
+                  ...(layer.flicker && interactive ? { transformOrigin: `${layer.flicker.x}% ${layer.flicker.y}%`, animation: `rc3-flicker ${layer.flicker.period || 1.9}s ease-in-out infinite` } : null),
+                  // A blaze (layer.blaze: where the fire starts, in % of the layer): a big fire that surges and gutters
+                  // from that point. And a crackle (layer.crackle): the layer flares, the way lightning lights a scene.
+                  ...(layer.bobble && interactive ? { transformOrigin: `${layer.bobble.x}% ${layer.bobble.y}%`, rotate: "var(--bob, 0deg)" } : null),
+                  ...(layer.blaze && interactive ? { transformOrigin: `${layer.blaze.x}% ${layer.blaze.y}%`, animation: `rc3-blaze ${layer.blaze.period || 1.5}s ease-in-out infinite` } : null),
+                  ...(layer.crackle && interactive ? { animation: `rc3-crackle ${layer.crackle === true ? 2.6 : layer.crackle}s linear infinite` } : null) }} />
+                  {/* A flare (layer.flare): the layer's own highlights flash, and nothing moves. Two hot, high-contrast
+                      copies of the picture are screened over it, each showing through its own slanted bands and flashing on
+                      its own clock, so the light runs along the fire and never lifts the whole sheet at once. A turn of
+                      the card brightens it. */}
+                  {layer.flare && interactive && [0, 1].map((k) => (
+                    <div key={`flare${k}`} aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", mixBlendMode: "screen",
+                      transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out", opacity: "calc(.7 + var(--lit, 0) * .3)",
+                      WebkitMaskImage: `repeating-linear-gradient(${k ? 62 : 118}deg, #000 0%, #000 ${k ? 5 : 7}%, transparent ${k ? 11 : 14}%, transparent ${k ? 23 : 29}%)`, maskImage: `repeating-linear-gradient(${k ? 62 : 118}deg, #000 0%, #000 ${k ? 5 : 7}%, transparent ${k ? 11 : 14}%, transparent ${k ? 23 : 29}%)` }}>
+                      <img src={layer.src} alt="" draggable={false} decoding="async" style={{ position: "absolute", left: 0, top: 0, width: "100%", height: "100%", filter: "brightness(1.55) contrast(1.9) saturate(1.25)",
+                        animation: `rc3-flare ${((layer.flare.period || 2.3) * (k ? 0.73 : 1)).toFixed(2)}s linear ${k ? -0.9 : 0}s infinite` }} />
+                    </div>
+                  ))}
+                  {layer.bolts && interactive && (
+                    <svg aria-hidden="true" viewBox={`0 0 ${W} ${H}`} style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", mixBlendMode: "screen", overflow: "visible",
+                      transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out", filter: `drop-shadow(0 0 2px #fff) drop-shadow(0 0 5px ${layer.bolts.color || "#59c2ff"}) drop-shadow(0 0 12px ${layer.bolts.color || "#59c2ff"})` }}>
+                      {boltPaths(layer.bolts).map((b, bi) => <path key={bi} d={b.d} fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round"
+                        style={{ opacity: 0, animation: `rc3-bolt ${b.period.toFixed(2)}s linear ${b.delay.toFixed(2)}s infinite` }} />)}
+                    </svg>
+                  )}
                   {light?.glint}
+                  {/* Glints (layer.glints: points in % of the layer, each { x, y, size? }): four-pointed sparks that
+                      flare and die one after another, each on its own clock, riding the layer as it slides. On the
+                      live card only; a turn of the card brightens them. */}
+                  {layer.glints && interactive && (
+                    <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", mixBlendMode: "screen",
+                      transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out", opacity: "calc(.75 + var(--lit, 0) * .25)" }}>
+                      {layer.glints.map((g, gi) => {
+                        const size = (g.size || 1) * 66, period = 2.1 + ((gi * 7) % 5) * 0.45;
+                        return <div key={gi} style={{ position: "absolute", left: `${g.x}%`, top: `${g.y}%`, width: size, height: size, marginLeft: -size / 2, marginTop: -size / 2,
+                          animation: `rc3-glint ${period}s ease-in-out ${(-((gi * 0.618) % 1) * period).toFixed(2)}s infinite`, scale: "0",
+                          background: `radial-gradient(circle, #fff 0, rgba(255,255,255,.95) 7%, ${g.color || "rgba(190,220,255,.55)"} 18%, transparent 38%), linear-gradient(90deg, transparent 4%, rgba(255,255,255,.95) 50%, transparent 96%) center / 100% 7% no-repeat, linear-gradient(0deg, transparent 4%, rgba(255,255,255,.95) 50%, transparent 96%) center / 7% 100% no-repeat` }} />;
+                      })}
+                    </div>
+                  )}
                   {light && apparition.mask && (
                     <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none",
                       transform: `${slide} scale(${layer.scale ?? 1})`, transition: interactive ? "transform var(--ease, 500ms) ease-out, opacity var(--ease, 500ms) ease-out" : undefined,
@@ -499,8 +594,12 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
             })}
           </div>
           {wasLive && data.live3d && <RcanaLive3D key={data.id} kind={data.live3d} paused={!interactive} style={{ position: "absolute", left: 0, top: 0, width: 480, height: 470 }} />}
+          {/* Full art: the shade the words stand on. A soft pool behind the rules, widest in the middle and thinning
+              to almost nothing at the sides so the picture's corners stay bright, over a band at the foot for the name. */}
+          {fullArt && <div aria-hidden="true" style={{ ...abs, left: 0, top: 380, width: 480, height: artH - 380, pointerEvents: "none",
+            background: "radial-gradient(ellipse 58% 44% at 50% 50%, rgba(10,6,19,.66) 0%, rgba(10,6,19,.5) 50%, rgba(10,6,19,0) 100%), linear-gradient(180deg, rgba(10,6,19,0) 0%, rgba(10,6,19,0) 58%, rgba(10,6,19,.6) 80%, rgba(10,6,19,.88) 100%)" }} />}
         </div>
-        <div style={{ ...abs, left: 14, top: 14, width: 480, height: 470, border: `2px solid ${GOLD}`, borderRadius: 12 }} />
+        <div style={{ ...abs, left: 14, top: 14, width: 480, height: artH, border: `2px solid ${GOLD}`, borderRadius: 12 }} />
 
         <svg aria-hidden="true" viewBox={`0 0 ${W} ${H}`} style={{ ...abs, inset: 0, width: W, height: H, pointerEvents: "none" }}
           dangerouslySetInnerHTML={{ __html: filigreeMarkup(m, GILT) }} />
@@ -531,18 +630,34 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
         )}
 
         {/* The text box: a framed parchment plate, the ability or timing as a tab on its top edge. */}
-        <div style={{ ...abs, left: 28, top: 440, width: 456, height: 154, boxSizing: "border-box", border: `2px solid ${GOLD}`, borderRadius: 12, background: PARCHMENT }} />
-        <div style={{ ...abs, left: 35, top: 447, width: 442, height: 140, boxSizing: "border-box", border: "1px solid #b9892f", borderRadius: 7 }} />
-        <div style={{ ...abs, left: tx, top: 462, width: tw, height: m.flavor ? 74 : 118, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <p style={{ margin: 0, textAlign: "center", fontFamily: BODY, fontSize: textSize, lineHeight: 1.45, letterSpacing: "0.14em", textTransform: "uppercase", color: "#24160a" }}><RulesText text={m.text} /></p>
+        {!fullArt && <div style={{ ...abs, left: 28, top: 440, width: 456, height: 154, boxSizing: "border-box", border: `2px solid ${GOLD}`, borderRadius: 12, background: PARCHMENT }} />}
+        {!fullArt && <div style={{ ...abs, left: 35, top: 447, width: 442, height: 140, boxSizing: "border-box", border: "1px solid #b9892f", borderRadius: 7 }} />}
+        {/* THE APPARITION KEYWORD (APPARITION_KEYWORD, below the imports): every card that carries Our Lady's image wears
+            the badge at the head of its text box, a dark pill in a rainbow rim with her eight-pointed star, and beside
+            it what witnessing her gives. The rules sit a little lower to make room. */}
+        {m.apparition && (
+          <div style={{ ...abs, left: tx, top: 459, width: tw, height: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, whiteSpace: "nowrap" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, height: 18, boxSizing: "border-box", padding: "0 8px 0 6px", borderRadius: 9, border: "1.5px solid transparent",
+              background: `linear-gradient(${INK}, ${INK}) padding-box, linear-gradient(90deg, #ff5f6d, #ffc371, #f9f871, #5ee7a0, #4facfe, #b98cff, #ff5f6d) border-box`,
+              fontFamily: CAPS, fontSize: 12, lineHeight: 1, letterSpacing: "0.14em", textTransform: "uppercase", color: "#ffe9a6" }}>
+              <svg aria-hidden="true" viewBox="-10 -10 20 20" style={{ width: 10, height: 10, flex: "none" }}>
+                <polygon fill="#ffd95a" points={Array.from({ length: 16 }, (_, k) => { const r = k % 2 ? 4 : 9.6; const a = (k * Math.PI) / 8 - Math.PI / 2; return `${(r * Math.cos(a)).toFixed(2)},${(r * Math.sin(a)).toFixed(2)}`; }).join(" ")} />
+              </svg>
+              {APPARITION_KEYWORD.name}
+            </span>
+            <span style={{ fontFamily: CAPS, fontSize: 11, lineHeight: 1, letterSpacing: "0.14em", textTransform: "uppercase", color: "#7a4f00", ...(fullArt ? { color: "#ffe08a", ...ON_ART, WebkitTextStroke: "2.4px #0a0613" } : null) }}>{APPARITION_KEYWORD.gift}</span>
+          </div>
+        )}
+        <div style={{ ...abs, left: tx, top: m.apparition ? 476 : 462, width: tw, height: (m.flavor ? 74 : 118) - (m.apparition ? 13 : 0), display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <p style={{ margin: 0, textAlign: "center", fontFamily: BODY, fontSize: textSize, lineHeight: 1.45, letterSpacing: "0.14em", textTransform: "uppercase", color: "#24160a", ...(fullArt ? { color: "#fff", fontWeight: 700, ...ON_ART } : null) }}><RulesText text={m.text} /></p>
         </div>
         {m.flavor && (
           <>
             <svg aria-hidden="true" viewBox="0 0 160 12" style={{ ...abs, left: tx + tw / 2 - 80, top: 538, width: 160, height: 12 }}>
-              <line x1="0" y1="6" x2="62" y2="6" stroke="#b9892f" strokeWidth="1.5" /><line x1="98" y1="6" x2="160" y2="6" stroke="#b9892f" strokeWidth="1.5" />
+              <line x1="0" y1="6" x2="62" y2="6" stroke={fullArt ? GILT : "#b9892f"} strokeWidth="1.5" /><line x1="98" y1="6" x2="160" y2="6" stroke={fullArt ? GILT : "#b9892f"} strokeWidth="1.5" />
               <polygon points="80,1 86,6 80,11 74,6" fill={m.color} /><polygon points="68,3.5 71,6 68,8.5 65,6" fill="#b9892f" /><polygon points="92,3.5 95,6 92,8.5 89,6" fill="#b9892f" />
             </svg>
-            <p style={{ ...abs, left: tx, top: 554, width: tw, textAlign: "center", fontFamily: BODY, fontSize: m.flavor.length > (tri ? 40 : 48) ? 10 : 11.5, fontStyle: "italic", lineHeight: 1.3, letterSpacing: "0.14em", textTransform: "uppercase", color: "#4a3520" }}>{m.flavor}</p>
+            <p style={{ ...abs, left: tx, top: 554, width: tw, textAlign: "center", fontFamily: BODY, fontSize: m.flavor.length > (tri ? 40 : 48) ? 10 : 11.5, fontStyle: "italic", lineHeight: 1.3, letterSpacing: "0.14em", textTransform: "uppercase", color: "#4a3520", ...(fullArt ? { color: "#f4ecd8", ...ON_ART, WebkitTextStroke: "2.4px #0a0613" } : null) }}>{m.flavor}</p>
           </>
         )}
 
@@ -573,7 +688,7 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
               <linearGradient id={`${uid}-sheen`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="430" y2="190" spreadMethod="repeat">
                 <stop offset="0" stopColor="#fff" stopOpacity="0" /><stop offset="0.42" stopColor="#fff" stopOpacity="0" /><stop offset="0.5" stopColor="#fff" stopOpacity={foil.sheen} /><stop offset="0.58" stopColor="#fff" stopOpacity="0" /><stop offset="1" stopColor="#fff" stopOpacity="0" />
               </linearGradient>
-              <mask id={`${uid}-metal`} maskUnits="userSpaceOnUse" x="0" y="0" width={W} height={H} dangerouslySetInnerHTML={{ __html: metalMaskMarkup(m) }} />
+              <mask id={`${uid}-metal`} maskUnits="userSpaceOnUse" x="0" y="0" width={W} height={H} dangerouslySetInnerHTML={{ __html: metalMaskMarkup(m, fullArt) }} />
             </defs>
             <rect x="0" y="0" width={W} height={H} fill={`url(#${uid}-foil)`} mask={`url(#${uid}-metal)`} />
             <rect x="0" y="0" width={W} height={H} fill={`url(#${uid}-sheen)`} mask={`url(#${uid}-metal)`} />
@@ -581,7 +696,7 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
         )}
         {/* The mirror: polished gold whose bands slide against the lean, under a glare that follows the pointer. */}
         {mirror && (
-          <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: W, height: H, pointerEvents: "none", WebkitMaskImage: metalMaskUrl(m), maskImage: metalMaskUrl(m), WebkitMaskSize: "100% 100%", maskSize: "100% 100%", WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat" }}>
+          <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: W, height: H, pointerEvents: "none", WebkitMaskImage: metalMaskUrl(m, fullArt), maskImage: metalMaskUrl(m, fullArt), WebkitMaskSize: "100% 100%", maskSize: "100% 100%", WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat" }}>
             <div style={{ ...abs, inset: 0, backgroundImage: "repeating-linear-gradient(calc(118deg + var(--ry, 0deg) * 1.6), #a06a00 0%, #d39a00 7%, #f2b705 13%, #fff6c4 19%, #ffd84a 25%, #c58600 36%, #a87000 44%, #ffe58a 55%, #fffbe0 59%, #f2b705 68%, #a06a00 100%)", backgroundSize: "320% 320%", backgroundPosition: "calc(50% + (50% - var(--mx, 50%)) * 1.5) calc(50% + (50% - var(--my, 50%)) * 1.5)", transition: "background-position var(--ease, 500ms) ease-out" }} />
             <div style={{ ...abs, inset: 0, mixBlendMode: "screen", backgroundImage: "radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,.95) 0%, rgba(255,246,196,.5) 16%, rgba(255,255,255,0) 42%)" }} />
           </div>
@@ -614,19 +729,19 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
         </div>
 
         {/* The name band. */}
-        <p style={{ ...abs, left: 0, top: 602, width: W, textAlign: "center", fontFamily: CAPS, fontSize: 15, letterSpacing: "0.34em", lineHeight: 1, textTransform: "uppercase", ...giltText }}>{m.typeLabel}</p>
+        <p style={{ ...abs, left: 0, top: 602, width: W, textAlign: "center", fontFamily: CAPS, fontSize: 15, letterSpacing: "0.34em", lineHeight: 1, textTransform: "uppercase", ...giltText, ...(fullArt ? { filter: ON_ART_GILT } : null) }}>{m.typeLabel}</p>
         {m.apparition && (
-          <svg role="img" aria-label="Apparition: revealing this card grants a Miracle" viewBox="-10 -10 20 20" style={{ ...abs, left: W / 2 - String(m.typeLabel).length * 5.6 - 20, top: 600, width: 15, height: 15 }}>
+          <svg role="img" aria-label="Apparition (Radi8): revealing this card grants one more action and a Miracle" viewBox="-10 -10 20 20" style={{ ...abs, left: W / 2 - String(m.typeLabel).length * 5.6 - 20, top: 600, width: 15, height: 15 }}>
             <polygon fill={GILT} stroke={INK} strokeWidth="0.8" points={Array.from({ length: 16 }, (_, k) => { const r = k % 2 ? 4 : 9.4; const a = (k * Math.PI) / 8 - Math.PI / 2; return `${(r * Math.cos(a)).toFixed(2)},${(r * Math.sin(a)).toFixed(2)}`; }).join(" ")} />
           </svg>
         )}
         <div style={{ ...abs, left: 96, top: 618, width: 320, height: 58, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <p style={{ margin: 0, whiteSpace: "nowrap", fontFamily: NAME, fontWeight: 800, fontSize: nameSize, lineHeight: 1, ...giltText }}>{m.name}</p>
+          <p style={{ margin: 0, whiteSpace: "nowrap", fontFamily: NAME, fontWeight: 800, fontSize: nameSize, lineHeight: 1, ...giltText, ...(fullArt ? { filter: ON_ART_GILT } : null) }}>{m.name}</p>
         </div>
 
         {/* Bottom right: the seal over the collector number. */}
         <img src={SEAL} alt="The RL80 seal" draggable={false} style={{ ...abs, left: 434, top: 608, width: 60, height: 65, display: "block" }} />
-        {m.collector && <p style={{ ...abs, left: 434, top: 678, width: 60, textAlign: "center", fontFamily: CAPS, fontSize: 13, letterSpacing: "0.12em", lineHeight: 1, color: "#e6d3a0" }}>{m.collector}</p>}
+        {m.collector && <p style={{ ...abs, left: 434, top: 678, width: 60, textAlign: "center", fontFamily: CAPS, fontSize: 13, letterSpacing: "0.12em", lineHeight: 1, color: "#e6d3a0", ...(fullArt ? { ...ON_ART, WebkitTextStroke: "2px #0a0613" } : null) }}>{m.collector}</p>}
       </div>
       </div>
     </div>

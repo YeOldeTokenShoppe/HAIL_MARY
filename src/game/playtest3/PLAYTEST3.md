@@ -244,6 +244,22 @@ Compound Interest was an arbitrary fit for a unicorn. **The Narrative:** while E
 
 ## Apparitions and Miracles (2026-11-20)
 
+**Changed 2026-11-22: an apparition also grants one more main action. The keyword is Radi8** (the badge on every apparition card; `APPARITION_KEYWORD` in RcanaCard3.jsx). Revealing an apparition now gives one more
+main action (this turn, or the witness's next if it was revealed on a rival's) as well as the Miracle
+(`RULES.apparitionGift: 'action+miracle'`). Tried over 8,000 games each, two players:
+
+| An apparition grants | Devotion wins | Rounds | Whoever saw more apparitions wins |
+|---|---|---|---|
+| a Miracle (the rule until now) | 49.9% | 11.7 | 51% |
+| one more action | 47.3% | 11.7 | 53% |
+| one more action and a Miracle (chosen) | 46.9% | 11.5 | 56% |
+| another turn | 41.1% | 10.8 | 67% |
+| another turn and a Miracle | 40.5% | 10.6 | 70% |
+
+Another turn decided too many games. With the bots taught that an apparition gives its action back, the chosen rule
+stands at Devotion 48.5% / Degen 51.5% over 10,000 games, going first 51.5%. Degen gains a little more because two
+of its apparitions are Events that fire on the draw, for nothing. The decks were left as they were.
+
 Ten cards carry Our Lady's image (`apparition: true` in designs.js): The Holy Roller, The Fire Horse, The Virtual Mary, Mardi Gras, The Rose, The Fountain, The Miracle Tortilla, The Tattoo, Ride or Die and the Dashboard Figure.
 
 - **Whoever reveals one witnesses an apparition and takes a Miracle** (an eight-pointed star), three at most: the player who draws an apparition Event, or who plays any other apparition card from their hand.

@@ -29,7 +29,7 @@ export const RECIPES = {
     ['bear', 1], ['rug', 1],
     ['bell', 1], ['tortilla', 2], ['publicista', 1], ['stimulus', 1], ['ofrenda', 1],
     ['heart', 1], ['halo', 1], ['rosary', 1], ['grail', 1], ['dashboard', 1], ['tattoo', 1], ['geometry', 1],
-    ['cherub', 1], ['fountain', 1], ['limpia', 1], ['anima', 1], ['lagrimas', 1]],
+    ['cherub', 1], ['fountain', 1], ['anima', 1], ['lagrimas', 1]],
   degen: [['diablito', 2], ['unicornio', 2], ['prospector', 1], ['abuela', 1], ['bot', 1],
     ['meme', 1], ['tech', 1], ['perp', 1], ['bluechip', 1], ['jardin', 1], ['ponzi', 1], ['catacumbas', 1],
     ['unlock', 1],

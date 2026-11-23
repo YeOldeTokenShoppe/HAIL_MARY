@@ -503,6 +503,8 @@ export function toRcanaCard(card, overrides = {}) {
     backdrop: art.backdrop ?? null,
     // A live 3D scene for the art window (a key of SCENES in RcanaLive3D.jsx); the layers are its poster.
     live3d: art.live3d ?? null,
+    // Full art (RcanaCard3): the picture fills the frame, with no text box; the words are set on the art.
+    fullArt: art.fullArt ?? false,
 
     // An art file may pin a frame; otherwise the plate follows the type.
     plate: card.plate || "boxed",
@@ -528,6 +530,10 @@ export function toRcanaCard(card, overrides = {}) {
       id: l.id || `layer-${i}`,
       src: l.src || artPath(card.id, l.id || `layer-${i}`),
       swingOrigin: l.swingOrigin,
+      bobble: l.bobble, // a head on a spring: { x, y } the foot of the spring in % of the layer (RcanaCard3)
+      flare: l.flare, // the layer's own highlights flash; nothing moves (RcanaCard3)
+      blaze: l.blaze, crackle: l.crackle, bolts: l.bolts, // a surging fire { x, y }; a layer that flares like lightning; forks leaping from an ellipse { cx, cy, rx, ry } (RcanaCard3)
+      glints: l.glints, // sparks that flare and die: [{ x, y, size?, color? }] in % of the layer (RcanaCard3)
       flicker: l.flicker, // a flame: { x, y } its base in % of the layer, optional period in seconds (RcanaCard3)
       clapperRestAngle: l.clapperRestAngle,
       clapperOrigin: l.clapperOrigin,

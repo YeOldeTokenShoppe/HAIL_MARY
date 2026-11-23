@@ -1,7 +1,7 @@
 // Quantum Hack — the hooded hacker in the matrix hall, a Calamity. Four
 // planes behind the plate: the code-rain hall with its floating terminals,
 // the hacker inside the window, the haloed quantum cube hovering between his
-// hands just ahead of him, and the falling code glyphs nearest the window.
+// hands just ahead of him, and the falling code glyphs on the hacker's own rung.
 // Everything stays under the frame.
 //
 // No paths: public/TCG/rcana/quantum-hack/<id>.webp by convention (artPath).
@@ -23,8 +23,9 @@ export default {
     // The quantum cube, a step ahead of the hands that hold it.
     { id: "prop", z: 8, scale: 1 },
 
-    // The falling glyphs — the top layer, nearest the window but still
-    // BEHIND the plate (z < 44), so the frame clips them at its edge.
-    { id: "prop1", z: 24, scale: 1 },
+    // The falling glyphs — drawn last, but on the SAME rung as the hacker
+    // (2026-11-22; they were nearest the window at z 24), so they fall with
+    // him on tilt instead of sliding across him.
+    { id: "prop1", z: ART_PLANES.subject, scale: 1 },
   ],
 };

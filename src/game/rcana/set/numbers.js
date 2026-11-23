@@ -23,7 +23,7 @@ export const RESERVED_NUMBERS = {
   // Assets
   tech: 14,
   meme: 22,
-  nacimiento: 30, // El Nacimiento — unfaced (was Collectibles, whose face keeps its art for a later set)
+  nacimiento: 30, // El Nacimiento (was Collectibles, whose face keeps its art for a later set)
   realestate: 32,
   stablecoin: 43,
   bluechip: 45,
@@ -63,7 +63,7 @@ export const RESERVED_NUMBERS = {
   bear: 13,
   hack: 40,
   paperhands: 60, // Paper Hands (added 2026-11-21 as 89; took The Virtue Signal's number the same day, so the set is 88)
-  infierno: 61, // El Infierno — unfaced
+  infierno: 61, // El Infierno
   rug: 39,
   taxman: 36,
   escandalo: 46,
@@ -75,7 +75,7 @@ export const RESERVED_NUMBERS = {
   tortilla: 16,
   publicista: 64, // El Comunicado — unfaced
   whistle: 42, // The Whistleblower (took La Horchata's number, 2026-11-21)
-  stimulus: 65, // The Stimulus — unfaced (took The Burro's number, 2026-11-20)
+  stimulus: 65, // The Stimulus (took The Burro's number, 2026-11-20)
   // Relics
   heart: 66, // El Corazón — unfaced
   halo: 67, // La Aureola — unfaced
@@ -89,14 +89,16 @@ export const RESERVED_NUMBERS = {
   geometry: 72, // Sacred Geometry
   tattoo: 73, // El Tatuaje — unfaced
   dashboard: 74, // La Virgencita — unfaced
-  mission: 85, // The Mission (added 2026-11-21)
-  singular: 86, // The Singular80 — an Event, always numbered last (the set is 86 since The Mission, 2026-11-21)
+  mission: 77, // The Mission (added 2026-11-21; took The Cleansing's number on 2026-11-22)
+  pareto: 85, // The 80/20 Rule (added 2026-11-22)
+  rewind: 86, // Rewind (added 2026-11-22)
+  singular: 87, // The Singular80 (it was always numbered last until Back to the 80s took 88, 2026-11-22)
+  eighties: 88, // Back to the 80s — the portal, card 88 of 88 (added 2026-11-22)
   motherboard: 5, // La Placa Madre — unfaced (a Relic since 2026-11-12)
   // Graces
   ofrenda: 75, // La Ofrenda — unfaced
   cherub: 76, // El Exvoto — unfaced
-  limpia: 77, // La Limpia — unfaced (was The Intercession)
-  ponzi: 78, // The Ponzi — unfaced (was La Pirámide, before that Divine Intervention)
+  ponzi: 78, // The Ponzi (was La Pirámide, before that Divine Intervention)
   anima: 79, // Ánima Sola — unfaced
   confession: 80, // La Confesión
   fountain: 25,

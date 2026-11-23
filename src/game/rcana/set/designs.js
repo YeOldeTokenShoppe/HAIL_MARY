@@ -115,6 +115,10 @@ export const DESIGNS = [
   // one has landed there is nothing on the table to clear, so until now they could only be prevented (The
   // Keys, The Audit). She undoes the last one played on you, and its player takes a strike. (whistle: the
   // engine's flag; the fraud is remembered on the victim as lastFraud.)
+  // Rewind (2026-11-22): the eighties card, a VHS tape. Take back the last card you discarded (played,
+  // sold or spent; not an Event that fired on the draw, and not another Rewind). You still pay to play
+  // that card again. (rewind: the engine's flag.)
+  D('rewind', 'Rewind', 'remedy', 1, { rewind: true, text: 'Take the last card you discarded back into your hand' }),
   D('whistle', 'The Whistleblower', 'remedy', 2, { whistle: true, text: 'Undo the last fraud played on you: take back what it cost you. The rival who played it takes a strike' }),
   D('tortilla', 'Miracle Tortilla', 'remedy', 2, { apparition: true, clears: 'any', printName: 'La Tortilla' }),
   // The thing the publicist hands you, not the man: the Remedies row is objects.
@@ -183,7 +187,8 @@ export const DESIGNS = [
   // Coins in the water: not a candle (the shrine holds three) but a better roll.
   // Absolution: a candle, and the slate wiped clean.
   // Someone prays on your behalf: a candle, and a Calamity lifted.
-  D('limpia', 'La Limpia', 'grace', 2, { savingGrace: 3, text: 'To the shrine: light a candle, and the egg sweeps one Calamity off you' }),
+  // The Cleansing (La Limpia) left the set on 2026-11-22; kept on file.
+  // D('limpia', 'La Limpia', 'grace', 2, { savingGrace: 3, text: 'To the shrine: light a candle, and the egg sweeps one Calamity off you' }),
   // The lonely soul in the flames: a discredited Trader comes back from purgatory.
   D('anima', 'Ánima Sola', 'grace', 1, { text: 'To the shrine: light a candle, and return the most recently discarded Trader with 5 Credibility to your empty seat or to your hand' }),
   // Her tears fall for the fallen: a plain candle, and the strongest rescue in the hand.
@@ -193,7 +198,7 @@ export const DESIGNS = [
   D('fountain', 'The Fountain', 'grace', 2, { apparition: true, text: 'Toss in 2 Liquidity: your Hail Mary odds rise one step, even past the shrine’s three', printName: 'La Fuente' }),
   D('rose', 'The Rose', 'grace', 0, { apparition: true, pros: 50, cash: 2, text: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise', printName: 'La Rosa' }),
   // Locations — places you build. One stands per player, takes no Relic slot, is never sold.
-  D('nacimiento', 'The Nativity Scene', 'location', 2, { text: 'Build it: place a figure at the start of each turn. At the third, the Niño arrives at midnight — light a candle and bank 75, then pack it away', printName: 'El Nacimiento' }),
+  D('nacimiento', 'The Nativity', 'location', 2, { text: 'Build it: place a figure at the start of each turn. At the third, the Niño arrives at midnight — light a candle and bank 75, then pack it away', printName: 'El Nacimiento' }),
   D('catedral', 'The Chart Cathedral', 'location', 2, { text: 'Green candles: whenever any player lights a candle, bank 25', printName: 'La Catedral' }),
   // The Prediction Market (2026-11-21): a place where you bet. First built as an Asset sold on a roll; a
   // market is a venue, so the same day it became the first Location of the Degen kind. Once on its
@@ -203,6 +208,11 @@ export const DESIGNS = [
   // The Mission (2026-11-21): a place that looks after whoever is behind. While it stands, its owner collects
   // alms (in coins) at the start of any turn they begin with less cash than every rival. A place from the
   // RL80 website, and the set's samaritan.
+  // Back to the 80s (2026-11-22): the portal, card 88 of 88. Rewind reaches into the past; this place has been
+  // to the future. While it stands you look at one more card when you draw for your turn (the same look
+  // a Trader's Logos gives, and added to it; it works with no Trader seated and through a scandal).
+  // (foresight: the engine's flag.) Its art is to be a live 3D scene.
+  D('eighties', 'Back to the 80s', 'location', 2, { foresight: 1, text: 'At the start of your turn, look at one extra card from your deck, then choose which to draw' }),
   D('mission', 'The Mission', 'location', 2, { alms: 2, text: 'At the start of your turn, if you have less cash than every rival, collect $20M' }),
   D('catacumbas', 'The Catacombs', 'location', 2, { text: 'Buried with honors: at the start of your turn you may bury your seated Trader — bank 5 Prosperity per point of Credibility they have left', printName: 'Las Catacumbas' }),
   D('moneda', 'The Airdrop', 'event', 0, { text: 'Free money falls from the sky: every player collects 2 Liquidity' }),
@@ -231,7 +241,7 @@ export const DESIGNS = [
   D('virtual', 'The Virtual Mary', 'event', 0, { apparition: true, subtype: 'Ambiguity', text: 'She flickers on every screen: every player shuffles their hand into their deck and draws that many' }),
   // The feast day of the shrine's own saint: the whole table lights a candle.
   D('feast', 'The Feast of Perpetual Profit', 'event', 0, { text: 'Feast day: every player lights a candle' }),
-  D('techwreck', 'Tech Wreck', 'event', 0, { subtype: 'Calamity', text: 'The bubble bursts: every Tech Stock on the table is wrecked — scrapped for 1 Liquidity' }),
+  D('techwreck', 'Tech Wrecked', 'event', 0, { subtype: 'Calamity', text: 'The bubble bursts: every Tech Stock on the table is wrecked — scrapped for 1 Liquidity' }),
   D('ballena', 'The Whale', 'event', 0, { subtype: 'Ambiguity', text: 'The whale surfaces: the richest portfolio’s best Asset moves to the poorest player' }),
   // Initiation: the drawer is taken into the society; fires on draw like the
   // other market weather but PRINTS as an Opportunity (the face sets subClass).
@@ -250,6 +260,9 @@ export const DESIGNS = [
   // The Singular80 (2026-11-20): the point past which nothing slows down. On the draw it changes the
   // game for good: every player takes two main actions a turn from then on. An Ambiguity: it helps
   // whoever has more to do with a turn. Its art is a live 3D scene (art/the-singular80.js).
+  // The 80/20 Rule (2026-11-22): most of the reward goes to a few. On the draw the richest player
+  // collects $80M and everyone else $20M; a tie goes to whoever drew it. An Ambiguity: it helps the leader.
+  D('pareto', 'The 80/20 Rule', 'event', 0, { subtype: 'Ambiguity', text: 'The richest player collects 8 Liquidity. Everyone else collects 2 Liquidity' }),
   D('singular', 'The Singular80', 'event', 0, { subtype: 'Ambiguity', text: 'Time folds: from now on, every player takes two main actions each turn' }),
 
   // Locations (type 'location'): places you build, not things you hold. One
@@ -291,9 +304,9 @@ export const ENGLISH_TITLES = {
   gallo: "The Rooster", vaca: "The Cow", aguacate: "The Avocado", cava: "The Cellar", plata: "The Silver",
   // Artifacts, Graces and Events
   tortilla: "The Miracle Tortilla", rosary: "The Rosary", enigma: "The Enigma Machine", horchata: "Horchata",
-  map: "The Treasure Map", anima: "The Lonely Soul", fuego: "The Fire Horse",
+  map: "The Treasure Map", anima: "The Lonely Soul", fuego: "The Fire Horse", infierno: "The Inferno",
   // Not yet printed
-  infierno: "The Inferno", ofrenda: "The Offering", limpia: "The Cleansing", lagrimas: "The Tears",
+  ofrenda: "The Offering", limpia: "The Cleansing", lagrimas: "The Tears",
 };
 export const loteriaTitleOf = (d) => d.printName || d.name;
 export const titleOf = (d) => (EDITION === "loteria" ? loteriaTitleOf(d) : ENGLISH_TITLES[d.key] || d.name);

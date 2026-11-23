@@ -66,6 +66,13 @@ import theAudit from "./the-audit.js";
 import predictionMarket from "./prediction-market.js";
 import confession from "./confession.js";
 import theMission from "./the-mission.js";
+import nativityScene from "./nativity-scene.js";
+import theStimulus from "./the-stimulus.js";
+import diamondHands from "./diamond-hands.js";
+import paperHands from "./paper-hands.js";
+import theInferno from "./the-inferno.js";
+import backToThe80s from "./back-to-the-80s.js";
+import thePonzi from "./the-ponzi.js";
 import theSingular80 from "./the-singular80.js";
 
 export const RCANA_ART = {
@@ -133,5 +140,12 @@ export const RCANA_ART = {
   "prediction-market": predictionMarket,
   confession,
   "the-mission": theMission,
+  "nativity-scene": nativityScene,
+  "the-stimulus": theStimulus,
+  "diamond-hands": diamondHands,
+  "paper-hands": paperHands,
+  "the-inferno": theInferno,
+  "back-to-the-80s": backToThe80s,
+  "the-ponzi": thePonzi,
   "the-singular80": theSingular80,
 };
