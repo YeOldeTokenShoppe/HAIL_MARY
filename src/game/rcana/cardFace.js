@@ -530,10 +530,17 @@ export function toRcanaCard(card, overrides = {}) {
       id: l.id || `layer-${i}`,
       src: l.src || artPath(card.id, l.id || `layer-${i}`),
       swingOrigin: l.swingOrigin,
+      ripple: l.ripple, // water: rings opening from { x, y } and a slow sway of the layer (RcanaCard3)
+      eyes: l.eyes, // eyes that follow, drawn inside the layer's own shape (the whites): { irises: [{ x, y, r }], travel: { x, y }, color } (RcanaCard3)
+      gaze: l.gaze, // eyes that follow: { x, y } the layer's travel toward the tilt, in px of the card (RcanaCard3)
+      liquid: l.liquid, // quicksilver standing in a vessel, drawn live: { mask, box, level, cx, rx } (RcanaCard3: LiquidMetal)
       bobble: l.bobble, // a head on a spring: { x, y } the foot of the spring in % of the layer (RcanaCard3)
       flare: l.flare, // the layer's own highlights flash; nothing moves (RcanaCard3)
       blaze: l.blaze, crackle: l.crackle, bolts: l.bolts, // a surging fire { x, y }; a layer that flares like lightning; forks leaping from an ellipse { cx, cy, rx, ry } (RcanaCard3)
       glints: l.glints, // sparks that flare and die: [{ x, y, size?, color? }] in % of the layer (RcanaCard3)
+      tick: l.tick, // the wheel's flapper: { x, y } its pivot in % of the layer; knocked aside as each peg passes (RcanaCard3)
+      spin: l.spin, // a wheel: { x, y } its axle in % of the layer, optional period in seconds (RcanaCard3)
+      flames: l.flames, // several flames on one layer: [{ x, y, r }] each wick in % of the layer, r its window in px (RcanaCard3)
       flicker: l.flicker, // a flame: { x, y } its base in % of the layer, optional period in seconds (RcanaCard3)
       clapperRestAngle: l.clapperRestAngle,
       clapperOrigin: l.clapperOrigin,

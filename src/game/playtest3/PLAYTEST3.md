@@ -169,7 +169,7 @@ A test of playing with no starter decks. Every card in the set, one copy each, i
 - The game is the same length and as fair to the second player as the starter decks.
 - Only half the deck is seen in a game, so with one copy each a card and its answer rarely meet: a one-target Remedy is played in about one game in twenty and is a dead card four times as often.
 - The bot's own habits are in these numbers: it rates a condition above a fraud and almost never equips a protection, so the fraud and protection rows say more about the bot than the cards.
-- Cards written for a deck of your own read differently here: Marisol sees the top of the shared deck, The Lonely Soul returns the last Trader anyone discarded.
+- Cards written for a deck of your own read differently here: Marisol sees the top of the shared deck, Purgatory (The Lonely Soul until 2026-11-23) returns the last Trader anyone discarded.
 
 ## Logos, Ethos, Pathos: a trial (2026-11-20)
 
@@ -223,7 +223,9 @@ The rule since the evening of 2026-11-20, at the table too (`--noattrs` is the o
 - **At the table** the Logos look is a prompt: the top cards are shown and you tap the one to draw. The card frame prints a Trader's Money in the coin and the three attributes as a triangle in the text box.
 - Calamities are played less (0.9 a game, from 1.3): the bots are put off by Pathos, which now averages nearly 3 where Equanimity averaged under 2.
 
-## Eugene: The Narrative (2026-11-20)
+## Eugene: The Spectacle (2026-11-20; named The Narrative until 2026-11-23)
+
+The ability was renamed The Spectacle on 2026-11-23. The notes below were written under its first name, and the engine's flag is still `narrative`.
 
 Compound Interest was an arbitrary fit for a unicorn. **The Narrative:** while Eugene is seated and in good standing, each of his player's unsold Assets counts toward the billion at its sale price plus $50M. Everyone else has to sell to score; he only has to be believed, and one strike ends the story. (A unicorn is a company worth a billion on paper.) The scoreboard shows the paper beside the cash.
 
@@ -492,3 +494,82 @@ The heap of ore in the card's art reads as Our Lady, mantle and rays: a happy ac
 name. It is an apparition (`apparition: true`; playing it grants a Miracle) with the lit-halo finish
 (`apparitions.js`, on the scene layer). Its rule is unchanged, its key is still `mine`, and it is in
 neither starter deck. Eleven apparitions until The Rose leaves for the Lotería edition; then ten.
+
+## Saint's Skull (2026-11-23)
+
+The Skull was renamed Saint's Skull and given a rule that pays. Tried over 8,000 games each, the card added to both decks ("holder wins": games where one player has it out and the other does not):
+
+| Rule | Played in | Holder wins | Brings in, a game |
+|---|---|---|---|
+| $10M when a rival sells an Asset (the rule until now) | 10% | 47% | $1M |
+| $30M when a rival sells | 25% | 44% | $11M |
+| $50M when a rival sells | 36% | 51% | $35M |
+| $30M on every sale, the holder's own included (chosen) | 43% | 53% | $55M |
+| a tithe: each rival pays the holder $10M at the start of the holder's turn | 43% | 61% | $50M |
+
+A player sells about once in five rounds, so a rival's sales alone never paid. The tithe was too strong (every $10M is a $20M swing) and costing it $30M did not tame it (59%). The trial settings stay in the engine (`cut`, `cutAll`, `tithe` on the design).
+
+It went into the Devotion deck in The Press Release's place: Devotion 50.5% / Degen 49.5% over 8,000 games (48.5% before), going first 51.1%.
+
+## The set on 2026-11-23: three out, two in
+
+- **The Press Release left** (played about once in sixteen copies; Coin-op Confession and Miracle Tortilla do its two jobs). **Pawn Shop** took its number, 64: a Location, once on your turn before the main action discard a card for $20M. In both decks over 8,000 games: built in 37% of seats, 2.6 cards pawned per builder, a one-sided builder wins 49% (the bots pawn only dead cards).
+- **The Halo left** (played in 5 games in 100, its player winning 49%; and "halo" is also a game term). **The Black Swan** took its number, 67: an Event on the draw, the richest player loses $50M (each of them, if tied). In both decks over 8,000 games it fired in 46% of games and the player it hit still won 54% (a richer player wins 62% at any other moment); at $100M that fell to 46%, so it stays at $50M. With The 80/20 Rule beside it: 57%.
+- Devotion: Saint's Skull where The Press Release was, Pawn Shop where The Halo was. Neither The Black Swan, The 80/20 Rule, Rewind nor Back to the 80s is in a starter deck.
+
+## The Visitor (2026-11-23)
+
+The Tears left (a plain candle for $10M beside The Offering's free one). **The Visitor** took its number, 6, and its place in Devotion: Our Lady in the beam of a saucer, arriving or leaving, and deliberately not saying which. A Grace and the twelfth apparition (so one card in 7.3 now, not one in eight). It lights a candle, then its player chooses: she arrives (draw two cards) or she departs (take any card back from the discard pile).
+
+Over 8,000 games each (its player's win rate is against 55% for the same card as a plain candle, since an apparition already gives an action and a Miracle):
+
+| Rule | Devotion wins | Its player wins |
+|---|---|---|
+| a candle only | 52.4% | 55% |
+| arrive (draw two) or depart, $10M (chosen) | 55.0% | 61% |
+| the same, draw one | 54.2% | 59% |
+| the same, $30M | 53.9% | 59% |
+| a trial: send a seated Trader back to its owner's hand | 55.3% | 62% |
+
+Cost and the number of cards hardly moved it, so the rule stayed as written and the decks were levelled another way: **The Black Swan went into Devotion in Full Moon's place.** The bots chose "arrives" about nine times in ten.
+
+## Tech Rekt (2026-11-23)
+
+Tech Wrecked was renamed Tech Rekt and made a general Calamity. Over 8,000 games each:
+
+| On the draw, it wrecks | Wrecks something | Assets a firing | The player ahead still wins |
+|---|---|---|---|
+| every Tech Stock (the rule until now) | 18% of firings | 0.20 | 62% |
+| each player's most valuable Asset (chosen) | 64% | 0.79 | 59% |
+| each player's most recent Asset | 64% | 0.79 | 59% |
+| the best Asset of whoever holds the most | 64% | 0.76 | 59% |
+
+Players mostly hold one Asset at a time, so the three general rules pick the same card; the first is the plainest to read. Deck balance did not move (it fires in under a quarter of games). The others stay in the engine behind `wreck`.
+
+## The Inheritance (2026-11-23)
+
+It read "3 coins, or 50 Prosperity". Two currencies made that a choice; with one money it was $50M for nothing. The choice is now time. Over 8,000 games each, the card added to both decks (it is in neither starter deck):
+
+| Rule | Taken now / put in trust, per 100 games | A lone player of it wins |
+|---|---|---|
+| $30M or $50M, both at once (as it was) | all take the $50M | 54% |
+| $50M now, or $100M in 3 rounds | 14 / 87 | 60% |
+| $50M now, or $80M in 3 rounds | 21 / 72 | 57% |
+| $50M now, or $90M in 4 rounds | 22 / 75 | 57% |
+| $50M now, or $100M in 5 rounds (chosen) | 27 / 71 | 57% |
+
+Three rounds was too little to wait for double. Five rounds is close to half a game, so late in a game the money now is right, and about nine trusts in ten pay out before the game ends.
+
+## The Black Swan, the long tail (2026-11-23)
+
+Its first rule (the richest loses $50M) was only ever bad news, and a black swan is neither good nor bad: it is rare and large. Now its drawer rolls the die; a 1 hits the richest, an 8 lifts the poorest, and on 2 to 7 nothing happens. Over 12,000 games each, a copy in both decks (a player ahead wins 62% at an ordinary moment, a player behind 38%):
+
+| On a 1, the richest / on an 8, the poorest | The richest then wins | The poorest then wins |
+|---|---|---|
+| loses half / doubles | 27% | 83% |
+| loses a third / gains half again | 36% | 70% |
+| loses $200M / gains $200M (chosen) | 34% | 67% |
+| loses $150M / gains $150M | 41% | 60% |
+| loses $100M / gains $100M | 50% | 52% |
+
+Half and double ended games (a doubling is worth about $430M by the time it fires). $200M turns the game around and leaves a game to play. Deck balance and length did not move in any version. Also tried and set aside: doubling the next Event to fire; a one-in-eight swap of the two players' cash.

@@ -47,7 +47,8 @@ export const ETHOS_UNIT = 5; // $M per point of Ethos while in good standing
 // new frame and at the Playtest 3 table. Keyed by design key; any card type.
 export const TRINITY_TEXT = {
   gato: "When seated, and each turn on a roll of 5+, knock one Calamity off your table.",
-  diablito: "At the start of your turn, flip a coin: heads, collect $20M.",
+  // The wager is rolled on the game's own die, split down the middle (5 to 8 wins): there is no coin in the box. (It read "flip a coin" until 2026-11-23.)
+  diablito: "At the start of your turn, roll the die: 5 or higher, collect $20M.",
   investigadora: "The cards you look at and do not draw go to the bottom of the deck.",
   abuela: "Your gambles pay out on a roll one lower.",
   general: "When a Calamity fails against your Pathos, collect $10M.",

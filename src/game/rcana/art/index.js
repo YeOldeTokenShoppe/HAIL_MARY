@@ -73,6 +73,12 @@ import paperHands from "./paper-hands.js";
 import theInferno from "./the-inferno.js";
 import backToThe80s from "./back-to-the-80s.js";
 import thePonzi from "./the-ponzi.js";
+import theInheritance from "./the-inheritance.js";
+import fallFromGrace from "./fall-from-grace.js";
+import liquidityTrap from "./liquidity-trap.js";
+import blackSwan from "./black-swan.js";
+import feast from "./feast.js";
+import wheelOfFortune from "./wheel-of-fortune.js";
 import theSingular80 from "./the-singular80.js";
 
 export const RCANA_ART = {
@@ -147,5 +153,11 @@ export const RCANA_ART = {
   "the-inferno": theInferno,
   "back-to-the-80s": backToThe80s,
   "the-ponzi": thePonzi,
+  "the-inheritance": theInheritance,
+  "fall-from-grace": fallFromGrace,
+  "liquidity-trap": liquidityTrap,
+  "black-swan": blackSwan,
+  "feast": feast,
+  "wheel-of-fortune": wheelOfFortune,
   "the-singular80": theSingular80,
 };

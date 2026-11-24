@@ -73,7 +73,7 @@ export const FACES = [
     number: 13,
     rarity: "Uncommon",
     // A Calamity narrates (the line follows the rule).
-    ability: "Until cleared, the target banks\nat most 75 from a single card.",
+    ability: "The target banks at most 75\nfrom a single card.",
     flavor: "The market only ever remembers one direction.",
     printed: {},
   },
@@ -138,11 +138,11 @@ export const FACES = [
   {
     id: "la-calavera",
     design: "skull",
-    gloss: "The Skull",
+    gloss: "Saint’s Skull", // The Skull until 2026-11-23
     // PROVISIONAL number and rarity.
     number: 19,
     rarity: "Uncommon",
-    ability: "Whenever a rival sells an Asset,\ncollect +1 coin.",
+    ability: "Whenever any player sells an Asset,\ncollect +3 coins.",
     flavor: "Even the dead take their cut.",
     printed: {},
   },
@@ -272,14 +272,14 @@ export const FACES = [
     number: 29,
     rarity: "Uncommon",
     // The fee and the bonus; the design's line is a simulator's.
-    ability: "Pay 1 when banking from a card:\n+25 Prosperity.",
+    ability: "Whenever a card pays you,\npay 1 and collect 25 more.",
     // A Trader speaks; the quotation follows the rules and flourish.
     flavor: "Every eye on me is a dollar in the bank.",
     printed: {},
   },
   {
     id: "collectibles", // the art id: the velvet case of graded cards in the vault
-    design: "grail", // prints as "The Holy Grail" — the design's name
+    design: "grail", // prints as "Grail Card" — the design's name (The Holy Grail until 2026-11-23)
     // PROVISIONAL number and rarity. The collector's grail: the one card
     // you chase. Number inherited from the retired El Cáliz Relic.
     number: 68,
@@ -360,7 +360,7 @@ export const FACES = [
     number: 36,
     rarity: "Uncommon",
     // A Calamity narrates (the line follows the rule).
-    ability: "Until cleared, the target pays 1\nto the bank at the start of each turn.",
+    ability: "The target pays 1 to the bank\nat the start of each turn.",
     flavor: "He always finds the door. He never knocks.",
     printed: {},
   },
@@ -383,7 +383,7 @@ export const FACES = [
     number: 38,
     rarity: "Uncommon",
     // A Calamity narrates (the line follows the rule).
-    ability: "Everyone holding 8 or more Liquidity\nloses half of it.",
+    ability: "Everyone holding 8 or more Liquidity\nloses a quarter of it.", // a quarter since Playtest 3 (RULES.crash 0.25); the line said half until 2026-11-23
     flavor: "The bottom is wherever the last bid was.",
     printed: {},
   },
@@ -416,9 +416,9 @@ export const FACES = [
     number: 41,
     rarity: "Uncommon",
     // The throws, then Ash Wednesday; the design's line is a simulator's.
-    ability: "Everyone rolls and collects that much.\nNext turn their Trader repents half, in CRED.",
+    ability: "Everyone rolls the die and collects\n1 Liquidity for each point rolled.", // Playtest 3 has no Credibility points, so nothing is repented; the line still said so until 2026-11-23
     // An Event narrates; the line follows the rule.
-    flavor: "Party now. Repent later.",
+    flavor: "Let the good times roll.",
     printed: {},
   },
   // La Horchata left this set on 2026-11-21 (reserved for the Lotería edition). Its face, kept for that edition:
@@ -501,13 +501,13 @@ export const FACES = [
   },
   {
     id: "tech-wreck",
-    design: "techwreck", // prints as "Tech Wreck" — the design's name
+    design: "techwreck", // prints as "Tech Rekt" — the design's name (Tech Wrecked until 2026-11-23)
     // PROVISIONAL number and rarity.
     number: 48,
     rarity: "Uncommon",
-    // A Calamity narrates (the line follows the rule). The design: every Tech
-    // Stock on the table, whoever holds it, is scrapped for 1 Liquidity.
-    ability: "Every Tech Stock on the table is wrecked:\nits holder scraps it for 1 Liquidity.",
+    // A Calamity narrates (the line follows the rule). The design: each player's
+    // most valuable Asset is scrapped for 1 Liquidity (every Tech Stock, until 2026-11-23).
+    ability: "Each player’s most valuable Asset is wrecked:\nits holder scraps it for 1 Liquidity.",
     flavor: "The next big thing is a pile by the road.",
     printed: {},
   },
@@ -539,7 +539,7 @@ export const FACES = [
   },
   {
     id: "virtual-mary",
-    design: "virtual", // prints as "The Virtual Mary" — the design's name
+    design: "virtual", // prints as "Virtual Mary" — the design's name (no article since 2026-11-23)
     // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
     number: 54,
     rarity: "Common",
@@ -568,7 +568,7 @@ export const FACES = [
   {
     id: "anima-sola",
     design: "anima", // prints as "Ánima Sola" — the design's name
-    gloss: "The Lonely Soul",
+    gloss: "Purgatory", // The Lonely Soul until 2026-11-23
     // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
     number: 79,
     rarity: "Common",
@@ -697,28 +697,28 @@ export const FACES = [
   {
     id: "la-plata",
     design: "plata", // prints as "La Plata" — the design's name
-    gloss: "The Silver",
+    gloss: "Quicksilver", // mercury, element 80 (Silver until 2026-11-23)
     // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
-    number: 81,
+    number: 80, // element 80
     rarity: "Common",
     // An Asset's line says what it sells for. The boxes print value (125)
     // and cost (3); the text carries the cash option and the flight to
     // safety.
     ability: "Sell for 3 coins, or bank 125 Prosperity.\nIn a Flash Crash you lose nothing and bank 25.",
     // An Asset narrates, so the flavor follows the rule unquoted.
-    flavor: "When everything else falls, it only gets heavier.",
+    flavor: "You cannot hold it. You can only hold onto it.",
     printed: {},
   },
   {
     id: "savings-bond",
-    design: "bono", // prints as "The Savings Bond" — the design's name
+    design: "bono", // prints as "Savings Bond" — the design's name (no article since 2026-11-23)
     // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
     number: 84,
     rarity: "Common",
     // An Asset's line says what it sells for. The boxes print value (25)
     // and cost (2); the text carries the cash option, the growth and the
     // immunity to The Bear.
-    ability: "Sell for 2 coins, or bank 25 Prosperity,\n+25 each round held. The Bear cannot touch it.",
+    ability: "Sell for 2 coins, or bank 25 Prosperity,\n+25 each round held. Bear Market cannot touch it.",
     // An Asset narrates, so the flavor follows the rule unquoted.
     flavor: "She bought it the day you were born.",
     printed: {},
@@ -732,7 +732,7 @@ export const FACES = [
     // An Asset's line says what it sells for. The boxes print value (75)
     // and cost (4); the text carries the cash option, the leverage and the
     // liquidation (a Bear Market played on its holder discards it).
-    ability: "Sell for 4 coins, or bank 75 Prosperity.\nLeverage: sells double; the Bear liquidates it.",
+    ability: "Sell for 4 coins, or bank 75 Prosperity.\nLeverage: sells double; Bear Market liquidates it.",
     // An Asset narrates, so the flavor follows the rule unquoted.
     flavor: "The ride never stops. The rider sometimes does.",
     printed: {},
@@ -758,27 +758,27 @@ export const FACES = [
     rarity: "Common",
     // A played Event: the boxes print value (100) and cost (3); the text
     // carries the per-Calamity bonus and the immunity to The Bear's cap.
-    ability: "Bank 100 Prosperity, +50 for each\nCalamity on you. The Bear cannot cap it.",
+    ability: "Bank 100 Prosperity, +50 for each\nCalamity on you. Bear Market cannot cap it.",
     // An Event narrates; the line follows the rule.
     flavor: "Every exit was bought. The only way left is up.",
     printed: {},
   },
   {
     id: "god-candle",
-    design: "godcandle", // prints as "The God Candle" — the design's name
+    design: "godcandle", // prints as "God Candle" — the design's name (no article since 2026-11-23)
     // Number per set/numbers.js; rarity PROVISIONAL (a windfall, so Rare for now).
     number: 57,
     rarity: "Rare",
     // An on-draw Opportunity: it resolves as drawn, then leaves its bonus on
     // the table until the drawer's next turn.
-    ability: "Until your next turn,\nevery Prosperity sale pays 100 more.",
+    ability: "Until your next turn,\nevery Asset sold pays 100 more.",
     // An Event narrates; the line follows the rule.
     flavor: "One wick, and the whole sky bought in.",
     printed: {},
   },
   {
     id: "lottery-ticket",
-    design: "lottery", // prints as "The Lottery Ticket" — the design's name ("El Boleto" in the Lotería edition)
+    design: "lottery", // prints as "Lottery Ticket" — the design's name (no article since 2026-11-23) ("El Boleto" in the Lotería edition)
     gloss: "The Ticket",
     // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
     number: 71,
@@ -844,7 +844,7 @@ export const FACES = [
   },
   {
     id: "prediction-market",
-    design: "predict", // prints as "The Prediction Market" — the design's name (a market name, no lotería title)
+    design: "predict", // prints as "Prediction Market" — the design's name (no article since 2026-11-23) (a market name, no lotería title)
     // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
     number: 83,
     rarity: "Uncommon",
@@ -859,7 +859,7 @@ export const FACES = [
     id: "confession",
     design: "confession", // prints as "Coin-Op Confession" — the design's name (The Confession until 2026-11-21)
     // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
-    number: 80,
+    number: 81,
     rarity: "Uncommon",
     // A Grace goes to the shrine; the line is the candle and what it buys.
     // The design's line is a simulator's; the face matches the Card3 line in trinity.js.
@@ -925,7 +925,7 @@ export const FACES = [
     number: 60,
     rarity: "Uncommon",
     // A Calamity narrates (the line follows the rule).
-    ability: "Until cleared, each turn the target sells\nthe Asset they bought last, for its cash price.",
+    ability: "Each turn the target sells the Asset\nthey bought last, for its cash price.",
     flavor: "They fold at the first gust.",
     printed: {},
   },
@@ -966,6 +966,83 @@ export const FACES = [
     ability: "Bank 25 for each Asset a rival holds.\nThen each rival collects 1.",
     // An Event narrates; the line follows the rule.
     flavor: "Everyone gets paid, in order of arrival.",
+    printed: {},
+  },
+  {
+    id: "the-inheritance",
+    design: "inherit", // prints as "The Inheritance" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 8,
+    rarity: "Uncommon",
+    // The choice is time (2026-11-23): 5 coins at once, or 100 Prosperity five rounds on. With one money the old
+    // line (3 coins, or 50 Prosperity) was no choice at all.
+    ability: "Take 5 coins now, or put it in trust:\nfive rounds on, bank 100 Prosperity.",
+    // An Event narrates; the line follows the rule.
+    flavor: "He left you the key. He kept the lock.",
+    printed: {},
+  },
+  {
+    id: "fall-from-grace",
+    design: "fall", // prints as "Fall From Grace" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 51,
+    rarity: "Uncommon",
+    // A Calamity narrates (the line follows the rule). Playtest 3 idiom (2026-11-23): Credibility is two
+    // states, so the old "loses 4 Credibility" is one strike on everyone at the table, the caster included.
+    ability: "The fall: every seated Trader takes\na strike, yours included.",
+    flavor: "Everything has a melting point.",
+    printed: {},
+  },
+  {
+    id: "liquidity-trap",
+    design: "trap", // prints as "Liquidity Trap" — the design's name (a market name, no lotería title)
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 58,
+    rarity: "Uncommon",
+    // A Calamity narrates (the line follows the rule). One money (2026-11-23): everything the target
+    // collects piles under the card; clearing it hands the pile back (pt3-sim releaseTrap).
+    // The tab already says "Until cleared", so the line does not repeat it. It is EVERYTHING the target collects
+    // (a Trader's pay, sales, Event payouts), not only income; and what is trapped comes back when it is cleared.
+    ability: "Everything the target collects goes under this card.\nWhen cleared, the pile is theirs.",
+    flavor: "The font is blessed. The lock is not.",
+    printed: {},
+  },
+  {
+    id: "black-swan",
+    design: "swan", // prints as "The Black Swan" — the design's name (a market name, no lotería title)
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 67,
+    rarity: "Uncommon",
+    // FULL ART (art/black-swan.js: fullArt). An on-draw Ambiguity: the drawer rolls, and only the ends of
+    // the die do anything (designs.js tails: 20 coins flat, $200M at the Playtest 3 rate). DRAFT line.
+    ability: "Roll. On a 1, the richest loses $200M.\nOn an 8, the poorest collects $200M.",
+    // An Event narrates; the line follows the rule. DRAFT.
+    flavor: "Nobody saw it. Everybody says they did.",
+    printed: {},
+  },
+  {
+    id: "feast",
+    design: "feast", // prints as "The Feast of Perpetual Profit" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 55,
+    rarity: "Uncommon",
+    // FULL ART (art/feast.js: fullArt). An on-draw Opportunity for the whole table (pt3-sim: every player
+    // lights a candle). DRAFT line.
+    ability: "Feast day: every player lights a candle.",
+    // An Event narrates; the line follows the rule. DRAFT.
+    flavor: "Nobody asks who is paying.",
+    printed: {},
+  },
+  {
+    id: "wheel-of-fortune",
+    design: "rueda", // prints as "The Wheel" — the design's name (the art folder says Wheel of Fortune)
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 56,
+    rarity: "Uncommon",
+    // An on-draw Ambiguity. A two-player game, so "every portfolio passes one seat along" (pt3-sim) is a swap;
+    // Ride or Die holds its owner's Assets, and then nothing moves.
+    ability: "The two players swap portfolios.",
+    flavor: "Round and round. What was theirs is yours.",
     printed: {},
   },
 ];

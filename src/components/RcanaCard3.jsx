@@ -156,8 +156,10 @@ export function rcana3Model(data) {
     const cost = Number(data.cost) || 0;
     // No coin means nothing to pay: a card that fires when drawn, or one that is free to play.
     if (!firesOnDraw && cost > 0) model.topLeft = { shape: "coin", value: cost * MONEY_UNIT, label: `Price: $${cost * MONEY_UNIT}M to play` };
-    const value = cls === "Asset" ? (design.perp ? design.pros * 2 : design.pros) : design.type === "event" && design.played ? design.pros : null;
-    if (value) model.plate = { value, halo: false, label: cls === "Asset" ? `Sells for $${value}M` : `Pays $${value}M` };
+    // A card with a choice of now or later (The Inheritance: cash at once, or more in trust) shows the SURE amount, the one paid at once.
+    const sure = design.type === "event" && design.choice && design.trust ? design.cash * MONEY_UNIT : null;
+    const value = sure ?? (cls === "Asset" ? (design.perp ? design.pros * 2 : design.pros) : design.type === "event" && design.played ? design.pros : null);
+    if (value) model.plate = { value, halo: false, label: sure ? `Pays $${value}M at once, or more in trust` : cls === "Asset" ? `Sells for $${value}M` : `Pays $${value}M` };
     if (!model.text && value) model.text = cls === "Asset" ? `Sell it for $${value}M.` : `Collect $${value}M.`;
     if (design.income) model.corner = { shape: "drop", value: design.income * MONEY_UNIT, label: `Pays $${design.income * MONEY_UNIT}M each turn while held` };
   }
@@ -194,8 +196,128 @@ function RulesText({ text }) {
 }
 
 // The Virtual Mary has circuit traces; the rest of the set uses flowing scrolls.
+// LIQUID METAL (layer.liquid): quicksilver standing in a vessel, drawn live over the layer's own painted liquid.
+//   mask   an image the size of the layer, opaque wherever liquid could be (the inside of the vessel)
+//   box    { x, y, w, h } the part of the layer the mask's shape occupies, in %: only that much is drawn
+//   level  where the surface rests, in % of the layer's height; cx, rx its middle and half-width there, in %
+// It is a small simulation, not a loop: the surface is a spring that leans the way the card is tipped (the liquid
+// keeps to its own level, as in a spirit level), overshoots and settles, and ripples while it is moving. The metal is
+// painted each frame: a steel gradient, bright and dark bands that drift like reflections on chrome, the room's red
+// on one side and a cold blue on the other, and the bright ellipse of the surface seen from just above.
+function LiquidMetal({ spec, slide, scale }) {
+  const ref = useRef(null);
+  const bx = (spec.box.x / 100) * W, by = (spec.box.y / 100) * H, bw = (spec.box.w / 100) * W, bh = (spec.box.h / 100) * H;
+  useEffect(() => {
+    const cv = ref.current; if (!cv) return;
+    const stage = cv.closest(".rc-stage"), ctx = cv.getContext("2d");
+    const dpr = Math.min(2, (typeof window !== "undefined" && window.devicePixelRatio) || 1);
+    cv.width = Math.round(bw * dpr); cv.height = Math.round(bh * dpr);
+    const y0 = ((spec.level - spec.box.y) / 100) * H, cx = ((spec.cx - spec.box.x) / 100) * W, rx = (spec.rx / 100) * W, LIMIT = spec.lean ?? 0.14;
+    let a = 0, v = 0, last = performance.now(), raf = 0;
+    // A band is laid down in four coats, a little wider than its core to narrow: a crisp, bright middle (what
+    // makes it read as polished metal) with one soft step at the edge. Seven wide coats blended better and went milky.
+    const band = (yc, amp, freq, phase, thick, rgb, alpha) => {
+      const color = `rgba(${rgb},${(alpha * 0.8).toFixed(3)})`;
+      for (let pass = 0; pass < 4; pass++) { const th = thick * (1.22 - pass * 0.27); ctx.beginPath();
+        for (let x = -4; x <= bw + 4; x += 6) { const y = yc + amp * Math.sin(x * freq + phase) + amp * 0.45 * Math.sin(x * freq * 2.3 - phase * 1.7); if (x < 0) ctx.moveTo(x, y - th / 2); else ctx.lineTo(x, y - th / 2); }
+        for (let x = bw + 4; x >= -4; x -= 6) { const y = yc + amp * Math.sin(x * freq + phase) + amp * 0.45 * Math.sin(x * freq * 2.3 - phase * 1.7); ctx.lineTo(x, y + th / 2 + th * 0.35 * Math.sin(x * 0.03 + phase)); }
+        ctx.closePath(); ctx.fillStyle = color; ctx.fill(); }
+    };
+    const draw = (now) => {
+      const dt = Math.min(0.033, (now - last) / 1000); last = now; const t = now / 1000;
+      const tx = stage ? parseFloat(stage.style.getPropertyValue("--tx")) || 0 : 0;
+      v += (-(a - -tx * LIMIT * 0.8) * 46 - v * 2.6) * dt; a += v * dt; a = Math.max(-LIMIT, Math.min(LIMIT, a)); // a slow, heavy slosh
+      const amp = Math.min(3.2, Math.abs(v) * 16 + 0.35), slope = Math.tan(a);
+      const surf = (x) => y0 + slope * (x - cx) + amp * Math.sin(x * 0.05 + t * 5.1) + amp * 0.55 * Math.sin(x * 0.11 - t * 7.3);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, bw, bh);
+      ctx.save(); ctx.beginPath(); ctx.moveTo(-2, surf(-2)); for (let x = 4; x <= bw + 6; x += 6) ctx.lineTo(x, surf(x)); ctx.lineTo(bw + 2, bh + 2); ctx.lineTo(-2, bh + 2); ctx.closePath(); ctx.clip();
+      const g = ctx.createLinearGradient(0, y0 - 14, 0, bh);
+      g.addColorStop(0, "#f2f6fa"); g.addColorStop(0.1, "#98a2b0"); g.addColorStop(0.32, "#2b313c"); g.addColorStop(0.6, "#0e1117"); g.addColorStop(0.85, "#566170"); g.addColorStop(1, "#aab4c0");
+      ctx.fillStyle = g; ctx.fillRect(-2, -2, bw + 4, bh + 4);
+      const span = bh - y0, drift = t * 0.55 + tx * 1.6;
+      ctx.globalCompositeOperation = "screen";
+      band(y0 + span * 0.22, 9, 0.021, drift, span * 0.13, "235,242,250", 0.30);
+      band(y0 + span * 0.52, 12, 0.017, -drift * 0.8 + 2, span * 0.09, "200,214,230", 0.22);
+      band(y0 + span * 0.83, 7, 0.026, drift * 1.3 + 4, span * 0.10, "245,248,252", 0.30);
+      const red = ctx.createRadialGradient(cx + rx * (0.62 - tx * 0.2), y0 + span * 0.45, 2, cx + rx * (0.62 - tx * 0.2), y0 + span * 0.45, rx * 0.75);
+      red.addColorStop(0, "rgba(255,40,66,.55)"); red.addColorStop(1, "rgba(255,40,66,0)"); ctx.fillStyle = red; ctx.fillRect(0, 0, bw, bh);
+      const blue = ctx.createRadialGradient(cx - rx * (0.66 + tx * 0.2), y0 + span * 0.5, 2, cx - rx * (0.66 + tx * 0.2), y0 + span * 0.5, rx * 0.6);
+      blue.addColorStop(0, "rgba(110,185,255,.40)"); blue.addColorStop(1, "rgba(110,185,255,0)"); ctx.fillStyle = blue; ctx.fillRect(0, 0, bw, bh);
+      ctx.globalCompositeOperation = "multiply";
+      band(y0 + span * 0.36, 10, 0.019, drift * 0.9 + 1, span * 0.10, "40,46,60", 0.55);
+      band(y0 + span * 0.69, 8, 0.023, -drift * 1.1 + 3, span * 0.08, "40,46,60", 0.50);
+      ctx.globalCompositeOperation = "source-over"; ctx.restore();
+      // the surface, seen from just above: a bright ellipse that leans with the liquid
+      ctx.save(); ctx.translate(cx, y0 + amp * 0.3 * Math.sin(t * 5.1)); ctx.rotate(a);
+      const top = ctx.createLinearGradient(0, -7, 0, 7); top.addColorStop(0, "#8e99a8"); top.addColorStop(0.45, "#eef3f8"); top.addColorStop(1, "#c3ccd7");
+      ctx.beginPath(); ctx.ellipse(0, 0, rx * 1.04, 6.5, 0, 0, Math.PI * 2); ctx.fillStyle = top; ctx.fill();
+      ctx.lineWidth = 1.2; ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(-rx * 0.2 + tx * rx * 0.25, -0.5, rx * 0.42, 2.2, 0, 0, Math.PI * 2); ctx.fillStyle = "rgba(255,255,255,.75)"; ctx.fill();
+      ctx.restore();
+      raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(raf);
+  }, [spec, bw, bh]);
+  const mask = { WebkitMaskImage: `url("${spec.mask}")`, maskImage: `url("${spec.mask}")`, WebkitMaskSize: `${W}px ${H}px`, maskSize: `${W}px ${H}px`, WebkitMaskPosition: `${-bx}px ${-by}px`, maskPosition: `${-bx}px ${-by}px`, WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat" };
+  return (
+    <div aria-hidden="true" style={{ position: "absolute", left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", transform: `${slide} scale(${scale})`, transition: "transform var(--ease, 500ms) ease-out" }}>
+      <canvas ref={ref} style={{ position: "absolute", left: bx, top: by, width: bw, height: bh, ...mask }} />
+    </div>
+  );
+}
+// THE NAME'S SIZE. A short name (nine letters or fewer) is set at 54. A longer one is set as large as will run
+// about 272px, between 28 and 46, by its real width and not its letter count: "Lottery Ticket" is all narrow
+// letters and "Enigma Machine" is not, though both are fourteen long. The widths are Grenze Gotisch 800's, in em,
+// measured from the set's own titles (within 5% on every one).
+const NAME_EM = { space: 0.174, narrow: 0.303, wide: 0.702, upper: 0.464, digit: 0.493, other: 0.482 };
+function nameSizeFor(name) {
+  const text = String(name || "");
+  if (text.length <= 9) return 54;
+  let em = 0;
+  for (const c of text) em += c === " " ? NAME_EM.space : "iljtfrI'’.-/".includes(c) ? NAME_EM.narrow : "mwMW".includes(c) ? NAME_EM.wide : /[0-9]/.test(c) ? NAME_EM.digit : c !== c.toLowerCase() ? NAME_EM.upper : NAME_EM.other;
+  return Math.max(28, Math.min(46, Math.round(272 / em)));
+}
 // THE APPARITION KEYWORD: the name on the badge every apparition card wears, and the reminder beside it.
 // One place to rename it.
+// THE WHEEL (layer.spin, layer.tick). A throw turns the wheel from one angle to another along one eased curve; the
+// pegs sit on the wedge lines, 45 degrees apart, so the moments a peg passes the flapper follow from the same numbers:
+// at each one the flapper is pushed aside and drops back, fast at the throw and slower as the wheel runs down.
+const SPIN_EASE = [0.16, 0.55, 0.12, 1];
+function tickFrames(from, to) {
+  const bez = (t, a, b) => 3 * (1 - t) * (1 - t) * t * a + 3 * (1 - t) * t * t * b + t * t * t;
+  const when = (y) => { let lo = 0, hi = 1; for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (bez(mid, SPIN_EASE[1], SPIN_EASE[3]) < y) lo = mid; else hi = mid; } return bez((lo + hi) / 2, SPIN_EASE[0], SPIN_EASE[2]); };
+  const at = [];
+  for (let deg = Math.ceil((from - 22.5) / 45) * 45 + 22.5; deg < to; deg += 45) if (deg > from) at.push(when((deg - from) / (to - from)));
+  const out = [{ offset: 0, rotate: "0deg" }];
+  at.forEach((p, i) => { const before = i ? p - at[i - 1] : p, after = i < at.length - 1 ? at[i + 1] - p : 1 - p;
+    const pre = Math.min(before * 0.45, 0.06), post = Math.min(after * 0.3, 0.0125), push = Math.min(19, 9 + before * 240);
+    out.push({ offset: p - pre, rotate: "0deg" }, { offset: p, rotate: `${(-push).toFixed(1)}deg` }, { offset: p + post, rotate: "0deg" }); });
+  out.push({ offset: 1, rotate: "0deg" });
+  return out;
+}
+
+// The flapper's sound: one short wooden click for each peg, made here (no sound file), each set for the moment its peg
+// passes (`times`, in seconds from now). Only a throw the player makes is heard: a browser plays nothing until the page
+// has been clicked, and a card that clicked away by itself would be a nuisance. Returns how to silence what is left.
+let wheelAudio = null, wheelNoise = null;
+function wheelClicks(times) {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
+    const ctx = wheelAudio || (wheelAudio = new AC()); if (ctx.state === "suspended") ctx.resume();
+    if (!wheelNoise) { wheelNoise = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.03), ctx.sampleRate); const d = wheelNoise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length); }
+    const out = ctx.createGain(); out.gain.value = 0.45; out.connect(ctx.destination);
+    const t0 = ctx.currentTime + 0.03;
+    times.forEach((s, i) => { const t = t0 + s, f = 1250 + ((i * 7) % 5) * 60;
+      const o = ctx.createOscillator(), g = ctx.createGain(); o.type = "triangle"; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.5, t + 0.03);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.06);
+      const n = ctx.createBufferSource(), band = ctx.createBiquadFilter(), ng = ctx.createGain(); n.buffer = wheelNoise; band.type = "bandpass"; band.frequency.value = 2600; band.Q.value = 1.2; ng.gain.value = 0.7;
+      n.connect(band); band.connect(ng); ng.connect(out); n.start(t); });
+    return () => { try { out.gain.value = 0; out.disconnect(); } catch { /* already gone */ } };
+  } catch { return null; }
+}
+
 export const APPARITION_KEYWORD = { name: "Radi8", gift: "One more action, and a Miracle" };
 // FULL ART (data.fullArt, from the card's art file): the picture fills the frame from top to bottom. There
 // is no text box: the rules, the flavor line and the name are set straight on the art, in white (the name in
@@ -320,6 +442,10 @@ function haloLight(app, slide, live) {
 const MAX_TILT = 18;        // mouse: the pointer at the card's edge
 const MAX_TILT_TOUCH = 34;  // finger or pen: a full drag
 const MAX_TILT_GYRO = 26;   // the device itself, tipped about 25 degrees
+// Steering the card by tipping the phone or tablet is OFF (2026-11-23): it never came alive on a real iPad or
+// iPhone, and the finger drag does the job. The code is kept; set this true to try it again (iOS will ask the
+// person for motion access on their first tap of a live card).
+const DEVICE_TILT = false;
 const clamp1 = (v) => Math.max(-1, Math.min(1, v));
 const MIRROR_TEXT = "repeating-linear-gradient(115deg, #b97a00 0%, #ffd84a 14%, #fff6c4 22%, #ffd84a 30%, #b97a00 46%, #ffe58a 60%, #b97a00 76%)";
 
@@ -348,10 +474,13 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
     el.style.setProperty("--ty", ny.toFixed(3));
     el.style.setProperty("--lit", Math.min(1, Math.hypot(nx, ny) * 1.2).toFixed(3));
     el.style.setProperty("--ease", ease);
+    at.current = { ax: nx * max, ay: ny * max };
   };
+  const at = useRef({ ax: 0, ay: 0 }); // the lean now showing, in degrees: a drag picks up from it
   const drag = useRef(null);   // a finger or pen turning the card: { id, x, y, nx, ny, moved }
   const resting = useRef({ nx: 0, ny: 0 }); // where a drag leaves off, so the next one picks up from there
   const gyro = useRef(false);  // the device's own tilt is steering
+  const released = useRef(false); // a drag has just ended with the device steering: its next pose glides in
   const lean = (e) => {
     const el = stageRef.current;
     if (!el) return;
@@ -361,7 +490,8 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
       return;
     }
     if (e.type === "pointerdown") { // a finger or pen: start a drag, and keep it even when it leaves the card
-      drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, nx: resting.current.nx, ny: resting.current.ny, moved: false };
+      // It starts from the lean now showing (the device's own tilt may have set it), so the card does not jump under the finger.
+      drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, nx: clamp1(at.current.ax / MAX_TILT_TOUCH), ny: clamp1(at.current.ay / MAX_TILT_TOUCH), moved: false };
       try { el.setPointerCapture(e.pointerId); } catch {}
       return;
     }
@@ -370,20 +500,60 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
     const dx = e.clientX - d.x, dy = e.clientY - d.y;
     if (Math.hypot(dx, dy) > 8) d.moved = true;
     resting.current = { nx: clamp1(d.nx + dx / (box.width * 0.5)), ny: clamp1(d.ny + dy / (box.height * 0.5)) }; // half the card's width is a full turn
-    pose(resting.current.nx, resting.current.ny, MAX_TILT_TOUCH, "50ms");
+    // The pose is written once a frame, with NO easing: the finger already moves the card a frame at a time, and an
+    // eased transition restarted on every touch event keeps WebKit (every iPad browser) animating without pause,
+    // which it draws at reduced quality and stalls on as the tilted card's size on screen changes.
+    if (!frame.current) frame.current = requestAnimationFrame(() => { frame.current = 0; if (drag.current && drag.current.id != null) pose(resting.current.nx, resting.current.ny, MAX_TILT_TOUCH, "0ms"); });
   };
+  const frame = useRef(0);
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
   const settle = (e) => {
     const el = stageRef.current;
     if (!el) return;
     if (e && e.pointerType !== "mouse" && e.type === "pointerleave" && drag.current) return; // a captured drag is still going
     drag.current = drag.current && e && e.type === "pointerup" ? { ...drag.current, id: null } : null;
-    if (gyro.current) return; // the device's tilt takes it from here
+    cancelAnimationFrame(frame.current); frame.current = 0;
     resting.current = { nx: 0, ny: 0 };
+    if (gyro.current) { released.current = true; return; } // the device's tilt takes it from here, gently
+    at.current = { ax: 0, ay: 0 };
     el.style.setProperty("--ease", "700ms");
     for (const v of ["--mx", "--my", "--rx", "--ry", "--tx", "--ty", "--lit"]) el.style.removeProperty(v);
   };
   // A drag that turned the card is not a tap: it must not also flip the card over.
-  const swallowDragClick = (e) => { const d = drag.current; drag.current = null; if (d && d.moved) { e.stopPropagation(); e.preventDefault(); } };
+  // THE WHEEL (layer.spin on the disc, layer.tick on its flapper). It is thrown, runs down and rests on a wedge; left
+  // alone it throws itself again after a few seconds, and a click or tap on the wheel throws it at once, from wherever
+  // it is, with the flapper's clicks heard (spin.sound: false for a silent wheel). Each throw is its own animation (the browser's animate()), so a new one can start mid-spin.
+  const wheels = interactive && (data?.artLayers || []).some((l) => l.spin);
+  const throwWheel = useRef(null);
+  useEffect(() => {
+    const root = stageRef.current, disc = root?.querySelector("[data-spin]"), flap = root?.querySelector("[data-tick]");
+    if (!wheels || !disc || !disc.animate) return;
+    let angle = 0, run = null, ticking = null, hush = null, timer = 0, alive = true;
+    const sound = (data?.artLayers || []).find((l) => l.spin)?.spin.sound !== false;
+    const showing = () => { const m = /(-?[\d.]+)deg/.exec(getComputedStyle(disc).rotate || ""); return m ? parseFloat(m[1]) : angle; };
+    const toss = (hard) => {
+      clearTimeout(timer);
+      const from = (((run ? showing() : angle) % 360) + 360) % 360;
+      run?.cancel(); ticking?.cancel(); hush?.(); hush = null;
+      const to = Math.round((from + ((hard ? 2.6 : 1.9) + Math.random() * 1.2) * 360) / 45) * 45; // rests on a wedge
+      const ms = 2600 + (to - from) * 2.6;
+      disc.style.rotate = `${to % 360}deg`; // where it rests once the throw is over
+      const mine = run = disc.animate([{ rotate: `${from}deg` }, { rotate: `${to}deg` }], { duration: ms, easing: `cubic-bezier(${SPIN_EASE.join(",")})` });
+      const ticks = tickFrames(from, to);
+      if (flap) ticking = flap.animate(ticks, { duration: ms, easing: "linear" });
+      if (hard && sound) hush = wheelClicks(ticks.filter((k) => k.rotate !== "0deg").map((k) => (k.offset * ms) / 1000));
+      angle = to % 360;
+      mine.onfinish = () => { if (!alive || run !== mine) return; run = null; timer = setTimeout(() => toss(false), 3200 + Math.random() * 2600); };
+    };
+    throwWheel.current = () => toss(true);
+    timer = setTimeout(() => toss(false), 900);
+    return () => { alive = false; clearTimeout(timer); run?.cancel(); ticking?.cancel(); hush?.(); throwWheel.current = null; disc.style.rotate = ""; };
+  }, [wheels, data?.id]);
+  // A click that ends a drag is not a click. A click on the wheel throws the wheel, and goes no further (so it does
+  // not turn the card over, RcanaFlipCard); a click anywhere else on the card passes on as before.
+  const swallowDragClick = (e) => { const d = drag.current; drag.current = null; if (d && d.moved) { e.stopPropagation(); e.preventDefault(); return; }
+    const hit = throwWheel.current && stageRef.current?.querySelector("[data-spin-hit]");
+    if (hit) { const b = hit.getBoundingClientRect(); if (Math.hypot(e.clientX - (b.left + b.width / 2), e.clientY - (b.top + b.height / 2)) <= b.width / 2) { e.stopPropagation(); throwWheel.current(); } } };
   // A BOBBLE (layer.bobble: { x, y } the foot of the spring, in % of the layer): a head on a spring. It is a real
   // spring, stepped each frame and written to --bob on the stage: the head leans the way the card is tipped,
   // overshoots, and wobbles to rest; left alone, it takes a small nod every few seconds. Live card only.
@@ -419,28 +589,53 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
   // that ask permission for motion (iOS Safari) are asked on the first touch of a live card; a refusal, or
   // a device with no sensor, simply leaves the drag.
   useEffect(() => {
-    if (!interactive || typeof window === "undefined" || !("DeviceOrientationEvent" in window)) return;
+    if (!DEVICE_TILT || !interactive || typeof window === "undefined" || !("DeviceOrientationEvent" in window)) return;
     if (!window.matchMedia || !window.matchMedia("(pointer: coarse)").matches) return;
-    let base = null, live = true;
+    // Three things keep the card calm in the hand. The readings are smoothed, because a sensor at rest still
+    // jitters by a fraction of a degree and every jitter would redraw the card. Near the resting hold there is a
+    // dead zone (about a degree and a half) where the card sits exactly flat: flat is the one pose the browser
+    // draws pin-sharp, and a card forever a hair off flat looks soft. And the resting hold itself drifts only
+    // very slowly while the card is tipped (over half a minute), so a tilt that is held stays held instead of
+    // creeping back to the middle; close to flat it follows faster, which keeps flat where the hands are.
+    let base = null, smooth = null, shown = { nx: 0, ny: 0 }, live = true;
+    const DEAD = 0.06, DRIFT = 0.0005, DRIFT_FLAT = 0.004, SMOOTH = 0.22;
     const onTilt = (ev) => {
       if (ev.gamma == null || ev.beta == null) return;
       const turned = ((window.screen?.orientation?.angle ?? window.orientation ?? 0) + 360) % 360; // landscape swaps the axes
       const lr = turned === 90 ? ev.beta : turned === 270 ? -ev.beta : ev.gamma, fb = turned === 90 ? -ev.gamma : turned === 270 ? ev.gamma : ev.beta;
-      if (!base) base = { lr, fb };
-      base.lr += (lr - base.lr) * 0.015; base.fb += (fb - base.fb) * 0.015;
+      if (!base) { base = { lr, fb }; smooth = { lr, fb }; }
+      smooth.lr += (lr - smooth.lr) * SMOOTH; smooth.fb += (fb - smooth.fb) * SMOOTH;
+      const drift = Math.hypot(smooth.lr - base.lr, smooth.fb - base.fb) / 25 < DEAD * 2 ? DRIFT_FLAT : DRIFT; // within about three degrees of flat, settle to flat in a few seconds
+      base.lr += (smooth.lr - base.lr) * drift; base.fb += (smooth.fb - base.fb) * drift;
       gyro.current = true;
       if (drag.current && drag.current.id != null) return;
-      pose(clamp1((lr - base.lr) / 25), clamp1((fb - base.fb) / 25), MAX_TILT_GYRO, "140ms");
+      let nx = (smooth.lr - base.lr) / 25, ny = (smooth.fb - base.fb) / 25;
+      const m = Math.hypot(nx, ny);
+      if (m < DEAD) { nx = 0; ny = 0; } else { const k = Math.min(1, (m - DEAD) / (1 - DEAD)) / m; nx *= k; ny *= k; } // the dead zone, eased out of so there is no step at its edge
+      nx = clamp1(nx); ny = clamp1(ny);
+      if (!released.current && Math.abs(nx - shown.nx) < 0.004 && Math.abs(ny - shown.ny) < 0.004) return; // nothing worth a redraw
+      shown = { nx, ny };
+      pose(nx, ny, MAX_TILT_GYRO, released.current ? "450ms" : "0ms"); released.current = false; // already smoothed above: no easing to restart every reading
     };
     const listen = () => { if (live) window.addEventListener("deviceorientation", onTilt); };
     const DOE = window.DeviceOrientationEvent;
-    let ask = null;
+    // Browsers that ask permission for motion (every iPhone and iPad browser) only let a page ask from inside a
+    // finished tap: the END of a touch or a click. A touch that has only just begun does not count, and asking
+    // then is refused without the person ever seeing the question. So the card asks when a touch on it ends, and
+    // keeps asking on later taps until the browser has put the question (granted or denied); a refusal for want
+    // of a gesture is not an answer.
+    let ask = null; const el = stageRef.current; const ASK_ON = ["touchend", "pointerup", "click"];
+    const stopAsking = () => { if (ask) for (const t of ASK_ON) el?.removeEventListener(t, ask); };
     if (typeof DOE.requestPermission === "function") {
-      ask = () => { stageRef.current?.removeEventListener("pointerdown", ask); DOE.requestPermission().then((state) => { if (state === "granted") listen(); }).catch(() => {}); };
-      stageRef.current?.addEventListener("pointerdown", ask);
+      let asking = false;
+      ask = () => {
+        if (asking) return; asking = true;
+        let answer; try { answer = DOE.requestPermission(); } catch { asking = false; return; }
+        Promise.resolve(answer).then((state) => { stopAsking(); if (state === "granted") listen(); }).catch(() => { asking = false; });
+      };
+      for (const t of ASK_ON) el?.addEventListener(t, ask);
     } else listen();
-    const el = stageRef.current;
-    return () => { live = false; gyro.current = false; window.removeEventListener("deviceorientation", onTilt); if (ask) el?.removeEventListener("pointerdown", ask); };
+    return () => { live = false; gyro.current = false; window.removeEventListener("deviceorientation", onTilt); stopAsking(); };
   }, [interactive]);
   const layers = data?.artLayers || [];
   const sources = layers.map((l) => l.src).filter(Boolean).join("|");
@@ -466,7 +661,7 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
   const fullArt = !!data.fullArt, artH = fullArt ? FULL_ART_H : 470;
   const plate = m.plate ? plateBox(m.plate.value) : null;
   const shapes = plate ? plateShapes(plate.w) : null;
-  const nameSize = m.name.length <= 9 ? 54 : m.name.length <= 13 ? 44 : m.name.length <= 17 ? 36 : m.name.length <= 19 ? 34 : 30;
+  const nameSize = nameSizeFor(m.name);
   // Rules and flavor are set in spaced capitals, so they run wide: size by length to hold three or four lines.
   const textSize = (m.text.length <= 60 ? 17 : m.text.length <= 100 ? 14 : 12.5) * (tri ? 0.9 : 1);
   const giltText = metal === "rainbow" ? { color: "transparent", backgroundImage: RAINBOW_TEXT, WebkitBackgroundClip: "text", backgroundClip: "text" }
@@ -479,7 +674,9 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
     <div
       ref={stageRef}
       className={`rc-stage rc3-stage ${className}`}
-      style={{ position: "relative", width: cw, height: (cw * H) / W, perspective: interactive ? cw * 2.6 : undefined, touchAction: interactive ? "none" : undefined, ...style }}
+      style={{ position: "relative", width: cw, height: (cw * H) / W, perspective: interactive ? cw * 2.6 : undefined, touchAction: interactive ? "none" : undefined,
+        // A finger resting on the card must not start a text selection, the image callout or the tap highlight: on iOS each one stalls the drag.
+        ...(interactive ? { userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", WebkitTapHighlightColor: "transparent" } : null), ...style }}
       onPointerMove={interactive ? lean : undefined}
       onPointerDown={interactive ? lean : undefined}
       onPointerLeave={interactive ? settle : undefined}
@@ -495,6 +692,8 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
         @keyframes rc3-crackle { 0%, 100% { filter: brightness(1); } 6% { filter: brightness(1.22); } 8% { filter: brightness(1); } 31% { filter: brightness(1); } 33% { filter: brightness(1.16); } 36% { filter: brightness(1.02); } 60% { filter: brightness(1); } 62% { filter: brightness(1.28); } 64% { filter: brightness(1.04); } 66% { filter: brightness(1.2); } 70% { filter: brightness(1); } }
         @keyframes rc3-blaze { 0%, 100% { scale: 1 1; filter: brightness(1) saturate(1); } 11% { scale: 1.012 1.03; filter: brightness(1.14) saturate(1.1); } 24% { scale: .995 .985; filter: brightness(.93) saturate(1); } 39% { scale: 1.02 1.045; filter: brightness(1.2) saturate(1.15); } 53% { scale: 1 1.01; filter: brightness(.98) saturate(1); } 68% { scale: 1.015 1.035; filter: brightness(1.16) saturate(1.1); } 84% { scale: .99 .98; filter: brightness(.9) saturate(.97); } }
         @keyframes rc3-flare { 0%, 100% { opacity: .08; } 9% { opacity: .95; } 15% { opacity: .3; } 21% { opacity: .8; } 34% { opacity: .1; } 55% { opacity: .15; } 63% { opacity: 1; } 70% { opacity: .2; } 86% { opacity: .55; } }
+        @keyframes rc3-ripple { 0% { scale: .12; opacity: 0; } 10% { opacity: .75; } 60% { opacity: .3; } 100% { scale: 1.55; opacity: 0; } }
+        @keyframes rc3-sway { 0%, 100% { scale: 1 1; translate: 0 0; } 30% { scale: 1.004 1.012; translate: .25% 0; } 65% { scale: 1 1.02; translate: -.3% 0; } }
         @keyframes rc3-flash { 0% { background-size: 0% 0%; opacity: 0; } 10% { opacity: 1; } 55% { opacity: .85; } 100% { background-size: 280% 280%; opacity: 0; } }`}</style>
       <div
         className="rc-card rc3-card"
@@ -517,7 +716,7 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
               return (
                 <React.Fragment key={layer.id}>
                   {light?.glow}
-                  <img src={layer.src} alt="" draggable={false} decoding="async"
+                  <img src={layer.src} alt="" draggable={false} decoding="async" data-spin={layer.spin && interactive ? "" : undefined} data-tick={layer.tick && interactive ? "" : undefined}
                 style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", transform: `translate(calc(${layer.offset?.x || 0}% - var(--tx, 0) * ${parallax(layer)}%), calc(${layer.offset?.y || 0}% - var(--ty, 0) * ${parallax(layer)}%)) scale(${layer.scale ?? 1})`, transition: interactive ? "transform var(--ease, 500ms) ease-out" : undefined, filter: layer.filter || undefined,
                   // A flame that flickers (layer.flicker: where its base is, in % of the layer): it stretches, leans and
                   // dims a little about that point, on the live card only. `scale` and `rotate` are their own
@@ -525,6 +724,20 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
                   ...(layer.flicker && interactive ? { transformOrigin: `${layer.flicker.x}% ${layer.flicker.y}%`, animation: `rc3-flicker ${layer.flicker.period || 1.9}s ease-in-out infinite` } : null),
                   // A blaze (layer.blaze: where the fire starts, in % of the layer): a big fire that surges and gutters
                   // from that point. And a crackle (layer.crackle): the layer flares, the way lightning lights a scene.
+                  // A gaze (layer.gaze: { x, y } how far it may travel, in px of the card): the layer slides a little toward
+                  // wherever the card is tipped. On a layer that is only a portrait's irises, the eyes follow the viewer.
+                  ...(layer.gaze && interactive ? { translate: `calc(var(--tx, 0) * ${layer.gaze.x ?? 3}px) calc(var(--ty, 0) * ${layer.gaze.y ?? 2}px)`, transition: "transform var(--ease, 500ms) ease-out, translate 260ms ease-out" } : null),
+                  // Water (layer.ripple): the layer breathes, a slow stretch from its top edge, so a reflection in it wavers.
+                  // A wheel (layer.spin: { x, y } its axle in % of the layer; squash, the height to give it so a disc painted
+                  // a touch out of round is a true circle before it turns; r, its radius in % of the layer's width, for the
+                  // click). The tilt's slide moves to `translate`, which is applied after `rotate`: left in `transform` it
+                  // would be turned with the wheel, and the wheel would swing off its axle whenever the card is tipped.
+                  ...((layer.spin || layer.tick) && interactive ? { transform: "none", translate: `calc(${layer.offset?.x || 0}% - var(--tx, 0) * ${parallax(layer)}%) calc(${layer.offset?.y || 0}% - var(--ty, 0) * ${parallax(layer)}%)`, transition: "translate var(--ease, 500ms) ease-out",
+                    transformOrigin: `${(layer.spin || layer.tick).x}% ${(layer.spin || layer.tick).y}%`, ...(layer.spin ? { scale: `1 ${layer.spin.squash || 1}` } : null) } : null),
+                  ...(layer.ripple && interactive ? { transformOrigin: "50% 0%", animation: `rc3-sway ${(layer.ripple.period || 5) * 1.3}s ease-in-out infinite` } : null),
+                  // Several flames on one layer (layer.flames): the layer itself is not shown on the live card; each flame is
+                  // drawn from it below, in its own small window, so each can flicker about its own wick.
+                  ...(layer.flames && interactive ? { visibility: "hidden" } : null),
                   ...(layer.bobble && interactive ? { transformOrigin: `${layer.bobble.x}% ${layer.bobble.y}%`, rotate: "var(--bob, 0deg)" } : null),
                   ...(layer.blaze && interactive ? { transformOrigin: `${layer.blaze.x}% ${layer.blaze.y}%`, animation: `rc3-blaze ${layer.blaze.period || 1.5}s ease-in-out infinite` } : null),
                   ...(layer.crackle && interactive ? { animation: `rc3-crackle ${layer.crackle === true ? 2.6 : layer.crackle}s linear infinite` } : null) }} />
@@ -534,12 +747,66 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
                       the card brightens it. */}
                   {layer.flare && interactive && [0, 1].map((k) => (
                     <div key={`flare${k}`} aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", mixBlendMode: "screen",
-                      transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out", opacity: "calc(.7 + var(--lit, 0) * .3)",
+                      transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out", opacity: `calc((.7 + var(--lit, 0) * .3) * ${layer.flare.strength ?? 1})` /* flare.strength: 1 is a fire's flash; well under 1 is a glimmer */,
                       WebkitMaskImage: `repeating-linear-gradient(${k ? 62 : 118}deg, #000 0%, #000 ${k ? 5 : 7}%, transparent ${k ? 11 : 14}%, transparent ${k ? 23 : 29}%)`, maskImage: `repeating-linear-gradient(${k ? 62 : 118}deg, #000 0%, #000 ${k ? 5 : 7}%, transparent ${k ? 11 : 14}%, transparent ${k ? 23 : 29}%)` }}>
                       <img src={layer.src} alt="" draggable={false} decoding="async" style={{ position: "absolute", left: 0, top: 0, width: "100%", height: "100%", filter: "brightness(1.55) contrast(1.9) saturate(1.25)",
                         animation: `rc3-flare ${((layer.flare.period || 2.3) * (k ? 0.73 : 1)).toFixed(2)}s linear ${k ? -0.9 : 0}s infinite` }} />
                     </div>
                   ))}
+                  {/* Liquid metal (layer.liquid): drawn over the layer inside its mask, then the layer once more, faintly, so
+                      the glass keeps its shine over the metal. */}
+                  {layer.liquid && interactive && <LiquidMetal spec={layer.liquid} slide={slide} scale={layer.scale ?? 1} />}
+                  {layer.liquid && interactive && (
+                    <img src={layer.src} alt="" aria-hidden="true" draggable={false} decoding="async" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", mixBlendMode: "screen", opacity: layer.liquid.shine ?? 0.32,
+                      transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out", WebkitMaskImage: `url("${layer.liquid.mask}")`, maskImage: `url("${layer.liquid.mask}")`, WebkitMaskSize: "100% 100%", maskSize: "100% 100%" }} />
+                  )}
+                  {/* Eyes that follow (layer.eyes). The layer's own picture is the WHITES of the eyes, the shape of each
+                      opening; the irises are drawn here, inside that shape, so they slide under the lids, and they drift
+                      toward wherever the card is tipped, a moment late. irises: [{ x, y, r }] their place at rest in %
+                      of the layer and their radius in px of the card; travel: { x, y } how far they may go, in px. Drawn
+                      on every card, live or not (at rest when it is not), since they are the portrait's eyes. */}
+                  {layer.eyes && (
+                    <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", transform: `${slide} scale(${layer.scale ?? 1})`, transition: interactive ? "transform var(--ease, 500ms) ease-out" : undefined,
+                      WebkitMaskImage: `url("${layer.src}")`, maskImage: `url("${layer.src}")`, WebkitMaskSize: "100% 100%", maskSize: "100% 100%" }}>
+                      <div style={{ position: "absolute", inset: 0, translate: interactive ? `calc(var(--tx, 0) * ${layer.eyes.travel?.x ?? 1.6}px) calc(var(--ty, 0) * ${layer.eyes.travel?.y ?? 0.9}px)` : undefined, transition: "translate 320ms ease-out" }}>
+                        {layer.eyes.irises.map((e, ei) => (
+                          <div key={ei} style={{ position: "absolute", left: `${e.x}%`, top: `${e.y}%`, width: e.r * 2, height: e.r * 2, marginLeft: -e.r, marginTop: -e.r, borderRadius: "50%",
+                            background: `radial-gradient(circle at 34% 30%, rgba(255,255,255,.95) 0, rgba(255,255,255,.95) 9%, transparent 12%), radial-gradient(circle, #0d0705 0, #0d0705 36%, ${layer.eyes.color || "#6b3f1c"} 40%, ${layer.eyes.color || "#6b3f1c"} 74%, #2a160a 82%, #2a160a 100%)` }} />
+                        ))}
+                      </div>
+                      {/* the lid's shadow across the top of each eye */}
+                      <div style={{ position: "absolute", inset: 0, background: layer.eyes.irises.map((e) => `radial-gradient(ellipse ${e.r * 3.2}px ${e.r * 1.5}px at ${e.x}% calc(${e.y}% - ${e.r * 1.25}px), rgba(45,24,12,.6) 0, rgba(45,24,12,0) 100%)`).join(", ") }} />
+                    </div>
+                  )}
+                  {/* Ripples (layer.ripple: { x, y } where they start, in % of the layer; rx their widest half-width in %;
+                      period, seconds): rings that open across the water one after another and fade, seen at a low angle
+                      so they are flat ellipses. Kept inside the layer's own shape, so they stop at the waterline. */}
+                  {layer.ripple && interactive && (
+                    <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", mixBlendMode: "screen", transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out",
+                      WebkitMaskImage: `url("${layer.src}")`, maskImage: `url("${layer.src}")`, WebkitMaskSize: "100% 100%", maskSize: "100% 100%" }}>
+                      {[0, 1, 2, 3].map((k) => { const w = ((layer.ripple.rx || 46) / 100) * W * 2, h = w * (layer.ripple.flat || 0.24), period = layer.ripple.period || 5;
+                        return <div key={k} style={{ position: "absolute", left: `${layer.ripple.x}%`, top: `${layer.ripple.y}%`, width: w, height: h, marginLeft: -w / 2, marginTop: -h / 2, borderRadius: "50%", boxSizing: "border-box",
+                          border: `2px solid ${layer.ripple.color || "rgba(200,255,238,.6)"}`, boxShadow: `0 0 10px ${layer.ripple.color || "rgba(170,255,230,.35)"}, inset 0 0 8px ${layer.ripple.color || "rgba(170,255,230,.2)"}`,
+                          opacity: 0, animation: `rc3-ripple ${period}s cubic-bezier(.2,.6,.4,1) ${(-(k * period) / 4).toFixed(2)}s infinite` }} />; })}
+                    </div>
+                  )}
+                  {/* layer.flames: [{ x, y, r }] the foot of each flame (its wick) in % of the layer, and r, the reach of
+                      the window cut around it, in px of the card. Each is the layer again, clipped to that one flame,
+                      flickering on its own clock about its own wick, with a soft glow that breathes behind it. */}
+                  {layer.flames && interactive && layer.flames.map((f, fi) => { const period = 1.5 + ((fi * 5) % 4) * 0.23, delay = -((fi * 0.618) % 1) * period, r = f.r || 14;
+                    return (
+                      <React.Fragment key={`flame${fi}`}>
+                        <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", mixBlendMode: "screen", transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out" }}>
+                          <div style={{ position: "absolute", left: `${f.x}%`, top: `${f.y}%`, width: r * 5, height: r * 5, marginLeft: -r * 2.5, marginTop: -r * 3.1, borderRadius: "50%",
+                            background: "radial-gradient(circle, rgba(255,214,120,.5) 0, rgba(255,170,60,.2) 35%, rgba(255,150,40,0) 70%)", animation: `rc3-flicker ${(period * 1.7).toFixed(2)}s ease-in-out ${delay.toFixed(2)}s infinite` }} />
+                        </div>
+                        <img src={layer.src} alt="" aria-hidden="true" draggable={false} decoding="async" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none",
+                          transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out", clipPath: `circle(${r}px at ${f.x}% calc(${f.y}% - ${r * 0.62}px))`,
+                          transformOrigin: `${f.x}% ${f.y}%`, animation: `rc3-flicker ${period.toFixed(2)}s ease-in-out ${delay.toFixed(2)}s infinite` }} />
+                      </React.Fragment>
+                    ); })}
+                  {/* Where a click counts as a click on the wheel: its disc, sliding with it. Nothing is drawn. */}
+                  {layer.spin && interactive && <div data-spin-hit="" aria-hidden="true" style={{ position: "absolute", left: `${layer.spin.x}%`, top: `${layer.spin.y}%`, width: ((layer.spin.r || 30) / 100) * W * 2, height: ((layer.spin.r || 30) / 100) * W * 2, marginLeft: -((layer.spin.r || 30) / 100) * W, marginTop: -((layer.spin.r || 30) / 100) * W, borderRadius: "50%", pointerEvents: "none", transform: slidePx }} />}
                   {layer.bolts && interactive && (
                     <svg aria-hidden="true" viewBox={`0 0 ${W} ${H}`} style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", mixBlendMode: "screen", overflow: "visible",
                       transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out", filter: `drop-shadow(0 0 2px #fff) drop-shadow(0 0 5px ${layer.bolts.color || "#59c2ff"}) drop-shadow(0 0 12px ${layer.bolts.color || "#59c2ff"})` }}>
@@ -649,7 +916,7 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
           </div>
         )}
         <div style={{ ...abs, left: tx, top: m.apparition ? 476 : 462, width: tw, height: (m.flavor ? 74 : 118) - (m.apparition ? 13 : 0), display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <p style={{ margin: 0, textAlign: "center", fontFamily: BODY, fontSize: textSize, lineHeight: 1.45, letterSpacing: "0.14em", textTransform: "uppercase", color: "#24160a", ...(fullArt ? { color: "#fff", fontWeight: 700, ...ON_ART } : null) }}><RulesText text={m.text} /></p>
+          <p style={{ margin: 0, textAlign: "center", fontFamily: BODY, fontSize: textSize, lineHeight: 1.45, letterSpacing: "0.14em", textTransform: "uppercase", color: "#24160a", textWrap: "balance" /* lines of even length: no word left alone at a line's end */, ...(fullArt ? { color: "#fff", fontWeight: 700, ...ON_ART } : null) }}><RulesText text={m.text} /></p>
         </div>
         {m.flavor && (
           <>
