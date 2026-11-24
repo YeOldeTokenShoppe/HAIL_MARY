@@ -105,7 +105,7 @@ export const DESIGNS = [
   D('paperhands', 'Paper Hands', 'hazard', 3, { text: 'At the start of each turn, they sell the Asset they bought most recently, for its cash price' }),
   D('taxman', 'Tax Collector', 'hazard', 2, { text: 'Pay 1 to the bank at the start of each turn' }),
   D('trap', 'Liquidity Trap', 'hazard', 3, { text: 'Trapped: every Liquidity they collect goes under this card instead. Clear it, and the pile is theirs' }),
-  D('escandalo', 'Scandal', 'hazard', 2, { text: 'Scandal: the seated Trader loses 5 Credibility when it breaks, 2 more each turn' }),
+  D('escandalo', 'Scandal', 'hazard', 2, { text: 'A strike when it lands. While it stays, the Trader cannot return to good standing' }),
   D('scam', 'Exit Scam', 'hazard', 3, { hit: true, loss: 75, text: 'Your rival loses $75M' }),
   D('bell', 'The Bell', 'remedy', 1, { clears: 'bear', printName: 'La Campana' }),
   // Not your keys, not your coins: the Keys answer the two Calamities that lock you out of
@@ -176,7 +176,7 @@ export const DESIGNS = [
   // The board that holds it all: the one card that touches the two-slot limit.
   D('motherboard', 'The Motherboard', 'artifact', 2, { slots: true, text: 'Expansion slots: the board takes no Relic slot, and you may hold a third Relic', printName: 'La Placa Madre' }),
   D('map', 'Treasure Map', 'artifact', 2, { text: 'X marks the spot: whenever you sell an Asset, draw a card', printName: 'El Mapa' }),
-  D('tattoo', 'The Tattoo', 'artifact', 2, { apparition: true, text: 'Inked devotion: at the start of your turn, your seated Trader regains 1 Credibility', printName: 'El Tatuaje' }),
+  D('tattoo', 'The Tattoo', 'artifact', 2, { apparition: true, text: 'Inked devotion: at the start of your turn, your seated Trader returns to good standing', printName: 'El Tatuaje' }),
   // Due diligence, done beforehand: prevention, not cure.
   // The Audit left the set on 2026-11-21, merged with The Keys into The Talisman. Design, face and art kept.
   // D('audit', 'The Audit', 'artifact', 2, { wards: ['rug'], text: 'Rug Pull cannot be played on you' }),
@@ -197,7 +197,7 @@ export const DESIGNS = [
   // The Cleansing (La Limpia) left the set on 2026-11-22; kept on file.
   // D('limpia', 'La Limpia', 'grace', 2, { savingGrace: 3, text: 'To the shrine: light a candle, and the egg sweeps one Calamity off you' }),
   // The lonely soul in the flames: a discredited Trader comes back from purgatory.
-  D('anima', 'Ánima Sola', 'grace', 1, { text: 'To the shrine: light a candle, and return the most recently discarded Trader with 5 Credibility to your empty seat or to your hand' }),
+  D('anima', 'Ánima Sola', 'grace', 1, { text: 'To the shrine: light a candle, and return the most recently discarded Trader, in scandal, to your empty seat or to your hand' }),
   // Her tears fall for the fallen: a plain candle, and the strongest rescue in the hand.
   // The Tears (Las Lágrimas) left the set on 2026-11-23: a plain candle for $10M beside The Offering's free one. Kept on file.
   // D('lagrimas', 'Las Lágrimas', 'grace', 1, { savingGrace: 4, text: 'To the shrine: light a candle' }),
@@ -209,7 +209,7 @@ export const DESIGNS = [
   // in the engine behind `abduct`, unset here.
   D('visitor', 'The Visitor', 'grace', 1, { apparition: true, visit: true, text: 'To the shrine: light a candle. Then choose: she arrives (draw two cards) or she departs (take a card back from your discard pile)' }),
   // Coin-Op Confession (The Confession until 2026-11-21, when its art arrived: a coin-operated booth with a robot confessor).
-  D('confession', 'Coin-Op Confession', 'grace', 1, { savingGrace: 3, text: 'To the shrine: light a candle, and your seated Trader’s Credibility is restored in full. The Inferno cannot stop it, and it lifts The Inferno', printName: 'La Confesión' }),
+  D('confession', 'Coin-Op Confession', 'grace', 1, { savingGrace: 3, text: 'To the shrine: light a candle, and your seated Trader returns to good standing, even under a Scandal. The Inferno cannot stop it, and it lifts The Inferno', printName: 'La Confesión' }),
   D('fountain', 'The Fountain', 'grace', 2, { apparition: true, text: 'Toss in 2 Liquidity: your Hail Mary odds rise one step, even past the shrine’s three', printName: 'La Fuente' }),
   D('rose', 'The Rose', 'grace', 0, { apparition: true, pros: 50, cash: 2, text: 'Offer it to a rival: if they accept, they keep it (worth 50 Prosperity) and you light a candle — your Hail Mary odds rise', printName: 'La Rosa' }),
   // Locations — places you build. One stands per player, takes no Relic slot, is never sold.
@@ -233,7 +233,7 @@ export const DESIGNS = [
   // with no trouble to clear, a Grace after the third candle) and a question every turn. (pawn: what it pays, in coins.)
   D('pawn', 'Pawn Shop', 'location', 2, { pawn: 2, text: 'Once on your turn, before your main action, you may discard a card from your hand: collect 2 Liquidity' }),
   D('mission', 'The Mission', 'location', 2, { alms: 2, text: 'At the start of your turn, if you have less cash than every rival, collect $20M' }),
-  D('catacumbas', 'The Catacombs', 'location', 2, { text: 'Buried with honors: at the start of your turn you may bury your seated Trader — bank 5 Prosperity per point of Credibility they have left', printName: 'Las Catacumbas' }),
+  D('catacumbas', 'The Catacombs', 'location', 2, { text: 'Buried with honors: at the start of your turn you may bury your seated Trader — bank 75 Prosperity for one in good standing, 25 for one in scandal', printName: 'Las Catacumbas' }),
   D('moneda', 'The Airdrop', 'event', 0, { text: 'Free money falls from the sky: every player collects 2 Liquidity' }),
   // Yield farming: fat income until the market moves and wipes it.
   D('jardin', 'Yield Farm', 'asset', 4, { cash: 2, pros: 50, income: 2, text: 'While held: collect 2 a turn. Discard this Asset when any Event fires on draw' }),
@@ -249,10 +249,10 @@ export const DESIGNS = [
   // On-draw events print a subtype by outcome (eventTemplate.js): a windfall
   // is an Opportunity (the default), a loss a Calamity, a shake-up whose
   // winner is unknown an Ambiguity.
-  D('crash', 'Flash Crash', 'event', 0, { subtype: 'Calamity', text: 'Everyone holding 8+ Liquidity loses half' }),
+  D('crash', 'Flash Crash', 'event', 0, { subtype: 'Calamity', text: 'Everyone holding 8+ Liquidity loses a quarter of it' }),
   // The dot-com bust: it finds every Tech Stock on the table, whoever holds it.
   // The reputational crash: the Calamity that makes SAVING GRACE matter.
-  D('fall', 'Fall From Grace', 'event', 0, { subtype: 'Calamity', text: 'The fall: every seated Trader loses 4 Credibility' }),
+  D('fall', 'Fall From Grace', 'event', 0, { subtype: 'Calamity', text: 'The fall: every seated Trader takes a strike' }),
   // Apparitions: Our Lady appears to the whole table, unbidden. Each is an
   // on-draw Event named for her; the names are hers, so the Spanish one stays.
   D('holyroller', 'The Holy Roller', 'event', 0, { apparition: true, text: 'She rolls through: every player draws a card and collects 1 Liquidity' }),
@@ -276,7 +276,7 @@ export const DESIGNS = [
   // Fat Tuesday, then Ash Wednesday: everyone catches something, and pays for
   // it the morning after — half the roll, in Credibility. An Ambiguity: the
   // bigger the party, the bigger the penance.
-  D('mardigras', 'Mardi Gras', 'event', 0, { apparition: true, subtype: 'Ambiguity', text: 'Party now, repent later: every player rolls the die and collects that much; at their next turn start, their Trader loses half of it in Credibility' }),
+  D('mardigras', 'Mardi Gras', 'event', 0, { apparition: true, subtype: 'Ambiguity', text: 'Everyone rolls the die and collects 1 Liquidity for each point rolled' }),
   // The Singular80 (2026-11-20): the point past which nothing slows down. On the draw it changes the
   // game for good: every player takes two main actions a turn from then on. An Ambiguity: it helps
   // whoever has more to do with a turn. Its art is a live 3D scene (art/the-singular80.js).

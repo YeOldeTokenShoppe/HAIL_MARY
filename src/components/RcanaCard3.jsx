@@ -428,8 +428,11 @@ function haloLight(app, slide, live) {
     <div aria-hidden="true" style={{ ...disc(r * (app.spread ?? 3.4) * 0.7), opacity: `calc(${rest * peak} + var(--lit, 0) * ${(1 - rest) * peak})`, WebkitMaskImage: fade, maskImage: fade,
       backgroundImage: `${rays}radial-gradient(closest-side, ${app.color} 0%, ${app.color}${app.hollow ? "" : "99"} ${app.hollow ? 80 : 37}%, transparent ${app.hollow ? 100 : 88}%)` }} />
   );
+  // `open`: the glint's ring is left open at the foot, over that many degrees, so it runs round her head and down to
+  // her shoulders but does not cross her throat and chest, where there is no ring painted for it to ride.
+  const half = (app.open || 0) / 2, gap = half ? `, conic-gradient(from 180deg, transparent ${Math.max(0, half - 12)}deg, #000 ${half + 12}deg, #000 ${360 - half - 12}deg, transparent ${Math.min(360, 360 - half + 12)}deg)` : "";
   const glint = app.glint === false ? null : (
-    <div aria-hidden="true" style={{ ...disc(r * 1.35), opacity: "calc(.1 + var(--lit, 0) * .9)", WebkitMaskImage: ring, maskImage: ring,
+    <div aria-hidden="true" style={{ ...disc(r * 1.35), opacity: "calc(.1 + var(--lit, 0) * .9)", WebkitMaskImage: ring + gap, maskImage: ring + gap, ...(gap ? { WebkitMaskComposite: "source-in", maskComposite: "intersect" } : null),
       backgroundImage: "conic-gradient(from calc(var(--ry, 0deg) * 11 + var(--rx, 0deg) * 11), transparent 0deg, rgba(255,255,255,.95) 26deg, transparent 62deg, transparent 180deg, rgba(255,255,255,.8) 206deg, transparent 242deg, transparent 360deg)" }} />
   );
   // `over`: she is painted INTO the layer (a silhouette in the scene, a scorch on a tortilla), so the light goes on top of it.

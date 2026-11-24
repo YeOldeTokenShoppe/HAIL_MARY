@@ -23,6 +23,8 @@
 //   spread    how far the glow reaches, in halo radii (default 3.4)
 //   glow      false for no halo disc at all (the mask carries the light)
 //   maskLight true to light the mask as a halo (in `color`, with rays) rather than as embers
+//   open      degrees of the glint's ring left open at the foot (150 or so), so the glint runs round her head
+//             and down to her shoulders but does not cross her throat and chest
 //   hollow    true to light only the aureole around her, not her figure
 //   flash     with a mask, on the live card: a ring of light runs out from her along the masked lines,
 //             every `flash` seconds
@@ -36,15 +38,15 @@ export const APPARITIONS = {
   // La Tortilla: she is toasted into it, rays and all; the scorch glows like embers.
   // `mask` lights her own scorched rays: an image the size of the layer, opaque where the rays are.
   "tortilla": { layer: "subject", over: true, cx: 48.8, cy: 33, r: 6.5, spread: 3.2, rays: false, glint: false, rest: 0.1, strength: 0.3, color: "#ffb04a", mask: "/TCG/rcana/tortilla/rays-mask.webp?v=1" },
-  "fire-horse": { layer: "subject", cx: 54.5, cy: 15.8, r: 7.5, color: "#ffdc78" },
+  "fire-horse": { layer: "subject", cx: 54.5, cy: 15.8, r: 7.5, color: "#ffdc78", open: 150 },
   // El Tatuaje: the fresh ink glows — the light is masked to the tattoo's own gold lines (her crown, hair and circuit traces).
   "el-tatuaje": { layer: "subject", over: true, cx: 60.8, cy: 46.3, r: 4, glow: false, glint: false, rest: 0.3, strength: 0.95, color: "#ffd24a", mask: "/TCG/rcana/el-tatuaje/ink-mask.png?v=2", maskLight: true },
-  "holy-roller": { layer: "subject", cx: 40, cy: 17, r: 8.5, color: "#ffdc78" },
+  "holy-roller": { layer: "subject", cx: 40, cy: 17, r: 8.5, color: "#ffdc78", open: 150 },
   "ride-or-die": { layer: "subject", cx: 56.5, cy: 15, r: 10, color: "#ffe08a" }, // Ride or Die (the lowrider): her aureole over the car
-  "mardi-gras": { layer: "subject", cx: 49.5, cy: 18.6, r: 7, color: "#ffdc78" },
+  "mardi-gras": { layer: "subject", cx: 49.5, cy: 18.6, r: 7, color: "#ffdc78", open: 150 }, // the glint stops at her shoulders: no ring crosses her chest
   // The Mother Lode: she is the heap itself, and the gold veins at its top are her rays. `mask` is those veins
   // and the outline of her head, cut from the scene (gold pixels within reach of her head, fading out at the
   // shoulders): they light in her gold as the card tilts, over a soft glow behind her head. No ring, so no glint.
   "the-mine": { layer: "scene", over: true, cx: 49.8, cy: 22.5, r: 9, spread: 2.2, rays: false, glint: false, rest: 0.18, strength: 0.9, color: "#ffcf55", mask: "/TCG/rcana/the-mine/rays-mask.webp?v=1", maskLight: true, flash: 2.6 },
-  "virtual-mary": { layer: "subject", cx: 54.5, cy: 20, r: 6, color: "#6ff3ff" }, // the hologram: the same light, in her cyan
+  "virtual-mary": { layer: "subject", cx: 54.5, cy: 20, r: 6, color: "#6ff3ff", open: 150 }, // the hologram: the same light, in her cyan
 };
