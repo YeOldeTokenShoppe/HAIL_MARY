@@ -70,13 +70,13 @@ export const RESERVED_NUMBERS = {
   scam: 47,
   // Remedies
   bell: 17,
-  catacumbas: 62, // Las Catacumbas — unfaced (was Quantum Resistance)
+  catacumbas: 62, // Las Catacumbas (faced 2026-11-25; was Quantum Resistance)
   talisman: 63, // The Talisman (2026-11-21: The Keys and The Audit merged; it has The Keys' number)
   tortilla: 16,
   whistle: 42, // The Whistleblower (took La Horchata's number, 2026-11-21)
   stimulus: 65, // The Stimulus (took The Burro's number, 2026-11-20)
   // Relics
-  heart: 66, // El Corazón — unfaced
+  heart: 66, // El Corazón
   swan: 67, // The Black Swan (added 2026-11-23; The Halo's old number)
   rosary: 18,
   grail: 68, // The Grail — the graded card in the vault (was the El Cáliz Relic, retired 2026-11-15)
@@ -87,17 +87,17 @@ export const RESERVED_NUMBERS = {
   lottery: 71, // El Boleto
   geometry: 72, // Sacred Geometry
   tattoo: 73, // El Tatuaje — unfaced
-  dashboard: 74, // La Virgencita — unfaced
+  dashboard: 74, // La Virgencita
   mission: 77, // The Mission (added 2026-11-21; took The Cleansing's number on 2026-11-22)
-  pareto: 85, // The 80/20 Rule (added 2026-11-22)
+  special: 85, // Special Offer (2026-11-25; The 80/20 Rule's old number)
   rewind: 86, // Rewind (added 2026-11-22)
   singular: 87, // The Singular80 (it was always numbered last until Back to the 80s took 88, 2026-11-22)
   pawn: 64, // Pawn Shop (added 2026-11-23; The Press Release's old number)
   eighties: 88, // Back to the 80s — the portal, card 88 of 88 (added 2026-11-22)
   motherboard: 5, // La Placa Madre — unfaced (a Relic since 2026-11-12)
   // Graces
-  ofrenda: 75, // La Ofrenda — unfaced
-  cherub: 76, // El Exvoto — unfaced
+  ofrenda: 75, // La Ofrenda
+  cherub: 76, // El Exvoto
   ponzi: 78, // The Ponzi (was La Pirámide, before that Divine Intervention)
   anima: 79, // Ánima Sola — unfaced
   confession: 81, // La Confesión (80 until 2026-11-23, when Quicksilver took it)

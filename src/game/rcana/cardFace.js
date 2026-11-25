@@ -541,6 +541,18 @@ export function toRcanaCard(card, overrides = {}) {
       tick: l.tick, // the wheel's flapper: { x, y } its pivot in % of the layer; knocked aside as each peg passes (RcanaCard3)
       spin: l.spin, // a wheel: { x, y } its axle in % of the layer, optional period in seconds (RcanaCard3)
       flames: l.flames, // several flames on one layer: [{ x, y, r }] each wick in % of the layer, r its window in px (RcanaCard3)
+      pixelate: l.pixelate, // square blocks: the block size in px of the 512px card (RcanaCard3, live card)
+      blend: l.blend, // a CSS mix-blend-mode, or "negation" (RcanaCard3)
+      tractor: l.tractor, // a beam that answers the tilt: { x, y, pinch, widen, flood, cold, gap, speed, ring, idle } (RcanaCard3)
+      screen: l.screen, // a television's picture drawn on the layer: { box, ad, glow, period } (RcanaCard3: AdScreen)
+      neon: l.neon, // a neon sign that hums, sways and drops a letter: { hang, sway, tube, drop, period } (RcanaCard3)
+      beat: l.beat, // a heartbeat of light: true or { period } (RcanaCard3)
+      roll: l.roll, // a glow that tumbles up through the layer: { top, bottom, period, strength, size, color } (RcanaCard3)
+      facets: l.facets, // light that rolls round the layer, patch to patch: { at: [{ x, y, r }], cx, cy, period, idle, strength } (RcanaCard3)
+      glows: l.glows, mist: l.mist, // lamplight that gutters: [{ x, y, r }]; low fog across a band: { x0, x1, y0, y1 } (RcanaCard3)
+      visit: l.visit, // she rises or descends with the tilt: { x, y, rise, fall, shrink, fine, coarse } (RcanaCard3)
+      motes: l.motes, lamps: l.lamps, lampPeriod: l.lampPeriod, breathe: l.breathe, // dust in a beam; running lights; a light that breathes (RcanaCard3)
+      glitch: l.glitch, // a bad signal: { top, height } the figure's band in % of the layer; optional period, fade, shift, scan (RcanaCard3)
       flicker: l.flicker, // a flame: { x, y } its base in % of the layer, optional period in seconds (RcanaCard3)
       clapperRestAngle: l.clapperRestAngle,
       clapperOrigin: l.clapperOrigin,

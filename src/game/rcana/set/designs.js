@@ -46,7 +46,7 @@ export const DESIGNS = [
   // The Byzantine Generals: a Calamity has to reach consensus before it lands.
   D('general', 'Byzantine General', 'trader', 2, { liq: 2, cred: 14, eq: 3, abilityName: 'Fault Tolerance', text: 'When a Calamity fails against your Equanimity, collect 1 Liquidity', printName: 'El General' }),
   // The trading bot: fat income, no soul. Scandal has nothing to grip; the shrine hears nothing.
-  D('bot', 'The Bot', 'trader', 3, { liq: 3, cred: 6, eq: 3, abilityName: 'Eight Arms, No Soul', armsBuy: true, text: 'After your main action, you may also buy or sell one Asset. It cannot pray: while it sits, your Graces go unheard', printName: 'El Octobot' }),
+  D('bot', 'The Bot', 'trader', 3, { liq: 3, cred: 6, eq: 3, abilityName: 'Eight Arms', armsBuy: true, text: 'After your main action, you may also buy or sell one Asset. It cannot pray: while it sits, your Graces go unheard', printName: 'El Octobot' }),
   D('tech', 'Tech Stock', 'asset', 3, { cash: 5, pros: 100, tech: true }),
   // The degen asset, and the only gamble: sell safe for cash, or roll the die for
   // Prosperity. (Was two cards — Meme Coin's body with Shitcoin's upside.)
@@ -184,7 +184,7 @@ export const DESIGNS = [
   // the third; frauds are rare, so each was usually a dead card. The Talisman stops all three, and it does
   // something every game besides: its wearer's Trader counts one more Pathos against any Calamity (pathos).
   D('talisman', 'The Talisman', 'artifact', 2, { wards: ['rug', 'hack', 'scam'], pathos: 1, text: 'Rug Pull, Quantum Hack and Exit Scam cannot be played on you. Your seated Trader counts one more Pathos against Calamities' }),
-  D('dashboard', 'Dashboard Figure', 'artifact', 2, { apparition: true, noSlot: true, text: 'Our Lady of the Dashboard: an apparition for the road. She takes no Relic slot', printName: 'La Virgencita' }),
+  D('dashboard', 'Dashboard Mary', 'artifact', 2, { apparition: true, noSlot: true, text: 'Our Lady of the Dashboard: an apparition for the road. She takes no Relic slot', printName: 'La Virgencita' }),
   D('ofrenda', 'La Ofrenda', 'grace', 0, { savingGrace: 2, text: 'Offer this card to Our Lady: it goes to the shrine and lights a candle' }),
   // SAVING GRACE N (keyword): discard this from your hand when your seated
   // Trader would be discredited — they stay, with N Credibility. Printed as a line
@@ -233,7 +233,7 @@ export const DESIGNS = [
   // with no trouble to clear, a Grace after the third candle) and a question every turn. (pawn: what it pays, in coins.)
   D('pawn', 'Pawn Shop', 'location', 2, { pawn: 2, text: 'Once on your turn, before your main action, you may discard a card from your hand: collect 2 Liquidity' }),
   D('mission', 'The Mission', 'location', 2, { alms: 2, text: 'At the start of your turn, if you have less cash than every rival, collect $20M' }),
-  D('catacumbas', 'The Catacombs', 'location', 2, { text: 'Buried with honors: at the start of your turn you may bury your seated Trader — bank 75 Prosperity for one in good standing, 25 for one in scandal', printName: 'Las Catacumbas' }),
+  D('catacumbas', 'The Catacombs', 'location', 2, { vault: true, /* cold storage since 2026-11-24; it buried a Trader for cash before */ text: 'Cold storage: once a turn, move one Asset down or up. Below, nothing can touch it, and it cannot be sold', printName: 'Las Catacumbas' }),
   D('moneda', 'The Airdrop', 'event', 0, { text: 'Free money falls from the sky: every player collects 2 Liquidity' }),
   // Yield farming: fat income until the market moves and wipes it.
   D('jardin', 'Yield Farm', 'asset', 4, { cash: 2, pros: 50, income: 2, text: 'While held: collect 2 a turn. Discard this Asset when any Event fires on draw' }),
@@ -280,15 +280,18 @@ export const DESIGNS = [
   // The Singular80 (2026-11-20): the point past which nothing slows down. On the draw it changes the
   // game for good: every player takes two main actions a turn from then on. An Ambiguity: it helps
   // whoever has more to do with a turn. Its art is a live 3D scene (art/the-singular80.js).
-  // The 80/20 Rule (2026-11-22): most of the reward goes to a few. On the draw the richest player
-  // collects $80M and everyone else $20M; a tie goes to whoever drew it. An Ambiguity: it helps the leader.
+  // Special Offer (2026-11-25, in The 80/20 Rule's place and number): a sale. For the round it is turned, every Asset
+  // costs half as much to buy (saleRate; it was $20M off, `sale: 2`, for its first hour), for everyone. The market Fates move what Assets sell for; this one moves
+  // what they cost. An Ambiguity: it helps whoever has an Asset in hand and the cash to take it.
+  // The 80/20 Rule (2026-11-22 to 2026-11-25) is kept on file: the richest collected $80M and everyone else $20M.
   // The Black Swan (2026-11-23, in The Halo's place): the long-tail event, an Ambiguity. On the draw its drawer rolls
   // the die. On a 1 the richest player loses $200M; on an 8 the poorest collects $200M; on any other face nothing
   // happens (each of them, if tied). Three times in four the market shrugs; the fourth turns the game around: a
   // leader's 62% becomes 34%, a trailer's 38% becomes 67% (PLAYTEST3.md). Its first rule, "the richest loses $50M",
   // was only ever bad news. (tails: how many faces at each end count, and the stakes in coins.)
   D('swan', 'The Black Swan', 'event', 0, { subtype: 'Ambiguity', tails: { low: 1, high: 1, lose: 20, gain: 20, flat: true }, text: 'Roll the die. On a 1, the richest player loses 20 Liquidity. On an 8, the poorest player collects 20 Liquidity. Otherwise, nothing happens' }),
-  D('pareto', 'The 80/20 Rule', 'event', 0, { subtype: 'Ambiguity', text: 'The richest player collects 8 Liquidity. Everyone else collects 2 Liquidity' }),
+  // D('pareto', 'The 80/20 Rule', 'event', 0, { subtype: 'Ambiguity', text: 'The richest player collects 8 Liquidity. Everyone else collects 2 Liquidity' }),
+  D('special', 'Special Offer', 'event', 0, { subtype: 'Ambiguity', saleRate: 0.5, text: 'This round, every Asset costs half as much to buy' }),
   D('singular', 'The Singular80', 'event', 0, { subtype: 'Ambiguity', text: 'Time folds: from now on, every player takes two main actions each turn' }),
 
   // Locations (type 'location'): places you build, not things you hold. One
@@ -303,11 +306,11 @@ export const designByKey = Object.fromEntries(DESIGNS.map((d) => [d.key, d]));
 
 // ── APPARITIONS AND MIRACLES (2026-11-20) ────────────────────────────────────
 // Eleven cards carry Our Lady's image (`apparition: true`): The Holy Roller, The Fire Horse, The Virtual Mary,
-// Mardi Gras, The Rose, The Fountain, The Miracle Tortilla, The Tattoo, Ride or Die, the Dashboard Figure and,
+// Mardi Gras, The Rose, The Fountain, The Miracle Tortilla, The Tattoo, Ride or Die, the Dashboard Mary and,
 // since 2026-11-21, The Mother Lode. (The Rose is reserved for the Lotería edition; when it leaves, ten.)
 // Whoever REVEALS one witnesses an apparition and takes a MIRACLE (an eight-pointed star; three at most):
 // the player who draws an apparition Event, or who plays any other apparition card from their hand.
-// A Miracle is spent to roll any one die of your own again. (The Dashboard Figure used to be that reroll,
+// A Miracle is spent to roll any one die of your own again. (The Dashboard Mary used to be that reroll,
 // once, as a Relic; now it is the tenth apparition.) The art's lit halos are keyed by face id in apparitions.js.
 export const APPARITION_KEYS = ["holyroller", "fuego", "virtual", "mardigras", "rose", "fountain", "tortilla", "tattoo", "rideordie", "dashboard", "mine", "visitor"];
 
@@ -330,9 +333,9 @@ export const ENGLISH_TITLES = {
   gallo: "The Rooster", vaca: "The Cow", aguacate: "The Avocado", cava: "The Cellar", plata: "Quicksilver" /* mercury: element 80. Silver until 2026-11-23 */,
   // Artifacts, Graces and Events
   tortilla: "Miracle Tortilla", rosary: "The Rosary", enigma: "Enigma Machine", horchata: "Horchata",
-  map: "Treasure Map", anima: "Purgatory", fuego: "Fire Horse", infierno: "The Inferno",
+  map: "Treasure Map", anima: "Purgatory", fuego: "Fire Horse", infierno: "The Inferno", ofrenda: "The Offering",
   // Not yet printed
-  ofrenda: "The Offering", limpia: "The Cleansing", lagrimas: "The Tears",
+  limpia: "The Cleansing", lagrimas: "The Tears",
 };
 export const loteriaTitleOf = (d) => d.printName || d.name;
 export const titleOf = (d) => (EDITION === "loteria" ? loteriaTitleOf(d) : ENGLISH_TITLES[d.key] || d.name);

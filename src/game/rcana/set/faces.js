@@ -895,6 +895,19 @@ export const FACES = [
     printed: {},
   },
   {
+    id: "the-catacombs",
+    design: "catacumbas", // prints as "Las Catacumbas" — the design's printName
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 62,
+    rarity: "Uncommon",
+    // The fourth printed Location (2026-11-25): cold storage. The design's line is a
+    // simulator's; the face keeps the move and what it buys.
+    ability: "Once a turn, move one Asset down or up.\nBelow, nothing can touch it or sell it.",
+    // A Location narrates; the line follows the rule. DRAFT.
+    flavor: "Nothing down here has ever been lost.",
+    printed: {},
+  },
+  {
     id: "the-stimulus",
     design: "stimulus", // prints as "The Stimulus" — the design's name
     // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
@@ -1043,6 +1056,95 @@ export const FACES = [
     // Ride or Die holds its owner's Assets, and then nothing moves.
     ability: "The two players swap portfolios.",
     flavor: "Round and round. What was theirs is yours.",
+    printed: {},
+  },
+  {
+    id: "the-offering",
+    design: "ofrenda", // prints as "The Offering" — ENGLISH_TITLES (the design is La Ofrenda)
+    gloss: "The Offering",
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 75,
+    rarity: "Uncommon",
+    // A Grace goes to the shrine; the line is the candle. The plainest Grace in the set. DRAFT line.
+    ability: "Light a candle.", // the tab already says where it goes
+    // The man in the picture, in his own words: a fat purse, one coin. The card is free to play.
+    flavor: "A small token of my enormous devotion.",
+    printed: {},
+  },
+  {
+    id: "the-votive",
+    design: "cherub", // prints as "The Votive" — the design's name (El Exvoto in the lotería edition)
+    gloss: "The Votive",
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 76,
+    rarity: "Uncommon",
+    // A Grace goes to the shrine; the line is the candle and what it buys (pt3-sim: then draw). DRAFT line.
+    ability: "Light a candle, then draw a card.", // the tab already says where it goes
+    // A Grace narrates; the line follows the rule. DRAFT.
+    flavor: "Burns for a week. Asks for a lifetime.",
+    printed: {},
+  },
+  {
+    id: "the-visitor",
+    design: "visitor", // prints as "The Visitor" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 6,
+    rarity: "Uncommon",
+    // A Grace goes to the shrine, and the twelfth apparition (art/the-visitor.js: rainbow by default). The
+    // line is the candle and the choice she offers. DRAFT line.
+    ability: "Light a candle. She arrives (draw two)\nor departs (take back a discard).",
+    // A Grace narrates; the line follows the rule. DRAFT.
+    flavor: "She did not say where she was from.",
+    printed: {},
+  },
+  {
+    id: "special-offer",
+    design: "special", // prints as "Special Offer" — the design's name (in The 80/20 Rule's place, 2026-11-25)
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 85,
+    rarity: "Uncommon",
+    // A Fate: it happens to the table for the round it is turned. The line is the rule (pt3-sim: saleRate).
+    ability: "This round, every Asset\nis half off.",
+    // The voice on the television, after midnight. DRAFT line.
+    flavor: "But wait. There is always more.",
+    printed: {},
+  },
+  {
+    id: "pawn-shop",
+    design: "pawn", // prints as "Pawn Shop" — the design's name (a market name, no lotería title)
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 64,
+    rarity: "Uncommon",
+    // A Location builds, then offers its trade once a turn (designs.js pawn: 2 coins, $20M). DRAFT line.
+    ability: "Once a turn, before your main action,\ndiscard a card: collect $20M.",
+    // A Location narrates; the line follows the rule. DRAFT.
+    flavor: "Everything must go. Everything came back.",
+    printed: {},
+  },
+  {
+    id: "dashboard-figurine",
+    design: "dashboard", // prints as "Dashboard Mary" — the design's name (La Virgencita in the lotería edition)
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 74,
+    rarity: "Uncommon",
+    // A Relic equips, and an apparition (art/dashboard-figurine.js: rainbow by default). The line is the
+    // design's: she rides along and costs no slot. DRAFT line.
+    ability: "An apparition for the road.\nShe takes no Relic slot.",
+    // A Relic narrates; the line follows the rule. DRAFT.
+    flavor: "Eyes on the road. Hers, not yours.",
+    printed: {},
+  },
+  {
+    id: "sacred-heart",
+    design: "heart", // prints as "Sacred Heart" — the design's name (El Corazón in the lotería edition)
+    gloss: "Sacred Heart",
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 66,
+    rarity: "Uncommon",
+    // A Relic equips; the line is the design's: a one-use shield against a Calamity. DRAFT line.
+    ability: "A shield, not a cure: discard it\nto cancel a Calamity as it lands.",
+    // A Relic narrates; the line follows the rule. DRAFT.
+    flavor: "It burns. It has always burned.",
     printed: {},
   },
 ];

@@ -573,3 +573,221 @@ Its first rule (the richest loses $50M) was only ever bad news, and a black swan
 | loses $100M / gains $100M | 50% | 52% |
 
 Half and double ended games (a doubling is worth about $430M by the time it fires). $200M turns the game around and leaves a game to play. Deck balance and length did not move in any version. Also tried and set aside: doubling the next Event to fire; a one-in-eight swap of the two players' cash.
+
+## Traders are free (2026-11-24)
+
+A Trader is who you are, not something you buy, so the price is gone. **Any Trader in your deck may open**, and becoming another from your hand **costs the main action and no money**. Money on a Trader card is now income only (`liq` in ../rcana/set/trinity.js; `cost` is 0 and `STARTER_MAX_COST` is `null` in pt3-sim.js). The starter rule about juniors is retired with it.
+
+The price was never the lever (it is paid once, the income every turn), but the income gap was. Free, with the incomes as they were, openers ran from 43% to 61% (Marisol 61%, The Influencer 60%, The Octobot 57%); free with everyone at $20M was worse (Saint GR80 64%, The Octobot 39%, Devotion 58%). So income now offsets character: the strongest abilities earn least.
+
+| Trader | Income was | Income now | Opens at |
+|---|---:|---:|---:|
+| Saint GR80 | $15M | $20M | 52% |
+| The Influencer | $30M | $20M | 49% |
+| Marisol | $30M | $20M | 49% |
+| The Gambler | $20M | $25M | 47% |
+| Connor | $20M | $25M | 48% |
+| The Prospector | $20M | $25M | 50% |
+| Eugene | $30M | $25M | 53% |
+| Virgil | $20M | $30M | 53% |
+| Byzantine General | $20M | $30M | 52% |
+| The Octobot | $40M | $30M | 48% |
+
+16,000 two-player games, greedy bots choosing an opener at random, with The Catacombs as cold storage (below): Devotion 51.0%, 10.7 rounds (11.5 before), going first 51%. Logos, Ethos and Pathos and every ability are unchanged.
+
+- Eugene was first left at $30M and opened at 58% to 60% once the Catacombs stopped burying him; $25M brings him to 53%. At $20M he opens at 49% but Devotion goes to 54%.
+- Still open: Eugene is the Trader at the desk at the end of 29% of seats, and those seats win 55%. The Octobot, The Gambler and Connor end games at 37% to 41%.
+
+## The Catacombs: cold storage (2026-11-24)
+
+Burying your own character for cash made no sense once a Trader is who you are, and it carried the bury-and-reseat exploit. The Catacombs are now **cold storage** (`vault` on the design; `isCold`, `hot`, `coldStorage` in pt3-sim.js). Once on your turn, after the draw and before the main action (the Pawn Shop's moment), move one Asset down or bring one up.
+
+- Down there nothing reaches it: Rug Pull, Tech Rekt, The Whale, The Wheel, Paper Hands, a Bear Market's liquidation of The Perp, the weather on a Yield Farm.
+- It cannot be sold or uncorked until it is back up. It still ages, pays its income, and counts for Eugene.
+- If the Catacombs close (a second Location is opened over them), everything is back in reach.
+
+12,000 to 16,000 games: the bots use it in 12% of seats (the card is in Degen only), 0.42 Assets sent down and 0.13 brought up a game, and a player who used it wins 49%. Against the same card doing nothing, deck balance moves about a point. Assets are hit rarely (a Rug Pull 0.13, Tech Rekt 0.16, Paper Hands 0.11 a game), so it is insurance, not an engine. Bringing an Asset up and selling it happen on the same turn, so storage costs no tempo; the one exposed turn is the turn an Asset is bought.
+
+## The Degen leads (2026-11-24)
+
+Eugene was where Degen games ended: with two copies he was at the desk at the end of 59% of Degen's games, and those seats won 56%. Connor (10%, 41%), The Prospector (8%, 42%) and The Gambler (7%, 40%) are the Traders who behave like degens, so they now carry the deck and Eugene is its wild card.
+
+- **Eugene**: one copy in Degen (a second Gambler in his place), and The Spectacle adds $25M an Asset, not $50M (`premium` in `PT3`).
+- **Connor**: the wager pays $30M on 5 or higher (it was $20M).
+- **The Prospector**: Assets cost $20M less (it was $10M; `discount` in `PT3`).
+- **The Gambler**: Lucky Streak covers every die her player rolls (`lucky()` in pt3-sim.js): a gamble and a market bet need one less, the Hail Mary has one more winning face, her Pathos blocks on one more, Mardi Gras pays one more point, The Lottery Ticket wins on the top two faces, and a Black Swan she draws moves one face her way.
+- **The Octobot**: income $35M (it was $30M this morning, $40M before). It was the weak opener at 40%.
+- The bots now count The Gambler's and The Prospector's abilities when they weigh one Trader against another, as they already did Eugene's.
+
+16,000 games: Degen 48%, 10.7 rounds, openers from 46% (The Octobot, The Gambler) to 55% (Virgil). Who Degen ends as: The Octobot 34% (wins 44%), Eugene 19% (54%), The Gambler 17% (47%), Connor 16% (50%), The Prospector 15% (48%). This supersedes the incomes table above for The Octobot only.
+
+- Each $5M of income moves that Trader's opening about seven points, so there is no room between steps: The Gambler at $30M opens at 56%, Connor at $30M or with a $40M wager at 57%, The Octobot at $40M at 55%.
+- The end-of-game shares follow the bots' taste (they move to whoever they value most), so read them as a rough guide. The Octobot's 34% is that.
+- Still open: Degen sits a point or two under even, and Virgil opens at 54% to 55%.
+
+## Trade only (2026-11-24)
+
+Traders should earn through trading, not a salary. **A Trader now earns nothing each turn** (`RULES.income` false; `--income` in the sim is the old game, opening with $50M), **players open with $100M** (`start: 10`), and **Ethos is a better price**: each point adds $10M to every Asset sold in good standing (`ETHOS_UNIT`, `ethosBonus()`; a forced sale pays none). An earned halo counts as one more point of Ethos. `TRADER_INCOME` in trinity.js takes the Money coin off the Trader card; the `liq` values stay there as history. This supersedes the income tables in the two sections above; free Traders, cold storage and Lucky Streak stand.
+
+Salary was about 40% of the money in the game, so the abilities that pay each turn became the only steady income and were re-set: **Connor's wager $20M** (at $30M he opened at 60% to 63%), **Saint GR80's Vow $15M a candle** (was $25M), **Eugene's Spectacle $50M an Asset** (was cut to $25M that morning; he opened at 43% without it).
+
+Starting capital, 8,000 games a row in a trial with those settings:
+
+| Opens with | Rounds | Passes a player | Devotion | Openers |
+|---|---:|---:|---:|---|
+| $10M | 18.4 | 4.4 | 40% | 35% to 69% |
+| $50M | 17.0 | 1.0 | 51% | 40% to 55% |
+| $100M (chosen) | 15.9 | 0.7 | 52% | 42% to 55% |
+| $200M | 14.0 | 0.5 | 50% | 44% to 54% |
+| $300M | 12.0 | 0.3 | 49% | 45% to 54% |
+
+At $10M the game stalls (in rounds 1 to 4, 78% of turns begin with under $20M and 31% end in a pass) and belongs to whoever can make money from nothing: Connor 69%, The Prospector 68%. $100M is the least that never stalls (0% and 2%). $100M with the goal at $750M runs 10.9 rounds, the old length.
+
+As built, 12,000 to 16,000 games: 16.2 rounds (10.8 with a salary), Devotion 53% to 54%, going first 50%, 3.2 sales a player, the Ethos bonus about $71M a player a game. Openers: Marisol 56, The Influencer 55, Saint GR80 54, The Prospector 53, Virgil 50, The Gambler 49, Byzantine General 49, Connor 48, Eugene 45, The Octobot 40.
+
+- The built game leans a little more to Devotion than the trial did, because the bots now count the Ethos bonus when they decide to sell, and Devotion holds the high-Ethos Traders. At $5M a point it is the same (Devotion 52.5%), so the lean is not the size of the bonus.
+- **Still open: The Octobot** (40%). Its strength was its income. Letting it pray changes nothing. It needs a trading ability. Eugene (45%) is low with it, and the two are why Degen is behind.
+- Ethos at $5M a point paid about $29M a player a game, too little to matter; $10M is the rule.
+
+## The Octobot: Speed (2026-11-24)
+
+A bot's edge is speed: it sees an opportunity and takes it before a person can. With no salary The Octobot opened at 40%, and a player who stayed as it won 32%. **Speed** replaces Eight Arms (`PT3.bot`; knobs `first`, `draws`, `graceSale`, `fastSell`, `speed` in pt3-sim.js):
+
+- Whoever **opens** the game as The Octobot takes the first turn (`seatOrder()`; becoming it later changes nothing, and two Octobots cancel out).
+- It **draws two cards** each turn.
+- It has **no religious observances** (the old "cannot pray"): no candle lights while it sits, so its Hail Mary odds cannot rise. A Grace in its hand is sold for $30M as a main action.
+
+16,000 games each, counting players who opened as The Octobot and stayed as it (a first trial counted every opener, and read 50% for a version whose players were mostly leaving it):
+
+| Version | Stays and wins | Degen |
+|---|---:|---:|
+| Eight Arms | 32% | 46% |
+| Two main actions, sells the turn it buys | 33% to 36% | 46% |
+| ...and an extra card when the hand is three or fewer | 42% | 48% |
+| Two actions and two cards | 89% | 61% |
+| First turn, two cards, sells Graces (chosen) | 49% | 50% |
+| ...and sells the turn it buys | 52% | 50% |
+
+Two actions were not worth much because it had one card a turn and no salary to spend: it passed on 40% of the second actions. Going first is worth a point or so (the round is always played out), and is there as a sign of what it is. Selling Graces does not move the numbers in Degen, which carries one.
+
+With it, 12,000 games: Devotion 50.2%, 14.7 rounds, openers Marisol 56, The Influencer 54, The Prospector 53, The Octobot 52, Saint GR80 50, The Gambler 50, Connor 48, Virgil 46, Eugene 46, Byzantine General 45.
+
+**Eight Arms, later the same day.** The ability keeps its old name and the eight becomes its signature: The Octobot **opens with eight cards and holds eight** (`opens`, `holds`; everyone else five and seven), with the first turn, two cards a turn and no religious observances as above. The bigger hand is not the engine: a hand limit of eight alone left a player staying as it at 31%, opening with eight as well at 36%, opening with ten at 40%. With two cards a turn: 54% (16,000 games), an opener at 52% to 55%, Devotion 50.3%, 14.6 rounds. The old Eight Arms (an extra Asset bought or sold) stays off behind `arms`.
+
+## The opening prayer (2026-11-24)
+
+Players are scrappy would-be capitalists, and some people simply start ahead. **Nobody starts with money.** Before the first turn each player rolls the die, a prayer for a windfall (`RULES.prayer`, `openingPrayer()`; `--noprayer` opens everyone with `start`). **The higher roll is answered and starts with $200M. The other starts with $100M and two candles lit**, so their Hail Mary begins at 3 in 8: capital for one, grace for the other. A tie is rolled again (12% of games). The rolls are plain: Lucky Streak does not touch them, and The Octobot keeps candles lit before the game. Both are open questions.
+
+How much a head start decides, 12,000 games a row (set by hand, before the rule was built):
+
+| Lucky / unlucky | The lucky player wins |
+|---|---:|
+| $150M / $100M | 57% |
+| $200M / $100M | 63% |
+| $200M / $50M | 69% |
+| $300M / $100M | 74% |
+| $200M / $0 | 84% (the other passes 2.3 turns a game) |
+| $200M / $100M and one candle | 60% |
+| $200M / $100M and two candles (chosen) | 55.5% |
+| $200M / $100M and three candles | 53% |
+
+Every $50M is worth six or seven points, so the bare windfall would settle too much on a roll nobody can answer. As built, 16,000 games: the answered prayer wins 55.3%, 13.1 rounds, Devotion 48%. Openers: The Octobot 57, The Prospector 54, The Influencer 52, Marisol 52, Connor 50, The Gambler 50, Eugene 49, Saint GR80 48, Byzantine General 44, Virgil 44.
+
+- At the table the prayer is a dialog after the deal: both dice, a Roll button, the result, Begin.
+- Still open: The Octobot rose to 57% with more money on the table at the start, and Virgil and the General sit at 44%.
+
+## The fuller turn (2026-11-24)
+
+Set beside Pokémon and One Piece, a turn here held too little: one card drawn, one main action, under one card played a turn. **A turn is now: draw two cards, then do up to three things in any order, one of each kind: buy one Asset, sell one Asset (or uncork one), and take one main action** (any other card, a gift, paying a Calamity off, the Hail Mary). Passing ends the turn (`RULES.slots`, `RULES.draws`, `catOf()`; `--oneaction` is the old turn). An apparition and The Singular80 add free actions of any kind after the three.
+
+8,000 games a row, in a trial before it was built:
+
+| Turn | Actions a turn | Rounds | Cards played a player | Devotion | Openers |
+|---|---:|---:|---:|---:|---|
+| Draw 1, one action (before) | 1.1 | 13.0 | 10.6 | 47% | 40% to 57% |
+| Draw 1; buy, sell, main | 1.45 | 13.1 | 13.9 | 38% | 36% to 78% |
+| Draw 2, one action | 1.2 | 9.6 | 8.1 | 50% | 38% to 59% |
+| Draw 2; buy, sell, main (chosen) | 1.95 | 8.7 | 12.5 | 50% | 46% to 54% |
+| Draw 3; buy, sell, main | 2.3 | 6.7 | 11.3 | 49% | 46% to 54% |
+
+- **Card flow was the constraint.** With one card a turn the three kinds go unused, and only The Octobot (who drew two) could use them: 77%. It is why Speed as two actions failed the same morning.
+- As built, 16,000 games: 8.7 rounds, 1.95 actions a turn, Devotion 50.4%, the answered prayer wins 54%, openers from 47% (The Gambler) to 53%. A player takes about 17 actions a game, against 14 before, in fewer rounds.
+- **The Octobot** no longer draws more than anyone (everyone draws two): its edge is the first turn, eight cards to open and eight held. A player staying as it wins 50%; drawing three, 57%.
+- It balances at $1 billion. With the goal at $1.5 billion the same turn gives Devotion 63% and openers from 34% to 67%.
+- Still low: under one Calamity a player a game. The fuller turn makes the race busier, not more of a contest.
+- At the table: three lines by the End turn button (Buy an Asset, Sell an Asset, Play a card) are struck through as they are used; the turn ends by itself when nothing is left to do.
+
+## The Fates (2026-11-24)
+
+The Events that fire for the whole table are no longer in anyone's deck. They are **The Fates**: one shared deck of 16 (17 in the General shuffle, which adds The Singular80), and **one is turned at the start of each round** (`RULES.fates`, `flipFate()`; `--nofates` puts them back in the decks, firing on the draw). Each Fate is turned *for* one player, alternating by round: that player witnesses an apparition, rolls The Black Swan, is initiated by The Illumin80, and their Enigma Machine may intercept. "Fires on draw, then draw a replacement" is gone, and a player's own deck is all theirs.
+
+Degen carried seven of these Events and Devotion two, so the starter decks changed (both still 40):
+
+- **Devotion**: out, The Black Swan and Tech Rekt. In, Tax Collector and Paper Hands.
+- **Degen**: out, The Whale, The Wheel, Mardi Gras, God Candle, Fire Horse, The Illumin80, Fall From Grace. In, Oil Field Claim, Bull Run, Full Moon, Tax Collector, and a second Bear Market, Rug Pull and Exit Scam.
+
+8,000 games a row, in a trial:
+
+| Version | Rounds | Devotion | Openers | Calamities a player |
+|---|---:|---:|---|---:|
+| Events in the decks (before) | 8.7 | 51% | 47% to 53% | 0.96 |
+| The Fates, decks not refilled | 8.5 | 58% | 38% to 60% | 1.01 |
+| The Fates, one every turn | 7.9 | 61% | 37% to 62% | 0.94 |
+| Degen refilled with seven money cards | 6.8 to 7.2 | 32% to 43% | up to 28% to 71% | 0.60 |
+| Refilled with the mix above (chosen) | 8.7 | 49% | 46% to 54% | 1.09 |
+
+As built: 8.5 rounds, 8.5 Fates a game, Devotion 49.4%, openers 47% to 54% (The Octobot highest), the answered prayer 53%, going first 53% (it was 51% to 52%).
+
+- The refill is a first mix that balanced, not a designed deck.
+- Interaction is unchanged: about one Calamity a player a game. The Fates share the weather; they do not make the players contest each other. Long and short positions on the next Fate are the idea for that, not built.
+- Not built: the next Fate lying face down to be peeked at (Marisol, The Enigma Machine).
+- At the table: the round label reads "Round 3 · The Fates: The Whale", and a Fate's notice is headed "The Fates · turned for you". Card text loses "Fires when drawn".
+
+## Disgraced, not discarded (2026-11-24)
+
+A second strike used to discard the Trader and leave an empty seat. A Trader is who you play as, so now they are **disgraced and stay** (`RULES.disgrace: 'stay'`; `--leave` is the old rule): no ability, no Ethos bonus, no Pathos and a blind draw, until they are back in good standing (a candle, The Confession) or the player becomes another Trader. The seat shows them drained of colour.
+
+12,000 games each: it changes nothing in the balance (8.6 rounds, Devotion 49%, openers 45% to 55% in every version). A Trader is disgraced 0.35 times a game, and a player it happens to wins 55%, because the bots strike whoever is ahead. Also tried: no Trader, no buying or selling until one is seated (the same numbers; the bots reseat within a turn, a person in the General shuffle might wait much longer), and the same with the next Trader dug out of the deck.
+
+## The market (2026-11-24)
+
+A bull run happens to everybody. The four Events a player paid for and collected on at once (Bull Run, Full Moon, Short Squeeze, Token Unlock) are **Fates** now, and they move the price of every Asset for the round they are turned (`market` on the card, `Game.market`, read by `saleBonus()`): **Bull Run, Full Moon and Short Squeeze are bull markets, +$50M a sale; Token Unlock and Flash Crash are bear markets, -$50M** (Flash Crash still takes its quarter of the cash). The God Candle's +$100M is the same thing, larger. The Fates are 20 cards. **The next Fate lies face down, and a Trader with Logos 4 in good standing reads it** (`foresees()`: Marisol, The Octobot).
+
+On the cards that left: free at the net amount (Bull Run collects $80M) played identically to paying $20M for $100M (8.6 rounds, Devotion 49%, the same openers), so the price did nothing; free at the full amount took a round off the game.
+
+Starter decks (both 40): **Devotion** loses Bull Run x2 and Short Squeeze x2 for a second Tech Stock and Cellar, a Savings Bond and a Stablecoin. **Degen** loses Bull Run, Full Moon and Token Unlock for Real Estate, a second Blue Chip and a third Tech Stock. Devotion's are modest on purpose: Ethos 4 is paid on every sale, and with strong Assets in those slots Devotion won 58% to 67%.
+
+As built, 16,000 games: 9.3 rounds, Devotion 48.5%, going first 52.5%, 4.9 sales a player (3.1 before), openers from 44% (The Influencer) to 57% (The Octobot).
+
+- **The bots do not time the market.** In a trial bull rounds were 14% of rounds and saw 15% to 16% of the sales; bear rounds 13% and 12% to 13%. Reading the next Fate moves no opener by more than a point (nobody reads it, Marisol only, Logos 4, Logos 3: all the same). Whether a person uses it is for the table to show.
+- Bear Market is still the Calamity played on one rival; as a Fate it would need that card renamed (a Bear Raid is the trader's word for an attack on one target).
+- Sacred Geometry now adds $25M only to Seed Round, The Inheritance and The Ponzi, the Events still played from the hand. It needs a new job.
+- The Octobot opens at 55% to 57% with or without the reading: its eight cards are worth more in a deck that is mostly Assets.
+- At the table: the Fates band shows the market for the round (green for bull, red for bear) and the next Fate, face down, or its name and picture to a player who can read it.
+
+## Special Offer (2026-11-25)
+
+**The 80/20 Rule left the Fates; Special Offer took its place and its number (85).** The 80/20 Rule paid the richest player
+$80M and everyone else $20M: a leader's card, and its picture never came right. Special Offer is a sale: for the round it is
+turned, every Asset costs $20M less to buy, for everyone, on top of the Prospector's own discount (`sale: 2` on the design;
+`Game.sale`, read in `costOf`, cleared when the next Fate is turned, like `Game.market`). The market Fates move what Assets
+sell for; this is the first that moves what they cost.
+
+12,000 games each, two players, seeds 424200+:
+
+| Fate in slot 85 | rounds | Devotion | Octobot | Prospector | Influencer |
+|---|---|---|---|---|---|
+| The 80/20 Rule | 9.3 | 48.6% | 56 | 55 | 45 |
+| nothing (blank card) | 9.7 | 48.6% | 56 | 55 | 45 |
+| Special Offer, $20M off | 9.6 | 48.5% | 56 | 55 | 44 |
+| Special Offer, $30M off | 9.5 | 48.3% | 57 | 55 | 44 |
+| Special Offer, $50M off | 9.5 | 48.2% | 57 | 55 | 44 |
+
+Balance does not move at any size, and it does not stack into a Prospector problem. The game is about a third of a round
+longer than with The 80/20 Rule, which handed out $100M each time it turned. $20M stands. The bots do not hold a purchase
+back for a sale; a person can.
+
+**Half off (later the same day).** The sale became half price (`saleRate: 0.5`; the Prospector's $20M comes off first, then
+the half, so a $60M Blue Chip costs him $20M). 12,000 games: 9.6 rounds, Devotion 48.4%, Octobot 56, Prospector 54,
+Influencer 44: the same as $20M off. A flat $20M made the two cheapest Assets free and barely dented a Blue Chip; half off
+saves $10M to $30M, most on the dearest, so the sale is the round to buy big. `sale` (a flat amount) still works.

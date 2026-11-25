@@ -79,7 +79,15 @@ import liquidityTrap from "./liquidity-trap.js";
 import blackSwan from "./black-swan.js";
 import feast from "./feast.js";
 import wheelOfFortune from "./wheel-of-fortune.js";
+import theOffering from "./the-offering.js";
+import theVotive from "./the-votive.js";
+import theVisitor from "./the-visitor.js";
+import specialOffer from "./special-offer.js";
+import pawnShop from "./pawn-shop.js";
+import dashboardFigurine from "./dashboard-figurine.js";
+import sacredHeart from "./sacred-heart.js";
 import theSingular80 from "./the-singular80.js";
+import theCatacombs from "./the-catacombs.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -159,5 +167,13 @@ export const RCANA_ART = {
   "black-swan": blackSwan,
   "feast": feast,
   "wheel-of-fortune": wheelOfFortune,
+  "the-offering": theOffering,
+  "the-votive": theVotive,
+  "the-visitor": theVisitor,
+  "special-offer": specialOffer,
+  "pawn-shop": pawnShop,
+  "dashboard-figurine": dashboardFigurine,
+  "sacred-heart": sacredHeart,
   "the-singular80": theSingular80,
+  "the-catacombs": theCatacombs,
 };

@@ -28,7 +28,7 @@
 // scripts/rcana-render-faces.mjs can screenshot it unchanged.
 import React, { useEffect, useId, useRef, useState } from "react";
 import { designByKey } from "@/game/rcana/set/designs.js";
-import { TRINITY, TRINITY_TEXT, MONEY_UNIT, ATTRS, ETHOS_UNIT } from "@/game/rcana/set/trinity.js";
+import { TRINITY, TRINITY_TEXT, MONEY_UNIT, ATTRS, ETHOS_UNIT, TRADER_INCOME, MARKET } from "@/game/rcana/set/trinity.js";
 import { oneMoney } from "@/game/rcana/set/oneMoney.js";
 import { APPARITIONS } from "@/game/rcana/set/apparitions.js";
 import { RCANA_SET } from "@/game/rcana/cardFace";
@@ -54,7 +54,7 @@ export const rcana3MetalFor = (data, chosen, fallback = "flat") =>
 // rules): Logos is insight, Ethos is character, Pathos is nerve.
 export const attrTip = (k, n) => ({
   logos: ["Insight", n > 1 ? `When you draw for your turn, look at ${n} cards and keep one.` : "You draw the top card of the deck, unseen."],
-  ethos: ["Character", `In good standing, you make $${n * ETHOS_UNIT}M more each turn.`],
+  ethos: ["Character", TRADER_INCOME ? `In good standing, you make $${n * ETHOS_UNIT}M more each turn.` : `In good standing, each Asset you sell pays $${n * ETHOS_UNIT}M more.`],
   pathos: ["Nerve", `A Calamity played on you fails on a d8 roll of ${n} or lower.`],
 }[k]);
 // Hover, focus or tap a corner: its circle inverts (gold with an ink numeral) and `tipBox`, a rectangle in
@@ -132,25 +132,31 @@ export function rcana3Model(data) {
   const design = designByKey[key] || {};
   const cls = data.cardClass || "Artifact";
   const trinity = cls === "Trader" ? TRINITY[key] : null;
-  const firesOnDraw = design.type === "event" && !design.played;
+  // A FATE (2026-11-24): an Event that happens to the whole table. It is turned from the shared deck, never played from a hand,
+  // so it has no price and no payout plate, and its tab reads FATE. The market cards (MARKET) are Fates too.
+  const firesOnDraw = (design.type === "event" && !design.played) || MARKET[key] != null;
   const model = {
     id: data.id,
     cls,
     color: cls === "Trader" ? CLASS_COLOR.Trader : data.keywordColor || CLASS_COLOR[cls] || CLASS_COLOR.Artifact,
     name: data.name || "",
     typeLabel: cls === "Trader" || cls === "Asset" ? cls : data.subClass || cls,
-    tab: cls === "Trader" ? data.abilityName || "Trader" : data.keyword || data.subClass || cls,
+    tab: cls === "Trader" ? data.abilityName || "Trader" : firesOnDraw ? "Fate" : data.keyword || data.subClass || cls,
     text: TRINITY_TEXT[key] || oneMoney(data.ability, cls),
     flavor: data.flavor ? (data.flavorQuoted ? `“${data.flavor}”` : data.flavor) : null,
     collector: data.collector ? `${data.collector.number} / ${data.collector.of}` : null,
     apparition: !!design.apparition, // one of the cards with Our Lady's image: an eight-pointed star by the type line
+    // The keyword badge at the head of the text box. An apparition wears Radi8; a card with Saving Face (it may be given up
+    // from the hand to keep a Trader from disgrace) wears that. No card has both.
+    keyword: design.apparition ? { ...APPARITION_KEYWORD, star: true } : design.savingGrace ? SAVING_FACE_KEYWORD : null,
     topLeft: null, plate: null, corner: null, attrs: null,
   };
   if (trinity) {
     // MONEY in the coin, like every other card's price: what the Trader costs to play and makes each turn.
     // Their character is the trinity triangle in the text box (ATTRS in trinity.js), not badges in the corners.
     const liqM = trinity.liq * MONEY_UNIT;
-    model.topLeft = { shape: "coin", value: liqM, label: `Money: costs $${liqM}M to play, makes $${liqM}M a turn` };
+    // Trade only (2026-11-24): a Trader is free and earns no salary, so there is no coin on a Trader card.
+    if (TRADER_INCOME) model.topLeft = { shape: "coin", value: liqM, label: `Money: makes $${liqM}M a turn` };
     model.attrs = ATTRS[key] || null;
   } else {
     const cost = Number(data.cost) || 0;
@@ -158,7 +164,7 @@ export function rcana3Model(data) {
     if (!firesOnDraw && cost > 0) model.topLeft = { shape: "coin", value: cost * MONEY_UNIT, label: `Price: $${cost * MONEY_UNIT}M to play` };
     // A card with a choice of now or later (The Inheritance: cash at once, or more in trust) shows the SURE amount, the one paid at once.
     const sure = design.type === "event" && design.choice && design.trust ? design.cash * MONEY_UNIT : null;
-    const value = sure ?? (cls === "Asset" ? (design.perp ? design.pros * 2 : design.pros) : design.type === "event" && design.played ? design.pros : null);
+    const value = sure ?? (cls === "Asset" ? (design.perp ? design.pros * 2 : design.pros) : design.type === "event" && design.played && !firesOnDraw ? design.pros : null);
     if (value) model.plate = { value, halo: false, label: sure ? `Pays $${value}M at once, or more in trust` : cls === "Asset" ? `Sells for $${value}M` : `Pays $${value}M` };
     if (!model.text && value) model.text = cls === "Asset" ? `Sell it for $${value}M.` : `Collect $${value}M.`;
     if (design.income) model.corner = { shape: "drop", value: design.income * MONEY_UNIT, label: `Pays $${design.income * MONEY_UNIT}M each turn while held` };
@@ -319,6 +325,7 @@ function wheelClicks(times) {
 }
 
 export const APPARITION_KEYWORD = { name: "Radi8", gift: "One more action, and a Miracle" };
+export const SAVING_FACE_KEYWORD = { name: "Saving Face", gift: "Discard it to stop a disgrace" };
 // FULL ART (data.fullArt, from the card's art file): the picture fills the frame from top to bottom. There
 // is no text box: the rules, the flavor line and the name are set straight on the art, in white (the name in
 // gold) with a dark outline, over a shade that deepens toward the foot of the card so they always read.
@@ -452,6 +459,86 @@ const DEVICE_TILT = false;
 const clamp1 = (v) => Math.max(-1, Math.min(1, v));
 const MIRROR_TEXT = "repeating-linear-gradient(115deg, #b97a00 0%, #ffd84a 14%, #fff6c4 22%, #ffd84a 30%, #b97a00 46%, #ffe58a 60%, #b97a00 76%)";
 
+// THE TELEVISION (layer.screen): an advertisement, drawn live on a layer that is only a set's screen glass. The layer's own
+// shape is the mask, so the picture keeps to the curved tube. `box` is the glass in % of the layer; `ad` is the copy:
+// { kicker, kicker2, price, sub, burst, phone, name, lines: [..], fine }. The picture is laid out at 400 x 300 and scaled
+// to the box. On the live card it runs a 15 second spot (the offer; "but wait"; the order screen; a blink of snow) under
+// tape grain, scan lines, a tracking bar and a colour fringe. On a still it shows the offer, and nothing moves.
+// After "But Wait!" by Gymnase (CodePen): the phases and the VHS overlays are that pen's idea; the code and copy are ours.
+const AD_NOISE = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
+const AD_BURST = "polygon(50% 0%, 58% 15%, 72% 5%, 72% 22%, 89% 19%, 82% 34%, 99% 39%, 86% 50%, 99% 61%, 82% 66%, 89% 81%, 72% 78%, 72% 95%, 58% 85%, 50% 100%, 42% 85%, 28% 95%, 28% 78%, 11% 81%, 18% 66%, 1% 61%, 14% 50%, 1% 39%, 18% 34%, 11% 19%, 28% 22%, 28% 5%, 42% 15%)";
+function AdScreen({ spec, src, live, uid, w, h }) {
+  const ad = spec.ad || {}, box = spec.box || { x: 0, y: 0, w: 100, h: 100 }, T = spec.period || 15;
+  const ink = "#f3e39a", shade = "#0b0820", fill = { position: "absolute", inset: 0 };
+  const on = (name, shown) => ({ opacity: shown ? 1 : 0, ...(live ? { animation: `${name} ${T}s steps(1, end) infinite` } : null) });
+  const txt = { position: "absolute", margin: 0, width: "100%", textAlign: "center", textTransform: "uppercase", textShadow: `.06em .07em 0 ${shade}`, whiteSpace: "nowrap" };
+  return (
+    <div aria-hidden="true" style={{ ...fill, WebkitMaskImage: `url(${src})`, maskImage: `url(${src})`, WebkitMaskSize: "100% 100%", maskSize: "100% 100%" }}>
+      <style>{`@keyframes rc3-ad-a { 0% { opacity: 1; } 58% { opacity: 0; } }
+        @keyframes rc3-ad-k1 { 0% { opacity: 1; } 33% { opacity: 0; } }
+        @keyframes rc3-ad-k2 { 0% { opacity: 0; } 33% { opacity: 1; } 58% { opacity: 0; } }
+        @keyframes rc3-ad-burst { 0% { opacity: 0; } 25% { opacity: 1; } 33% { opacity: 0; } }
+        @keyframes rc3-ad-b { 0% { opacity: 0; } 58% { opacity: 1; } 94% { opacity: 0; } }
+        @keyframes rc3-ad-snow { 0% { opacity: 0; } 94% { opacity: 1; } }
+        @keyframes rc3-ad-throb { from { scale: .94; } to { scale: 1.08; } }
+        @keyframes rc3-ad-grain { to { background-position: 560px 360px; } }
+        @keyframes rc3-ad-track { 0%, 84% { translate: 0 304px; opacity: 0; } 85%, 97% { opacity: .9; } 100% { translate: 0 -16px; opacity: 0; } }
+        @keyframes rc3-ad-jitter { 12% { translate: 0 1px; } 13%, 30% { translate: 0 0; } 31% { translate: .6px 0; } 33%, 71% { translate: 0 0; } 72% { translate: -.5px .3px; } 73% { translate: 0 0; } }
+        @keyframes rc3-ad-glow { 0%, 100% { opacity: .55; } 8% { opacity: .9; } 21% { opacity: .5; } 37% { opacity: .85; } 52% { opacity: .6; } 68% { opacity: 1; } 81% { opacity: .5; } }`}</style>
+      <svg width="0" height="0" style={{ position: "absolute" }}>
+        <filter id={`${uid}tape`} x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
+          <feGaussianBlur stdDeviation=".7 .12" result="soft" />
+          <feColorMatrix in="soft" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" /><feGaussianBlur stdDeviation="1.4 0" /><feOffset dx="1.4" result="red" />
+          <feColorMatrix in="soft" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" /><feGaussianBlur stdDeviation="1.1 0" /><feOffset dx="-.8" result="blue" />
+          <feColorMatrix in="soft" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="green" />
+          <feBlend in="red" in2="green" mode="screen" /><feBlend in2="blue" mode="screen" />
+        </filter>
+      </svg>
+      <div style={{ position: "absolute", left: `${box.x}%`, top: `${box.y}%`, width: `${box.w}%`, height: `${box.h}%`, overflow: "hidden", background: "#01035e" }}>
+        <div style={{ position: "absolute", left: 0, top: 0, width: 400, height: 300, transformOrigin: "0 0", transform: `scale(${((box.w / 100) * w / 400).toFixed(4)}, ${((box.h / 100) * h / 300).toFixed(4)})`, overflow: "hidden",
+          fontFamily: '"Anton", "Arial Narrow", Arial, sans-serif', color: ink, letterSpacing: ".02em" }}>
+          <div style={{ ...fill, filter: `url(#${uid}tape) saturate(1.4) contrast(.92) brightness(1.06)`, ...(live ? { animation: "rc3-ad-jitter 3.3s steps(1) infinite" } : null) }}>
+            {/* The offer. */}
+            <div style={{ ...fill, background: "radial-gradient(ellipse 70% 62% at 50% 42%, #3243f4, #1020d8 42%, #040ba8 72%, #01035e)", ...on("rc3-ad-a", true) }}>
+              <p style={{ ...txt, top: 20, fontSize: 21, ...on("rc3-ad-k1", true) }}>{ad.kicker}</p>
+              <p style={{ ...txt, top: 20, fontSize: 21, ...on("rc3-ad-k2", false) }}>{ad.kicker2}</p>
+              <p style={{ ...txt, top: 62, fontSize: 104, lineHeight: 1, letterSpacing: 0 }}>{ad.price}</p>
+              <p style={{ ...txt, top: 186, fontSize: 30 }}>{ad.sub}</p>
+              <p style={{ ...txt, bottom: 16, padding: "5px 0 6px", fontSize: 17, fontFamily: '"Bebas Neue", "Anton", sans-serif', letterSpacing: ".06em", background: "linear-gradient(90deg, transparent, rgba(0,0,0,.55) 18% 82%, transparent)" }}>Call now <b style={{ fontSize: "1.45em", marginLeft: ".3em" }}>{ad.phone}</b></p>
+              <div style={{ position: "absolute", top: 34, left: 262, width: 126, height: 126, rotate: "-12deg", ...on("rc3-ad-burst", false) }}>
+                <div style={{ ...fill, display: "grid", placeItems: "center", ...(live ? { animation: "rc3-ad-throb .5s ease-in-out infinite alternate" } : null) }}>
+                  <div style={{ ...fill, background: "radial-gradient(#ff3b22, #d8150f 70%)", clipPath: AD_BURST }} />
+                  <p style={{ position: "relative", margin: 0, fontSize: 30, lineHeight: .95, textAlign: "center", textTransform: "uppercase", fontStyle: "italic", textShadow: `.06em .07em 0 ${shade}` }}>{(ad.burst || "But wait!").split(" ").map((wd, i) => <React.Fragment key={i}>{i ? <br /> : null}{wd}</React.Fragment>)}</p>
+                </div>
+              </div>
+            </div>
+            {/* The order screen. */}
+            <div style={{ ...fill, background: "linear-gradient(#0b16dc, #0610d6 60%, #0208c4)", ...on("rc3-ad-b", false) }}>
+              <p style={{ ...txt, top: 18, fontSize: 30 }}>{ad.name}</p>
+              {(ad.lines || []).map((ln, i) => <p key={i} style={{ ...txt, top: 62 + i * 26, fontSize: 19, fontFamily: '"Bebas Neue", "Anton", sans-serif', letterSpacing: ".07em" }}>{ln}</p>)}
+              <p style={{ ...txt, top: 142, fontSize: 60, lineHeight: 1, letterSpacing: 0 }}>{ad.phone}</p>
+              <p style={{ ...txt, top: 216, fontSize: 20, fontFamily: '"Bebas Neue", "Anton", sans-serif', letterSpacing: ".07em" }}>Not available in stores</p>
+              <p style={{ ...txt, top: 242, fontSize: 10, lineHeight: 1.35, whiteSpace: "normal", padding: "0 52px", boxSizing: "border-box", fontFamily: "Arial, sans-serif", fontWeight: 700, letterSpacing: 0 }}>{ad.fine}</p>
+            </div>
+          </div>
+          {/* Between spots: snow. */}
+          <div style={{ ...fill, background: "#6f737c", filter: "contrast(5) brightness(.85)", ...on("rc3-ad-snow", false) }}>
+            <div style={{ ...fill, background: `${AD_NOISE} 0 0 / 96px`, ...(live ? { animation: "rc3-ad-grain .2s steps(4) infinite" } : null) }} />
+          </div>
+          {/* Tape: grain, a tracking bar that climbs the picture now and then, the head-switch noise along the bottom. */}
+          {live && <div style={{ ...fill, background: `${AD_NOISE} 0 0 / 220px`, opacity: .24, mixBlendMode: "hard-light", animation: "rc3-ad-grain .48s steps(6) infinite" }} />}
+          {live && <div style={{ ...fill, bottom: "auto", height: 12, background: `linear-gradient(transparent, rgba(255,255,255,.55) 35%, rgba(255,40,210,.45) 55%, transparent), ${AD_NOISE} 0 0 / 56px`, mixBlendMode: "screen", opacity: 0, animation: "rc3-ad-track 8.4s linear infinite" }} />}
+          {live && <div style={{ ...fill, top: "auto", height: 6, background: `linear-gradient(transparent, rgba(255,255,255,.2) 40%, rgba(0,0,0,.5)), ${AD_NOISE} 0 0 / 48px`, mixBlendMode: "screen" }} />}
+          {/* The tube: scan lines, a soft reflection, and the dark of the corners. */}
+          <div style={{ ...fill, background: "repeating-linear-gradient(rgba(0,0,0,.24) 0 1.2px, transparent 1.2px 2.6px)" }} />
+          <div style={{ ...fill, background: "radial-gradient(ellipse 50% 32% at 30% 16%, rgba(255,255,255,.1), transparent), radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,.7))" }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 // `interactive` lets the card lean under the pointer (or a finger). The lean is
 // written straight to CSS variables on the stage, never through React state, so
 // following the pointer costs no re-render. Every metal tilts; the "mirror"
@@ -577,6 +664,57 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
     raf = requestAnimationFrame(step);
     return () => { cancelAnimationFrame(raf); el.style.removeProperty("--bob"); };
   }, [bobbles]);
+  // THE VISIT'S PIXELS (layer.visit.pixels: { min, max, rest }): her block size follows the tilt in whole steps, from min
+  // (tipped fully forward: sharp) through rest to max (tipped fully back). One filter, re-cut here whenever the step
+  // changes; the tilt is eased first so the steps are walked through, never jumped.
+  const visits = interactive ? (data?.artLayers || []).filter((l) => l.visit && l.visit.pixels) : [];
+  const visitKey = visits.map((l) => l.id).join(",");
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!visitKey || !el) return;
+    let ty = 0, raf = 0; const shown = {};
+    const step = () => {
+      const want = parseFloat(el.style.getPropertyValue("--ty")) || 0;
+      ty += (want - ty) * 0.12;
+      for (const l of visits) {
+        const q = l.visit.pixels, min = q.min ?? 1, max = q.max ?? 20, rest = q.rest ?? 4, reach = q.reach ?? 0.5;
+        const size = Math.round(ty < 0 ? rest + (max - rest) * Math.min(1, -ty / (q.back ?? 0.8)) : rest + (min - rest) * Math.min(1, ty / reach));
+        if (shown[l.id] === size) continue;
+        shown[l.id] = size;
+        const f = el.querySelector(`[data-visit-pix="${l.id}"]`), img = el.querySelector(`[data-visit-img="${l.id}"]`);
+        if (!f || !img) { shown[l.id] = null; continue; }
+        const [flood, tile, , , grow] = f.children;
+        flood.setAttribute("x", size / 2 - 0.5); flood.setAttribute("y", size / 2 - 0.5);
+        tile.setAttribute("width", size); tile.setAttribute("height", size); grow.setAttribute("radius", size / 2);
+        img.style.filter = size <= 1 ? "none" : `url(#${f.id})`; // one-pixel blocks are the picture itself
+      }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [visitKey]);
+  // FACETS (layer.facets): light that rolls round a layer, after the first frame's flame on Connor's card. Each facet is a
+  // patch of the layer that faces its own way (its place round the layer's middle). A light circles slowly on its own, and the
+  // tilt pushes it; a facet flares as the light comes round to face it and dies as it passes, so the glow travels from
+  // tongue to tongue instead of the whole layer brightening at once.
+  const faceted = interactive ? (data?.artLayers || []).filter((l) => l.facets) : [];
+  const facetKey = faceted.map((l) => l.id).join(",");
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!facetKey || !el) return;
+    const calm = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let raf = 0, tx = 0, ty = 0; const t0 = performance.now();
+    const step = (now) => {
+      tx += ((parseFloat(el.style.getPropertyValue("--tx")) || 0) - tx) * 0.15; ty += ((parseFloat(el.style.getPropertyValue("--ty")) || 0) - ty) * 0.15;
+      for (const l of faceted) { const F = l.facets, turn = calm ? 0 : ((now - t0) / 1000 / (F.period || 4.5)) * Math.PI * 2, idle = F.idle ?? 0.62;
+        const lx = Math.cos(turn) * idle + tx * (F.tilt ?? 1), ly = Math.sin(turn) * idle + ty * (F.tilt ?? 1);
+        el.querySelectorAll(`[data-facet="${l.id}"]`).forEach((n) => { const d = (lx * +n.dataset.ax + ly * +n.dataset.ay - (F.peak ?? 0.62)) / (F.rough ?? 0.3);
+          n.style.opacity = ((F.rest ?? 0.06) + Math.exp(-0.5 * d * d) * (F.strength ?? 1)).toFixed(3); }); }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [facetKey]);
   // A finger on the live card turns the card; it must not scroll the page under it. touch-action: none on
   // the stage says so, but WebKit loses that inside the flip card's 3D-transformed faces, so the touch
   // moves are also refused outright (a non-passive listener; React's own touch handlers are passive).
@@ -697,6 +835,22 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
         @keyframes rc3-flare { 0%, 100% { opacity: .08; } 9% { opacity: .95; } 15% { opacity: .3; } 21% { opacity: .8; } 34% { opacity: .1; } 55% { opacity: .15; } 63% { opacity: 1; } 70% { opacity: .2; } 86% { opacity: .55; } }
         @keyframes rc3-ripple { 0% { scale: .12; opacity: 0; } 10% { opacity: .75; } 60% { opacity: .3; } 100% { scale: 1.55; opacity: 0; } }
         @keyframes rc3-sway { 0%, 100% { scale: 1 1; translate: 0 0; } 30% { scale: 1.004 1.012; translate: .25% 0; } 65% { scale: 1 1.02; translate: -.3% 0; } }
+        @keyframes rc3-glitch { 0%, 100% { translate: 0 0; opacity: var(--go); filter: var(--gp); clip-path: none; } 11% { translate: calc(var(--gs) * -1) 0; opacity: calc(var(--go) * .6); filter: var(--gp) brightness(1.5) saturate(.4); clip-path: none; } 12.5% { translate: var(--gs) 0; opacity: var(--go); filter: var(--gp) hue-rotate(40deg); clip-path: inset(calc(var(--gt) + var(--gh) * 0.22) 0 calc(100% - var(--gt) - var(--gh) * 0.71) 0); } 14% { translate: 0 0; opacity: var(--go); filter: var(--gp); clip-path: none; } 47% { translate: 0 0; opacity: calc(var(--go) * .35); filter: var(--gp) brightness(1.8) blur(1px); clip-path: none; } 48.5% { translate: calc(var(--gs) * .6) 0; opacity: calc(var(--go) * .8); filter: var(--gp); clip-path: inset(calc(var(--gt) + var(--gh) * 0) 0 calc(100% - var(--gt) - var(--gh) * 0.58) 0); } 50% { translate: 0 0; opacity: var(--go); filter: var(--gp); clip-path: none; } 78% { translate: calc(var(--gs) * -.5) 0; opacity: calc(var(--go) * .7); filter: var(--gp) saturate(.3) brightness(1.3); clip-path: none; } 79.5% { translate: 0 0; opacity: var(--go); filter: var(--gp); clip-path: none; } }
+        @keyframes rc3-glitch-ghost { 0%, 100% { opacity: 0; translate: 0 0; clip-path: none; } 11% { opacity: .85; translate: calc(var(--gs) * 2) 0; clip-path: inset(calc(var(--gt) + var(--gh) * 0.08) 0 calc(100% - var(--gt) - var(--gh) * 0.3) 0); } 12.5% { opacity: .7; translate: calc(var(--gs) * -2.4) 0; clip-path: inset(calc(var(--gt) + var(--gh) * 0.55) 0 calc(100% - var(--gt) - var(--gh) * 0.8) 0); } 14% { opacity: 0; translate: 0 0; clip-path: none; } 47% { opacity: .8; translate: calc(var(--gs) * -1.6) 0; clip-path: inset(calc(var(--gt) + var(--gh) * 0.34) 0 calc(100% - var(--gt) - var(--gh) * 0.5) 0); } 48.5% { opacity: .75; translate: calc(var(--gs) * 3) 0; clip-path: inset(calc(var(--gt) + var(--gh) * 0.7) 0 calc(100% - var(--gt) - var(--gh) * 0.96) 0); } 50% { opacity: 0; translate: 0 0; clip-path: none; } 78% { opacity: .6; translate: calc(var(--gs) * 1.2) 0; clip-path: inset(calc(var(--gt) + var(--gh) * 0.02) 0 calc(100% - var(--gt) - var(--gh) * 0.2) 0); } 79.5% { opacity: 0; translate: 0 0; clip-path: none; } }
+        @keyframes rc3-scan { from { background-position: 0 0; } to { background-position: 0 12px; } }
+        @keyframes rc3-mote { 0% { translate: 0 0; opacity: 0; } 18% { opacity: 1; } 80% { opacity: 1; } 100% { translate: var(--mdx, 0px) calc(var(--mdy, 100px) * -1); opacity: 0; } }
+        @keyframes rc3-lamp { 0%, 100% { opacity: .12; scale: .8; } 12% { opacity: 1; scale: 1.25; } 34% { opacity: .12; scale: .8; } }
+        @keyframes rc3-breathe { 0%, 100% { opacity: var(--b0, .78); } 50% { opacity: 1; } }
+        @keyframes rc3-rings { from { background-position: 0 0; } to { background-position: 0 var(--rp, -48px); } }
+        @keyframes rc3-tear-on { 0%, 44%, 54%, 100% { opacity: 0; } 45%, 53% { opacity: 1; } }
+        @keyframes rc3-tear-off { 0%, 44%, 54%, 100% { opacity: 1; } 45%, 53% { opacity: .12; } }
+        @keyframes rc3-neon-buzz { 0%, 100% { opacity: 1; } 7% { opacity: .93; } 9% { opacity: 1; } 31% { opacity: .96; } 33% { opacity: 1; } 58% { opacity: .9; } 59% { opacity: 1; } 84% { opacity: .95; } }
+        @keyframes rc3-neon-drop { 0%, 100% { opacity: 0; } 61% { opacity: 1; } 62.5% { opacity: 0; } 63.5% { opacity: 1; } 64% { opacity: .15; } 65% { opacity: 1; } 78% { opacity: 0; } 79% { opacity: 1; } 80% { opacity: 0; } }
+        @keyframes rc3-neon-sway { from { rotate: calc(var(--sw, .8deg) * -1); } to { rotate: var(--sw, .8deg); } }
+        @keyframes rc3-beat { 0%, 100% { filter: brightness(1) saturate(1); } 6% { filter: brightness(1.22) saturate(1.15); } 14% { filter: brightness(1.02) saturate(1); } 22% { filter: brightness(1.14) saturate(1.1); } 36% { filter: brightness(1) saturate(1); } }
+        @keyframes rc3-roll { from { background-position: 0 0; } to { background-position: var(--nx, 0px) var(--ny, -160px); } }
+        @keyframes rc3-ember { 0%, 100% { opacity: .62; scale: 1; } 9% { opacity: .9; scale: 1.04; } 17% { opacity: .55; scale: .97; } 31% { opacity: .82; scale: 1.02; } 44% { opacity: .6; scale: .98; } 58% { opacity: 1; scale: 1.06; } 66% { opacity: .7; scale: 1; } 83% { opacity: .88; scale: 1.03; } }
+        @keyframes rc3-mist { from { background-position: 0 0; } to { background-position: var(--nx, 300px) 0; } }
         @keyframes rc3-flash { 0% { background-size: 0% 0%; opacity: 0; } 10% { opacity: 1; } 55% { opacity: .85; } 100% { background-size: 280% 280%; opacity: 0; } }`}</style>
       <div
         className="rc-card rc3-card"
@@ -719,6 +873,9 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
               return (
                 <React.Fragment key={layer.id}>
                   {light?.glow}
+                  {layer.blend === "negation" && (
+                    <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", WebkitBackdropFilter: "invert(1)", backdropFilter: "invert(1)" }} />
+                  )}
                   <img src={layer.src} alt="" draggable={false} decoding="async" data-spin={layer.spin && interactive ? "" : undefined} data-tick={layer.tick && interactive ? "" : undefined}
                 style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", transform: `translate(calc(${layer.offset?.x || 0}% - var(--tx, 0) * ${parallax(layer)}%), calc(${layer.offset?.y || 0}% - var(--ty, 0) * ${parallax(layer)}%)) scale(${layer.scale ?? 1})`, transition: interactive ? "transform var(--ease, 500ms) ease-out" : undefined, filter: layer.filter || undefined,
                   // A flame that flickers (layer.flicker: where its base is, in % of the layer): it stretches, leans and
@@ -741,7 +898,34 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
                   // Several flames on one layer (layer.flames): the layer itself is not shown on the live card; each flame is
                   // drawn from it below, in its own small window, so each can flicker about its own wick.
                   ...(layer.flames && interactive ? { visibility: "hidden" } : null),
-                  ...(layer.bobble && interactive ? { transformOrigin: `${layer.bobble.x}% ${layer.bobble.y}%`, rotate: "var(--bob, 0deg)" } : null),
+                  ...(layer.bobble && interactive ? { transformOrigin: `${layer.bobble.x}% ${layer.bobble.y}%`, rotate: layer.bobble.gain != null ? `calc(var(--bob, 0deg) * ${layer.bobble.gain})` : "var(--bob, 0deg)" } : null), // gain: a stiffer or looser spring than the one shared swing
+                  // A glitch (layer.glitch: { top, height } the figure's band in % of the layer; optional period in seconds,
+                  // fade its steady opacity, shift the jump in % of the card): a bad signal. The layer holds a little faint, then
+                  // jumps sideways, drops to a band of itself and blows out, in short bursts. Ghost copies and scan lines are below.
+                  // Pixelate (layer.pixelate: the block size in px of the card): the layer is redrawn in square blocks. On the live card
+                  // only; the filter itself is drawn below. With a glitch, the glitch carries it (--gp), since both animate `filter`.
+                  ...(layer.pixelate && interactive ? { "--gp": `url(#${uid}pix${layer.id})`, filter: `url(#${uid}pix${layer.id})` } : { "--gp": "opacity(1)" }),
+                  // A blend (layer.blend: any CSS mix-blend-mode, or "negation"): how the layer mixes with what is under it.
+                  // Negation is 1 - |1 - a - b|; CSS has no such mode, so it is built in three steps: a pane that inverts everything
+                  // under the layer, the layer laid on by difference (here), and a second pane that inverts the result. Where the
+                  // layer is clear the two inversions cancel, so a soft edge stays soft.
+                  ...(layer.blend ? { mixBlendMode: layer.blend === "negation" ? "difference" : layer.blend } : null),
+                  ...(layer.glitch && interactive ? { "--gt": `${layer.glitch.top ?? 0}%`, "--gh": `${layer.glitch.height ?? 100}%`, "--go": layer.glitch.fade ?? 0.88, "--gs": `${layer.glitch.shift ?? 1.4}%`,
+                    opacity: layer.glitch.fade ?? 0.88, animation: `rc3-glitch ${layer.glitch.period || 4.6}s steps(1, end) infinite` } : null),
+                  // A tractor beam (layer.tractor: { x, y } its source in % of the layer): the beam answers the tilt. Tipped back it
+                  // pinches toward a thin column and loses its colour; tipped forward it opens and brightens. The cold copy and the
+                  // rings are drawn below.
+                  ...(layer.tractor && interactive ? { transformOrigin: `${layer.tractor.x ?? 50}% ${layer.tractor.y ?? 0}%`, transition: "transform var(--ease, 500ms) ease-out, scale 600ms ease-out, filter 600ms ease-out",
+                    scale: `calc(1 + min(var(--ty, 0), 0) * ${layer.tractor.pinch ?? 0.55} + max(var(--ty, 0), 0) * ${layer.tractor.widen ?? 0.14}) 1`,
+                    filter: `saturate(calc(1 + min(var(--ty, 0), 0) * 0.85)) brightness(calc(1 + max(var(--ty, 0), 0) * ${layer.tractor.flood ?? 0.3}))` } : null),
+                  // A neon sign (layer.neon): on the live card the layer itself is not shown; the lit sign is drawn below.
+                  ...(layer.neon && interactive ? { visibility: "hidden" } : null),
+                  // A visit (layer.visit): on the live card the layer itself is not shown; she is drawn below, rising or descending with the tilt.
+                  ...(layer.visit && interactive ? { visibility: "hidden" } : null),
+                  // Breathing (layer.breathe: true, or { low, period }): the layer's light swells and sinks, slowly.
+                  ...(layer.breathe && interactive ? { "--b0": layer.breathe.low ?? 0.78, animation: `rc3-breathe ${layer.breathe.period || 4.2}s ease-in-out infinite` } : null),
+                  // A heartbeat (layer.beat: true, or { period } seconds): the layer's light thumps twice and rests. Nothing moves.
+                  ...(layer.beat && interactive ? { animation: `rc3-beat ${layer.beat.period || 1.6}s ease-in-out infinite` } : null),
                   ...(layer.blaze && interactive ? { transformOrigin: `${layer.blaze.x}% ${layer.blaze.y}%`, animation: `rc3-blaze ${layer.blaze.period || 1.5}s ease-in-out infinite` } : null),
                   ...(layer.crackle && interactive ? { animation: `rc3-crackle ${layer.crackle === true ? 2.6 : layer.crackle}s linear infinite` } : null) }} />
                   {/* A flare (layer.flare): the layer's own highlights flash, and nothing moves. Two hot, high-contrast
@@ -793,6 +977,212 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
                           opacity: 0, animation: `rc3-ripple ${period}s cubic-bezier(.2,.6,.4,1) ${(-(k * period) / 4).toFixed(2)}s infinite` }} />; })}
                     </div>
                   )}
+                  {layer.pixelate && interactive && (
+                    <svg aria-hidden="true" width="0" height="0" style={{ position: "absolute" }}>
+                      <filter id={`${uid}pix${layer.id}`} x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
+                        <feFlood x={layer.pixelate / 2 - 0.5} y={layer.pixelate / 2 - 0.5} width="1" height="1" />
+                        <feComposite width={layer.pixelate} height={layer.pixelate} />
+                        <feTile result="grid" />
+                        <feComposite in="SourceGraphic" in2="grid" operator="in" />
+                        <feMorphology operator="dilate" radius={layer.pixelate / 2} />
+                      </filter>
+                    </svg>
+                  )}
+                  {layer.blend === "negation" && (
+                    <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", WebkitBackdropFilter: "invert(1)", backdropFilter: "invert(1)" }} />
+                  )}
+                  {/* layer.glitch, the rest of it: two tinted copies of the layer that show only in the bursts, each a thin band thrown
+                      sideways (the colours of a signal coming apart), and scan lines that crawl down the figure, cut to its own shape. */}
+                  {layer.glitch && interactive && !layer.visit && (() => { const g = layer.glitch, period = g.period || 4.6;
+                    const vars = { "--gt": `${g.top ?? 0}%`, "--gh": `${g.height ?? 100}%`, "--gs": `${g.shift ?? 1.4}%` };
+                    const lay = { ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out" };
+                    return (
+                      <React.Fragment key="glitch">
+                        {[["hue-rotate(150deg) saturate(2.2) brightness(1.25)", 0], ["hue-rotate(-70deg) saturate(2.2) brightness(1.25)", -0.37]].map(([tint, lag], gi) => (
+                          <img key={gi} src={layer.src} alt="" aria-hidden="true" draggable={false} decoding="async" style={{ ...lay, ...vars, opacity: 0, mixBlendMode: "screen", filter: layer.pixelate ? `url(#${uid}pix${layer.id}) ${tint}` : tint,
+                            animation: `rc3-glitch-ghost ${period}s steps(1, end) ${(lag * period).toFixed(2)}s infinite` }} />
+                        ))}
+                        {g.scan !== false && <div aria-hidden="true" style={{ ...lay, opacity: g.scan ?? 0.45, WebkitMaskImage: `url(${layer.src})`, maskImage: `url(${layer.src})`, WebkitMaskSize: "100% 100%", maskSize: "100% 100%",
+                          background: "repeating-linear-gradient(0deg, rgba(20,0,60,.7) 0 1px, rgba(20,0,60,0) 1px 3px)", animation: "rc3-scan 1.4s linear infinite" }} />}
+                      </React.Fragment>
+                    ); })()}
+                  {/* A visit (layer.visit: { x, y } the point she is drawn up toward, in % of the layer; rise and fall, how far she travels
+                      in % of the layer; shrink, how much smaller she is at the top; fine and coarse, two pixel sizes in px of the card).
+                      The tilt decides whether she is arriving or leaving. Tip the card back (--ty < 0) and she rises toward that
+                      point, smaller, fainter, breaking into coarse blocks. Tip it forward and she comes down, whole and sharp. At
+                      rest she hangs between, in fine blocks. Three copies of the layer (sharp, fine, coarse) cross-fade to do it.
+                      A glitch on the same layer becomes a stutter of the whole figure. */}
+                  {layer.visit && interactive && (() => { const v = layer.visit, fine = v.fine ?? 3, coarse = v.coarse ?? 8, g = layer.glitch;
+                    const up = "min(var(--ty, 0), 0)", down = "max(var(--ty, 0), 0)", full = { ...abs, left: 0, top: 0, width: "100%", height: "100%" };
+                    const pix = (id, size) => (
+                      <filter id={id} x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
+                        <feFlood x={size / 2 - 0.5} y={size / 2 - 0.5} width="1" height="1" /><feComposite width={size} height={size} /><feTile result="grid" />
+                        <feComposite in="SourceGraphic" in2="grid" operator="in" /><feMorphology operator="dilate" radius={size / 2} />
+                      </filter>);
+                    // A tear (visit.tear: { amp } px of the card, bands the noise's vertical frequency): her red, green and blue come apart
+                    // sideways in bands, each channel pushed its own way by the same slow noise, which is re-dealt a few times a
+                    // second. Transparency is kept (each channel carries the layer's alpha). It shows mid-departure, between the
+                    // fine blocks and the coarse, and, as visit.stutter (seconds), for a blink every so often.
+                    const tear = v.tear === false ? null : (v.tear || {}), stutter = tear && v.stutter !== false ? (v.stutter || 7) : 0;
+                    const tearFilter = (id, amp, dur) => (
+                      <filter id={id} x="-15%" y="0" width="130%" height="100%" colorInterpolationFilters="sRGB">
+                        <feTurbulence type="fractalNoise" baseFrequency={`0.0015 ${tear.bands ?? 0.055}`} numOctaves="1" seed="2">
+                          <animate attributeName="seed" values="2;11;5;17;8;3" dur={`${dur}s`} calcMode="discrete" repeatCount="indefinite" />
+                        </feTurbulence>
+                        <feColorMatrix values="1 0 0 0 0  0 0 0 0 .5  0 0 1 0 0  0 0 0 1 0" result="n" />
+                        <feColorMatrix in="SourceGraphic" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" /><feDisplacementMap in2="n" scale={amp} xChannelSelector="R" yChannelSelector="G" result="r" />
+                        <feColorMatrix in="SourceGraphic" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" /><feDisplacementMap in2="n" scale={-amp * 0.6} xChannelSelector="B" yChannelSelector="G" result="g" />
+                        <feColorMatrix in="SourceGraphic" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" /><feDisplacementMap in2="n" scale={-amp * 1.3} xChannelSelector="R" yChannelSelector="G" result="b" />
+                        <feBlend in="r" in2="g" mode="screen" result="rg" /><feBlend in="rg" in2="b" mode="screen" />
+                      </filter>);
+                    const ease = "translate 600ms ease-out, scale 600ms ease-out, opacity 600ms ease-out";
+                    return (
+                      <div key="visit" aria-hidden="true" style={{ ...full, pointerEvents: "none", transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out" }}>
+                        <svg width="0" height="0" style={{ position: "absolute" }}>{pix(`${uid}vf${layer.id}`, fine)}{pix(`${uid}vc${layer.id}`, coarse)}{tear && tearFilter(`${uid}vt${layer.id}`, tear.amp ?? 16, 0.9)}{tear && stutter && tearFilter(`${uid}vs${layer.id}`, (tear.amp ?? 16) * 1.8, 0.35)}</svg>
+                        <div style={{ ...full, transformOrigin: `${v.x ?? 50}% ${v.y ?? 0}%`, transition: ease,
+                          translate: `0 calc(${up} * ${v.rise ?? 4}% + ${down} * ${v.fall ?? 3}%)`, scale: `calc(1 + ${up} * ${v.shrink ?? 0.45} + ${down} * ${v.grow ?? 0.06})`,
+                          opacity: `clamp(${v.faint ?? 0.12}, calc(${v.rest ?? 0.8} + var(--ty, 0) * 0.75), 1)` }}>
+                          {stutter > 0 && <img src={layer.src} alt="" draggable={false} decoding="async" style={{ ...full, opacity: 0, filter: `url(#${uid}vs${layer.id})`, animation: `rc3-tear-on ${stutter}s steps(1, end) infinite` }} />}
+                          <div style={{ ...full, ...(stutter > 0 ? { animation: `rc3-tear-off ${stutter}s steps(1, end) infinite` } : null), ...(g ? { "--gt": `${g.top ?? 0}%`, "--gh": `${g.height ?? 100}%`, "--go": 1, "--gp": "opacity(1)", "--gs": `${g.shift ?? 0.8}%`, animation: `rc3-glitch ${g.period || 7}s steps(1, end) infinite` } : null) }}>
+                            {v.pixels ? (
+                              <>
+                                <svg width="0" height="0" style={{ position: "absolute" }}><filter id={`${uid}vq${layer.id}`} data-visit-pix={layer.id} x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
+                                  <feFlood x="1.5" y="1.5" width="1" height="1" /><feComposite width="4" height="4" /><feTile result="grid" />
+                                  <feComposite in="SourceGraphic" in2="grid" operator="in" /><feMorphology operator="dilate" radius="2" />
+                                </filter></svg>
+                                <img data-visit-img={layer.id} src={layer.src} alt="" draggable={false} decoding="async" style={{ ...full, transition: "opacity 600ms ease-out",
+                                  opacity: tear ? `clamp(0.3, max((var(--ty, 0) + 0.4) * 3.2, (var(--ty, 0) + 0.4) * -3.2), 1)` : 1 }} />
+                              </>
+                            ) : (<>
+                            <img src={layer.src} alt="" draggable={false} decoding="async" style={{ ...full, transition: "opacity 600ms ease-out", opacity: `clamp(0, calc(var(--ty, 0) * 2.4 + 0.15), 1)` }} />
+                            <img src={layer.src} alt="" draggable={false} decoding="async" style={{ ...full, transition: "opacity 600ms ease-out", filter: `url(#${uid}vf${layer.id})`, opacity: `clamp(0, calc(1 - max(var(--ty, 0) * 2.6, var(--ty, 0) * -1.7)), 1)` }} />
+                            <img src={layer.src} alt="" draggable={false} decoding="async" style={{ ...full, transition: "opacity 600ms ease-out", filter: `url(#${uid}vc${layer.id})`, opacity: tear ? `clamp(0, calc(var(--ty, 0) * -2.6 - 0.75), 1)` : `clamp(0, calc(var(--ty, 0) * -1.9 - 0.12), 1)` }} />
+                            </>)}
+                            {tear && <img src={layer.src} alt="" draggable={false} decoding="async" style={{ ...full, transition: "opacity 600ms ease-out", filter: `url(#${uid}vt${layer.id})`, opacity: `clamp(0, calc(1 - max((var(--ty, 0) + 0.4) * 3.2, (var(--ty, 0) + 0.4) * -3.2)), 1)` }} />}
+                          </div>
+                        </div>
+                      </div>
+                    ); })()}
+                  {/* layer.tractor, the rest of it. A cold copy of the beam (blue-white) fades in as she leaves, so the light turns from
+                      gold to cold. And rings: bands of light, cut to the beam's own shape, running up the cone when the card is tipped
+                      back and down it when tipped forward; faint, both ways, at rest. Both pinch and open with the beam. */}
+                  {layer.tractor && interactive && (() => { const t = layer.tractor, gap = t.gap || 48, speed = t.speed || 1.5;
+                    const lay = { ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", transform: `${slide} scale(${layer.scale ?? 1})`, transformOrigin: `${t.x ?? 50}% ${t.y ?? 0}%`,
+                      scale: `calc(1 + min(var(--ty, 0), 0) * ${t.pinch ?? 0.55} + max(var(--ty, 0), 0) * ${t.widen ?? 0.14}) 1`, transition: "transform var(--ease, 500ms) ease-out, scale 600ms ease-out, opacity 600ms ease-out" };
+                    const mask = { WebkitMaskImage: `url(${layer.src})`, maskImage: `url(${layer.src})`, WebkitMaskSize: "100% 100%", maskSize: "100% 100%" };
+                    const band = `repeating-linear-gradient(180deg, rgba(255,246,214,0) 0, rgba(255,246,214,0) ${gap * 0.55}px, rgba(255,248,224,${t.ring ?? 0.6}) ${gap * 0.8}px, rgba(255,246,214,0) ${gap}px)`;
+                    return (
+                      <React.Fragment key="tractor">
+                        {t.cold !== false && <img src={layer.src} alt="" aria-hidden="true" draggable={false} decoding="async" style={{ ...lay, filter: "hue-rotate(175deg) saturate(1.3) brightness(1.25)", opacity: `clamp(0, calc(var(--ty, 0) * ${-(t.cold ?? 0.9)}), 1)` }} />}
+                        {[["up", -gap, `clamp(0, calc(${t.idle ?? 0.1} - var(--ty, 0) * 1.2), 1)`], ["down", gap, `clamp(0, calc(${t.idle ?? 0.1} + var(--ty, 0) * 1.2), 1)`]].map(([k, to, op]) => (
+                          <div key={k} aria-hidden="true" style={{ ...lay, ...mask, mixBlendMode: "screen", opacity: op, background: band, "--rp": `${to}px`, animation: `rc3-rings ${speed}s linear infinite` }} />
+                        ))}
+                      </React.Fragment>
+                    ); })()}
+                  {/* Motes (layer.motes: { n, top: { x, y, w }, bottom: { x, y, w } } a cone in % of the layer, w its half-width; travel in
+                      px of the card): dust in a beam. Two sets, one rising and one falling; the tilt fades one up and the other
+                      down, so at rest they drift both ways. */}
+                  {layer.motes && interactive && (() => { const m = layer.motes, n = m.n || 16, travel = m.travel || 90, rnd = (i, k) => { const x = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return x - Math.floor(x); };
+                    const set = (rising) => (
+                      <div key={rising ? "up" : "down"} style={{ position: "absolute", inset: 0, transition: "opacity 700ms ease-out", opacity: rising ? "clamp(0, calc(0.55 - var(--ty, 0) * 1.6), 1)" : "clamp(0, calc(0.55 + var(--ty, 0) * 1.6), 1)" }}>
+                        {Array.from({ length: n }, (_, i) => { const k = rising ? 1 : 2, t = 0.2 + rnd(i, k) * 0.75, w = m.top.w + (m.bottom.w - m.top.w) * t, period = 5 + rnd(i, k + 2) * 5, size = 1.6 + rnd(i, k + 4) * 2.2;
+                          return <div key={i} style={{ position: "absolute", left: `${m.top.x + (m.bottom.x - m.top.x) * t + (rnd(i, k + 6) - 0.5) * 1.7 * w}%`, top: `${m.top.y + (m.bottom.y - m.top.y) * t}%`, width: size, height: size, marginLeft: -size / 2, borderRadius: "50%",
+                            background: "radial-gradient(circle, rgba(255,250,225,1) 0, rgba(255,225,150,.7) 45%, rgba(255,210,120,0) 75%)", boxShadow: "0 0 4px 1px rgba(255,225,150,.55)", opacity: 0,
+                            "--mdx": `${((rnd(i, k + 8) - 0.5) * 14).toFixed(1)}px`, "--mdy": `${(travel * (0.6 + rnd(i, k + 10) * 0.6)).toFixed(0)}px`,
+                            animation: `rc3-mote ${period.toFixed(2)}s linear ${(-rnd(i, k + 12) * period).toFixed(2)}s infinite ${rising ? "normal" : "reverse"}` }} />; })}
+                      </div>);
+                    return (
+                      <div key="motes" aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", mixBlendMode: "screen", transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out, scale 600ms ease-out",
+                        ...(layer.tractor ? { transformOrigin: `${layer.tractor.x ?? 50}% ${layer.tractor.y ?? 0}%`, scale: `calc(1 + min(var(--ty, 0), 0) * ${layer.tractor.pinch ?? 0.55} + max(var(--ty, 0), 0) * ${layer.tractor.widen ?? 0.14}) 1` } : null) }}>
+                        {set(true)}{set(false)}
+                      </div>
+                    ); })()}
+                  {/* Lamps (layer.lamps: [{ x, y, r }] in % of the layer, r in px of the card; lampPeriod seconds): running lights. Each
+                      swells in its turn, so the light chases from the first to the last. */}
+                  {layer.lamps && interactive && (
+                    <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", mixBlendMode: "screen", transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out" }}>
+                      {layer.lamps.map((l, li) => { const period = layer.lampPeriod || 2.4, r = l.r || 9;
+                        return <div key={li} style={{ position: "absolute", left: `${l.x}%`, top: `${l.y}%`, width: r * 2, height: r * 1.3, marginLeft: -r, marginTop: -r * 0.65, borderRadius: "50%", opacity: 0.12,
+                          background: `radial-gradient(ellipse, ${l.color || "rgba(255,244,200,.95)"} 0, rgba(255,190,70,.55) 40%, rgba(255,160,40,0) 72%)`, animation: `rc3-lamp ${period}s ease-in-out ${(-period + (li * period) / layer.lamps.length).toFixed(2)}s infinite` }} />; })}
+                    </div>
+                  )}
+                  {/* layer.screen: a television's picture, drawn on the layer (AdScreen, above), and layer.screen.glow: { x, y, w, h } in % of
+                      the layer, the light the screen throws on what is under it, flickering with the picture. Drawn on stills too. */}
+                  {layer.screen && (
+                    <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", transform: `${slide} scale(${layer.scale ?? 1})`, transition: interactive ? "transform var(--ease, 500ms) ease-out" : undefined }}>
+                      <AdScreen spec={layer.screen} src={layer.src} live={interactive} uid={uid} w={W} h={H} />
+                      {layer.screen.glow && interactive && <div style={{ position: "absolute", left: `${layer.screen.glow.x}%`, top: `${layer.screen.glow.y}%`, width: `${layer.screen.glow.w}%`, height: `${layer.screen.glow.h}%`, borderRadius: "50%", mixBlendMode: "screen",
+                        background: "radial-gradient(ellipse, rgba(120,150,255,.75) 0, rgba(60,90,255,.35) 45%, rgba(40,60,255,0) 72%)", animation: "rc3-ad-glow 2.7s steps(1) infinite" }} />}
+                    </div>
+                  )}
+                  {/* A neon sign (layer.neon: { hang: { x, y } where it hangs from, in % of the layer; sway degrees; tube: { top } the % of
+                      the layer above which nothing is lit (chains); drop: { x0, y0, x1, y1, feather } one letter's box in % of the
+                      layer; period seconds between that letter's failures). The sign hums: its light wavers a hair, a soft halo of
+                      its own colours breathes round it, it turns a little on its chains, and one letter keeps failing and catching
+                      again. The failure is an unlit copy of the layer laid over that letter, its edges feathered (two gradients,
+                      intersected), so no box shows against the glow the letters share. */}
+                  {layer.neon && interactive && (() => { const n = layer.neon, d = n.drop, full = { ...abs, left: 0, top: 0, width: "100%", height: "100%" };
+                    const f = d ? (d.feather ?? 0.6) : 0, fy = f * (W / H);
+                    const fade = d ? `linear-gradient(90deg, transparent ${d.x0 - f}%, #000 ${d.x0 + f}%, #000 ${d.x1 - f}%, transparent ${d.x1 + f}%), linear-gradient(180deg, transparent ${d.y0 - fy}%, #000 ${d.y0 + fy}%, #000 ${d.y1 - fy}%, transparent ${d.y1 + fy}%)` : undefined;
+                    return (
+                      <div key="neon" aria-hidden="true" style={{ ...full, pointerEvents: "none", transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out" }}>
+                        <div style={{ ...full, transformOrigin: `${n.hang?.x ?? 50}% ${n.hang?.y ?? 0}%`, "--sw": `${n.sway ?? 0.8}deg`, animation: n.sway === 0 ? undefined : `rc3-neon-sway ${n.swing || 3.4}s ease-in-out infinite alternate` }}>
+                          <img src={layer.src} alt="" draggable={false} decoding="async" style={{ ...full, mixBlendMode: "screen", filter: `blur(${n.halo ?? 7}px) brightness(1.5) saturate(1.4)`, clipPath: `inset(${n.tube?.top ?? 0}% 0 0 0)`, opacity: .8, animation: "rc3-breathe 2.9s ease-in-out infinite", "--b0": .55 }} />
+                          <img src={layer.src} alt="" draggable={false} decoding="async" style={{ ...full, animation: "rc3-neon-buzz 1.7s steps(1, end) infinite" }} />
+                          {d && <img src={layer.src} alt="" draggable={false} decoding="async" style={{ ...full, opacity: 0, filter: `grayscale(1) brightness(${d.dim ?? 0.38})`, WebkitMaskImage: fade, maskImage: fade, WebkitMaskComposite: "source-in", maskComposite: "intersect",
+                            animation: `rc3-neon-drop ${n.period || 9}s steps(1, end) infinite` }} />}
+                        </div>
+                      </div>
+                    ); })()}
+                  {/* A tumbling glow (layer.roll: { top, bottom } the band of the layer it fills, in %; period seconds; strength 0-1; size, the
+                      patches' scale in px of the card; color "r,g,b"). Soft patches of light, cut to the layer's own shape, drift up
+                      through it: two sheets of the same slow noise, one climbing to the left and one to the right at different
+                      speeds, so the bright patches form, cross and break up. Heat turning over in a flame. Nothing moves. */}
+                  {layer.roll && interactive && (() => { const r = layer.roll, top = r.top ?? 0, bottom = r.bottom ?? 100, size = r.size || 150, c = (r.color || "255,205,96").split(","), period = r.period || 3.2;
+                    const noise = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.016 .024' numOctaves='2' seed='7' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 ${(c[0] / 255).toFixed(2)}  0 0 0 0 ${(c[1] / 255).toFixed(2)}  0 0 0 0 ${(c[2] / 255).toFixed(2)}  4.2 0 0 0 -2.2'/></filter><rect width='100%' height='100%' filter='url(#n)'/></svg>`)}")`;
+                    const sheet = (k, sz, dx, dur) => <div key={k} style={{ position: "absolute", left: 0, right: 0, top: `${top}%`, height: `${bottom - top}%`, opacity: r.strength ?? 0.8, mixBlendMode: "screen",
+                      background: `${noise} 0 0 / ${sz}px ${sz}px`, "--nx": `${dx * sz}px`, "--ny": `${-sz}px`, animation: `rc3-roll ${dur.toFixed(2)}s linear infinite` }} />;
+                    return (
+                      <div key="roll" aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", mixBlendMode: "screen", transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out",
+                        WebkitMaskImage: `url(${layer.src})`, maskImage: `url(${layer.src})`, WebkitMaskSize: "100% 100%", maskSize: "100% 100%" }}>
+                        {sheet("a", size, 1, period)}{sheet("b", size * 0.62, -1, period * 0.71)}
+                      </div>
+                    ); })()}
+                  {/* layer.facets: { at: [{ x, y, r }] the patches, in % of the layer, r in px of the card; cx, cy the layer's middle, which
+                      each patch faces away from; period seconds per circuit; idle, the circling light's reach; strength }. The light
+                      itself is worked out each frame (above); here are the patches, white-hot at the core, cut to the layer's shape. */}
+                  {layer.facets && interactive && (
+                    <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", mixBlendMode: "screen", transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out",
+                      WebkitMaskImage: `url(${layer.src})`, maskImage: `url(${layer.src})`, WebkitMaskSize: "100% 100%", maskSize: "100% 100%" }}>
+                      {layer.facets.at.map((f, fi) => { const dx = (f.x - (layer.facets.cx ?? 50)) * W, dy = (f.y - (layer.facets.cy ?? 50)) * H, n = Math.hypot(dx, dy) || 1, r = f.r || 26;
+                        return <div key={fi} data-facet={layer.id} data-ax={(dx / n).toFixed(3)} data-ay={(dy / n).toFixed(3)} style={{ position: "absolute", left: `${f.x}%`, top: `${f.y}%`, width: r * 2, height: r * 2.6, marginLeft: -r, marginTop: -r * 1.3, borderRadius: "50%", opacity: 0,
+                          background: "radial-gradient(ellipse, rgba(255,255,236,.95) 0, rgba(255,232,140,.8) 30%, rgba(255,170,50,.4) 60%, rgba(255,140,30,0) 78%)" }} />; })}
+                    </div>
+                  )}
+                  {/* Lamplight (layer.glows: [{ x, y, r, color? "r,g,b", period? }] in % of the layer, r in px of the card): a flame behind
+                      glass that is painted into a bigger layer. A warm pool of light sits on it and gutters, unevenly; the paint under
+                      it does not move. */}
+                  {layer.glows && interactive && (
+                    <div aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", mixBlendMode: "screen", transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out" }}>
+                      {layer.glows.map((g, gi) => { const r = g.r || 40, c = g.color || "255,196,96", period = g.period || 2.3;
+                        return <div key={gi} style={{ position: "absolute", left: `${g.x}%`, top: `${g.y}%`, width: r * 2, height: r * 2, marginLeft: -r, marginTop: -r, borderRadius: "50%",
+                          background: `radial-gradient(circle, rgba(255,246,214,.85) 0, rgba(${c},.6) 16%, rgba(${c},.22) 42%, rgba(${c},0) 70%)`, animation: `rc3-ember ${period}s ease-in-out ${(-gi * 0.7).toFixed(1)}s infinite` }} />; })}
+                    </div>
+                  )}
+                  {/* Mist (layer.mist: { x0, x1, y0, y1 } a band of the layer in %; period seconds; strength 0-1; color "r,g,b"): low fog.
+                      Two sheets of slow noise slide across the band, one each way, and fade out at its edges. */}
+                  {layer.mist && interactive && (() => { const m = layer.mist, c = (m.color || "170,235,240").split(","), period = m.period || 26;
+                    const noise = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='300' height='120'><filter id='n' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.012 .035' numOctaves='2' seed='4' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 ${(c[0] / 255).toFixed(2)}  0 0 0 0 ${(c[1] / 255).toFixed(2)}  0 0 0 0 ${(c[2] / 255).toFixed(2)}  3 0 0 0 -1.15'/></filter><rect width='100%' height='100%' filter='url(#n)'/></svg>`)}")`;
+                    const fade = "linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent), linear-gradient(180deg, transparent, #000 45%, #000 70%, transparent)";
+                    return (
+                      <div key="mist" aria-hidden="true" style={{ ...abs, left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none", transform: `${slide} scale(${layer.scale ?? 1})`, transition: "transform var(--ease, 500ms) ease-out" }}>
+                        <div style={{ position: "absolute", left: `${m.x0}%`, width: `${m.x1 - m.x0}%`, top: `${m.y0}%`, height: `${m.y1 - m.y0}%`, opacity: m.strength ?? 0.5, filter: "blur(2px)",
+                          WebkitMaskImage: fade, maskImage: fade, WebkitMaskComposite: "source-in", maskComposite: "intersect" }}>
+                          <div style={{ position: "absolute", inset: 0, background: `${noise} 0 0 / 300px 100%`, "--nx": "300px", animation: `rc3-mist ${period}s linear infinite` }} />
+                          <div style={{ position: "absolute", inset: 0, background: `${noise} 90px 0 / 210px 100%`, "--nx": "-210px", opacity: .7, animation: `rc3-mist ${(period * 0.63).toFixed(1)}s linear infinite` }} />
+                        </div>
+                      </div>
+                    ); })()}
                   {/* layer.flames: [{ x, y, r }] the foot of each flame (its wick) in % of the layer, and r, the reach of
                       the window cut around it, in px of the card. Each is the layer again, clipped to that one flame,
                       flickering on its own clock about its own wick, with a soft glow that breathes behind it. */}
@@ -905,20 +1295,21 @@ export default function RcanaCard3({ data, scale = 1, metal: metalProp = null, i
         {/* THE APPARITION KEYWORD (APPARITION_KEYWORD, below the imports): every card that carries Our Lady's image wears
             the badge at the head of its text box, a dark pill in a rainbow rim with her eight-pointed star, and beside
             it what witnessing her gives. The rules sit a little lower to make room. */}
-        {m.apparition && (
+        {m.keyword && (
           <div style={{ ...abs, left: tx, top: 459, width: tw, height: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, whiteSpace: "nowrap" }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4, height: 18, boxSizing: "border-box", padding: "0 8px 0 6px", borderRadius: 9, border: "1.5px solid transparent",
-              background: `linear-gradient(${INK}, ${INK}) padding-box, linear-gradient(90deg, #ff5f6d, #ffc371, #f9f871, #5ee7a0, #4facfe, #b98cff, #ff5f6d) border-box`,
+              background: `linear-gradient(${INK}, ${INK}) padding-box, ${m.keyword.star ? 'linear-gradient(90deg, #ff5f6d, #ffc371, #f9f871, #5ee7a0, #4facfe, #b98cff, #ff5f6d)' : `linear-gradient(90deg, ${GOLD_LO}, ${GOLD_HI}, ${GOLD_LO})`} border-box`,
               fontFamily: CAPS, fontSize: 12, lineHeight: 1, letterSpacing: "0.14em", textTransform: "uppercase", color: "#ffe9a6" }}>
-              <svg aria-hidden="true" viewBox="-10 -10 20 20" style={{ width: 10, height: 10, flex: "none" }}>
+              {!m.keyword.star && <svg aria-hidden="true" viewBox="-10 -10 20 20" style={{ width: 10, height: 10, flex: "none" }}><ellipse cx="0" cy="-1" rx="8" ry="3.4" fill="none" stroke="#ffd95a" strokeWidth="2.4" /></svg>}
+              {m.keyword.star && <svg aria-hidden="true" viewBox="-10 -10 20 20" style={{ width: 10, height: 10, flex: "none" }}>
                 <polygon fill="#ffd95a" points={Array.from({ length: 16 }, (_, k) => { const r = k % 2 ? 4 : 9.6; const a = (k * Math.PI) / 8 - Math.PI / 2; return `${(r * Math.cos(a)).toFixed(2)},${(r * Math.sin(a)).toFixed(2)}`; }).join(" ")} />
-              </svg>
-              {APPARITION_KEYWORD.name}
+              </svg>}
+              {m.keyword.name}
             </span>
-            <span style={{ fontFamily: CAPS, fontSize: 11, lineHeight: 1, letterSpacing: "0.14em", textTransform: "uppercase", color: "#7a4f00", ...(fullArt ? { color: "#ffe08a", ...ON_ART, WebkitTextStroke: "2.4px #0a0613" } : null) }}>{APPARITION_KEYWORD.gift}</span>
+            <span style={{ fontFamily: CAPS, fontSize: 11, lineHeight: 1, letterSpacing: "0.14em", textTransform: "uppercase", color: "#7a4f00", ...(fullArt ? { color: "#ffe08a", ...ON_ART, WebkitTextStroke: "2.4px #0a0613" } : null) }}>{m.keyword.gift}</span>
           </div>
         )}
-        <div style={{ ...abs, left: tx, top: m.apparition ? 476 : 462, width: tw, height: (m.flavor ? 74 : 118) - (m.apparition ? 13 : 0), display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ ...abs, left: tx, top: m.keyword ? 476 : 462, width: tw, height: (m.flavor ? 74 : 118) - (m.keyword ? 13 : 0), display: "flex", alignItems: "center", justifyContent: "center" }}>
           <p style={{ margin: 0, textAlign: "center", fontFamily: BODY, fontSize: textSize, lineHeight: 1.45, letterSpacing: "0.14em", textTransform: "uppercase", color: "#24160a", textWrap: "balance" /* lines of even length: no word left alone at a line's end */, ...(fullArt ? { color: "#fff", fontWeight: 700, ...ON_ART } : null) }}><RulesText text={m.text} /></p>
         </div>
         {m.flavor && (

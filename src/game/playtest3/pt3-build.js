@@ -36,7 +36,7 @@ if (!importLine.test(engine)) throw new Error('pt3-sim.js no longer imports DESI
 engine = engine.replace(importLine, () => designs + '\n');
 // The trinity is a second import; inline it the same way.
 const trinity = readFileSync(join(root, 'src/game/rcana/set/trinity.js'), 'utf8').replace(/^export /gm, '').trim();
-const trinityLine = /^import \{ TRINITY, ATTRS, ETHOS_UNIT \} from '\.\.\/rcana\/set\/trinity\.js';\n/m;
+const trinityLine = /^import \{ TRINITY, ATTRS, ETHOS_UNIT, MARKET \} from '\.\.\/rcana\/set\/trinity\.js';\n/m;
 if (!trinityLine.test(engine)) throw new Error('pt3-sim.js no longer imports TRINITY from the set; update pt3-build.js');
 engine = engine.replace(trinityLine, () => trinity + '\n');
 
