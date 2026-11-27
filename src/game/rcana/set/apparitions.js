@@ -42,6 +42,8 @@ export const APPARITIONS = {
   // El Tatuaje: the fresh ink glows — the light is masked to the tattoo's own gold lines (her crown, hair and circuit traces).
   "el-tatuaje": { layer: "subject", over: true, cx: 60.8, cy: 46.3, r: 4, glow: false, glint: false, rest: 0.3, strength: 0.95, color: "#ffd24a", mask: "/TCG/rcana/el-tatuaje/ink-mask.png?v=2", maskLight: true },
   "holy-roller": { layer: "subject", cx: 40, cy: 17, r: 8.5, color: "#ffdc78", open: 150 },
+  "motherboard": { layer: "subject", over: true, cx: 49.8, cy: 15.8, r: 17.5, rays: false, rest: 0.08, strength: 0.5, spread: 1.5, color: "#ffe08a", open: 150 }, // The Motherboard: her halo is a gold trace; the glint runs round it
+  "the-votive": { layer: "subject", over: true, cx: 50.1, cy: 24.2, r: 9, rays: false, rest: 0.15, strength: 0.6, color: "#ffd27a", open: 150 }, // The Votive: her icon on the candle's label; a soft light on her painted halo
   "dashboard-figurine": { layer: "prop", cx: 51.2, cy: 24.6, r: 3.8, color: "#ffe08a", open: 150 }, // Dashboard Mary: Ride or Die's light, at her own small ring
   "ride-or-die": { layer: "subject", cx: 56.5, cy: 15, r: 10, color: "#ffe08a", open: 150 }, // Ride or Die (the lowrider): her aureole over the car
   "mardi-gras": { layer: "subject", cx: 49.5, cy: 18.6, r: 7, color: "#ffdc78", open: 150 }, // the glint stops at her shoulders: no ring crosses her chest

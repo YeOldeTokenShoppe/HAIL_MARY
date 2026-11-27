@@ -791,3 +791,316 @@ back for a sale; a person can.
 the half, so a $60M Blue Chip costs him $20M). 12,000 games: 9.6 rounds, Devotion 48.4%, Octobot 56, Prospector 54,
 Influencer 44: the same as $20M off. A flat $20M made the two cheapest Assets free and barely dented a Blue Chip; half off
 saves $10M to $30M, most on the dearest, so the sale is the round to buy big. `sale` (a flat amount) still works.
+
+## Thirteen and fourteen apparitions (2026-11-25)
+
+**The Motherboard** (Our Lady drawn in its traces) and **The Votive** (her icon on the candle) joined the apparitions: playing
+either gives one more action and a Miracle, as the other twelve do. 12,000 games each, two players, seeds 424200+:
+
+| apparitions | rounds | Devotion | Octobot | Prospector | Influencer | apparition actions per player |
+|---|---|---|---|---|---|---|
+| 12 | 9.6 | 48.4% | 56 | 54 | 44 | not measured |
+| 13, The Motherboard | 9.5 | 48.2% | 55 | 55 | 45 | 2.69 |
+| 14, The Votive too | 9.5 | 49.2% | 52 | 55 | 46 | 2.81 |
+
+The Motherboard is only in the General Shuffle and moves nothing. The Votive is in the Devotion starter: Devotion gains a
+point and the Octobot, which was the strongest opener, loses three.
+
+## The Airdrop and The Whistleblower (2026-11-25)
+
+**The Airdrop goes to holders.** Every player with at least one Asset (cold storage counts) collects $20M; it paid everyone, so
+it changed nothing. 12,000 games each way: 9.5 rounds, Devotion 49.3% before and 49.2% after. Tried and not taken: $20M per
+Asset held, $10M plus $10M per Asset, $40M to players with no Asset, $40M to whoever holds fewest (all within a point).
+
+**The Whistleblower answers any Calamity played on you** (`clears: 'any'`, her own player's only). A fraud is undone, as before;
+any other Calamity on you is cleared; either way the rival who played it takes a strike. She is only in the General Shuffle.
+There she was played in 12% of the hands that drew her and is now played in 27%, winning 55% of those; starter games are
+unchanged (Devotion 49.2%). Not taken: a copy in the Devotion starter for Sacred Geom8ry (Devotion 52.7%, Gambler 44, Eugene 41).
+A control, The Stimulus for Sacred Geom8ry, gave Devotion 50.0%: Sacred Geom8ry still wants a new job.
+
+## The Short replaces The Whistleblower (2026-11-26)
+
+**The Whistleblower left the set** (kept on file in designs.js): the game is about trading, and a whistleblower belongs to a
+story about companies and regulators. Her number, 42, goes to **The Short**, an Event played from the hand for $20M.
+
+**The Short.** Play it on an Asset your rival holds (the player chooses which; not one in cold storage, and one Short an Asset
+at most). It waits on its player's desk (`p.shorts`) until that Asset leaves the rival's portfolio, however it leaves: sold,
+rugged, wrecked, sold by Paper Hands, moved by The Whale or The Wheel. Then it pays $100M (`short: 10` on the design), unless
+the rival sold it in a round when the market adds to sale prices (a bull Fate or The God Candle): then The Short is lost.
+`settleShorts()` runs after every action, after each Fate, after the start-of-turn effects and before the win is read. Frauds
+that have landed have no answer now, which is the hit-versus-condition rule: hits are prevented, not cured.
+
+Trials first (`pt3-trial-short.mjs`, `pt3-trial-stoploss.mjs`; 12,000 General Shuffle games each, seeds 424200+):
+
+| card in slot 42 | played by those who drew it | paid | those who drew it won |
+|---|---|---|---|
+| The Whistleblower | 26% | | 48.2% |
+| The Short, first draft: pays the sale price, only if rugged, wrecked or sold in a bear round | 29% | 13% | 45.8% |
+| The Short, pays unless sold in a bull round, $50M | 22% | 56% | 46.3% |
+| The Short, the same, $100M | 46% | 51% | 47.2% |
+| Stop-Loss (a Relic), Assets only, pays what the Asset cost, spent on use | | 0.12 a copy | 45.6% |
+| Stop-Loss, Assets and half of any cash taken, stays equipped | | 0.55 a copy | 45.7% |
+
+The first draft expired worthless 69% of the time: nine rounds is too short a game for a bet on something rare. Stop-Loss
+worked but returned about $38M on a $20M card, a fourth protection beside The Talisman, Sacred Heart and The Catacombs.
+
+**As built**, 12,000 General Shuffle games: 9.3 rounds, going first 58.2% (both unchanged); The Short is played by 45% of the
+players who draw it, 58% of Shorts pay, 21% are lost to a bull sale and 21% are still open at the end; the players who draw it
+win 50.0%. Starter games are unchanged (it is only in the General Shuffle): Devotion 49.2%.
+
+- The bots do not play around a Short: a shorted Asset is held back outside a bull round, but they do not wait for one on
+  purpose. A person will, so the 58% is a ceiling.
+- Shorting an Asset and then playing Rug Pull on it happened in fewer than 100 of 12,000 trial games.
+- Not built: the Short Squeeze Fate discarding every Short on the table.
+- The card has no face or art yet.
+
+## Fire Horse and The Holy Roller move the market (2026-11-26)
+
+Both were handouts with nothing to do with trading (everyone collects $75M; everyone draws a card and collects $10M). They stay
+apparitions with Radi8, and now they are market Fates:
+
+- **Fire Horse**: a bull round, every Asset sells for $75M more (`market: 75` on the design; flipFate sets it like any market
+  Fate). Between the ordinary bull Fates (+$50M) and The God Candle (+$100M).
+- **The Holy Roller**: the die is rolled when she is turned. 5 or higher is a bull round, 4 or lower a bear round, $50M a sale
+  either way (`marketRoll: { bull: 5, amount: 50 }`). A plain roll: no Trader's ability touches it. Her subtype is Ambiguity now.
+
+12,000 starter games, seeds 424200+ (the trial, `pt3-trial-market-apparitions.mjs`, left Yield Farms standing through these two
+Fates and read a little short; the rows below are the engine as built):
+
+| | rounds | Devotion | games with no winner |
+|---|---|---|---|
+| both as handouts (before) | 9.5 | 49.2% | 0 |
+| Fire Horse +$75M, Holy Roller 5+ / 4- (built) | 9.85 | 47.9% | 4 |
+| Fire Horse +$100M, the same Holy Roller | 9.7 | 47.7% | 2 |
+| Fire Horse +$75M, Holy Roller also deals everyone a card (`marketRoll.draw: 1`, a knob, off) | 9.6 | 48.5% | 2 |
+
+- A third of a round longer: $170M a cycle of the Fates no longer falls on the table.
+- **A dry table is now possible, rarely.** A sold Asset leaves the game, so the supply is finite; Fire Horse's $75M each time
+  she came round was what always got someone to the billion. In 2 to 4 bot games in 12,000 every Asset is sold, nobody is at
+  $1B, and the two trade frauds until the turn limit. The game wants an ending for that case (most cash when the Assets run
+  out, say).
+- More bull rounds are more ways out for a shorted Asset.
+- The printed faces of both cards carry the old text until they are rendered again.
+
+## A sold Asset goes to the discard pile (2026-11-26)
+
+The fix for the dry table. A sold Asset used to leave the game; now it goes to its seller's discard pile and comes round again
+when the deck is reshuffled (`recycle: true` in RULES; `recycle()` in the engine). The Assets never run out, so the game always
+ends. Rewind can take a sold Asset back, as its text already said. Trial: `pt3-trial-ending.mjs`, 12,000 games each.
+
+| starters | rounds | 99% of games over by | longest | Devotion | no result |
+|---|---|---|---|---|---|
+| sold Assets leave | 9.85 | 19 | 247 | 47.9% | 4 |
+| sold Assets recycle (built) | 9.79 | 19 | 24 | 48.0% | 0 |
+| leave, and a cap of 20 rounds (most cash wins) | 9.79 | 19 | 20 | 48.0% | 2 ties; 72 games ended by the cap |
+| leave, and a cap of 30 rounds | 9.81 | 19 | 30 | 48.0% | 0; 11 ended by the cap |
+
+General Shuffle: 9.69 rounds, longest 154 and 2 with no result before; 9.45 rounds, longest 21 and none after. A round cap also
+works, but it is one more rule to teach and it decides some games on a count.
+
+## Quantum Hack costs $30M (2026-11-26)
+
+It was $20M, the cheapest of the three frauds and the most efficient (the thief gains $40M and the victim loses $40M). Now all
+three cost $30M. 12,000 starter games: 9.8 rounds, Devotion 48.3% (48.0% before). 20,000 General Shuffle games
+(`pt3-card-report.mjs`): played by 35% of the players who hold it (39% before); those who land it win 64.5% (64.7%). The price
+moved little: the card is still as good as Exit Scam. The printed face shows 20 until it is rendered again.
+
+## Token Unlock is The Sell-Off (2026-11-26)
+
+A rename: a crypto term gave way to a general trading one. The same bear Fate ($50M less a sale for the round); the design key
+stays `unlock`, and the face id and art folder keep `token-unlock`. Its line reads "Everyone heads for the exit."
+
+## Seven out, seven in: more Assets, and Garth Raider (2026-11-26)
+
+`pt3-card-report.mjs` (20,000 General Shuffle games, every card one copy) showed what was weak and what the groups were short
+of: Assets were one card in six and holding them is what wins; Relics, Locations and Traders mostly sat in the hand.
+
+**Out** (kept on file in designs.js and faces.js): Enigma Machine, Sacred Geom8ry, Diamond Hands, Treasure Map (Relics), The
+Mission (Location), Paper Hands (Calamity), The Bell (Remedy; played by 5% of the players who held it).
+
+**In**, on their numbers:
+
+| card | | rule |
+|---|---|---|
+| Garth Raider (82) | Trader, Logos 4 Ethos 2 Pathos 2 | in a bear market his Assets sell for more instead of less (`bearish`) |
+| Gold Bar (17) | Asset $40M, sells $100M | a bear market raises its price instead of lowering it (`haven`) |
+| Index Fund (33) | Asset $30M, sells $75M | Rug Pull and Tech Rekt cannot take it (`diversified`; `exposed()`) |
+| Junk Bond (60) | Asset $20M, sells $25M | $20M a turn, but first the die: on a 1 it defaults (`junk`) |
+| Pork Bellies (69) | Asset $30M | $50M, $150M on the second round held, then $50M less a round (`ripe`, The Avocado's rule) |
+| Fine Art (72) | Asset $50M, sells $300M | only in a bull market (`bullOnly`) |
+| Racehorse (77) | Asset $30M | sell for $30M, or race her: 7 or 8 wins $350M (`gamble`) |
+
+**Renamed:** Yield Farm is Dividend Stock ($20M a turn, and it no longer withers when a Fate turns: with a Fate every round it
+never lasted one; in the report it was never once sold). The Prospector is Brent Crude, an oil man (title The Wildcatter).
+
+The set is 88: Traders 11, Assets 20, Fates 21, played Events 4, Calamities 8, Remedies 3, Relics 8, Graces 7, Locations 6.
+Starters: Devotion gets Gold Bar, Index Fund, Junk Bond and Fine Art for Diamond Hands, Paper Hands, The Bell and Sacred
+Geom8ry; Degen gets Garth (for the second Gambler), Racehorse and Pork Bellies for Paper Hands and the Enigma Machine.
+
+12,000 starter games, seeds 424200+:
+
+| | rounds | Devotion | openers |
+|---|---|---|---|
+| before | 9.8 | 48.3% | |
+| after | 7.9 | 50.7% | 47% (Garth) to 55% (Saint GR80) |
+
+**The game is two rounds shorter.** More Assets means more sales: the buy and sell slots are used. General Shuffle: 7.3
+rounds (9.45 before); The Octobot opens at 66% there (72% before). In the report every new Asset sits inside the old range
+(players holding one win 52% to 59%; Blue Chip is 61%, Savings Bond 47%). If nine or ten rounds was the right length, the
+goal or the prices want a look.
+
+Not done: faces and art for the seven new cards; Brent Crude's art (he is still drawn as a gold prospector); Dividend Stock's
+art (still the farm); the vice named on each Trader.
+
+## Companion cards and sets (2026-11-26)
+
+The idea is Pokémon's: a card that does more when its partner is present, which is also the best reason for two players to
+trade. On the designs: `companion` on each Trader, `set` on eight Assets; in the engine `comp()`, `setMate()`, `pairBonus()`.
+
+| Trader | companion | together |
+|---|---|---|
+| Brent Crude | Oil Field Claim | gushes on one more face |
+| Garth Raider | The Short | pays $150M |
+| Saint GR80 | Pocket Saint | equipping it lights a candle |
+| Eugene | Seed Round | blooms in two rounds |
+| The Gambler | Racehorse | wins on one more face |
+| The Influencer | Meme Coin | moons on two more faces |
+| The Octobot · Connor · Virgil · Marisol · Byzantine General | Tech Stock · Perpetuals · Real Estate · Blue Chip · Savings Bond | sells for $50M more (placeholders) |
+
+Sets, $50M more on each sale while two are held: Metals (Gold Bar, Quicksilver), Collector (Fine Art, Classic Car, Grail
+Card), Income (Dividend Stock, Junk Bond, Stablecoin).
+
+As built, 8,000 games: starters 7.7 rounds (7.9), Devotion 48.7% (50.7%), openers 47% to 54%; General Shuffle 7.1 rounds (7.3).
+Left to chance the pairs seldom meet: 5% to 8% of sales carry a companion bonus, 4% to 6% a set bonus.
+
+**Trading with the rival** is not built. Trial (`pt3-trial-pairs.mjs --trade 1`): at the start of a turn a player may sell
+the rival one Asset from the portfolio or one card from the hand; the bots trade when it is worth $MIN more to the buyer, and
+split the difference.
+
+| | rounds | trades a game | driven by a companion or set | Devotion |
+|---|---|---|---|---|
+| General Shuffle, min $20M | 6.8 | 3.3 | 36% | |
+| General Shuffle, min $50M | 6.9 | 0.9 | 76% | |
+| starters, min $20M | 7.4 | 3.6 | 41% | 43.6% |
+| starters, min $50M | 7.5 | 1.1 | 84% | 47.1% |
+
+Without companions the bots still trade 2.6 times a game: Ethos, The Gambler's odds and three candles for a Grail Card
+already make a card worth more to one player. With a $50M bar the trades are nearly all about a pair, and the starters hold.
+
+Not done: the small symbol of the key card on the printed frame (RcanaCard3.jsx); rules of their own for the five placeholder pairs.
+
+## The five other companions, the card medallions, and trading (2026-11-26, later)
+
+**The five placeholder pairs have a rule of their own** (they were a plain $50M on the sale): The Octobot sells its Tech Stock
+the turn it buys it (`fast`); Connor's wager pays double while he holds Perpetuals (`wager`); Virgil collects $10M rent a turn
+from Real Estate (`rent`); Marisol pays $20M less for a Blue Chip (kind `cost`); Byzantine General's Savings Bond grows twice
+as fast (`growth`). 8,000 starter games: 7.8 rounds, Devotion 50.3%, openers 47% to 55%.
+
+**On the printed card** (RcanaCard3.jsx: `pair` and `set` on the model): a small medallion of the partner card on the text box's
+top edge, at the right (a Trader shows their companion, the companion shows the Trader; the partner's subject art, or its
+initials while it has none), and a set's diamond at the left. Not yet seen rendered; the faces want rendering again.
+
+**Trading with the rival is built** (`trade: { min: 50 }` in RULES; `offerSale()`, `tradeWorth()`, `tradeStep()`; --notrade).
+Once on your turn you may offer the rival one card at a price you name: an Asset from your portfolio, or a card from your
+hand. They take it or leave it, and it uses none of the three actions. A person uses the Offer a card button; a bot offers at
+the start of its turn, the card worth at least $50M more to the buyer, at the price that splits the gap, and buys when its
+gain is no smaller than the seller's. A sale to the rival is a way of leaving the portfolio: a Short on that Asset pays.
+
+8,000 games, bots: starters 7.7 rounds, Devotion 48.8% (50.3% without trading), 0.58 trades a game (a trade in 45% of games),
+average price $113M; General Shuffle 7.0 rounds, 0.53 trades a game, $129M. About half the bots' offers are turned down.
+
+## The bar: fuel as a temptation (2026-11-26)
+
+Pokémon's energy, turned round: not something a Trader needs, but something they may give in to. No cards (the set is still
+88): on your turn you may order one drink, or none, never the same one two turns running. A kick now, a comedown after; a
+Trader's own drink (`prefers` on the design) has no comedown. The Octobot takes the same five as power boosts. `bar: true` in
+RULES, `DRINKS`, `drink()`, `canDrink()`, `barStep()`; --nobar.
+
+| drink | kick | comedown |
+|---|---|---|
+| Espresso | everything sold this turn brings $30M more | next turn: one card fewer, no buying |
+| Energy Drink | two more actions, and sell what you buy this turn | next turn: one card fewer, no buying, ability off |
+| Champagne | the next gamble wins on two more faces | the next sale brings $50M less |
+| Whiskey | no Calamity can be played on you until your next turn | next turn: ability off |
+| Sugar Rush | draw two cards | discard one at the end of the turn |
+
+Their own: espresso Garth Raider, Marisol · energy drink The Influencer · champagne The Gambler, Eugene · whiskey Brent Crude,
+Byzantine General, Connor · sugar rush Virgil, Saint GR80.
+
+Trials (`pt3-trial-fuel.mjs`, 8,000 games each; "drinker" is a bot that drinks against one that never does, General Shuffle):
+
+| | the drinker wins |
+|---|---|
+| fuel the Trader NEEDS (attached, ability off without it) | ability off on 19% to 23% of turns, a round longer: dropped |
+| drinks as five cards, first kicks (an extra action) | 48.6%: an extra action is worth little |
+| drinks as five cards, the kicks above, light comedowns | 50.6% |
+| the bar, each drink once a game, light comedowns | 54.2% |
+| the bar, one a turn, light comedowns, the bot free to repeat | 50.0%: it chained energy drinks and never bought; starter games ran 12 rounds |
+| the bar, one a turn, light comedowns, never the same twice running | 60.8% |
+| the bar, one a turn, the comedowns above, never the same twice running | 52.6% |
+
+As built, 8,000 games: starters 7.2 rounds (7.7 with no bar), Devotion 48.9%, openers 43% (Byzantine General) to 57% (Brent
+Crude), The Octobot 52%; General Shuffle, the drinker wins 54.0% against a player who never drinks, at six drinks a game.
+
+## Two keywords renamed (2026-11-26)
+
+**Epiphany** is the apparition keyword (Radi8 before): the same badge, the same gift, one more action and a Miracle.
+**Synergy** is what a companion card or a set is called on the cards and at the table (the engine still says `companion` and
+`set`). The printed faces carry the old badge until they are rendered again.
+
+## The Synergy line on the card, and The Usual (2026-11-26)
+
+A card with a Synergy and no keyword of its own prints it in the badge slot at the head of the text box (RcanaCard3.jsx): a
+Trader's card says what the pairing does (`short` on the companion entry, 30 letters at most), the partner card names its
+Trader, a set Asset its set. Apparitions keep Epiphany there and show their Synergy by the medallion alone.
+
+A Trader's own drink is **The Usual**. Connor's is the Energy Drink now (it was Whiskey, which three Traders shared).
+
+## The track: Racehorse and Prediction Market (2026-11-26)
+
+Two racetrack cards, so they have Synergy: while its holder has Prediction Market open, their Racehorse wins on one more face
+(6, 7 or 8; with The Gambler seated as well, 4 or higher). `venue` on the Asset, `synergy` on the Location, `atVenue()`. The
+first Synergy between an Asset and a Location.
+
+## Four drinks, and a shorter menu (2026-11-26)
+
+Sugar Rush left the bar: it was the Energy Drink over again, and the menu was too much to read at the table. Its two Traders
+have a new usual: Saint GR80 the Espresso, Virgil the Whiskey. The menu prints each drink on one short line (`menu` in DRINKS:
+the kick, then what comes after), under a one-line rule.
+
+## Three drinks (2026-11-26)
+
+Coffee, an Energy Drink, or a Stiff Drink. Coffee is the Espresso renamed (the key is still `espresso`). The Stiff Drink is
+Champagne and Whiskey in one glass: this turn your gambles win on two more faces, and no Calamity can be played on you until
+your next turn; next turn the Trader's ability is off. Champagne's own comedown ($50M off the next sale) went with it.
+The usual: Coffee for Garth Raider, Marisol, Saint GR80 · Energy Drink for The Influencer, Connor, Eugene · Stiff Drink for
+The Gambler, Brent Crude, Byzantine General, Virgil.
+
+## Synergy marks: portraits and four glyphs (2026-11-26)
+
+Fifteen Synergies on 31 of the 88 cards: eleven Trader pairs, three sets, the track. At the table the words covered the card's
+name and "synergy" told a new player nothing, so a card's Synergies are small round marks on its left edge: the Trader's
+portrait on that Trader's own card, and a glyph for the rest (`SYNERGY_GLYPHS` in designs.js: an ingot for Metals, a picture
+frame for Collector, a stack of coins for Income, a horseshoe for the track). Dim while the partner is missing, lit once it is
+working; the words are in the tooltip and under the card when it is opened. The printed card uses the same glyphs in its left
+medallion (it was one diamond for every set). A set pays on the NEXT sale while two are held, and the card and the rules now
+say so ("hold two, next sale +$50M").
+
+## The bar is a vending machine (2026-11-26)
+
+The same rule (one drink a turn or none, never the same one twice running), behind a machine instead of a list: a button on the
+table opens a modal drawn in code (`openVending()` in pt3-table.src.html), three cans behind the glass and a button for each;
+press one and its can drops in about half a second. The drink you had last turn is SOLD OUT; your Trader's usual is ringed in
+teal. For The Octobot it is a charging station. Art, when it exists, goes in `public/TCG/rcana/vending/`: `machine.webp` (the
+cabinet, behind everything), `coffee.webp`, `energy.webp`, `alcohol.webp` (the cans, about 1:2, upright). Each drawn part stays
+until its file is there. The idea came from a CodePen of a soft-drink machine; none of its code, pictures or brands is used.
+
+## The vending machine, redrawn around the art (2026-11-26)
+
+The modal no longer draws its own sign, glass, button panel or tray: `public/TCG/rcana/vending/machine.webp` (1448x1086) is the
+machine, and the drinks standing on its two shelves are the buttons. Top shelf: `coffee.webp`, `energy.webp`. Bottom shelf:
+`beer.webp`, `cocktail.webp`, `wine.webp`, all three the one alcohol drink (Stiff Drink), so the rules stay at three options.
+Tap a drink to read its one line under the machine; tap it again and it falls to the tray and is yours. A drink you had last
+turn is greyed out; your Trader's usual has a teal light under it. Positions are in `VEND_SHELF` in `pt3-table.src.html`
+(`[drink, art file, centre x %, bottom %, width %]`). No rule or engine change. Edited in the source and in both built pages by
+hand (the device shell was down); the next `npm run pt3:build` should reproduce them.

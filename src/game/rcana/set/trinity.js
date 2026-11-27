@@ -19,6 +19,7 @@ export const TRINITY = {
   general:       { liq: 3, cred: 1, eq: 3 }, // the rock
   diablito:      { liq: 2.5, cred: 0, eq: 0 }, // no halo, no composure: he lives on his wager
   prospector:    { liq: 2.5, cred: 1, eq: 1 },
+  garth:         { liq: 2.5, cred: 1, eq: 2 }, // Garth Raider (2026-11-26)
   abuela:        { liq: 2.5, cred: 2, eq: 2 }, // respected, unflappable
   unicornio:     { liq: 2.5, cred: 1, eq: 1 },
   celebridad:    { liq: 2, cred: 2, eq: 0 }, // pays well, falls at the first Calamity
@@ -39,7 +40,8 @@ export const ATTRS = {
   unicornio:     { logos: 3, ethos: 3, pathos: 2 }, // Eugene
   general:       { logos: 3, ethos: 2, pathos: 3 }, // Byzantine General
   diablito:      { logos: 3, ethos: 1, pathos: 4 }, // Connor: clever, shameless, all appetite
-  prospector:    { logos: 2, ethos: 3, pathos: 3 }, // The Prospector
+  prospector:    { logos: 2, ethos: 3, pathos: 3 }, // Brent Crude (The Prospector until 2026-11-26)
+  garth:         { logos: 4, ethos: 2, pathos: 2 }, // Garth Raider: he knows exactly what he is doing, has a name to spend, and is not brave
   gato:          { logos: 2, ethos: 2, pathos: 4 }, // Virgil: nothing rattles a cat
   monje:         { logos: 1, ethos: 4, pathos: 3 }, // Saint GR80: faith over analysis
   abuela:        { logos: 1, ethos: 3, pathos: 4 }, // The Gambler: respected, and all heart
@@ -63,6 +65,7 @@ export const TRINITY_TEXT = {
   investigadora: "The cards you look at and do not draw go to the bottom of the deck.",
   abuela: "Every die you roll counts one in your favor.", // Lucky Streak, widened on 2026-11-24 (it was gambles only)
   prospector: "Assets you buy cost $20M less.",
+  garth: "In a bear market, your Assets sell for more instead of less.",
   general: "When a Calamity fails against your Pathos, collect $10M.",
   bot: "Goes first. Opens with eight cards and holds eight. No religious observances: sells a Grace for $30M.", // Eight Arms, as speed (2026-11-24); everyone draws two since the fuller turn
   unicornio: "In good standing, each unsold Asset counts toward your billion at its sale price plus $50M.",
@@ -71,7 +74,7 @@ export const TRINITY_TEXT = {
   bull: "A bull market: this round, every Asset sells for $50M more.",
   moon: "A bull market: this round, every Asset sells for $50M more.",
   squeeze: "The shorts are squeezed. A bull market: this round, every Asset sells for $50M more.",
-  unlock: "Supply floods in. A bear market: this round, every Asset sells for $50M less.",
+  unlock: "Everyone heads for the exit. A bear market: this round, every Asset sells for $50M less.", // The Sell-Off (Token Unlock until 2026-11-26)
   crash: "Everyone holding $80M or more loses a quarter of it. A bear market: Assets sell for $50M less this round.",
   enigma: "When you turn a Fate, you may discard this: that Fate is cancelled for everyone.",
   singular: "From now on, every player takes one more action of any kind each turn.",

@@ -16,6 +16,9 @@ export const EVENT_SUBTYPES = ["Calamity", "Opportunity", "Ambiguity"];
 export function getEventSubtype(card) {
   if (card.type === "hazard") return "Calamity";
   if (card.type === "event") {
+    // A design that names its own sort is printed as that, played or not: Token Unlock is still `played` on the
+    // shared design (its first rule, kept on file) but is a bear-market Fate, a Calamity (2026-11-25).
+    if (EVENT_SUBTYPES.includes(card.subtype)) return card.subtype;
     if (card.played) return "Opportunity";
     // An on-draw event names its own sort on the design (`subtype`); unnamed,
     // it is a windfall.

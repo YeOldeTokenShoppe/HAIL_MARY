@@ -20,6 +20,13 @@ import theWhale from "./the-whale.js";
 import laFuente from "./la-fuente.js";
 import laInvestigadora from "./la-investigadora.js";
 import elGambusino from "./el-gambusino.js";
+import brentCrude from "./brent-crude.js";
+import goldBar from "./gold-bar.js";
+import racehorse from "./racehorse.js";
+import fineArt from "./fine-art.js";
+import junkBond from "./junk-bond.js";
+import indexFund from "./index-fund.js";
+import porkbellies from "./porkbellies.js";
 import theIllumin80 from "./the-illumin80.js";
 import theCelebrity from "./the-celebrity.js";
 import collectibles from "./collectibles.js";
@@ -86,8 +93,17 @@ import specialOffer from "./special-offer.js";
 import pawnShop from "./pawn-shop.js";
 import dashboardFigurine from "./dashboard-figurine.js";
 import sacredHeart from "./sacred-heart.js";
+import chartCathedral from "./chart-cathedral.js";
 import theSingular80 from "./the-singular80.js";
 import theCatacombs from "./the-catacombs.js";
+import rewind from "./rewind.js";
+import motherboard from "./motherboard.js";
+import theSellOff from "./the-sell-off.js";
+import pocketSaint from "./pocket-saint.js";
+import moralHazard from "./moral-hazard.js";
+import airdrop from "./airdrop.js";
+import theShort from "./the-short.js";
+import garthRaider from "./garth-raider.js";
 
 export const RCANA_ART = {
   "el-diablito": elDiablito,
@@ -107,7 +123,14 @@ export const RCANA_ART = {
   "the-whale": theWhale,
   "la-fuente": laFuente,
   "la-investigadora": laInvestigadora,
-  "el-gambusino": elGambusino,
+  "el-gambusino": elGambusino, // the mine, kept on file: the face moved to brent-crude on 2026-11-26
+  "brent-crude": brentCrude,
+  "gold-bar": goldBar,
+  "racehorse": racehorse,
+  "fine-art": fineArt,
+  "junk-bond": junkBond,
+  "index-fund": indexFund,
+  "porkbellies": porkbellies,
   "the-illumin80": theIllumin80,
   "the-celebrity": theCelebrity,
   collectibles,
@@ -174,6 +197,15 @@ export const RCANA_ART = {
   "pawn-shop": pawnShop,
   "dashboard-figurine": dashboardFigurine,
   "sacred-heart": sacredHeart,
+  "chart-cathedral": chartCathedral,
   "the-singular80": theSingular80,
   "the-catacombs": theCatacombs,
+  "rewind": rewind,
+  "motherboard": motherboard,
+  "the-sell-off": theSellOff,
+  "pocket-saint": pocketSaint,
+  "moral-hazard": moralHazard,
+  "airdrop": airdrop,
+  "the-short": theShort,
+  "garth-raider": garthRaider,
 };

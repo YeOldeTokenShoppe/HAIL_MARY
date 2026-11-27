@@ -28,13 +28,13 @@ export const RESERVED_NUMBERS = {
   stablecoin: 43,
   bluechip: 45,
   plata: 80, // Quicksilver (La Plata): card 80 for element 80, mercury (2026-11-23; it traded numbers with Coin-op Confession)
-  diamond: 82, // Diamond Hands (took La Vaca's number, 2026-11-21)
+  garth: 82, // Garth Raider (2026-11-26; Diamond Hands's old number)
   predict: 83, // The Prediction Market (took El Aguacate's number, 2026-11-21; the first printed Location)
   bono: 84, // The Savings Bond — unfaced
   cava: 3, // La Cava — unfaced (took El Ángel's number when the Angel and Shady Lady were cut, 2026-11-15)
-  catedral: 4, // La Catedral — unfaced (took La Tramposa's number)
-  jardin: 44,
-  map: 33,
+  catedral: 4, // La Catedral (took La Tramposa's number)
+  jardin: 44, // Dividend Stock (Yield Farm until 2026-11-26)
+  index: 33, // Index Fund (2026-11-26; Treasure Map's old number)
   mine: 31,
   oil: 34,
   semilla: 37,
@@ -43,8 +43,8 @@ export const RESERVED_NUMBERS = {
   moon: 49,
   inherit: 8, // The Inheritance
   squeeze: 9,
-  unlock: 10, // Token Unlock — unfaced
-  moneda: 50, // The Airdrop — unfaced
+  unlock: 10, // The Sell-Off (Token Unlock until 2026-11-26)
+  moneda: 50, // The Airdrop
   crash: 38,
   fall: 51, // Fall From Grace
   holyroller: 52, // The Holy Roller — unfaced
@@ -56,45 +56,45 @@ export const RESERVED_NUMBERS = {
   illuminati: 28,
   rueda: 56, // The Wheel
   godcandle: 57,
-  moralhazard: 59, // Moral Hazard — unfaced
+  moralhazard: 59, // Moral Hazard
   mardigras: 41,
   // Hazards
   trap: 58, // Liquidity Trap (was The World)
   bear: 13,
   hack: 40,
-  paperhands: 60, // Paper Hands (added 2026-11-21 as 89; took The Virtue Signal's number the same day, so the set is 88)
+  junk: 60, // Junk Bond (2026-11-26; Paper Hands's old number)
   infierno: 61, // El Infierno
   rug: 39,
   taxman: 36,
   escandalo: 46,
   scam: 47,
   // Remedies
-  bell: 17,
+  goldbar: 17, // Gold Bar (2026-11-26; The Bell's old number)
   catacumbas: 62, // Las Catacumbas (faced 2026-11-25; was Quantum Resistance)
-  talisman: 63, // The Talisman (2026-11-21: The Keys and The Audit merged; it has The Keys' number)
+  talisman: 63, // Pocket Saint, The Talisman until 2026-11-25 (2026-11-21: The Keys and The Audit merged; it has The Keys' number)
   tortilla: 16,
-  whistle: 42, // The Whistleblower (took La Horchata's number, 2026-11-21)
+  short: 42, // The Short (2026-11-26; The Whistleblower's old number, La Horchata's before her)
   stimulus: 65, // The Stimulus (took The Burro's number, 2026-11-20)
   // Relics
   heart: 66, // El Corazón
   swan: 67, // The Black Swan (added 2026-11-23; The Halo's old number)
   rosary: 18,
   grail: 68, // The Grail — the graded card in the vault (was the El Cáliz Relic, retired 2026-11-15)
-  enigma: 69, // El Enigma — unfaced
+  porkbellies: 69, // Pork Bellies (2026-11-26; Enigma Machine's old number)
   skull: 19,
   perp: 70, // Perpetuals (was 86 until 2026-11-21; took The Shroud's number when the set went to 86)
   rideordie: 35,
   lottery: 71, // El Boleto
-  geometry: 72, // Sacred Geometry
+  fineart: 72, // Fine Art (2026-11-26; Sacred Geom8ry's old number)
   tattoo: 73, // El Tatuaje — unfaced
   dashboard: 74, // La Virgencita
-  mission: 77, // The Mission (added 2026-11-21; took The Cleansing's number on 2026-11-22)
+  racehorse: 77, // Racehorse (2026-11-26; The Mission's old number)
   special: 85, // Special Offer (2026-11-25; The 80/20 Rule's old number)
   rewind: 86, // Rewind (added 2026-11-22)
   singular: 87, // The Singular80 (it was always numbered last until Back to the 80s took 88, 2026-11-22)
   pawn: 64, // Pawn Shop (added 2026-11-23; The Press Release's old number)
   eighties: 88, // Back to the 80s — the portal, card 88 of 88 (added 2026-11-22)
-  motherboard: 5, // La Placa Madre — unfaced (a Relic since 2026-11-12)
+  motherboard: 5, // La Placa Madre (a Relic since 2026-11-12)
   // Graces
   ofrenda: 75, // La Ofrenda
   cherub: 76, // El Exvoto

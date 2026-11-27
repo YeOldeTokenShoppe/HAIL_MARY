@@ -24,15 +24,20 @@ export default {
     // The table and the company, inside the window on the subject rung.
     { id: "subject", z: ART_PLANES.subject, scale: 1 },
 
-    // The four candle flames, drawn over the table on its own rung, so they
+    // The five candle flames, drawn over the table on its own rung, so they
     // stay on their wicks on tilt. On the live card each one flickers on its
     // own clock about its own wick (flames: x, y the wick in % of the layer,
     // r the window cut around that flame in px), far to near.
+    // Re-measured from prop1.webp on 2026-11-26, when the Feast was painted
+    // again with Brent Crude at the table: the flames sit about three points
+    // left of and above where they were, and there is a fifth, on the candle
+    // fourth from the far end.
     { id: "prop1", z: ART_PLANES.subject, scale: 1, flames: [
-      { x: 52.68, y: 25.25, r: 8 },
-      { x: 53.12, y: 28.6, r: 10 },
-      { x: 53.65, y: 34.45, r: 14 },
-      { x: 52.48, y: 54.5, r: 18 },
+      { x: 49.76, y: 21.94, r: 8 },
+      { x: 50.27, y: 26.08, r: 10 },
+      { x: 50.83, y: 32.05, r: 14 },
+      { x: 49.36, y: 38.72, r: 19 },
+      { x: 49.64, y: 52.7, r: 18 },
     ] },
   ],
 };

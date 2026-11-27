@@ -32,21 +32,34 @@ export const DESIGNS = [
   // zero the Trader is discredited) and EQUANIMITY (eq — composure: a
   // Calamity played on you fails on a die roll of eq or lower). Three things
   // a real trader should hold onto; printed as three "-ity" words.
-  D('unicornio', 'El Unicornio', 'trader', 3, { liq: 3, cred: 20, eq: 1, abilityName: 'The Spectacle', narrative: true, /* the ability was The Narrative until 2026-11-23; `narrative` is still the engine's flag */ premium: 50, text: 'In good standing, each unsold Asset counts toward your billion at its sale price plus $50M' }), // 2026-11-20: Compound Interest was arbitrary; a unicorn is worth a billion on paper, for as long as the story is believed
-  D('gato', 'El Gato', 'trader', 2, { liq: 2, cred: 16, eq: 1, abilityName: 'Clean Sweep', text: 'When seated, and at the start of each turn on a roll of 4+, knock one Calamity off your table, free' }),
+  D('unicornio', 'El Unicornio', 'trader', 3, { prefers: 'energy', companion: { card: 'semilla', short: 'Seed Round blooms in two', kind: 'special', sooner: 2, text: 'blooms in two rounds instead of four' }, liq: 3, cred: 20, eq: 1, abilityName: 'The Spectacle', narrative: true, /* the ability was The Narrative until 2026-11-23; `narrative` is still the engine's flag */ premium: 50, text: 'In good standing, each unsold Asset counts toward your billion at its sale price plus $50M' }), // 2026-11-20: Compound Interest was arbitrary; a unicorn is worth a billion on paper, for as long as the story is believed
+  D('gato', 'El Gato', 'trader', 2, { prefers: 'alcohol', companion: { card: 'realestate', short: 'Real Estate pays $10M rent', kind: 'special', rent: 1, text: 'pays him $10M rent each turn' }, liq: 2, cred: 16, eq: 1, abilityName: 'Clean Sweep', text: 'When seated, and at the start of each turn on a roll of 4+, knock one Calamity off your table, free' }),
   // The investigator: she reads the tape before the market does. Before her
   // turn's draw she peeks at the top card and may send it to the bottom —
   // the one Trader who can dodge the weather instead of weathering it.
-  D('investigadora', 'La Investigadora', 'trader', 3, { liq: 3, cred: 14, eq: 1, abilityName: 'Due Diligence', text: 'The top card of your deck is face up to you. Once on your turn, you may put it on the bottom' }),
-  D('monje', 'El Monje', 'trader', 1, { liq: 1, cred: 22, eq: 2, abilityName: 'Vow of Prosperity', text: 'When you light a candle, bank 25 Prosperity' }),
-  D('diablito', 'El Diablito', 'trader', 2, { liq: 2, cred: 10, eq: 0, abilityName: 'Devil’s Wager', text: 'At the start of your turn, flip a coin: heads, collect 1 Liquidity; tails, El Diablito loses 1 CRED' }),
-  D('celebridad', 'The Influencer', 'trader', 3, { liq: 3, cred: 8, eq: 0, abilityName: 'Star Power', text: 'The influencer: pay 1 when banking from a card, +25 Prosperity', printName: 'La Influencer' }),
-  D('abuela', 'La Abuela', 'trader', 2, { liq: 2, cred: 18, eq: 1, abilityName: 'Lucky Streak', text: 'The gambling grandmother: your gambles moon on 4+ instead of 5+' }),
-  D('prospector', 'El Gambusino', 'trader', 2, { liq: 2, cred: 15, eq: 1, abilityName: 'Prospector’s Eye', text: 'Assets you buy cost 1 less' }),
+  D('investigadora', 'La Investigadora', 'trader', 3, { prefers: 'espresso', companion: { card: 'bluechip', short: 'Blue Chip costs $20M less', kind: 'cost', off: 2, text: 'costs $20M less to buy' }, liq: 3, cred: 14, eq: 1, abilityName: 'Due Diligence', text: 'The top card of your deck is face up to you. Once on your turn, you may put it on the bottom' }),
+  D('monje', 'El Monje', 'trader', 1, { prefers: 'espresso', companion: { card: 'talisman', short: 'Pocket Saint lights a candle', kind: 'special', candle: true, text: 'lights a candle when he equips it' }, liq: 1, cred: 22, eq: 2, abilityName: 'Vow of Prosperity', text: 'When you light a candle, bank 25 Prosperity' }),
+  D('diablito', 'El Diablito', 'trader', 2, { prefers: 'energy', companion: { card: 'perp', short: 'Perpetuals double his wager', kind: 'special', wager: 2, text: 'doubles his wager while he holds it' }, liq: 2, cred: 10, eq: 0, abilityName: 'Devil’s Wager', text: 'At the start of your turn, flip a coin: heads, collect 1 Liquidity; tails, El Diablito loses 1 CRED' }),
+  D('celebridad', 'The Influencer', 'trader', 3, { prefers: 'energy', companion: { card: 'meme', short: 'Meme Coin: +2 winning faces', kind: 'gamble', n: 2, text: 'moons on two more faces of the die' }, liq: 3, cred: 8, eq: 0, abilityName: 'Star Power', text: 'The influencer: pay 1 when banking from a card, +25 Prosperity', printName: 'La Influencer' }),
+  D('abuela', 'La Abuela', 'trader', 2, { prefers: 'alcohol', companion: { card: 'racehorse', short: 'Racehorse: +1 winning face', kind: 'gamble', n: 1, text: 'wins on one more face of the die' }, liq: 2, cred: 18, eq: 1, abilityName: 'Lucky Streak', text: 'The gambling grandmother: your gambles moon on 4+ instead of 5+' }),
+  // THE BAR (2026-11-26): `prefers` on a Trader is their own drink (DRINKS in pt3-sim.js): it has no comedown for them. The Octobot has
+  // none: it takes the same five as power boosts, comedowns and all.
+  // COMPANION CARDS AND SETS (2026-11-26). Every Trader has one card that does more in their hands (`companion` on the Trader:
+  // `card` its key · `kind` 'sale' (it sells for `amount` $M more; no Trader uses it now), 'gamble' (it wins on `n` more faces) or 'special' (`more` coins
+  // on The Short, `sooner` rounds off a Seed Round, `candle` on equipping) · `text` the line the table prints · `short` the same for the card's own Synergy line, 30 letters at most). And some Assets
+  // belong to a `set` (metals, collector, income): while you hold two of a set, each sells for SET_BONUS more (pt3-sim.js).
+  // The other five have a rule of their own too (the same day; they began as a plain $50M on the sale): `fast` The Octobot sells its
+  // Tech Stock the turn it buys it · `wager` Connor's wager is multiplied while he holds Perpetuals · `rent` Virgil collects that many
+  // coins a turn from Real Estate · kind 'cost', `off` Marisol pays that many coins less for a Blue Chip · `growth` Byzantine
+  // General's Savings Bond grows that many times as fast.
+  // GARTH RAIDER (2026-11-26): the 80s corporate raider. He makes money when the market falls: in a bear market his Assets sell
+  // for more instead of less (`bearish`; saleBonusFor() in the engine). Logos 4, Ethos 2, Pathos 2 (trinity.js).
+  D('garth', 'Garth Raider', 'trader', 2, { prefers: 'espresso', companion: { card: 'short', short: 'The Short pays $150M', kind: 'special', more: 5, text: 'pays $150M instead of $100M' }, abilityName: 'Avarice', bearish: true, text: 'In a bear market, your Assets sell for more instead of less' }),
+  D('prospector', 'El Gambusino', 'trader', 2, { prefers: 'alcohol', companion: { card: 'oil', short: 'Oil Field Claim: +1 winning face', kind: 'gamble', n: 1, text: 'gushes on one more face of the die' }, liq: 2, cred: 15, eq: 1, abilityName: 'Prospector’s Eye', text: 'Assets you buy cost 1 less' }),
   // The Byzantine Generals: a Calamity has to reach consensus before it lands.
-  D('general', 'Byzantine General', 'trader', 2, { liq: 2, cred: 14, eq: 3, abilityName: 'Fault Tolerance', text: 'When a Calamity fails against your Equanimity, collect 1 Liquidity', printName: 'El General' }),
+  D('general', 'Byzantine General', 'trader', 2, { prefers: 'alcohol', companion: { card: 'bono', short: 'Savings Bond grows double', kind: 'special', growth: 2, text: 'grows twice as fast' }, liq: 2, cred: 14, eq: 3, abilityName: 'Fault Tolerance', text: 'When a Calamity fails against your Equanimity, collect 1 Liquidity', printName: 'El General' }),
   // The trading bot: fat income, no soul. Scandal has nothing to grip; the shrine hears nothing.
-  D('bot', 'The Bot', 'trader', 3, { liq: 3, cred: 6, eq: 3, abilityName: 'Eight Arms', armsBuy: true, text: 'After your main action, you may also buy or sell one Asset. It cannot pray: while it sits, your Graces go unheard', printName: 'El Octobot' }),
+  D('bot', 'The Bot', 'trader', 3, { companion: { card: 'tech', short: 'Tech Stock sells same turn', kind: 'special', fast: true, text: 'can be sold on the turn it is bought' }, liq: 3, cred: 6, eq: 3, abilityName: 'Eight Arms', armsBuy: true, text: 'After your main action, you may also buy or sell one Asset. It cannot pray: while it sits, your Graces go unheard', printName: 'El Octobot' }),
   D('tech', 'Tech Stock', 'asset', 3, { cash: 5, pros: 100, tech: true }),
   // The degen asset, and the only gamble: sell safe for cash, or roll the die for
   // Prosperity. (Was two cards — Meme Coin's body with Shitcoin's upside.)
@@ -55,10 +68,10 @@ export const DESIGNS = [
   // Slow and safe: the one pile The Bear cannot cap.
   D('realestate', 'Real Estate', 'asset', 5, { cash: 8, pros: 150, bearProof: true, text: 'While held, immune to The Bear' }),
   // The old Moneda's job — a trickle of income — on a coin that holds its value.
-  D('stablecoin', 'Stablecoin', 'asset', 2, { cash: 3, pros: 50, income: 1, text: 'While held: collect 1 Liquidity at the start of your turn' }),
+  D('stablecoin', 'Stablecoin', 'asset', 2, { set: 'income', cash: 3, pros: 50, income: 1, text: 'While held: collect 1 Liquidity at the start of your turn' }),
   D('bluechip', 'Blue Chip', 'asset', 6, { cash: 10, pros: 250 }),
-  D('grail', 'Grail Card', 'asset', 3, { cash: 5, pros: 100, gem: 250, text: 'Gem mint: sells for 100 — or 250 while you hold three lit candles' }),
-  D('rideordie', 'Ride or Die', 'asset', 3, { apparition: true, cash: 4, pros: 100, text: 'While Ride or Die is in your portfolio, your Assets stay with you — the Whale and the Wheel pass you by' }), // titled The Lowrider until 2026-11-21
+  D('grail', 'Grail Card', 'asset', 3, { set: 'collector', cash: 5, pros: 100, gem: 250, text: 'Gem mint: sells for 100 — or 250 while you hold three lit candles' }),
+  D('rideordie', 'Classic Car', 'asset', 3, { set: 'collector', apparition: true, cash: 4, pros: 100, text: 'Ride or die: while the Classic Car is in your portfolio, your Assets stay with you — the Whale and the Wheel pass you by' }), // Classic Car since 2026-11-25 (Ride or Die before; the key and the face id keep that name) // titled The Lowrider until 2026-11-21
   // The Rooster left this set on 2026-11-21 (a card of the traditional lotería deck, reserved for that edition).
   // Cult of Personal80 took its number and its place in the Degen deck.
   // D('gallo', 'El Gallo', 'asset', 2, { cash: 2, pros: 75, rooster: true, text: 'The fighting rooster: at the start of your turn, roll — a 6 collects 2; a 1, and he is dead' }),
@@ -68,7 +81,7 @@ export const DESIGNS = [
   // D('aguacate', 'El Aguacate', 'asset', 3, { cash: 2, pros: 50, ripe: true, text: 'Green gold: ripe on the second round, worth 150. Green before, 50 — then it rots, 50 less each round' }),
   D('cava', 'La Cava', 'asset', 3, { cash: 3, pros: 50, grow: 25, uncork: true, text: 'Vintage: worth 25 more each round held — or uncork it: discard to light a candle' }),
   D('bono', 'Savings Bond', 'asset', 2, { cash: 2, pros: 25, grow: 25, bearProof: true, text: 'Grandmother’s gift: worth 25 more each round held, and immune to The Bear' }),
-  D('plata', 'La Plata', 'asset', 3, { cash: 3, pros: 125, silver: true, text: 'Flight to safety: in a Flash Crash you lose nothing, and bank 25' }),
+  D('plata', 'La Plata', 'asset', 3, { set: 'metals', cash: 3, pros: 125, silver: true, text: 'Flight to safety: in a Flash Crash you lose nothing, and bank 25' }),
   D('perp', 'Perpetuals', 'asset', 4, { cash: 4, pros: 75, perp: true, text: 'Leverage: sells for double — but a Bear Market played on you while it is held liquidates it' }),
   // Events you CALL: played from the hand for their cost, banked on the spot —
   // where the other Events fire the moment they are drawn. `played` is the flag.
@@ -77,19 +90,27 @@ export const DESIGNS = [
   // The Inheritance (rule since 2026-11-23). It was "3 coins, or 50 Prosperity": two currencies made that a choice,
   // and with one money it was a flat $50M for nothing. Now the choice is time: $50M at once (cash), or put it in
   // trust and collect $100M five rounds on (pros, trust: the rounds; it waits on the desk like a planted Seed Round).
+  // THE SHORT (2026-11-26, in The Whistleblower's place): a position against one Asset a rival holds. It stays with its player
+  // until that Asset leaves the rival's portfolio by any road (sold, rugged, wrecked, panic-sold, moved), and then pays `short`
+  // coins: unless the rival sold it in a round when the market adds to sale prices. An Event played from the hand, like Seed Round.
+  D('short', 'The Short', 'event', 2, { played: true, short: 10, text: 'Play on an Asset your rival holds. When it leaves their portfolio, collect $100M, unless they sold it in a bull market' }),
   D('inherit', 'The Inheritance', 'event', 0, { cash: 5, pros: 100, trust: 5, choice: true, played: true, text: 'Take 5 Liquidity now — or put it in trust: five rounds on, bank 100' }),
   // The two that replaced Rocket (2026-11-10). Called Events that care what is on
   // your table: suffering pays for Devotion, the Degen windfall leaks to the room.
   D('squeeze', 'Short Squeeze', 'event', 3, { pros: 100, perHaz: 50, bearProof: true, played: true, text: 'Bank 100, plus 50 for each Calamity on you. Bear Market cannot cap it' }),
   D('ponzi', 'The Ponzi', 'event', 2, { pros: 0, perRivalAsset: 25, rivalsCollect: 1, played: true, text: 'New money pays the old: bank 25 for every Asset your rivals hold — then every rival collects 1' }),
-  D('unlock', 'Token Unlock', 'event', 4, { pros: 200, rivalsCollect: 1, played: true, text: 'Bank 200 — and every rival collects 1 Liquidity' }),
+  // Token Unlock is a FATE and a bear market since 2026-11-24 (trinity.js: MARKET, TRINITY_TEXT; pt3-sim lays that over this line), so it
+  // prints as a Calamity (2026-11-25; it printed 'Opportunity', the default, with a bear on it). The numbers here are its first rule, kept on file.
+  // THE SELL-OFF since 2026-11-26 (Token Unlock before: a crypto term; the set is general trading). Same card, same bear market; the key stays `unlock`.
+  D('unlock', 'The Sell-Off', 'event', 4, { subtype: 'Calamity', pros: 200, rivalsCollect: 1, played: true, text: 'Bank 200 — and every rival collects 1 Liquidity' }),
   D('bear', 'Bear Market', 'hazard', 2, { text: 'Bank at most 75 Prosperity from a single card' }),
   // THE THREE FRAUDS (2026-11-20). A Calamity is either a CONDITION — it sits on the rival until cleared
   // (Bear Market, Tax Collector, Liquidity Trap, Scandal, The Inferno) — or a HIT (`hit: true`): a fraud that
   // happens once and is over. A hit is played on a rival, resolves and is discarded; there is nothing to
   // clear, so it can only be prevented (Sacred Heart, Equanimity, the Relics that ward it). `steal` and
   // `loss` are in $M. Playtest 2's engine does not read `hit` and still plays these three the old way.
-  D('hack', 'Quantum Hack', 'hazard', 2, { hit: true, steal: 40, text: 'Take $40M from your rival' }),
+  // $30M since 2026-11-26 (it was $20M): the cheapest fraud was also the most efficient, an $80M swing. All three frauds cost $30M now.
+  D('hack', 'Quantum Hack', 'hazard', 3, { hit: true, steal: 40, text: 'Take $40M from your rival' }),
   // Performative piety: the candles are lit, and count for nothing.
   // The Virtue Signal left the set on 2026-11-21, the weakest card in it: it only stopped a rival's candles from
   // helping their Hail Mary, it had no cure of its own, and it was in neither starter deck. Paper Hands took
@@ -102,12 +123,14 @@ export const DESIGNS = [
   // Paper Hands (2026-11-21): a condition. Each turn it stays, its victim sells the Asset they bought most
   // recently (the same Asset a Rug Pull would take) at its cash price, the lower of its two. Cleared by
   // The Stimulus or The Miracle Tortilla; Diamond Hands turns it away.
-  D('paperhands', 'Paper Hands', 'hazard', 3, { text: 'At the start of each turn, they sell the Asset they bought most recently, for its cash price' }),
+  // Paper Hands left the set on 2026-11-26 (the cut that made room for six more Assets and Garth Raider; PLAYTEST3.md). Kept on file.
+  // D('paperhands', 'Paper Hands', 'hazard', 3, { text: 'At the start of each turn, they sell the Asset they bought most recently, for its cash price' }),
   D('taxman', 'Tax Collector', 'hazard', 2, { text: 'Pay 1 to the bank at the start of each turn' }),
   D('trap', 'Liquidity Trap', 'hazard', 3, { text: 'Trapped: every Liquidity they collect goes under this card instead. Clear it, and the pile is theirs' }),
   D('escandalo', 'Scandal', 'hazard', 2, { text: 'A strike when it lands. While it stays, the Trader cannot return to good standing' }),
   D('scam', 'Exit Scam', 'hazard', 3, { hit: true, loss: 75, text: 'Your rival loses $75M' }),
-  D('bell', 'The Bell', 'remedy', 1, { clears: 'bear', printName: 'La Campana' }),
+  // The Bell left the set on 2026-11-26 (the cut that made room for six more Assets and Garth Raider; PLAYTEST3.md). Kept on file.
+  // D('bell', 'The Bell', 'remedy', 1, { clears: 'bear', printName: 'La Campana' }),
   // Not your keys, not your coins: the Keys answer the two Calamities that lock you out of
   // what is yours — the exchange that shuts (Exit Scam) and the lock that is broken (Quantum Hack).
   // `clears` may be one design key, a list of them, or 'any'. (They cleared Rug Pull until 2026-11-20.)
@@ -122,7 +145,9 @@ export const DESIGNS = [
   // sold or spent; not an Event that fired on the draw, and not another Rewind). You still pay to play
   // that card again. (rewind: the engine's flag.)
   D('rewind', 'Rewind', 'remedy', 1, { rewind: true, text: 'Take the last card you discarded back into your hand' }),
-  D('whistle', 'The Whistleblower', 'remedy', 2, { whistle: true, text: 'Undo the last fraud played on you: take back what it cost you. The rival who played it takes a strike' }),
+  // Any Calamity since 2026-11-25 (clears: 'any'): frauds alone left her unplayed in 88% of the hands that drew her.
+  // The Whistleblower left the set on 2026-11-26: the game is about trading, not corporate governance. The Short has her number (42). Kept on file.
+  // D('whistle', 'The Whistleblower', 'remedy', 2, { whistle: true, clears: 'any', text: 'Answer a Calamity played on you: undo the last fraud (take back what it cost you), or clear any other. The rival who played it takes a strike' }),
   D('tortilla', 'Miracle Tortilla', 'remedy', 2, { apparition: true, clears: 'any', printName: 'La Tortilla' }),
   // The thing the publicist hands you, not the man: the Remedies row is objects.
   // The Press Release left the set on 2026-11-23 (played about once in sixteen copies; Coin-op Confession and Miracle Tortilla do its two jobs). Kept on file.
@@ -144,7 +169,8 @@ export const DESIGNS = [
   // D('keys', 'The Keys', 'artifact', 2, { wards: ['hack', 'scam'], text: 'Quantum Hack and Exit Scam cannot be played on you', printName: 'Las Llaves' }),
   D('rosary', 'The Rosary Beads', 'artifact', 2, { text: 'When you light a candle, draw a card', printName: 'El Rosario' }),
   // Intercepted traffic: the market's message is decoded before it is sent.
-  D('enigma', 'Enigma Machine', 'artifact', 2, { text: 'Intercept: when an Event fires on your draw, discard the Machine — the Event is cancelled for everyone', printName: 'El Enigma' }),
+  // Enigma Machine left the set on 2026-11-26 (the cut that made room for six more Assets and Garth Raider; PLAYTEST3.md). Kept on file.
+  // D('enigma', 'Enigma Machine', 'artifact', 2, { text: 'Intercept: when an Event fires on your draw, discard the Machine — the Event is cancelled for everyone', printName: 'El Enigma' }),
   // Exit liquidity, held rather than fired: the Skull's owner is the one every
   // seller pays.
   // Saint's Skull since 2026-11-23 (The Skull before): the relic the art already was.
@@ -158,7 +184,8 @@ export const DESIGNS = [
   // lets it land and pays anyway. (cult: the engine's flag.)
   // Diamond Hands (2026-11-21): patience, paid. An Asset held three rounds or more sells for $25M more
   // (diamond, in $M), and Paper Hands cannot be played on its holder.
-  D('diamond', 'Diamond Hands', 'artifact', 2, { diamond: 25, wards: ['paperhands'], text: 'Each Asset you have held three rounds or more sells for $25M more. Paper Hands cannot be played on you' }),
+  // Diamond Hands left the set on 2026-11-26 (the cut that made room for six more Assets and Garth Raider; PLAYTEST3.md). Kept on file.
+  // D('diamond', 'Diamond Hands', 'artifact', 2, { diamond: 25, wards: ['paperhands'], text: 'Each Asset you have held three rounds or more sells for $25M more. Paper Hands cannot be played on you' }),
   // CUT on 2026-11-21, the day it was added: a card that pays a Trader for staying in scandal works against
   // what the game is about (Ethos, character, is the strongest attribute). Kept here as a record.
   // D('cult', 'Cult of Personal80', 'artifact', 2, { cult: true, flock: 1, text: 'The faithful pay in: your seated Trader collects $10M more each turn, and is paid for good standing even in scandal. You cannot seat another Trader over them. If they are discredited, discard this' }),
@@ -172,10 +199,12 @@ export const DESIGNS = [
   D('lottery', 'Lottery Ticket', 'artifact', 1, { text: 'Scratch it at the start of each turn: roll the die — a 6 wins 150 Prosperity, and the Ticket is spent', printName: 'El Boleto' }),
   // Ink of devotion: a slow, permanent heal for whoever sits at the desk.
   // Everything aligns: the called Events (Bull Run, Full Moon…) pay a little more.
-  D('geometry', 'Sacred Geom8ry', 'artifact', 2, { text: 'Everything aligns: your called Events bank 25 more', printName: 'La Geometría' }),
+  // Sacred Geom8ry left the set on 2026-11-26 (the cut that made room for six more Assets and Garth Raider; PLAYTEST3.md). Kept on file.
+  // D('geometry', 'Sacred Geom8ry', 'artifact', 2, { text: 'Everything aligns: your called Events bank 25 more', printName: 'La Geometría' }),
   // The board that holds it all: the one card that touches the two-slot limit.
-  D('motherboard', 'The Motherboard', 'artifact', 2, { slots: true, text: 'Expansion slots: the board takes no Relic slot, and you may hold a third Relic', printName: 'La Placa Madre' }),
-  D('map', 'Treasure Map', 'artifact', 2, { text: 'X marks the spot: whenever you sell an Asset, draw a card', printName: 'El Mapa' }),
+  D('motherboard', 'The Motherboard', 'artifact', 2, { apparition: true, slots: true, text: 'Expansion slots: the board takes no Relic slot, and you may hold a third Relic', printName: 'La Placa Madre' }),
+  // Treasure Map left the set on 2026-11-26 (the cut that made room for six more Assets and Garth Raider; PLAYTEST3.md). Kept on file.
+  // D('map', 'Treasure Map', 'artifact', 2, { text: 'X marks the spot: whenever you sell an Asset, draw a card', printName: 'El Mapa' }),
   D('tattoo', 'The Tattoo', 'artifact', 2, { apparition: true, text: 'Inked devotion: at the start of your turn, your seated Trader returns to good standing', printName: 'El Tatuaje' }),
   // Due diligence, done beforehand: prevention, not cure.
   // The Audit left the set on 2026-11-21, merged with The Keys into The Talisman. Design, face and art kept.
@@ -183,6 +212,7 @@ export const DESIGNS = [
   // The Talisman (2026-11-21): one protection where there were two. The Keys stopped two frauds and The Audit
   // the third; frauds are rare, so each was usually a dead card. The Talisman stops all three, and it does
   // something every game besides: its wearer's Trader counts one more Pathos against any Calamity (pathos).
+  // Printed as POCKET SAINT since 2026-11-25 (ENGLISH_TITLES): the little monk in his capsule, art/pocket-saint.js.
   D('talisman', 'The Talisman', 'artifact', 2, { wards: ['rug', 'hack', 'scam'], pathos: 1, text: 'Rug Pull, Quantum Hack and Exit Scam cannot be played on you. Your seated Trader counts one more Pathos against Calamities' }),
   D('dashboard', 'Dashboard Mary', 'artifact', 2, { apparition: true, noSlot: true, text: 'Our Lady of the Dashboard: an apparition for the road. She takes no Relic slot', printName: 'La Virgencita' }),
   D('ofrenda', 'La Ofrenda', 'grace', 0, { savingGrace: 2, text: 'Offer this card to Our Lady: it goes to the shrine and lights a candle' }),
@@ -190,7 +220,7 @@ export const DESIGNS = [
   // Trader would be discredited — they stay, with N Credibility. Printed as a line
   // under the card's own text; the engine reads `savingGrace`. It gives a
   // Grace a second life once the shrine's three candles are lit.
-  D('cherub', 'The Votive', 'grace', 1, { savingGrace: 3, text: 'To the shrine: light a candle, then draw a card', printName: 'El Exvoto' }),
+  D('cherub', 'The Votive', 'grace', 1, { apparition: true, savingGrace: 3, text: 'To the shrine: light a candle, then draw a card', printName: 'El Exvoto' }),
   // Coins in the water: not a candle (the shrine holds three) but a better roll.
   // Absolution: a candle, and the slate wiped clean.
   // Someone prays on your behalf: a candle, and a Calamity lifted.
@@ -219,7 +249,9 @@ export const DESIGNS = [
   // market is a venue, so the same day it became the first Location of the Degen kind. Once on its
   // owner's turn, before the main action, they may stake `stake` coins and name their odds: market is
   // [the face needed, what it pays in $M] for each contract. A miss loses the stake.
-  D('predict', 'Prediction Market', 'location', 3, { stake: 2, market: [[3, 30], [5, 50], [8, 200]], text: 'Once on your turn, before your main action, you may stake $20M and name your odds: 3+ pays $30M, 5+ pays $50M, an 8 pays $200M. Miss, and the stake is lost' }),
+  // THE TRACK (2026-11-26): the two racetrack cards have Synergy. While its holder has this Location open, their Racehorse wins on
+  // `n` more faces (`venue` on the Asset names the Location; `synergy` here is what this card prints about it).
+  D('predict', 'Prediction Market', 'location', 3, { synergy: { card: 'racehorse', short: 'Racehorse: +1 winning face', text: 'wins on one more face of the die while this is open' }, stake: 2, market: [[3, 30], [5, 50], [8, 200]], text: 'Once on your turn, before your main action, you may stake $20M and name your odds: 3+ pays $30M, 5+ pays $50M, an 8 pays $200M. Miss, and the stake is lost' }),
   // The Mission (2026-11-21): a place that looks after whoever is behind. While it stands, its owner collects
   // alms (in coins) at the start of any turn they begin with less cash than every rival. A place from the
   // RL80 website, and the set's samaritan.
@@ -232,11 +264,26 @@ export const DESIGNS = [
   // turn, before the main action, discard a card for $20M. It gives a use to the cards with nothing to do (a Remedy
   // with no trouble to clear, a Grace after the third candle) and a question every turn. (pawn: what it pays, in coins.)
   D('pawn', 'Pawn Shop', 'location', 2, { pawn: 2, text: 'Once on your turn, before your main action, you may discard a card from your hand: collect 2 Liquidity' }),
-  D('mission', 'The Mission', 'location', 2, { alms: 2, text: 'At the start of your turn, if you have less cash than every rival, collect $20M' }),
+  // The Mission left the set on 2026-11-26 (the cut that made room for six more Assets and Garth Raider; PLAYTEST3.md). Kept on file.
+  // D('mission', 'The Mission', 'location', 2, { alms: 2, text: 'At the start of your turn, if you have less cash than every rival, collect $20M' }),
   D('catacumbas', 'The Catacombs', 'location', 2, { vault: true, /* cold storage since 2026-11-24; it buried a Trader for cash before */ text: 'Cold storage: once a turn, move one Asset down or up. Below, nothing can touch it, and it cannot be sold', printName: 'Las Catacumbas' }),
-  D('moneda', 'The Airdrop', 'event', 0, { text: 'Free money falls from the sky: every player collects 2 Liquidity' }),
+  D('moneda', 'The Airdrop', 'event', 0, { text: 'Free money falls on holders: every player with at least one Asset collects 2 Liquidity' }), // holders only since 2026-11-25 (it paid everyone; 12,000 games each way: no change in balance)
   // Yield farming: fat income until the market moves and wipes it.
-  D('jardin', 'Yield Farm', 'asset', 4, { cash: 2, pros: 50, income: 2, text: 'While held: collect 2 a turn. Discard this Asset when any Event fires on draw' }),
+  // DIVIDEND STOCK since 2026-11-26 (Yield Farm before; the key stays `jardin`). The farm was discarded whenever an Event fired, and
+  // since The Fates a Fate turns every round, so it never lasted one. Now it simply pays.
+  D('jardin', 'Dividend Stock', 'asset', 4, { set: 'income', cash: 2, pros: 50, income: 2, text: 'While held: collect $20M at the start of your turn' }),
+  // SIX MORE ASSETS (2026-11-26): the set was one Asset in six, and holding Assets is what wins. Each plays its own way.
+  //   haven        a bear market raises its price instead of lowering it
+  //   diversified  Rug Pull and Tech Rekt cannot take it
+  //   junk         at the start of its holder's turn the die is rolled: on `junk` or lower it defaults (discarded) before it pays
+  //   ripe         The Avocado's old rule: $50M, then $150M on the second round held, then $50M less each round
+  //   bullOnly     it can only be sold in a round when the market adds to sale prices
+  D('goldbar', 'Gold Bar', 'asset', 4, { set: 'metals', cash: 4, pros: 100, haven: true, text: 'Safe haven: a bear market raises its price instead of lowering it' }),
+  D('index', 'Index Fund', 'asset', 3, { cash: 3, pros: 75, diversified: true, text: 'Diversified: Rug Pull and Tech Rekt cannot take it' }),
+  D('junk', 'Junk Bond', 'asset', 2, { set: 'income', cash: 2, pros: 25, income: 2, junk: 1, text: 'At the start of your turn, roll the die: on a 1 it defaults and is discarded. Otherwise, collect $20M' }),
+  D('porkbellies', 'Pork Bellies', 'asset', 3, { cash: 2, pros: 50, ripe: true, text: 'Futures: worth $150M on the second round you hold them. Before that, $50M; after it, $50M less each round' }),
+  D('fineart', 'Fine Art', 'asset', 5, { set: 'collector', cash: 5, pros: 300, bullOnly: true, text: 'It can only be sold in a bull market' }),
+  D('racehorse', 'Racehorse', 'asset', 3, { venue: { location: 'predict', n: 1 }, cash: 3, pros: 350, gamble: true, gambleOn: 6, text: 'Sell her for $30M, or race her: on a 7 or 8 she wins $350M, else nothing' }),
   // Hail Mary Prospecting Co. — three claims:
   // the map leads somewhere (cards), the mine pays the longer you dig, the well is a wildcat.
   // The Mother Lode (The Mine until 2026-11-21): the heap of ore reads as Our Lady, mantle and rays, a happy
@@ -255,8 +302,12 @@ export const DESIGNS = [
   D('fall', 'Fall From Grace', 'event', 0, { subtype: 'Calamity', text: 'The fall: every seated Trader takes a strike' }),
   // Apparitions: Our Lady appears to the whole table, unbidden. Each is an
   // on-draw Event named for her; the names are hers, so the Spanish one stays.
-  D('holyroller', 'The Holy Roller', 'event', 0, { apparition: true, text: 'She rolls through: every player draws a card and collects 1 Liquidity' }),
-  D('fuego', 'Nuestra Señora del Fuego', 'event', 0, { apparition: true, text: 'She rides the fire horse through the market: every player banks 75 Prosperity' }),
+  // MARKET APPARITIONS (2026-11-26): these two were handouts (draw a card and collect $10M; everyone collects $75M). Now they move the
+  // market for the round they are turned, like the other market Fates. The Holy Roller rolls for it (marketRoll: `bull` or higher on the
+  // die is a bull round, anything lower a bear round, by `amount` $M a sale), so nobody knows which until it resolves: an Ambiguity.
+  // Fire Horse is a bull round at +$75M (market), between the ordinary bull Fates (+$50M) and The God Candle (+$100M).
+  D('holyroller', 'The Holy Roller', 'event', 0, { apparition: true, subtype: 'Ambiguity', marketRoll: { bull: 5, amount: 50 }, text: 'She rolls through. Roll the die: 5 or higher, a bull market; 4 or lower, a bear market. This round, every Asset sells for $50M more or less' }),
+  D('fuego', 'Nuestra Señora del Fuego', 'event', 0, { apparition: true, market: 75, text: 'She rides the fire horse through the market: this round, every Asset sells for $75M more' }),
   D('virtual', 'Virtual Mary', 'event', 0, { apparition: true, subtype: 'Ambiguity', text: 'She flickers on every screen: every player shuffles their hand into their deck and draws that many' }),
   // The feast day of the shrine's own saint: the whole table lights a candle.
   D('feast', 'The Feast of Perpetual Profit', 'event', 0, { text: 'Feast day: every player lights a candle' }),
@@ -305,14 +356,17 @@ export const DESIGN_TYPES = ["trader", "asset", "event", "hazard", "remedy", "ar
 export const designByKey = Object.fromEntries(DESIGNS.map((d) => [d.key, d]));
 
 // ── APPARITIONS AND MIRACLES (2026-11-20) ────────────────────────────────────
+// FOURTEEN, later the same day: The Votive, whose candle carries her icon (12,000 games: Devotion 48.2% to 49.2%, Octobot 55 to 52).
+// THIRTEEN since 2026-11-25: The Visitor (2026-11-23) was the twelfth, and The Motherboard, Our Lady drawn in its traces, is
+// the thirteenth (12,000 games each way: no change; the card is only in the General Shuffle). The note below is the first count.
 // Eleven cards carry Our Lady's image (`apparition: true`): The Holy Roller, The Fire Horse, The Virtual Mary,
-// Mardi Gras, The Rose, The Fountain, The Miracle Tortilla, The Tattoo, Ride or Die, the Dashboard Mary and,
+// Mardi Gras, The Rose, The Fountain, The Miracle Tortilla, The Tattoo, the Classic Car, Dashboard Mary and,
 // since 2026-11-21, The Mother Lode. (The Rose is reserved for the Lotería edition; when it leaves, ten.)
 // Whoever REVEALS one witnesses an apparition and takes a MIRACLE (an eight-pointed star; three at most):
 // the player who draws an apparition Event, or who plays any other apparition card from their hand.
 // A Miracle is spent to roll any one die of your own again. (The Dashboard Mary used to be that reroll,
 // once, as a Relic; now it is the tenth apparition.) The art's lit halos are keyed by face id in apparitions.js.
-export const APPARITION_KEYS = ["holyroller", "fuego", "virtual", "mardigras", "rose", "fountain", "tortilla", "tattoo", "rideordie", "dashboard", "mine", "visitor"];
+export const APPARITION_KEYS = ["holyroller", "fuego", "virtual", "mardigras", "rose", "fountain", "tortilla", "tattoo", "rideordie", "dashboard", "mine", "visitor", "motherboard", "cherub"];
 
 // ── EDITION (2026-11-19) ─────────────────────────────────────────────────────
 // The set prints in English. The lotería titles ("El Gato", `printName`) are
@@ -327,17 +381,27 @@ export const EDITION = "english";
 export const ENGLISH_TITLES = {
   // Traders. Five go by their character's name: Connor (the little devil), Saint GR80 (the monk), Virgil (the cat), Eugene (the unicorn), Marisol (the investigator).
   diablito: "Connor", monje: "Saint GR80", abuela: "The Gambler", unicornio: "Eugene",
-  gato: "Virgil", investigadora: "Marisol", prospector: "The Prospector",
+  gato: "Virgil", investigadora: "Marisol", prospector: "Brent Crude" /* the oil man, a wildcatter; The Prospector until 2026-11-26 */,
   general: "Byzantine General", bot: "The Octobot",
   // Assets
   gallo: "The Rooster", vaca: "The Cow", aguacate: "The Avocado", cava: "The Cellar", plata: "Quicksilver" /* mercury: element 80. Silver until 2026-11-23 */,
   // Artifacts, Graces and Events
   tortilla: "Miracle Tortilla", rosary: "The Rosary", enigma: "Enigma Machine", horchata: "Horchata",
   map: "Treasure Map", anima: "Purgatory", fuego: "Fire Horse", infierno: "The Inferno", ofrenda: "The Offering",
+  talisman: "Pocket Saint", // The Talisman, renamed on 2026-11-25 when its art arrived
   // Not yet printed
   limpia: "The Cleansing", lagrimas: "The Tears",
 };
 export const loteriaTitleOf = (d) => d.printName || d.name;
+// SYNERGY GLYPHS (2026-11-26): the mark of each Synergy that is not a Trader's own card (those show the Trader's portrait). SVG markup
+// for a viewBox of -10 -10 20 20, drawn in currentColor: an ingot for the Metals set, a picture frame for Collector, a stack of
+// coins for Income, a horseshoe for the track (Racehorse and Prediction Market). The card frame and the Playtest 3 table both read it.
+export const SYNERGY_GLYPHS = {
+  metals: '<polygon points="-8.5,5.5 -5.5,-4.5 5.5,-4.5 8.5,5.5" fill="currentColor"/><polygon points="-4.4,-2.6 4.4,-2.6 5.2,0.2 -5.2,0.2" fill="#1b1430" opacity=".3"/>',
+  collector: '<rect x="-7.2" y="-7.2" width="14.4" height="14.4" rx="1.2" fill="none" stroke="currentColor" stroke-width="2.8"/><rect x="-2.8" y="-2.8" width="5.6" height="5.6" fill="currentColor"/>',
+  income: '<ellipse cx="0" cy="5" rx="7.2" ry="2.9" fill="currentColor" stroke="#1b1430" stroke-width="1"/><ellipse cx="0" cy="0.4" rx="7.2" ry="2.9" fill="currentColor" stroke="#1b1430" stroke-width="1"/><ellipse cx="0" cy="-4.2" rx="7.2" ry="2.9" fill="currentColor" stroke="#1b1430" stroke-width="1"/>',
+  track: '<path d="M -5.6,7.2 L -5.6,-1 A 5.6,5.6 0 0 1 5.6,-1 L 5.6,7.2" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/>',
+};
 export const titleOf = (d) => (EDITION === "loteria" ? loteriaTitleOf(d) : ENGLISH_TITLES[d.key] || d.name);
 
 // The four that are cards of the traditional lotería deck itself (El Gallo, El

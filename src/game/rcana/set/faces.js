@@ -113,17 +113,18 @@ export const FACES = [
     flavor: "She appeared at breakfast. The spread closed by noon.",
     printed: {},
   },
-  {
-    id: "la-campana",
-    design: "bell",
-    gloss: "The Bell",
-    // PROVISIONAL number and rarity.
-    number: 17,
-    rarity: "Uncommon",
-    ability: "Clear Bear Market.",
-    flavor: "When it rings, the bear goes back to the hills.",
-    printed: {},
-  },
+  // The Bell left the set on 2026-11-26. Its face, kept:
+  // {
+  //   id: "la-campana",
+  //   design: "bell",
+  //   gloss: "The Bell",
+  //   // PROVISIONAL number and rarity.
+  //   number: 17,
+  //   rarity: "Uncommon",
+  //   ability: "Clear Bear Market.",
+  //   flavor: "When it rings, the bear goes back to the hills.",
+  //   printed: {},
+  // },
   {
     id: "rosario",
     design: "rosary",
@@ -240,16 +241,16 @@ export const FACES = [
     printed: {},
   },
   {
-    id: "el-gambusino",
-    design: "prospector", // prints as "El Gambusino" — the design's name
-    gloss: "The Prospector",
+    id: "brent-crude", // el-gambusino until 2026-11-26: the new art is the oil man, not the miner (the mine's art and folder are kept on file)
+    design: "prospector", // prints as "Brent Crude" (ENGLISH_TITLES) — El Gambusino is the design's name
+    gloss: "The Wildcatter", // Brent Crude, the oil man (The Prospector until 2026-11-26)
     // PROVISIONAL number and rarity.
     number: 27,
     rarity: "Uncommon",
     // The design's line is already a card's length; printed as is.
     ability: "Assets you buy cost 1 less.",
     // A Trader speaks; the quotation follows the rules and flourish.
-    flavor: "Gold's where you dig, not where they tell you.",
+    flavor: "Oil's where you drill, not where they tell you.", // gold and dig until 2026-11-26
     printed: {},
   },
   {
@@ -317,17 +318,18 @@ export const FACES = [
     flavor: "They are not making any more of it.",
     printed: {},
   },
-  {
-    id: "treasure-map",
-    design: "map", // prints as "El Mapa" — the design's printName
-    // PROVISIONAL number and rarity.
-    number: 33,
-    rarity: "Uncommon",
-    // A Relic: held, never sold. The box prints its cost (2).
-    ability: "X marks the spot:\nwhenever you sell an Asset,\ndraw a card.",
-    flavor: "Untold riches. Approximate directions.",
-    printed: {},
-  },
+  // Treasure Map left the set on 2026-11-26. Its face, kept:
+  // {
+  //   id: "treasure-map",
+  //   design: "map", // prints as "El Mapa" — the design's printName
+  //   // PROVISIONAL number and rarity.
+  //   number: 33,
+  //   rarity: "Uncommon",
+  //   // A Relic: held, never sold. The box prints its cost (2).
+  //   ability: "X marks the spot:\nwhenever you sell an Asset,\ndraw a card.",
+  //   flavor: "Untold riches. Approximate directions.",
+  //   printed: {},
+  // },
   {
     id: "oil-field",
     design: "oil", // prints as "Oil Field Claim" — the design's name
@@ -343,13 +345,13 @@ export const FACES = [
   },
   {
     id: "ride-or-die",
-    design: "rideordie", // prints as "Ride or Die" — the design's name (The Lowrider until 2026-11-21)
+    design: "rideordie", // prints as "Classic Car" — the design's name (Ride or Die until 2026-11-25; The Lowrider until 2026-11-21)
     // PROVISIONAL number and rarity.
     number: 35,
     rarity: "Rare",
     // An Asset since 2026-11-15: the boxes print value (100) and cost (3).
     // The caption painted on the car is the card's title now, so the rules line no longer opens with it.
-    ability: "Your Assets stay with you.\nThe Whale and The Wheel pass you by.",
+    ability: "Ride or die: your Assets stay with you.\nThe Whale and The Wheel pass you by.",
     flavor: "Nobody gets out of the car.",
     printed: {},
   },
@@ -450,16 +452,16 @@ export const FACES = [
   },
   {
     id: "yield-farm",
-    design: "jardin", // prints as "Yield Farm" — the design's name
+    design: "jardin", // prints as "Dividend Stock" — the design's name (Yield Farm until 2026-11-26; the id and art folder keep the old name)
     // PROVISIONAL number and rarity.
     number: 44,
     rarity: "Uncommon",
     // An Asset's line says what it sells for. The boxes print value (50)
     // and cost (4); the text carries the cash option, the yield and the
-    // catch — the design discards it when any Event fires on draw.
-    ability: "Sell for 2 coins, or bank 50 Prosperity.\nCollect 2 Liquidity a turn; an Event discards it.",
+    // catch (until 2026-11-26 an Event discarded it; Dividend Stock simply pays).
+    ability: "Collect 2 Liquidity at the start of your turn.",
     // An Asset narrates, so the flavor follows the rule unquoted.
-    flavor: "Fat harvests, right up until the weather turns.",
+    flavor: "It pays you to do nothing. Most people can't.", // DRAFT (2026-11-26)
     printed: {},
   },
   {
@@ -578,20 +580,21 @@ export const FACES = [
     flavor: "No one is left in the fire for good.",
     printed: {},
   },
-  {
-    id: "enigma-machine",
-    design: "enigma", // prints as "El Enigma" — the design's printName
-    gloss: "The Enigma",
-    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
-    number: 69,
-    rarity: "Common",
-    // A Relic equips; the printed line is the intercept, shorter than the
-    // design's simulator line.
-    ability: "Discard it when an Event fires on your draw:\nthat Event is cancelled for everyone.",
-    // A Relic narrates; the line follows the rule.
-    flavor: "Every message was read. Not one was received.",
-    printed: {},
-  },
+  // Enigma Machine left the set on 2026-11-26. Its face, kept:
+  // {
+  //   id: "enigma-machine",
+  //   design: "enigma", // prints as "El Enigma" — the design's printName
+  //   gloss: "The Enigma",
+  //   // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+  //   number: 69,
+  //   rarity: "Common",
+  //   // A Relic equips; the printed line is the intercept, shorter than the
+  //   // design's simulator line.
+  //   ability: "Discard it when an Event fires on your draw:\nthat Event is cancelled for everyone.",
+  //   // A Relic narrates; the line follows the rule.
+  //   flavor: "Every message was read. Not one was received.",
+  //   printed: {},
+  // },
   {
     id: "byzantine-general",
     design: "general", // prints as "El General" — the design's printName
@@ -816,19 +819,20 @@ export const FACES = [
   //   flavor: "She read the fine print. There was no rug.",
   //   printed: {},
   // },
-  {
-    id: "sacred-geometry",
-    design: "geometry", // prints as "Sacred Geometry" — the design's name
-    // Number per set/numbers.js; rarity PROVISIONAL. The first card with LIVE 3D art
-    // (art/sacred-geometry.js: live3d).
-    number: 72,
-    rarity: "Rare",
-    // A Relic equips; the printed line is the design's bonus on called Events.
-    ability: "Everything aligns:\nyour called Events bank 25 more.",
-    // A Relic narrates; the line follows the rule.
-    flavor: "Look long enough and the lines agree.",
-    printed: {},
-  },
+  // Sacred Geom8ry left the set on 2026-11-26. Its face, kept:
+  // {
+  //   id: "sacred-geometry",
+  //   design: "geometry", // prints as "Sacred Geometry" — the design's name
+  //   // Number per set/numbers.js; rarity PROVISIONAL. The first card with LIVE 3D art
+  //   // (art/sacred-geometry.js: live3d).
+  //   number: 72,
+  //   rarity: "Rare",
+  //   // A Relic equips; the printed line is the design's bonus on called Events.
+  //   ability: "Everything aligns:\nyour called Events bank 25 more.",
+  //   // A Relic narrates; the line follows the rule.
+  //   flavor: "Look long enough and the lines agree.",
+  //   printed: {},
+  // },
   {
     id: "the-singular80",
     design: "singular", // prints as "The Singular80" — the design's name
@@ -868,19 +872,20 @@ export const FACES = [
     flavor: "Insert coin. Absolution while you wait.",
     printed: {},
   },
-  {
-    id: "the-mission",
-    design: "mission", // prints as "The Mission" — the design's name
-    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
-    number: 77,
-    rarity: "Uncommon",
-    // The second printed Location: it builds, then pays alms to whoever is behind.
-    // The design's line is a simulator's; the face keeps the test and the sum.
-    ability: "Start your turn with less cash than\nevery rival, and collect $20M.",
-    // A Location narrates; the line follows the rule.
-    flavor: "Whoever has least is served first.",
-    printed: {},
-  },
+  // The Mission left the set on 2026-11-26. Its face, kept:
+  // {
+  //   id: "the-mission",
+  //   design: "mission", // prints as "The Mission" — the design's name
+  //   // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+  //   number: 77,
+  //   rarity: "Uncommon",
+  //   // The second printed Location: it builds, then pays alms to whoever is behind.
+  //   // The design's line is a simulator's; the face keeps the test and the sum.
+  //   ability: "Start your turn with less cash than\nevery rival, and collect $20M.",
+  //   // A Location narrates; the line follows the rule.
+  //   flavor: "Whoever has least is served first.",
+  //   printed: {},
+  // },
   {
     id: "nativity-scene",
     design: "nacimiento", // prints as "The Nativity" — the design's name
@@ -919,29 +924,31 @@ export const FACES = [
     flavor: "Fresh off the press. The trouble is papered over.",
     printed: {},
   },
-  {
-    id: "diamond-hands",
-    design: "diamond", // prints as "Diamond Hands" — the design's name (a market name, no lotería title)
-    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
-    number: 82,
-    rarity: "Uncommon",
-    // A Relic equips; the printed line is the design's bonus and its ward.
-    ability: "Assets held three rounds or more sell for $25M\nmore. Paper Hands cannot be played on you.",
-    // A Relic narrates; the line follows the rule.
-    flavor: "Hold. The pressure is what makes them.",
-    printed: {},
-  },
-  {
-    id: "paper-hands",
-    design: "paperhands", // prints as "Paper Hands" — the design's name (a market name, no lotería title)
-    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
-    number: 60,
-    rarity: "Uncommon",
-    // A Calamity narrates (the line follows the rule).
-    ability: "Each turn the target sells the Asset\nthey bought last, for its cash price.",
-    flavor: "They fold at the first gust.",
-    printed: {},
-  },
+  // Diamond Hands left the set on 2026-11-26. Its face, kept:
+  // {
+  //   id: "diamond-hands",
+  //   design: "diamond", // prints as "Diamond Hands" — the design's name (a market name, no lotería title)
+  //   // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+  //   number: 82,
+  //   rarity: "Uncommon",
+  //   // A Relic equips; the printed line is the design's bonus and its ward.
+  //   ability: "Assets held three rounds or more sell for $25M\nmore. Paper Hands cannot be played on you.",
+  //   // A Relic narrates; the line follows the rule.
+  //   flavor: "Hold. The pressure is what makes them.",
+  //   printed: {},
+  // },
+  // Paper Hands left the set on 2026-11-26. Its face, kept:
+  // {
+  //   id: "paper-hands",
+  //   design: "paperhands", // prints as "Paper Hands" — the design's name (a market name, no lotería title)
+  //   // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+  //   number: 60,
+  //   rarity: "Uncommon",
+  //   // A Calamity narrates (the line follows the rule).
+  //   ability: "Each turn the target sells the Asset\nthey bought last, for its cash price.",
+  //   flavor: "They fold at the first gust.",
+  //   printed: {},
+  // },
   {
     id: "the-inferno",
     design: "infierno", // prints as "The Inferno" — ENGLISH_TITLES (the design is El Infierno)
@@ -1145,6 +1152,200 @@ export const FACES = [
     ability: "A shield, not a cure: discard it\nto cancel a Calamity as it lands.",
     // A Relic narrates; the line follows the rule. DRAFT.
     flavor: "It burns. It has always burned.",
+    printed: {},
+  },
+  {
+    id: "chart-cathedral",
+    design: "catedral", // prints as "The Chart Cathedral" — the design's name (La Catedral in the lotería edition)
+    gloss: "The Chart Cathedral",
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 4,
+    rarity: "Uncommon",
+    // FULL ART (art/chart-cathedral.js: fullArt). A Location builds, then pays on every candle at the table
+    // (pt3-sim: bank 25, anyone's candle). DRAFT line.
+    ability: "Green candles: whenever any player\nlights a candle, collect $25M.",
+    // A Location narrates; the line follows the rule. DRAFT.
+    flavor: "Every window is a chart. Every chart, a prayer.",
+    printed: {},
+  },
+  {
+    id: "rewind",
+    design: "rewind", // prints as "Rewind" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 86,
+    rarity: "Uncommon",
+    // A Remedy; the line is the design's: the last card you discarded comes back to your hand
+    // (not an Event that fired on the draw, not another Rewind). DRAFT line.
+    ability: "Take the last card you discarded\nback into your hand.",
+    // A Remedy narrates; the line follows the rule. DRAFT.
+    flavor: "Be kind. Rewind.",
+    printed: {},
+  },
+  {
+    id: "motherboard",
+    design: "motherboard", // prints as "The Motherboard" — the design's name (La Placa Madre in the lotería edition)
+    gloss: "The Motherboard",
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 5,
+    rarity: "Uncommon",
+    // A Relic equips, and an apparition (art/motherboard.js: rainbow by default). The line is the design's:
+    // the board takes no slot and opens a third. DRAFT line.
+    ability: "Expansion slots: takes no Relic slot,\nand you may hold a third Relic.",
+    // A Relic narrates; the line follows the rule. DRAFT.
+    flavor: "She was always in the machine.",
+    printed: {},
+  },
+  {
+    id: "the-sell-off",
+    design: "unlock", // prints as "The Sell-Off" — the design's name (Token Unlock until 2026-11-26; the id and art folder were renamed the-sell-off the same day)
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 10,
+    rarity: "Uncommon",
+    // A Fate, and a market card: the frame prints TRINITY_TEXT.unlock (set/trinity.js) over this line, so the
+    // two are kept the same. DRAFT line.
+    ability: "Everyone heads for the exit. A bear market: this\nround, every Asset sells for $50M less.",
+    // A Fate narrates; the line follows the rule. DRAFT.
+    flavor: "The door is the same size it always was.",
+    printed: {},
+  },
+  {
+    id: "pocket-saint",
+    design: "talisman", // prints as "Pocket Saint" (ENGLISH_TITLES) — The Talisman until 2026-11-25
+    gloss: "Pocket Saint",
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 63,
+    rarity: "Uncommon",
+    // A Relic equips; the line is the design's: wards the three frauds and lends a point of Pathos. DRAFT line.
+    ability: "Rug Pull, Quantum Hack and Exit Scam\ncannot touch you. One more Pathos.",
+    // A Relic narrates; the line follows the rule. DRAFT.
+    flavor: "The other kind of pocket protector.",
+    printed: {},
+  },
+  {
+    id: "moral-hazard",
+    design: "moralhazard", // prints as "Moral Hazard" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 59,
+    rarity: "Uncommon",
+    // An Ambiguity; the line is the design's: the bailout, 5 and 2 in money (MONEY_UNIT 10). DRAFT line.
+    ability: "The bailout: the poorest player collects\n$50M; the richest loses $20M.",
+    // An Ambiguity narrates; the line follows the rule. DRAFT.
+    flavor: "Someone always catches him. That is the problem.",
+    printed: {},
+  },
+  {
+    id: "airdrop",
+    design: "moneda", // prints as "The Airdrop" — the design's name (La Moneda in the lotería edition)
+    gloss: "The Airdrop",
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 50,
+    rarity: "Uncommon",
+    // A Fate; the line is the design's: 2 Liquidity, in money (MONEY_UNIT 10), to every player who holds an Asset. DRAFT line.
+    ability: "Every player holding an Asset\ncollects $20M.",
+    // A Fate narrates; the line follows the rule. DRAFT.
+    flavor: "Nobody asks who packed the chutes.",
+    printed: {},
+  },
+  {
+    id: "the-short",
+    design: "short", // prints as "The Short" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Uncommon until tiers are set).
+    number: 42,
+    rarity: "Uncommon",
+    // An Event that stays on a rival's Asset; the line is the design's, shortened for the frame. DRAFT line.
+    ability: "Pin to a rival's Asset. When it goes,\ncollect $100M; a bull market voids it.",
+    // An Event narrates; the line follows the rule. DRAFT.
+    flavor: "Caught short, and hung out to dry.",
+    printed: {},
+  },
+  {
+    id: "garth-raider",
+    design: "garth", // prints as "Garth Raider" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set, like the other Traders).
+    number: 82,
+    rarity: "Common",
+    // Avarice: the line is the design's. DRAFT line.
+    ability: "In a bear market, your Assets sell\nfor more instead of less.",
+    // A Trader speaks; the quotation follows the rules and flourish. DRAFT.
+    flavor: "Fear is a discount. I buy it.",
+    printed: {},
+  },
+  {
+    id: "gold-bar",
+    design: "goldbar", // prints as "Gold Bar" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 17,
+    rarity: "Common",
+    // An Asset's line says what it sells for; the boxes print value (100) and cost (4). The text carries
+    // the safe haven (design: haven). DRAFT line.
+    ability: "Safe haven: a bear market raises\nits price instead of lowering it.",
+    // An Asset narrates, so the flavor follows the rule unquoted. DRAFT.
+    flavor: "Heavy, dull, and never once sorry.",
+    printed: {},
+  },
+  {
+    id: "racehorse",
+    design: "racehorse", // prints as "Racehorse" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 77,
+    rarity: "Common",
+    // An Asset's line says what it sells for; the boxes print value (350) and cost (3). The text carries
+    // the cash option and the gamble (design: gambleOn 6, a 7 or 8 wins). DRAFT line.
+    ability: "Sell her for $30M, or race her:\na 7 or 8 wins $350M, else nothing.",
+    // An Asset narrates, so the flavor follows the rule unquoted. DRAFT.
+    flavor: "Bred to run. Fed on hope.",
+    printed: {},
+  },
+  {
+    id: "fine-art",
+    design: "fineart", // prints as "Fine Art" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 72,
+    rarity: "Common",
+    // An Asset's line says what it sells for; the boxes print value (300) and cost (5). The text carries
+    // the one condition (design: bullOnly). DRAFT line.
+    ability: "Priceless until someone is buying:\nit can only be sold in a bull market.",
+    // An Asset narrates, so the flavor follows the rule unquoted. DRAFT.
+    flavor: "Worth whatever the last fool paid.",
+    printed: {},
+  },
+  {
+    id: "junk-bond",
+    design: "junk", // prints as "Junk Bond" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 60,
+    rarity: "Common",
+    // An Asset's line says what it pays; the boxes print value (25) and cost (2). The text carries the
+    // income and the default (design: income 2, junk 1), shortened for the frame. DRAFT line.
+    ability: "Each turn, roll: a 1 defaults it\n(discard). Otherwise, collect $20M.",
+    // An Asset narrates, so the flavor follows the rule unquoted. DRAFT.
+    flavor: "High yield. Higher regret.",
+    printed: {},
+  },
+  {
+    id: "index-fund",
+    design: "index", // prints as "Index Fund" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 33,
+    rarity: "Common",
+    // An Asset's line says what it sells for; the boxes print value (75) and cost (3). The text carries
+    // the one protection (design: diversified). DRAFT line.
+    ability: "Diversified: Rug Pull and Tech Rekt\ncannot take it.",
+    // An Asset narrates, so the flavor follows the rule unquoted. DRAFT.
+    flavor: "A little of everything, and nothing to brag about.",
+    printed: {},
+  },
+  {
+    id: "porkbellies",
+    design: "porkbellies", // prints as "Pork Bellies" — the design's name
+    // Number per set/numbers.js; rarity PROVISIONAL (Common until tiers are set).
+    number: 69,
+    rarity: "Common",
+    // An Asset's line says what it sells for; the boxes print value (50) and cost (2). The text carries
+    // the ripening (design: ripe), shortened for the frame. DRAFT line.
+    ability: "Futures: $150M on the second round\nyou hold them. $50M before; less after.",
+    // An Asset narrates, so the flavor follows the rule unquoted. DRAFT.
+    flavor: "Fresh is a window, not a promise.",
     printed: {},
   },
 ];

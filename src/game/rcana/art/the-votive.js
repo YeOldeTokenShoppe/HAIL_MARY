@@ -8,6 +8,10 @@
 import { ART_PLANES } from "../artSpec.js";
 
 export default {
+  // Rainbow foil by default (2026-11-25), like the other apparitions: the
+  // candle carries her icon, and the card is the fourteenth apparition.
+  metalFrame: "rainbow",
+
   // No `frame`: the plate follows the card's type.
 
   // The wall's teal, for the sliver past the scene's edge on tilt.
